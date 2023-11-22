@@ -1,14 +1,14 @@
 #!/bin/bash
-source /intel-extension-for-transformers/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/script/change_color.sh
 
 pip install clang-format==14.0.0
-log_dir=/intel-extension-for-transformers/.github/workflows/script/formatScan
+log_dir=/neural-speed/.github/workflows/script/formatScan
 log_path=${log_dir}/clangformat.log
 
-cd /intel-extension-for-transformers
+cd /neural-speed
 git config --global --add safe.directory "*"
 
-cd /intel-extension-for-transformers/intel_extension_for_transformers/llm/runtime/graph
+cd /neural-speed/neural_speed
 python scripts/clang-format.py
 
 echo "run git diff"

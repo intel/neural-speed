@@ -1,8 +1,8 @@
 #!/bin/bash
-source /intel-extension-for-transformers/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/script/change_color.sh
 pip install bandit==1.7.4
-log_dir=/intel-extension-for-transformers/.github/workflows/script/formatScan
-python -m bandit -r -lll -iii /intel-extension-for-transformers >${log_dir}/bandit.log
+log_dir=/neural-speed/.github/workflows/script/formatScan
+python -m bandit -r -lll -iii /neural-speed >${log_dir}/bandit.log
 exit_code=$?
 
 $BOLD_YELLOW && echo " -----------------  Current log file output start --------------------------"

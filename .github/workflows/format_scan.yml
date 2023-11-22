@@ -4,9 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - intel_extension_for_transformers/**
-      - neural_chat/**
-      - workflows/**
+      - neural_speed/**
       - setup.py
       - .github/workflows/format_scan.yml
       - .github/workflows/script/formatScan/**
@@ -26,7 +24,7 @@ env:
 
 jobs:
   format-scan:
-    runs-on: itrex-node-spell
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         job_name: [
@@ -46,7 +44,7 @@ jobs:
           if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}-${{ runner.name }}'$) ]]; then
               docker start ${{ env.CONTAINER_NAME }}-${{ runner.name }}
               echo "remove left files through container ..."
-              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /intel-extension-for-transformers && rm -fr /intel-extension-for-transformers/* && rm -fr /intel-extension-for-transformers/.* || true"
+              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /neural-speed && rm -fr /neural-speed/* && rm -fr /neural-speed/.* || true"
           fi
 
       - name: Checkout out Repo
@@ -63,18 +61,18 @@ jobs:
             docker rm -vf ${{ env.CONTAINER_NAME }}-${{ runner.name }} || true
           fi
           docker run -dit --memory="4g" --memory-reservation="1g" --disable-content-trust --privileged --name=${{ env.CONTAINER_NAME }}-${{ runner.name }} --shm-size="1g" \
-          -v ${{ github.workspace }}:/intel-extension-for-transformers \
+          -v ${{ github.workspace }}:/neural-speed \
           ${{ env.REPO_NAME }}:${{ env.REPO_TAG }}
 
       - name: Env build
         run: |
           docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash /intel-extension-for-transformers/.github/workflows/script/prepare_env.sh
+          bash /neural-speed/.github/workflows/script/prepare_env.sh
 
       - name: Code scan check
         run: |
           docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash -c "bash /intel-extension-for-transformers/.github/workflows/script/formatScan/${{ matrix.job_name }}.sh"
+          bash -c "bash /neural-speed/.github/workflows/script/formatScan/${{ matrix.job_name }}.sh"
 
       - name: Publish pipeline artifact
         if: ${{ !cancelled() }}

@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - intel_extension_for_transformers/**
+      - neural_speed/**
       - setup.py
       - .github/workflows/format_scan.yml
   workflow_dispatch:
@@ -20,7 +20,7 @@ env:
 
 jobs:
   format-scan:
-    runs-on: itrex-node-spell
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         job_name: ["copyright"]
@@ -32,7 +32,7 @@ jobs:
           if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}-${{ runner.name }}'$) ]]; then
               docker start ${{ env.CONTAINER_NAME }}-${{ runner.name }}
               echo "remove left files through container ..."
-              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /intel-extension-for-transformers && rm -fr /intel-extension-for-transformers/* && rm -fr /intel-extension-for-transformers/.* || true"
+              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /neural-speed && rm -fr /neural-speed/* && rm -fr /neural-speed/.* || true"
           fi
           
       - name: Checkout out Repo
@@ -45,7 +45,7 @@ jobs:
           mkdir -p ${{ env.CODE_SCAN_LOG_PATH }}
           supported_extensions=(py, sh, yaml)
           git fetch
-          git --no-pager diff --name-only remotes/origin/${{ github.base_ref }} ${{ github.workspace }}/intel_extension_for_transformers> ${{ env.CODE_SCAN_LOG_PATH }}/diff.log
+          git --no-pager diff --name-only remotes/origin/${{ github.base_ref }} ${{ github.workspace }}/neural_speed> ${{ env.CODE_SCAN_LOG_PATH }}/diff.log
           files=$(cat ${{ env.CODE_SCAN_LOG_PATH }}/diff.log | awk '!a[$0]++')
           $LIGHT_PURPLE && echo " ----------------- checking ... --------------------------" && $RESET
           if [[ -f ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log ]]; then 

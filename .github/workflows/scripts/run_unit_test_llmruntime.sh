@@ -1,9 +1,9 @@
 #!/bin/bash
-source /intel-extension-for-transformers/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/script/change_color.sh
 test_install_backend="true"
-LOG_DIR=/intel-extension-for-transformers/log_dir
+LOG_DIR=/neural-speed/log_dir
 mkdir -p ${LOG_DIR}
-WORKING_DIR="/intel-extension-for-transformers/intel_extension_for_transformers/llm/runtime/graph"
+WORKING_DIR="/neural-speed"
 
 # -------------------LLM Runtime Test-------------------
 function llmruntime_test() {

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-source /intel-extension-for-transformers/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/script/change_color.sh
 
-REPO_DIR=/intel-extension-for-transformers
-log_dir=/intel-extension-for-transformers/.github/workflows/script/formatScan
+REPO_DIR=/neural-speed
+log_dir=/neural-speed/.github/workflows/script/formatScan
 pydocstyle --convention=google ${REPO_DIR} >${log_dir}/pydocstyle.log
 exit_code=$?
 

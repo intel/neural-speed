@@ -1,5 +1,5 @@
 #!/bin/bash
-WORKING_PATH="/intel-extension-for-transformers"
+WORKING_PATH="/neural-speed"
 for var in "$@"
 do
     case $var in

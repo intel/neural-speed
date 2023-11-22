@@ -1,4 +1,4 @@
-cd /intel-extension-for-transformers
+cd /neural-speed
 
 pip install -U pip
 
