@@ -26,14 +26,6 @@ jobs:
         job_name: ["copyright"]
       fail-fast: false
     steps:
-      - name: Docker Clean Up
-        run: |
-          docker ps -a
-          if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}-${{ runner.name }}'$) ]]; then
-              docker start ${{ env.CONTAINER_NAME }}-${{ runner.name }}
-              echo "remove left files through container ..."
-              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /neural-speed && rm -fr /neural-speed/* && rm -fr /neural-speed/.* || true"
-          fi
           
       - name: Checkout out Repo
         uses: actions/checkout@v3
