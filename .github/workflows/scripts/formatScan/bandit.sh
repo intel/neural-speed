@@ -1,7 +1,7 @@
 #!/bin/bash
-source /neural-speed/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 pip install bandit==1.7.4
-log_dir=/neural-speed/.github/workflows/script/formatScan
+log_dir=/neural-speed/.github/workflows/scripts/formatScan
 python -m bandit -r -lll -iii /neural-speed >${log_dir}/bandit.log
 exit_code=$?
 

@@ -1,8 +1,8 @@
 #!/bin/bash
-source /neural-speed/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 
 pip install clang-format==14.0.0
-log_dir=/neural-speed/.github/workflows/script/formatScan
+log_dir=/neural-speed/.github/workflows/scripts/formatScan
 log_path=${log_dir}/clangformat.log
 
 cd /neural-speed

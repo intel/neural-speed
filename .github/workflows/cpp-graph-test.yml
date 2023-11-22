@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
        - '.github/workflows/cpp-graph-test.yml'
-       - '.github/workflows/script/models/cpp_graph_inference.sh'
+       - '.github/workflows/scripts/models/cpp_graph_inference.sh'
        - 'neural_speed/**'
        - 'bestla/**'
   workflow_dispatch:
@@ -32,8 +32,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OUT_SCRIPT_PATH: ${{ github.workspace }}/.github/workflows/script/models
-  SCRIPT_PATH: ${{ github.workspace }}/.github/workflows/script
+  OUT_SCRIPT_PATH: ${{ github.workspace }}/.github/workflows/scripts/models
+  SCRIPT_PATH: ${{ github.workspace }}/.github/workflows/scripts
   WORKING_DIR: ${{ github.workspace }}
   CONTAINER_NAME: "codeScan"
   INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '13.1.0' }}
@@ -53,7 +53,7 @@ jobs:
 
       - name: Env build
         run: |
-          bash ${{ github.workspace }}/.github/workflows/script/prepare_env_with_conda.sh "cpp-graph-test" "3.8"
+          bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "cpp-graph-test" "3.8"
 
       - name: Binary build
         if: 0 == 1
@@ -68,7 +68,7 @@ jobs:
 
       - name: BF16 Benchmark
         run: |
-          cd ${{ github.workspace }}/.github/workflows/script/models
+          cd ${{ github.workspace }}/.github/workflows/scripts/models
           bash cpp_graph_inference.sh cpp-graph-test ${{ matrix.modelName }} ${{ env.INPUT_COMPILER_VERSION }}
       
       - name: Rename summary

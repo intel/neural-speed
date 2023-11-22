@@ -139,7 +139,7 @@ function main() {
                         $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c ${ctx} -n ${output} -m ${model}-${precision}.bin -p "$prompt" 2>&1 | tee ${WORKING_DIR}/${logs_file} || true &
                     minitor
 
-                    python ${WORKING_DIR}/.github/workflows/script/models/calculate_percentage.py ${WORKING_DIR}/${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
+                    python ${WORKING_DIR}/.github/workflows/scripts/models/calculate_percentage.py ${WORKING_DIR}/${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
                 done
             done
         done

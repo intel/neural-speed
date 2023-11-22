@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /neural-speed/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 cd /neural-speed
 $BOLD_YELLOW && echo "---------------- git submodule update --init --recursive -------------" && $RESET
 git config --global --add safe.directory "*"
@@ -12,7 +12,7 @@ pip list
 
 
 cd /neural-speed
-log_dir=/neural-speed/.github/workflows/script/formatScan
+log_dir=/neural-speed/.github/workflows/scripts/formatScan
 if [ -f "requirements.txt" ]; then
     python -m pip install --default-timeout=100 -r requirements.txt
     pip list

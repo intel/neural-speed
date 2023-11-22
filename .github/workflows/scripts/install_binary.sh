@@ -1,5 +1,5 @@
 #!/bin/bash
-source /intel-extension-for-transformers/.github/workflows/script/change_color.sh
+source /intel-extension-for-transformers/.github/workflows/scripts/change_color.sh
 
 cd /intel-extension-for-transformers
 export CMAKE_ARGS="-DNE_DNNL_CACHE_DIR=/cache"

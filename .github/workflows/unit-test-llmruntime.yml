@@ -7,7 +7,7 @@ on:
       - neural_speed/**
       - tests/**
       - .github/workflows/unit-test-llmruntime.yml
-      - .github/workflows/script/unitTest/**
+      - .github/workflows/scripts/unitTest/**
   workflow_dispatch:
 
 # If there is a new commit, the previous jobs will be canceled
@@ -71,18 +71,18 @@ jobs:
       - name: Env build
         run: |
           docker exec ${{ env.CONTAINER_NAME }} \
-          bash /neural-speed/.github/workflows/script/prepare_env.sh
+          bash /neural-speed/.github/workflows/scripts/prepare_env.sh
 
       - name: Binary build
         run: |
           docker exec ${{ env.CONTAINER_NAME }} \
-          bash -c "cd /neural-speed/.github/workflows/script \
+          bash -c "cd /neural-speed/.github/workflows/scripts \
           && bash install_binary.sh"
 
       - name: Run UT
         run: |
           docker exec ${{ env.CONTAINER_NAME }} \
-          bash -c "cd /neural-speed/.github/workflows/script/unitTest \
+          bash -c "cd /neural-speed/.github/workflows/scripts/unitTest \
           && bash run_unit_test_llmruntime.sh"
 
       - name: Publish pipeline artifact

@@ -7,7 +7,7 @@ on:
       - neural_speed/**
       - setup.py
       - .github/workflows/format_scan.yml
-      - .github/workflows/script/formatScan/**
+      - .github/workflows/scripts/formatScan/**
   workflow_dispatch:
 
 # If there is a new commit, the previous jobs will be canceled
@@ -67,16 +67,16 @@ jobs:
       - name: Env build
         run: |
           docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash /neural-speed/.github/workflows/script/prepare_env.sh
+          bash /neural-speed/.github/workflows/scripts/prepare_env.sh
 
       - name: Code scan check
         run: |
           docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash -c "bash /neural-speed/.github/workflows/script/formatScan/${{ matrix.job_name }}.sh"
+          bash -c "bash /neural-speed/.github/workflows/scripts/formatScan/${{ matrix.job_name }}.sh"
 
       - name: Publish pipeline artifact
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.job_name }}
-          path: ${{ github.workspace }}/.github/workflows/script/formatScan/${{ matrix.job_name }}.*
+          path: ${{ github.workspace }}/.github/workflows/scripts/formatScan/${{ matrix.job_name }}.*

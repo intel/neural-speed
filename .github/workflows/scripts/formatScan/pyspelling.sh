@@ -8,8 +8,8 @@ do
     esac
 done
 
-log_dir=${WORKING_PATH}/.github/workflows/script/formatScan
-VAL_REPO=${WORKING_PATH}/.github/workflows/script/formatScan
+log_dir=${WORKING_PATH}/.github/workflows/scripts/formatScan
+VAL_REPO=${WORKING_PATH}/.github/workflows/scripts/formatScan
 REPO_DIR=${WORKING_PATH}
 
 sed -i "s|\${VAL_REPO}|$VAL_REPO|g" ${VAL_REPO}/pyspelling_conf.yaml

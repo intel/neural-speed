@@ -32,7 +32,7 @@ jobs:
 
       - name: CopyRight check
         run: |
-          source ${{ github.workspace }}/.github/workflows/script/change_color.sh
+          source ${{ github.workspace }}/.github/workflows/scripts/change_color.sh
           set -e
           mkdir -p ${{ env.CODE_SCAN_LOG_PATH }}
           supported_extensions=(py, sh, yaml)

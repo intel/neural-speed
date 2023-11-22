@@ -1,5 +1,5 @@
 #!/bin/bash
-source /neural-speed/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 test_install_backend="true"
 LOG_DIR=/neural-speed/log_dir
 mkdir -p ${LOG_DIR}

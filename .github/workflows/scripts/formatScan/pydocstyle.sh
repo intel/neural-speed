@@ -1,9 +1,9 @@
 #!/bin/bash
 
-source /neural-speed/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 
 REPO_DIR=/neural-speed
-log_dir=/neural-speed/.github/workflows/script/formatScan
+log_dir=/neural-speed/.github/workflows/scripts/formatScan
 pydocstyle --convention=google ${REPO_DIR} >${log_dir}/pydocstyle.log
 exit_code=$?
 
