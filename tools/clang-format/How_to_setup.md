@@ -20,12 +20,12 @@ Make sure you've install clang-format and put the executable in the **PATH**
 
 The `pre-commit` should be found in `.git/hooks/pre-commit`, if we don't have such a file in that folder, it means you didn't configure any pre-commit action before, please create one.
 
-Copy the content of `$REPO_ROOT/hooks/clang-format.hook` and paste it into **file** .`git/hooks/pre-commit`.
+Copy the content of `$REPO_ROOT/tools/clang-format/clang-format.hook` and paste it into **file** .`git/hooks/pre-commit`.
 
 If you are using linux, also add the execution permission to the file
 
 ```
-cp hooks/clang-fomat.hook .git/hooks/pre-commit
+cp $REPO_ROOT/tools/clang-format/clang-format.hook .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
 
