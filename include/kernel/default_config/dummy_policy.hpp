@@ -31,8 +31,6 @@ struct dummy_optimizer : param_optimizer_base {
         template <auto key_, typename T, typename U>
         struct param_distance_eval_fcn<key_, T, U, eval_tag::TYPE> {
             static constexpr int value = []() constexpr {
-                using T_L = typename T::template find_elem_t<key_>::type;
-                using T_R = typename U::template find_elem_t<key_>::type;
                 return (std::is_same<T, U>::value) ? 0 : 1;
             }
             ();

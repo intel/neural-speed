@@ -41,7 +41,6 @@ template <typename data_type_in, typename data_type_coff_in,
 int bwd_reduction_result_validate(data_type_in *in_ptr,
         data_type_coff_in *coff_in_ptr, data_type_out *out_ptr, int m, int n,
         data_type_acc sqrt_dk_inv) {
-    int err_cnt = 0;
     buff_cmp::buff_vals<data_type_out> softmax_gpu(out_ptr, m, n, n);
     std::vector<data_type_acc> softmax_acc(m * n, 0);
     std::vector<data_type_acc> softmax_max(m, 0);
@@ -76,7 +75,6 @@ int bwd_reduction_result_validate(data_type_in *in_ptr,
 template <typename data_type_in, typename data_type_out, typename data_type_acc>
 int fwd_reduction_result_validate(data_type_in *in_ptr, data_type_out *out_ptr,
         int m, int n, data_type_acc sqrt_dk_inv) {
-    int err_cnt = 0;
     buff_cmp::buff_vals<data_type_out> softmax_gpu(out_ptr, m, n, n);
     std::vector<data_type_acc> softmax_acc(m * n, 0);
     std::vector<data_type_acc> softmax_max(m, 0);

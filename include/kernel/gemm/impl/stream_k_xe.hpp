@@ -149,16 +149,16 @@ public:
             : matrix_m(matrix_m_)
             , matrix_k(matrix_k_)
             , matrix_n(matrix_n_)
-            , matA_base(matA_base_)
             , matA_ld(matA_ld_)
-            , matB_base(matB_base_)
             , matB_ld(matB_ld_)
-            , matC_base(matC_base_)
             , matC_ld(matC_ld_)
-            , matD_base(matD_base_)
             , matD_ld(matD_ld_)
-            , matatomic_sync_base(matatomic_sync_base_)
             , matatomic_sync_ld(matatomic_sync_ld_)
+            , matA_base(matA_base_)
+            , matB_base(matB_base_)
+            , matC_base(matC_base_)
+            , matD_base(matD_base_)
+            , matatomic_sync_base(matatomic_sync_base_)
             , stream_k_args(stream_k_args_)
             , epilogue_args(epilogue_args_) {}
         // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
@@ -168,16 +168,16 @@ public:
             : matrix_m(args.matrix_m)
             , matrix_k(args.matrix_k)
             , matrix_n(args.matrix_n)
-            , matA_base(args.matA_base)
             , matA_ld(args.matA_ld)
-            , matB_base(args.matB_base)
             , matB_ld(args.matB_ld)
-            , matC_base(args.matC_base)
             , matC_ld(args.matC_ld)
-            , matD_base(args.matD_base)
             , matD_ld(args.matD_ld)
-            , matatomic_sync_base(args.matatomic_sync_base)
             , matatomic_sync_ld(args.matatomic_sync_ld)
+            , matA_base(args.matA_base)
+            , matB_base(args.matB_base)
+            , matC_base(args.matC_base)
+            , matD_base(args.matD_base)
+            , matatomic_sync_base(args.matatomic_sync_base)
             , stream_k_args(args.stream_k_args)
             , epilogue_args(args.epilogue_args) {}
         inline arguments_t &operator=(const arguments_t &args) {
@@ -357,7 +357,8 @@ protected:
 
     __XETLA_API static void init_sk_tile_work(TileWorkDesc &tile_work,
             int tile_idx, int group_iter_begin, int group_iter_end,
-            int matrix_k, int iters_per_tile, uint32_t stride_k) {
+            int matrix_k, int iters_per_tile,
+            [[maybe_unused]] uint32_t stride_k) {
 
         //The first global-scoped MAC iteration for this tile
         int tile_iter_begin = tile_idx * iters_per_tile;
@@ -467,7 +468,7 @@ public:
 
                 int first_group_idx = workgroup_mapping.get_first_group_idx(
                         tile_idx, group_idx);
-                bool tile_finished = (tile_work.k_end == args.matrix_k);
+                bool tile_finished = (boundary_k == args.matrix_k);
                 bool tile_started = (tile_work.k_begin == 0);
 
                 // set up arguments

@@ -217,7 +217,6 @@ void stream_k_gemm_run(uint32_t iter) {
     uint32_t size_a = matrix_m * matrix_k;
     uint32_t size_b = matrix_k * matrix_n;
     uint32_t size_c = matrix_m * matrix_n;
-    uint32_t atomic_flag_space = 1024;
     uint32_t size_bias = matrix_n;
 
     using data_type_a = typename Test::data_type_a;

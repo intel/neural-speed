@@ -274,7 +274,7 @@ public:
     /// @param slm_base Is the slm base address.
     /// @param nbarrier_base Is the named barrier base.
     __XETLA_API KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
-            arguments_t args, uint32_t slm_base = 0,
+            arguments_t args, [[maybe_unused]] uint32_t slm_base = 0,
             uint32_t nbarrier_base = 0) {
         int32_t sg_idx = g.get_id() % wg_size_x;
         int32_t sg_idy = g.get_id() / wg_size_x;
@@ -295,7 +295,7 @@ public:
         nbarrier_b.init_nbarrier(sg_idx + barrier_count_y + nbarrier_base,
                 nbarrier_role::producer_consumer);
 #pragma unroll
-        for (int i = 0; i < stages; i++) {
+        for (uint32_t i = 0; i < stages; i++) {
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     matA_prefetch_payload);
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -306,7 +306,7 @@ public:
                     matB_t::tile_size_y);
         }
 
-        for (int i = 0; i < args.inner_loop_count; i++) {
+        for (uint32_t i = 0; i < args.inner_loop_count; i++) {
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.arrive(); }

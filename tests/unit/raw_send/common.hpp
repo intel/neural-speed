@@ -17,7 +17,8 @@
 
 #include "kernel_func.hpp"
 
-int raw_send_result_validate(int *A, int *B, int *C, unsigned Size) {
+int raw_send_result_validate(
+        int *A, [[maybe_unused]] int *B, int *C, unsigned Size) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Size; ++i) {
         if (A[i] != C[i] * 2) {

@@ -413,8 +413,8 @@ private:
         return ret;
     }
 
-    static inline bool check_block(int32_t x, int32_t y, uint32_t width,
-            uint32_t height, uint8_t array_len) {
+    static inline bool check_block(int32_t x, [[maybe_unused]] int32_t y,
+            uint32_t width, uint32_t height, uint8_t array_len) {
         if (check_block_start_x(x) && check_block_width(width)
                 && check_block_height(height) && check_array_len(array_len)) {
             return true;

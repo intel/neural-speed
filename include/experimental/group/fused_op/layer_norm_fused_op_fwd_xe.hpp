@@ -79,8 +79,10 @@ struct ln_fwd_fused_op_t<ln_fused_op_kind_, dtype_in_, dtype_out_, dtype_acc_,
     /// @param sg_idx
     /// @param sg_idy
     /// @return
-    __XETLA_API void init(arguments_t *args, uint32_t wg_idx, uint32_t wg_idy,
-            uint32_t sg_idx, uint32_t sg_idy, uint32_t start_m) {}
+    __XETLA_API void init([[maybe_unused]] arguments_t *args,
+            [[maybe_unused]] uint32_t wg_idx, [[maybe_unused]] uint32_t wg_idy,
+            [[maybe_unused]] uint32_t sg_idx, [[maybe_unused]] uint32_t sg_idy,
+            [[maybe_unused]] uint32_t start_m) {}
 
     /// @brief
     ///
@@ -175,8 +177,9 @@ struct ln_fwd_fused_op_t<ln_fwd_fused_kind::bias_dropout_resAdd_ln, dtype_in_,
     /// @param sg_idx
     /// @param sg_idy
     /// @return
-    __XETLA_API void init(arguments_t *args, uint32_t wg_idx, uint32_t wg_idy,
-            uint32_t sg_idx, uint32_t sg_idy, uint32_t start_m) {
+    __XETLA_API void init(arguments_t *args, uint32_t wg_idx,
+            [[maybe_unused]] uint32_t wg_idy, uint32_t sg_idx,
+            [[maybe_unused]] uint32_t sg_idy, uint32_t start_m) {
         int start_n = wg_idx * wg_tile_n + sg_idx * sg_tile_n;
         mat_ld = args->mat_ld;
         mask_ld = args->mask_ld;
@@ -313,8 +316,9 @@ struct ln_fwd_fused_op_t<ln_fwd_fused_kind::ln_dropout, dtype_in_, dtype_out_,
     /// @param sg_idx
     /// @param sg_idy
     /// @return
-    __XETLA_API void init(arguments_t *args, uint32_t wg_idx, uint32_t wg_idy,
-            uint32_t sg_idx, uint32_t sg_idy, uint32_t start_m) {
+    __XETLA_API void init(arguments_t *args, uint32_t wg_idx,
+            [[maybe_unused]] uint32_t wg_idy, uint32_t sg_idx,
+            [[maybe_unused]] uint32_t sg_idy, uint32_t start_m) {
         int start_n = wg_idx * wg_tile_n + sg_idx * sg_tile_n;
         dropout_scale = args->dropout_scale;
         mask_ld = args->mask_ld;

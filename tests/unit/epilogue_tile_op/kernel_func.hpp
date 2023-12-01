@@ -39,8 +39,8 @@ struct tile_elemwise_op_func {
     using work_group_t = typename tile_shape::work_group_t;
     using epilogue_args_t = typename epilogue_t::arguments_t;
 
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         matA_t matA;
         matA_payload_t matA_payload;
         matA_payload.init(a, swidth, sheight, spitch, 0, 0);
@@ -73,8 +73,8 @@ struct tile_elemwise_op_func<dtype, swidth, sheight, spitch, twidth, theight,
     using work_group_t = typename tile_shape::work_group_t;
     using epilogue_args_t = typename epilogue_t::arguments_t;
 
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         matA_t matA;
         matA_payload_t matA_payload;
         matA_payload.init(a, swidth, sheight, spitch, 0, 0);
@@ -107,8 +107,8 @@ struct tile_elemwise_op_func<dtype, swidth, sheight, spitch, twidth, theight,
     using work_group_t = typename tile_shape::work_group_t;
     using epilogue_args_t = typename epilogue_t::arguments_t;
 
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         matA_t matA;
         matA_payload_t matA_payload;
         matA_payload.init(a, swidth, sheight, spitch, 0, 0);
@@ -138,8 +138,8 @@ struct tile_elemwise_op_func<dtype, swidth, sheight, spitch, twidth, theight,
     using work_group_t = typename tile_shape::work_group_t;
     using epilogue_args_t = typename epilogue_t::arguments_t;
 
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         matAcc_t matAcc;
         matAcc.reg = 0;
         mem_desc_c_t mem_desc_c({c}, {swidth, sheight, spitch}, {0, 0});
@@ -167,8 +167,8 @@ struct tile_elemwise_op_func<dtype, swidth, sheight, spitch, twidth, theight,
     using work_group_t = typename tile_shape::work_group_t;
     using epilogue_args_t = typename epilogue_t::arguments_t;
 
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         matAcc_t matAcc;
         matAcc.reg = 0;
         mem_desc_c_t mem_desc_c({c}, {swidth, sheight, spitch}, {0, 0});
@@ -196,8 +196,8 @@ struct tile_elemwise_op_func<dtype, swidth, sheight, spitch, twidth, theight,
     using work_group_t = typename tile_shape::work_group_t;
     using epilogue_args_t = typename epilogue_t::arguments_t;
 
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         matAcc_t matAcc;
         matAcc.reg = 0;
         mem_desc_c_t mem_desc_c {{c}, {swidth, sheight, spitch}, {0, 0}};

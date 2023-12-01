@@ -29,9 +29,6 @@ int gemm_softmax_result_validate(data_type_a *A_device, data_type_b *B_device,
         uint32_t batch_num, sycl::queue &queue,
         mem_layout mem_layout_a_ = mem_layout::row_major,
         mem_layout mem_layout_b_ = mem_layout::row_major) {
-    uint32_t err_cnt = 0;
-    bool is_col_major_a = mem_layout_a_ == mem_layout::col_major;
-    bool is_col_major_b = mem_layout_b_ == mem_layout::col_major;
     uint32_t size_a = m * k;
     uint32_t size_b = k * n;
     uint32_t size_c = m * n;
@@ -137,8 +134,6 @@ void gemm_softmax_run(uint32_t iter) {
     constexpr uint32_t sg_tile_m = 32;
     constexpr uint32_t sg_tile_n = 64;
 
-    // buffer size of softmax row data
-    constexpr uint32_t softmax_size = 512;
     // default set Thread num = 32 to maximize EU utilization
     constexpr uint32_t thread_num = 32;
     //"Row data need to be in a same work group!"

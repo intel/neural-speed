@@ -41,7 +41,8 @@ public:
     }
     // correct group range, nothing will be done under this swizzle policy
     static __XETLA_API void update_group_range(
-            uint32_t &group_range_m, uint32_t &group_range_n) {}
+            [[maybe_unused]] uint32_t &group_range_m,
+            [[maybe_unused]] uint32_t &group_range_n) {}
 };
 
 /// @brief GROUP_SWIZZLE implementation of snake curve.
@@ -332,9 +333,6 @@ struct dispatch_policy_stream_k {
         int num_tiles_n = (matrix_n + wg_tile_n - 1) / wg_tile_n;
 
         int output_tiles = num_tiles_m * num_tiles_n;
-        int waves = (output_tiles + avail_xecores - 1) / avail_xecores;
-        float dp_efficiency
-                = float(output_tiles) / float(waves * avail_xecores);
 
         int dp_tiles = output_tiles;
         int sk_groups = 0;
@@ -361,7 +359,8 @@ struct dispatch_policy_stream_k {
             sk_iters_per_big_group = sk_iters_per_normal_group + 1;
 
             //KSlicing to fill up multiple regions within groups
-            if ((sk_groups > sk_tiles) && (sk_groups % sk_tiles == 0)) {
+            uint32_t current_sk_gruops = sk_groups;
+            if ((current_sk_gruops > sk_tiles) && (sk_groups % sk_tiles == 0)) {
 
                 sk_regions = sk_tiles;
             }
@@ -468,7 +467,8 @@ struct dispatch_policy_stream_k {
 
         //Adjust extents for the first num_big_group groups that get one extra iteration
         int group_iters = get_sk_iters_per_normal_group();
-        if (group_idx_in_region < sk_big_groups_per_region) {
+        uint32_t current_group_idx_in_region = group_idx_in_region;
+        if (current_group_idx_in_region < sk_big_groups_per_region) {
 
             group_iter_begin += group_idx_in_region;
             group_iters += 1;
@@ -484,8 +484,8 @@ struct dispatch_policy_stream_k {
     ///@brief kernel function to get the first sk group index writing the sliced output tile;
     __XETLA_API KERNEL_FUNC int get_first_group_idx(
             int tile_idx, int group_idx) const {
-
-        if (tile_idx >= sk_tiles) {
+        uint32_t current_tile_idx = tile_idx;
+        if (current_tile_idx >= sk_tiles) {
             //DP group
             return group_idx;
         }
@@ -505,7 +505,7 @@ struct dispatch_policy_stream_k {
         //Number of iterations in the normal group region
         int normal_group_iters = iter_in_region - big_group_iters;
 
-        int big_group_idx_in_region
+        uint32_t big_group_idx_in_region
                 = div_mod_sk_iters_per_big_group.div(iter_in_region);
 
         int normal_group_idx_in_region = sk_big_groups_per_region

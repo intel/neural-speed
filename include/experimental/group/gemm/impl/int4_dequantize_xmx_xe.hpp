@@ -326,7 +326,7 @@ public:
     /// @param slm_base Is the slm base address.
     /// @param nbarrier_base Is the named barrier base.
     __XETLA_API KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
-            arguments_t args, uint32_t slm_base = 0,
+            arguments_t args, [[maybe_unused]] uint32_t slm_base = 0,
             uint32_t nbarrier_base = 0) {
         int32_t sg_idx = g.get_id() % wg_size_x;
         int32_t sg_idy = g.get_id() / wg_size_x;
@@ -361,7 +361,7 @@ public:
         int scale_load_addr_i = 0;
         SW_BARRIER();
 #pragma unroll
-        for (int i = 0; i < stages; i++) {
+        for (uint32_t i = 0; i < stages; i++) {
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     matA_prefetch_payload);
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -385,7 +385,7 @@ public:
             }
         }
 
-        for (int i = 0; i < args.inner_loop_count; i++) {
+        for (uint32_t i = 0; i < args.inner_loop_count; i++) {
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.arrive(); }
@@ -466,9 +466,9 @@ private:
         constexpr uint32_t vnni_rows = sizeof(uint32_t) / sizeof(dtype_mma_b);
         constexpr uint32_t block_b_y_per_scale = dequant_s / block_size_y_b;
 #pragma unroll
-        for (int i = 0; i < num_block_y; ++i) {
+        for (uint32_t i = 0; i < num_block_y; ++i) {
 #pragma unroll
-            for (int j = 0; j < num_block_x; ++j) {
+            for (uint32_t j = 0; j < num_block_x; ++j) {
                 int block_id = (i * num_block_x + j);
                 auto matB_blk = matB.reg.xetla_select<matB_t::block_elems, 1>(
                                                 block_id * matB_t::block_elems)
@@ -499,7 +499,7 @@ private:
                 xetla_vector<uint8_t, block_size_x_b * block_size_y_b>
                         zero_pt_blk;
 #pragma unroll
-                for (int row = 0; row < block_size_y_b; row++) {
+                for (uint32_t row = 0; row < block_size_y_b; row++) {
                     zero_pt_blk
                             .xetla_select<block_size_x_b, 1>(
                                     row * block_size_x_b)
@@ -524,9 +524,9 @@ private:
                         = cvt_blk_i32;
 
 #pragma unroll
-                for (int k = 0; k < block_size_y_b; k += vnni_rows) {
+                for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
 #pragma unroll
-                    for (int row = 0; row < vnni_rows; row++) {
+                    for (uint32_t row = 0; row < vnni_rows; row++) {
                         temp_blk.xetla_select<block_size_x_b, vnni_rows>(
                                 row + block_size_x_b * k * vnni_rows)
                                 = temp_blk.xetla_select<block_size_x_b,
@@ -537,13 +537,13 @@ private:
 
                 xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
 #pragma unroll
-                for (int row = 0; row < vnni_rows; row++) {
+                for (uint32_t row = 0; row < vnni_rows; row++) {
                     scale_blk.xetla_select<block_size_x_b, vnni_rows>(row)
                             = scale_vec;
                 }
 
 #pragma unroll
-                for (int k = 0; k < block_size_y_b; k += vnni_rows) {
+                for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
                     dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
                             k * block_size_x_b)
                             = temp_blk.xetla_select<block_size_x_b * vnni_rows,

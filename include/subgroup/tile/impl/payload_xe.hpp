@@ -137,13 +137,13 @@ public:
         auto payloads_2d = payloads.xetla_format<uint32_t, num_block, 16>();
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
 #pragma unroll
-            for (int i = 0; i < num_block; i++) {
+            for (uint32_t i = 0; i < num_block; i++) {
                 xetla_update_tdesc_offsetx(
                         payloads_2d.row(i), offset / int32_t(scale_factor));
             }
         } else {
 #pragma unroll
-            for (int i = 0; i < num_block; i++) {
+            for (uint32_t i = 0; i < num_block; i++) {
                 xetla_update_tdesc_offsety(payloads_2d.row(i), offset);
             }
         }
@@ -154,7 +154,7 @@ private:
         auto payloads_2d = payloads.xetla_format<uint32_t, num_block, 16>();
         uint32_t base_offset_y = 0;
 #pragma unroll
-        for (int i = 0; i < num_block_y; i++) {
+        for (uint32_t i = 0; i < num_block_y; i++) {
             auto tdesc_row_2d = payloads_2d.xetla_select<num_block_x, 1, 16, 1>(
                     i * num_block_x, 0);
             prepare_tile_desc_core<num_block_x, block_size_x, block_size_y, 1,
@@ -177,7 +177,7 @@ private:
             xetla_tdescriptor base_tdesc, uint32_t base_offset_y) {
         uint32_t base_offset_x = 0;
 #pragma unroll
-        for (int j = 0; j < num_tdesc; j++) {
+        for (uint32_t j = 0; j < num_tdesc; j++) {
             payloads_row_2d.row(j) = base_tdesc;
             // To mimic dw transpose for word/byte data type with transpose and pack
             constexpr uint8_t block_width
@@ -258,8 +258,9 @@ public:
         base_ptr = (mem_dtype *)mem_tdesc.base.base;
     }
 
-    inline mem_payload_t(dtype *p, int surface_width, int surface_height,
-            int surface_pitch, int surface_offset_x, int surface_offset_y) {
+    inline mem_payload_t(dtype *p, [[maybe_unused]] int surface_width,
+            [[maybe_unused]] int surface_height, int surface_pitch,
+            int surface_offset_x, int surface_offset_y) {
         pitch_in_bytes = surface_pitch * sizeof(dtype);
         uint32_t offset_x = surface_offset_x;
         uint32_t offset_y = surface_offset_y;
@@ -275,8 +276,9 @@ public:
         base_ptr = (mem_dtype *)mem_tdesc.base.base;
     }
 
-    __XETLA_API void init(dtype *p, int surface_width, int surface_height,
-            int surface_pitch, int surface_offset_x, int surface_offset_y) {
+    __XETLA_API void init(dtype *p, [[maybe_unused]] int surface_width,
+            [[maybe_unused]] int surface_height, int surface_pitch,
+            int surface_offset_x, int surface_offset_y) {
         pitch_in_bytes = surface_pitch * sizeof(dtype);
         uint32_t offset_x = surface_offset_x;
         uint32_t offset_y = surface_offset_y;
@@ -526,8 +528,9 @@ public:
         address = mem_tdesc.base.base + offset_y * pitch_in_bytes
                 + offset_x * sizeof(dtype);
     }
-    inline mem_payload_t(uint32_t base, int surface_width, int surface_height,
-            int surface_pitch, int surface_offset_x, int surface_offset_y) {
+    inline mem_payload_t(uint32_t base, [[maybe_unused]] int surface_width,
+            [[maybe_unused]] int surface_height, int surface_pitch,
+            int surface_offset_x, int surface_offset_y) {
         uint32_t offset_x = surface_offset_x;
         uint32_t offset_y = surface_offset_y;
         pitch_in_bytes = surface_pitch * sizeof(dtype);
@@ -542,8 +545,9 @@ public:
                 + offset_x * sizeof(dtype);
     }
 
-    __XETLA_API void init(uint32_t base, int surface_width, int surface_height,
-            int surface_pitch, int surface_offset_x, int surface_offset_y) {
+    __XETLA_API void init(uint32_t base, [[maybe_unused]] int surface_width,
+            [[maybe_unused]] int surface_height, int surface_pitch,
+            int surface_offset_x, int surface_offset_y) {
         uint32_t offset_x = surface_offset_x;
         uint32_t offset_y = surface_offset_y;
         pitch_in_bytes = surface_pitch * sizeof(dtype);
@@ -1211,12 +1215,12 @@ public:
         auto tdesc_2d = tdesc_prefetch.xetla_format<uint32_t, num_tdesc, 16>();
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
 #pragma unroll
-            for (int i = 0; i < num_tdesc; i++) {
+            for (uint32_t i = 0; i < num_tdesc; i++) {
                 xetla_update_tdesc_offsetx(tdesc_2d.row(i), offset);
             }
         } else {
 #pragma unroll
-            for (int i = 0; i < num_tdesc; i++) {
+            for (uint32_t i = 0; i < num_tdesc; i++) {
                 xetla_update_tdesc_offsety(tdesc_2d.row(i), offset);
             }
         }
@@ -1227,7 +1231,7 @@ private:
         auto tdesc_2d = tdesc_prefetch.xetla_format<uint32_t, num_tdesc, 16>();
         uint32_t base_offset_y = 0;
 #pragma unroll
-        for (int i = 0; i < tile_size_h / block_size_h; i++) {
+        for (uint32_t i = 0; i < tile_size_h / block_size_h; i++) {
             auto tdesc_row_2d = tdesc_2d.xetla_select<num_block_w, 1, 16, 1>(
                     i * num_block_w, 0);
             prepare_tile_desc_core<num_block_w, block_size_w, block_size_h>(
@@ -1343,9 +1347,9 @@ public:
                 + (coop_id % num_coop_sg) * mem_tile_size_x;
     }
 
-    inline prefetch_payload_t(dtype *p, int surface_width, int surface_height,
-            int surface_pitch, int surface_offset_x, int surface_offset_y,
-            uint32_t coop_id = 0) {
+    inline prefetch_payload_t(dtype *p, [[maybe_unused]] int surface_width,
+            [[maybe_unused]] int surface_height, int surface_pitch,
+            int surface_offset_x, int surface_offset_y, uint32_t coop_id = 0) {
         pitch_in_bytes = surface_pitch * sizeof(dtype);
         uint32_t offset_x = surface_offset_x;
         uint32_t offset_y = surface_offset_y;
@@ -1384,14 +1388,19 @@ struct prefetch_payload_t<
     static constexpr mem_layout memory_layout = mem_layout_;
     static constexpr gpu_arch arch_tag = arch_tag_;
 
-    inline prefetch_payload_t(mem_desc_t &mem_desc, uint32_t coop_id = 0) {}
+    inline prefetch_payload_t([[maybe_unused]] mem_desc_t &mem_desc,
+            [[maybe_unused]] uint32_t coop_id = 0) {}
 
-    inline prefetch_payload_t(dtype *p, int surface_width, int surface_height,
-            int surface_pitch, int surface_offset_x, int surface_offset_y,
-            uint32_t coop_id = 0) {}
+    inline prefetch_payload_t([[maybe_unused]] dtype *p,
+            [[maybe_unused]] int surface_width,
+            [[maybe_unused]] int surface_height,
+            [[maybe_unused]] int surface_pitch,
+            [[maybe_unused]] int surface_offset_x,
+            [[maybe_unused]] int surface_offset_y,
+            [[maybe_unused]] uint32_t coop_id = 0) {}
 
     template <tdesc_update_dir update_dir = tdesc_update_dir::x_dir>
-    __XETLA_API void update_tdesc(int offset) {}
+    __XETLA_API void update_tdesc([[maybe_unused]] int offset) {}
 };
 
 } // namespace gpu::xetla::subgroup

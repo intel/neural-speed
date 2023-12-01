@@ -63,7 +63,7 @@ tile_prefetch(payload_t &payload) {
             = payload.tdesc_prefetch.xetla_format<uint32_t, num_tdesc, 16>();
 
 #pragma unroll
-    for (int i = 0; i < num_tdesc; i++) {
+    for (uint32_t i = 0; i < num_tdesc; i++) {
         xetla_tprefetch_global<dtype, L1, L2, payload_t::arch_tag>(
                 tdesc_2d.row(i));
     }
@@ -89,7 +89,7 @@ tile_prefetch(payload_t &payload) {
             = tile_desc::tile_size_x / payload_t::scale_factor;
     if constexpr (prefetch_len >= 64) {
 #pragma unroll
-        for (int j = 0; j < prefetch_len / 64; j++) {
+        for (uint32_t j = 0; j < prefetch_len / 64; j++) {
             uint32_t offset_x = j * 64 * payload_t::scale_factor;
             uint32_t address_offset = offset_x * sizeof(dtype);
             xetla_prefetch_global<prefetch_dtype, 64, data_size::default_size,
@@ -113,6 +113,6 @@ template <cache_hint L1 = cache_hint::cached,
         cache_hint L2 = cache_hint::cached, typename payload_t>
 __XETLA_API typename std::enable_if_t<
         detail::check_prefetch_type<payload_t>::is_local_xe>
-tile_prefetch(payload_t &payload) {}
+tile_prefetch([[maybe_unused]] payload_t &payload) {}
 
 } // namespace gpu::xetla::subgroup

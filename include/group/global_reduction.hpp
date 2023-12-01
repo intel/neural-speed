@@ -138,7 +138,8 @@ public:
     template <typename matAcc_t>
     __XETLA_API KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
             mem_desc_acc_t mem_desc_acc, mem_desc_cnt_t mem_desc_cnt,
-            uint32_t slm_base = 0, uint32_t nbarrier_base = 0) {
+            [[maybe_unused]] uint32_t slm_base = 0,
+            [[maybe_unused]] uint32_t nbarrier_base = 0) {
         static_assert(std::is_same<typename matAcc_t::dtype, dtype_acc>::value,
                 "matAcc_t::dtype should match with dtype_acc");
         update_sg_tile_tdesc(g, mem_desc_acc, mem_desc_cnt);
@@ -191,9 +192,12 @@ public:
     inline bool is_last_group() { return true; }
 
     template <typename matAcc_t>
-    inline KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
-            mem_desc_acc_t mem_desc_acc, mem_desc_cnt_t mem_desc_cnt,
-            uint32_t slm_base = 0, uint32_t nbarrier_base = 0) {}
+    inline KERNEL_FUNC void operator()([[maybe_unused]] work_group_t &g,
+            [[maybe_unused]] matAcc_t &matAcc,
+            [[maybe_unused]] mem_desc_acc_t mem_desc_acc,
+            [[maybe_unused]] mem_desc_cnt_t mem_desc_cnt,
+            [[maybe_unused]] uint32_t slm_base = 0,
+            [[maybe_unused]] uint32_t nbarrier_base = 0) {}
 };
 
 } // namespace gpu::xetla::group

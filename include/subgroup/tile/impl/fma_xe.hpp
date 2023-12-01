@@ -99,24 +99,24 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
         auto b_blk_2d = b_block.xetla_format<dtype_dst, blk_k, blk_n>();
         auto src_blk_2d = src.xetla_format<dtype_src, blk_m, blk_n>();
 #pragma unroll
-        for (int i = 0; i < blk_m / mma_m; i++) {
+        for (uint32_t i = 0; i < blk_m / mma_m; i++) {
             xetla_vector<dtype_dst, mma_m * blk_n> dst_tmp;
             auto dst_tmp_2d = dst_tmp.xetla_format<dtype_dst, mma_m, blk_n>();
 #pragma unroll
-            for (int i_acc = 0; i_acc < mma_m; i_acc++) {
+            for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
                 dst_tmp_2d.row(i_acc)
                         = a_block[i_acc + i * mma_m] * b_blk_2d.row(0)
                         + src_blk_2d.row(i_acc + i * mma_m);
             }
 #pragma unroll
-            for (int k = 1; k < blk_k - 1; k++) {
-                for (int i_acc = 0; i_acc < mma_m; i_acc++) {
+            for (uint32_t k = 1; k < blk_k - 1; k++) {
+                for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
                     int a_offset = k * blk_m + i_acc + i * mma_m;
                     dst_tmp_2d.row(i_acc)
                             += a_block[a_offset] * b_blk_2d.row(k);
                 }
             }
-            for (int i_acc = 0; i_acc < mma_m; i_acc++) {
+            for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
                 int a_offset = (blk_k - 1) * blk_m + i_acc + i * mma_m;
                 dst_blk_2d.row(i_acc + i * mma_m)
                         = a_block[a_offset] * b_blk_2d.row(blk_k - 1)
@@ -131,20 +131,20 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
             xetla_vector<dtype_dst, tail_m * blk_n> dst_tmp;
             auto dst_tmp_2d = dst_tmp.xetla_format<dtype_dst, tail_m, blk_n>();
 #pragma unroll
-            for (int i_acc = 0; i_acc < tail_m; i_acc++) {
+            for (uint32_t i_acc = 0; i_acc < tail_m; i_acc++) {
                 dst_tmp_2d.row(i_acc)
                         = a_block[i_acc + tail_start_m] * b_blk_2d.row(0)
                         + src_blk_2d.row(i_acc + tail_start_m);
             }
 #pragma unroll
-            for (int k = 1; k < blk_k - 1; k++) {
-                for (int i_acc = 0; i_acc < tail_m; i_acc++) {
+            for (uint32_t k = 1; k < blk_k - 1; k++) {
+                for (uint32_t i_acc = 0; i_acc < tail_m; i_acc++) {
                     int a_offset = k * blk_m + i_acc + tail_start_m;
                     dst_tmp_2d.row(i_acc)
                             += a_block[a_offset] * b_blk_2d.row(k);
                 }
             }
-            for (int i_acc = 0; i_acc < tail_m; i_acc++) {
+            for (uint32_t i_acc = 0; i_acc < tail_m; i_acc++) {
                 int a_offset = (blk_k - 1) * blk_m + i_acc + tail_start_m;
                 dst_blk_2d.row(i_acc + tail_start_m)
                         = a_block[a_offset] * b_blk_2d.row(blk_k - 1)
@@ -159,11 +159,11 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
             auto b_reg
                     = b.reg.xetla_select<b_block_size_y * b_tile_size_x, 1>(0);
 #pragma unroll
-            for (int i = 0; i < tile_size_m / block_size_m; i++) {
+            for (uint32_t i = 0; i < tile_size_m / block_size_m; i++) {
                 auto a_block = a.reg.xetla_select<a_block_elems, 1>(
                         i * num_block_k * a_block_elems);
 #pragma unroll
-                for (int j = 0; j < num_block_n; j++) {
+                for (uint32_t j = 0; j < num_block_n; j++) {
                     auto b_block = b_reg.xetla_select<b_block_elems, 1>(
                             j * b_block_elems);
                     auto src_block = src.reg.xetla_select<block_elems, 1>(
@@ -188,7 +188,7 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
                 auto a_block = a.reg.xetla_select<a_tail_blk_elems, 1>(
                         a_tile_size_x * tail_start_m);
 #pragma unroll
-                for (int j = 0; j < num_block_n; j++) {
+                for (uint32_t j = 0; j < num_block_n; j++) {
                     auto b_block = b_reg.xetla_select<b_block_elems, 1>(
                             j * b_block_elems);
                     auto src_block
@@ -206,16 +206,16 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
         }
         // different K block
 #pragma unroll
-        for (int k_i = 1; k_i < num_block_k; k_i++) {
+        for (uint32_t k_i = 1; k_i < num_block_k; k_i++) {
 
             auto b_reg = b.reg.xetla_select<b_block_size_y * b_tile_size_x, 1>(
                     k_i * b_block_size_y * b_tile_size_x);
 #pragma unroll
-            for (int i = 0; i < tile_size_m / block_size_m; i++) {
+            for (uint32_t i = 0; i < tile_size_m / block_size_m; i++) {
                 auto a_block = a.reg.xetla_select<a_block_elems, 1>(
                         (i * num_block_k + k_i) * a_block_elems);
 #pragma unroll
-                for (int j = 0; j < num_block_n; j++) {
+                for (uint32_t j = 0; j < num_block_n; j++) {
                     auto b_block = b_reg.xetla_select<b_block_elems, 1>(
                             j * b_block_elems);
                     auto dst_block = dst.reg.xetla_select<block_elems, 1>(
@@ -237,7 +237,7 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
                 auto a_block = a.reg.xetla_select<a_tail_blk_elems, 1>(
                         a_tile_size_x * tail_start_m + k_i * a_tail_blk_elems);
 #pragma unroll
-                for (int j = 0; j < num_block_n; j++) {
+                for (uint32_t j = 0; j < num_block_n; j++) {
                     auto b_block = b_reg.xetla_select<b_block_elems, 1>(
                             j * b_block_elems);
                     auto dst_block

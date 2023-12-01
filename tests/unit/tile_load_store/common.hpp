@@ -18,9 +18,9 @@
 #include "kernel_func.hpp"
 
 template <typename dtype, bool transform = false, bool transpose = false>
-int tile_load_store_result_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Sizey, unsigned Blockx, unsigned Blocky,
-        int offset_y = 0) {
+int tile_load_store_result_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Sizey, unsigned Blockx,
+        unsigned Blocky, int offset_y = 0) {
     int err_cnt = 0;
     size_t a_index, c_index;
     int ele_per_dw = transform ? sizeof(uint32_t) / sizeof(dtype) : 1;
@@ -65,8 +65,9 @@ int tile_load_store_result_validate(dtype *A, dtype *B, dtype *C,
 }
 
 template <typename dtype>
-int tile_load_broadcase_store_result_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
+int tile_load_broadcase_store_result_validate(dtype *A,
+        [[maybe_unused]] dtype *B, dtype *C, unsigned Sizex, unsigned Blockx,
+        unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {
@@ -91,16 +92,16 @@ int tile_load_broadcase_store_result_validate(dtype *A, dtype *B, dtype *C,
 }
 
 template <typename dtype>
-int tile_padding_load_store_result_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Sizey, unsigned Startx, unsigned Starty) {
+int tile_padding_load_store_result_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Sizey, unsigned Startx,
+        unsigned Starty) {
     int err_cnt = 0;
-    int a_index, c_index;
-    int pwidth;
+    int c_index;
     for (unsigned i = 0; i < Sizey; ++i) {
         for (unsigned j = 0; j < Sizex; ++j) {
             c_index = i * Sizex + j;
-            int a_index_x = j + Startx;
-            int a_index_y = i + Starty;
+            unsigned a_index_x = j + Startx;
+            unsigned a_index_y = i + Starty;
 
             dtype c_temp = C[c_index];
             dtype a_temp;

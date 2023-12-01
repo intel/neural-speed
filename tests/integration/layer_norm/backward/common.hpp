@@ -28,10 +28,11 @@ template <typename data_type_x, typename data_type_weight, typename data_type_y,
 int ln_bwd_result_validate(data_type_y *dy_in, data_type_y *grad_in,
         data_type_x *x_in, data_type_weight *gamma_in, data_type_acc *mu_in,
         data_type_acc *rs_in, data_type_x *dx_out, data_type_weight *dgamma_out,
-        data_type_weight *dbeta_out, int m, int n, int mask_n, int sg_size_n,
-        data_type_x *dx_resAdd_out, data_type_x *dbias_out,
-        uint8_t *buffer_mask, float drop_out_scale_inv,
-        ln_bwd_fused_kind ln_fused_op_kind, data_type_acc epsilon = 1e-5) {
+        data_type_weight *dbeta_out, int m, int n, [[maybe_unused]] int mask_n,
+        [[maybe_unused]] int sg_size_n, data_type_x *dx_resAdd_out,
+        data_type_x *dbias_out, uint8_t *buffer_mask, float drop_out_scale_inv,
+        ln_bwd_fused_kind ln_fused_op_kind,
+        [[maybe_unused]] data_type_acc epsilon = 1e-5) {
 
     bool is_bias_dropout_resAdd_fuse
             = ln_fused_op_kind == ln_bwd_fused_kind::bias_dropout_resAdd_ln;
@@ -41,7 +42,6 @@ int ln_bwd_result_validate(data_type_y *dy_in, data_type_y *grad_in,
     std::vector<data_type_acc> dbeta_acc(n, 0);
     std::vector<data_type_acc> dx_acc(m * n, 0);
     std::vector<data_type_acc> dy_acc(m * n, 0);
-    int sg_mask_len = (sg_size_n + 31) / 32;
     std::vector<data_type_acc> dbias_acc(n, 0);
     std::vector<data_type_acc> dx_resAdd_acc(m * n, 0);
     for (int i = 0; i < m; i++) {

@@ -36,7 +36,6 @@ int sdp_fwd_result_validate(dtype_in *q_device, dtype_in *k_device,
         mem_layout mem_layout_qk_b_ = mem_layout::row_major,
         mem_layout mem_layout_sv_a_ = mem_layout::row_major,
         mem_layout mem_layout_sv_b_ = mem_layout::row_major) {
-    uint32_t err_cnt = 0;
 
     uint32_t matrix_size_a = qk_m * qk_k;
     uint32_t matrix_size_b = qk_k * qk_n;
@@ -390,8 +389,6 @@ void sdp_fwd_run(uint32_t iter) {
                             gpu_arch::Xe, // GPU arch
                             tune_option1>;
 
-                    using tile_shape1 = typename gemm1_t::tile_shape;
-
                     // gemm arguments include matA & matB load information and
                     // cycle number on k-dimension
                     using gemm_args_t = typename gemm1_t::arguments_t;
@@ -407,12 +404,10 @@ void sdp_fwd_run(uint32_t iter) {
                                     matAcc_t::block_size_y, reg_layout::tiled>>;
                     // Following six variables is a conterpart of gemm::arguments
                     // Reuse this three variables for new gemm
-                    uint32_t matrix_m = matrix_m_sv;
                     uint32_t matrix_k = matrix_k_sv;
                     uint32_t matrix_n = matrix_n_sv;
                     // matA & matB base address and load width
                     uint32_t matA_base = 0; // matA_base
-                    uint32_t matA_ld = matrix_k_sv; // matA load width
                     dtype_in *matB_ptr = v
                             + batch_id * size_qkv; // matB_ptr + batch offset
                     uint32_t matB_ld = matrix_n_sv; // matB load width
@@ -424,9 +419,6 @@ void sdp_fwd_run(uint32_t iter) {
                     uint32_t boundary_n = (start_n + wg_tile_n_sv) > matrix_n
                             ? matrix_n
                             : (start_n + wg_tile_n_sv);
-                    uint32_t boundary_m = (start_m + wg_tile_m_sv) > matrix_m
-                            ? matrix_m
-                            : (start_m + wg_tile_m_sv);
                     uint32_t boundary_k = wg_tile_k;
 
                     work_group_t g;

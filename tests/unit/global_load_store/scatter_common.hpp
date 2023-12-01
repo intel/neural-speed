@@ -22,7 +22,7 @@ using namespace std::placeholders;
 
 template <typename datatype>
 int load_store_result_validate(
-        datatype *A, datatype *B, datatype *C, unsigned Size) {
+        datatype *A, datatype *B, [[maybe_unused]] datatype *C, unsigned Size) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Size; ++i) {
         if (A[i] != B[i]) {
@@ -42,8 +42,8 @@ int load_store_result_validate(
 }
 
 template <typename datatype>
-int mask_result_validate(datatype *A, datatype *B, datatype *C, unsigned Size,
-        int mask, datatype maskedValue) {
+int mask_result_validate(datatype *A, datatype *B, [[maybe_unused]] datatype *C,
+        unsigned Size, int mask, datatype maskedValue) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Size; ++i) {
         if ((mask >> i) & 0x1) {

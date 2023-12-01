@@ -40,11 +40,6 @@ static void igemm_quantize_run(int iter = 100) {
     constexpr gpu::xetla::mem_layout mem_layout_a = Test::layout_a;
     constexpr gpu::xetla::mem_layout mem_layout_b = Test::layout_b;
 
-    constexpr bool is_col_major_a
-            = mem_layout_a == gpu::xetla::mem_layout::col_major;
-    constexpr bool is_col_major_b
-            = mem_layout_b == gpu::xetla::mem_layout::col_major;
-
     int size_a = matrix_m * matrix_k;
     int size_b = matrix_k * matrix_n;
     int size_c = matrix_m * matrix_n;
@@ -141,7 +136,6 @@ static void igemm_quantize_run(int iter = 100) {
     prof.print_profiling_result(profiling_selector::GPU);
 
     // validation
-    int err_cnt;
     ASSERT_EQ(0,
             (gemm_result_validate<data_type_a, data_type_b, data_type_c,
                     data_type_acc, data_type_param>(A, B, C, scale, offset,

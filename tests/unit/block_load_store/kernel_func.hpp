@@ -24,8 +24,8 @@ template <typename dtype, int swidth, int sheight, int spitch, int bwidth,
         int bheight, bool transform = false, bool transpose = false,
         gpu_arch arch_tag = gpu_arch::Xe>
 struct block_load_store_func {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            dtype *a, [[maybe_unused]] dtype *b, dtype *c) {
 
         xetla_tdescriptor src_tdesc;
         xetla_fill_tdesc<dtype, bwidth, bheight, 1>(

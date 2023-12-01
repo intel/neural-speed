@@ -80,8 +80,9 @@ public:
     /// @param nbarrier_base Is the named barrier base.
     template <typename matAcc_t>
     __XETLA_API KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
-            mem_desc_c_t mem_desc_c, arguments_t args = {},
-            uint32_t slm_base = 0, uint32_t nbarrier_base = 0) {
+            mem_desc_c_t mem_desc_c, [[maybe_unused]] arguments_t args = {},
+            [[maybe_unused]] uint32_t slm_base = 0,
+            [[maybe_unused]] uint32_t nbarrier_base = 0) {
         using matC_tile_desc_t = subgroup::tile_desc_t<matAcc_t::tile_size_x,
                 matAcc_t::tile_size_y, matAcc_t::block_size_x,
                 matAcc_t::block_size_y, reg_layout::tiled>;

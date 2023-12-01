@@ -74,15 +74,24 @@ static void row_reduction_run() {
             queue, device, context);
 
     auto buffer_x = alloc_device_and_init<data_type_x>(
-            size_x, [](data_type_x *data, size_t idx) { data[idx] = 0; }, queue,
-            device, context);
+            size_x,
+            [](data_type_x *data, size_t idx) {
+                data[idx] = static_cast<data_type_x>(0);
+            },
+            queue, device, context);
 
     auto buffer_d = alloc_device_and_init<data_type_d>(
-            size_d, [](data_type_d *data, size_t idx) { data[idx] = 0; }, queue,
-            device, context);
+            size_d,
+            [](data_type_d *data, size_t idx) {
+                data[idx] = static_cast<data_type_d>(0);
+            },
+            queue, device, context);
 
     auto buffer_out = alloc_device_and_init<data_type_out>(
-            size_out, [](data_type_out *data, size_t idx) { data[idx] = 0; },
+            size_out,
+            [](data_type_out *data, size_t idx) {
+                data[idx] = static_cast<data_type_out>(0);
+            },
             queue, device, context);
 
     uint32_t drop_threshold = drop_out_prob * double(RAND_MAX);
@@ -127,7 +136,6 @@ static void row_reduction_run() {
     }
 
     // validation
-    int err_cnt;
     ASSERT_EQ(0,
             (reduction_result_validate<data_type_in, data_type_out, data_type_w,
                     data_type_x, data_type_d, data_type_acc>(buffer_in,

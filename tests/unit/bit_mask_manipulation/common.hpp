@@ -32,8 +32,8 @@ enum class bit_shift_op {
 };
 
 template <typename datatype>
-int bit_shift_result_validate(
-        datatype *A, datatype *B, datatype *C, uint32_t Size, bit_shift_op op) {
+int bit_shift_result_validate(datatype *A, [[maybe_unused]] datatype *B,
+        datatype *C, uint32_t Size, bit_shift_op op) {
     int err_cnt = 0;
     for (uint32_t i = 0; i < Size; ++i) {
         auto lambda = [&, i]() -> std::tuple<datatype, datatype> {

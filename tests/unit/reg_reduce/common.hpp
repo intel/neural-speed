@@ -38,7 +38,8 @@ struct reduce_max {
 };
 
 template <typename dtype, typename op>
-int kernel_validation(float *A, float *B, float *C, unsigned Size) {
+int kernel_validation(
+        float *A, [[maybe_unused]] float *B, float *C, unsigned Size) {
     int err_cnt = 0;
     dtype dst = A[0] + 5;
     for (unsigned i = 1; i < Size; ++i) {

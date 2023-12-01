@@ -69,7 +69,7 @@ public:
     val_128b_t operator()() {
         val_64b_t key_ = key;
         val_128b_t counter_ = counter;
-        for (int i = 0; i < round; i++) {
+        for (uint32_t i = 0; i < round; i++) {
             counter_ = single_round(counter_, key_);
             key_.u32[0] += kPhilox10A;
             key_.u32[1] += kPhilox10B;
@@ -116,11 +116,11 @@ private:
 int rand_result_validate(uint32_t *A, uint32_t *B, uint32_t *C, unsigned Size) {
     std::vector<uint32_t> ret0(Size * 4, 0);
     std::vector<uint32_t> ret1(Size * 4, 0);
-    for (int i = 0; i < Size; i++) {
+    for (uint32_t i = 0; i < Size; i++) {
         philox_t rand(A[3], i, A[5]);
         val_128b_t out0 = rand();
         val_128b_t out1 = rand();
-        for (int j = 0; j < 4; j++) {
+        for (uint32_t j = 0; j < 4; j++) {
             ret0[i + j * Size] = out0.u32[j];
             ret1[i + j * Size] = out1.u32[j];
         }

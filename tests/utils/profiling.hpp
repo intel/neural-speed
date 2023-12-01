@@ -55,13 +55,13 @@ class profiling_helper {
     vector<string> kernel_name;
 
     //Used when profiling multiple kernels, defaults to 1
-    int kernel_nums;
+    uint32_t kernel_nums;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> cpu_start_time;
     std::chrono::time_point<std::chrono::high_resolution_clock> cpu_end_time;
 
     void get_gpu_time_from_events(int kernel_id) {
-        for (const auto gpu_event : gpu_event_vec[kernel_id]) {
+        for (const auto &gpu_event : gpu_event_vec[kernel_id]) {
             auto gpu_start = gpu_event.get_profiling_info<
                     sycl::info::event_profiling::command_start>();
             auto gpu_end = gpu_event.get_profiling_info<
@@ -116,7 +116,7 @@ class profiling_helper {
                 "variance(exclude the first trial) "};
         string unit = "ms";
 
-        for (int i = 0; i < value.size(); i++) {
+        for (uint32_t i = 0; i < value.size(); i++) {
             string info = "The " + desc[i] + "running(" + device
                     + "_time) time is ";
             print_info(label, info, value[i], unit);
@@ -136,7 +136,7 @@ class profiling_helper {
         vector<string> desc = {"minimum ", "maximum ", "median  ", "mean    "};
         string unit = "";
         string perf_string = "";
-        for (int i = 0; i < value.size(); i++) {
+        for (uint32_t i = 0; i < value.size(); i++) {
             string info = "The " + desc[i] + work_name[kernel_id] + "(" + device
                     + "_time) is ";
             double perf = ((double)work_amount[kernel_id] / scaling_ratio)
@@ -197,8 +197,9 @@ class profiling_helper {
                 ":kernel_time:ms", "minimum:maximum:median:mean");
         vector<string> metrics = {"gflops", "mhashs", "GB/s"};
         vector<bool> is_printed(metrics.size(), 0);
-        for (int kernel_id = 0; kernel_id < this->kernel_nums; kernel_id++) {
-            for (int i = 0; i < metrics.size(); i++) {
+        for (uint32_t kernel_id = 0; kernel_id < this->kernel_nums;
+                kernel_id++) {
+            for (uint32_t i = 0; i < metrics.size(); i++) {
                 if (!is_printed[i]
                         && (this->work_name[kernel_id] == metrics[i])) {
                     ::testing::Test::RecordProperty(
@@ -259,7 +260,7 @@ public:
 
     void print_profiling_result(profiling_selector selector) {
         write_performance_metrics_into_report();
-        for (int i = 0; i < kernel_nums; i++) {
+        for (uint32_t i = 0; i < kernel_nums; i++) {
             std::cout << "\n***************** PROFILING FOR KERNEL" << i
                       << " ***********************" << std::endl;
             if (selector != profiling_selector::CPU) {

@@ -40,12 +40,6 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
     constexpr size_t matrix_n = Test::mat_n;
     constexpr size_t matrix_k = Test::mat_k;
 
-    constexpr size_t wg_tile_m = Test::wg_m;
-    constexpr size_t wg_tile_n = Test::wg_n;
-    constexpr size_t sg_tile_m = Test::sg_m;
-    constexpr size_t sg_tile_n = Test::sg_n;
-    constexpr size_t sg_tile_k = Test::sg_k;
-
     size_t size_a = matrix_m * matrix_k;
     size_t size_b = matrix_k * matrix_n;
     size_t size_c = matrix_m * matrix_n;
@@ -197,7 +191,11 @@ void kernel_run(auto nd_range, auto validate_result) {
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type>(
-            Size, [](data_type *data, size_t idx) {}, queue, device, context);
+            Size,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(idx);
+            },
+            queue, device, context);
 
     try {
         auto e_esimd = queue.submit([&](handler &cgh) {

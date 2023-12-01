@@ -310,7 +310,7 @@ public:
     /// @param slm_base Is the slm base address.
     /// @param nbarrier_base Is the named barrier base.
     __XETLA_API KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
-            arguments_t args, uint32_t slm_base = 0,
+            arguments_t args, [[maybe_unused]] uint32_t slm_base = 0,
             uint32_t nbarrier_base = 0) {
         int32_t sg_idx = g.get_id() % wg_size_x;
         int32_t sg_idy = g.get_id() / wg_size_x;
@@ -374,7 +374,7 @@ public:
         nbarrier_a.arrive();
         nbarrier_b.arrive();
 #pragma unroll
-        for (int i = 1; i < num_cyclic - 1; i++) {
+        for (uint32_t i = 1; i < num_cyclic - 1; i++) {
             tile_load(partial_matA, matA_payload);
             tile_load(partial_matB, matB_payload);
 
@@ -400,7 +400,7 @@ public:
         matB_prefetch_payload.template update_tdesc<update_dir_b>(
                 matB_t::tile_size_y * (num_cyclic - 1));
 #pragma unroll
-        for (int i = 0; i < stages; i++) {
+        for (uint32_t i = 0; i < stages; i++) {
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     matA_prefetch_payload);
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -411,7 +411,7 @@ public:
                     matB_t::tile_size_y);
         }
 
-        for (int i = 0; i < args.inner_loop_count; i++) {
+        for (uint32_t i = 0; i < args.inner_loop_count; i++) {
             tile_load(partial_matA, matA_payload);
             tile_load(partial_matB, matB_payload);
 

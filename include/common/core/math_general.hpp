@@ -22,7 +22,8 @@
 #include "common/core/base_ops.hpp"
 #include "common/core/base_types.hpp"
 #include "common/core/common.hpp"
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 namespace gpu::xetla {
 
 /// @addtogroup xetla_core_math
@@ -405,7 +406,7 @@ __XETLA_API xetla_vector<T, SZ> xetla_tanh(xetla_vector<T, SZ> src) {
     xetla_vector<T, SZ> ret;
     if constexpr (SZ / flag_elems > 0) {
 #pragma unroll
-        for (int i = 0; i < SZ / flag_elems; i++) {
+        for (uint32_t i = 0; i < SZ / flag_elems; i++) {
             auto src_sub = src.xetla_select<flag_elems, 1>(i * flag_elems);
             auto ret_sub = ret.xetla_select<flag_elems, 1>(i * flag_elems);
             xetla_mask<flag_elems> mask = src_sub >= 10;
@@ -580,3 +581,4 @@ __XETLA_API xetla_vector<T1, SZ> xetla_sat(xetla_vector<T0, SZ> src) {
 /// @} xetla_core_math
 
 } // namespace gpu::xetla
+#pragma clang diagnostic pop

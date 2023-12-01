@@ -43,7 +43,11 @@ static void vadd_run() {
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type>(
-            size, [](data_type *data, size_t idx) {}, queue, device, context);
+            size,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(0);
+            },
+            queue, device, context);
 
     // We need that many workitems. Each processes VL elements of data.
     cl::sycl::range<1> global_range {size / VL};
@@ -63,7 +67,6 @@ static void vadd_run() {
     }
 
     // validation
-    int err_cnt;
     ASSERT_EQ(0, vadd_result_validate(A, B, C, size, queue));
 
     free(A, context);

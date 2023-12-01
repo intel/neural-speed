@@ -66,7 +66,9 @@ public:
 
     template <typename matAcc_t>
     __XETLA_API KERNEL_FUNC void operator()(work_group_t &g, matAcc_t &matAcc,
-            coord_t coord, const arguments_t &args, uint32_t slm_base = 0,
+            [[maybe_unused]] [[maybe_unused]] [[maybe_unused]] [[maybe_unused]] [[maybe_unused]] [[maybe_unused]] [[maybe_unused]] coord_t
+                    coord,
+            const arguments_t &args, uint32_t slm_base = 0,
             uint32_t nbarrier_base = 0) {
         static_assert(std::is_same<typename matAcc_t::dtype, dtype_acc>::value,
                 "matAcc dtype_acc should match with dtype_acc");

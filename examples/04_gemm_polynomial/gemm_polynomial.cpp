@@ -32,8 +32,6 @@ int gemm_polynomial_result_validate(data_type_a *A_device,
     auto B = alloc_host_and_copy<data_type_b>(B_device, k * n, queue);
     auto C = alloc_host_and_copy<data_type_c>(C_device, m * n, queue);
 
-    bool is_col_major_a = mem_layout_a_ == mem_layout::col_major;
-    bool is_col_major_b = mem_layout_b_ == mem_layout::col_major;
     buff_cmp::buff_vals<data_type_c> data(C, m, n, n);
     std::vector<data_type_acc> gold_C(m * n, 0);
     get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
@@ -42,7 +40,7 @@ int gemm_polynomial_result_validate(data_type_a *A_device,
     std::transform(gold_C.cbegin(), gold_C.cend(), gold_C.begin(),
             [&coeff](data_type_acc x) {
                 data_type_acc res = 0.0f;
-                for (int i = 0; i < coeff.size(); ++i) {
+                for (uint32_t i = 0; i < coeff.size(); ++i) {
                     res = x * res;
                     res += static_cast<data_type_acc>(coeff[i]);
                 }
@@ -120,13 +118,9 @@ void gemm_polynomial_run(int iter) {
 
     // Workload mapping, linear mapping will be used in the code
     // Suppose it is divisible.
-    uint32_t group_range_m = matrix_m / wg_tile_m;
-    uint32_t group_range_n = matrix_n / wg_tile_n;
 
     // Each subgroup will be executed in one hardware thread
     // Calculate how many threads in a workgroup
-    uint32_t thread_range_m = wg_tile_m / sg_tile_m;
-    uint32_t thread_range_n = wg_tile_n / sg_tile_n;
 
     // epilogue function to define how to write result back or post
     // fusion

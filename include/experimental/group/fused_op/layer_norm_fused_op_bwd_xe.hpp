@@ -75,8 +75,10 @@ struct ln_bwd_fused_op_t<ln_fused_op_kind_, dtype_in_, dtype_out_, dtype_acc_,
     /// @param sg_idx
     /// @param sg_idy
     /// @return
-    __XETLA_API void init(arguments_t *args, uint32_t wg_idx, uint32_t wg_idy,
-            uint32_t sg_idx, uint32_t sg_idy) {}
+    __XETLA_API void init([[maybe_unused]] arguments_t *args,
+            [[maybe_unused]] uint32_t wg_idx, [[maybe_unused]] uint32_t wg_idy,
+            [[maybe_unused]] uint32_t sg_idx,
+            [[maybe_unused]] uint32_t sg_idy) {}
 
     /// @brief
     ///
@@ -102,7 +104,7 @@ struct ln_bwd_fused_op_t<ln_fused_op_kind_, dtype_in_, dtype_out_, dtype_acc_,
     /// @param ln_group_row_reduce
     /// @return
     template <typename reduce_t>
-    __XETLA_API void final_op(reduce_t &ln_group_row_reduce) {}
+    __XETLA_API void final_op([[maybe_unused]] reduce_t &ln_group_row_reduce) {}
 };
 
 /// @brief
@@ -352,7 +354,7 @@ struct ln_bwd_fused_op_t<ln_bwd_fused_kind::ln_dropout_gradAdd, dtype_in_,
     /// @param ln_group_row_reduce
     /// @return
     template <typename reduce_t>
-    __XETLA_API void final_op(reduce_t &ln_group_row_reduce) {}
+    __XETLA_API void final_op([[maybe_unused]] reduce_t &ln_group_row_reduce) {}
 };
 
 /// @brief
@@ -449,7 +451,7 @@ struct ln_bwd_fused_op_t<ln_bwd_fused_kind::ln_dropout, dtype_in_, dtype_out_,
     /// @param ln_group_row_reduce
     /// @return
     template <typename reduce_t>
-    __XETLA_API void final_op(reduce_t &ln_group_row_reduce) {}
+    __XETLA_API void final_op([[maybe_unused]] reduce_t &ln_group_row_reduce) {}
 };
 
 } // namespace gpu::xetla::group

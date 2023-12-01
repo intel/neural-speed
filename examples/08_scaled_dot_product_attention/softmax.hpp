@@ -104,7 +104,7 @@ struct xetla_softmax_fwd_t {
                 ? wg_tile_m / thread_num
                 : (wg_tile_m / thread_num) + 1;
 
-        for (int row = 0; row < inner_loop_count; ++row) {
+        for (uint32_t row = 0; row < inner_loop_count; ++row) {
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     softmax_load, softmax_load_payload);
             softmax_load_payload.template update_tdesc<tdesc_update_dir::y_dir>(
