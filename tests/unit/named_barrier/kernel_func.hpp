@@ -22,8 +22,8 @@ using namespace gpu::xetla;
 
 template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::Xe>
 struct named_barrier_func {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
         offsets *= sizeof(dtype);
@@ -33,7 +33,7 @@ struct named_barrier_func {
         nbarrier.arrive();
         nbarrier.wait();
 #pragma unroll
-        for (int i = 0; i < 16; i++) {
+        for (size_t i = 0; i < 16; i++) {
             if (item->get_local_id(0) == i) {
                 xetla_vector<dtype, SIMD> A_load_vec
                         = xetla_load_global(a, offsets);
@@ -52,8 +52,8 @@ struct named_barrier_producer_consumer_1_func {
     // only one named barrier used
     // tidX=2,3 are producers, reads original data , multiplies by 2 and writes to SLM
     // tidX=0,1 are consumers, reads multiplied data from SLM and writes to output buffer
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
         xetla_nbarrier_t<2, 2, arch_tag> nbarrier;
         auto nelem_per_thread = SIMD;
         auto tidX = item->get_local_id(0);
@@ -87,8 +87,8 @@ struct named_barrier_producer_consumer_2_func {
     // tidX=16..31 are producers, reads original data , multiplies by 2 and writes to SLM
     // tidX=0..15 are consumers, reads multiplied data from SLM and writes to output buffer
     // only 1 producer , 1 consumer per named barrier
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
 
         xetla_nbarrier_t<1, 1, arch_tag> nbarrier;
         auto nelem_per_thread = SIMD;
@@ -124,8 +124,8 @@ struct named_barrier_producer_consumer_3_func {
     // 16 named barriers used, only 1 producer , 1 consumer per named barrier, each named barrier is used multiple times
     // tidX=0..7  reads original data , multiplies by 2 writes to SLM, do a barrier wait, then multiplies by 2 again, writes to SLM
     // tidX=8..15 wait for (tidX%8) thread finish the first write, reads multiplied data from SLM ,wait again and do another read, then add the two vector, and writes to output buffer
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run(sycl::nd_item<1> *item, dtype *a,
+            [[maybe_unused]] dtype *b, dtype *c) {
 
         xetla_nbarrier_t<1, 1, arch_tag> nbarrier1;
         xetla_nbarrier_t<1, 1, arch_tag> nbarrier2;

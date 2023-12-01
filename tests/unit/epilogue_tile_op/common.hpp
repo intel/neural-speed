@@ -78,8 +78,8 @@ struct gelu_bwd_op {
 };
 
 template <typename dtype, typename op>
-int tile_elemwise_op_validate(dtype *A, dtype *B, dtype *C, unsigned Sizex,
-        unsigned Blockx, unsigned Blocky) {
+int tile_elemwise_op_validate(dtype *A, [[maybe_unused]] dtype *B, dtype *C,
+        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {
@@ -104,8 +104,8 @@ int tile_elemwise_op_validate(dtype *A, dtype *B, dtype *C, unsigned Sizex,
 }
 
 template <typename dtype>
-int tile_elemwise_bias_add_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
+int tile_elemwise_bias_add_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {
@@ -130,8 +130,8 @@ int tile_elemwise_bias_add_validate(dtype *A, dtype *B, dtype *C,
 }
 
 template <typename dtype>
-int tile_elemwise_gelu_bwd_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
+int tile_elemwise_gelu_bwd_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {
@@ -157,8 +157,8 @@ int tile_elemwise_gelu_bwd_validate(dtype *A, dtype *B, dtype *C,
 }
 
 template <typename dtype>
-int tile_elemwise_res_add_validate(dtype *A, dtype *B, dtype *C, unsigned Sizex,
-        unsigned Blockx, unsigned Blocky) {
+int tile_elemwise_res_add_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {
@@ -183,8 +183,8 @@ int tile_elemwise_res_add_validate(dtype *A, dtype *B, dtype *C, unsigned Sizex,
 }
 
 template <typename dtype>
-int tile_elemwise_linear_op_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
+int tile_elemwise_linear_op_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {

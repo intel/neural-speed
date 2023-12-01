@@ -22,8 +22,8 @@ using namespace gpu::xetla;
 
 template <int SIMD>
 struct xetla_abs_vector_version_with_different_input_and_output_types {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -40,8 +40,8 @@ struct xetla_abs_vector_version_with_different_input_and_output_types {
 
 template <int SIMD>
 struct xetla_abs_vector_version_with_same_input_and_output_types {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -57,24 +57,24 @@ struct xetla_abs_vector_version_with_same_input_and_output_types {
 
 template <int SIMD>
 struct xetla_abs_scalar_version_with_different_input_and_output_types {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         c[0] = static_cast<int>(xetla_abs<float, int>(a[0] - 8));
     }
 };
 
 template <int SIMD>
 struct xetla_abs_scalar_version_with_same_input_and_output_types {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         c[0] = xetla_abs<int>(a[0] - 8);
     }
 };
 
 template <int SIMD>
 struct xetla_max_with_vector_Src0_and_vector_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -90,8 +90,8 @@ struct xetla_max_with_vector_Src0_and_vector_Src1 {
 
 template <int SIMD>
 struct xetla_max_with_vector_Src0_and_scalar_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -106,8 +106,8 @@ struct xetla_max_with_vector_Src0_and_scalar_Src1 {
 
 template <int SIMD>
 struct xetla_max_with_scalar_Src0_and_vector_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -122,16 +122,16 @@ struct xetla_max_with_scalar_Src0_and_vector_Src1 {
 
 template <int SIMD>
 struct xetla_max_with_scalar_Src0_and_scalar_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         c[0] = xetla_max<int>(8, a[0]);
     }
 };
 
 template <int SIMD>
 struct xetla_min_with_vector_Src0_and_vector_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -147,8 +147,8 @@ struct xetla_min_with_vector_Src0_and_vector_Src1 {
 
 template <int SIMD>
 struct xetla_min_with_vector_Src0_and_scalar_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -163,8 +163,8 @@ struct xetla_min_with_vector_Src0_and_scalar_Src1 {
 
 template <int SIMD>
 struct xetla_min_with_scalar_Src0_and_vector_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         uint64_t offset = sizeof(int) * SIMD * item->get_group(0);
         xetla_vector<uint32_t, SIMD> offsets
                 = xetla_vector_gen<uint32_t, SIMD>(0, 1);
@@ -179,8 +179,8 @@ struct xetla_min_with_scalar_Src0_and_vector_Src1 {
 
 template <int SIMD>
 struct xetla_min_with_scalar_Src0_and_scalar_Src1 {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, int *a, int *b, int *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            int *a, [[maybe_unused]] int *b, int *c) {
         c[0] = xetla_min<int>(8, a[0]);
     }
 };

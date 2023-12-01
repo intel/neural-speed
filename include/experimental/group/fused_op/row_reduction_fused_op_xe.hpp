@@ -59,11 +59,14 @@ struct row_reduction_fused_op_t<fused_op_kind_, dtype_in_, dtype_out_,
     using dtype_acc = dtype_acc_;
     using arguments_t = xetla_row_reduction_fused_op_arguments_t<dtype_in,
             dtype_out, dtype_acc>;
-    __XETLA_API row_reduction_fused_op_t(
-            arguments_t *args, int start_n = 0, int start_m = 0) {}
+    __XETLA_API row_reduction_fused_op_t([[maybe_unused]] arguments_t *args,
+            [[maybe_unused]] int start_n = 0,
+            [[maybe_unused]] int start_m = 0) {}
     template <typename matAcc_t>
-    __XETLA_API KERNEL_FUNC void operator()(matAcc_t &matAcc) {}
-    __XETLA_API void update_tdesc(int offset_n = 0, int offset_m = 0) {}
+    __XETLA_API KERNEL_FUNC void operator()([[maybe_unused]] matAcc_t &matAcc) {
+    }
+    __XETLA_API void update_tdesc([[maybe_unused]] int offset_n = 0,
+            [[maybe_unused]] int offset_m = 0) {}
 };
 
 template <typename dtype_in_, typename dtype_out_, typename dtype_acc_,
@@ -183,7 +186,6 @@ struct row_reduction_fused_op_t<reduction_fused_kind::bias_dropout_bwd,
         static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
         static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
         static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
-        static constexpr uint32_t num_elems = matAcc_t::tile_elems;
         using reduction_tile_desc_t = subgroup::tile_desc_t<tile_size_x,
                 tile_size_y, block_size_x, block_size_y, reg_layout::tiled>;
         using mask_in_t = subgroup::tile_t<dtype_mask, reduction_tile_desc_t>;

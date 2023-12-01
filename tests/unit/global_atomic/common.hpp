@@ -21,8 +21,8 @@ using namespace gpu;
 using namespace gpu::xetla;
 
 template <typename datatype>
-int global_atomic_result_validate(
-        datatype *A, datatype *B, datatype *C, uint32_t Size, atomic_op op) {
+int global_atomic_result_validate(datatype *A, datatype *B,
+        [[maybe_unused]] datatype *C, uint32_t Size, atomic_op op) {
     int err_cnt = 0;
     for (uint32_t i = 0; i < Size; ++i) {
         auto lambda = [&, i]() -> std::tuple<datatype, datatype> {
@@ -64,8 +64,8 @@ int global_atomic_result_validate(
     return err_cnt;
 }
 
-int global_atomic_bit_op_result_validate(
-        uint32_t *A, uint32_t *B, uint32_t *C, uint32_t Size, atomic_op op) {
+int global_atomic_bit_op_result_validate(uint32_t *A, uint32_t *B,
+        [[maybe_unused]] uint32_t *C, uint32_t Size, atomic_op op) {
     int err_cnt = 0;
     for (uint32_t i = 0; i < Size; ++i) {
 
@@ -94,8 +94,8 @@ int global_atomic_bit_op_result_validate(
 }
 
 template <typename datatype>
-int global_atomic_with_ret_result_validate(
-        datatype *A, datatype *B, datatype *C, uint32_t Size, atomic_op op) {
+int global_atomic_with_ret_result_validate(datatype *A, datatype *B,
+        [[maybe_unused]] datatype *C, uint32_t Size, atomic_op op) {
     int err_cnt = 0;
     for (uint32_t i = 0; i < Size; ++i) {
         auto lambda = [&, i]() -> std::tuple<datatype, datatype> {
@@ -124,7 +124,7 @@ int global_atomic_with_ret_result_validate(
 
 template <typename datatype>
 int global_atomic_with_mask_result_validate(datatype *A, datatype *B,
-        datatype *C, uint32_t Size, atomic_op op, int mask) {
+        [[maybe_unused]] datatype *C, uint32_t Size, atomic_op op, int mask) {
     int err_cnt = 0;
 
     for (uint32_t i = 0; i < Size; ++i) {

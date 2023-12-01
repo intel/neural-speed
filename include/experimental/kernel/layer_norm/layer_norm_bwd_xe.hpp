@@ -192,7 +192,7 @@ private:
                 = xetla_cvt<dtype_acc, dtype_x>(x);
         /// to generate mixed instruction
 #pragma unroll
-        for (int i = 0; i < sg_tile_n / SIMD; i++) {
+        for (uint32_t i = 0; i < sg_tile_n / SIMD; i++) {
             x_temp.xetla_select<SIMD, 1>(i * SIMD)
                     = rs * (x_acc.xetla_select<SIMD, 1>(i * SIMD) - mu);
         }
@@ -220,7 +220,7 @@ private:
                 = xetla_cvt<dtype_acc, dtype_weight>(gamma);
         /// to generate mixed instruction
 #pragma unroll
-        for (int i = 0; i < sg_tile_n / SIMD; i++) {
+        for (uint32_t i = 0; i < sg_tile_n / SIMD; i++) {
             dy_temp.xetla_select<SIMD, 1>(i * SIMD)
                     = gamma_acc.xetla_select<SIMD, 1>(i * SIMD)
                     * dy.xetla_select<SIMD, 1>(i * SIMD);
@@ -277,7 +277,7 @@ public:
         xetla_vector<dtype_acc, sg_tile_n> dgamma = 0;
         xetla_vector<dtype_acc, sg_tile_n> dbeta = 0;
 
-        for (int row = start_m; row < args->matrix_m;
+        for (uint32_t row = start_m; row < args->matrix_m;
                 row += wg_num_m * wg_tile_m) {
             subgroup::tile_load(dy_in, dy_in_payload);
             subgroup::tile_load(x_in, x_in_payload);

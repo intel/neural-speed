@@ -117,8 +117,6 @@ KERNEL_FUNC inline void vector_add_func(
     xetla_matrix_ref<dtype, SIMD, SIMD> __REF__ C_buffer_2d
             = C_buffer.xetla_format<dtype, SIMD, SIMD>();
 
-    xetla_vector<uint32_t, 2> xy_C;
-    xetla_vector<uint32_t, 2> xy_B;
     xetla_vector<uint32_t, 2> xy_A;
 
     // construct matA read and prefetch message

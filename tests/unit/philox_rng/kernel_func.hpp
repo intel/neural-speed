@@ -23,8 +23,8 @@ template <typename dtype, int SIMD>
 struct rand_func {
     static_assert((std::is_same<remove_const_t<dtype>, uint32_t>::value),
             "only test uint32_t");
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            dtype *a, dtype *b, dtype *c) {
         xetla_vector<dtype, SIMD> src0 = xetla_load_global<dtype, SIMD>(a, 0);
 
         xetla_rand_t<SIMD> rand_gen;

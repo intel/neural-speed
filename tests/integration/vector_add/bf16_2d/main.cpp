@@ -43,7 +43,11 @@ static void vadd_run() {
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type>(
-            size, [](data_type *data, size_t idx) {}, queue, device, context);
+            size,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(0);
+            },
+            queue, device, context);
 
     // each thread process 16x16 block
     cl::sycl::range<1> global_range {size / BL / BL};

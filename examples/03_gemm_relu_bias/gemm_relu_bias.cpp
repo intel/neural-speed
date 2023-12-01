@@ -33,8 +33,6 @@ int gemm_relu_bias_result_validate(data_type_a *A_device, data_type_b *B_device,
     auto C = alloc_host_and_copy<data_type_c>(C_device, m * n, queue);
     auto D = alloc_host_and_copy<data_type_d>(D_device, n, queue);
 
-    bool is_col_major_a = mem_layout_a_ == mem_layout::col_major;
-    bool is_col_major_b = mem_layout_b_ == mem_layout::col_major;
     buff_cmp::buff_vals<data_type_c> data(C, m, n, n);
     std::vector<data_type_acc> gold_C(m * n, 0);
     get_gemm_gold<data_type_a, data_type_b, data_type_acc>(

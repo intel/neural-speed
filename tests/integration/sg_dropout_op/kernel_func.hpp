@@ -22,8 +22,9 @@ using namespace gpu::xetla;
 
 enum class dropout_op : uint8_t { normal = 0, mask_gen = 1 };
 
-template <typename dtype_in, typename dtype_out, typename dtype_acc, int wg_n,
-        int wg_m, int sg_n, int sg_m, dropout_op dropout_kind>
+template <typename dtype_in, typename dtype_out, typename dtype_acc,
+        uint32_t wg_n, uint32_t wg_m, uint32_t sg_n, uint32_t sg_m,
+        dropout_op dropout_kind>
 struct dropout_func_t {
     using mem_desc_in_t
             = mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -65,14 +66,17 @@ struct dropout_func_t {
             uint64_t *rand_offset_ptr, uint32_t mat_m, uint32_t mat_n,
             uint32_t mat_ld, float dropout_prob, float dropout_scale) {
         work_group_t g(item.get_local_linear_id());
-        int start_n = item.get_group(2) * wg_n;
-        int start_m = item.get_group(1) * wg_m;
+        uint32_t start_n = item.get_group(2) * wg_n;
+        uint32_t start_m = item.get_group(1) * wg_m;
         uint32_t boundary_n
                 = (start_n + wg_n) > mat_n ? mat_n : (start_n + wg_n);
         uint32_t boundary_m
                 = (start_m + wg_m) > mat_m ? mat_m : (start_m + wg_m);
+        int current_start_n = start_n;
+        int current_start_m = start_m;
         mem_desc_in_t mem_desc_in({mat_in_ptr},
-                {boundary_n, boundary_m, mat_ld}, {start_n, start_m});
+                {boundary_n, boundary_m, mat_ld},
+                {current_start_n, current_start_m});
         int32_t sg_idx = g.get_id() % wg_size_x;
         int32_t sg_idy = g.get_id() / wg_size_x;
         int32_t tile_offset_n = sg_idx * sg_n;
@@ -80,7 +84,8 @@ struct dropout_func_t {
         mem_desc_in.update_coord(tile_offset_n, tile_offset_m);
 
         mem_desc_out_t mem_desc_out({mat_out_ptr},
-                {boundary_n, boundary_m, mat_ld}, {start_n, start_m});
+                {boundary_n, boundary_m, mat_ld},
+                {current_start_n, current_start_m});
         mat_in_t mat_in;
         mat_in_payload_t mat_in_payload;
         mat_in_payload.init(mem_desc_in);

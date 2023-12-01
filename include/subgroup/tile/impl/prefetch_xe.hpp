@@ -70,7 +70,7 @@ tile_prefetch(payload_t &payload) {
             = payload.tdesc_prefetch.xetla_format<uint32_t, num_tdesc, 16>();
 
 #pragma unroll
-    for (int i = 0; i < num_tdesc; i++) {
+    for (uint32_t i = 0; i < num_tdesc; i++) {
         xetla_tprefetch_global<dtype, L1, L2, payload_t::arch_tag>(
                 tdesc_2d.row(i));
     }
@@ -94,16 +94,16 @@ tile_prefetch(payload_t &payload) {
     using tile_desc = typename payload_t::tile_desc;
     using prefetch_dtype = typename payload_t::prefetch_dtype;
     constexpr uint32_t num_channel = payload_t::num_channel;
-    constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
-    constexpr uint32_t scale_factor = payload_t::scale_factor;
 #pragma unroll
-    for (int i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y; i++) {
+    for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
+            i++) {
         uint32_t offset_y = i * tile_desc::block_size_y;
 #pragma unroll
-        for (int j = 0; j < tile_desc::num_block_x; j++) {
+        for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
             uint32_t offset_x = j * tile_desc::block_size_x;
 #pragma unroll
-            for (int sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
+            for (uint32_t sub_block_y = 0;
+                    sub_block_y < tile_desc::block_size_y;
                     sub_block_y += num_channel) {
                 uint32_t address_offset = payload_t::trans
                         ? offset_x * payload.pitch_in_bytes
@@ -177,6 +177,6 @@ template <cache_hint L1 = cache_hint::cached,
         cache_hint L2 = cache_hint::cached, typename payload_t>
 __XETLA_API typename std::enable_if_t<
         detail::check_prefetch_type<payload_t>::is_local_xe>
-tile_prefetch(payload_t &payload) {}
+tile_prefetch([[maybe_unused]] payload_t &payload) {}
 
 } // namespace gpu::xetla::subgroup

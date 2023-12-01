@@ -90,7 +90,7 @@ __XETLA_API xetla_vector<dtype_acc, N> drop_out(xetla_vector<dtype_acc, N> in,
     constexpr uint32_t unroll_size = num_flag * 16;
     SW_BARRIER();
 #pragma unroll
-    for (int i = 0; i < N / unroll_size; i++) {
+    for (uint32_t i = 0; i < N / unroll_size; i++) {
         xetla_mask<unroll_size> mask_flag
                 = mask.xetla_select<unroll_size, 1>(i * unroll_size) > 0;
         out.xetla_select<unroll_size, 1>(i * unroll_size)

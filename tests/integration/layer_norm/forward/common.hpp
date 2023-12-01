@@ -25,11 +25,11 @@ template <typename data_type_x, typename data_type_weight, typename data_type_y,
         typename data_type_acc = float>
 int ln_fwd_result_validate(data_type_x *In, data_type_y *Out,
         data_type_weight *Gamma, data_type_weight *Beta, data_type_acc *Mu,
-        data_type_acc *Rs, int m, int n, int mask_n, int sg_size_n,
-        data_type_x *buffer_bias, data_type_x *buffer_resAdd,
-        uint8_t *buffer_mask, data_type_x *buffer_bias_dropout_res,
-        float drop_out_scale, ln_fwd_fused_kind ln_fused_op_kind,
-        data_type_acc epsilon = 1e-5) {
+        data_type_acc *Rs, int m, int n, [[maybe_unused]] int mask_n,
+        [[maybe_unused]] int sg_size_n, data_type_x *buffer_bias,
+        data_type_x *buffer_resAdd, uint8_t *buffer_mask,
+        data_type_x *buffer_bias_dropout_res, float drop_out_scale,
+        ln_fwd_fused_kind ln_fused_op_kind, data_type_acc epsilon = 1e-5) {
     bool is_bias_dropout_resAdd_fuse
             = (ln_fused_op_kind == ln_fwd_fused_kind::bias_dropout_resAdd_ln)
             || (ln_fused_op_kind

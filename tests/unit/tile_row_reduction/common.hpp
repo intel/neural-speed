@@ -18,8 +18,8 @@
 #include "kernel_func.hpp"
 
 template <typename dtype>
-int tile_row_reduction_result_validate(dtype *A, dtype *B, dtype *C,
-        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
+int tile_row_reduction_result_validate(dtype *A, [[maybe_unused]] dtype *B,
+        dtype *C, unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     std::vector<float> acc(Blockx, 0);
     for (unsigned i = 0; i < Blocky; ++i) {

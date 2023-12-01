@@ -297,7 +297,6 @@ xetla_tatomic_store_global(uint64_t base_address,
 
     constexpr uint32_t numSrc0 = (N * sizeof(uint64_t) + 63) / 64;
     constexpr uint32_t numSrc1 = (N * sizeof(Ty) + 63) / 64;
-    constexpr uint32_t num_dest = (N * sizeof(Ty) + 63) / 64;
 
     static_assert(sizeof(Ty) == 2 || sizeof(Ty) == 4 || sizeof(Ty) == 8,
             "element_size not supported!");

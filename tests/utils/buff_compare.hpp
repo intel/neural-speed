@@ -210,7 +210,7 @@ ulp_vec xetla_get_ulp_buffer(T &v1) {
 ///
 template <typename dtype>
 bool _handle_fp_types(buff_vals<dtype> &data, buff_vals<dtype> &other,
-        std::string name, size_t ulp_tol, double abs_tol) {
+        [[maybe_unused]] std::string name, size_t ulp_tol, double abs_tol) {
     if (std::is_same<remove_const_t<dtype>, gpu::xetla::bf16>::value) {
         if (ulp_tol == 0) ulp_tol = 8;
         if (abs_tol == 0) abs_tol = 0.25;
@@ -292,7 +292,8 @@ bool _handle_fp_types(buff_vals<dtype> &data, buff_vals<dtype> &other,
 
 template <typename cast_dtype, typename T1, typename T2>
 bool _cast_and_handle_fp_types(T1 &data, T2 &other, std::string name,
-        double diff_elems_tol, size_t ulp_tol, double abs_tol) {
+        [[maybe_unused]] double diff_elems_tol, size_t ulp_tol,
+        double abs_tol) {
     buff_vals<cast_dtype> casted_data, casted_other;
     casted_data.size = data.size;
     casted_data.buff

@@ -21,6 +21,9 @@
 
 #include "common/core/common.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+
 namespace gpu::xetla {
 namespace detail {
 
@@ -148,3 +151,4 @@ __XETLA_API xetla_vector<T, N> xetla_mma(xetla_vector<T, N> src0,
 /// @} xetla_core_math
 
 } // namespace gpu::xetla
+#pragma clang diagnostic pop

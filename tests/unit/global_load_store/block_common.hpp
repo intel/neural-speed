@@ -24,7 +24,7 @@ using namespace gpu::xetla;
 
 template <typename datatype>
 int load_store_result_validate(
-        datatype *A, datatype *B, datatype *C, unsigned Size) {
+        datatype *A, datatype *B, [[maybe_unused]] datatype *C, unsigned Size) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Size; ++i) {
         if (A[i] != B[i]) {

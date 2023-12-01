@@ -94,7 +94,8 @@ enum class process_flag : uint8_t { load = 0, store = 1 };
 template <uint32_t remained_len, uint32_t base_len, process_flag flag,
         cache_hint L1, cache_hint L2, typename payload_t, typename tile_t>
 __XETLA_API typename std::enable_if_t<base_len == 0> process_1d_tail(
-        tile_t &tile, payload_t &payload, uint32_t offset) {}
+        [[maybe_unused]] tile_t &tile, [[maybe_unused]] payload_t &payload,
+        [[maybe_unused]] uint32_t offset) {}
 
 template <uint32_t remained_len, uint32_t base_len, process_flag flag,
         cache_hint L1, cache_hint L2, typename payload_t, typename tile_t>
@@ -130,7 +131,6 @@ template <uint32_t remained_len, uint32_t base_len, process_flag flag,
 __XETLA_API typename std::enable_if_t<base_len != 0
         && payload_t::memory_space == mem_space::local>
 process_1d_tail(tile_t &tile, payload_t &payload, uint32_t offset) {
-    using dtype = typename payload_t::dtype;
     using mem_dtype = typename payload_t::mem_dtype;
     if constexpr (remained_len >= base_len) {
         auto reg_sub
@@ -196,7 +196,7 @@ template <uint32_t num_tdesc, uint32_t size_x, uint32_t size_y,
 __XETLA_API static void reset_tile_desc_core(
         xetla_matrix_ref<uint32_t, num_tdesc, 16> __REF__ payload_row) {
 #pragma unroll
-    for (int j = 0; j < num_tdesc; j++) {
+    for (uint32_t j = 0; j < num_tdesc; j++) {
         constexpr uint8_t block_width
                 = trans ? (size_y / scale_factor) : (size_x / scale_factor);
         constexpr uint8_t block_height = trans ? size_x : size_y;
