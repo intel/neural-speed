@@ -86,7 +86,7 @@ inline auto getTypeName<gpu::xetla::tf32>() {
     return "tf32";
 }
 
-enum class test_result { complete = 0, skip = 1, fail = 2 };
+enum class test_result : uint8_t { complete = 0, skip = 1, fail = 2 };
 
 template <typename result_type>
 inline result_type generate_real_random(

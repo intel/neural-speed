@@ -43,7 +43,7 @@ constexpr uint32_t get_element_size_code() {
     }
 }
 
-enum class lsc_action { prefetch, load, store, atomic };
+enum class lsc_action : uint8_t { prefetch, load, store, atomic };
 
 template <lsc_action Action, cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
 constexpr std::enable_if_t<arch_tag == gpu_arch::Xe, void>

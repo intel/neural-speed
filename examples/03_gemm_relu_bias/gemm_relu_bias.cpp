@@ -138,10 +138,10 @@ void gemm_relu_bias_run(uint32_t iter) {
 
     // Mirco-kernel configuration
     using tune_option = dict_t<
-            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                    tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-            elem_t_t<tune_key::EPILOGUE_POLICY, epilogue_policy>,
-            elem_t_t<tune_key::WG_TILE_SHAPE, shape<wg_tile_n, wg_tile_m>>>;
+            elem_v_t<tune_key::param_optimizer_type,
+                    tune_key_value::param_optimizer_decision_tree>,
+            elem_t_t<tune_key::epilogue_policy, epilogue_policy>,
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
     using default_config_t = gpu::xetla::kernel::default_gemm_config_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A

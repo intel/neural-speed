@@ -85,14 +85,14 @@ void gemm_large_n_run(uint32_t iter) {
             = xetla::kernel::group_swizzle_snake<wg_num_n, gpu_arch::Xe>;
 
     using tune_option = dict_t<
-            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                    tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-            elem_v_t<tune_key::WG_TILE_K, wg_tile_k>,
-            elem_t_t<tune_key::WG_TILE_SHAPE, shape<wg_tile_n, wg_tile_m>>,
-            elem_t_t<tune_key::SG_TILE_SHAPE, shape<sg_tile_n, sg_tile_m>>,
-            elem_t_t<tune_key::GROUP_SWIZZLE_POLICY, group_swizzle>,
-            elem_v_t<tune_key::PREFETCH_DISTANCE, 3>,
-            elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL, 8>>;
+            elem_v_t<tune_key::param_optimizer_type,
+                    tune_key_value::param_optimizer_decision_tree>,
+            elem_v_t<tune_key::wg_tile_k, wg_tile_k>,
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>,
+            elem_t_t<tune_key::sg_tile_shape, shape<sg_tile_n, sg_tile_m>>,
+            elem_t_t<tune_key::group_swizzle_policy, group_swizzle>,
+            elem_v_t<tune_key::prefetch_distance, 3>,
+            elem_v_t<tune_key::periodic_sync_interval, 8>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A

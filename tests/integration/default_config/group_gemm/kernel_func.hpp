@@ -40,16 +40,16 @@ struct default_config_group_gemm_test_func {
 
     // Mirco-kernel configuration
     using gemm_tune_option = dict_t<
-            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                    tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-            elem_v_t<tune_key::DISPATCH_POLICY,
-                    tune_key_value::DISPATCH_POLICY_KSLICING>,
-            elem_v_t<tune_key::GLOBAL_KSLICING_RATIO, global_kslicing>,
-            elem_v_t<tune_key::LOCAL_KSLICING_RATIO, local_kslicing>,
-            elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>,
-            elem_v_t<tune_key::MMA_ENGINE, engine>,
-            elem_v_t<tune_key::PREFETCH_DISTANCE, prefetch_distance>,
-            elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL, periodic_sync_interval>>;
+            elem_v_t<tune_key::param_optimizer_type,
+                    tune_key_value::param_optimizer_decision_tree>,
+            elem_v_t<tune_key::dispatch_policy,
+                    tune_key_value::dispatch_policy_kslicing>,
+            elem_v_t<tune_key::global_kslicing_ratio, global_kslicing>,
+            elem_v_t<tune_key::local_kslicing_ratio, local_kslicing>,
+            elem_t_t<tune_key::sg_tile_shape, sg_shape>,
+            elem_v_t<tune_key::mma_engine, engine>,
+            elem_v_t<tune_key::prefetch_distance, prefetch_distance>,
+            elem_v_t<tune_key::periodic_sync_interval, periodic_sync_interval>>;
     using gemm_t = gpu::xetla::group::default_gemm_selector_t<
             dtype_a, // input datatype for A
             layout_a, // memory layout for A
@@ -67,14 +67,14 @@ struct default_config_group_gemm_test_func {
 
     // Step 2: epilogue function to overwrite the result
     using epilogue_tune_option
-            = dict_t<elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                             tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-                    elem_v_t<tune_key::DISPATCH_POLICY,
-                            tune_key_value::DISPATCH_POLICY_KSLICING>,
-                    elem_v_t<tune_key::GLOBAL_KSLICING_RATIO, global_kslicing>,
-                    elem_v_t<tune_key::LOCAL_KSLICING_RATIO, local_kslicing>,
-                    elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>,
-                    elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>>;
+            = dict_t<elem_v_t<tune_key::param_optimizer_type,
+                             tune_key_value::param_optimizer_decision_tree>,
+                    elem_v_t<tune_key::dispatch_policy,
+                            tune_key_value::dispatch_policy_kslicing>,
+                    elem_v_t<tune_key::global_kslicing_ratio, global_kslicing>,
+                    elem_v_t<tune_key::local_kslicing_ratio, local_kslicing>,
+                    elem_t_t<tune_key::sg_tile_shape, sg_shape>,
+                    elem_t_t<tune_key::sg_tile_shape, sg_shape>>;
     using epilogue_t = gpu::xetla::group::default_epilogue_selector_t<
             dtype_c, // output datatype for C
             mem_layout::row_major, // memory layout for C

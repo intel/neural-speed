@@ -184,13 +184,13 @@ void gemm_softmax_run(uint32_t iter) {
 
                     // Mirco-kernel configuration
                     using tune_option = dict_t<
-                            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
+                            elem_v_t<tune_key::param_optimizer_type,
                                     tune_key_value::
-                                            PARAM_OPTIMZER_DECISION_TREE>,
-                            elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>,
-                            elem_v_t<tune_key::PREFETCH_DISTANCE,
+                                            param_optimizer_decision_tree>,
+                            elem_t_t<tune_key::sg_tile_shape, sg_shape>,
+                            elem_v_t<tune_key::prefetch_distance,
                                     prefetch_distance>,
-                            elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL,
+                            elem_v_t<tune_key::periodic_sync_interval,
                                     periodic_sync_interval>>;
                     using gemm_op_t = xetla::group::default_gemm_selector_t<
                             data_type_a, // input datatype for A

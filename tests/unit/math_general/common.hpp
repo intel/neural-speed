@@ -17,7 +17,7 @@
 
 #include "kernel_func.hpp"
 
-enum class math_op {
+enum class math_op : uint8_t {
     abs_vector = 0,
     abs_scalar = 1,
     min_vector = 2,

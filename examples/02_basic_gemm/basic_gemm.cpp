@@ -120,10 +120,10 @@ void basic_gemm_run(uint32_t iter) {
 
                 // Mirco-kernel configuration
                 using gemm_tune_option
-                        = dict_t<elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>,
-                                elem_v_t<tune_key::PREFETCH_DISTANCE,
+                        = dict_t<elem_t_t<tune_key::sg_tile_shape, sg_shape>,
+                                elem_v_t<tune_key::prefetch_distance,
                                         prefetch_distance>,
-                                elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL,
+                                elem_v_t<tune_key::periodic_sync_interval,
                                         periodic_sync_interval>>;
                 using gemm_t = xetla::group::default_gemm_selector_t<
                         data_type_a, // input datatype for A
@@ -145,7 +145,7 @@ void basic_gemm_run(uint32_t iter) {
 
                 // Step 2: epilogue function to overwrite the result
                 using epilogue_tune_option
-                        = dict_t<elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>>;
+                        = dict_t<elem_t_t<tune_key::sg_tile_shape, sg_shape>>;
                 using epilogue_t = xetla::group::default_epilogue_selector_t<
                         data_type_c, // onput datatype for C
                         mem_layout::row_major, // memory layout for C

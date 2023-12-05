@@ -264,15 +264,15 @@ void sdp_fwd_run(uint32_t iter) {
                     using group_swizzle = group_swizzle_default<gpu_arch::Xe>;
 
                     using tune_option0 = dict_t<
-                            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
+                            elem_v_t<tune_key::param_optimizer_type,
                                     tune_key_value::
-                                            PARAM_OPTIMZER_DECISION_TREE>,
-                            elem_t_t<tune_key::EPILOGUE_POLICY,
+                                            param_optimizer_decision_tree>,
+                            elem_t_t<tune_key::epilogue_policy,
                                     epilogue_policy0>,
-                            elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape0>,
-                            elem_v_t<tune_key::PREFETCH_DISTANCE,
+                            elem_t_t<tune_key::sg_tile_shape, sg_shape0>,
+                            elem_v_t<tune_key::prefetch_distance,
                                     prefetch_distance>,
-                            elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL,
+                            elem_v_t<tune_key::periodic_sync_interval,
                                     periodic_sync_interval>>;
                     using gemm0_t = xetla::group::default_gemm_selector_t<
                             dtype_in, // input datatype for A
@@ -363,13 +363,13 @@ void sdp_fwd_run(uint32_t iter) {
                     using sg_shape1 = shape<sg_tile_n_sv, sg_tile_m_sv>;
 
                     using tune_option1 = dict_t<
-                            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
+                            elem_v_t<tune_key::param_optimizer_type,
                                     tune_key_value::
-                                            PARAM_OPTIMZER_DECISION_TREE>,
-                            elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape1>,
-                            elem_v_t<tune_key::PREFETCH_DISTANCE,
+                                            param_optimizer_decision_tree>,
+                            elem_t_t<tune_key::sg_tile_shape, sg_shape1>,
+                            elem_v_t<tune_key::prefetch_distance,
                                     prefetch_distance>,
-                            elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL,
+                            elem_v_t<tune_key::periodic_sync_interval,
                                     periodic_sync_interval>>;
                     // Using gemm_selector to get a specific gemm class
                     using gemm1_t = xetla::group::default_gemm_selector_t<

@@ -24,8 +24,8 @@ namespace decision_tree_rule {
 template <typename T>
 struct data_type_handler {
     using type = typename T::template update_dict_t<dict_t<elem_t_t<
-            tune_key::DATA_TYPE_ACC,
-            typename T::template find_elem_t<tune_key::DATA_TYPE_ACC>::type>>>;
+            tune_key::data_type_acc,
+            typename T::template find_elem_t<tune_key::data_type_acc>::type>>>;
 };
 
 template <typename dict_t_>
@@ -42,10 +42,10 @@ struct tile_shape_handler {
             static constexpr uint32_t sg_tile_shape_m = sg_tile_shape_m_;
 
             using to_dict
-                    = dict_t<elem_t_t<tune_key::WG_TILE_SHAPE,
+                    = dict_t<elem_t_t<tune_key::wg_tile_shape,
                                      shape<wg_tile_shape_n, wg_tile_shape_m>>,
-                            elem_v_t<tune_key::WG_TILE_K, wg_tile_k>,
-                            elem_t_t<tune_key::SG_TILE_SHAPE,
+                            elem_v_t<tune_key::wg_tile_k, wg_tile_k>,
+                            elem_t_t<tune_key::sg_tile_shape,
                                     shape<sg_tile_shape_n, sg_tile_shape_m>>>;
         };
 
@@ -101,15 +101,15 @@ struct tile_shape_handler {
         template <typename T>
         struct from_dict_impl {
             using wg_tile_shape = typename T::template find_elem_t<
-                    tune_key::WG_TILE_SHAPE>::type;
+                    tune_key::wg_tile_shape>::type;
             using sg_tile_shape = typename T::template find_elem_t<
-                    tune_key::SG_TILE_SHAPE>::type;
+                    tune_key::sg_tile_shape>::type;
             static constexpr uint32_t wg_tile_shape_n
                     = wg_tile_shape::template dim<0>();
             static constexpr uint32_t wg_tile_shape_m
                     = wg_tile_shape::template dim<1>();
             static constexpr uint32_t wg_tile_k
-                    = T::template find_elem_v<tune_key::WG_TILE_K>;
+                    = T::template find_elem_v<tune_key::wg_tile_k>;
             static constexpr uint32_t sg_tile_shape_n
                     = sg_tile_shape::template dim<0>();
             static constexpr uint32_t sg_tile_shape_m
@@ -158,17 +158,17 @@ struct kslicing_handler {
                     local_kslicing_ratio, wg_tile_shape_n, wg_tile_shape_m,
                     wg_tile_k, sg_tile_shape_n, sg_tile_shape_m>;
 
-            using to_dict = dict_t<elem_v_t<tune_key::GLOBAL_KSLICING_RATIO,
+            using to_dict = dict_t<elem_v_t<tune_key::global_kslicing_ratio,
                                            global_kslicing_ratio>,
-                    elem_v_t<tune_key::LOCAL_KSLICING_RATIO,
+                    elem_v_t<tune_key::local_kslicing_ratio,
                             local_kslicing_ratio>,
-                    elem_t_t<tune_key::WG_TILE_SHAPE,
+                    elem_t_t<tune_key::wg_tile_shape,
                             shape<wg_tile_shape_n, wg_tile_shape_m>>,
-                    elem_v_t<tune_key::WG_TILE_K, wg_tile_k>,
-                    elem_t_t<tune_key::SG_TILE_SHAPE,
+                    elem_v_t<tune_key::wg_tile_k, wg_tile_k>,
+                    elem_t_t<tune_key::sg_tile_shape,
                             shape<sg_tile_shape_n, sg_tile_shape_m>>,
-                    elem_v_t<tune_key::DISPATCH_POLICY,
-                            tune_key_value::DISPATCH_POLICY_KSLICING>>;
+                    elem_v_t<tune_key::dispatch_policy,
+                            tune_key_value::dispatch_policy_kslicing>>;
 
             template <template <typename> typename G>
             using apply = typename G<this_t>::type;
@@ -177,19 +177,19 @@ struct kslicing_handler {
         template <typename T>
         struct from_dict_impl {
             static constexpr uint32_t global_kslicing_ratio
-                    = T::template find_elem_v<tune_key::GLOBAL_KSLICING_RATIO>;
+                    = T::template find_elem_v<tune_key::global_kslicing_ratio>;
             static constexpr uint32_t local_kslicing_ratio
-                    = T::template find_elem_v<tune_key::LOCAL_KSLICING_RATIO>;
+                    = T::template find_elem_v<tune_key::local_kslicing_ratio>;
             using wg_tile_shape = typename T::template find_elem_t<
-                    tune_key::WG_TILE_SHAPE>::type;
+                    tune_key::wg_tile_shape>::type;
             using sg_tile_shape = typename T::template find_elem_t<
-                    tune_key::SG_TILE_SHAPE>::type;
+                    tune_key::sg_tile_shape>::type;
             static constexpr uint32_t wg_tile_shape_n
                     = wg_tile_shape::template dim<0>();
             static constexpr uint32_t wg_tile_shape_m
                     = wg_tile_shape::template dim<1>();
             static constexpr uint32_t wg_tile_k
-                    = T::template find_elem_v<tune_key::WG_TILE_K>;
+                    = T::template find_elem_v<tune_key::wg_tile_k>;
             static constexpr uint32_t sg_tile_shape_n
                     = sg_tile_shape::template dim<0>();
             static constexpr uint32_t sg_tile_shape_m
@@ -257,7 +257,7 @@ struct kslicing_handler {
     using update_config = typename impl::update_config_impl::type;
     using type = typename std::conditional<
             (dict_t_::template find_elem_v<tune_key::
-                             DISPATCH_POLICY> == tune_key_value::DISPATCH_POLICY_KSLICING),
+                             dispatch_policy> == tune_key_value::dispatch_policy_kslicing),
             typename dict_t_::template update_dict_t<
                     typename update_config::to_dict>,
             dict_t_>::type;
@@ -267,32 +267,32 @@ struct kslicing_handler {
 template <typename dict_t_, typename opt_dict_t_>
 struct fallback_optimizer {
     using type = typename opt_dict_t_::template update_t<
-            elem_t_t<tune_key::DATA_TYPE_A,
+            elem_t_t<tune_key::data_type_a,
                     typename dict_t_::template find_elem_t<
-                            tune_key::DATA_TYPE_A>::type>,
-            elem_t_t<tune_key::DATA_TYPE_B,
+                            tune_key::data_type_a>::type>,
+            elem_t_t<tune_key::data_type_b,
                     typename dict_t_::template find_elem_t<
-                            tune_key::DATA_TYPE_B>::type>,
-            elem_t_t<tune_key::DATA_TYPE_C,
+                            tune_key::data_type_b>::type>,
+            elem_t_t<tune_key::data_type_c,
                     typename dict_t_::template find_elem_t<
-                            tune_key::DATA_TYPE_C>::type>,
-            elem_v_t<tune_key::MEMORY_LAYOUT_A,
-                    dict_t_::template find_elem_v<tune_key::MEMORY_LAYOUT_A>>,
-            elem_v_t<tune_key::MEMORY_LAYOUT_B,
-                    dict_t_::template find_elem_v<tune_key::MEMORY_LAYOUT_B>>,
-            elem_v_t<tune_key::MEMORY_LAYOUT_C,
-                    dict_t_::template find_elem_v<tune_key::MEMORY_LAYOUT_C>>,
-            elem_v_t<tune_key::MEMORY_ALIGNMENT_A,
+                            tune_key::data_type_c>::type>,
+            elem_v_t<tune_key::memory_layout_a,
+                    dict_t_::template find_elem_v<tune_key::memory_layout_a>>,
+            elem_v_t<tune_key::memory_layout_b,
+                    dict_t_::template find_elem_v<tune_key::memory_layout_b>>,
+            elem_v_t<tune_key::memory_layout_c,
+                    dict_t_::template find_elem_v<tune_key::memory_layout_c>>,
+            elem_v_t<tune_key::memory_alignment_a,
                     dict_t_::template find_elem_v<
-                            tune_key::MEMORY_ALIGNMENT_A>>,
-            elem_v_t<tune_key::MEMORY_ALIGNMENT_B,
+                            tune_key::memory_alignment_a>>,
+            elem_v_t<tune_key::memory_alignment_b,
                     dict_t_::template find_elem_v<
-                            tune_key::MEMORY_ALIGNMENT_B>>,
-            elem_v_t<tune_key::MEMORY_ALIGNMENT_C,
+                            tune_key::memory_alignment_b>>,
+            elem_v_t<tune_key::memory_alignment_c,
                     dict_t_::template find_elem_v<
-                            tune_key::MEMORY_ALIGNMENT_C>>,
-            elem_v_t<tune_key::GPU_ARCH,
-                    dict_t_::template find_elem_v<tune_key::GPU_ARCH>>>;
+                            tune_key::memory_alignment_c>>,
+            elem_v_t<tune_key::gpu_arch,
+                    dict_t_::template find_elem_v<tune_key::gpu_arch>>>;
 };
 
 template <param_optimizer_tag tag_, typename dict_t_, typename... candidates_t>
