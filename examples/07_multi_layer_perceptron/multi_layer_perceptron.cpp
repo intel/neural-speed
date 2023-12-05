@@ -169,12 +169,12 @@ void mlp_run(uint32_t iter) {
             xetla::subgroup::chained_tile_op_t<gpu::xetla::subgroup::relu_op_t>,
             gpu_arch::Xe>;
     using layer1_tune_option
-            = dict_t<elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                             tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-                    elem_t_t<tune_key::EPILOGUE_POLICY, epilogue_policy_layer1>,
-                    elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape_layer1>,
-                    elem_v_t<tune_key::PREFETCH_DISTANCE, stages>,
-                    elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL, sync_freq>>;
+            = dict_t<elem_v_t<tune_key::param_optimizer_type,
+                             tune_key_value::param_optimizer_decision_tree>,
+                    elem_t_t<tune_key::epilogue_policy, epilogue_policy_layer1>,
+                    elem_t_t<tune_key::sg_tile_shape, sg_shape_layer1>,
+                    elem_v_t<tune_key::prefetch_distance, stages>,
+                    elem_v_t<tune_key::periodic_sync_interval, sync_freq>>;
     using gemm_layer1_t = xetla::group::default_gemm_selector_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A
@@ -205,11 +205,11 @@ void mlp_run(uint32_t iter) {
 
     // Mirco-kernel configuration
     using layer2_tune_option
-            = dict_t<elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                             tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-                    elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape_layer2>,
-                    elem_v_t<tune_key::PREFETCH_DISTANCE, stages>,
-                    elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL, sync_freq>>;
+            = dict_t<elem_v_t<tune_key::param_optimizer_type,
+                             tune_key_value::param_optimizer_decision_tree>,
+                    elem_t_t<tune_key::sg_tile_shape, sg_shape_layer2>,
+                    elem_v_t<tune_key::prefetch_distance, stages>,
+                    elem_v_t<tune_key::periodic_sync_interval, sync_freq>>;
     using gemm_layer2_t = xetla::group::default_gemm_selector_t<
             data_type_b, // input datatype for B
             mem_layout::row_major, // memory layout for B

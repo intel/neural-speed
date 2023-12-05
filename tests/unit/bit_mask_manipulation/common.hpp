@@ -16,7 +16,7 @@
 #pragma once
 #include "utils/utils.hpp"
 
-enum class bit_shift_op {
+enum class bit_shift_op : uint8_t {
     shl_vector = 0,
     shl_scalar = 1,
     shr_vector = 2,

@@ -16,7 +16,7 @@
 #include "tests/utils/utils.hpp"
 #include "xetla.hpp"
 
-enum class kslicing_impl_t { none = 0, global = 1, local = 2 };
+enum class kslicing_impl_t : uint8_t { none = 0, global = 1, local = 2 };
 
 template <kslicing_impl_t kslicing_type = kslicing_impl_t::none>
 void gemm_universal_run(uint32_t iter) {
@@ -84,14 +84,14 @@ void gemm_universal_run(uint32_t iter) {
 
     // Mirco-kernel configuration
     using tune_option = dict_t<
-            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                    tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-            elem_t_t<tune_key::DATA_TYPE_ACC, data_type_acc>,
-            elem_v_t<tune_key::DISPATCH_POLICY,
-                    tune_key_value::DISPATCH_POLICY_KSLICING>,
-            elem_v_t<tune_key::GLOBAL_KSLICING_RATIO, num_global_splitk>,
-            elem_v_t<tune_key::LOCAL_KSLICING_RATIO, num_local_splitk>,
-            elem_t_t<tune_key::WG_TILE_SHAPE, shape<wg_tile_n, wg_tile_m>>>;
+            elem_v_t<tune_key::param_optimizer_type,
+                    tune_key_value::param_optimizer_decision_tree>,
+            elem_t_t<tune_key::data_type_acc, data_type_acc>,
+            elem_v_t<tune_key::dispatch_policy,
+                    tune_key_value::dispatch_policy_kslicing>,
+            elem_v_t<tune_key::global_kslicing_ratio, num_global_splitk>,
+            elem_v_t<tune_key::local_kslicing_ratio, num_local_splitk>,
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A
