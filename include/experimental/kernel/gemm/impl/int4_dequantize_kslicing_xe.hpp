@@ -274,8 +274,13 @@ public:
     __XETLA_API static constexpr uint32_t get_slm_size() {
         constexpr uint32_t size = gemm_slm_size * num_local_kslicing
                 + kslicing_slm_size + epilogue_slm_size * num_local_kslicing;
-        static_assert(size <= (128 * 1024),
-                "The local memory size should be less than 128KB!");
+        if constexpr (arch_tag == gpu_arch::Dg2) {
+            static_assert(size <= (64 * 1024),
+                    "The local memory size should be less than 64KB!");
+        } else {
+            static_assert(size <= (128 * 1024),
+                    "The local memory size should be less than 128KB!");
+        }
         return size;
     }
 
