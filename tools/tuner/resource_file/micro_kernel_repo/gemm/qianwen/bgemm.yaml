@@ -1,0 +1,54 @@
+file_type: micro_kernel_attri_cfg
+micro_kernel_type: GEMM
+micro_kernel_name: kernel_func.hpp
+tune_parameter:
+    wg_m:
+        start_value: 8
+        end_value: 256
+        # end_value: 16
+        stride: 8
+    wg_n:
+        start_value: 8
+        end_value: 256
+        # end_value: 16
+        stride: 8
+    sg_m:
+        start_value: 8
+        end_value: 128
+        # end_value: 16
+        stride: 8
+    sg_n:
+        start_value: 16
+        end_value: 128
+        # end_value: 16
+        stride: 8
+    sg_k:
+        start_value: 16
+        end_value: 64
+        # end_value: 16
+        stride: 8
+    #[1,2,4,8,16,32]#power of 2
+    local_kslicing:
+        start_value: 1
+        end_value: 8
+        # end_value: 1
+        stride: 1
+    global_kslicing:
+        start_value: 1
+        end_value: 2
+        # end_value: 1
+        stride: 1
+    # This parameter indicates the workgroup number in
+    # single Xe-core on vectorizonal direction
+    # available settings: 1, 2, 4 ,8, 16, 32, 64
+    # default 8
+    # wg_num_single_xcore:
+    #     start_value: 1
+    #     end_value: 64
+    #     # end_value: 1
+    #     stride: 1
+    # avail_xcores:
+    #     start_value: 32
+    #     end_value: 64
+    #     # end_value: 32
+    #     stride: 32

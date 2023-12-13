@@ -1,0 +1,405 @@
+/*******************************************************************************
+* Copyright (c) 2022-2023 Intel Corporation
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
+
+#include "kernel_func.hpp"
+#include "test.hpp"
+#include "utils/utils.hpp"
+#include "xetla.hpp"
+
+using namespace gpu::xetla;
+
+using namespace cl::sycl;
+
+bool enable_validation = false;
+
+template <class Test>
+bool can_implement(typename Test::data_type_a *A, typename Test::data_type_b *B,
+        typename Test::data_type_c *C, uint32_t mat_m, uint32_t mat_n,
+        uint32_t mat_k, uint32_t lda, uint32_t ldb, uint32_t ldc,
+        typename Test::data_type_bias *bias_ptr,
+        typename Test::data_type_res *res_ptr0,
+        typename Test::data_type_res *res_ptr1,
+        typename Test::data_type_acc *acc_ptr, uint32_t *cnt_ptr) {
+    if (Test::global_kslicing > 1) {
+        std::cout << "global_kslicing = " << Test::global_kslicing
+                  << " is not supported! Please modify the kernel!"
+                  << std::endl;
+        return false;
+    }
+    using gemm_functor = gemm_test_func<typename Test::data_type_a,
+            typename Test::data_type_b, typename Test::data_type_c,
+            typename Test::data_type_bias, typename Test::data_type_res,
+            typename Test::data_type_acc, Test::wg_m, Test::wg_n, Test::sg_m,
+            Test::sg_n, Test::sg_k, Test::layout_a, Test::layout_b,
+            Test::global_kslicing, Test::local_kslicing, Test::fused_op>;
+
+    return gemm_functor::can_implement(A, B, C, mat_m, mat_n, mat_k, lda, ldb,
+            ldc, bias_ptr, res_ptr0, res_ptr1, acc_ptr, cnt_ptr);
+}
+
+float tanh_cpu(float x) {
+    float exp2x = std::exp(x * 2.f);
+    float ret = (exp2x - 1.f) / (exp2x + 1.f);
+    return (x >= 10) ? 1 : ret;
+}
+float gelu_for_valid(float x) {
+    constexpr float C0 = 0.044715f;
+    constexpr float sqrt_two_over_pi = 0.79788458347320556640625f;
+    float input_x = sqrt_two_over_pi * x * (1.f + C0 * x * x);
+    float tanh_value = tanh_cpu(input_x);
+    float result = (0.5f * x * (1.f + tanh_value));
+    return result;
+}
+
+float gelu_bwd_w_for_valid(float x) {
+    constexpr float C0 = 0.044715f;
+    constexpr float D0 = 0.134145f;
+    constexpr float sqrt_two_over_pi = 0.79788458347320556640625f;
+    float input_x = sqrt_two_over_pi * x * (1.f + C0 * x * x);
+    float z = tanh_cpu(input_x);
+    float result = 0.5f * (1 + z)
+            + 0.5f * x * (1.f - z * z)
+                    * (sqrt_two_over_pi * (1.f + D0 * x * x));
+    return result;
+}
+template <typename data_type_a, typename data_type_b, typename data_type_c,
+        typename data_type_bias, typename data_type_res,
+        typename data_type_acc = float>
+int gemm_result_validate(data_type_a *A, data_type_b *B, data_type_c *C,
+        data_type_bias *bias, data_type_res *res0, data_type_res *res1, int m,
+        int k, int n, string name,
+        mem_layout mem_layout_a_ = mem_layout::row_major,
+        mem_layout mem_layout_b_ = mem_layout::row_major,
+        fused_type fused_op = fused_type::none) {
+    buff_cmp::buff_vals<data_type_c> gpu_C(C, m, n, n);
+    std::vector<data_type_acc> gold_C(m * n, 0);
+
+    get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
+            m, n, k, mem_layout_a_, mem_layout_b_, A, B, gold_C.data());
+
+    if (fused_op == fused_type::bias || fused_op == fused_type::bias_gelu) {
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                gold_C[i * n + j] += (data_type_acc)bias[j];
+            }
+        }
+    }
+    if (fused_op == fused_type::bias_gelu) {
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                gold_C[i * n + j] = gelu_for_valid(gold_C[i * n + j]);
+            }
+        }
+    }
+    if (fused_op == fused_type::res_add) {
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                gold_C[i * n + j] += (data_type_acc)res0[i * n + j];
+                gold_C[i * n + j] += (data_type_acc)res1[i * n + j];
+            }
+        }
+    }
+
+    buff_cmp::buff_vals<data_type_c, data_type_acc> cpu_C(
+            gold_C.data(), m, n, n);
+    bool result = buff_cmp::xetla_buff_cmp(gpu_C, cpu_C, name);
+
+    std::cout << (!result ? "FAILED\n" : "PASSED\n");
+    return result ? 0 : 1;
+}
+
+std::string get_fused_op_str(fused_type fused_op) {
+    if (fused_op == fused_type::none) { return "fused_type::none"; }
+    if (fused_op == fused_type::bias) { return "fused_type::bias"; }
+    if (fused_op == fused_type::bias_gelu) { return "fused_type::bias_gelu"; }
+    if (fused_op == fused_type::res_add) { return "fused_type::res_add"; }
+    return "fused_type::none";
+}
+
+template <class Test>
+void gemm_run(int iter) {
+
+    //Accept incoming parameters
+    constexpr size_t matrix_m = Test::mat_m;
+    constexpr size_t matrix_n = Test::mat_n;
+    constexpr size_t matrix_k = Test::mat_k;
+    constexpr size_t wg_tile_m = Test::wg_m;
+    constexpr size_t wg_tile_n = Test::wg_n;
+    constexpr size_t sg_tile_m = Test::sg_m;
+    constexpr size_t sg_tile_n = Test::sg_n;
+    constexpr size_t sg_tile_k = Test::sg_k;
+    constexpr fused_type fused_op = Test::fused_op;
+
+    using data_type_a = typename Test::data_type_a;
+    using data_type_b = typename Test::data_type_b;
+    using data_type_c = typename Test::data_type_c;
+    using data_type_res = typename Test::data_type_res;
+    using data_type_bias = typename Test::data_type_bias;
+    using data_type_acc = typename Test::data_type_acc;
+
+    uint32_t lda
+            = Test::layout_a == mem_layout::col_major ? matrix_m : matrix_k;
+    uint32_t ldb
+            = Test::layout_b == mem_layout::col_major ? matrix_k : matrix_n;
+    uint32_t ldc = matrix_n;
+
+    std::string mem_layout_a_str = Test::layout_a == mem_layout::col_major
+            ? "gpu::xetla::mem_layout::col_major"
+            : "gpu::xetla::mem_layout::row_major";
+    std::string mem_layout_b_str = Test::layout_b == mem_layout::col_major
+            ? "gpu::xetla::mem_layout::col_major"
+            : "gpu::xetla::mem_layout::row_major";
+    std::string fused_op_str = get_fused_op_str(fused_op);
+
+    constexpr size_t size_a = matrix_m * matrix_k;
+    constexpr size_t size_b = matrix_k * matrix_n;
+    constexpr size_t size_c = matrix_m * matrix_n;
+    constexpr size_t size_bias = 1 * matrix_n;
+    constexpr size_t size_res = matrix_m * matrix_n;
+    // constexpr uint32_t num_buffer = 1;
+    constexpr uint32_t num_buffer = (long)2 * 1024 * 1024 * 1024
+            / (size_a * sizeof(data_type_a) + size_b * sizeof(data_type_b)
+                    + size_c * sizeof(data_type_c));
+    if (num_buffer != 1) {
+        std::cout << num_buffer
+                  << "is not 1, The kernel may take a long time to run, please "
+                     "wait patiently."
+                  << std::endl;
+    }
+    //Turn on the enable_profiling property to facilitate subsequent profiling
+    sycl::property_list properties {sycl::property::queue::enable_profiling()};
+    auto Queue = queue(properties);
+    auto Context = Queue.get_info<info::queue::context>();
+    auto Device = Queue.get_info<info::queue::device>();
+
+    std::cout << "Running on " << Device.get_info<info::device::name>() << "\n";
+    using gemm_functor = gemm_test_func<data_type_a, data_type_b, data_type_c,
+            data_type_bias, data_type_res, data_type_acc, wg_tile_m, wg_tile_n,
+            sg_tile_m, sg_tile_n, sg_tile_k, Test::layout_a, Test::layout_b,
+            Test::global_kslicing, Test::local_kslicing, fused_op>;
+    using gemm_op_t = typename gemm_functor::gemm_op_t;
+    size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
+    size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
+
+    //Define and initialize the data required for the calculation
+    data_type_a *A = static_cast<data_type_a *>(malloc_shared(
+            size_a * sizeof(data_type_a) * num_buffer, Device, Context));
+    if (A == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    data_type_b *B = static_cast<data_type_b *>(malloc_shared(
+            size_b * sizeof(data_type_b) * num_buffer, Device, Context));
+    if (B == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    data_type_c *C = static_cast<data_type_c *>(malloc_shared(
+            size_c * sizeof(data_type_c) * num_buffer, Device, Context));
+    if (C == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    data_type_bias *bias = static_cast<data_type_bias *>(malloc_shared(
+            size_bias * sizeof(data_type_bias) * num_buffer, Device, Context));
+    if (bias == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    data_type_res *res0 = static_cast<data_type_res *>(malloc_shared(
+            size_res * sizeof(data_type_res) * num_buffer, Device, Context));
+    if (res0 == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    data_type_res *res1 = static_cast<data_type_res *>(malloc_shared(
+            size_res * sizeof(data_type_res) * num_buffer, Device, Context));
+    if (res1 == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    data_type_acc *Acc = static_cast<data_type_acc *>(malloc_shared(
+            size_acc * sizeof(data_type_acc) * num_buffer, Device, Context));
+    if (Acc == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+    uint32_t *Cnt = static_cast<uint32_t *>(malloc_shared(
+            size_cnt * sizeof(uint32_t) * num_buffer, Device, Context));
+    if (Cnt == nullptr) {
+        std::cout << "Out of memory. line=%d" << __LINE__ << std::endl;
+        return;
+    }
+
+    for (size_t i = 0; i < size_a * num_buffer; ++i) {
+        A[i] = (random_float() - 0.5f);
+    }
+    for (size_t i = 0; i < size_b * num_buffer; ++i) {
+        B[i] = (random_float() - 0.5f);
+    }
+    for (size_t i = 0; i < size_bias * num_buffer; ++i) {
+        bias[i] = (random_float() - 0.5f);
+    }
+    for (size_t i = 0; i < size_c * num_buffer; ++i) {
+        C[i] = 0;
+    }
+    for (size_t i = 0; i < size_res * num_buffer; ++i) {
+        res0[i] = (random_float() - 0.5f);
+        res1[i] = (random_float() - 0.5f);
+    }
+    for (size_t i = 0; i < size_acc * num_buffer; ++i) {
+        Acc[i] = 0;
+    }
+    for (size_t i = 0; i < size_cnt * num_buffer; ++i) {
+        Cnt[i] = 0;
+    }
+    // here keep the same dim in CM and esimd, diff the index in kernel code
+    size_t group_range_m = (matrix_m % wg_tile_m == 0)
+            ? matrix_m / wg_tile_m
+            : (matrix_m / wg_tile_m) + 1;
+    size_t group_range_n = (matrix_n % wg_tile_n == 0)
+            ? matrix_n / wg_tile_n
+            : (matrix_n / wg_tile_n) + 1;
+    size_t subgroup_range_m = (wg_tile_m % sg_tile_m == 0)
+            ? wg_tile_m / sg_tile_m
+            : (wg_tile_m / sg_tile_m) + 1;
+    size_t subgroup_range_n = (wg_tile_n % sg_tile_n == 0)
+            ? wg_tile_n / sg_tile_n
+            : (wg_tile_n / sg_tile_n) + 1;
+    std::cout << "group_num_x: " << group_range_n
+              << ", group_num_y: " << group_range_m
+              << ", group_num_z: " << Test::global_kslicing << "\n";
+    std::cout << "group_size_x: " << subgroup_range_n
+              << ", group_size_y: " << subgroup_range_m
+              << ", group_size_z: " << Test::local_kslicing << std::endl;
+    cl::sycl::range<3> GroupRange {
+            Test::global_kslicing, group_range_m, group_range_n};
+    cl::sycl::range<3> LocalRange {
+            Test::local_kslicing, subgroup_range_m, subgroup_range_n};
+    cl::sycl::nd_range<3> Range(GroupRange * LocalRange, LocalRange);
+
+    long ops = 2 * matrix_m * matrix_n * matrix_k;
+    profiling_helper prof("gemm_GPT_j", ops, "gflops");
+    // interop kernel prepratation and execution
+    // esimd kernel prepratation and execution
+
+    std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
+    auto inputBundle
+            = get_kernel_bundle<bundle_state::input>(Context, kernelId);
+    setenv("SYCL_PROGRAM_COMPILE_OPTIONS",
+            "-doubleGRF -vc-disable-indvars-opt "
+            " -Xfinalizer '-printregusage -enableBCR -DPASTokenReduction '",
+            1);
+    kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
+    unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
+    test_result result = test_result::complete;
+    try {
+        for (int i = 0; i < iter; i++) {
+            if (!can_implement<Test>(A + (i % num_buffer) * size_a,
+                        B + (i % num_buffer) * size_b,
+                        C + (i % num_buffer) * size_c, matrix_m, matrix_n,
+                        matrix_k, lda, ldb, ldc,
+                        bias + (i % num_buffer) * size_bias,
+                        res0 + (i % num_buffer) * size_res,
+                        res1 + (i % num_buffer) * size_res,
+                        Acc + (i % num_buffer) * size_acc,
+                        Cnt + (i % num_buffer) * size_cnt)) {
+                std::cout << "The arguments cannot be supported, the kernel is "
+                             "skipped ... "
+                          << std::endl;
+                result = test_result::skip;
+                break;
+            }
+            prof.cpu_start();
+            auto e_esimd = Queue.submit([&](handler &cgh) {
+                cgh.use_kernel_bundle(exeBundle);
+                cgh.parallel_for<Test>(Range, [=](nd_item<3> item) KERNEL_MAIN {
+                    constexpr uint32_t barrier_count
+                            = gemm_functor::barrier_count;
+                    constexpr uint32_t slm_size = gemm_functor::slm_size;
+                    xetla_nbarrier_init<barrier_count>();
+                    xetla_local_init<slm_size>();
+                    gemm_functor::run(item, A + (i % num_buffer) * size_a,
+                            B + (i % num_buffer) * size_b,
+                            C + (i % num_buffer) * size_c, matrix_m, matrix_n,
+                            matrix_k, lda, ldb, ldc,
+                            bias + (i % num_buffer) * size_bias,
+                            res0 + (i % num_buffer) * size_res,
+                            res1 + (i % num_buffer) * size_res,
+                            Acc + (i % num_buffer) * size_acc,
+                            Cnt + (i % num_buffer) * size_cnt);
+                });
+            });
+            e_esimd.wait();
+            prof.cpu_end();
+            prof.add_gpu_event(e_esimd);
+        }
+    } catch (cl::sycl::exception const &e) {
+        std::cout << "SYCL exception caught: " << e.what() << '\n';
+        result = test_result::fail;
+    }
+
+    if (result == test_result::complete) {
+        prof.print_profiling_result(profiling_selector::GPU);
+
+        if (enable_validation) {
+            int last_itr = (iter - 1) % num_buffer;
+            // validation
+            int err_cnt = gemm_result_validate<data_type_a, data_type_b,
+                    data_type_c, data_type_bias, data_type_res, data_type_acc>(
+                    A + last_itr * size_a, B + last_itr * size_b,
+                    C + last_itr * size_c, bias + last_itr * size_bias,
+                    res0 + last_itr * size_res, res1 + last_itr * size_res,
+                    matrix_m, matrix_k, matrix_n, Test::template name<Test>(),
+                    Test::layout_a, Test::layout_b, fused_op);
+            ASSERT_EQ(0, err_cnt);
+        }
+    }
+
+    free(A, Context);
+    free(B, Context);
+    free(C, Context);
+    free(bias, Context);
+    free(res0, Context);
+    free(res1, Context);
+    free(Acc, Context);
+    free(Cnt, Context);
+    if (result == test_result::skip) {
+        GTEST_SKIP();
+    } else if (result != test_result::complete) {
+        FAIL();
+    }
+}
+
+template <typename T>
+class tuner_kernel_gtpj_gemm : public ::testing::Test {};
+TYPED_TEST_SUITE_P(tuner_kernel_gtpj_gemm);
+TYPED_TEST_P(tuner_kernel_gtpj_gemm, esimd) {
+    gemm_run<TypeParam>(ITER);
+}
+
+REGISTER_TYPED_TEST_SUITE_P(tuner_kernel_gtpj_gemm, esimd);
+INSTANTIATE_TYPED_TEST_SUITE_P(
+        tuner_kernel_gtpj_gemm_test_suite, tuner_kernel_gtpj_gemm, tests);
+
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        string arg = argv[1];
+        if (arg == "1") { enable_validation = true; }
+    }
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
