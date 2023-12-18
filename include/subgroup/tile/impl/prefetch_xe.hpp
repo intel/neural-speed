@@ -45,7 +45,7 @@ struct check_prefetch_type {
 
     static constexpr bool is_local_xe
             = ((payload_t::memory_space == mem_space::local)
-                    && (payload_t::arch_tag == gpu_arch::Xe));
+                    && (payload_t::arch_tag <= gpu_arch::Xe));
 };
 
 } // namespace detail

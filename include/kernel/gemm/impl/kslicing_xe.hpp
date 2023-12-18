@@ -39,7 +39,7 @@ template <int num_global_kslicing_, int num_local_kslicing_, typename gemm_t_,
 class gemm_universal_t<dispatch_policy_kslicing<group_swizzle_,
                                num_global_kslicing_, num_local_kslicing_>,
         gemm_t_, epilogue_t_,
-        std::enable_if_t<(group_swizzle_::arch_tag == gpu_arch::Xe)>> {
+        std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::Xe)>> {
     using gemm_t = gemm_t_;
     using epilogue_t = epilogue_t_;
     using gemm_args_t = typename gemm_t::arguments_t;
