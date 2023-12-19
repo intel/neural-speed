@@ -354,7 +354,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
 
   JBLAS_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
                            int k_offset, void* tmpcache, size_t cachesize) {
-    if (_param.reordered == nullptr) {
+    if (_param.indices == nullptr) {
       return ActivationConverter<_GemmCore_T, ISA_T, SRC_T>::getActivation(
           dstptr, dststep, {_param.A, _param.lda}, m_size, k_size, m_offset, k_offset, tmpcache, cachesize);
     } else {
@@ -404,7 +404,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
 
   JBLAS_CODE quantize(const Param& _param, int m, int k, jblas::parallel::IThreading* threading) {
     auto srcptr = const_cast<SRC_T*>(_param.A);
-    if (_param.indices) {
+    if (_param.reordered) {
       auto shuffle_src = _param.reordered->template APtr<SRC_T>();
       threading->parallel_for([&](int tidx) {
         auto enable_thr = threading->num_threads();
