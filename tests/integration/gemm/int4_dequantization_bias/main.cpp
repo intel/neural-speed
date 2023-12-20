@@ -21,6 +21,48 @@ using namespace gpu::xetla;
 //The number of times the kernel is executed
 constexpr int ITER = 100;
 
+class test1 {
+public:
+    //Extract the parameters required by different test cases
+    static constexpr size_t mat_m = 1;
+    static constexpr size_t mat_n = 16384;
+    static constexpr size_t mat_k = 4096;
+    static constexpr size_t wg_m = 8;
+    static constexpr size_t wg_n = 64;
+    static constexpr size_t sg_m = 8;
+    static constexpr size_t sg_n = 16;
+    static constexpr size_t sg_k = 16;
+    static constexpr size_t dequant_s = 64;
+    static constexpr size_t num_buffer = 64;
+    static constexpr size_t local_kslicing = 8;
+    static constexpr size_t global_kslicing = 1;
+    static constexpr mem_layout layout_a = mem_layout::row_major;
+    static constexpr mem_layout layout_b = mem_layout::row_major;
+    using data_type_a = fp16;
+    using data_type_b = int4x2;
+    using data_type_c = fp16;
+};
+class test2 {
+public:
+    //Extract the parameters required by different test cases
+    static constexpr size_t mat_m = 1;
+    static constexpr size_t mat_n = 4096;
+    static constexpr size_t mat_k = 22016;
+    static constexpr size_t wg_m = 8;
+    static constexpr size_t wg_n = 128;
+    static constexpr size_t sg_m = 8;
+    static constexpr size_t sg_n = 16;
+    static constexpr size_t sg_k = 16;
+    static constexpr size_t dequant_s = 128;
+    static constexpr size_t num_buffer = 64;
+    static constexpr size_t local_kslicing = 4;
+    static constexpr size_t global_kslicing = 1;
+    static constexpr mem_layout layout_a = mem_layout::row_major;
+    static constexpr mem_layout layout_b = mem_layout::row_major;
+    using data_type_a = fp16;
+    using data_type_b = int4x2;
+    using data_type_c = fp16;
+};
 class qkv1 {
 public:
     //Extract the parameters required by different test cases
@@ -324,6 +366,9 @@ void dequantize_gemm_run(int iter) {
     using mem_desc_scale_t = xetla::mem_desc_t<data_type_scale,
             mem_layout::row_major, mem_space::global,
             DEVICE_MEM_ALIGNMENT / sizeof(data_type_scale)>;
+    using mem_desc_zero_pt_t = xetla::mem_desc_t<data_type_zero_pt,
+            mem_layout::row_major, mem_space::global,
+            DEVICE_MEM_ALIGNMENT / sizeof(data_type_zero_pt)>;
     using mem_desc_bias_t = xetla::mem_desc_t<data_type_bias,
             mem_layout::row_major, mem_space::global,
             DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
@@ -333,14 +378,13 @@ void dequantize_gemm_run(int iter) {
     using perf_tuning_knob = xetla::group::perf_tuning_knob_t<sg_tile_k,
             prefetch_distance, periodic_sync_interval>;
 
-    using compute_policy
-            = xetla::group::compute_policy_bit4_dequantize_xmx<compute_attr,
-                    perf_tuning_knob,
-                    gpu::xetla::group::quant_type::S4_FULLRANGE,
-                    data_type_scale, dequant_s, gpu_arch::Dg2>;
+    using compute_policy = xetla::group::compute_policy_int4_dequantize_xmx<
+            compute_attr, perf_tuning_knob,
+            gpu::xetla::group::quant_mode::S4_FULLRANGE, data_type_scale,
+            data_type_zero_pt, dequant_s, gpu_arch::Dg2>;
 
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
-            mem_desc_a_t, mem_desc_b_t, mem_desc_scale_t>;
+            mem_desc_a_t, mem_desc_b_t>;
 
     using bias_op_t = gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t,
             gpu::xetla::gpu_arch::Dg2>;
@@ -551,7 +595,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<qkv2>;
+using tests = ::testing::Types<test1>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7, qkv8,
 //         qkv9, qkv10>;
 
