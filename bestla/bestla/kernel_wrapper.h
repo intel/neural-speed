@@ -197,7 +197,7 @@ class Memcpy2DBf16CvtFp32 {
   static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileBF16()
-    if constexpr (ISA_T >= BTLAAMX_BF16) {
+    if constexpr (ISA_T >= BTLA_ISA::AMX_BF16) {
       return kernel::avx512_bf16::bf16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
