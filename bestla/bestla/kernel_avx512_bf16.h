@@ -45,7 +45,7 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
           reinterpret_cast<__m512>(_mm512_bslli_epi128(_mm512_cvtepu16_epi32(_mm256_loadu_epi16(src + j)), 2)));
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 #endif
   return avx512f::bf16_cvt_fp32_2D_write_back(src_ptr, dst_ptr, row, col, src_step, dst_step, zeropadding);
 }
@@ -81,6 +81,7 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
       std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
     }
   }
+  return BTLA_CODE::Success;
 #endif
   return avx512f::fp32_cvt_bf16_2D_write_back(raw_srcptr, raw_dstptr, row, col, srcstride, dststride, zeropadding);
 }
