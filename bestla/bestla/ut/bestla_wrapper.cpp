@@ -40,8 +40,7 @@ class UT_Fp32Fp32 {
     gemmref_fp32fp32fp32(m, n, k, matA.data(), matB.data(), ref.data(), k, n, n);
     using Launcher =
         wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                           prologue_b::gemm::WeightPack,
-                                           epilogue::gemm::AccumulatorWriteBackFp32>;
+                                    prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
@@ -62,9 +61,9 @@ class UT_Fp32Fp32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
-                                                        prologue_b::gemm::WeightPack,
-                                                        epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Launcher =
+        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -183,10 +182,8 @@ class UT_U8S8S32 {
       }
     }
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                           prologue_b::gemm::WeightPack,
-                                           epilogue::gemm::ZpDequantInt32ToFp32>;
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                                 prologue_b::gemm::WeightPack, epilogue::gemm::ZpDequantInt32ToFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
@@ -211,9 +208,9 @@ class UT_U8S8S32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
-                                                        prologue_b::gemm::WeightPack,
-                                                        epilogue::gemm::AccumulatorWriteBackInt32>;
+    using Launcher =
+        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackInt32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -264,8 +261,7 @@ class UT_U8S8S32 {
       benchmark<gemm::ICoreRowNAmxint8<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
     if (_cd->AVX512_VNNI()) {
-      benchmark<gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                              48);
+      benchmark<gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
     if (_cd->AVX_VNNI()) {
       benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
@@ -320,10 +316,8 @@ class UT_S8S8S32 {
       }
     }
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                           prologue_b::gemm::WeightPack,
-                                           epilogue::gemm::DequantInt32ToFp32>;
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                                 prologue_b::gemm::WeightPack, epilogue::gemm::DequantInt32ToFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
@@ -345,9 +339,9 @@ class UT_S8S8S32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
-                                                        prologue_b::gemm::WeightPack,
-                                                        epilogue::gemm::AccumulatorWriteBackInt32>;
+    using Launcher =
+        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackInt32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -393,12 +387,9 @@ class UT_S8S8S32 {
     GetCPUDevice();
     if (_cd->AMX_INT8()) {
       request_perm_xtile_data();
-      benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                              48);
-      benchmark<gemm::ICoreRowNAmxint8SS<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                              48);
-      benchmark<gemm::ICoreRowNAmxint8SS<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                              48);
+      benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8SS<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8SS<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
   }
 };
@@ -429,8 +420,7 @@ class UT_Bf16Bf16Fp32 {
     printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     using Launcher =
         wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                           prologue_b::gemm::WeightPack,
-                                           epilogue::gemm::AccumulatorWriteBackFp32>;
+                                    prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     auto packw = launcher.mProB.createStorage(n, k);
@@ -455,9 +445,9 @@ class UT_Bf16Bf16Fp32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
-                                                        prologue_b::gemm::WeightPack,
-                                                        epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Launcher =
+        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -535,8 +525,7 @@ class UT_Fp16Fp16Fp16 {
     printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     using Launcher =
         wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                           prologue_b::gemm::WeightPack,
-                                           epilogue::gemm::AccumulatorWriteBackFp16>;
+                                    prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     auto packw = launcher.mProB.createStorage(n, k);
@@ -560,9 +549,9 @@ class UT_Fp16Fp16Fp16 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
-                                                        prologue_b::gemm::WeightPack,
-                                                        epilogue::gemm::AccumulatorWriteBackFp16>;
+    using Launcher =
+        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -608,8 +597,7 @@ class UT_Fp16Fp16Fp16 {
     GetCPUDevice();
     if (_cd->AVX512_FP16()) {
       benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
-      benchmark<gemm::HCoreRowNAvx512fp16<64, 12>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                               56);
+      benchmark<gemm::HCoreRowNAvx512fp16<64, 12>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
       benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
   }

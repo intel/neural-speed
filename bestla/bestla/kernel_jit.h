@@ -251,7 +251,7 @@ class DequanKBlockS8Fp {
  public:
   template <int _PACK_ROW, typename _ST, typename _DST_T>
   static inline BTLA_CODE forward_avx512f(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                           _ST* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
+                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
     int row0 = kblock - k_offset % kblock;
     row0 = row0 == kblock ? 0 : row0;
     row0 = row0 > row ? row : row0;
@@ -291,8 +291,7 @@ struct DataConvertConfig {
     FP32_TO_F16,
   };
 
-  DataConvertConfig(BTLA_DTYPE src_t, BTLA_DTYPE dst_t,
-                    std::vector<kernel::jit_injector::eltwise_injector> injectors) {
+  DataConvertConfig(BTLA_DTYPE src_t, BTLA_DTYPE dst_t, std::vector<kernel::jit_injector::eltwise_injector> injectors) {
     input_dt = src_t;
     output_dt = dst_t;
     if (injectors.size() != 0) {
@@ -356,7 +355,7 @@ class JitMemcpy2DAvx2 : protected xbyak::JitAvx2 {
 
   template <typename _SRC_T, typename _DST_T>
   static BTLA_CODE forward(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
-                            void* elt_const_v = nullptr) {
+                           void* elt_const_v = nullptr) {
     static JitMemcpy2DAvx2 instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>);
     for (int i = 0; i < row; i++) {
       auto param = params{reinterpret_cast<char*>(const_cast<_SRC_T*>(srcptr)) + i * srcstep * sizeof(_SRC_T),
@@ -369,7 +368,7 @@ class JitMemcpy2DAvx2 : protected xbyak::JitAvx2 {
 
   template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP Op>
   static BTLA_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
-                             void* elt_const_v = nullptr) {
+                            void* elt_const_v = nullptr) {
     static JitMemcpy2DAvx2 instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>,
                                             {kernel::jit_injector::eltwise_injector(Op)});
     for (int i = 0; i < row; i++) {
@@ -566,7 +565,7 @@ class JitMemcpy2DAvx512f : protected xbyak::JitAvx512f {
 
   template <typename _SRC_T, typename _DST_T>
   static BTLA_CODE forward(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
-                            void* elt_const_v = nullptr) {
+                           void* elt_const_v = nullptr) {
     static JitMemcpy2DAvx512f instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>);
 
     for (int i = 0; i < row; i++) {
@@ -580,7 +579,7 @@ class JitMemcpy2DAvx512f : protected xbyak::JitAvx512f {
 
   template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP Op>
   static BTLA_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
-                             void* elt_const_v = nullptr) {
+                            void* elt_const_v = nullptr) {
     static JitMemcpy2DAvx512f instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>,
                                                {kernel::jit_injector::eltwise_injector(Op)});
     for (int i = 0; i < row; i++) {
@@ -890,7 +889,7 @@ class DecompressS4S8_AVX512F : protected xbyak::JitAvx512f {
 };
 
 static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                          int ld_dst) {
+                                         int ld_dst) {
   if (col != ld_src) {  // memory is not continuous
     return BTLA_CODE::NotSupport;
   }
@@ -1481,4 +1480,4 @@ class CScaleInterleavedBF16FP16 : protected xbyak::JitAvx512_fp16 {
 
 }  // namespace jit
 }  // namespace kernel
-}  // namespace BTLA
+}  // namespace bestla

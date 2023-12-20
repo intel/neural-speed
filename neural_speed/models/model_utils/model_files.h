@@ -627,8 +627,8 @@ struct model_model_loader {
     }
   }
 
-  void bestla_split_weight(void** src, void** dst, size_t src_n, size_t src_k, size_t dst_n, size_t dst_k, size_t n_rank,
-                          size_t k_rank) {
+  void bestla_split_weight(void** src, void** dst, size_t src_n, size_t src_k, size_t dst_n, size_t dst_k,
+                           size_t n_rank, size_t k_rank) {
     auto src_fp32 = (float*)malloc(src_n * src_k * sizeof(float));
     if (src_fp32 == nullptr) {
       assert(0);
@@ -691,7 +691,7 @@ struct model_model_loader {
         void* dst_data = (void*)lt.data;
         void* src_data = (void*)(tmp_buf.addr);
         bestla_split_weight(&src_data, &dst_data, lt.world_size * num_rows, lt.ne.at(0), num_rows, lt.ne.at(0), lt.rank,
-                           0);
+                            0);
       } else {
         // only copy part of weight form the tmp_buf of origin file
         tmp_buf.resize(lt.size * lt.world_size);
@@ -713,7 +713,7 @@ struct model_model_loader {
         void* dst_data = (void*)lt.data;
         void* src_data = (void*)(tmp_buf.addr);
         bestla_split_weight(&src_data, &dst_data, num_rows, lt.world_size * lt.ne.at(0), num_rows, lt.ne.at(0), 0,
-                           lt.rank);
+                            lt.rank);
       } else {
         tmp_buf.resize(lt.size * lt.world_size);
         file.read_raw(tmp_buf.addr, lt.size * lt.world_size);

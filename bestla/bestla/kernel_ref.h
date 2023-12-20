@@ -26,7 +26,7 @@ namespace ref {
 
 template <typename T>
 static inline BTLA_CODE shuffle_activation(T* src, T* dst, int shuffle_m, int shuffle_k, int m_offset, int k_offset,
-                                            int* indices, int src_stride, int dst_stride) {
+                                           int* indices, int src_stride, int dst_stride) {
   T* cur_src = src + m_offset * src_stride;
   for (int i = 0; i < shuffle_m; i++) {
     for (int j = 0; j < shuffle_k; j++) {
@@ -38,7 +38,7 @@ static inline BTLA_CODE shuffle_activation(T* src, T* dst, int shuffle_m, int sh
 
 template <typename T_SRC, typename T_DST = T_SRC>
 static inline BTLA_CODE padding_interleave(const T_SRC* src_ptr, T_DST* dst_ptr, int row, int col, int rowpad,
-                                            int colpad, int src_step, int dst_step, int NTile, int RowPack) {
+                                           int colpad, int src_step, int dst_step, int NTile, int RowPack) {
   const T_DST dst_0(0);
   static_assert(sizeof(T_SRC) == sizeof(T_DST), "SRC & DST size should be the same");
   for (int i = 0; i < rowpad; i += RowPack) {
@@ -60,7 +60,7 @@ static inline BTLA_CODE padding_interleave(const T_SRC* src_ptr, T_DST* dst_ptr,
 // row*col <= colpad/NTile*rowpad*NTile
 template <typename T_SRC, typename T_DST = T_SRC>
 static inline BTLA_CODE revert_padding_interleave(const T_SRC* src_ptr, T_DST* dst_ptr, int row, int col, int rowpad,
-                                                   int colpad, int src_step, int dst_step, int NTile, int RowPack) {
+                                                  int colpad, int src_step, int dst_step, int NTile, int RowPack) {
   static_assert(sizeof(T_SRC) == sizeof(T_DST), "SRC & DST size should be the same");
   for (int i = 0; i < rowpad; i += RowPack) {
     for (int j = 0; j < colpad; j += NTile) {
@@ -81,8 +81,8 @@ static inline BTLA_CODE revert_padding_interleave(const T_SRC* src_ptr, T_DST* d
 
 // M x N ===> M/MTile x N/colPack x MTile x colPack (leading dim stride = MTile * dst_stride)
 template <typename T_SRC, typename T_DST = T_SRC>
-static inline BTLA_CODE padding_trans_interleave(const T_SRC* src, T_DST* dst, int row, int col, int rowpad,
-                                                  int colpad, int src_step, int dst_step, int MTile, int ColPack) {
+static inline BTLA_CODE padding_trans_interleave(const T_SRC* src, T_DST* dst, int row, int col, int rowpad, int colpad,
+                                                 int src_step, int dst_step, int MTile, int ColPack) {
   // Note: rows/cols and i/j are in terms of src
   static_assert(sizeof(T_SRC) == sizeof(T_DST), "SRC & DST size should be the same");
   const T_DST dst_0(0);
@@ -103,7 +103,7 @@ static inline BTLA_CODE padding_trans_interleave(const T_SRC* src, T_DST* dst, i
 
 template <typename SRC_DT, typename DST_DT>
 static inline BTLA_CODE dt_cvt_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col, int srcstride,
-                                              int dststride, bool zeropadding) {
+                                             int dststride, bool zeropadding) {
   for (int i = 0; i < row; i++) {
     int j = 0;
     for (; j < col; j++) {
@@ -122,7 +122,7 @@ static inline BTLA_CODE dt_cvt_2D_write_back(const void* raw_srcptr, void* raw_d
 
 template <typename _DST_T>
 static inline BTLA_CODE dequan_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                      float* scales) {
+                                     float* scales) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
       dstptr[i * ld_dst + j] = static_cast<float>(srcptr[i * ld_src + j]) * scales[j];
@@ -132,7 +132,7 @@ static inline BTLA_CODE dequan_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row, in
 }
 
 static inline BTLA_CODE dequan_s8_bf16(int8_t* srcptr, uint16_t* dstptr, int row, int col, int ld_src, int ld_dst,
-                                        float* scales) {
+                                       float* scales) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
       dstptr[i * ld_dst + j] =
@@ -153,8 +153,8 @@ static inline BTLA_CODE transpose2d(const _T* srcptr, _T* dstptr, int row, int c
 }
 
 template <int NTile>
-static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstptr, int row, int col,
-                                        int ld_src, int ld_dst) {
+static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstptr, int row, int col, int ld_src,
+                                       int ld_dst) {
   for (int j = 0; j < row; j++) {
     for (int ii = 0; ii < col; ii += 2) {
       utils::int4x2 tmp;
@@ -168,7 +168,7 @@ static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstp
 
 template <int NTile>
 static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, int row, int col, int ld_src,
-                                     int ld_dst) {
+                                    int ld_dst) {
   for (int j = 0; j < row; j++) {
     for (int ii = 0; ii < col; ii += 2) {
       utils::f4x2 tmp;
@@ -182,7 +182,7 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
 
 template <int NTile>
 static inline BTLA_CODE decompress_s4_f32(utils::int4x2* srcptr, float* dstptr, int row, int col, int ld_src,
-                                           int ld_dst, float* scales) {
+                                          int ld_dst, float* scales) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
@@ -306,7 +306,7 @@ inline float f8_to_fp32(utils::f8 v, BTLA_DTYPE f8_t) {
 
 template <typename _DST_T, int _PACK_ROW, typename _S_T>
 inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                          _S_T* scales, int k_offset, int kblock, int NPad, BTLA_DTYPE src_f8_type) {
+                                         _S_T* scales, int k_offset, int kblock, int NPad, BTLA_DTYPE src_f8_type) {
   for (int i = 0; i < row; i++) {
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
@@ -329,7 +329,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
 
 template <typename _DST_T, int _PACK_ROW, typename _S_T>
 inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                          _S_T* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
+                                         _S_T* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
   for (int i = 0; i < row; i++) {
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
@@ -344,8 +344,8 @@ inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row
 
 template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW, typename _S_T>
 inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                          int ld_dst, _S_T* scales, int8_t* zero_points, int k_offset, int kblock,
-                                          int NPad, int8_t* tmp, size_t tmpsize) {
+                                         int ld_dst, _S_T* scales, int8_t* zero_points, int k_offset, int kblock,
+                                         int NPad, int8_t* tmp, size_t tmpsize) {
   for (int i = 0; i < row; i++) {
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
@@ -375,7 +375,7 @@ inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, 
 
 template <BTLA_DTYPE S4_T, typename _DST_T>
 inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                            int ld_dst, int8_t* tmp, size_t tmpsize) {
+                                           int ld_dst, int8_t* tmp, size_t tmpsize) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
@@ -646,8 +646,8 @@ inline int8_t f4_quantize(float x) {
 
 template <BTLA_DTYPE F4_T, typename _DST_T, int _PACK_ROW, typename _S_T>
 inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                          _S_T* scales, int k_offset, int kblock, int NPad, int8_t* tmp,
-                                          size_t tmpsize) {
+                                         _S_T* scales, int k_offset, int kblock, int NPad, int8_t* tmp,
+                                         size_t tmpsize) {
   for (int i = 0; i < row; i++) {
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
@@ -670,7 +670,7 @@ inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, in
 
 template <BTLA_DTYPE F4_T, typename _DST_T>
 inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                  int ld_dst, int8_t* tmp, size_t tmpsize) {
+                                                 int ld_dst, int8_t* tmp, size_t tmpsize) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
@@ -683,7 +683,7 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, _DST_T* ds
 
 template <typename _DST_T>
 inline BTLA_CODE decompress_kblock_f8_fp_noscale(utils::f8* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                  int ld_dst, BTLA_DTYPE src_f8_t) {
+                                                 int ld_dst, BTLA_DTYPE src_f8_t) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
       dstptr[i * ld_dst + j] = f8_to_fp32(srcptr[i * ld_src + j], src_f8_t);
@@ -693,21 +693,20 @@ inline BTLA_CODE decompress_kblock_f8_fp_noscale(utils::f8* srcptr, _DST_T* dstp
 }
 
 static inline BTLA_CODE memcpy2d_dw2highw(const void* srcptr, void* dstptr, int row, int col, int srcstride,
-                                           int dststride) {
+                                          int dststride) {
   auto bsrcptr = (char*)srcptr;
   auto bdstptr = (char*)dstptr;
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
-      std::memcpy(bdstptr + i * dststride + j * sizeof(utils::bf16),
-                  bsrcptr + i * srcstride + j * sizeof(float) + 2, sizeof(utils::bf16));
+      std::memcpy(bdstptr + i * dststride + j * sizeof(utils::bf16), bsrcptr + i * srcstride + j * sizeof(float) + 2,
+                  sizeof(utils::bf16));
     }
   }
   return BTLA_CODE::Success;
 }
 
 template <typename _SRC_T, typename _DST_T>
-static inline BTLA_CODE memcpy2d(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstride,
-                                  int dststride) {
+static inline BTLA_CODE memcpy2d(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstride, int dststride) {
   auto bsrcptr = (const char*)srcptr;
   auto bdstptr = (char*)dstptr;
   for (int i = 0; i < row; i++) {
@@ -743,7 +742,7 @@ static float postop(float x, BTLA_ELTWISEOP op, void* const_elt_v) {
 
 template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP OP_T>
 static inline BTLA_CODE memcpy2d_withop(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstride,
-                                         int dststride, void* const_elt_v) {
+                                        int dststride, void* const_elt_v) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += sizeof(_SRC_T)) {
       float v = srcptr[(i * srcstride + j) / sizeof(_SRC_T)];
@@ -755,7 +754,7 @@ static inline BTLA_CODE memcpy2d_withop(const _SRC_T* srcptr, _DST_T* dstptr, in
 }
 
 static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int row, int col, int srcstride,
-                                          int dststride) {
+                                         int dststride) {
   auto f8_v = (const utils::f8*)srcptr;
   auto f32_v = (float*)dstptr;
   auto f8_stride = srcstride / sizeof(utils::f8);
@@ -771,7 +770,7 @@ static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int r
 
 template <BTLA_DTYPE S4_T>
 inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                                 int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
+                                                int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
   int raw_blocksize = blocksize;
   for (int i = 0; i < col; i++) {
     int align_row_loop = row / blocksize * blocksize;
@@ -919,7 +918,7 @@ int8_t f8_mx_quantize(float v, float scale, BTLA_DTYPE scale_dtype) {
 
 template <BTLA_DTYPE F8_T>
 inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                                   int ld_dst, float* scales, int blocksize, BTLA_DTYPE scale_dtype) {
+                                                  int ld_dst, float* scales, int blocksize, BTLA_DTYPE scale_dtype) {
   for (int i = 0; i < col; i++) {
     int align_row_loop = row / blocksize * blocksize;
     int j = 0;
@@ -955,8 +954,8 @@ inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, int8_t* d
 }
 
 template <BTLA_DTYPE F4_T>
-inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                           int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
+inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
+                                          float* scales, int8_t* zero_points, int blocksize) {
   int raw_blocksize = blocksize;
   for (int i = 0; i < col; i++) {
     int align_row_loop = row / blocksize * blocksize;
@@ -1000,9 +999,8 @@ inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, i
 }
 
 template <typename SRC_T>
-inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* srcptr, int ld_src, uint8_t* dstptr,
-                                          int ld_dst, float* scales, int ld_scale, uint8_t* zps, int blocksize,
-                                          float* blkreduce) {
+inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* srcptr, int ld_src, uint8_t* dstptr, int ld_dst,
+                                         float* scales, int ld_scale, uint8_t* zps, int blocksize, float* blkreduce) {
   int colblk = utils::padto_le(col, blocksize);
   for (int i = 0; i < row; i++) {
     size_t j = 0;
@@ -1062,7 +1060,7 @@ inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* srcptr, 
 
 template <typename SRC_T>
 inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* srcptr, int ld_src, int8_t* dstptr, int ld_dst,
-                                          float* scales, int ld_scale, int blocksize, float* reduce) {
+                                         float* scales, int ld_scale, int blocksize, float* reduce) {
   int colblk = utils::padto_le(col, blocksize);
   for (int i = 0; i < row; i++) {
     size_t j = 0;
@@ -1106,8 +1104,8 @@ inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* srcptr, 
 }
 
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
-                                           const float* src1ptr, const int src1step, float* dstptr, const int dststep,
-                                           const int M, const int N) {
+                                          const float* src1ptr, const int src1step, float* dstptr, const int dststep,
+                                          const int M, const int N) {
   if (beta != 0.f) {
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < N; j++) {
@@ -1125,7 +1123,7 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
 }
 template <typename SCA_T>
 static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* srcptr, const int srcstep, float* dstptr,
-                                              const int dststep, const int M, const int N) {
+                                             const int dststep, const int M, const int N) {
   for (size_t i = 0; i < M; i++) {
     for (size_t j = 0; j < N; j++) {
       if constexpr (!std::is_same_v<SCA_T, utils::f8>) {
@@ -1140,7 +1138,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
 }
 
 static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, float* dstptr, const int dststep,
-                                       const int M, const int N) {
+                                      const int M, const int N) {
   for (size_t i = 0; i < M; i++) {
     for (size_t j = 0; j < N; j++) {
       dstptr[i * dststep + j] = srcptr[i * srcstep + j] + dstptr[i * dststep + j];
@@ -1150,8 +1148,8 @@ static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, fl
 }
 
 static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr, const int srcstep, uint8_t* dstptr,
-                                         const int dststep, const int M, const int N, float scaleSrc, float scaleDst,
-                                         int zpDst) {
+                                        const int dststep, const int M, const int N, float scaleSrc, float scaleDst,
+                                        int zpDst) {
   float factor = alpha * scaleSrc / scaleDst;
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < N; j++) {
@@ -1164,8 +1162,8 @@ static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr
 
 template <typename SCAB_T>
 static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcstep, float* dstptr, const int dststep,
-                                          const int M, const int N, const float* scaleA, const int ldsa,
-                                          const SCAB_T* scaleB) {
+                                         const int M, const int N, const float* scaleA, const int ldsa,
+                                         const SCAB_T* scaleB) {
   for (int i = 0; i < M; i++) {
     float scale = scaleA[i * ldsa];
     for (int j = 0; j < N; j++) {
@@ -1177,7 +1175,7 @@ static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcste
 }
 
 inline BTLA_CODE minmax_f32_kblock(const float* srcptr, int row, int col, int ld_src, float* minmaxptr, int ld_minmax,
-                                    int fsize_minmax, int blocksize) {
+                                   int fsize_minmax, int blocksize) {
   for (int i = 0; i < row; i++) {
     if (col >= blocksize) {
       for (int icol = 0; icol < col; icol += blocksize) {
@@ -1206,8 +1204,8 @@ inline BTLA_CODE minmax_f32_kblock(const float* srcptr, int row, int col, int ld
 }
 
 static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, float* dstptr, float alpha, float beta,
-                                                       int row, int col, int ld_src, int ld_dst, float* ascales,
-                                                       int ldas, float* wscales) {
+                                                      int row, int col, int ld_src, int ld_dst, float* ascales,
+                                                      int ldas, float* wscales) {
   for (int irow = 0; irow < row; irow++) {
     for (int icol = 0; icol < col; icol++) {
       float scale = ascales[irow * ldas] * wscales[icol] * alpha;
@@ -1227,7 +1225,7 @@ static inline BTLA_CODE broadcast_u8(int num, const uint8_t& srcval, uint8_t* ds
 
 template <typename _RT>
 static inline BTLA_CODE quant_s8_row_reduce_sum(const int8_t* srcptr, int ldsrc, const float* scales,
-                                                 const int8_t* zero_points, int row, int col, _RT* reduce) {
+                                                const int8_t* zero_points, int row, int col, _RT* reduce) {
   std::memset(reduce, 0, sizeof(reduce[0]) * col);
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
@@ -1256,7 +1254,7 @@ static inline BTLA_CODE row_reduce_sum(const float* srcptr, int ldsrc, int row, 
 
 template <typename SRC_T>
 static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int row, int col, int blocksize,
-                                              float* reduce, int ldr) {
+                                             float* reduce, int ldr) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += blocksize) {
       auto tmp = 0.f;
@@ -1272,7 +1270,7 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
 }
 
 static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zps,
-                                                   float* scales, int lds, const float* reduce) {
+                                                  float* scales, int lds, const float* reduce) {
   for (int i = 0; i < row; i++) {
     auto zpf = static_cast<float>(zps[i * lds]) * scales[i * lds];
     for (int j = 0; j < col; j++) {
@@ -1283,7 +1281,7 @@ static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int 
 }
 
 static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int row, int col, int8_t* zps,
-                                                   float* scales, int lds, const float* reduce) {
+                                                  float* scales, int lds, const float* reduce) {
   for (int i = 0; i < row; i++) {
     auto reducef = reduce[i * lds];
     for (int j = 0; j < col; j++) {
@@ -1294,8 +1292,8 @@ static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int 
 }
 
 static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zpa, int8_t* zpb,
-                                               float* scalea, float* scaleb, int lds, int k, const float* reducea,
-                                               const float* reduceb) {
+                                              float* scalea, float* scaleb, int lds, int k, const float* reducea,
+                                              const float* reduceb) {
   for (int i = 0; i < row; i++) {
     auto reduceaf = reducea[i * lds];
     auto zpaf = static_cast<float>(zpa[i * lds]) * scalea[i * lds];

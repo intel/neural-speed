@@ -41,7 +41,7 @@ void* bestla_get_thread_handle() { return ne_bestla::ne_threading::get(); }
 
 void bestla_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld) {
   BTLAGemmUnPackB(fp32data, wptr, static_cast<size_t>(n), static_cast<size_t>(k), static_cast<size_t>(ld),
-                   ne_bestla::ne_threading::get());
+                  ne_bestla::ne_threading::get());
 }
 
 void bestla_packweight_copyattr(const float* f32ptr, void* dstptr, int n, int k, int ld, void* srcptr) {

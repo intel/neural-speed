@@ -71,9 +71,8 @@ void GemmRunWithA_QKV(Launch_T* launcher, const typename Launch_T::Param* args, 
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void JblasGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
-                      storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK,
-                      storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
-                      parallel::IThreading* th) {
+                      storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK, storage::gemm::IWeightBase* _BV,
+                      float* C, const int ldc, int8_t* WorkSpace, parallel::IThreading* th) {
   if (M <= 16) {
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     using Launcher = tLauncher_Fp_F32F32<GemmCore_T, Wei_T>;
@@ -109,9 +108,9 @@ void JblasGemmCompF32(const int M, const int N, const int K, const float* A, con
     }
   } else {
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
-                                                        prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
-                                                        epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Launcher =
+        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32,
+                                    Wei_T, epilogue::gemm::AccumulatorWriteBackFp32>;
     static Launcher kernel;
     auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
     auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
@@ -193,7 +192,7 @@ bool bestla_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int
 
 // f32f32: activation & output dtype
 void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr, void* wvptr, float* output, int _m,
-                                     int _n, int _k, int lda, int ldo, void* _workspace) {
+                                      int _n, int _k, int lda, int ldo, void* _workspace) {
   GetCPUDevice();
   auto wqtmp = storage::gemm::PackedWeightParser::deserialBuffer(wqptr);
   auto wktmp = storage::gemm::PackedWeightParser::deserialBuffer(wkptr);
@@ -201,8 +200,7 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
   // must check support before forward, there is no need to check support twice.
   auto ptr = wqtmp;
   auto coretype = ptr->mCoreId;
-  auto NTile = gemm::CoreAttr::get_mask_val(ptr->mCoreId, gemm::CoreAttr::NTILE_MASK,
-                                                   gemm::CoreAttr::NTILE_SHIFT);
+  auto NTile = gemm::CoreAttr::get_mask_val(ptr->mCoreId, gemm::CoreAttr::NTILE_MASK, gemm::CoreAttr::NTILE_SHIFT);
   auto PackRow = gemm::CoreAttr::get_packrow(ptr->mCoreId);
   auto CType = gemm::CoreAttr::get_comp(ptr->mCoreId);
   auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));

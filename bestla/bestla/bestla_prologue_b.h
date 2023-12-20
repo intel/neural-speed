@@ -93,7 +93,7 @@ class WeightPack {
   }
 
   inline BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                              const Param param, void* tmpcache, size_t cachesize) {
+                             const Param param, void* tmpcache, size_t cachesize) {
     auto wptr = param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<WType>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
@@ -505,8 +505,8 @@ class WeightKBlockNInteger {
     });
   }
 
-  static void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
-                             BTLA_DTYPE qtype, parallel::IThreading* threading) {
+  static void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr, BTLA_DTYPE qtype,
+                             parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp({tidx});
@@ -554,7 +554,7 @@ class WeightKBlockNInteger {
   }
 
   static inline BTLA_CODE getWeight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                     const Param& _param, void* tmpcache, size_t cachesize) {
+                                    const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     if (wptr->mDType == BTLA_DTYPE::S8) {
       return getQ8Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
@@ -567,22 +567,22 @@ class WeightKBlockNInteger {
   }
 
   static inline BTLA_CODE getKBlockWeight(float** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                           int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
+                                          int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
     return getFpKBlockWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
   }
 
   static inline BTLA_CODE getKBlockWeight(utils::bf16** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                           int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
+                                          int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
     return getFpKBlockWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
   }
 
   static inline BTLA_CODE getKBlockWeight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                           int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
+                                          int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
     return getWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
   }
 
   static inline BTLA_CODE getScale(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                    const Param& _param, void* tmpcache, size_t cachesize) {
+                                   const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     if (wptr->SDtype() == BTLA_DTYPE::F32) {
       auto aptr = wptr->template SPtr<float>();
@@ -602,7 +602,7 @@ class WeightKBlockNInteger {
   }
 
   static inline BTLA_CODE getReduce(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                     const Param& _param, void* tmpcache, size_t cachesize) {
+                                    const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     if (wptr->RDtype() == BTLA_DTYPE::F32) {
       auto aptr = wptr->template RPtr<float>();
@@ -624,7 +624,7 @@ class WeightKBlockNInteger {
  protected:
   template <typename T>
   static inline BTLA_CODE getFpKBlockWeight(T** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                             int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
+                                            int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     auto NPad = wptr->mNPad;
     auto KPad = wptr->mKPad;
@@ -672,7 +672,7 @@ class WeightKBlockNInteger {
 
   template <typename _T>
   static inline BTLA_CODE getFpWeight(_T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                       const Param& _param, void* tmpcache, size_t cachesize) {
+                                      const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     auto NPad = wptr->mNPad;
     auto KPad = wptr->mKPad;
@@ -739,8 +739,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ8Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                       int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
+  static inline BTLA_CODE getQ8Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                      const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
@@ -751,8 +751,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ4Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                       int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
+  static inline BTLA_CODE getQ4Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                      const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2;
@@ -787,7 +787,7 @@ class WeightKBlockNInteger {
   }
 
   static inline BTLA_CODE doCompress(const int8_t* srcptr, void* dstptr, int row, int col, int ld_src, int ld_dst,
-                                      BTLA_DTYPE quant_dtype) {
+                                     BTLA_DTYPE quant_dtype) {
     if (quant_dtype == BTLA_DTYPE::S4_CLIP || quant_dtype == BTLA_DTYPE::S4_FULLRANGE) {
       return kernel::wrapper::CompressS8S4<_GemmCore_T::NTILE>::template forward<ISA_T>(
           srcptr, reinterpret_cast<utils::int4x2*>(dstptr), row, col, ld_src, ld_dst);
@@ -822,18 +822,18 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
   }
 
   inline BTLA_CODE getWeight(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                              const Param& _param, void* tmpcache, size_t cachesize) override {
+                             const Param& _param, void* tmpcache, size_t cachesize) override {
     return getFpWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
   }
 
   inline BTLA_CODE getWeight(utils::bf16** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                              const Param& _param, void* tmpcache, size_t cachesize) override {
+                             const Param& _param, void* tmpcache, size_t cachesize) override {
     return getFpWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
   }
 
   template <typename _DST_T>
   inline BTLA_CODE getFpWeight(_DST_T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                const Param& _param, void* tmpcache, size_t cachesize) {
+                               const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = reinterpret_cast<StorageWeight*>(_param.packedW);
     auto NPad = wptr->mNPad;
     auto KPad = wptr->mKPad;

@@ -35,21 +35,21 @@ struct BTLA_GEMM_DATA_PACKED_PARAMS {
   int ldc = 0;              /**< leading dimension of C*/
 };
 
-size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype,
-                          bool isAsym, ne_comp_type CompType, int* shuffle_indice);
+size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
+                         ne_comp_type CompType, int* shuffle_indice);
 
 bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
-                         BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType,
-                         bool isTrans, void* ThreadPool);
+                        BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType, bool isTrans,
+                        void* ThreadPool);
 
 // QData:  K*N quantized int8 weight
 // Scales: K/BlkSize * N scales
 // Zp:     K/BlkSize * N zero points
 bool BTLAGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N, size_t K,
-                    size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
-                    ne_comp_type CompType, int* shuffle_indice, void* ThreadPool);
+                   size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
+                   ne_comp_type CompType, int* shuffle_indice, void* ThreadPool);
 
 bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, size_t ldb, void* ThreadPool);
 
 bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
-                          const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool);
+                         const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool);

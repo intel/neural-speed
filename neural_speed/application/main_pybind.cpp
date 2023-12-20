@@ -92,9 +92,9 @@ class Model {
   }
 
   static size_t np_bestla_qpack(py::array_t<int8_t> src_w, py::array_t<float> src_scales, py::array_t<int8_t> src_zeros,
-                               py::array_t<int32_t> g_idx, py::array_t<int8_t> dst, const std::string& weight_dtype,
-                               const std::string& alg, int group_size, const std::string& scale_dtype,
-                               const std::string& compute_dtype, int threads) {
+                                py::array_t<int32_t> g_idx, py::array_t<int8_t> dst, const std::string& weight_dtype,
+                                const std::string& alg, int group_size, const std::string& scale_dtype,
+                                const std::string& compute_dtype, int threads) {
     int8_t* w_ptr = src_w.mutable_data();
     float* scales_ptr = src_scales.mutable_data();
     int8_t* zeros_ptr = nullptr;
@@ -114,12 +114,12 @@ class Model {
     q_params.alg = parse_alg(alg);
     q_params.group_size = group_size;
     return bestla_qpack(w_ptr, scales_ptr, zeros_ptr, dst_ptr, q_params, threads, src_w.shape(1), src_w.shape(0),
-                       g_idx_ptr);
+                        g_idx_ptr);
   }
 
   static size_t np_bestla_quantize(py::array_t<float> src_w, py::array_t<int8_t> dst, const std::string& weight_dtype,
-                                  const std::string& alg, int group_size, const std::string& scale_dtype,
-                                  const std::string& compute_dtype, int threads) {
+                                   const std::string& alg, int group_size, const std::string& scale_dtype,
+                                   const std::string& compute_dtype, int threads) {
     quant_params_internal q_params;
     q_params.bits = parse_bits(weight_dtype);
     q_params.scale_dtype = parse_scale_dtype(scale_dtype);
@@ -685,8 +685,9 @@ PYBIND11_MODULE(qwen_cpp, m)
                   py::arg("src_scales"), py::arg("src_zeros"), py::arg("g_idx"), py::arg("dst"),
                   py::arg("weight_dtype") = "int4", py::arg("alg") = "sym", py::arg("group_size") = 32,
                   py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8", py::arg("threads") = 8)
-      .def_static("np_bestla_quantize", &Model::np_bestla_quantize, "Quantize tensor to bestla format", py::arg("src_w"),
-                  py::arg("dst"), py::arg("weight_dtype") = "int4", py::arg("alg") = "sym", py::arg("group_size") = 32,
-                  py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8", py::arg("threads") = 8)
+      .def_static("np_bestla_quantize", &Model::np_bestla_quantize, "Quantize tensor to bestla format",
+                  py::arg("src_w"), py::arg("dst"), py::arg("weight_dtype") = "int4", py::arg("alg") = "sym",
+                  py::arg("group_size") = 32, py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8",
+                  py::arg("threads") = 8)
       .def("reinit", &Model::reinit);
 }

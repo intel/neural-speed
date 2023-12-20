@@ -307,7 +307,7 @@ inline constexpr const char* dtype_str() {
 }
 
 inline constexpr uint32_t bestla_dtype_get_mask_val(const BTLA_DTYPE& t, const BTLA_DTYPE& mask,
-                                                   const BTLA_DTYPE& shift) {
+                                                    const BTLA_DTYPE& shift) {
   return (static_cast<uint32_t>(t) & static_cast<uint32_t>(mask)) >> static_cast<uint32_t>(shift);
 }
 

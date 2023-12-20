@@ -127,11 +127,11 @@ utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   return buf;
 }
 
-#define UT_START()                                              \
-  {                                                             \
-    GetCPUDevice();                                             \
+#define UT_START()                                       \
+  {                                                      \
+    GetCPUDevice();                                      \
     ut::DefaultThreading.set_threads(_cd->getThreads()); \
-    printf("Test Class: %s\n", __FUNCTION__);                   \
+    printf("Test Class: %s\n", __FUNCTION__);            \
   }
 template <typename _T>
 static double buffer_error(_T* ref, _T* tar, size_t size, _T thres = _T(0)) {

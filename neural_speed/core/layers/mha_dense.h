@@ -137,7 +137,7 @@ void bestla_reordered_attn_fp32_update_k(const bestla_fusion_attn_fp32_update_kv
 void bestla_reordered_attn_fp32_update_v(const bestla_fusion_attn_fp32_update_kv_args_t* params);
 // shift-RoPE k-cache with pre-computed cos/sin values
 void bestla_reordered_attn_fp32_shift_rope_k(char* cache, const ne_fp16_t* cossin, int batch_size, int heads_kv,
-                                            int head_size, int seq_max, int seq_keep);
+                                             int head_size, int seq_max, int seq_keep);
 
 typedef struct bestla_fusion_attn_fp32_batch_cpy_kv_args_t {
   char* src;

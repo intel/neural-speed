@@ -263,8 +263,8 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
     {
       // FFN FUSION
       if (bestla_fusion_FFN_GeLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
-                                               N * batch_size, cur->ne[0], model.layers[il].ffn[0]->ne[1],
-                                               model.layers[il].ffn[1]->ne[1])) {
+                                                N * batch_size, cur->ne[0], model.layers[il].ffn[0]->ne[1],
+                                                model.layers[il].ffn[1]->ne[1])) {
         cur = ne_ffn_gelu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], cur);
       } else {
         cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);

@@ -171,9 +171,9 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     ne_tensor *Qcur, *Kcur, *Vcur;
     int kv_n_ctx_block = lctx.kv_n_ctx_block;
     if (bestla_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
-                                        model.layers[il].attn[2]->data, N * batch_size, head_size * n_head,
-                                        head_size * n_head)) {  // fused execution of QKV
-                                                                // if (false) {
+                                         model.layers[il].attn[2]->data, N * batch_size, head_size * n_head,
+                                         head_size * n_head)) {  // fused execution of QKV
+                                                                 // if (false) {
       struct ne_tensor* QKVcur =
           ne_mul_qkv(ctx0, model.layers[il].attn[0], model.layers[il].attn[1], model.layers[il].attn[2], cur);
       const size_t qkv_size = N * head_size * n_head * batch_size;
@@ -418,8 +418,8 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     // feed-forward network
     // disable ffn fusion because fp32 support not ready
     if (bestla_fusion_FFN_Add_GeLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[2]->data,
-                                                 N * batch_size, inpSA->ne[0], model.layers[il].ffn[0]->ne[1],
-                                                 model.layers[il].ffn[2]->ne[1])) {
+                                                  N * batch_size, inpSA->ne[0], model.layers[il].ffn[0]->ne[1],
+                                                  model.layers[il].ffn[2]->ne[1])) {
       cur = ne_ffn_add_gelu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[2], model.layers[il].ffn[1],
                             model.layers[il].ffn[3], inpSA);
     } else {
@@ -465,7 +465,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
 
   // lm_head
   if (bestla_fusion_add_f32f32_support(model.others[3]->data, N * batch_size, model.others[3]->ne[1],
-                                      model.others[3]->ne[0])) {
+                                       model.others[3]->ne[0])) {
     inpL = ne_mul_mat_with_bias(ctx0, model.others[3], model.others[4], inpL);
   } else {
     inpL = ne_mul_mat(ctx0, model.others[3], inpL);

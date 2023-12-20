@@ -114,8 +114,8 @@ class UT_ActivationU8KBlockQuantize {
   template <typename _T>
   void ut(int m, int k, int lda, int kblock, bool hasreduce = false) {
     int kpad = padto(k, _T::KTILE);
-    printf("Test Case core:%s: %d %d %d %d %d reduce:%d\n", gemm::CoreAttr::to_str(_T::ID), m, k, lda, kblock,
-           kpad, hasreduce);
+    printf("Test Case core:%s: %d %d %d %d %d reduce:%d\n", gemm::CoreAttr::to_str(_T::ID), m, k, lda, kblock, kpad,
+           hasreduce);
     int kcount = updiv(kpad, kblock);
     utils::aligned_vector<float> raw(m * lda), scales(m * kcount);
     ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 0.5f);
@@ -236,7 +236,7 @@ class UT_ShuffleActivationKblock {
     reordA.assign(bufA.data());
     kernel.preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32, &DefaultThreading);
 
-	kernel.getActivation(&dstptr, &dststride, {src.data(), k, nullptr, indices.data(), &reordA}, m, kpad, 0, 0, cache,
+    kernel.getActivation(&dstptr, &dststride, {src.data(), k, nullptr, indices.data(), &reordA}, m, kpad, 0, 0, cache,
                          CacheSize);
     for (int i = 0; i < m; i++) {
       int j = 0;

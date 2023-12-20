@@ -53,8 +53,8 @@ class ActivationBase {
     } else {
       auto k_pad = utils::padto(k_size, _GemmCore_T::KTILE);
       *dststep = k_pad;
-      return kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size, _param.lda,
-                                                                           k_pad);
+      return kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size,
+                                                                                _param.lda, k_pad);
     }
   }
 };

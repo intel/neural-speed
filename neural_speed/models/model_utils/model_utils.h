@@ -84,9 +84,9 @@ MODEL_API void model_free(struct model_context* ctx);
 // quant_layer - depends on each model's config
 MODEL_API int model_quantize(const quant_params& param, std::shared_ptr<quant_layer_base> quant_layer);
 size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
-                   const quant_params_internal params, int nthread, int n, int k, int* g_idx);
+                    const quant_params_internal params, int nthread, int n, int k, int* g_idx);
 size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_internal params, int nthread, size_t n,
-                      size_t k);
+                       size_t k);
 // Apply a LoRA adapter to a loaded model
 // path_base_model is the path to a higher quality model to use as a base for
 // the layers modified by the adapter. Can be NULL to use the current loaded

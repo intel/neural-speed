@@ -24,7 +24,7 @@ namespace avx512_bf16 {
 #pragma GCC target("avx512bf16", "avx512vl", "avx512bw")
 #endif
 static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
-                                                     int src_step, int dst_step, bool zeropadding) {
+                                                    int src_step, int dst_step, bool zeropadding) {
 #if CompileBF16()
   const int npadding = (dst_step - col) * sizeof(float);
   constexpr int simd_proc_elt = 16;
@@ -51,7 +51,7 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
 }
 
 static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
-                                                     int srcstride, int dststride, bool zeropadding) {
+                                                    int srcstride, int dststride, bool zeropadding) {
 #if CompileBF16()
   auto srcptr = reinterpret_cast<const char*>(raw_srcptr);
   auto dstptr = reinterpret_cast<char*>(raw_dstptr);
@@ -89,4 +89,4 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
 #endif
 }  // namespace avx512_bf16
 }  // namespace kernel
-}  // namespace BTLA
+}  // namespace bestla

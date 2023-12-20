@@ -161,7 +161,7 @@ class ScaleExpAccSumFp32 {
   };
 
   BTLA_CODE forward(const float* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_sum = p.dst_sum + M_offset;
@@ -188,8 +188,7 @@ class ScaleExpAccSumFp32 {
       }
       dst_sum[i] += _mm512_reduce_add_ps(v_sum);
 
-      if (j < utils::padto(N, 64))
-        memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
+      if (j < utils::padto(N, 64)) memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
     }
 #else
     for (int i = 0; i < M; ++i) {
@@ -226,7 +225,7 @@ class ScaleWriteBack {
   };
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto scale = p.scale + M_offset;
     // TODO(Yi): high performance implementation
@@ -322,7 +321,7 @@ class WeightPackBatchBf16Base {
   BTLA_CODE getWeight(...) = delete;
 
   BTLA_CODE getWeight(WType** dstptr, int* dststep, int /* b_size */, int /* k_size */, int /* n_size */, int b_offset,
-                       int k_offset, int n_offset, const Param& param, void* /* tmpcache */, size_t /* cachesize */) {
+                      int k_offset, int n_offset, const Param& param, void* /* tmpcache */, size_t /* cachesize */) {
     const auto wptr = param.packedW;
     if (!wptr) return BTLA_CODE::InvalidParam;
     assert(k_offset % GemmCore_T::KTILE == 0);
@@ -335,7 +334,7 @@ class WeightPackBatchBf16Base {
   }
 
   BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                       const Param& param, void* tmpcache, size_t cachesize) {
+                      const Param& param, void* tmpcache, size_t cachesize) {
     return getWeight(dstptr, dststep, 1, k_size, n_size, 0, k_offset, n_offset, param, tmpcache, cachesize);
   }
 
@@ -435,7 +434,7 @@ class ActivationIdentity {
   ActivationIdentity() {}
 
   BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                           int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
+                          int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
     auto aptr = const_cast<AType*>(_param.A);
     *dstptr = aptr + m_offset * _param.lda + k_offset;
     *dststep = _param.lda;
@@ -448,7 +447,7 @@ class ActivationIdentity {
  */
 template <BTLA_ISA RT_ISA_, class _GemmCore_T, template <class, BTLA_ISA> class _PrologueA_T,
           template <class, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
-class LauncherBaseOff                             //
+class LauncherBaseOff                      //
     : public wrapper::gemm::LauncherBase<  //
           RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
   using Base = wrapper::gemm::LauncherBase<  //
@@ -537,7 +536,7 @@ class LauncherBaseOff                             //
  */
 template <BTLA_ISA RT_ISA_, class _GemmCore_T, template <class, BTLA_ISA> class _PrologueA_T,
           template <class, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
-class LauncherBaseWeight                          //
+class LauncherBaseWeight                   //
     : public wrapper::gemm::LauncherBase<  //
           RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
   using Base = wrapper::gemm::LauncherBase<  //
@@ -656,7 +655,7 @@ class MHAInterface {
     assert(p.step_v_head_size == 1);
     assert(p.step_k_head_size == 1 || p.step_k_sl == 1);
     const auto num_heads = p.batch_size * p.head_num;  // Total number of heads
-    device::CpuBase cb;                         // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
+    device::CpuBase cb;                                // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
 
     const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
     const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
@@ -838,7 +837,7 @@ class ScaleTrackMax {
   struct Param;
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p) const {
+                    const int N, const Param& p) const {
     assert(false);
     return BTLA_CODE::NotSupport;
   }
@@ -858,7 +857,7 @@ class ScaleTrackMax<ISA_T, fp16, float> {
   };
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
@@ -929,14 +928,14 @@ class ScaleTrackMax<ISA_T, float, float> {
   static constexpr float seq15[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
     return p.alibi_slope == 0 ? forward_<false>(src, src_step, M_offset, N_offset, M, N, p)
                               : forward_<true>(src, src_step, M_offset, N_offset, M, N, p);
   }
 
   template <bool HAS_ALIBI>
   BTLA_CODE forward_(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                      const int N, const Param& p) const {
+                     const int N, const Param& p) const {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
 #if CompileAVX512F()
@@ -1011,7 +1010,7 @@ class ScaleTrackMax<ISA_T, int32_t, float> {
   };
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
@@ -1062,7 +1061,7 @@ class WeightBase {
   };
   WeightBase() {}
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+                      int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     if ((n_size % _GemmCore_T::NTILE == 0) && std::is_same<SType, BType>::value &&
         0) {  // TODO(Yi) : use a gemm core accept step for K or reorder at runtime
       *dst_ptr = const_cast<SType*>(p.B) + k_offset * p.ldb + n_offset;
@@ -1095,7 +1094,7 @@ class WeightForwardNTile48 {
   };
   WeightForwardNTile48() {}
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+                      int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);
     *dst_ptr = const_cast<SType*>(p.B) + k_offset * 48 + n_offset * p.ldb;
     *dst_step = p.ldb;
@@ -1337,7 +1336,7 @@ class MHAStableInterface {
     assert((p.K_layout != ATTN_FWD_LAYOUT_PLAIN || p.step_v_head_size == 1));
     assert((p.V_layout != ATTN_FWD_LAYOUT_PLAIN || p.step_k_sl == 1));
     const auto num_heads = p.batch_size * p.head_num;  // Total number of heads
-    device::CpuBase cb;                         // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
+    device::CpuBase cb;                                // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
     const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
     const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
     assert(!is_causal || p.sl_q <= p.sl_kv);
@@ -1508,15 +1507,15 @@ using WeightPackBatchBf16Bf16Trans = WeightPackBatchBf16Trans<GEMM_T, ISA_T, bf1
 template <>
 void bestla_fusion_attn_forward<bf16, bf16, bf16, bf16>(const attn_fwd_args_t<bf16, bf16, bf16, bf16>& p) {
   using GemmKernelBF16ExpSum = ::LauncherBaseOff<  //
-      BTLA_ISA::AMX_BF16,                               //
-      gemm::HCoreRowNAmxbf16<64, 16>,       //
-      prologue_a::gemm::ActivationBase,     //
+      BTLA_ISA::AMX_BF16,                          //
+      gemm::HCoreRowNAmxbf16<64, 16>,              //
+      prologue_a::gemm::ActivationBase,            //
       WeightPackBatchBf16Bf16Trans,                //
       ::ScaleExpAccSumFp32Bf16>;                   //
   using GemmKernelBF16 = ::LauncherBaseOff<        //
-      BTLA_ISA::AMX_BF16,                               //
-      gemm::HCoreRowNAmxbf16<64, 16>,       //
-      prologue_a::gemm::ActivationBase,     //
+      BTLA_ISA::AMX_BF16,                          //
+      gemm::HCoreRowNAmxbf16<64, 16>,              //
+      prologue_a::gemm::ActivationBase,            //
       WeightPackBatchBf16Bf16NonTr,                //
       ::ScaleWriteBackFp32Bf16>;
   static MHAInterface<GemmKernelBF16ExpSum, GemmKernelBF16> kernel;
@@ -1534,17 +1533,17 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
   GetCPUDevice();
   const auto pth = ne_threading::get();
   if (MHA_PREFER_AVX512FP16 && _cd->AVX512_FP16() && params.step_k_sl == 1) {
-    using GemmKernelFP16TrackMax = ::LauncherBaseWeight<   //
-        BTLA_ISA::AVX512_FP16,                                  //
-        gemm::HCoreRowNAvx512fp16<64, 8>,           //
-        prologue_a::gemm::ActivationConverterFp32,  //
-        ::WeightBase,                                      //
-        ::ScaleTrackMaxFp16Fp32>;                          //
-    using GemmKernelFP16 = ::LauncherBaseWeight<           //
-        BTLA_ISA::AVX512_FP16,                                  //
-        gemm::HCoreRowNAvx512fp16<64, 8>,           //
-        prologue_a::gemm::ActivationBase,           //
-        ::WeightBase,                                      //
+    using GemmKernelFP16TrackMax = ::LauncherBaseWeight<  //
+        BTLA_ISA::AVX512_FP16,                            //
+        gemm::HCoreRowNAvx512fp16<64, 8>,                 //
+        prologue_a::gemm::ActivationConverterFp32,        //
+        ::WeightBase,                                     //
+        ::ScaleTrackMaxFp16Fp32>;                         //
+    using GemmKernelFP16 = ::LauncherBaseWeight<          //
+        BTLA_ISA::AVX512_FP16,                            //
+        gemm::HCoreRowNAvx512fp16<64, 8>,                 //
+        prologue_a::gemm::ActivationBase,                 //
+        ::WeightBase,                                     //
         epilogue::gemm::AccumulatorWriteBackFp16Fp32>;
     static MHAStableInterface<GemmKernelFP16TrackMax, GemmKernelFP16> kernel;
     [[maybe_unused]] const auto ret = kernel.compute(params, *pth);
@@ -1552,15 +1551,15 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
   } else if (_cd->AMX_BF16()) {
     if (params.step_k_head_size == 1) {
       using GemmKernelFP32FP16BF16ExpSum = ::LauncherBaseOff<  //
-          BTLA_ISA::AMX_BF16,                                       //
-          gemm::HCoreRowNAmxbf16<64, 16>,               //
-          prologue_a::gemm::ActivationConverterFp32,    //
+          BTLA_ISA::AMX_BF16,                                  //
+          gemm::HCoreRowNAmxbf16<64, 16>,                      //
+          prologue_a::gemm::ActivationConverterFp32,           //
           WeightPackBatchFp16Bf16Trans,                        //
           ::ScaleExpAccSumFp32Bf16>;                           //
       using GemmKernelBF16FP16FP32 = ::LauncherBaseOff<        //
-          BTLA_ISA::AMX_BF16,                                       //
-          gemm::HCoreRowNAmxbf16<64, 16>,               //
-          prologue_a::gemm::ActivationBase,             //
+          BTLA_ISA::AMX_BF16,                                  //
+          gemm::HCoreRowNAmxbf16<64, 16>,                      //
+          prologue_a::gemm::ActivationBase,                    //
           WeightPackBatchFp16Bf16NonTr,                        //
           ::ScaleWriteBackFp32Fp32>;
       static MHAInterface<GemmKernelFP32FP16BF16ExpSum, GemmKernelBF16FP16FP32> kernel;
@@ -1568,15 +1567,15 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
       assert(ret == BTLA_CODE::Success);
     } else if (params.step_k_sl == 1) {
       using GemmKernelFP32FP16BF16ExpSum = ::LauncherBaseOff<  //
-          BTLA_ISA::AMX_BF16,                                       //
-          gemm::HCoreRowNAmxbf16<64, 16>,               //
-          prologue_a::gemm::ActivationConverterFp32,    //
+          BTLA_ISA::AMX_BF16,                                  //
+          gemm::HCoreRowNAmxbf16<64, 16>,                      //
+          prologue_a::gemm::ActivationConverterFp32,           //
           WeightPackBatchFp16Bf16NonTr,                        //
           ::ScaleExpAccSumFp32Bf16>;                           //
       using GemmKernelBF16FP16FP32 = ::LauncherBaseOff<        //
-          BTLA_ISA::AMX_BF16,                                       //
-          gemm::HCoreRowNAmxbf16<64, 16>,               //
-          prologue_a::gemm::ActivationBase,             //
+          BTLA_ISA::AMX_BF16,                                  //
+          gemm::HCoreRowNAmxbf16<64, 16>,                      //
+          prologue_a::gemm::ActivationBase,                    //
           WeightPackBatchFp16Bf16NonTr,                        //
           ::ScaleWriteBackFp32Fp32>;
       static MHAInterface<GemmKernelFP32FP16BF16ExpSum, GemmKernelBF16FP16FP32> kernel;
@@ -1594,15 +1593,15 @@ void bestla_fusion_attn_forward<fp16, fp16, fp16, fp16>(const attn_fwd_args_t<fp
   const auto pth = ne_threading::get();
   if (_cd->AMX_BF16()) {
     using GemmKernelFP16TrackMax = ::LauncherBaseWeight<  //
-        BTLA_ISA::AVX512_FP16,                                 //
-        gemm::HCoreRowNAvx512fp16<64, 8>,          //
-        prologue_a::gemm::ActivationBase,          //
+        BTLA_ISA::AVX512_FP16,                            //
+        gemm::HCoreRowNAvx512fp16<64, 8>,                 //
+        prologue_a::gemm::ActivationBase,                 //
         ::WeightBase,                                     //
         ::ScaleTrackMaxFp16Fp32>;                         //
     using GemmKernelFP16 = ::LauncherBaseWeight<          //
-        BTLA_ISA::AVX512_FP16,                                 //
-        gemm::HCoreRowNAvx512fp16<64, 8>,          //
-        prologue_a::gemm::ActivationBase,          //
+        BTLA_ISA::AVX512_FP16,                            //
+        gemm::HCoreRowNAvx512fp16<64, 8>,                 //
+        prologue_a::gemm::ActivationBase,                 //
         ::WeightBase,                                     //
         epilogue::gemm::AccumulatorWriteBackFp16>;
     static MHAStableInterface<GemmKernelFP16TrackMax, GemmKernelFP16> kernel;
@@ -1620,15 +1619,15 @@ void bestla_fusion_attn_forward<int8_t, int8_t, int8_t, int8_t>(
   const auto pth = ne_threading::get();
   if (/* params.sl_q > 4 &&  */ _cd->AMX_INT8()) {         // TODO(Yi): add vnni impl
     using GemmKernelInt32TrackMax = ::LauncherBaseWeight<  //
-        BTLA_ISA::AMX_INT8,                                     //
-        gemm::ICoreRowNAmxint8SS<48, 16>,           //
-        prologue_a::gemm::ActivationBase,           //
+        BTLA_ISA::AMX_INT8,                                //
+        gemm::ICoreRowNAmxint8SS<48, 16>,                  //
+        prologue_a::gemm::ActivationBase,                  //
         ::WeightForwardNTile48,                            //
         ::ScaleTrackMaxS32Fp32>;                           //
     using GemmKernelInt32 = ::LauncherBaseWeight<          //
-        BTLA_ISA::AMX_INT8,                                     //
-        gemm::ICoreRowNAmxint8<48, 16>,             //
-        prologue_a::gemm::ActivationBase,           //
+        BTLA_ISA::AMX_INT8,                                //
+        gemm::ICoreRowNAmxint8<48, 16>,                    //
+        prologue_a::gemm::ActivationBase,                  //
         ::WeightForwardNTile48,                            //
         ::ScaleWriteBackS32S8>;                            //
     static MHAStableInterface<GemmKernelInt32TrackMax, GemmKernelInt32> mha;
@@ -1660,19 +1659,19 @@ template <>
 void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<float, bf16, bf16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
-  if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {         // TODO(Yi): add vdpbf16ps impl
-    using GemmKernelBF16TrackMax = ::LauncherBaseWeight<   //
-        BTLA_ISA::AMX_BF16,                                     //
-        gemm::HCoreRowNAmxbf16<48, 16>,             //
-        prologue_a::gemm::ActivationConverterFp32,  //
-        ::WeightForwardNTile48,                            //
-        ::ScaleTrackMaxFp32Fp32>;                          //
-    using GemmKernelBF16 = ::LauncherBaseWeight<           //
-        BTLA_ISA::AMX_BF16,                                     //
-        gemm::HCoreRowNAmxbf16<48, 16>,             //
-        ::ActivationIdentity,                              // pretty sure we have enough paddings for P-matrix
-        ::WeightForwardNTile48,                            //
-        epilogue::gemm::AccumulatorWriteBackFp32>;  //
+  if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {        // TODO(Yi): add vdpbf16ps impl
+    using GemmKernelBF16TrackMax = ::LauncherBaseWeight<  //
+        BTLA_ISA::AMX_BF16,                               //
+        gemm::HCoreRowNAmxbf16<48, 16>,                   //
+        prologue_a::gemm::ActivationConverterFp32,        //
+        ::WeightForwardNTile48,                           //
+        ::ScaleTrackMaxFp32Fp32>;                         //
+    using GemmKernelBF16 = ::LauncherBaseWeight<          //
+        BTLA_ISA::AMX_BF16,                               //
+        gemm::HCoreRowNAmxbf16<48, 16>,                   //
+        ::ActivationIdentity,                             // pretty sure we have enough paddings for P-matrix
+        ::WeightForwardNTile48,                           //
+        epilogue::gemm::AccumulatorWriteBackFp32>;        //
     static MHAStableInterface<GemmKernelBF16TrackMax, GemmKernelBF16> mha;
     [[maybe_unused]] const auto ret = mha.compute(params, *pth);
     assert(ret == BTLA_CODE::Success);
@@ -2010,7 +2009,7 @@ void bestla_reordered_attn_fp32_update_v(const bestla_fusion_attn_fp32_update_kv
 }
 
 void bestla_reordered_attn_fp32_shift_rope_k(char* cache, const ne_fp16_t* cossin, int batch_size, int heads_kv,
-                                            int head_size, int seq_max, int seq_keep) {
+                                             int head_size, int seq_max, int seq_keep) {
   const auto pad_headsize = padto(head_size, 32);
   const auto pad_seq_max = padto(seq_max, 48);
   const auto cache_step_head_num = pad_headsize * pad_seq_max;

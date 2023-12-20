@@ -29,36 +29,36 @@ void bestla_init();
 unsigned long long bestla_f32f32_get_workspace_size(int _m, int _n, int _k, void* wptr);
 
 void bestla_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda, int ldo,
-                          void* workspace);
+                           void* workspace);
 
 bool bestla_fusion_add_f32f32_support(void* weiptr, int _m, int _n, int _k);
 void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bias, float* output, int _m, int _n,
-                                     int _k, int lda, int ldo, bool boardcast_bias, void* workspace);
+                                      int _k, int lda, int ldo, bool boardcast_bias, void* workspace);
 
 unsigned long long bestla_fusion_QKV_f32f32_get_workspace_size(int _m, int _n, int _k, void* w1ptr);
 
 bool bestla_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int _m, int _n, int _k);
 
 void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr, void* wvptr, float* output, int _m,
-                                     int _n, int _k, int lda, int ldo, void* workspace);
+                                      int _n, int _k, int lda, int ldo, void* workspace);
 
 unsigned long long bestla_fusion_FFN_f32f32_get_workspace_size(int seq, int fin, int fmid, int fout, void* w1ptr,
-                                                              void* w2ptr);
+                                                               void* w2ptr);
 
 bool bestla_fusion_FFN_SiLu_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid, int fout);
 
 void bestla_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
-                                          float* tmp2, float* output, int seq, int fin, int fmid, int fout,
-                                          void* workspace);
+                                           float* tmp2, float* output, int seq, int fin, int fmid, int fout,
+                                           void* workspace);
 
 bool bestla_fusion_FFN_GeLu_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout);
 void bestla_fusion_FFN_GeLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* tmp1, float* output,
-                                          int seq, int fin, int fmid, int fout, void* workspace);
+                                           int seq, int fin, int fmid, int fout, void* workspace);
 
 bool bestla_fusion_FFN_Add_GeLu_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout);
 void bestla_fusion_FFN_Add_GeLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* b1ptr, float* b2ptr,
-                                              float* tmp1, float* output, int seq, int fin, int fmid, int fout,
-                                              bool boardcast_bias, void* workspace);
+                                               float* tmp1, float* output, int seq, int fin, int fmid, int fout,
+                                               bool boardcast_bias, void* workspace);
 
 void bestla_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld);
 // packweight to dstptr, copy weight attributes from srcptr

@@ -287,7 +287,7 @@ struct model_context {
   // next tokens (decoding) generation may be larger than `request_running_bs`(for example, beam search)
   int batch_size = 1;
   bool beam_search = false;
-  bool shift_roped_k = false;     // whether to store non-RoPEd K cache
+  bool shift_roped_k = false;      // whether to store non-RoPEd K cache
   bool support_bestla_kv = false;  // whether the model graph supports bestla-kvcache
   int beam_size = 1;
   int kv_n_ctx_block = 1;

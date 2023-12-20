@@ -229,11 +229,11 @@ static inline void vec_broadcast_epi32_2_4(__m512i* dst4regs, __m512i* src2regs)
 
 template <typename _ST, typename _DT, bool _IS_SYM>
 static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _DT* dstptr, int row, int col,
-                                                         int ld_src, int ld_dst, _ST* scales, int8_t* zero_points,
-                                                         int k_offset, int kblock, int NPad,
-                                                         void (*dequantize)(_DT*, int8_t*, __m512*, __m512i*),
-                                                         void (*pad_bit4)(int8_t*, int8_t*, __m512i, int),
-                                                         int8_t* tmpbuf, size_t tmpsize) {
+                                                        int ld_src, int ld_dst, _ST* scales, int8_t* zero_points,
+                                                        int k_offset, int kblock, int NPad,
+                                                        void (*dequantize)(_DT*, int8_t*, __m512*, __m512i*),
+                                                        void (*pad_bit4)(int8_t*, int8_t*, __m512i, int),
+                                                        int8_t* tmpbuf, size_t tmpsize) {
   uint32_t mask = 0xf0f0f0f0;
   auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == 48) {
@@ -352,9 +352,9 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _
 
 template <BTLA_DTYPE _SRCT, typename _ST, typename _DT, bool _IS_SYM = true>
 static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _DT* dstptr, int row, int col,
-                                                         int ld_src, int ld_dst, _ST* scales, int8_t* zero_points,
-                                                         int k_offset, int kblock, int NPad, int8_t* tmpbuf,
-                                                         size_t tmpsize) {
+                                                        int ld_src, int ld_dst, _ST* scales, int8_t* zero_points,
+                                                        int k_offset, int kblock, int NPad, int8_t* tmpbuf,
+                                                        size_t tmpsize) {
   uint32_t mask = 0xf0f0f0f0;
   auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
   auto broadcast_idx = _mm512_setr_epi64(0, 4, 1, 5, 2, 6, 3, 7);
@@ -389,8 +389,8 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
 
         for (; irow < row0; irow++) {
           if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(
-                tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask, LoadMask64);
+            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
+                                               zmm_mask, LoadMask64);
             dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
           } else {
             convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
@@ -440,7 +440,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
       for (; irow < row; irow++) {
         if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
           convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
-                                              zmm_mask, LoadMask64);
+                                             zmm_mask, LoadMask64);
           dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
         } else {
           convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
@@ -478,8 +478,8 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
 
         for (; irow < row0; irow++) {
           if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(
-                tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask, LoadMask64);
+            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
+                                               zmm_mask, LoadMask64);
             convert_s4_s8_v32<BTLA_DTYPE::S4_CLIP>(
                 tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32), zmm_mask,
                 LoadMask64);
@@ -540,7 +540,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
       for (; irow < row; irow++) {
         if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
           convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
-                                              zmm_mask, LoadMask64);
+                                             zmm_mask, LoadMask64);
           convert_s4_s8_v32<BTLA_DTYPE::S4_CLIP>(
               tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32), zmm_mask, LoadMask64);
           dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
@@ -561,7 +561,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
 
 template <bool WITH_SCALE, typename _DST_T, int _PACK_ROW, typename _S_T>
 inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                          _S_T* scales, int k_offset, int kblock, int NPad, BTLA_DTYPE src_f8_type) {
+                                         _S_T* scales, int k_offset, int kblock, int NPad, BTLA_DTYPE src_f8_type) {
   int align_col = col / 16 * 16;
   int col_tail = col - align_col;
   auto ebits = utils::bestla_dtype_get_f8_ebits(src_f8_type);
@@ -619,8 +619,8 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
 
 template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW, typename _ST>
 static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                 int ld_dst, _ST* scales, int8_t* zero_points, int k_offset, int kblock,
-                                                 int NPad, int8_t* tmp, size_t tmpsize) {
+                                                int ld_dst, _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                int NPad, int8_t* tmp, size_t tmpsize) {
   if constexpr (_PACK_ROW == 1) {
     if (zero_points == nullptr) {
       return decompress_kblock_bit4_packrow1<_ST, _DST_T, true>(
@@ -645,8 +645,8 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
 
 template <BTLA_DTYPE _F4_T, typename _DST_T, int _PACK_ROW, typename _ST>
 static inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                 int ld_dst, _ST* scales, int k_offset, int kblock, int NPad,
-                                                 int8_t* tmp, size_t tmpsize) {
+                                                int ld_dst, _ST* scales, int k_offset, int kblock, int NPad,
+                                                int8_t* tmp, size_t tmpsize) {
   if constexpr (_PACK_ROW == 1) {
     return decompress_kblock_bit4_packrow1<_ST, _DST_T, true>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, nullptr,
                                                               k_offset, kblock, NPad, &dequant_f4_N<48, _DST_T, _F4_T>,
@@ -660,7 +660,7 @@ static inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dst
 
 template <BTLA_DTYPE F4_T, typename DST_T>
 inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dstptr, int row, int col, int ld_src,
-                                                  int ld_dst, int8_t* tmp, size_t tmpsize) {
+                                                 int ld_dst, int8_t* tmp, size_t tmpsize) {
   uint32_t mask = 0xf0f0f0f0;
   auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == ld_src) {
@@ -697,7 +697,7 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
 
 template <BTLA_DTYPE S4_T>
 static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                          int ld_dst) {
+                                         int ld_dst) {
   uint32_t mask = 0xf0f0f0f0;
   auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == ld_src) {
@@ -728,7 +728,7 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
 }
 
 static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, int8_t* dstptr, int row, int col,
-                                                            int ld_src, int ld_dst, float* scales, int blocksize) {
+                                                           int ld_src, int ld_dst, float* scales, int blocksize) {
   int constexpr VLen = 16;
   auto v127 = _mm512_set1_ps(127.f);
   int col16 = utils::padto_le(col, 16);
@@ -779,8 +779,8 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, 
 }
 
 static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr, int8_t* dstptr, int row, int col,
-                                                             int ld_src, int ld_dst, float* scales, int8_t* zero_points,
-                                                             int blocksize) {
+                                                            int ld_src, int ld_dst, float* scales, int8_t* zero_points,
+                                                            int blocksize) {
   int constexpr VLen = 16;
   auto v255 = _mm512_set1_ps(255.f);
   auto v2 = _mm512_set1_ps(2.f);
@@ -847,8 +847,8 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr,
 
 template <BTLA_DTYPE S4_T>
 static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col,
-                                                        int ld_src, int ld_dst, float* scales, int8_t* zero_points,
-                                                        int blocksize) {
+                                                       int ld_src, int ld_dst, float* scales, int8_t* zero_points,
+                                                       int blocksize) {
   if (zero_points == nullptr)
     return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
   else
@@ -998,16 +998,15 @@ constexpr auto broadcast_F4_BNB_quantv = broadcast_N_2_Nx16<8>(F4_BNB_simd_quant
 constexpr auto broadcast_F4_E2M1_quantv = broadcast_N_2_Nx16<8>(F4_E2M1_simd_quant_v);
 
 template <BTLA_DTYPE F4_T>
-inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                           int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
+inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
+                                          float* scales, int8_t* zero_points, int blocksize) {
   // assert(col % 16 == 0);
   auto align_row = row / blocksize * blocksize;
   auto align_blk = blocksize / 4 * 4;
   int8_t* broadcast_f4_quantv;
   if constexpr (F4_T == BTLA_DTYPE::F4_NF4) broadcast_f4_quantv = const_cast<int8_t*>(broadcast_F4_NF4_quantv.data());
   if constexpr (F4_T == BTLA_DTYPE::F4_BNB) broadcast_f4_quantv = const_cast<int8_t*>(broadcast_F4_BNB_quantv.data());
-  if constexpr (F4_T == BTLA_DTYPE::F4_E2M1)
-    broadcast_f4_quantv = const_cast<int8_t*>(broadcast_F4_E2M1_quantv.data());
+  if constexpr (F4_T == BTLA_DTYPE::F4_E2M1) broadcast_f4_quantv = const_cast<int8_t*>(broadcast_F4_E2M1_quantv.data());
   int i = 0;
   int align_col = col / 16 * 16;
 
@@ -1050,8 +1049,8 @@ inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, i
 
 template <typename SRC_T>
 static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* srcptr, int ld_src, uint8_t* dstptr,
-                                                 int ld_dst, float* scales, int ld_scale, uint8_t* zps, int blocksize,
-                                                 float* blkreduce) {
+                                                int ld_dst, float* scales, int ld_scale, uint8_t* zps, int blocksize,
+                                                float* blkreduce) {
   int constexpr VLen = 16;
   auto vff = _mm512_set1_epi32(255);
   auto v0 = _mm512_set1_epi32(0);
@@ -1158,8 +1157,7 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
 
 template <typename SRC_T>
 static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* srcptr, int ld_src, int8_t* dstptr,
-                                                 int ld_dst, float* scales, int ld_scale, int blocksize,
-                                                 float* reduce) {
+                                                int ld_dst, float* scales, int ld_scale, int blocksize, float* reduce) {
   int constexpr VLen = 16;
   auto vpos = _mm512_set1_epi32(127);
   auto vneg = _mm512_set1_epi32(-128);
@@ -1242,8 +1240,8 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
 }
 
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
-                                           const float* src1ptr, const int src1step, float* dstptr, const int dststep,
-                                           const int M, const int N) {
+                                          const float* src1ptr, const int src1step, float* dstptr, const int dststep,
+                                          const int M, const int N) {
   int constexpr Vlen = 16;
   auto vN = utils::padto_le(N, Vlen);
   auto valpha = _mm512_set1_ps(alpha);
@@ -1278,7 +1276,7 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
 
 template <BTLA_DTYPE S4_T, typename _DST_T>
 inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                            int ld_dst, int8_t* tmp, size_t tmpsize) {
+                                           int ld_dst, int8_t* tmp, size_t tmpsize) {
   uint32_t mask = 0xf0f0f0f0;
   auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == ld_src) {
@@ -1339,7 +1337,7 @@ inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int ro
 
 template <typename SCA_T>
 static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* srcptr, const int srcstep, float* dstptr,
-                                              const int dststep, const int M, const int N) {
+                                             const int dststep, const int M, const int N) {
   int constexpr Vlen = 16;
   auto vN = utils::padto_le(N, Vlen);
   int j = 0;
@@ -1375,7 +1373,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
 }
 
 static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, float* dstptr, const int dststep,
-                                       const int M, const int N) {
+                                      const int M, const int N) {
   int constexpr Vlen = 16;
   auto vN = utils::padto_le(N, Vlen);
   int j = 0;
@@ -1408,8 +1406,8 @@ static inline void vec_quanout_s32_u32_v16(const int32_t* srcptr, __m512& vfacto
 }
 
 static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr, const int srcstep, uint8_t* dstptr,
-                                         const int dststep, const int M, const int N, float scaleSrc, float scaleDst,
-                                         int zpDst) {
+                                        const int dststep, const int M, const int N, float scaleSrc, float scaleDst,
+                                        int zpDst) {
   float factor = alpha * scaleSrc / scaleDst;
   auto vfactor = _mm512_set1_ps(factor);
   auto vzp = _mm512_set1_epi32(zpDst);
@@ -1448,8 +1446,8 @@ static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr
 }
 
 static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, float* dstptr, float alpha, float beta,
-                                                       int row, int col, int ld_src, int ld_dst, float* ascales,
-                                                       int ldas, float* wscales) {
+                                                      int row, int col, int ld_src, int ld_dst, float* ascales,
+                                                      int ldas, float* wscales) {
   auto vbeta = _mm512_set1_ps(beta);
   int col16 = utils::padto_le(col, 16);
   for (int irow = 0; irow < row; irow++) {
@@ -1476,8 +1474,8 @@ static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, flo
 
 template <typename SCAB_T>
 static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcstep, float* dstptr, const int dststep,
-                                          const int row, const int col, const float* scaleA, const int ldsa,
-                                          const SCAB_T* scaleB) {
+                                         const int row, const int col, const float* scaleA, const int ldsa,
+                                         const SCAB_T* scaleB) {
   int col16 = utils::padto_le(col, 16);
   int col64 = utils::padto_le(col, 64);
   for (int irow = 0; irow < row; irow++) {
@@ -1544,7 +1542,7 @@ static inline BTLA_CODE broadcast_u8(int num, const uint8_t& srcval, uint8_t* ds
 }
 
 static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zps,
-                                                   float* scales, int lds, const float* reduce) {
+                                                  float* scales, int lds, const float* reduce) {
   int constexpr VLen = 16;
   auto col16 = utils::padto_le(col, VLen);
   for (int i = 0; i < row; i++) {
@@ -1567,7 +1565,7 @@ static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int 
 }
 
 static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int row, int col, int8_t* zps,
-                                                   float* scales, int lds, const float* reduce) {
+                                                  float* scales, int lds, const float* reduce) {
   int constexpr VLen = 16;
   auto col16 = utils::padto_le(col, VLen);
   for (int i = 0; i < row; i++) {
@@ -1591,8 +1589,8 @@ static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int 
 }
 
 static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zpa, int8_t* zpb,
-                                               float* scalea, float* scaleb, int lds, int k, const float* reducea,
-                                               const float* reduceb) {
+                                              float* scalea, float* scaleb, int lds, int k, const float* reducea,
+                                              const float* reduceb) {
   int constexpr VLen = 16;
   auto col16 = utils::padto_le(col, VLen);
   auto vk = _mm512_set1_ps(static_cast<float>(k));
@@ -1626,7 +1624,7 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
 }
 
 static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
-                                                     int srcstride, int dststride, bool zeropadding) {
+                                                    int srcstride, int dststride, bool zeropadding) {
   auto srcptr = reinterpret_cast<const char*>(raw_srcptr);
   auto dstptr = reinterpret_cast<char*>(raw_dstptr);
   constexpr int simd_proc_elt = 16;
@@ -1646,8 +1644,7 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
       round_bias = _mm512_add_epi32(round_bias, bf16_add_helper);
       auto round_fp32_v = _mm512_add_epi32(round_bias, _mm512_loadu_si512(src + sizeof(float) * simd_proc_elt * j));
       auto pack_bf16_value = _mm512_cvtepi32_epi16(_mm512_srli_epi32(round_fp32_v, 16));
-      _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + (j * simd_proc_elt) * sizeof(utils::bf16)),
-                          pack_bf16_value);
+      _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + (j * simd_proc_elt) * sizeof(utils::bf16)), pack_bf16_value);
     }
     if (col_tail > 0) {
       auto round_bias = _mm512_maskz_loadu_epi32(tail_mask, src + sizeof(float) * simd_proc_elt * j);
@@ -1656,8 +1653,8 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
       auto round_fp32_v =
           _mm512_add_epi32(round_bias, _mm512_maskz_loadu_epi32(tail_mask, src + sizeof(float) * simd_proc_elt * j));
       auto pack_bf16_tail = _mm512_cvtepi32_epi16(_mm512_srli_epi32(round_fp32_v, 16));
-      _mm256_mask_storeu_epi16(reinterpret_cast<__m256i*>(dst + (j * simd_proc_elt) * sizeof(utils::bf16)),
-                               tail_mask, pack_bf16_tail);
+      _mm256_mask_storeu_epi16(reinterpret_cast<__m256i*>(dst + (j * simd_proc_elt) * sizeof(utils::bf16)), tail_mask,
+                               pack_bf16_tail);
     }
     if (zeropadding && npadding) {
       std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
@@ -1668,7 +1665,7 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
 
 template <typename SRC_T>
 static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int row, int col, int blocksize,
-                                              float* reduce, int ldr) {
+                                             float* reduce, int ldr) {
   int constexpr VLen = 16;
   auto vblock2_ = utils::padto_le(blocksize, VLen * 2);
   auto vblock_ = utils::padto_le(blocksize, VLen);
@@ -1704,7 +1701,7 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
 }
 
 static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
-                                                     int src_step, int dst_step, bool zeropadding) {
+                                                    int src_step, int dst_step, bool zeropadding) {
 #if CompileFP16()
   const int npadding = (dst_step - col) * sizeof(utils::fp16);
   constexpr int simd_proc_elt = 16;
@@ -1731,7 +1728,7 @@ static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils:
 }
 
 static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, float* dst_ptr, int row, int col,
-                                                     int src_step, int dst_step, bool zeropadding) {
+                                                    int src_step, int dst_step, bool zeropadding) {
 #if CompileFP16()
   const int npadding = (dst_step - col) * sizeof(float);
   constexpr int simd_proc_elt = 16;
@@ -1758,7 +1755,7 @@ static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, 
 }
 
 static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
-                                                     int src_step, int dst_step, bool zeropadding) {
+                                                    int src_step, int dst_step, bool zeropadding) {
   const int npadding = (dst_step - col) * sizeof(float);
   constexpr int simd_proc_elt = 16;
   auto col_body = col / simd_proc_elt * simd_proc_elt;
@@ -1947,7 +1944,7 @@ template <typename T_SRC, typename T_DST = T_SRC, int RowPack = 4 / sizeof(T_DST
 struct padding_interleave_cvt {
   padding_interleave_cvt() = delete;
   static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int NTile, int row, int col, int row_pad, int col_pad,
-                            int src_step, int dst_step) {
+                           int src_step, int dst_step) {
     return BTLA_CODE::NotSupport;
   }
 };
@@ -1959,7 +1956,7 @@ struct padding_interleave_cvt<utils::fp16, utils::bf16, 2> {
 
   // M x N ===> N/NTile x M/RowPack x NTile x RowPack (leading dim stride = NTile * dststride)
   static BTLA_CODE forward(const utils::fp16* src, utils::bf16* dst, int NTile, int row, int col, int row_pad,
-                            int col_pad, int src_step, int dst_step) {
+                           int col_pad, int src_step, int dst_step) {
     int i = 0;
     for (; i < row / RowPack * RowPack; i += RowPack) {
       int j = 0;
@@ -2043,7 +2040,7 @@ template <typename T_SRC, typename T_DST = T_SRC, int ColPack = 4 / sizeof(T_DST
 struct padding_trans_interleave_cvt {
   padding_trans_interleave_cvt() = delete;
   static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int MTile, int row, int col, int row_pad, int col_pad,
-                            int src_step, int dst_step) {
+                           int src_step, int dst_step) {
     return BTLA_CODE::NotSupport;
   }
 };
@@ -2054,7 +2051,7 @@ struct padding_trans_interleave_cvt<utils::fp16, utils::bf16, 2> {
   padding_trans_interleave_cvt() = delete;
 
   static BTLA_CODE forward(const utils::fp16* src, utils::bf16* dst, int MTile, int row, int col, int row_pad,
-                            int col_pad, int src_step, int dst_step) {
+                           int col_pad, int src_step, int dst_step) {
     assert(row_pad % 16 == 0 && col_pad % 32 == 0);
     int i = 0;
     for (; i < row / MTile * MTile; i += MTile) {

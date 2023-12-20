@@ -45,7 +45,7 @@
 #endif
 
 #ifdef __GNUC__
-#define XBYAK_GNUC_PREREQ(major, minor) ((__GNUC__)*100 + (__GNUC_MINOR__) >= (major)*100 + (minor))
+#define XBYAK_GNUC_PREREQ(major, minor) ((__GNUC__) * 100 + (__GNUC_MINOR__) >= (major) * 100 + (minor))
 #else
 #define XBYAK_GNUC_PREREQ(major, minor) 0
 #endif
@@ -191,7 +191,7 @@ typedef uint8_t uint8;
 #endif
 #endif
 #ifndef MIE_PACK  // for shufps
-#define MIE_PACK(x, y, z, w) ((x)*64 + (y)*16 + (z)*4 + (w))
+#define MIE_PACK(x, y, z, w) ((x) * 64 + (y) * 16 + (z) * 4 + (w))
 #endif
 
 enum {

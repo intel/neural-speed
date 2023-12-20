@@ -595,8 +595,8 @@ class StorageQuantActivation : public IActivationKBlockBase {
     mPrologueID = BTLA_PROLOGUEB_IDS::WeightPack;
   }
 
-  size_t resize(int _mpad, int _kpad, int _m, int _k, int _kblock, BTLA_DTYPE buft, BTLA_DTYPE scalet,
-                BTLA_DTYPE zpt, BTLA_DTYPE redt, bool is_asym, bool has_reduce) {
+  size_t resize(int _mpad, int _kpad, int _m, int _k, int _kblock, BTLA_DTYPE buft, BTLA_DTYPE scalet, BTLA_DTYPE zpt,
+                BTLA_DTYPE redt, bool is_asym, bool has_reduce) {
     IActivationKBlockBase::resize(_mpad, _kpad, _kblock, _m, _k, buft);
     mCorrection.resize(_mpad, utils::updiv(_kpad, _kblock), scalet, zpt, redt, is_asym, has_reduce);
     size_t bufsize = static_cast<size_t>(_mpad) * _kpad * utils::bestla_dtype_size(buft);

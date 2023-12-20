@@ -247,8 +247,8 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
     // mlp.forward
     struct ne_tensor* mlp_output;
     if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
-                                             model.layers[il].ffn[2]->data, N, hidden_states->ne[0],
-                                             model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
+                                              model.layers[il].ffn[2]->data, N, hidden_states->ne[0],
+                                              model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
       mlp_output =
           ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], hidden_states);
     } else {

@@ -42,7 +42,7 @@ struct ne_tensor* qwen_ff(const model_layer& layer, const int batch_size, const 
                           ne_tensor* inp) {
   struct ne_tensor* cur = inp;
   if (bestla_fusion_FFN_SiLu_f32f32_support(layer.ffn[1]->data, layer.ffn[2]->data, layer.ffn[0]->data, N, cur->ne[0],
-                                           layer.ffn[1]->ne[1], layer.ffn[2]->ne[1])) {
+                                            layer.ffn[1]->ne[1], layer.ffn[2]->ne[1])) {
     cur = ne_ffn_silu(ctx0, layer.ffn[1], layer.ffn[2], layer.ffn[0], cur);
   } else {
     struct ne_tensor* cur_1 = ne_mul_mat(ctx0, layer.ffn[0], cur);

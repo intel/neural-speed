@@ -44,7 +44,7 @@ struct ne_tensor* gpt_neox_ff(const model_layer& layer, const int batch_size, co
 
   cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.norm[2], cur), cur), ne_repeat(ctx0, layer.norm[3], cur));
   if (bestla_fusion_FFN_Add_GeLu_f32f32_support(layer.ffn[0]->data, layer.ffn[2]->data, N * batch_size, cur->ne[0],
-                                               layer.ffn[0]->ne[1], layer.ffn[2]->ne[1])) {
+                                                layer.ffn[0]->ne[1], layer.ffn[2]->ne[1])) {
     cur = ne_ffn_add_gelu(ctx0, layer.ffn[0], layer.ffn[2], layer.ffn[1], layer.ffn[3], cur);
   } else {
     cur = ne_mul_mat(ctx0, layer.ffn[0], cur);

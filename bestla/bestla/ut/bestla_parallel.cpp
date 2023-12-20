@@ -22,7 +22,8 @@ class UT_OMPThreading {
     avector<float> src(row * col), dst(row * col), ref(row * col);
     fill_buffer_randn(src.data(), src.size(), -0.5f, 0.5f);
     int ld_src = col, ld_dst = row;
-    kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col, row);
+    kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col,
+                                                                             row);
     parallel::Scheduler2D _para({threads, row, col, 1, 1});
     DefaultThreading.parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
@@ -55,7 +56,8 @@ class UT_StdThreading {
     avector<float> src(row * col), dst(row * col), ref(row * col);
     fill_buffer_randn(src.data(), src.size(), -0.5f, 0.5f);
     int ld_src = col, ld_dst = row;
-    kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col, row);
+    kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col,
+                                                                             row);
     parallel::Scheduler2D _para({threads, row, col, 1, 1});
     DefaultThreading.parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};

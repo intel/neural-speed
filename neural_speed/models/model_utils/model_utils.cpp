@@ -871,7 +871,7 @@ quant_params_internal quant_params_to_internal(const quant_params& params) {
 }
 
 size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
-                   const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
+                    const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
 #ifdef __OPENMP
@@ -905,7 +905,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
   if (size) {
     if (!BTLAGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
-                        params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
+                       params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
       printf("Failed to quant this weight\n");
       return 0;
     }
@@ -916,7 +916,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
 
 // dstptr: default maximum workspace = float array size
 size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_internal params, int nthread, size_t n,
-                      size_t k) {
+                       size_t k) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
 #ifdef __OPENMP
@@ -967,8 +967,8 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, nullptr);
   bool constexpr IsTrans_TorchWeight = true;
   if (size) {
-    if (!BTLAGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym,
-                             ctype, IsTrans_TorchWeight, &threading)) {
+    if (!BTLAGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype,
+                            IsTrans_TorchWeight, &threading)) {
       printf("Failed to quant this weight\n");
       return 0;
     }
@@ -2059,7 +2059,7 @@ static void ne_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq
 }
 
 static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
-                                         const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
+                                          const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const auto& kv_self = ctx->model.kv_self;
   const auto& hparams = ctx->model.hparams;
   const int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;

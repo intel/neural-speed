@@ -394,9 +394,8 @@ class LauncherIntKBlock {
         mProA.getScale(&scaleA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded, (blk_m + i + _config.loc[0]),
                        iterk, tmp_, _config.tmpcachesize);
         mGemmCore.forward(aptr_cache, bptr_cache, cptr_cache, zpA_cache, scaleA_cache, ldsa_cache, scaleB_cache,
-                          reduceB_cache, ldsb_cache, m_remain, n_padded, k_padded, KBlock,
-                          acache_step * sizeof(AType), bcache_stride, ccache_stride, iterk, 1.f, tmp_,
-                          _config.tmpcachesize);
+                          reduceB_cache, ldsb_cache, m_remain, n_padded, k_padded, KBlock, acache_step * sizeof(AType),
+                          bcache_stride, ccache_stride, iterk, 1.f, tmp_, _config.tmpcachesize);
       }
     }
     mEpilogue.forward(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize, blk_nsize,
