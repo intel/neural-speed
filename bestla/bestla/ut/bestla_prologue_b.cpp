@@ -1,9 +1,9 @@
-#include "../jit_blas_gemm.h"
-#include "../jit_blas_prologue_b.h"
-#include "../jit_blas_parallel.h"
-#include "../jit_blas_device.h"
-#include "../jit_blas_wrapper.h"
-#include "jit_blas_ut.h"
+#include "bestla_gemm.h"
+#include "bestla_prologue_b.h"
+#include "bestla_parallel.h"
+#include "bestla_device.h"
+#include "bestla_wrapper.h"
+#include "bestla_ut.h"
 
 namespace jblas {
 using namespace utils;

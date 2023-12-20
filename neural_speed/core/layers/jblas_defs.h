@@ -13,8 +13,8 @@
 //  limitations under the License.
 
 #pragma once
-#include "jblas/jit_blas_prologue_b.h"
-#include "jblas/jit_blas_wrapper.h"
+#include "bestla/bestla_prologue_b.h"
+#include "bestla/bestla_wrapper.h"
 
 namespace jblas {
 template <class GemmCore_T, template <class, JBLAS_ISA> class Wei_T>

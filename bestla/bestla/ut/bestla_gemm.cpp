@@ -1,7 +1,6 @@
-#include "../jit_blas_gemm.h"
-
-#include "../jit_blas_utils.h"
-#include "jit_blas_ut.h"
+#include "bestla_gemm.h"
+#include "bestla_utils.h"
+#include "bestla_ut.h"
 
 namespace jblas {
 using namespace utils;

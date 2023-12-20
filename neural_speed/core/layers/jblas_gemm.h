@@ -25,7 +25,7 @@ Abstract:
 #pragma once
 
 #include "data_types.h"
-#include "jblas/jit_blas.h"
+#include "bestla/bestla.h"
 
 struct JBLAS_GEMM_DATA_PACKED_PARAMS {
   const float* A = nullptr; /**< address of A (float32 matrix)*/

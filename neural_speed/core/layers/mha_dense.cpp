@@ -30,14 +30,14 @@
 
 #include "core/data_types.h"
 #include "layers/jblas_common.hpp"
-#include "jblas/jit_blas.h"
-#include "jblas/jit_blas_epilogue.h"
-#include "jblas/jit_blas_gemm.h"
-#include "jblas/jit_blas_parallel.h"
-#include "jblas/jit_blas_prologue_b.h"
-#include "jblas/jit_blas_prologue_a.h"
-#include "jblas/jit_blas_storage.h"
-#include "jblas/jit_blas_wrapper.h"
+#include "bestla/bestla.h"
+#include "bestla/bestla_epilogue.h"
+#include "bestla/bestla_gemm.h"
+#include "bestla/bestla_parallel.h"
+#include "bestla/bestla_prologue_b.h"
+#include "bestla/bestla_prologue_a.h"
+#include "bestla/bestla_storage.h"
+#include "bestla/bestla_wrapper.h"
 
 #define MHA_2ND_EXP 1
 constexpr bool MHA_PREFER_AVX512FP16 = true;

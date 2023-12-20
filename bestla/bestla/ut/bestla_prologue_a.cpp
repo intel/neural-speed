@@ -1,6 +1,6 @@
-#include "../jit_blas_prologue_a.h"
-#include "jit_blas_ut.h"
-#include "../kernel_avx512f.h"
+#include "bestla_prologue_a.h"
+#include "bestla_ut.h"
+#include "kernel_avx512f.h"
 
 namespace jblas {
 using namespace utils;

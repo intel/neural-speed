@@ -16,8 +16,8 @@
 #include <cassert>
 #include <type_traits>
 
-#include "jblas/jit_blas.h"
-#include "jit_blas_utils.h"
+#include "bestla.h"
+#include "bestla_utils.h"
 #include "kernel_avx2.h"
 #include "kernel_avx512f.h"
 #include "kernel_avx512_bf16.h"

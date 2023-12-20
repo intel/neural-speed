@@ -18,8 +18,8 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-#include "jit_blas_utils.h"
-#include "jit_blas_device.h"
+#include "bestla_utils.h"
+#include "bestla_device.h"
 
 namespace jblas {
 namespace parallel {

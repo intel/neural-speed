@@ -13,10 +13,10 @@
 //  limitations under the License.
 #pragma once
 #include <cassert>
-#include "jblas/jit_blas_utils.h"
-#include "jit_blas_storage.h"
-#include "jit_blas_device.h"
-#include "jit_blas_parallel.h"
+#include "bestla_utils.h"
+#include "bestla_storage.h"
+#include "bestla_device.h"
+#include "bestla_parallel.h"
 #include "kernel_wrapper.h"
 
 namespace jblas {

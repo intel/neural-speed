@@ -1,9 +1,9 @@
 #include <random>
 #include <stdexcept>
-#include "../jit_blas_utils.h"
-#include "../jit_blas_gemm.h"
-#include "../jit_blas_device.h"
-#include "../jit_blas_parallel.h"
+#include "bestla_utils.h"
+#include "bestla_gemm.h"
+#include "bestla_device.h"
+#include "bestla_parallel.h"
 
 #define CheckISA(ISA)                         \
   {                                           \

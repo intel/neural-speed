@@ -17,8 +17,8 @@
 #include <vector>
 #include <algorithm>
 #include <limits>
-#include "jblas/jit_blas.h"
-#include "jit_blas_utils.h"
+#include "bestla.h"
+#include "bestla_utils.h"
 
 namespace jblas {
 namespace kernel {

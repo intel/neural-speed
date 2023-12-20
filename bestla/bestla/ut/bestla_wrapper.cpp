@@ -1,5 +1,5 @@
-#include "../jit_blas_wrapper.h"
-#include "jit_blas_ut.h"
+#include "bestla_wrapper.h"
+#include "bestla_ut.h"
 namespace jblas {
 using namespace utils;
 using namespace parallel;

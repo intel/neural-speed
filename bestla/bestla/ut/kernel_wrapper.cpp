@@ -1,5 +1,5 @@
 #include "kernel_ut.h"
-#include "../kernel_wrapper.h"
+#include "kernel_wrapper.h"
 namespace jblas {
 using namespace utils;
 namespace ut {

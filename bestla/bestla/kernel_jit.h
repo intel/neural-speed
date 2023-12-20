@@ -20,11 +20,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "jblas/jit_blas.h"
-#include "jblas/jit_blas_device.h"
-#include "jblas/xbyak/xbyak.h"
+#include "bestla.h"
+#include "bestla_device.h"
+#include "bestla_utils.h"
 #include "jit_base.h"
-#include "jit_blas_utils.h"
 #include "kernel_jit_injector.h"
 
 namespace jblas {

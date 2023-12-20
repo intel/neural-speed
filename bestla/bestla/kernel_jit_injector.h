@@ -22,8 +22,8 @@
 #include <set>
 #include <array>
 
-#include "jit_blas.h"
-#include "jit_blas_utils.h"
+#include "bestla.h"
+#include "bestla_utils.h"
 #include "xbyak/xbyak.h"
 
 namespace jblas {

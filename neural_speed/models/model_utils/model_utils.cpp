@@ -45,7 +45,7 @@
 #include "core/layers/mha_dense.h"
 #include "core/ne_layers.h"
 #include "core/layers/jblas_gemm.h"
-#include "jblas/jit_blas_parallel.h"
+#include "bestla/bestla_parallel.h"
 
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_files.h"
@@ -874,7 +874,11 @@ size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* s
                    const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
+#ifdef __OPENMP
   jblas::parallel::OMPThreading threading(nthread);
+#else
+  jblas::parallel::StdThreading threading(nthread);
+#endif
   JBLAS_DTYPE quant_type = JBLAS_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
     quant_type = JBLAS_DTYPE::S8;
@@ -915,7 +919,11 @@ size_t jblas_quantize(const float* f32ptr, void* dstpr, const quant_params_inter
                       size_t k) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
+#ifdef __OPENMP
   jblas::parallel::OMPThreading threading(nthread);
+#else
+  jblas::parallel::StdThreading threading(nthread);
+#endif
   JBLAS_DTYPE quant_type = JBLAS_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
     quant_type = JBLAS_DTYPE::S8;

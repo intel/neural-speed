@@ -15,8 +15,8 @@
 #include <tuple>
 
 #include "jit_base.h"
-#include "jit_blas.h"
-#include "jit_blas_utils.h"
+#include "bestla.h"
+#include "bestla_utils.h"
 #include "kernel_wrapper.h"
 
 namespace jblas {

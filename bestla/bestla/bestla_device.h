@@ -15,7 +15,7 @@
 #include <map>
 #include <thread>
 #include <vector>
-#include "jit_blas.h"
+#include "bestla.h"
 #include "xbyak/xbyak_util.h"
 #ifdef _WIN32
 #include <windows.h>

@@ -139,6 +139,6 @@ if (NE_PYTHON_API)
   add_subdirectory(third_party/pybind11)
 endif()
 
-add_subdirectory(bestla jblas)
+add_subdirectory(bestla bestla)
 
 add_subdirectory(neural_speed)

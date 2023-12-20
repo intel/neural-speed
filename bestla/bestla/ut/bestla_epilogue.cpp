@@ -1,5 +1,5 @@
-#include "../jit_blas_epilogue.h"
-#include "jit_blas_ut.h"
+#include "bestla_epilogue.h"
+#include "bestla_ut.h"
 
 namespace jblas {
 using namespace utils;

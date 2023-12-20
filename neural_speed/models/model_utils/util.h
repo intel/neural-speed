@@ -30,7 +30,7 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
-#include "jblas/jit_blas_utils.h"  // borrow aligned_malloc
+#include "bestla/bestla_utils.h"  // borrow aligned_malloc
 
 #ifdef __has_include
 #if __has_include(<unistd.h>)

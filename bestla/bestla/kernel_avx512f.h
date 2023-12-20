@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
-#include "jit_blas_utils.h"
+#include "bestla_utils.h"
 #include "kernel_ref.h"
 
 #include <array>

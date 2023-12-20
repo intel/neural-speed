@@ -14,7 +14,7 @@
 #pragma once
 #include <array>
 
-#include "jit_blas_utils.h"
+#include "bestla_utils.h"
 #include "jit_base.h"
 
 namespace jblas {

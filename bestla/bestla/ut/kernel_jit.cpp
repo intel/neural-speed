@@ -1,4 +1,4 @@
-#include "../kernel_jit.h"
+#include "kernel_jit.h"
 #include "kernel_ut.h"
 
 namespace jblas {

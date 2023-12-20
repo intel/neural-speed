@@ -14,7 +14,7 @@
 #pragma once
 #include <immintrin.h>
 #include "kernel_avx512f.h"
-#include "jit_blas_utils.h"
+#include "bestla_utils.h"
 
 namespace jblas {
 namespace kernel {

@@ -17,12 +17,12 @@
 #include <cassert>
 #include <type_traits>
 
-#include "jit_blas.h"
-#include "jit_blas_device.h"
-#include "jit_blas_gemm.h"
-#include "jit_blas_parallel.h"
-#include "jit_blas_storage.h"
-#include "jit_blas_utils.h"
+#include "bestla.h"
+#include "bestla_device.h"
+#include "bestla_gemm.h"
+#include "bestla_parallel.h"
+#include "bestla_storage.h"
+#include "bestla_utils.h"
 #include "kernel_wrapper.h"
 
 namespace jblas {

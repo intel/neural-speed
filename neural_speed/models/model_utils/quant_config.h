@@ -16,7 +16,7 @@
 #include <string>
 #include <memory>
 #include "core/data_types.h"
-#include "jblas/jit_blas.h"
+#include "bestla/bestla.h"
 
 enum class quant_bits : int { q4 = 0, q8, fp4_e2m1, nf4, fp8_e4m3, fp8_e5m2, count };
 static inline quant_bits parse_bits(const std::string& bits) {

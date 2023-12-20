@@ -14,11 +14,11 @@
 #pragma once
 #include <thread>
 
-#include "jit_blas_epilogue.h"
-#include "jit_blas_gemm.h"
-#include "jit_blas_prologue_a.h"
-#include "jit_blas_prologue_b.h"
-#include "jit_blas_utils.h"
+#include "bestla_epilogue.h"
+#include "bestla_gemm.h"
+#include "bestla_prologue_a.h"
+#include "bestla_prologue_b.h"
+#include "bestla_utils.h"
 
 namespace jblas {
 namespace wrapper {

@@ -13,9 +13,9 @@
 //  limitations under the License.
 #pragma once
 #include "jit_base.h"
-#include "jit_blas.h"
-#include "jit_blas_gemm.h"
-#include "jit_blas_utils.h"
+#include "bestla.h"
+#include "bestla_gemm.h"
+#include "bestla_utils.h"
 
 namespace jblas {
 namespace storage {

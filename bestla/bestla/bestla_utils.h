@@ -47,7 +47,7 @@
 #define ARCH_REQ_XCOMP_PERM 0x1023
 
 #endif
-#include "jit_blas.h"
+#include "bestla.h"
 
 // As long as the compiler supports the ISA, we will enable it.
 // Only the ISA you use in your project will be compiled.
