@@ -216,7 +216,7 @@ function monitor() {
     echo "======  Monitor Start ======="
     while true; do
         if [ $(ps -ef | grep "$infer_cmd" | wc -l) -lt 2 ]; then
-            python calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
+            python ${OUT_SCRIPT_PATH}/calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
             sleep 3
 
             break
@@ -225,6 +225,6 @@ function monitor() {
     done
 }
 function get_data() {
-    python calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
+    python ${OUT_SCRIPT_PATH}/calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
 }
 main $@ 2>&1 | tee ${WORKING_DIR}/launch.log
