@@ -88,7 +88,7 @@ class WeightPack {
     using PaddingInterleaveMNWType = kernel::wrapper::PaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW>;
     auto ret = PaddingInterleaveMNWType::template forward<ISA_T>(  //
         src, dst, thdp.size[0], thdp.size[1], rowpadded, colpadded, _param.ldb, packedw->mKPad);
-    assert(ret == BTLASuccess);
+    assert(ret == BTLA_CODE::Success);
     (void)ret;
   }
 
@@ -97,11 +97,11 @@ class WeightPack {
     auto wptr = param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<WType>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
-    kernel::wrapper::Memcpy2D::template forward<BTLANoSIMD, WType, WType>(
+    kernel::wrapper::Memcpy2D::template forward<BTLA_ISA::NoSIMD, WType, WType>(
         bptr, *dstptr, n_size / _GemmCore_T::NTILE, _GemmCore_T::NTILE * k_size, _GemmCore_T::NTILE * KPad,
         _GemmCore_T::NTILE * k_size);
     *dststep = k_size;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 
@@ -499,7 +499,7 @@ class WeightKBlockNInteger {
             kernel::wrapper::PaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW>;
         auto ret = PaddingInterleaveMNWType::template forward<ISA_T>(  //
             src, dst, thdp.size[0], thdp.size[1], rowpadded, colpadded, ldb, KPad);
-        assert(ret == BTLASuccess);
+        assert(ret == BTLA_CODE::Success);
         (void)ret;
       }
     });
@@ -514,7 +514,7 @@ class WeightKBlockNInteger {
       if (thdp.valid) {
         auto ret = doCompress(B + thdp.loc[0] * ldb + thdp.loc[1], dstptr + thdp.loc[0] * ldb / 2 + thdp.loc[1] / 2,
                               thdp.size[0], thdp.size[1], ldb, ldb, qtype);
-        assert(ret == BTLASuccess);
+        assert(ret == BTLA_CODE::Success);
         (void)ret;
       }
     });
@@ -535,7 +535,7 @@ class WeightKBlockNInteger {
           int rowremain = utils::remainsize(thdp.loc[0] + i, K, KBlock);
           auto ret = RowReduceSum::template forward<ISA_T>(  //
               src + i * ldb, ldb, rowremain, thdp.size[1], dst + i / KBlock * ldr);
-          assert(ret == BTLASuccess);
+          assert(ret == BTLA_CODE::Success);
           (void)ret;
         }
       }
@@ -563,7 +563,7 @@ class WeightKBlockNInteger {
     } else {
       assert(0);
     }
-    return BTLANotSupport;
+    return BTLA_CODE::NotSupport;
   }
 
   static inline BTLA_CODE getKBlockWeight(float** dstptr, int* dststep, int k_size, int n_size, int k_offset,
@@ -586,7 +586,7 @@ class WeightKBlockNInteger {
     auto wptr = _param.packedW;
     if (wptr->SDtype() == BTLA_DTYPE::F32) {
       auto aptr = wptr->template SPtr<float>();
-      kernel::wrapper::Memcpy2D::template forward<BTLANoSIMD>(
+      kernel::wrapper::Memcpy2D::template forward<BTLA_ISA::NoSIMD>(
           aptr + k_offset / wptr->mBlockSize * wptr->CStep() + n_offset, *dstptr,
           utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep(), n_size);
       *dststep = n_size;
@@ -598,7 +598,7 @@ class WeightKBlockNInteger {
           utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep() * 2, n_size * 4, false);
       *dststep = n_size;
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   static inline BTLA_CODE getReduce(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
@@ -606,7 +606,7 @@ class WeightKBlockNInteger {
     auto wptr = _param.packedW;
     if (wptr->RDtype() == BTLA_DTYPE::F32) {
       auto aptr = wptr->template RPtr<float>();
-      kernel::wrapper::Memcpy2D::template forward<BTLANoSIMD>(
+      kernel::wrapper::Memcpy2D::template forward<BTLA_ISA::NoSIMD>(
           aptr + k_offset / wptr->mBlockSize * wptr->CStep() + n_offset, *dstptr,
           utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep(), n_size);
       *dststep = n_size;
@@ -618,7 +618,7 @@ class WeightKBlockNInteger {
           utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep() * 2, n_size * 4, false);
       *dststep = n_size;
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
  protected:
@@ -667,7 +667,7 @@ class WeightKBlockNInteger {
       }
     }
     *dststep = k_size;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   template <typename _T>
@@ -736,7 +736,7 @@ class WeightKBlockNInteger {
       }
     }
     *dststep = k_size;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   static inline BTLA_CODE getQ8Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset,
@@ -744,11 +744,11 @@ class WeightKBlockNInteger {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
-    kernel::wrapper::Memcpy2D::template forward<BTLANoSIMD, int8_t, int8_t>(
+    kernel::wrapper::Memcpy2D::template forward<BTLA_ISA::NoSIMD, int8_t, int8_t>(
         bptr, *dstptr, n_size / _GemmCore_T::NTILE, _GemmCore_T::NTILE * k_size, _GemmCore_T::NTILE * KPad,
         _GemmCore_T::NTILE * k_size);
     *dststep = k_size;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   static inline BTLA_CODE getQ4Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset,
@@ -767,7 +767,7 @@ class WeightKBlockNInteger {
       }
     }
     *dststep = k_size;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   virtual inline void quantRowBlock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
@@ -798,7 +798,7 @@ class WeightKBlockNInteger {
           ld_dst);  // ld_dst here not stride
     } else {
       assert(0);
-      return BTLANotSupport;
+      return BTLA_CODE::NotSupport;
     }
   }
 };
@@ -945,7 +945,7 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
       }
     }
     *dststep = k_size;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
  protected:

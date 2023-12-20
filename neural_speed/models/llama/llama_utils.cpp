@@ -47,7 +47,7 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
   ms->load(ctx, progress_callback, progress_callback_user_data);
 
   model_context& lctx = *ctx;
-  lctx.support_jblas_kv = true;
+  lctx.support_bestla_kv = true;
 }
 
 void Llama::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,

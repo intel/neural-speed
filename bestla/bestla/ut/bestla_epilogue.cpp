@@ -9,24 +9,24 @@ class UT_AccumulatorWriteBack {
   UT_AccumulatorWriteBack() {
     UT_START();
     CheckISA(AVX2);
-    fp32ut<BTLAAVX2>(127, 255, 0, 0, 127, 255);
-    fp32ut<BTLAAVX2>(101, 237, 10, 63, 30, 33);
-    fp32ut_with_custom_gelu<BTLAAVX2>(15, 15, 0, 0, 15, 15);
-    fp32ut_with_custom_swish<BTLAAVX2>(15, 15, 0, 0, 15, 15);
-    bf16ut<BTLAAVX2>(127, 255, 0, 0, 127, 255);
-    bf16ut<BTLAAVX2>(101, 237, 10, 63, 30, 33);
-    bf16fp32ut<BTLAAVX2>(101, 237, 10, 63, 30, 33);
-    bf16fp32ut<BTLAAVX2>(127, 255, 0, 0, 127, 255);
+    fp32ut<BTLA_ISA::AVX2>(127, 255, 0, 0, 127, 255);
+    fp32ut<BTLA_ISA::AVX2>(101, 237, 10, 63, 30, 33);
+    fp32ut_with_custom_gelu<BTLA_ISA::AVX2>(15, 15, 0, 0, 15, 15);
+    fp32ut_with_custom_swish<BTLA_ISA::AVX2>(15, 15, 0, 0, 15, 15);
+    bf16ut<BTLA_ISA::AVX2>(127, 255, 0, 0, 127, 255);
+    bf16ut<BTLA_ISA::AVX2>(101, 237, 10, 63, 30, 33);
+    bf16fp32ut<BTLA_ISA::AVX2>(101, 237, 10, 63, 30, 33);
+    bf16fp32ut<BTLA_ISA::AVX2>(127, 255, 0, 0, 127, 255);
     CheckISA(AVX512F);
-    fp32ut<BTLAAVX512F>(127, 255, 0, 0, 127, 255);
-    fp32ut<BTLAAVX512F>(101, 237, 10, 63, 30, 33);
-    bf16ut<BTLAAVX512F>(127, 255, 0, 0, 127, 255);
-    bf16ut<BTLAAVX512F>(101, 237, 10, 63, 30, 33);
-    fp32ut_with_custom_gelu<BTLAAVX512F>(15, 15, 0, 0, 15, 15);
-    fp32ut_with_custom_swish<BTLAAVX512F>(15, 15, 0, 0, 15, 15);
+    fp32ut<BTLA_ISA::AVX512F>(127, 255, 0, 0, 127, 255);
+    fp32ut<BTLA_ISA::AVX512F>(101, 237, 10, 63, 30, 33);
+    bf16ut<BTLA_ISA::AVX512F>(127, 255, 0, 0, 127, 255);
+    bf16ut<BTLA_ISA::AVX512F>(101, 237, 10, 63, 30, 33);
+    fp32ut_with_custom_gelu<BTLA_ISA::AVX512F>(15, 15, 0, 0, 15, 15);
+    fp32ut_with_custom_swish<BTLA_ISA::AVX512F>(15, 15, 0, 0, 15, 15);
 
-    bf16fp32ut<BTLAAVX512F>(101, 237, 10, 63, 30, 33);
-    bf16fp32ut<BTLAAVX512F>(127, 255, 0, 0, 127, 255);
+    bf16fp32ut<BTLA_ISA::AVX512F>(101, 237, 10, 63, 30, 33);
+    bf16fp32ut<BTLA_ISA::AVX512F>(127, 255, 0, 0, 127, 255);
   }
   template <BTLA_ISA _RT_ISA_T>
   void bf16fp32ut(int _M, int _N, int _M_offset, int _N_offset, int _cpy_M, int _cpy_N) {
@@ -35,7 +35,7 @@ class UT_AccumulatorWriteBack {
     for (int i = 0; i < _M * _N; i++) src[i].fromfloat(i);
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
     epilogue::gemm::AccumulatorWriteBackBf16Fp32<_RT_ISA_T> ker;
-    epilogue::gemm::AccumulatorWriteBackBf16Fp32<BTLANoSIMD> kerref;
+    epilogue::gemm::AccumulatorWriteBackBf16Fp32<BTLA_ISA::NoSIMD> kerref;
 
     kerref.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstref.data(), _N}, cache, CacheSize);
     ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
@@ -48,7 +48,7 @@ class UT_AccumulatorWriteBack {
     for (int i = 0; i < _M * _N; i++) src[i] = float(i);
     std::vector<uint16_t> dstref(_M * _N, 0), dstker(_M * _N, 0);
     epilogue::gemm::AccumulatorWriteBackFp32Bf16<_RT_ISA_T> ker;
-    epilogue::gemm::AccumulatorWriteBackFp32Bf16<BTLANoSIMD> kerref;
+    epilogue::gemm::AccumulatorWriteBackFp32Bf16<BTLA_ISA::NoSIMD> kerref;
 
     kerref.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {reinterpret_cast<bf16*>(dstref.data()), _N},
                    cache, CacheSize);
@@ -63,7 +63,7 @@ class UT_AccumulatorWriteBack {
     for (int i = 0; i < _M * _N; i++) src[i] = float(i);
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
     epilogue::gemm::AccumulatorWriteBackFp32<_RT_ISA_T> ker;
-    epilogue::gemm::AccumulatorWriteBackFp32<BTLANoSIMD> kerref;
+    epilogue::gemm::AccumulatorWriteBackFp32<BTLA_ISA::NoSIMD> kerref;
 
     kerref.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstref.data(), _N}, cache, CacheSize);
     ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
@@ -124,8 +124,8 @@ class UT_AlphaBetaProcessFp32 {
     for (int i = 0; i < src.size(); i++) {
       src[i] = float(i);
     }
-    epilogue::gemm::AlphaBetaProcessFp32<BTLANoSIMD> kernref;
-    epilogue::gemm::AlphaBetaProcessFp32<BTLAAVX512F> kern0;
+    epilogue::gemm::AlphaBetaProcessFp32<BTLA_ISA::NoSIMD> kernref;
+    epilogue::gemm::AlphaBetaProcessFp32<BTLA_ISA::AVX512F> kern0;
     kernref.forward(src.data(), _srcstep, 0, 0, _M, _N, {dstref.data(), src1.data(), _dststep, _src1step, alpha, beta},
                     cache, CacheSize);
     kern0.forward(src.data(), _srcstep, 0, 0, _M, _N, {dst.data(), src1.data(), _dststep, _src1step, alpha, beta},

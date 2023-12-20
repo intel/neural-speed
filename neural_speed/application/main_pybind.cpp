@@ -34,9 +34,9 @@
 #include <vector>
 
 #include "common.h"
-#include "core/layers/jblas_common.hpp"
-#include "core/layers/jblas_gemm.h"
-#include "jblas/jit_blas_parallel.h"
+#include "core/layers/bestla_common.hpp"
+#include "core/layers/bestla_gemm.h"
+#include "bestla/jit_blas_parallel.h"
 #include "models/model_utils/model_types.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
@@ -91,7 +91,7 @@ class Model {
     generate_count = 0;
   }
 
-  static size_t np_jblas_qpack(py::array_t<int8_t> src_w, py::array_t<float> src_scales, py::array_t<int8_t> src_zeros,
+  static size_t np_bestla_qpack(py::array_t<int8_t> src_w, py::array_t<float> src_scales, py::array_t<int8_t> src_zeros,
                                py::array_t<int32_t> g_idx, py::array_t<int8_t> dst, const std::string& weight_dtype,
                                const std::string& alg, int group_size, const std::string& scale_dtype,
                                const std::string& compute_dtype, int threads) {
@@ -113,11 +113,11 @@ class Model {
     q_params.compute_dtype = parse_compute_type(compute_dtype, /*ggml_arg=*/0);
     q_params.alg = parse_alg(alg);
     q_params.group_size = group_size;
-    return jblas_qpack(w_ptr, scales_ptr, zeros_ptr, dst_ptr, q_params, threads, src_w.shape(1), src_w.shape(0),
+    return bestla_qpack(w_ptr, scales_ptr, zeros_ptr, dst_ptr, q_params, threads, src_w.shape(1), src_w.shape(0),
                        g_idx_ptr);
   }
 
-  static size_t np_jblas_quantize(py::array_t<float> src_w, py::array_t<int8_t> dst, const std::string& weight_dtype,
+  static size_t np_bestla_quantize(py::array_t<float> src_w, py::array_t<int8_t> dst, const std::string& weight_dtype,
                                   const std::string& alg, int group_size, const std::string& scale_dtype,
                                   const std::string& compute_dtype, int threads) {
     quant_params_internal q_params;
@@ -126,7 +126,7 @@ class Model {
     q_params.compute_dtype = parse_compute_type(compute_dtype, /*ggml_arg=*/0);
     q_params.alg = parse_alg(alg);
     q_params.group_size = group_size;
-    return jblas_quantize(src_w.mutable_data(), dst.mutable_data(), q_params, threads, src_w.shape(0), src_w.shape(1));
+    return bestla_quantize(src_w.mutable_data(), dst.mutable_data(), q_params, threads, src_w.shape(0), src_w.shape(1));
   }
 
  private:
@@ -681,11 +681,11 @@ PYBIND11_MODULE(qwen_cpp, m)
                   py::arg("threads") = 8)
       .def("is_token_end", &Model::is_token_end)
       .def("reset_token_end", &Model::reset_token_end)
-      .def_static("np_jblas_qpack", &Model::np_jblas_qpack, "QPack tensor to jblas format", py::arg("src_w"),
+      .def_static("np_bestla_qpack", &Model::np_bestla_qpack, "QPack tensor to bestla format", py::arg("src_w"),
                   py::arg("src_scales"), py::arg("src_zeros"), py::arg("g_idx"), py::arg("dst"),
                   py::arg("weight_dtype") = "int4", py::arg("alg") = "sym", py::arg("group_size") = 32,
                   py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8", py::arg("threads") = 8)
-      .def_static("np_jblas_quantize", &Model::np_jblas_quantize, "Quantize tensor to jblas format", py::arg("src_w"),
+      .def_static("np_bestla_quantize", &Model::np_bestla_quantize, "Quantize tensor to bestla format", py::arg("src_w"),
                   py::arg("dst"), py::arg("weight_dtype") = "int4", py::arg("alg") = "sym", py::arg("group_size") = 32,
                   py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8", py::arg("threads") = 8)
       .def("reinit", &Model::reinit);

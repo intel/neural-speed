@@ -144,7 +144,7 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <int PACK_ROW, bool WITH_ZP, typename _DST_T>
@@ -185,7 +185,7 @@ BTLA_CODE dequant_kblock_s8_fp_fwd(int8_t* srcptr, _DST_T* dstptr, int row, int 
       dstptr[i * ld_dst + j] = tmp * sptr[j / PACK_ROW];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <int PACK_ROW, typename _DST_T>
@@ -226,7 +226,7 @@ static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcste
       dstptr[irow * dststep + icol] = scale * scaleB[icol] * srcptr[irow * srcstep + icol];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zps,
@@ -249,7 +249,7 @@ static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int 
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int row, int col, int8_t* zps,
@@ -275,7 +275,7 @@ static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int 
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zpa, int8_t* zpb,
@@ -311,7 +311,7 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -331,9 +331,9 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
       dstptr[i + 0] = kernel::ref::get_s8<S4_T>(tmp.x);
       dstptr[i + 1] = kernel::ref::get_s8<S4_T>(tmp.y);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <BTLA_DTYPE S4_T, typename _DST_T>
@@ -356,9 +356,9 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
       dstptr[i + 0] = static_cast<_DST_T>(static_cast<float>(ref::get_s8<S4_T>(tmp.x)));
       dstptr[i + 1] = static_cast<_DST_T>(static_cast<float>(ref::get_s8<S4_T>(tmp.y)));
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <bool WITH_SCALE, typename _DST_T, int _PACK_ROW, typename _S_T>
@@ -423,7 +423,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename DST_T>
@@ -443,9 +443,9 @@ inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int ro
       auto tmp = srcptr[i];
       dstptr[i] = static_cast<DST_T>(static_cast<float>(tmp));
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <typename SCA_T>
@@ -482,7 +482,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <int N, typename _DST_T, BTLA_DTYPE F4_T>
@@ -559,9 +559,9 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
       dstptr[i + 0] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.x));
       dstptr[i + 1] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.y));
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <bool _IS_SYM, int _NCOL, typename _ST, typename _DST_T>
@@ -659,7 +659,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow1(
       dequantize(dstptr + irow * ld_dst, tmpbuf, vscales, vzps);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <bool _IS_SYM, typename _ST, typename _DST_T>
@@ -669,7 +669,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
                                                          void (*dequantize)(_DST_T*, int8_t*, __m256*, __m256i*),
                                                          void (*pad_bit4)(int8_t*, int8_t*), int8_t* tmp,
                                                          size_t tmpsize) {
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <BTLA_DTYPE _F4_T, typename _DST_T, int _PACK_ROW, typename _ST>
@@ -692,7 +692,7 @@ static inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dst
                                                               k_offset, kblock, NPad, &dequant_f4_N<64, _DST_T, _F4_T>,
                                                               fp4_pad_4bit, tmp, tmpsize);
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 enum class AVX2_REDUCE_TYPE { MAX, MIN, ADD };
@@ -864,7 +864,7 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -901,7 +901,7 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
       reduce[i * ldr + j / blocksize] = tmp;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
@@ -923,7 +923,7 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static const uint8_t avx2_bf16_convert_maigc_num[32] = {
@@ -966,7 +966,7 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
       std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 #ifdef __GNUC__
@@ -976,4 +976,4 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
 #endif
 }  // namespace avx2
 }  // namespace kernel
-}  // namespace jblas
+}  // namespace bestla

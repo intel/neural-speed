@@ -52,6 +52,6 @@ Compile:
 
 Usage:
 ```cmake
-add_subdirectory(jblas)
-target_link_libraries("${YOUR_PROJECT}" jblas::jblas)
+add_subdirectory(bestla)
+target_link_libraries("${YOUR_PROJECT}" bestla::bestla)
 ```

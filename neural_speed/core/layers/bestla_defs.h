@@ -16,40 +16,40 @@
 #include "bestla/bestla_prologue_b.h"
 #include "bestla/bestla_wrapper.h"
 
-namespace jblas {
-template <class GemmCore_T, template <class, JBLAS_ISA> class Wei_T>
-using tLauncher_Fp_F32F32 = jblas::wrapper::gemm::LauncherKBlock<
-    GemmCore_T::ISA, GemmCore_T, jblas::prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
-    jblas::epilogue::gemm::CompFp32BlockEpilogue, jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+namespace bestla {
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
+using tLauncher_Fp_F32F32 = wrapper::gemm::LauncherKBlock<
+    GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+    epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
 
-template <class GemmCore_T, template <class, JBLAS_ISA> class Wei_T>
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 using tLauncher_Int8_F32F32 =
-    jblas::wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
-                                            jblas::prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T,
-                                            jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+    wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
+                                            prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T,
+                                            epilogue::gemm::AccumulatorWriteBackFp32>;
 
-using tAVX2 = jblas::gemm::SCoreRowNAvx2<24, 4>;
-using tAVX_VNNI = jblas::gemm::ICoreRowNAvxvnni<24, 4>;
-using tAVX512F = jblas::gemm::SCoreRowNAvx512f<48, 8>;
-using tAVX512_VNNI = jblas::gemm::ICoreRowNAvx512vnni<48, 8>;
-using tAMX_BF16 = jblas::gemm::HCoreRowNAmxbf16<48, 16>;
-using tAVX512_BF16 = jblas::gemm::HCoreRowNAvx512bf16<48, 8>;
-using tAVX512_FP16 = jblas::gemm::HCoreRowNAvx512fp16<96, 8>;
-using tAMX_INT8_US = jblas::gemm::ICoreRowNAmxint8<48, 16>;
-using tAMX_INT8_SS = jblas::gemm::ICoreRowNAmxint8SS<48, 16>;
+using tAVX2 = gemm::SCoreRowNAvx2<24, 4>;
+using tAVX_VNNI = gemm::ICoreRowNAvxvnni<24, 4>;
+using tAVX512F = gemm::SCoreRowNAvx512f<48, 8>;
+using tAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
+using tAMX_BF16 = gemm::HCoreRowNAmxbf16<48, 16>;
+using tAVX512_BF16 = gemm::HCoreRowNAvx512bf16<48, 8>;
+using tAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
+using tAMX_INT8_US = gemm::ICoreRowNAmxint8<48, 16>;
+using tAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<48, 16>;
 
-using tAVX_VNNI_KBlock = jblas::gemm::ICoreRowNAvxvnniKBlock<24, 2>;
-using tAVX512_VNNI_KBlock = jblas::gemm::ICoreRowNAvx512vnniKBlock<48, 4>;
-using tAMX_INT8_US_KBlock = jblas::gemm::ICoreRowNAmxint8KBlock<48, 16>;
-using tAMX_INT8_SS_KBlock = jblas::gemm::ICoreRowNAmxint8SSKBlock<48, 16>;
+using tAVX_VNNI_KBlock = gemm::ICoreRowNAvxvnniKBlock<24, 2>;
+using tAVX512_VNNI_KBlock = gemm::ICoreRowNAvx512vnniKBlock<48, 4>;
+using tAMX_INT8_US_KBlock = gemm::ICoreRowNAmxint8KBlock<48, 16>;
+using tAMX_INT8_SS_KBlock = gemm::ICoreRowNAmxint8SSKBlock<48, 16>;
 
 template <class GC_T, JBLAS_ISA ISA_T>
 using tWeiNInt = jblas::prologue_b::gemm::WeightKBlockNInteger<GC_T, ISA_T>;
 template <class GC_T, JBLAS_ISA ISA_T>
 using tWeiNFloat = jblas::prologue_b::gemm::WeightKBlockNFloat<GC_T, ISA_T>;
 
-template <class GC_T, JBLAS_ISA ISA_T>
-using tActKBaseF32 = jblas::prologue_a::gemm::ShuffleActivationKBlockBaseF32<GC_T, ISA_T>;
+template <class GC_T, BTLA_ISA ISA_T>
+using tActKBaseF32 = prologue_a::gemm::ShuffleActivationKBlockBaseF32<GC_T, ISA_T>;
 
 constexpr uint64_t Fp32Cores[] = {tAVX2::ID, tAVX512F::ID};
 constexpr uint64_t Bf16Cores[] = {tAMX_BF16::ID};
@@ -65,4 +65,4 @@ constexpr uint64_t AllKBlockCores[] = {tAVX2::ID,
                                        tAMX_INT8_US_KBlock::ID,
                                        tAMX_INT8_SS_KBlock::ID};
 
-}  // namespace jblas
+}  // namespace bestla

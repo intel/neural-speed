@@ -133,7 +133,7 @@ class Avx2N8P1 : protected bestla::xbyak::JitAvx2 {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX2;
+  static auto constexpr ISA = BTLA_ISA::AVX2;
   static auto constexpr COMPUTE = CompType::COMP_FP32;
   typedef float AType;
   typedef float BType;
@@ -353,7 +353,7 @@ class Avx512fN16P1 : protected bestla::xbyak::JitAvx512f {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX512F;
+  static auto constexpr ISA = BTLA_ISA::AVX512F;
   static auto constexpr COMPUTE = CompType::COMP_FP32;
   typedef float AType;
   typedef float BType;
@@ -573,7 +573,7 @@ class Avx512fp16N32P1 : protected bestla::xbyak::JitAvx512_fp16 {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_FP16;
+  static auto constexpr ISA = BTLA_ISA::AVX512_FP16;
   static auto constexpr COMPUTE = CompType::COMP_FP16_FP16;
   typedef utils::fp16 AType;
   typedef utils::fp16 BType;
@@ -793,7 +793,7 @@ class Avx512bf16N16P2 : protected bestla::xbyak::JitAvx512_bf16 {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 2;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_BF16;
+  static auto constexpr ISA = BTLA_ISA::AVX512_BF16;
   static auto constexpr COMPUTE = CompType::COMP_BF16_FP32;
   typedef utils::bf16 AType;
   typedef utils::bf16 BType;
@@ -1013,7 +1013,7 @@ class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_VNNI;
+  static auto constexpr ISA = BTLA_ISA::AVX512_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -1232,7 +1232,7 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX_VNNI;
+  static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -1453,7 +1453,7 @@ class Amxbf16N16P2 : protected bestla::xbyak::JitAmxbf16 {
   static_assert(NRegs * MRegs + 2 <= TileCount);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs * RegLen, KTILE = 32;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAMX_BF16;
+  static auto constexpr ISA = BTLA_ISA::AMX_BF16;
   static auto constexpr COMPUTE = CompType::COMP_BF16_FP32;
   typedef utils::bf16 AType;
   typedef utils::bf16 BType;
@@ -1716,7 +1716,7 @@ class Amxint8N16P4 : protected bestla::xbyak::JitAmxint8 {
   static_assert(NRegs * MRegs + 2 <= TileCount);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs * RegLen, KTILE = 64;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAMX_INT8;
+  static auto constexpr ISA = BTLA_ISA::AMX_INT8;
   static auto constexpr COMPUTE =
       (std::is_same_v<AT, int8_t>
            ? std::is_same_v<BT, int8_t> ? CompType::COMP_INT8_SS_INT32 : CompType::COMP_INT8_SU_INT32
@@ -2012,7 +2012,7 @@ class Avx512fN16P1 : protected bestla::xbyak::JitAvx512f {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX512F;
+  static auto constexpr ISA = BTLA_ISA::AVX512F;
   static auto constexpr COMPUTE = CompType::COMP_FP32;
   typedef float AType;
   typedef float BType;
@@ -2232,7 +2232,7 @@ class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_VNNI;
+  static auto constexpr ISA = BTLA_ISA::AVX512_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_FP32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -2530,7 +2530,7 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   static_assert(NRegs * MRegs <= RegCount - 3);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAVX_VNNI;
+  static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_FP32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -2875,7 +2875,7 @@ class Amxint8N16P4 : protected bestla::xbyak::JitAmxint8 {
   static_assert(NRegs * MRegs + 2 <= TileCount);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs * RegLen, KTILE = 64;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::BTLAAMX_INT8;
+  static auto constexpr ISA = BTLA_ISA::AMX_INT8;
   static auto constexpr COMPUTE = (std::is_same_v<AT, int8_t> ? std::is_same_v<BT, int8_t> ? CompType::COMP_INT8_SS_FP32
                                                                                            : CompType::COMP_INT8_SU_FP32
                                    : std::is_same_v<BT, int8_t> ? CompType::COMP_INT8_US_FP32

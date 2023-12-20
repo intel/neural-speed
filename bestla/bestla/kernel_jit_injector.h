@@ -65,25 +65,25 @@ class eltwise_injector {
   void vector_compute(const Xbyak::Zmm& zmm_src, int const_p_offset = 0) {
     load_table_addr();
     switch (elt_op) {
-      case EXP:
+      case BTLA_ELTWISEOP::EXP:
         exp_compute_vector_fwd(zmm_src);
         break;
-      case TANH:
+      case BTLA_ELTWISEOP::TANH:
         tanh_compute_vector_fwd(zmm_src);
         break;
-      case GELU:
+      case BTLA_ELTWISEOP::GELU:
         gelu_compute_vector_fwd(zmm_src);
         break;
-      case RELU:
+      case BTLA_ELTWISEOP::RELU:
         relu_compute_vector_fwd(zmm_src, const_p_offset);
         break;
-      case LINEAR:
+      case BTLA_ELTWISEOP::LINEAR:
         linear_compute_vector_fwd(zmm_src, const_p_offset);
         break;
-      case LOW_PRECISION_EXP:
+      case BTLA_ELTWISEOP::LOW_PRECISION_EXP:
         low_precision_exp_compute_vector_fwd(zmm_src);
         break;
-      case SWISH:
+      case BTLA_ELTWISEOP::SWISH:
         swish_compute_vector_fwd(zmm_src, const_p_offset);
         break;
       default:
@@ -94,19 +94,19 @@ class eltwise_injector {
   void vector_compute(const Xbyak::Ymm& ymm_src, int const_p_offset = 0) {
     load_table_addr();
     switch (elt_op) {
-      case EXP:
+      case BTLA_ELTWISEOP::EXP:
         exp_compute_vector_fwd(ymm_src);
         break;
-      case TANH:
+      case BTLA_ELTWISEOP::TANH:
         tanh_compute_vector_fwd(ymm_src);
         break;
-      case GELU:
+      case BTLA_ELTWISEOP::GELU:
         gelu_compute_vector_fwd(ymm_src);
         break;
-      case LOW_PRECISION_EXP:
+      case BTLA_ELTWISEOP::LOW_PRECISION_EXP:
         low_precision_exp_compute_vector_fwd(ymm_src);
         break;
-      case SWISH:
+      case BTLA_ELTWISEOP::SWISH:
         swish_compute_vector_fwd(ymm_src, const_p_offset);
         break;
       default:
@@ -426,11 +426,11 @@ class eltwise_injector {
 
     struct need_t {
       explicit need_t(BTLA_ELTWISEOP& op) {
-        if (op == EXP) exp_ = true;
-        if (op == TANH) tanh_ = true;
-        if (op == GELU) gelu_ = true;
-        if (op == SWISH) swish_ = true;
-        if (op == LOW_PRECISION_EXP) low_precision_exp_ = true;
+        if (op == BTLA_ELTWISEOP::EXP) exp_ = true;
+        if (op == BTLA_ELTWISEOP::TANH) tanh_ = true;
+        if (op == BTLA_ELTWISEOP::GELU) gelu_ = true;
+        if (op == BTLA_ELTWISEOP::SWISH) swish_ = true;
+        if (op == BTLA_ELTWISEOP::LOW_PRECISION_EXP) low_precision_exp_ = true;
       }
       bool bf16_ = false;
       bool exp_ = false;

@@ -103,7 +103,7 @@ struct model_load_tensor {
     calc_type();
     calc_split_type();
     calc_ne();
-    if (type == NE_TYPE_JBLAS) {
+    if (type == NE_TYPE_BTLA) {
       size = shards[0].size;
     } else {
       calc_size();
@@ -329,7 +329,7 @@ struct model_file_loader {
         case NE_TYPE_Q5_0:
         case NE_TYPE_Q5_1:
         case NE_TYPE_Q8_0:
-        case NE_TYPE_JBLAS:
+        case NE_TYPE_BTLA:
           break;
         default: {
           throw format("unrecognized tensor type %u\n", shard.type);
@@ -342,7 +342,7 @@ struct model_file_loader {
       }
       shard.file_idx = file_idx;
       shard.file_off = file.tell();
-      if (shard.type == NE_TYPE_JBLAS) {
+      if (shard.type == NE_TYPE_BTLA) {
         size_t size = 0;
         file.read_raw(&size, sizeof(size_t));
         shard.size = size;
@@ -429,7 +429,7 @@ struct model_file_saver {
       case NE_TYPE_Q5_0:
       case NE_TYPE_Q5_1:
       case NE_TYPE_Q8_0:
-      case NE_TYPE_JBLAS:
+      case NE_TYPE_BTLA:
         break;
       default:
         MODEL_ASSERT(false);
@@ -440,7 +440,7 @@ struct model_file_saver {
     file.write_raw(tensor.ne.data(), sizeof(tensor.ne[0]) * tensor.ne.size());
     file.write_raw(tensor.name.data(), tensor.name.size());
     file.seek(-static_cast<ptrdiff_t>(file.tell()) & 31, SEEK_CUR);
-    if (new_type != NE_TYPE_JBLAS) MODEL_ASSERT(new_size == model_calc_tensor_size(tensor.ne, new_type));
+    if (new_type != NE_TYPE_BTLA) MODEL_ASSERT(new_size == model_calc_tensor_size(tensor.ne, new_type));
     file.write_raw(new_data, new_size);
   }
 };
@@ -526,7 +526,7 @@ struct model_model_loader {
     size_t size_needed = 0;
     for (const model_load_tensor& lt : tensors_map.tensors) {
       *ctx_size_p += sizeof(struct ne_tensor) + NE_OBJECT_SIZE;
-      if (lt.type == NE_TYPE_JBLAS) {
+      if (lt.type == NE_TYPE_BTLA) {
         size_needed = lt.size;
       } else {
         size_needed = (lt.size + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN * NE_MEM_ALIGN;
@@ -562,7 +562,7 @@ struct model_model_loader {
   struct ne_tensor* get_tensor_for(model_load_tensor& lt, ne_backend backend) {
     struct ne_tensor* tensor;
     if (lt.ne.size() == 2) {
-      if (lt.type == NE_TYPE_JBLAS) {
+      if (lt.type == NE_TYPE_BTLA) {
         tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), lt.size);
       } else {
         tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), NE_SIZE_CALC);
@@ -627,16 +627,16 @@ struct model_model_loader {
     }
   }
 
-  void jblas_split_weight(void** src, void** dst, size_t src_n, size_t src_k, size_t dst_n, size_t dst_k, size_t n_rank,
+  void bestla_split_weight(void** src, void** dst, size_t src_n, size_t src_k, size_t dst_n, size_t dst_k, size_t n_rank,
                           size_t k_rank) {
     auto src_fp32 = (float*)malloc(src_n * src_k * sizeof(float));
     if (src_fp32 == nullptr) {
       assert(0);
     }
-    jblas_unpackweight_fp32(*src, src_n, src_k, src_fp32, src_n);
+    bestla_unpackweight_fp32(*src, src_n, src_k, src_fp32, src_n);
     // layout will be K * N in the buffer
     auto dst_fp32 = src_fp32 + k_rank * dst_k * src_n + n_rank * dst_n;
-    jblas_packweight_copyattr(dst_fp32, *dst, dst_n, dst_k, src_n, *src);
+    bestla_packweight_copyattr(dst_fp32, *dst, dst_n, dst_k, src_n, *src);
     free(src_fp32);
   }
   void load_data_for(model_load_tensor& lt) {
@@ -685,12 +685,12 @@ struct model_model_loader {
       model_file& file = file_loaders.at(shard.file_idx)->file;
       file.seek(shard.file_off, SEEK_SET);
       size_t num_rows = lt.ne.size() == 1 ? 1 : lt.ne.at(1);
-      if (lt.type == NE_TYPE_JBLAS) {
+      if (lt.type == NE_TYPE_BTLA) {
         tmp_buf.resize(shard.size);
         file.read_raw(tmp_buf.addr, shard.size);
         void* dst_data = (void*)lt.data;
         void* src_data = (void*)(tmp_buf.addr);
-        jblas_split_weight(&src_data, &dst_data, lt.world_size * num_rows, lt.ne.at(0), num_rows, lt.ne.at(0), lt.rank,
+        bestla_split_weight(&src_data, &dst_data, lt.world_size * num_rows, lt.ne.at(0), num_rows, lt.ne.at(0), lt.rank,
                            0);
       } else {
         // only copy part of weight form the tmp_buf of origin file
@@ -707,12 +707,12 @@ struct model_model_loader {
       model_file& file = file_loaders.at(shard.file_idx)->file;
       file.seek(shard.file_off, SEEK_SET);
       size_t num_rows = lt.ne.size() == 1 ? 1 : lt.ne.at(1);
-      if (lt.type == NE_TYPE_JBLAS) {
+      if (lt.type == NE_TYPE_BTLA) {
         tmp_buf.resize(shard.size);
         file.read_raw(tmp_buf.addr, shard.size);
         void* dst_data = (void*)lt.data;
         void* src_data = (void*)(tmp_buf.addr);
-        jblas_split_weight(&src_data, &dst_data, num_rows, lt.world_size * lt.ne.at(0), num_rows, lt.ne.at(0), 0,
+        bestla_split_weight(&src_data, &dst_data, num_rows, lt.world_size * lt.ne.at(0), num_rows, lt.ne.at(0), 0,
                            lt.rank);
       } else {
         tmp_buf.resize(lt.size * lt.world_size);

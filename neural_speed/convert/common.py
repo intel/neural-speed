@@ -326,7 +326,7 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     print(f"converting {dst_name} qauntized tensor to fp32 tensor")
 
 
-def convert_q4_jblas_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
+def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
     import intel_extension_for_transformers.llm.runtime.graph.llama_cpp as cpp_model
     qzeros = model[f"{src_name}.qzeros"]
     zeros = qzeros_to_zeros(qzeros)
@@ -376,10 +376,10 @@ def convert_q4_jblas_tensor(src_name, dst_name, model, fout, q_config, n_head, n
     else:
         g_idx = np.empty(0, dtype=np.int32)
 
-    byte_size = cpp_model.Model.np_jblas_qpack(int_weight, gptq_scales, gptq_zeros, g_idx, dst,
+    byte_size = cpp_model.Model.np_bestla_qpack(int_weight, gptq_scales, gptq_zeros, g_idx, dst,
                                                weight_dtype="int4" if q_config['bits'] == 4 else "int8",
                                                group_size=q_config['group_size'],
                                                alg="sym" if q_config['sym'] else "asym",
                                                compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
-    print(f"converting {dst_name} qauntized tensor to jblas q4 block")
+    print(f"converting {dst_name} qauntized tensor to bestla q4 block")

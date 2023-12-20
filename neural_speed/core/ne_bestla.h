@@ -18,51 +18,51 @@
 extern "C" {
 #endif
 
-void jblas_timer(bool _init);
+void bestla_timer(bool _init);
 
-int jblas_set_threads(int _nth);
+int bestla_set_threads(int _nth);
 
-void* jblas_get_thread_handle();
+void* bestla_get_thread_handle();
 
-void jblas_init();
+void bestla_init();
 
-unsigned long long jblas_f32f32_get_workspace_size(int _m, int _n, int _k, void* wptr);
+unsigned long long bestla_f32f32_get_workspace_size(int _m, int _n, int _k, void* wptr);
 
-void jblas_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda, int ldo,
+void bestla_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda, int ldo,
                           void* workspace);
 
-bool jblas_fusion_add_f32f32_support(void* weiptr, int _m, int _n, int _k);
-void jblas_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bias, float* output, int _m, int _n,
+bool bestla_fusion_add_f32f32_support(void* weiptr, int _m, int _n, int _k);
+void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bias, float* output, int _m, int _n,
                                      int _k, int lda, int ldo, bool boardcast_bias, void* workspace);
 
-unsigned long long jblas_fusion_QKV_f32f32_get_workspace_size(int _m, int _n, int _k, void* w1ptr);
+unsigned long long bestla_fusion_QKV_f32f32_get_workspace_size(int _m, int _n, int _k, void* w1ptr);
 
-bool jblas_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int _m, int _n, int _k);
+bool bestla_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int _m, int _n, int _k);
 
-void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr, void* wvptr, float* output, int _m,
+void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr, void* wvptr, float* output, int _m,
                                      int _n, int _k, int lda, int ldo, void* workspace);
 
-unsigned long long jblas_fusion_FFN_f32f32_get_workspace_size(int seq, int fin, int fmid, int fout, void* w1ptr,
+unsigned long long bestla_fusion_FFN_f32f32_get_workspace_size(int seq, int fin, int fmid, int fout, void* w1ptr,
                                                               void* w2ptr);
 
-bool jblas_fusion_FFN_SiLu_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid, int fout);
+bool bestla_fusion_FFN_SiLu_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid, int fout);
 
-void jblas_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
+void bestla_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
                                           float* tmp2, float* output, int seq, int fin, int fmid, int fout,
                                           void* workspace);
 
-bool jblas_fusion_FFN_GeLu_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout);
-void jblas_fusion_FFN_GeLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* tmp1, float* output,
+bool bestla_fusion_FFN_GeLu_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout);
+void bestla_fusion_FFN_GeLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* tmp1, float* output,
                                           int seq, int fin, int fmid, int fout, void* workspace);
 
-bool jblas_fusion_FFN_Add_GeLu_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout);
-void jblas_fusion_FFN_Add_GeLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* b1ptr, float* b2ptr,
+bool bestla_fusion_FFN_Add_GeLu_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout);
+void bestla_fusion_FFN_Add_GeLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* b1ptr, float* b2ptr,
                                               float* tmp1, float* output, int seq, int fin, int fmid, int fout,
                                               bool boardcast_bias, void* workspace);
 
-void jblas_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld);
+void bestla_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld);
 // packweight to dstptr, copy weight attributes from srcptr
-void jblas_packweight_copyattr(const float* f32ptr, void* dstpr, int n, int k, int ld, void* srcptr);
+void bestla_packweight_copyattr(const float* f32ptr, void* dstpr, int n, int k, int ld, void* srcptr);
 #ifdef __cplusplus
 }
 #endif

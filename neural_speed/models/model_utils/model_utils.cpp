@@ -69,7 +69,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
 
   int64_t layer_ne_k = batch_size * beam_size * k_size;
   int64_t layer_ne_v = batch_size * beam_size * v_size;
-  const auto wsize = wtype == NE_TYPE_JBLAS ? 1 : ne_type_size(wtype);
+  const auto wsize = wtype == NE_TYPE_BTLA ? 1 : ne_type_size(wtype);
 #ifdef NE_TP_MODEL
   // when use TP, cached kv will also have smaller size
   parallel_context* p_ctx = init_parallel_context();
@@ -96,8 +96,8 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
     return false;
   }
 
-  // NE_TYPE_JBLAS can not be allocated memory
-  const auto wtype_alloc = wtype == NE_TYPE_JBLAS ? NE_TYPE_I8 : wtype;
+  // NE_TYPE_BTLA can not be allocated memory
+  const auto wtype_alloc = wtype == NE_TYPE_BTLA ? NE_TYPE_I8 : wtype;
 
   if (model) {  // non-null param of model for kv-cache as components of model->layers[il]
     for (int il = 0; il < hparams.n_layer; ++il) {
@@ -108,7 +108,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
         const int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;
         k_cache = d_ne_new_tensor_4d(model->ctx, NE_TYPE_F16, head_size, n_ctx, heads_kv, batch_size * beam_size);
         v_cache = d_ne_new_tensor_4d(model->ctx, NE_TYPE_F16, n_ctx, head_size, heads_kv, batch_size * beam_size);
-      } else if (wtype == NE_TYPE_JBLAS) {
+      } else if (wtype == NE_TYPE_BTLA) {
         k_cache = ne_new_tensor_1d(model->ctx, wtype_alloc, layer_ne_k + NE_ALIGNMENT, NE_SIZE_CALC);
         const auto k_align_off = reinterpret_cast<uintptr_t>(k_cache->data) % NE_ALIGNMENT;
         k_cache = ne_view_1d(model->ctx, k_cache, layer_ne_k, NE_ALIGNMENT - k_align_off);
@@ -123,7 +123,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
       ne_set_name(k_cache, "cache_k");
       ne_set_name(v_cache, "cache_v");
     }
-    const bool run_mha_reordered = model->layers[0].k_cache->type == NE_TYPE_JBLAS;
+    const bool run_mha_reordered = model->layers[0].k_cache->type == NE_TYPE_BTLA;
     fprintf(stderr, "%s: run_mha_reordered = %d\n", __func__, run_mha_reordered);
   } else {
     cache.k = ne_new_tensor_1d(cache.ctx, wtype_alloc, n_layer * layer_ne_k + NE_ALIGNMENT, NE_SIZE_CALC);
@@ -139,7 +139,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
   }
 
   if (shift_roped_k) {  // prepare rope helper for fused-attention
-    const auto cossin_dtype = wtype == NE_TYPE_JBLAS ? NE_TYPE_F16 : wtype;
+    const auto cossin_dtype = wtype == NE_TYPE_BTLA ? NE_TYPE_F16 : wtype;
     cache.cossin = ne_new_tensor_1d(cache.ctx, cossin_dtype, head_size, NE_SIZE_CALC);
     ne_set_name(cache.cossin, "cossin(-1)");
     float theta = -1;
@@ -870,22 +870,22 @@ quant_params_internal quant_params_to_internal(const quant_params& params) {
                                parse_compute_type(params.compute_dtype, params.use_ggml)};
 }
 
-size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
+size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
                    const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
 #ifdef __OPENMP
-  jblas::parallel::OMPThreading threading(nthread);
+  bestla::parallel::OMPThreading threading(nthread);
 #else
-  jblas::parallel::StdThreading threading(nthread);
+  bestla::parallel::StdThreading threading(nthread);
 #endif
-  JBLAS_DTYPE quant_type = JBLAS_DTYPE::S4_CLIP;
+  BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
-    quant_type = JBLAS_DTYPE::S8;
+    quant_type = BTLA_DTYPE::S8;
   }
-  auto dtype_type = static_cast<JBLAS_DTYPE>(
-      jblas::utils::jblas_dtype_get_mask_val(quant_type, JBLAS_DTYPE::TypeMask, JBLAS_DTYPE::TypeShift));
-  if (dtype_type == JBLAS_DTYPE::TypeFloat) {
+  auto dtype_type = static_cast<BTLA_DTYPE>(
+      bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
+  if (dtype_type == BTLA_DTYPE::TypeFloat) {
     printf("Not support float dtype in qpack\n");
     if (params.alg == quant_alg::asym) {
       printf("Invalid alg for float quant types, will be igonred\n");
@@ -894,17 +894,17 @@ size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* s
       printf("Compute Int8 is not supported by float quant types, will be igonred\n");
     }
   }
-  JBLAS_DTYPE scale_type = JBLAS_DTYPE::BF16;
+  BTLA_DTYPE scale_type = BTLA_DTYPE::BF16;
   if (params.scale_dtype == quant_sdtype::fp32) {
-    scale_type = JBLAS_DTYPE::F32;
+    scale_type = BTLA_DTYPE::F32;
   }
   if (params.scale_dtype == quant_sdtype::fp16) {
     printf("Current not support float16 scale, reset to bf16\n");
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
-  auto size = JblasGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
+  auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
   if (size) {
-    if (!JblasGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
+    if (!BTLAGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
                         params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
       printf("Failed to quant this weight\n");
       return 0;
@@ -915,34 +915,34 @@ size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* s
 }
 
 // dstptr: default maximum workspace = float array size
-size_t jblas_quantize(const float* f32ptr, void* dstpr, const quant_params_internal params, int nthread, size_t n,
+size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_internal params, int nthread, size_t n,
                       size_t k) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
 #ifdef __OPENMP
-  jblas::parallel::OMPThreading threading(nthread);
+  bestla::parallel::OMPThreading threading(nthread);
 #else
-  jblas::parallel::StdThreading threading(nthread);
+  bestla::parallel::StdThreading threading(nthread);
 #endif
-  JBLAS_DTYPE quant_type = JBLAS_DTYPE::S4_CLIP;
+  BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
-    quant_type = JBLAS_DTYPE::S8;
+    quant_type = BTLA_DTYPE::S8;
   }
   if (params.bits == quant_bits::fp4_e2m1) {
-    quant_type = JBLAS_DTYPE::F4_E2M1;
+    quant_type = BTLA_DTYPE::F4_E2M1;
   }
   if (params.bits == quant_bits::nf4) {
-    quant_type = JBLAS_DTYPE::F4_NF4;
+    quant_type = BTLA_DTYPE::F4_NF4;
   }
   if (params.bits == quant_bits::fp8_e4m3) {
-    quant_type = JBLAS_DTYPE::F8_E4M3;
+    quant_type = BTLA_DTYPE::F8_E4M3;
   }
   if (params.bits == quant_bits::fp8_e5m2) {
-    quant_type = JBLAS_DTYPE::F8_E5M2;
+    quant_type = BTLA_DTYPE::F8_E5M2;
   }
-  auto dtype_type = static_cast<JBLAS_DTYPE>(
-      jblas::utils::jblas_dtype_get_mask_val(quant_type, JBLAS_DTYPE::TypeMask, JBLAS_DTYPE::TypeShift));
-  if (dtype_type == JBLAS_DTYPE::TypeFloat) {
+  auto dtype_type = static_cast<BTLA_DTYPE>(
+      bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
+  if (dtype_type == BTLA_DTYPE::TypeFloat) {
     if (params.alg == quant_alg::asym) {
       printf("Invalid alg for float quant types, will be igonred\n");
     }
@@ -950,24 +950,24 @@ size_t jblas_quantize(const float* f32ptr, void* dstpr, const quant_params_inter
       printf("Compute Int8 is not supported by float quant types, will be igonred\n");
     }
   }
-  JBLAS_DTYPE scale_type = JBLAS_DTYPE::BF16;
+  BTLA_DTYPE scale_type = BTLA_DTYPE::BF16;
   if (params.scale_dtype == quant_sdtype::fp32) {
-    scale_type = JBLAS_DTYPE::F32;
+    scale_type = BTLA_DTYPE::F32;
   }
   if (params.scale_dtype == quant_sdtype::fp16) {
     printf("Current not support float16 scale, reset to bf16\n");
   }
-  if (quant_type == JBLAS_DTYPE::F8_E4M3 || quant_type == JBLAS_DTYPE::F8_E5M2) {
+  if (quant_type == BTLA_DTYPE::F8_E4M3 || quant_type == BTLA_DTYPE::F8_E5M2) {
     if (params.scale_dtype != quant_sdtype::fp8 && params.scale_dtype != quant_sdtype::fp32) {
       printf("Warning: fp8 weight only supports fp8 / fp32 scale now! Fall back to fp8.\n");
     }
-    scale_type = JBLAS_DTYPE::F8_E8M0;
+    scale_type = BTLA_DTYPE::F8_E8M0;
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
-  auto size = JblasGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, nullptr);
+  auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, nullptr);
   bool constexpr IsTrans_TorchWeight = true;
   if (size) {
-    if (!JblasGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym,
+    if (!BTLAGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym,
                              ctype, IsTrans_TorchWeight, &threading)) {
       printf("Failed to quant this weight\n");
       return 0;
@@ -1052,12 +1052,12 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   }
   printf("quantizing .. ");
   fflush(stdout);
-  if (new_type == NE_TYPE_JBLAS) {
+  if (new_type == NE_TYPE_BTLA) {
     size_t k_ = tensor.ne.at(0);
     size_t n_ = tensor.ne.at(1);
     printf("JBLAS ");
-    new_size = jblas_quantize(f32_data, work.addr, params, nthread, n_, k_);
-  } else if (new_type >= NE_TYPE_Q4_0 && new_type < NE_TYPE_JBLAS) {
+    new_size = bestla_quantize(f32_data, work.addr, params, nthread, n_, k_);
+  } else if (new_type >= NE_TYPE_Q4_0 && new_type < NE_TYPE_BTLA) {
     printf("GGML ");
     new_size = ggml_quantize(f32_data, work.addr, new_type, nthread, nelements);
   }
@@ -1181,13 +1181,13 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
         /* .sl_q = */ 1,  // for next-token inference
         /* .sl_kv = */ static_cast<int>(ctx->n_ctx),
     };
-    const bool support_jblas_kv = ctx->support_jblas_kv && jblas_reordered_attn_fp32_support(&attn_shape);
-    fprintf(stderr, "%s: support_jblas_kv = %d\n", __func__, support_jblas_kv);
+    const bool support_bestla_kv = ctx->support_bestla_kv && bestla_reordered_attn_fp32_support(&attn_shape);
+    fprintf(stderr, "%s: support_bestla_kv = %d\n", __func__, support_bestla_kv);
 
     const ne_type memory_type = params.kv_type == KV_MEM_TYPE_F16   ? NE_TYPE_F16
                                 : params.kv_type == KV_MEM_TYPE_F32 ? NE_TYPE_F32
                                 : params.kv_type == KV_MEM_TYPE_AUTO
-                                    ? (support_jblas_kv ? NE_TYPE_JBLAS : NE_TYPE_F16)  // fall back to fp16
+                                    ? (support_bestla_kv ? NE_TYPE_BTLA : NE_TYPE_F16)  // fall back to fp16
                                     : NE_TYPE_COUNT;
     NE_ASSERT(memory_type != NE_TYPE_COUNT);
 
@@ -1545,12 +1545,12 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
       /* .head_num = */ static_cast<int>(model_hparams.n_head),
       /* .heads_kv = */ static_cast<int>(model_hparams.n_head_kv + model_hparams.multi_query_group_num),
       /* .head_size = */ static_cast<int>(model_hparams.n_embd / model_hparams.n_head),
-      /* .sl_q = */ 1,  // Note: make sure that jblas reordered attn supports next token inferencing
+      /* .sl_q = */ 1,  // Note: make sure that bestla reordered attn supports next token inferencing
       /* .sl_kv = */ static_cast<int>(lparams.n_ctx),
   };
   const auto k_cache_example = lctx->model.kv_self.k != nullptr ? lctx->model.kv_self.k           // llama.cpp style
                                                                 : lctx->model.layers[0].k_cache;  // chatglm style
-  NE_ASSERT(k_cache_example->type != NE_TYPE_JBLAS || jblas_reordered_attn_fp32_support(&attn_shape));
+  NE_ASSERT(k_cache_example->type != NE_TYPE_BTLA || bestla_reordered_attn_fp32_support(&attn_shape));
 
   if (lctx == NULL) {
     fprintf(stderr, "%s: error: failed to load model '%s'\n", __func__, params.model.c_str());
@@ -1574,14 +1574,14 @@ void get_batch_kv_elements_from_gpt_params(int heads_kv, int head_size, int n_ct
   if (wtype == NE_TYPE_F16 || wtype == NE_TYPE_F32) {
     *k_size = n_ctx * heads_kv * head_size;
     *v_size = n_ctx * heads_kv * head_size;
-  } else if (wtype == NE_TYPE_JBLAS) {
+  } else if (wtype == NE_TYPE_BTLA) {
     kv_shape_t kv_shape = {
         /* .heads_kv = */ static_cast<uint32_t>(heads_kv),
         /* .head_size = */ static_cast<uint32_t>(head_size),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
     kv_cache_info_t kv_cache_info;
-    jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
     *k_size = kv_cache_info.k_bytes;
     *v_size = kv_cache_info.v_bytes;
   } else {
@@ -2058,7 +2058,7 @@ static void ne_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq
   }
 }
 
-static void jblas_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
+static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
                                          const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const auto& kv_self = ctx->model.kv_self;
   const auto& hparams = ctx->model.hparams;
@@ -2073,11 +2073,11 @@ static void jblas_model_kv_cache_seq_cpy(struct model_context* ctx, const model_
       /* .head_size = */ static_cast<uint32_t>(head_size),
       /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
   };
-  jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+  bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   const auto k_bytes = kv_cache_info.k_bytes;
   const auto v_bytes = kv_cache_info.v_bytes;
 
-  jblas_fusion_attn_fp32_batch_cpy_kv_args_t seq_cpy_param{
+  bestla_fusion_attn_fp32_batch_cpy_kv_args_t seq_cpy_param{
       /* .src = */ nullptr,
       /* .dst = */ nullptr,
       /* .heads_kv = */ heads_kv,
@@ -2091,21 +2091,21 @@ static void jblas_model_kv_cache_seq_cpy(struct model_context* ctx, const model_
     const auto k_data = reinterpret_cast<char*>(kv_self.k->data) + il * kv_n_ctx_block * k_bytes;
     seq_cpy_param.src = k_data + seq_id_src * k_bytes;
     seq_cpy_param.dst = k_data + seq_id_dst * k_bytes;
-    jblas_fusion_attn_fp32_batch_cpy_k(&seq_cpy_param);
+    bestla_fusion_attn_fp32_batch_cpy_k(&seq_cpy_param);
 
     const auto v_data = reinterpret_cast<char*>(kv_self.v->data) + il * kv_n_ctx_block * v_bytes;
     seq_cpy_param.src = v_data + seq_id_src * v_bytes;
     seq_cpy_param.dst = v_data + seq_id_dst * v_bytes;
-    jblas_fusion_attn_fp32_batch_cpy_v(&seq_cpy_param);
+    bestla_fusion_attn_fp32_batch_cpy_v(&seq_cpy_param);
   }
 }
 
 void model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src, const model_seq_id& seq_id_dst,
                             const model_pos& p0, const model_pos& p1) {
-  if (ctx->model.kv_self.k->type != NE_TYPE_JBLAS)
+  if (ctx->model.kv_self.k->type != NE_TYPE_BTLA)
     ne_model_kv_cache_seq_cpy(ctx, seq_id_src, seq_id_dst, p0, p1);
   else
-    jblas_model_kv_cache_seq_cpy(ctx, seq_id_src, seq_id_dst, p0, p1);
+    bestla_model_kv_cache_seq_cpy(ctx, seq_id_src, seq_id_dst, p0, p1);
 }
 
 static ne_tensor* ne_model_kv_cache_seq_concat(struct ne_cgraph* cgraph, struct model_context* moctx,
@@ -2172,10 +2172,10 @@ static ne_tensor* ne_model_kv_cache_seq_concat(struct ne_cgraph* cgraph, struct 
 ne_tensor* model_kv_cache_seq_concat(struct ne_cgraph* cgraph, struct model_context* moctx, struct ne_context* nectx,
                                      const int64_t& ne0, const int64_t& ne1, const int64_t& ne2, const int64_t& ne3,
                                      const std::vector<int>& block_ids, const int& layer_idx, const bool& concat_k) {
-  if (moctx->model.kv_self.k->type != NE_TYPE_JBLAS) {
+  if (moctx->model.kv_self.k->type != NE_TYPE_BTLA) {
     return ne_model_kv_cache_seq_concat(cgraph, moctx, nectx, ne0, ne1, ne2, ne3, block_ids, layer_idx, concat_k);
   } else {
-    return nullptr;  // jblas
+    return nullptr;  // bestla
   }
 }
 

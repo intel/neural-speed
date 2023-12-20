@@ -278,7 +278,7 @@ class DequanKBlockS8Fp {
     if (row2 > 0) {
       DequanS8FP::forward_avx512f<_PACK_ROW>(srcptr, dstptr, row2, col, ld_src, ld_dst, sptr, zptr);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 
@@ -364,7 +364,7 @@ class JitMemcpy2DAvx2 : protected xbyak::JitAvx2 {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP Op>
@@ -378,7 +378,7 @@ class JitMemcpy2DAvx2 : protected xbyak::JitAvx2 {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
  protected:
@@ -575,7 +575,7 @@ class JitMemcpy2DAvx512f : protected xbyak::JitAvx512f {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP Op>
@@ -589,7 +589,7 @@ class JitMemcpy2DAvx512f : protected xbyak::JitAvx512f {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
  protected:
@@ -882,7 +882,7 @@ class DecompressS4S8_AVX512F : protected xbyak::JitAvx512f {
     static DecompressS4S8_AVX512F instance;
     auto param = params{srcptr, dstptr, size};
     instance.mKernel(&param);
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
  private:
@@ -892,10 +892,10 @@ class DecompressS4S8_AVX512F : protected xbyak::JitAvx512f {
 static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src,
                                           int ld_dst) {
   if (col != ld_src) {  // memory is not continuous
-    return BTLANotSupport;
+    return BTLA_CODE::NotSupport;
   }
   DecompressS4S8_AVX512F::forward(srcptr, dstptr, (size_t)row * col);
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 // src: row x col => dst: ⌈col/n_tile⌉ x ⌈row/row_pack⌉ x n_tile x row_pack (zeor-padded)

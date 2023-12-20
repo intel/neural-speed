@@ -387,13 +387,13 @@ static void request_perm_xtile_data() {}
 template <BTLA_ISA ISA_T>
 class isa_base {
  public:
-  static bool constexpr avx = ISA_T >= BTLAAVX;
-  static bool constexpr avx2 = ISA_T >= BTLAAVX2;
-  static bool constexpr avx512f = ISA_T >= BTLAAVX512F;
-  static bool constexpr avx512_vnni = ISA_T >= BTLAAVX512_VNNI;
-  static bool constexpr avx512_fp16 = ISA_T >= BTLAAVX512_FP16;
-  static bool constexpr amx_bf16 = ISA_T >= BTLAAMX_BF16;
-  static bool constexpr amx_int8 = ISA_T >= BTLAAMX_INT8;
+  static bool constexpr avx = ISA_T >= BTLA_ISA::AVX;
+  static bool constexpr avx2 = ISA_T >= BTLA_ISA::AVX2;
+  static bool constexpr avx512f = ISA_T >= BTLA_ISA::AVX512F;
+  static bool constexpr avx512_vnni = ISA_T >= BTLA_ISA::AVX512_VNNI;
+  static bool constexpr avx512_fp16 = ISA_T >= BTLA_ISA::AVX512_FP16;
+  static bool constexpr amx_bf16 = ISA_T >= BTLA_ISA::AMX_BF16;
+  static bool constexpr amx_int8 = ISA_T >= BTLA_ISA::AMX_INT8;
 };
 
 static inline int padto_le(int src, int padding) { return src / padding * padding; }
@@ -680,4 +680,4 @@ static float nf4_dequant_fp32_LUT[] = {0.f,
                                        0.5626170039176941f,
                                        0.7229568362236023f,
                                        1.0f};
-}  // namespace jblas
+}  // namespace bestla

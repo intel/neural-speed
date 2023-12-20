@@ -730,7 +730,7 @@ ne_ftype quant_params_to_ftype(const quant_params& params) {
       return NE_FTYPE_MOSTLY_Q8_0;
     }
   } else {
-    return NE_FTYPE_MOSTLY_Q_JBLAS;
+    return NE_FTYPE_MOSTLY_Q_BTLA;
   }
   return NE_FTYPE_UNKNOWN;
 }
@@ -753,7 +753,7 @@ ne_type quant_params_to_type(const quant_params& params) {
       return NE_TYPE_Q8_0;
     }
   } else {
-    return NE_TYPE_JBLAS;
+    return NE_TYPE_BTLA;
   }
   return NE_TYPE_F32;
 }

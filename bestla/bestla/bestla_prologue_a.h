@@ -49,11 +49,11 @@ class ActivationBase {
     if (use_rawptr) {
       *dstptr = aptr;
       *dststep = _param.lda;
-      return BTLASuccess;
+      return BTLA_CODE::Success;
     } else {
       auto k_pad = utils::padto(k_size, _GemmCore_T::KTILE);
       *dststep = k_pad;
-      return kernel::wrapper::Memcpy2D::forward<BTLANoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size, _param.lda,
+      return kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size, _param.lda,
                                                                            k_pad);
     }
   }
@@ -88,7 +88,7 @@ class ActivationConverter : public ActivationBase<_GemmCore_T, ISA_T> {
     } else {
       assert(0);
     }
-    return BTLANotSupport;
+    return BTLA_CODE::NotSupport;
   }
 };
 
@@ -160,7 +160,7 @@ class ActivationKBlockQuantize {
       paral.getIndex(thdp);
       if (thdp.valid) run(_param, thdp);
     });
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
  public:  // Runtime get by launcher
@@ -172,7 +172,7 @@ class ActivationKBlockQuantize {
     auto aptr = quan->template APtr<AType>();
     *dstptr = aptr + m_offset * quan->mKPad + k_offset;
     *dststep = quan->mKPad;
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   BTLA_CODE getZp(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset, int k_offset,
@@ -181,13 +181,13 @@ class ActivationKBlockQuantize {
     auto aptr = quan->template ZPtr<AType>();
     if (aptr == nullptr) {  // optional
       *dstptr = nullptr;
-      return BTLASuccess;
+      return BTLA_CODE::Success;
     }
     int kele = utils::updiv(k_size, quan->mBlockSize);
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * quan->CStep() + k_offset / quan->mBlockSize, *dstptr, m_size,
                           kele * sizeof(AType), quan->CStep() * sizeof(AType), kele * sizeof(AType));
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   BTLA_CODE getScale(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
@@ -198,7 +198,7 @@ class ActivationKBlockQuantize {
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * quan->CStep() + k_offset / quan->mBlockSize, *dstptr, m_size,
                           kele * sizeof(float), quan->CStep() * sizeof(float), kele * sizeof(float));
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   BTLA_CODE getReduce(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
@@ -209,7 +209,7 @@ class ActivationKBlockQuantize {
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * quan->CStep() + k_offset / quan->mBlockSize, *dstptr, m_size,
                           kele * sizeof(float), quan->CStep() * sizeof(float), kele * sizeof(float));
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 
@@ -255,7 +255,7 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
       auto thdrptr = stor->template RPtr<float>() + blk_offset;
       auto ret = kernel::wrapper::ColBlockReduceSum::template forward<ISA_T, SRC_T>(
           srcptr, _param.lda, thdp.size[0], thdp.size[1], stor->kblock, thdrptr, stor->lda);
-      assert(ret == BTLASuccess);
+      assert(ret == BTLA_CODE::Success);
     }
   }
 
@@ -266,7 +266,7 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
       paral.getIndex(thdp);
       if (thdp.valid) run(_param, thdp);
     });
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
@@ -283,7 +283,7 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * reduce->lda + k_offset / reduce->kblock, *dstptr, m_size,
                           kele * sizeof(float), reduce->lda * sizeof(float), kele * sizeof(float));
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 
@@ -337,7 +337,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
         auto thdrptr = stor->template RPtr<float>() + blk_offset;
         auto ret = kernel::wrapper::ColBlockReduceSum::template forward<ISA_T, SRC_T>(
             srcptr, _param.lda, thdp.size[0], thdp.size[1], stor->kblock, thdrptr, stor->lda);
-        assert(ret == BTLASuccess);
+        assert(ret == BTLA_CODE::Success);
       }
     }
   }
@@ -349,7 +349,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
       paral.getIndex(thdp);
       run(_param, thdp);
     });
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 
   BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
@@ -416,7 +416,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
       srcptr = shuffle_src;
     }
     ActivationKBlockQuantize<_GemmCore_T, ISA_T, SRC_T>::quantize({srcptr, k, _param.quan}, m, k, threading);
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 

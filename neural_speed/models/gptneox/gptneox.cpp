@@ -43,7 +43,7 @@ struct ne_tensor* gpt_neox_ff(const model_layer& layer, const int batch_size, co
   struct ne_tensor* cur = ne_norm(ctx0, inp);
 
   cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.norm[2], cur), cur), ne_repeat(ctx0, layer.norm[3], cur));
-  if (jblas_fusion_FFN_Add_GeLu_f32f32_support(layer.ffn[0]->data, layer.ffn[2]->data, N * batch_size, cur->ne[0],
+  if (bestla_fusion_FFN_Add_GeLu_f32f32_support(layer.ffn[0]->data, layer.ffn[2]->data, N * batch_size, cur->ne[0],
                                                layer.ffn[0]->ne[1], layer.ffn[2]->ne[1])) {
     cur = ne_ffn_add_gelu(ctx0, layer.ffn[0], layer.ffn[2], layer.ffn[1], layer.ffn[3], cur);
   } else {
@@ -129,27 +129,27 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
-  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_JBLAS;
+  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
   if (run_mha_reordered) {
-    NE_ASSERT(("kv cache should be the same dtype", kv_self.v->type == NE_TYPE_JBLAS));
+    NE_ASSERT(("kv cache should be the same dtype", kv_self.v->type == NE_TYPE_BTLA));
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
         /* .heads_kv = */ n_head,
         /* .head_size = */ head_dim,
-        /* .sl_q = */ N,  // Note: make sure that jblas reordered attn supports next token inference
+        /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_past + N,
     };
 
-    NE_ASSERT(("jblas managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
-               jblas_reordered_attn_fp32_support(&attn_shape)));
+    NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
+               bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
         /* .heads_kv = */ static_cast<uint32_t>(n_head),
         /* .head_size = */ static_cast<uint32_t>(head_dim),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
-    jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
   ne_set_name(embd, "embd");
@@ -271,12 +271,12 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
         {
           const auto k_cache = ne_view_3d(ctx0, kv_self.k,          // tensor
                                           head_dim, n_ctx, n_head,  // ne
-                                          0, 0,                     // nb (jblas managed)
+                                          0, 0,                     // nb (bestla managed)
                                           il * k_size);             // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, false));
           const auto v_cache = ne_view_3d(ctx0, kv_self.v,          // tensor
                                           head_dim, n_ctx, n_head,  // ne
-                                          0, 0,                     // nb (jblas managed)
+                                          0, 0,                     // nb (bestla managed)
                                           il * v_size);             // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur, n_past, false));
         }
@@ -287,14 +287,14 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
         struct ne_tensor* K =
             ne_view_3d(ctx0, kv_self.k,                                             // tensor
                        head_dim, seq_kv, n_head,                                    // ne
-                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (jblas managed)
+                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
                        il * k_size);                                                // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
         ne_set_name(K, "K");
         struct ne_tensor* V =
             ne_view_3d(ctx0, kv_self.v,                                                    // tensor
                        seq_kv, head_dim, n_head,                                           // ne
-                       kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (jblas managed)
+                       kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
                        il * v_size);                                                       // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout
         ne_set_name(V, "V");

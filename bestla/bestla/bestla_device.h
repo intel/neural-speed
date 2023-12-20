@@ -198,13 +198,13 @@ class SapphireRapids {
 template <BTLA_ISA ISA_T>
 class isa_base {
  public:
-  static bool constexpr avx = ISA_T >= JblasAVX;
-  static bool constexpr avx2 = ISA_T >= JblasAVX2;
-  static bool constexpr avx512f = ISA_T >= JblasAVX512F;
-  static bool constexpr avx512_vnni = ISA_T >= JblasAVX512_VNNI;
-  static bool constexpr avx512_fp16 = ISA_T >= JblasAVX512_FP16;
-  static bool constexpr amx_bf16 = ISA_T >= JblasAMX_BF16;
-  static bool constexpr amx_int8 = ISA_T >= JblasAMX_INT8;
+  static bool constexpr avx = ISA_T >= BTLA_ISA::AVX;
+  static bool constexpr avx2 = ISA_T >= BTLA_ISA::AVX2;
+  static bool constexpr avx512f = ISA_T >= BTLA_ISA::AVX512F;
+  static bool constexpr avx512_vnni = ISA_T >= BTLA_ISA::AVX512_VNNI;
+  static bool constexpr avx512_fp16 = ISA_T >= BTLA_ISA::AVX512_FP16;
+  static bool constexpr amx_bf16 = ISA_T >= BTLA_ISA::AMX_BF16;
+  static bool constexpr amx_int8 = ISA_T >= BTLA_ISA::AMX_INT8;
 };
 
 class CpuDevice {
@@ -436,4 +436,4 @@ class CpuBase {
   int mNumThreads;
 };
 }  // namespace device
-}  // namespace jblas
+}  // namespace bestla

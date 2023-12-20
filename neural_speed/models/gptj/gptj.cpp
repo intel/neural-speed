@@ -115,29 +115,29 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   ne_cgraph gf = {};
   gf.n_threads = n_threads;
 
-  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_JBLAS;
-  const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && jblas_fusion_attn_fp16_support(NULL);
+  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
+  const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && bestla_fusion_attn_fp16_support(NULL);
   const bool run_mha_bf16_first =
-      !run_mha_reordered && MHA_FUSION && !MHA_FP16 && jblas_fusion_attn_fp32_fp16_fp16_fp32_support(NULL);
+      !run_mha_reordered && MHA_FUSION && !MHA_FP16 && bestla_fusion_attn_fp32_fp16_fp16_fp32_support(NULL);
   kv_cache_info_t kv_cache_info = {0, 0};
   if (run_mha_reordered) {
-    NE_ASSERT(kv_self.v->type == NE_TYPE_JBLAS);  // kv type should be the same
+    NE_ASSERT(kv_self.v->type == NE_TYPE_BTLA);  // kv type should be the same
     attn_shape_t attn_shape = {
         /* .batch_size = */ batch_size,
         /* .head_num = */ n_head,
         /* .heads_kv = */ n_head,  // GPT-J does not have MQA/GQA
         /* .head_size = */ head_size,
-        /* .sl_q = */ N,  // Note: make sure that jblas reordered attn supports next token inference
+        /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_cached,
     };
-    NE_ASSERT(("jblas managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
-               jblas_reordered_attn_fp32_support(&attn_shape)));
+    NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
+               bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
         /* .head_num = */ static_cast<uint32_t>(n_head),
         /* .head_size = */ static_cast<uint32_t>(head_size),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
-    jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
@@ -170,7 +170,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
 
     ne_tensor *Qcur, *Kcur, *Vcur;
     int kv_n_ctx_block = lctx.kv_n_ctx_block;
-    if (jblas_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
+    if (bestla_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
                                         model.layers[il].attn[2]->data, N * batch_size, head_size * n_head,
                                         head_size * n_head)) {  // fused execution of QKV
                                                                 // if (false) {
@@ -266,14 +266,14 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       const auto v_size = kv_cache_info.v_bytes;
       const auto k_cache = ne_view_4d(ctx0, kv_self.k,                       // tensor
                                       head_size, n_ctx, n_head, batch_size,  // ne
-                                      0, 0, k_size,                          // nb (jblas managed)
+                                      0, 0, k_size,                          // nb (bestla managed)
                                       il * kv_n_ctx_block * k_size);         // offset
       ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, is_ring_full));
       const auto v_cache = ne_view_4d(ctx0, kv_self.v,                       // tensor
                                       head_size, n_ctx, n_head, batch_size,  // ne
-                                      0, 0, v_size,                          // nb (jblas managed)
+                                      0, 0, v_size,                          // nb (bestla managed)
                                       il * kv_n_ctx_block * v_size);         // offset
-      // jblas alway view V as (D, n_head, seq, bs)
+      // bestla alway view V as (D, n_head, seq, bs)
       const auto Vcur_plain = ne_reshape_4d(ctx0, Vcur, head_size, n_head, N, batch_size);
       ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur_plain, n_past, is_ring_full));
     }
@@ -285,7 +285,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       const auto k_size = kv_cache_info.k_bytes;
       K = ne_view_4d(ctx0, kv_self.k,                                                     // tensor
                      head_size, n_cached, n_head, batch_size,                             // ne
-                     kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num, k_size,  // nb (jblas managed)
+                     kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num, k_size,  // nb (bestla managed)
                      il * kv_n_ctx_block * k_size);                                       // offset
       *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;
       if (is_ring_full) {
@@ -298,7 +298,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       const auto v_size = kv_cache_info.v_bytes;
       V = ne_view_4d(ctx0, kv_self.v,                                                            // tensor
                      n_cached, head_size, n_head, batch_size,                                    // ne
-                     kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num, v_size,  // nb (jblas managed)
+                     kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num, v_size,  // nb (bestla managed)
                      il * kv_n_ctx_block * v_size);                                              // offset
       *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;
     } else if (run_mha_fp16) {
@@ -417,7 +417,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
 
     // feed-forward network
     // disable ffn fusion because fp32 support not ready
-    if (jblas_fusion_FFN_Add_GeLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[2]->data,
+    if (bestla_fusion_FFN_Add_GeLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[2]->data,
                                                  N * batch_size, inpSA->ne[0], model.layers[il].ffn[0]->ne[1],
                                                  model.layers[il].ffn[2]->ne[1])) {
       cur = ne_ffn_add_gelu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[2], model.layers[il].ffn[1],
@@ -464,7 +464,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   }
 
   // lm_head
-  if (jblas_fusion_add_f32f32_support(model.others[3]->data, N * batch_size, model.others[3]->ne[1],
+  if (bestla_fusion_add_f32f32_support(model.others[3]->data, N * batch_size, model.others[3]->ne[1],
                                       model.others[3]->ne[0])) {
     inpL = ne_mul_mat_with_bias(ctx0, model.others[3], model.others[4], inpL);
   } else {

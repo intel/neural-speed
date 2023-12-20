@@ -14,8 +14,8 @@
 
 #include "bestla_common.hpp"
 
-using namespace jblas;     // NOLINT
-using namespace ne_jblas;  // NOLINT
+using namespace bestla;     // NOLINT
+using namespace ne_bestla;  // NOLINT
 
 namespace ip_qkv {
 
@@ -69,13 +69,13 @@ void GemmRunWithA_QKV(Launch_T* launcher, const typename Launch_T::Param* args, 
   });
 }
 
-template <class GemmCore_T, template <class, JBLAS_ISA> class Wei_T>
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void JblasGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
-                      jblas::storage::gemm::IWeightBase* _BQ, jblas::storage::gemm::IWeightBase* _BK,
-                      jblas::storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
-                      jblas::parallel::IThreading* th) {
+                      storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK,
+                      storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
+                      parallel::IThreading* th) {
   if (M <= 16) {
-    using Parallel = jblas::parallel::gemm::SchedulerKBlock<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     using Launcher = tLauncher_Fp_F32F32<GemmCore_T, Wei_T>;
     static Launcher kernel;
     auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
@@ -108,10 +108,10 @@ void JblasGemmCompF32(const int M, const int N, const int K, const float* A, con
       GemmRun_QKV<Parallel>(&kernel, args, th);
     }
   } else {
-    using Parallel = jblas::parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher = jblas::wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
-                                                        jblas::prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
-                                                        jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
+                                                        prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+                                                        epilogue::gemm::AccumulatorWriteBackFp32>;
     static Launcher kernel;
     auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
     auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
@@ -130,12 +130,12 @@ void JblasGemmCompF32(const int M, const int N, const int K, const float* A, con
   }
 }
 
-template <class GemmCore_T, template <class, JBLAS_ISA> class Wei_T>
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void JblasGemmCompInt8(const int M, const int N, const int K, const float* A, const int lda,
-                       jblas::storage::gemm::IWeightBase* _BQ, jblas::storage::gemm::IWeightBase* _BK,
-                       jblas::storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
-                       jblas::parallel::IThreading* th) {
-  using Parallel = jblas::parallel::gemm::SchedulerKBlockS<GemmCore_T>;
+                       storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK,
+                       storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
+                       parallel::IThreading* th) {
+  using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher = tLauncher_Int8_F32F32<GemmCore_T, Wei_T>;
   auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
   auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
@@ -153,7 +153,7 @@ void JblasGemmCompInt8(const int M, const int N, const int K, const float* A, co
 }
 }  // namespace ip_qkv
 
-unsigned long long jblas_fusion_QKV_f32f32_get_workspace_size(int _m, int _n, int _k, void* w1ptr) {  // NOLINT
+unsigned long long bestla_fusion_QKV_f32f32_get_workspace_size(int _m, int _n, int _k, void* w1ptr) {  // NOLINT
   // maximum padding
   // we can parse w1ptr to get a accurate size, but not necessary
   int constexpr padding = 128;
@@ -161,17 +161,17 @@ unsigned long long jblas_fusion_QKV_f32f32_get_workspace_size(int _m, int _n, in
   return s;
 }
 
-bool jblas_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int _m, int _n, int _k) {
+bool bestla_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int _m, int _n, int _k) {
   GetCPUDevice();
   bool support = false;
-  auto wqtmp = jblas::storage::gemm::PackedWeightParser::deserialBuffer(wqptr);
-  auto wktmp = jblas::storage::gemm::PackedWeightParser::deserialBuffer(wkptr);
-  auto wvtmp = jblas::storage::gemm::PackedWeightParser::deserialBuffer(wvptr);
+  auto wqtmp = storage::gemm::PackedWeightParser::deserialBuffer(wqptr);
+  auto wktmp = storage::gemm::PackedWeightParser::deserialBuffer(wkptr);
+  auto wvtmp = storage::gemm::PackedWeightParser::deserialBuffer(wvptr);
   if (wqtmp && wktmp && wvtmp) {
     storage::gemm::IWeightBase* wset[] = {wqtmp, wktmp, wvtmp};
     if (samePackedWeight(wset, 3)) {
-      if (wqtmp->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger) {
-        auto wqptr = reinterpret_cast<jblas::storage::gemm::StorageWeightKBlockNInteger*>(wqtmp);
+      if (wqtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
+        auto wqptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(wqtmp);
         if (wqptr->ShfIndice()) {
           return false;  // Do not support QKV fusion for activation shuffle
         }
@@ -192,7 +192,7 @@ bool jblas_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int 
 }
 
 // f32f32: activation & output dtype
-void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr, void* wvptr, float* output, int _m,
+void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr, void* wvptr, float* output, int _m,
                                      int _n, int _k, int lda, int ldo, void* _workspace) {
   GetCPUDevice();
   auto wqtmp = storage::gemm::PackedWeightParser::deserialBuffer(wqptr);
@@ -201,17 +201,17 @@ void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr
   // must check support before forward, there is no need to check support twice.
   auto ptr = wqtmp;
   auto coretype = ptr->mCoreId;
-  auto NTile = jblas::gemm::CoreAttr::get_mask_val(ptr->mCoreId, jblas::gemm::CoreAttr::NTILE_MASK,
-                                                   jblas::gemm::CoreAttr::NTILE_SHIFT);
-  auto PackRow = jblas::gemm::CoreAttr::get_packrow(ptr->mCoreId);
-  auto CType = jblas::gemm::CoreAttr::get_comp(ptr->mCoreId);
-  auto btype = static_cast<jblas::gemm::CompType>(jblas::gemm::CompTypeHelper::get_B(CType));
-  auto pth = ne_jblas::ne_threading::get();
+  auto NTile = gemm::CoreAttr::get_mask_val(ptr->mCoreId, gemm::CoreAttr::NTILE_MASK,
+                                                   gemm::CoreAttr::NTILE_SHIFT);
+  auto PackRow = gemm::CoreAttr::get_packrow(ptr->mCoreId);
+  auto CType = gemm::CoreAttr::get_comp(ptr->mCoreId);
+  auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));
+  auto pth = ne_bestla::ne_threading::get();
   auto workspace = reinterpret_cast<int8_t*>(_workspace);
-  if (ptr->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger) {
-    auto bptr = reinterpret_cast<jblas::storage::gemm::IWeightKBlockBase*>(ptr);
+  if (ptr->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
+    auto bptr = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(ptr);
     auto BlkSize = bptr->mBlockSize;
-    if (btype == jblas::gemm::CompType::tFP32 && PackRow == 1) {
+    if (btype == gemm::CompType::tFP32 && PackRow == 1) {
       if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
         ip_qkv::JblasGemmCompF32<tAVX512F, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
                                                      workspace, pth);
@@ -220,7 +220,7 @@ void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr
                                                   workspace, pth);
       }
     }
-    if (btype == jblas::gemm::CompType::tBF16 && PackRow == 2) {
+    if (btype == gemm::CompType::tBF16 && PackRow == 2) {
       if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
         if (_m <= tAVX512_BF16::MTILE) {
           static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
@@ -232,7 +232,7 @@ void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr
         }
       }
     }
-    if (btype == jblas::gemm::CompType::tS8 && PackRow == 4) {
+    if (btype == gemm::CompType::tS8 && PackRow == 4) {
       if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
         if (_m <= tAVX512_VNNI_KBlock::MTILE) {
           static_assert(tAVX512_VNNI_KBlock::NTILE == tAMX_INT8_SS_KBlock::NTILE);
@@ -256,7 +256,7 @@ void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr
   if (ptr->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNFloat) {
     auto bptr = reinterpret_cast<jblas::storage::gemm::IWeightKBlockBase*>(ptr);
     auto BlkSize = bptr->mBlockSize;
-    if (btype == jblas::gemm::CompType::tFP32 && PackRow == 1) {
+    if (btype == gemm::CompType::tFP32 && PackRow == 1) {
       if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
         ip_qkv::JblasGemmCompF32<tAVX512F, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
                                                        workspace, pth);
@@ -265,7 +265,7 @@ void jblas_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkptr
                                                     workspace, pth);
       }
     }
-    if (btype == jblas::gemm::CompType::tBF16 && PackRow == 2) {
+    if (btype == gemm::CompType::tBF16 && PackRow == 2) {
       if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
         if (_m <= tAVX512_BF16::MTILE) {
           static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);

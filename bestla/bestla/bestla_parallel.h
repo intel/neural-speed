@@ -698,4 +698,4 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
 }
 
 }  // namespace parallel
-}  // namespace jblas
+}  // namespace bestla

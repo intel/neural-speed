@@ -825,4 +825,4 @@ class PackedWeightParser {
 };
 }  // namespace gemm
 }  // namespace storage
-}  // namespace jblas
+}  // namespace bestla

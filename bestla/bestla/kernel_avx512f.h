@@ -345,9 +345,9 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _
         }
       }
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <BTLA_DTYPE _SRCT, typename _ST, typename _DT, bool _IS_SYM = true>
@@ -449,7 +449,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
       }
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   } else if (col % 96 == 0) {
     constexpr int ColTile = 96;
     constexpr int NRegs = ColTile / 16;
@@ -554,9 +554,9 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
       }
     }
 
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <bool WITH_SCALE, typename _DST_T, int _PACK_ROW, typename _S_T>
@@ -614,7 +614,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
     for (; j < align_col; j += 16) quant(_cvtu32_mask16(0xffff));
     if (col_tail > 0) quant(_cvtu32_mask16(0xffff >> (16 - col_tail)));
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW, typename _ST>
@@ -640,7 +640,7 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
           srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad, tmp, tmpsize);
     }
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <BTLA_DTYPE _F4_T, typename _DST_T, int _PACK_ROW, typename _ST>
@@ -655,7 +655,7 @@ static inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dst
     return decompress_kblock_bit4_packrow2<_F4_T, _ST, _DST_T, true>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
                                                                      nullptr, k_offset, kblock, NPad, tmp, tmpsize);
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <BTLA_DTYPE F4_T, typename DST_T>
@@ -690,9 +690,9 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
       dstptr[i + 0] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.x));
       dstptr[i + 1] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.y));
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -722,9 +722,9 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
       dstptr[i + 0] = kernel::ref::get_s8<S4_T>(tmp.x);
       dstptr[i + 1] = kernel::ref::get_s8<S4_T>(tmp.y);
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, int8_t* dstptr, int row, int col,
@@ -775,7 +775,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, 
     for (; j < align_row; j += blocksize) scalar_process_block(blocksize);
     if (j < row) scalar_process_block(row - align_row);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr, int8_t* dstptr, int row, int col,
@@ -842,7 +842,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr,
     for (; j < align_row; j += blocksize) scalar_process_block(blocksize);
     if (j < row) scalar_process_block(row - align_row);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -1045,7 +1045,7 @@ inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, i
   for (; i < align_col; i += 16) process_row_blk(i, 16);
   if (i < col) process_row_blk(i, col - i);
 
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -1153,7 +1153,7 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -1238,7 +1238,7 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
       if (reduce) reduce[j / blocksize + i * ld_scale] = sum * scale;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
@@ -1273,7 +1273,7 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T, typename _DST_T>
@@ -1310,9 +1310,9 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
       dstptr[i + 0] = static_cast<_DST_T>(static_cast<float>(kernel::ref::get_s8<S4_T>(tmp.x)));
       dstptr[i + 1] = static_cast<_DST_T>(static_cast<float>(kernel::ref::get_s8<S4_T>(tmp.y)));
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <typename DST_T>
@@ -1332,9 +1332,9 @@ inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int ro
       auto tmp = srcptr[i];
       dstptr[i] = static_cast<DST_T>(static_cast<float>(tmp));
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 }
 
 template <typename SCA_T>
@@ -1371,7 +1371,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, float* dstptr, const int dststep,
@@ -1392,7 +1392,7 @@ static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, fl
       dstptr[i * dststep + j] += srcptr[i * srcstep + j];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline void vec_quanout_s32_u32_v16(const int32_t* srcptr, __m512& vfactor, __m512i& vzp, __m512i& vzeros,
@@ -1444,7 +1444,7 @@ static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr
       dstptr[i * dststep + j] = utils::cast<float, uint8_t>(fsrc + static_cast<float>(zpDst));
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, float* dstptr, float alpha, float beta,
@@ -1471,7 +1471,7 @@ static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, flo
           scale * wscales[icol] * srcptr[irow * ld_src + icol] + beta * dstptr[irow * ld_dst + icol];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SCAB_T>
@@ -1520,7 +1520,7 @@ static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcste
       dstptr[irow * dststep + icol] = scale * scaleB[icol] * srcptr[irow * srcstep + icol];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE broadcast_u8(int num, const uint8_t& srcval, uint8_t* dstptr) {
@@ -1540,7 +1540,7 @@ static inline BTLA_CODE broadcast_u8(int num, const uint8_t& srcval, uint8_t* ds
   for (; i < num; i++) {
     dstptr[i] = srcval;
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zps,
@@ -1563,7 +1563,7 @@ static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int 
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int row, int col, int8_t* zps,
@@ -1587,7 +1587,7 @@ static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int 
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zpa, int8_t* zpb,
@@ -1622,7 +1622,7 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
@@ -1663,7 +1663,7 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
       std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -1700,7 +1700,7 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
       reduce[i * ldr + j / blocksize] = tmp;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
@@ -1724,9 +1724,9 @@ static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils:
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 #else
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 #endif
 }
 
@@ -1751,9 +1751,9 @@ static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, 
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 #else
-  return BTLANotSupport;
+  return BTLA_CODE::NotSupport;
 #endif
 }
 
@@ -1780,7 +1780,7 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
               _mm512_cvtepu16_epi32(_mm256_castps_si256(_mm256_loadu_ps(reinterpret_cast<float*>(src + j)))), 2)));
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 #ifdef __GNUC__
@@ -1948,7 +1948,7 @@ struct padding_interleave_cvt {
   padding_interleave_cvt() = delete;
   static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int NTile, int row, int col, int row_pad, int col_pad,
                             int src_step, int dst_step) {
-    return BTLANotSupport;
+    return BTLA_CODE::NotSupport;
   }
 };
 #if CompileBF16() && CompileFP16()
@@ -2034,7 +2034,7 @@ struct padding_interleave_cvt<utils::fp16, utils::bf16, 2> {
         memset(dst + i * NTile + j * dst_step, 0, sizeof(utils::bf16) * NTile * RowPack);
       }
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 #endif
@@ -2044,7 +2044,7 @@ struct padding_trans_interleave_cvt {
   padding_trans_interleave_cvt() = delete;
   static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int MTile, int row, int col, int row_pad, int col_pad,
                             int src_step, int dst_step) {
-    return BTLANotSupport;
+    return BTLA_CODE::NotSupport;
   }
 };
 #if CompileBF16() && CompileFP16()
@@ -2147,7 +2147,7 @@ struct padding_trans_interleave_cvt<utils::fp16, utils::bf16, 2> {
         memset(dst + i * dst_step + j * MTile, 0, 2 * sizeof(utils::bf16) * MTile);
       }
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
 };
 #endif

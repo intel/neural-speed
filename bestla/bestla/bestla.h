@@ -13,24 +13,24 @@
 //  limitations under the License.
 #pragma once
 #include <stdint.h>
-enum BTLA_CODE {
-  BTLASuccess = 0,
-  BTLAInvalidParam = 1,
-  BTLAInvalidISA = 2,
-  BTLARuntimeError = 4,
-  BTLANotSupport = 8,
+enum class BTLA_CODE {
+  Success = 0,
+  InvalidParam = 1,
+  InvalidISA = 2,
+  RuntimeError = 4,
+  NotSupport = 8,
 };
-enum BTLA_ISA : uint8_t {
-  BTLANoSIMD = 0,
-  BTLAAVX,
-  BTLAAVX2,
-  BTLAAVX_VNNI,
-  BTLAAVX512F,
-  BTLAAVX512_VNNI,
-  BTLAAMX_BF16,
-  BTLAAMX_INT8,
-  BTLAAVX512_FP16,
-  BTLAAVX512_BF16,
+enum class BTLA_ISA : uint8_t {
+  NoSIMD = 0,
+  AVX,
+  AVX2,
+  AVX_VNNI,
+  AVX512F,
+  AVX512_VNNI,
+  AMX_BF16,
+  AMX_INT8,
+  AVX512_FP16,
+  AVX512_BF16,
 };
 enum class BTLA_DTYPE : uint32_t {
   EleBitsMask = 0xff,
@@ -70,13 +70,7 @@ enum class BTLA_DTYPE : uint32_t {
   U32 = EleBits32 | TypeInt | SubType1,
 };
 
-enum BTLA_LAYOUT { BTLARowMajor = 101, BTLAColMajor = 102 };
-enum BTLA_TRANSPOSE {
-  BTLANoTrans = 111,
-  BTLATrans = 112,
-  BTLAConjTrans = 113,
-};
-enum BTLA_ELTWISEOP { GELU, SWISH, TANH, EXP, LOW_PRECISION_EXP, RELU, LINEAR };
+enum class BTLA_ELTWISEOP { GELU, SWISH, TANH, EXP, LOW_PRECISION_EXP, RELU, LINEAR };
 
 enum class BTLA_PROLOGUEB_IDS : uint32_t {
   Undef = (uint32_t)-1,

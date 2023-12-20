@@ -116,7 +116,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument(
         "--memory-auto",
         action="store_true",
-        help="Try with jblas flash attn managed format for kv memory (Currently GCC13 & AMX required); "
+        help="Try with bestla flash attn managed format for kv memory (Currently GCC13 & AMX required); "
         "fall back to fp16 if failed (default option for kv-memory)",
     )
 

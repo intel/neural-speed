@@ -21,15 +21,15 @@
 #include "layers/ele_wise.h"
 #include "bestla_defs.h"
 
-namespace ne_jblas {
+namespace ne_bestla {
 
 class ne_threading {
  public:
-  static jblas::parallel::IThreading* get() {
+  static bestla::parallel::IThreading* get() {
 #ifdef _OPENMP
-    static jblas::parallel::OMPThreading DefaultThreading(4);
+    static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
-    static jblas::parallel::StdThreading DefaultThreading(4);
+    static bestla::parallel::StdThreading DefaultThreading(4);
 #endif  // _OPNEMP
     return &DefaultThreading;
   }
@@ -55,33 +55,34 @@ static bool contains(const T& val, const T* set, size_t len) {
 }
 
 static bool hasISA(const uint64_t* coreset, size_t len) {
+  using namespace bestla;
   GetCPUDevice();
   bool support = false;
   for (size_t i = 0; i < len; i++) {
-    auto isa = jblas::gemm::CoreAttr::get_ISA(coreset[i]);
+    auto isa = gemm::CoreAttr::get_ISA(coreset[i]);
     switch (isa) {
-      case JblasAVX:
+      case BTLA_ISA::AVX:
         support |= _cd->AVX();
         break;
-      case JblasAVX2:
+      case BTLA_ISA::AVX2:
         support |= _cd->AVX2();
         break;
-      case JblasAMX_BF16:
+      case BTLA_ISA::AMX_BF16:
         support |= _cd->AMX_BF16();
         break;
-      case JblasAMX_INT8:
+      case BTLA_ISA::AMX_INT8:
         support |= _cd->AMX_INT8();
         break;
-      case JblasAVX512F:
+      case BTLA_ISA::AVX512F:
         support |= _cd->AVX512F();
         break;
-      case JblasAVX512_VNNI:
+      case BTLA_ISA::AVX512_VNNI:
         support |= _cd->AVX512_VNNI();
         break;
-      case JblasAVX512_FP16:
+      case BTLA_ISA::AVX512_FP16:
         support |= _cd->AVX512_FP16();
         break;
-      case JblasAVX_VNNI:
+      case BTLA_ISA::AVX_VNNI:
         support |= _cd->AVX_VNNI();
         break;
       default:
@@ -94,11 +95,12 @@ static bool hasISA(const uint64_t* coreset, size_t len) {
   return support;
 }
 
-static inline bool samePackedWeight(jblas::storage::gemm::IWeightBase* ptr0, jblas::storage::gemm::IWeightBase* ptr1) {
+static inline bool samePackedWeight(bestla::storage::gemm::IWeightBase* ptr0,
+                                    bestla::storage::gemm::IWeightBase* ptr1) {
   return ptr0->mCoreId == ptr1->mCoreId && ptr0->mPrologueID == ptr1->mPrologueID;
 }
 
-static inline bool samePackedWeight(jblas::storage::gemm::IWeightBase** ptrs, size_t len) {
+static inline bool samePackedWeight(bestla::storage::gemm::IWeightBase** ptrs, size_t len) {
   bool sameKernel = samePackedWeight(ptrs[0], ptrs[1]);
   if (sameKernel) {
     for (size_t i = 2; i < len; i++) {
@@ -115,13 +117,13 @@ struct ParamAdd {
   _T *C, *D;
   int ldc, ldd;
 };
-template <JBLAS_ISA ISA_T, typename _T>
+template <BTLA_ISA ISA_T, typename _T>
 class Add {
  public:
   using Param = ParamAdd<_T>;
 
-  JBLAS_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
+                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
@@ -134,10 +136,10 @@ class Add {
         cptr[i * _param.ldc + j] = dptr[i * _param.ldd + j] + cacheptr[i * cachestep + j];
       }
     }
-    return JblasSuccess;
+    return BTLA_CODE::Success;
   }
 };
-template <JBLAS_ISA ISA_T>
+template <BTLA_ISA ISA_T>
 using AddFp32 = Add<ISA_T, float>;
 
 template <typename _T>
@@ -145,12 +147,12 @@ struct ParamMul {
   _T *C, *D;
   int ldc, ldd;
 };
-template <JBLAS_ISA ISA_T, typename _T>
+template <BTLA_ISA ISA_T, typename _T>
 class Mul {
  public:
   using Param = ParamMul<_T>;
-  JBLAS_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
+                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
@@ -160,10 +162,10 @@ class Mul {
         cptr[i * _param.ldc + j] = dptr[i * _param.ldd + j] * cacheptr[i * cachestep + j];
       }
     }
-    return JblasSuccess;
+    return BTLA_CODE::Success;
   }
 };
-template <JBLAS_ISA ISA_T>
+template <BTLA_ISA ISA_T>
 using MulFp32 = Mul<ISA_T, float>;
 
 template <typename _T>
@@ -171,11 +173,11 @@ struct ParamAdd_Gelu {
   _T *C, *D;
   int ldc, ldd;
 };
-template <JBLAS_ISA ISA_T, typename _T>
+template <BTLA_ISA ISA_T, typename _T>
 class Add_Gelu {
  public:
   using Param = ParamAdd_Gelu<_T>;
-  JBLAS_CODE forward(  // NOLINT [build/include_what_you_use]
+  BTLA_CODE forward(  // NOLINT [build/include_what_you_use]
       const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M, const int N,
       const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
@@ -184,18 +186,17 @@ class Add_Gelu {
     auto dptr = _param.D + DOffset;
     for (int i = 0; i < M; i++) {
       ne_vec_add_f32(N, cptr + i * _param.ldc, dptr + i * _param.ldd, cacheptr + i * cachestep);
-      // ne_vec_gelu_f32(N, cptr + i * _param.ldc, cptr + i * _param.ldc);
     }
-    using GeluKernel = jblas::epilogue::gemm::AccumulatorWriteBackWithGeluFp32<ISA_T>;
+    using GeluKernel = bestla::epilogue::gemm::AccumulatorWriteBackWithGeluFp32<ISA_T>;
     static GeluKernel ker;
     typename GeluKernel::Param param{_param.C, _param.ldc, NULL};
     auto ret = ker.forward(cptr, _param.ldc, M_offset, N_offset, M, N, param, tmpcache, cachesize);
     return ret;
   }
 };
-template <JBLAS_ISA ISA_T>
+template <BTLA_ISA ISA_T>
 using Add_GeluFp32 = Add_Gelu<ISA_T, float>;
 
 }  // namespace epilogue
 }  // namespace custom
-}  // namespace ne_jblas
+}  // namespace ne_bestla

@@ -13,10 +13,10 @@
 //  limitations under the License.
 #include "bestla_common.hpp"
 #include "bestla_gemm.h"
-using namespace jblas;     // NOLINT
-using namespace ne_jblas;  // NOLINT
+using namespace bestla;     // NOLINT
+using namespace ne_bestla;  // NOLINT
 
-void jblas_init() {
+void bestla_init() {
   GetCPUDevice();
   if (_cd->AMX_BF16() || _cd->AMX_INT8()) {
     utils::request_perm_xtile_data();
@@ -24,7 +24,7 @@ void jblas_init() {
   _cd->print();
 }
 
-void jblas_timer(bool _init) {
+void bestla_timer(bool _init) {
   static utils::timer<utils::microseconds> tr;
   if (_init)
     tr.start();
@@ -32,23 +32,23 @@ void jblas_timer(bool _init) {
     printf("time :%f us\n", tr.stop());
 }
 
-int jblas_set_threads(int _nth) {
-  ne_jblas::ne_threading::get()->set_threads(_nth);
-  return ne_jblas::ne_threading::get()->num_threads();
+int bestla_set_threads(int _nth) {
+  ne_bestla::ne_threading::get()->set_threads(_nth);
+  return ne_bestla::ne_threading::get()->num_threads();
 }
 
-void* jblas_get_thread_handle() { return ne_jblas::ne_threading::get(); }
+void* bestla_get_thread_handle() { return ne_bestla::ne_threading::get(); }
 
-void jblas_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld) {
-  JblasGemmUnPackB(fp32data, wptr, static_cast<size_t>(n), static_cast<size_t>(k), static_cast<size_t>(ld),
-                   ne_jblas::ne_threading::get());
+void bestla_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld) {
+  BTLAGemmUnPackB(fp32data, wptr, static_cast<size_t>(n), static_cast<size_t>(k), static_cast<size_t>(ld),
+                   ne_bestla::ne_threading::get());
 }
 
-void jblas_packweight_copyattr(const float* f32ptr, void* dstptr, int n, int k, int ld, void* srcptr) {
-  auto wtmp = jblas::storage::gemm::PackedWeightParser::deserialBuffer(srcptr);
+void bestla_packweight_copyattr(const float* f32ptr, void* dstptr, int n, int k, int ld, void* srcptr) {
+  auto wtmp = storage::gemm::PackedWeightParser::deserialBuffer(srcptr);
   if (wtmp != nullptr) {
     auto proID = wtmp->mPrologueID;
-    if (wtmp->mPrologueID != JBLAS_PROLOGUEB_IDS::WeightPack) {
+    if (wtmp->mPrologueID != BTLA_PROLOGUEB_IDS::WeightPack) {
       auto kwtmp = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(wtmp);
       auto coreID = wtmp->mCoreId;
       auto comptype = gemm::CoreAttr::get_comp(coreID);
@@ -63,7 +63,7 @@ void jblas_packweight_copyattr(const float* f32ptr, void* dstptr, int n, int k, 
       if (btype == gemm::CompType::tFP32) {
         ne_comptype = ne_comp_type::NE_COMP_F32;
       }
-      if (kwtmp->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger) {
+      if (kwtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
         auto niptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(kwtmp);
 
         JblasGemmQuantPackB(dstptr, f32ptr, n, k, ld, niptr->mBlockSize, niptr->mDType, niptr->SDtype(),

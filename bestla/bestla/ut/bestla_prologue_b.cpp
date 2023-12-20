@@ -382,7 +382,7 @@ class UT_StorageMemCheck {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = gemm::SCoreRowNAvx512f<48, 8>;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, BTLAAVX2>;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, BTLA_ISA::AVX2>;
     PrologueB ProWei;
 
     auto packedW = ProWei.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
@@ -430,7 +430,7 @@ class UT_ShuffleIndices {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = gemm::SCoreRowNAvx2<24, 4>;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, BTLAAVX2>;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, BTLA_ISA::AVX2>;
     PrologueB ProWei;
     auto packedW = ProWei.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
     ProWei.enableShuffle(&packedW);
@@ -1828,4 +1828,4 @@ static UT_CompFp16 sUT_CompFp16;
 #endif
 #endif
 }  // namespace ut
-}  // namespace jblas
+}  // namespace bestla

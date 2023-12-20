@@ -624,4 +624,4 @@ struct UT_GEMMData_Row_f32 {
 };
 
 };  // namespace ut
-}  // namespace jblas
+}  // namespace bestla

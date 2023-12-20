@@ -43,7 +43,7 @@ enum ne_type {
   NE_TYPE_I8,
   NE_TYPE_I16,
   NE_TYPE_I32,
-  NE_TYPE_JBLAS,
+  NE_TYPE_BTLA,
   NE_TYPE_COUNT,
 };
 
@@ -66,7 +66,7 @@ enum ne_ftype {
   NE_FTYPE_MOSTLY_Q8_0 = 7,           // except 1d tensors
   NE_FTYPE_MOSTLY_Q5_0 = 8,           // except 1d tensors
   NE_FTYPE_MOSTLY_Q5_1 = 9,           // except 1d tensors
-  NE_FTYPE_MOSTLY_Q_JBLAS = 10,       // except 1d tensors
+  NE_FTYPE_MOSTLY_Q_BTLA = 10,       // except 1d tensors
 };
 
 #define QK4_0 32

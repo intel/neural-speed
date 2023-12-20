@@ -24,8 +24,8 @@ class UT_ActivationBase {
     for (int i = 0; i < src.size(); i++) {
       src[i] = static_cast<BType>(i);
     }
-    prologue_a::gemm::ActivationBase<_T, BTLANoSIMD> reorderref;
-    prologue_a::gemm::ActivationBase<_T, BTLAAVX512F> reorderavx512;
+    prologue_a::gemm::ActivationBase<_T, BTLA_ISA::NoSIMD> reorderref;
+    prologue_a::gemm::ActivationBase<_T, BTLA_ISA::AVX512F> reorderavx512;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();
     int dststride = 0;
@@ -63,15 +63,15 @@ class UT_ActivationConverter {
     for (int i = 0; i < src.size(); i++) {
       src[i] = static_cast<SrcType>(float(i));
     }
-    prologue_a::gemm::ActivationConverter<_T, BTLANoSIMD, SRC_T> reorderref;
-    prologue_a::gemm::ActivationConverter<_T, BTLAAVX512F, SRC_T> reorderavx512;
+    prologue_a::gemm::ActivationConverter<_T, BTLA_ISA::NoSIMD, SRC_T> reorderref;
+    prologue_a::gemm::ActivationConverter<_T, BTLA_ISA::AVX512F, SRC_T> reorderavx512;
     auto dstptr = dstref.data();
     int dststride = 0;
     auto ret = reorderref.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
-    assert(ret == BTLASuccess);
+    assert(ret == BTLA_CODE::Success);
     dstptr = dst.data();
     ret = reorderavx512.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
-    assert(ret == BTLASuccess);
+    assert(ret == BTLA_CODE::Success);
     ut::buffer_error(dst.data(), dstref.data(), dst.size(), AType{0});
     aligned_vector<SrcType> revert(dst.size());
     for (size_t i = 0; i < revert.size(); i++) {
@@ -181,7 +181,7 @@ class UT_ActivationS8KBlockQuantize {
     q.resize(m * lda);
     kernel::ref::quantize_fp_s8_colblock(m, k, raw.data(), k, q.data(), lda, scales.data(), kcount, kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    prologue_a::gemm::ActivationF32KBlockQuantize<_T, BTLAAVX512F> actA;
+    prologue_a::gemm::ActivationF32KBlockQuantize<_T, BTLA_ISA::AVX512F> actA;
     auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
@@ -227,7 +227,7 @@ class UT_ShuffleActivationKblock {
       indices[i] = i % 2 == 0 ? (i + 1) == indices.size() ? i : i + 1 : i - 1;
     }
     for (int i = 0; i < src.size(); i++) src[i] = static_cast<_SRC_T>(i);
-    prologue_a::gemm::ShuffleActivationKBlockBase<GC, BTLANoSIMD, _SRC_T> kernel;
+    prologue_a::gemm::ShuffleActivationKBlockBase<GC, BTLA_ISA::NoSIMD, _SRC_T> kernel;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();
     int dststride = 0;
@@ -265,7 +265,7 @@ class UT_ShuffleActivationKblock {
     kernel::ref::shuffle_activation(raw_cp.data(), raw.data(), m, k, 0, 0, indices.data(), k, k);
     kernel::ref::quantize_fp_s8_colblock(m, k, raw.data(), k, q.data(), lda, scales.data(), kcount, kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    prologue_a::gemm::ShuffleActivationKBlockQuantize<GC, BTLANoSIMD, float> actA;
+    prologue_a::gemm::ShuffleActivationKBlockQuantize<GC, BTLA_ISA::NoSIMD, float> actA;
     auto quanAct = actA.createQuantStorage(m, k, kblock, hasreduce);
     auto reordAct = actA.createReorderStorage(m, k, kblock);
     avector<int8_t> bufA(quanAct.mSize + reordAct.mSize);
@@ -291,4 +291,4 @@ class UT_ShuffleActivationKblock {
 static UT_ShuffleActivationKblock sUT_ShuffleActivationKblock;
 #endif
 }  // namespace ut
-}  // namespace jblas
+}  // namespace bestla

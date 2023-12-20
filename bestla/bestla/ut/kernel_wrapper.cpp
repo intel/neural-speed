@@ -34,10 +34,10 @@ class UT_DecompressKBlockS4FP {
       s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
       s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
     }
-    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLAAVX512F, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::AVX512F, ST_T, S4_T>(
         s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLANoSIMD, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::NoSIMD, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
@@ -62,10 +62,10 @@ class UT_DecompressKBlockS4FP {
       s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
       s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
     }
-    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLANoSIMD, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::NoSIMD, ST_T, S4_T>(
         s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLAAVX2, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::AVX2, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
@@ -80,11 +80,11 @@ class UT_DecompressKBlockF4FP {
   UT_DecompressKBlockF4FP() {
     UT_START();
     CheckISA(AVX2);
-    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX2>(35, 48, 48, 48, 0, 12, 48);
-    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX2>(11, 48, 48, 48, 0, 20, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLA_ISA::AVX2>(35, 48, 48, 48, 0, 12, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLA_ISA::AVX2>(11, 48, 48, 48, 0, 20, 48);
     CheckISA(AVX512F);
-    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX512F>(35, 48, 48, 48, 0, 12, 48);
-    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX512F>(11, 48, 48, 48, 0, 20, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLA_ISA::AVX512F>(35, 48, 48, 48, 0, 12, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLA_ISA::AVX512F>(11, 48, 48, 48, 0, 20, 48);
   }
 
   template <typename T, int PACK_ROW, BTLA_DTYPE F4_T, BTLA_ISA ISA_T>
@@ -102,7 +102,7 @@ class UT_DecompressKBlockF4FP {
     }
     kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<ISA_T, T, F4_T>(
         f4_wei.data(), wei.data(), row, col, ld_src, ld_dst, scales.data(), k_offset, kblock, NPad, cache, CacheSize);
-    kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<BTLANoSIMD, T, F4_T>(
+    kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<BTLA_ISA::NoSIMD, T, F4_T>(
         f4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), k_offset, kblock, NPad, cache,
         CacheSize);
     ut::buffer_error(ref_wei.data(), wei.data(), wei.size(), T(0.01f));
@@ -129,9 +129,9 @@ class UT_PaddingInterleaveMN {
     aligned_vector<T_DST> dst(row_pad * col_pad), ref(row_pad * col_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLANoSIMD>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLAAVX512_FP16>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size());
   }
@@ -157,9 +157,9 @@ class UT_PaddingTransInterleaveMN {
     aligned_vector<T_DST> dst(col_pad * row_pad), ref(col_pad * row_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLANoSIMD>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLAAVX512_FP16>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size());
   }
@@ -186,9 +186,9 @@ class UT_RevertPaddingInterleaveMN {
       src[i] = static_cast<T>(i);
     }
     aligned_vector<T> reverted(row * col);
-    kernel::wrapper::PaddingInterleaveMN<NTile, PackRow>::template forward<BTLANoSIMD>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, PackRow>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), packed.data(), row, col, rowpad, colpad, col, rowpad);
-    kernel::wrapper::RevertPaddingInterleaveMN<NTile, PackRow>::template forward<BTLANoSIMD>(
+    kernel::wrapper::RevertPaddingInterleaveMN<NTile, PackRow>::template forward<BTLA_ISA::NoSIMD>(
         packed.data(), reverted.data(), row, col, rowpad, colpad, rowpad, col);
     ut::buffer_error(src.data(), reverted.data(), reverted.size());
   }
@@ -197,4 +197,4 @@ class UT_RevertPaddingInterleaveMN {
 static UT_RevertPaddingInterleaveMN sUT_RevertPaddingInterleaveMN;
 #endif
 }  // namespace ut
-}  // namespace jblas
+}  // namespace bestla

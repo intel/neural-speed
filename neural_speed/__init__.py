@@ -89,7 +89,7 @@ class Model:
         if use_ggml:
             quant_desc += "_ggml"
         else:
-            quant_desc += "_jblas_c" + compute_dtype
+            quant_desc += "_bestla_c" + compute_dtype
             if group_size == -1:
                 quant_desc += "_pc"
             else:

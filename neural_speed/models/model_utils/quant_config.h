@@ -83,10 +83,10 @@ static inline quant_sdtype parse_scale_dtype(std::string arg) {
 
 enum class quant_comp : int {
   ggml = 0,  // native
-  int8,      // jblas int8
-  fp32,      // jblas fp32
-  bf16,      // jblas bf16
-  fp16,      // jblas fp16
+  int8,      // bestla int8
+  fp32,      // bestla fp32
+  bf16,      // bestla bf16
+  fp16,      // bestla fp16
   count,
 };
 static inline quant_comp parse_compute_type(std::string arg, bool ggml_arg) {
@@ -154,7 +154,7 @@ static inline ne_type quant_params_to_type(const quant_params_internal& params) 
       }
     }
   } else {
-    return NE_TYPE_JBLAS;
+    return NE_TYPE_BTLA;
   }
   return NE_TYPE_F32;
 }

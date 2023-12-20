@@ -98,27 +98,27 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
-  const bool run_mha_reordered = model.layers[0].k_cache->type == NE_TYPE_JBLAS;
+  const bool run_mha_reordered = model.layers[0].k_cache->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
   if (run_mha_reordered) {
-    NE_ASSERT(("kv cache should be the same dtype", model.layers[0].v_cache->type == NE_TYPE_JBLAS));
+    NE_ASSERT(("kv cache should be the same dtype", model.layers[0].v_cache->type == NE_TYPE_BTLA));
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
         /* .heads_kv = */ num_kv_heads,
         /* .head_size = */ head_size,
-        /* .sl_q = */ N,  // Note: make sure that jblas reordered attn supports next token inference
+        /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_cached,
     };
 
-    NE_ASSERT(("jblas managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
-               jblas_reordered_attn_fp32_support(&attn_shape)));
+    NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
+               bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
         /* .heads_kv = */ static_cast<uint32_t>(num_kv_heads),
         /* .head_size = */ static_cast<uint32_t>(head_size),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
-    jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
@@ -231,12 +231,12 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
         {
           const auto k_cache = ne_view_3d(ctx0, model.layers[il].k_cache,  // tensor
                                           head_size, n_ctx, num_kv_heads,  // ne
-                                          0, 0,                            // nb (jblas managed)
+                                          0, 0,                            // nb (bestla managed)
                                           0);                              // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, key_layer, n_past, is_ring_full));
           const auto v_cache = ne_view_3d(ctx0, model.layers[il].v_cache,  // tensor
                                           head_size, n_ctx, num_kv_heads,  // ne
-                                          0, 0,                            // nb (jblas managed)
+                                          0, 0,                            // nb (bestla managed)
                                           0);                              // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, value_layer, n_past, is_ring_full));
         }
@@ -245,7 +245,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
         key_layer =                                                                       //
             ne_view_3d(ctx0, model.layers[il].k_cache,                                    // tensor
                        head_size, n_cached, num_kv_heads,                                 // ne
-                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,        // nb (jblas managed)
+                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,        // nb (bestla managed)
                        0);                                                                // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&key_layer->nb[0]) = kv_cache_info.k_layout;  // us nb0 for layout
         if (is_ring_full) {
@@ -258,7 +258,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
         value_layer =
             ne_view_3d(ctx0, model.layers[il].v_cache,                                      // tensor
                        n_cached, head_size, num_kv_heads,                                   // ne
-                       kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,   // nb (jblas managed)
+                       kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,   // nb (bestla managed)
                        0);                                                                  // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&value_layer->nb[0]) = kv_cache_info.v_layout;  // us nb0 for layout
 

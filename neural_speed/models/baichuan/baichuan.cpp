@@ -93,27 +93,27 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
-  const bool run_mha_reordered = model.layers[0].k_cache->type == NE_TYPE_JBLAS;
+  const bool run_mha_reordered = model.layers[0].k_cache->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
   if (run_mha_reordered) {
-    NE_ASSERT(("kv cache should be the same dtype", model.layers[0].v_cache->type == NE_TYPE_JBLAS));
+    NE_ASSERT(("kv cache should be the same dtype", model.layers[0].v_cache->type == NE_TYPE_BTLA));
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
         /* .heads_kv = */ n_head,
         /* .head_size = */ head_size,
-        /* .sl_q = */ N,  // Note: make sure that jblas reordered attn supports next token inference
+        /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_past + N,
     };
 
-    NE_ASSERT(("jblas managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
-               jblas_reordered_attn_fp32_support(&attn_shape)));
+    NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
+               bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
         /* .heads_kv = */ static_cast<uint32_t>(n_head),
         /* .head_size = */ static_cast<uint32_t>(head_size),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
-    jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
@@ -201,12 +201,12 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
         {
           const auto k_cache = ne_view_3d(ctx0, model.layers[il].k_cache,  // tensor
                                           head_size, n_ctx, n_head,        // ne
-                                          0, 0,                            // nb (jblas managed)
+                                          0, 0,                            // nb (bestla managed)
                                           0);                              // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, key_layer, n_past, false));
           const auto v_cache = ne_view_3d(ctx0, model.layers[il].v_cache,  // tensor
                                           head_size, n_ctx, n_head,        // ne
-                                          0, 0,                            // nb (jblas managed)
+                                          0, 0,                            // nb (bestla managed)
                                           0);                              // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, value_layer, n_past, false));
         }
@@ -215,14 +215,14 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
         key_layer =                                                                       //
             ne_view_3d(ctx0, model.layers[il].k_cache,                                    // tensor
                        head_size, n_past + N, n_head,                                     // ne
-                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,        // nb (jblas managed)
+                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,        // nb (bestla managed)
                        0);                                                                // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&key_layer->nb[0]) = kv_cache_info.k_layout;  // us nb0 for layout
 
         value_layer =                                                                       //
             ne_view_3d(ctx0, model.layers[il].v_cache,                                      // tensor
                        n_past + N, head_size, n_head,                                       // ne
-                       kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,   // nb (jblas managed)
+                       kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,   // nb (bestla managed)
                        0);                                                                  // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&value_layer->nb[0]) = kv_cache_info.v_layout;  // us nb0 for layout
 
@@ -246,7 +246,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
 
     // mlp.forward
     struct ne_tensor* mlp_output;
-    if (jblas_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
+    if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
                                              model.layers[il].ffn[2]->data, N, hidden_states->ne[0],
                                              model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
       mlp_output =

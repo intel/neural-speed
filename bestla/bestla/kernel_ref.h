@@ -33,7 +33,7 @@ static inline BTLA_CODE shuffle_activation(T* src, T* dst, int shuffle_m, int sh
       dst[i * dst_stride + j] = cur_src[i * src_stride + indices[k_offset + j]];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename T_SRC, typename T_DST = T_SRC>
@@ -53,7 +53,7 @@ static inline BTLA_CODE padding_interleave(const T_SRC* src_ptr, T_DST* dst_ptr,
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 // revert padding and interleave
@@ -76,7 +76,7 @@ static inline BTLA_CODE revert_padding_interleave(const T_SRC* src_ptr, T_DST* d
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 // M x N ===> M/MTile x N/colPack x MTile x colPack (leading dim stride = MTile * dst_stride)
@@ -98,7 +98,7 @@ static inline BTLA_CODE padding_trans_interleave(const T_SRC* src, T_DST* dst, i
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_DT, typename DST_DT>
@@ -117,7 +117,7 @@ static inline BTLA_CODE dt_cvt_2D_write_back(const void* raw_srcptr, void* raw_d
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _DST_T>
@@ -128,7 +128,7 @@ static inline BTLA_CODE dequan_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row, in
       dstptr[i * ld_dst + j] = static_cast<float>(srcptr[i * ld_src + j]) * scales[j];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE dequan_s8_bf16(int8_t* srcptr, uint16_t* dstptr, int row, int col, int ld_src, int ld_dst,
@@ -139,7 +139,7 @@ static inline BTLA_CODE dequan_s8_bf16(int8_t* srcptr, uint16_t* dstptr, int row
           utils::cast<float, utils::bf16>(static_cast<float>(srcptr[i * ld_src + j]) * scales[j]).x;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _T>
@@ -149,7 +149,7 @@ static inline BTLA_CODE transpose2d(const _T* srcptr, _T* dstptr, int row, int c
       dstptr[j + i * ld_dst] = srcptr[j * ld_src + i];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <int NTile>
@@ -163,7 +163,7 @@ static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstp
       dstptr[j * ld_dst / 2 + ii / 2] = tmp;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <int NTile>
@@ -177,7 +177,7 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
       dstptr[j * ld_dst / 2 + ii / 2] = tmp;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <int NTile>
@@ -191,7 +191,7 @@ static inline BTLA_CODE decompress_s4_f32(utils::int4x2* srcptr, float* dstptr, 
       dstptr[i * ld_dst + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scales[noffset + 1];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -282,7 +282,7 @@ inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row
       dstptr[i * ld_dst + j + 1] = get_s8<S4_T>(tmp.y);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 inline float f8_to_fp32(utils::f8 v, BTLA_DTYPE f8_t) {
@@ -324,7 +324,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
       dstptr[i * ld_dst + j] = fp_v * scale;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _DST_T, int _PACK_ROW, typename _S_T>
@@ -339,7 +339,7 @@ inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row
       dstptr[i * ld_dst + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW, typename _S_T>
@@ -370,7 +370,7 @@ inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, 
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T, typename _DST_T>
@@ -383,7 +383,7 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(static_cast<float>(get_s8<S4_T>(tmp.y)));
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename DST_T>
@@ -394,7 +394,7 @@ inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int ro
       dstptr[i * ld_dst + j] = static_cast<DST_T>(static_cast<float>(tmp));
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 inline float fp4_bnb_unpack(uint8_t val) {
@@ -665,7 +665,7 @@ inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, in
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE F4_T, typename _DST_T>
@@ -678,7 +678,7 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, _DST_T* ds
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(f4_unpack<F4_T>(tmp.y));
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _DST_T>
@@ -689,7 +689,7 @@ inline BTLA_CODE decompress_kblock_f8_fp_noscale(utils::f8* srcptr, _DST_T* dstp
       dstptr[i * ld_dst + j] = f8_to_fp32(srcptr[i * ld_src + j], src_f8_t);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE memcpy2d_dw2highw(const void* srcptr, void* dstptr, int row, int col, int srcstride,
@@ -702,7 +702,7 @@ static inline BTLA_CODE memcpy2d_dw2highw(const void* srcptr, void* dstptr, int 
                   bsrcptr + i * srcstride + j * sizeof(float) + 2, sizeof(utils::bf16));
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _SRC_T, typename _DST_T>
@@ -727,14 +727,14 @@ static inline BTLA_CODE memcpy2d(const _SRC_T* srcptr, _DST_T* dstptr, int row, 
       assert(0);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static float postop(float x, BTLA_ELTWISEOP op, void* const_elt_v) {
-  if (op == GELU) {
+  if (op == BTLA_ELTWISEOP::GELU) {
     return 0.5f * x * (1.f + tanhf(0.7978845834732056f * (x + 0.044714998453855515f * x * x * x)));
   }
-  if (op == SWISH) {
+  if (op == BTLA_ELTWISEOP::SWISH) {
     return x / (1 + exp(-x));
   }
   assert(0);
@@ -751,7 +751,7 @@ static inline BTLA_CODE memcpy2d_withop(const _SRC_T* srcptr, _DST_T* dstptr, in
       dstptr[(i * srcstride + j) / sizeof(_DST_T)] = v;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int row, int col, int srcstride,
@@ -766,7 +766,7 @@ static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int r
       f32_v[i * f32_stride + j] = std::pow(2, f8_v[i * f8_stride + j].x);
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -872,7 +872,7 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
     for (; j < align_row_loop; j += blocksize) dispatch_calc(blocksize);
     if (j < row) dispatch_calc(row - align_row_loop);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE F8_T>
@@ -951,7 +951,7 @@ inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, int8_t* d
     for (; j < align_row_loop; j += blocksize) f8_blk_quant(blocksize);
     if (j < row) f8_blk_quant(row - align_row_loop);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE F4_T>
@@ -996,7 +996,7 @@ inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, i
     for (; j < align_row_loop; j += blocksize) dispatch_calc(blocksize);
     if (j < row) dispatch_calc(row - align_row_loop);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -1057,7 +1057,7 @@ inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* srcptr, 
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -1102,7 +1102,7 @@ inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* srcptr, 
       if (reduce) reduce[j / blocksize + i * ld_scale] = sum * scale;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
@@ -1114,14 +1114,14 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
         dstptr[i * dststep + j] = alpha * srcptr[i * srcstep + j] + beta * src1ptr[i * src1step + j];
       }
     }
-    return BTLASuccess;
+    return BTLA_CODE::Success;
   }
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < N; j++) {
       dstptr[i * dststep + j] = alpha * srcptr[i * srcstep + j];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 template <typename SCA_T>
 static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* srcptr, const int srcstep, float* dstptr,
@@ -1136,7 +1136,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, float* dstptr, const int dststep,
@@ -1146,7 +1146,7 @@ static inline BTLA_CODE accum_f32_f32(const float* srcptr, const int srcstep, fl
       dstptr[i * dststep + j] = srcptr[i * srcstep + j] + dstptr[i * dststep + j];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr, const int srcstep, uint8_t* dstptr,
@@ -1159,7 +1159,7 @@ static inline BTLA_CODE quanout_s32_u32(const float alpha, const int32_t* srcptr
       dstptr[i * dststep + j] = utils::cast<float, uint8_t>(fsrc + static_cast<float>(zpDst));
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SCAB_T>
@@ -1173,7 +1173,7 @@ static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcste
       dstptr[i * dststep + j] = fsrc;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 inline BTLA_CODE minmax_f32_kblock(const float* srcptr, int row, int col, int ld_src, float* minmaxptr, int ld_minmax,
@@ -1202,7 +1202,7 @@ inline BTLA_CODE minmax_f32_kblock(const float* srcptr, int row, int col, int ld
       minmaxptr[i * ld_minmax + 1] = maxval;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, float* dstptr, float alpha, float beta,
@@ -1214,7 +1214,7 @@ static inline BTLA_CODE accumulate_dequantize_s32_f32(const int32_t* srcptr, flo
       dstptr[irow * ld_dst + icol] = scale * srcptr[irow * ld_src + icol] + beta * dstptr[irow * ld_dst + icol];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE broadcast_u8(int num, const uint8_t& srcval, uint8_t* dstptr) {
@@ -1222,7 +1222,7 @@ static inline BTLA_CODE broadcast_u8(int num, const uint8_t& srcval, uint8_t* ds
   for (; i < num; i++) {
     dstptr[i] = srcval;
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _RT>
@@ -1239,7 +1239,7 @@ static inline BTLA_CODE quant_s8_row_reduce_sum(const int8_t* srcptr, int ldsrc,
       }
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename _RT>
@@ -1251,7 +1251,7 @@ static inline BTLA_CODE row_reduce_sum(const float* srcptr, int ldsrc, int row, 
     }
     reduce[j] = static_cast<_RT>(tmp);
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 template <typename SRC_T>
@@ -1268,7 +1268,7 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
       reduce[i * ldr + j / blocksize] = tmp;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zps,
@@ -1279,7 +1279,7 @@ static inline BTLA_CODE remove_act_zeropoint_bias(float* accptr, int ldacc, int 
       accptr[i * ldacc + j] -= zpf * reduce[j];
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int row, int col, int8_t* zps,
@@ -1290,7 +1290,7 @@ static inline BTLA_CODE remove_wei_zeropoint_bias(float* accptr, int ldacc, int 
       accptr[i * ldacc + j] -= static_cast<float>(zps[j]) * scales[j] * reducef;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 
 static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row, int col, uint8_t* zpa, int8_t* zpb,
@@ -1306,7 +1306,7 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
       accptr[i * ldacc + j] -= zpaf * zpbf * k;
     }
   }
-  return BTLASuccess;
+  return BTLA_CODE::Success;
 }
 }  // namespace ref
 }  // namespace kernel

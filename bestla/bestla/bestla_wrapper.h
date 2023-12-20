@@ -475,4 +475,4 @@ class LauncherIntKBlock {
 };
 }  // namespace gemm
 }  // namespace wrapper
-}  // namespace jblas
+}  // namespace bestla

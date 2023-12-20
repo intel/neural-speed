@@ -15,7 +15,7 @@
 /*++
 Module Name:
 
-    jblas_gemm.h
+    bestla_gemm.h
 
 Abstract:
 
@@ -27,7 +27,7 @@ Abstract:
 #include "data_types.h"
 #include "bestla/bestla.h"
 
-struct JBLAS_GEMM_DATA_PACKED_PARAMS {
+struct BTLA_GEMM_DATA_PACKED_PARAMS {
   const float* A = nullptr; /**< address of A (float32 matrix)*/
   const void* B = nullptr;  /**< address of B (packed nbits blob)*/
   float* C = nullptr;       /**< address of result matrix */
@@ -35,21 +35,21 @@ struct JBLAS_GEMM_DATA_PACKED_PARAMS {
   int ldc = 0;              /**< leading dimension of C*/
 };
 
-size_t JblasGemmPackBSize(size_t N, size_t K, size_t BlkSize, JBLAS_DTYPE QuantType, JBLAS_DTYPE ScaleDtype,
+size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype,
                           bool isAsym, ne_comp_type CompType, int* shuffle_indice);
 
-bool JblasGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
-                         JBLAS_DTYPE QuantType, JBLAS_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType,
+bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
+                         BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType,
                          bool isTrans, void* ThreadPool);
 
 // QData:  K*N quantized int8 weight
 // Scales: K/BlkSize * N scales
 // Zp:     K/BlkSize * N zero points
-bool JblasGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N, size_t K,
-                    size_t ldb, size_t BlkSize, JBLAS_DTYPE QuantType, JBLAS_DTYPE ScaleDtype, bool isAsym,
+bool BTLAGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N, size_t K,
+                    size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
                     ne_comp_type CompType, int* shuffle_indice, void* ThreadPool);
 
-bool JblasGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, size_t ldb, void* ThreadPool);
+bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, size_t ldb, void* ThreadPool);
 
-bool JblasGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
-                          const JBLAS_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool);
+bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
+                          const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool);
