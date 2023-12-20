@@ -21,7 +21,7 @@
 
 #define OFFSET(field) offsetof(params, field)
 
-namespace jblas {
+namespace bestla {
 
 namespace xbyak {
 class JitBase : protected Xbyak::CodeGenerator {
@@ -300,4 +300,4 @@ inline void JitAmxint8::_tdpb<uint8_t, uint8_t>(const Xbyak::Tmm& x1, const Xbya
   tdpbuud(x1, x2, x3);
 }
 }  // namespace xbyak
-}  // namespace jblas
+}  // namespace bestla

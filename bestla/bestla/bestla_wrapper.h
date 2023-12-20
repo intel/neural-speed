@@ -20,15 +20,15 @@
 #include "bestla_prologue_b.h"
 #include "bestla_utils.h"
 
-namespace jblas {
+namespace bestla {
 namespace wrapper {
 namespace gemm {
-template <JBLAS_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, JBLAS_ISA> class _PrologueA_T,
-          template <class _T, JBLAS_ISA> class _PrologueB_T, template <JBLAS_ISA> class _Epilogue_T>
+template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
+          template <class _T, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
 class LauncherBase {
  public:
   using GemmCore = _GemmCore_T;
-  static constexpr JBLAS_ISA ISA = _RT_ISA_T;
+  static constexpr BTLA_ISA ISA = _RT_ISA_T;
   using PrologueA = _PrologueA_T<GemmCore, _RT_ISA_T>;
   using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
   using Epilogue = _Epilogue_T<_RT_ISA_T>;
@@ -114,13 +114,13 @@ class LauncherBase {
   }
 };
 
-template <JBLAS_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, JBLAS_ISA> class _PrologueA_T,
-          template <class _T, JBLAS_ISA> class _PrologueB_T, template <JBLAS_ISA> class _BlockEpilogue_T,
-          template <JBLAS_ISA> class _Epilogue_T>
+template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
+          template <class _T, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _BlockEpilogue_T,
+          template <BTLA_ISA> class _Epilogue_T>
 class LauncherKBlock {
  public:
   using GemmCore = _GemmCore_T;
-  static constexpr JBLAS_ISA ISA = _RT_ISA_T;
+  static constexpr BTLA_ISA ISA = _RT_ISA_T;
   using PrologueA = _PrologueA_T<GemmCore, _RT_ISA_T>;
   using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
   using Epilogue = _Epilogue_T<_RT_ISA_T>;
@@ -281,12 +281,12 @@ class LauncherKBlock {
   }
 };
 
-template <JBLAS_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, JBLAS_ISA> class _PrologueA_T,
-          template <class _T, JBLAS_ISA> class _PrologueB_T, template <JBLAS_ISA> class _Epilogue_T>
+template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
+          template <class _T, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
 class LauncherIntKBlock {
  public:
   using GemmCore = _GemmCore_T;
-  static constexpr JBLAS_ISA ISA = _RT_ISA_T;
+  static constexpr BTLA_ISA ISA = _RT_ISA_T;
   using PrologueA = _PrologueA_T<GemmCore, _RT_ISA_T>;
   using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
   using Epilogue = _Epilogue_T<_RT_ISA_T>;

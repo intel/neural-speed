@@ -23,16 +23,16 @@
 #include "bestla.h"
 #include "bestla_device.h"
 #include "bestla_utils.h"
-#include "jit_base.h"
+#include "bestla_jit.h"
 #include "kernel_jit_injector.h"
 
-namespace jblas {
+namespace bestla {
 namespace kernel {
 namespace jit {
 
 class DequanS8FP {
  public:
-  class MicroKernelAVX512F : protected jblas::xbyak::JitAvx512f {
+  class MicroKernelAVX512F : protected xbyak::JitAvx512f {
    public:
     struct params {
       void *srcptr, *dstptr;
@@ -46,15 +46,15 @@ class DequanS8FP {
     static int constexpr RegScale = 0;
     static int constexpr RegZP = 4;
     static int constexpr RegTmp = RegScale + 8;
-    MicroKernelAVX512F(JBLAS_DTYPE dst_dt, bool is_sym_, int pack_row) {
-      assert(dst_dt == JBLAS_DTYPE::F32 || dst_dt == JBLAS_DTYPE::BF16);
+    MicroKernelAVX512F(BTLA_DTYPE dst_dt, bool is_sym_, int pack_row) {
+      assert(dst_dt == BTLA_DTYPE::F32 || dst_dt == BTLA_DTYPE::BF16);
       is_sym = is_sym_;
       generate(dst_dt, pack_row);
       this->ready();
       mKernel = this->getCode<func_t>();
     }
 
-    void generate(JBLAS_DTYPE dst_dt, int pack_row) {
+    void generate(BTLA_DTYPE dst_dt, int pack_row) {
       assert(pack_row == 1 || pack_row == 2 || pack_row == 4);
       int scale_step = 64 / pack_row;
       Xbyak::Label data_label;
@@ -100,11 +100,11 @@ class DequanS8FP {
         }
 
         auto get_dst_step = [&] {
-          if (dst_dt == JBLAS_DTYPE::BF16) return 2;
+          if (dst_dt == BTLA_DTYPE::BF16) return 2;
           return 4;  // f32 case.
         };
 
-        auto generateNTile = [&](int N, JBLAS_DTYPE dst_dt, int scale_step, std::string row_label) {
+        auto generateNTile = [&](int N, BTLA_DTYPE dst_dt, int scale_step, std::string row_label) {
           if (pack_row == 2) {
             vmovups(Xbyak::Zmm(RegTmp), ptr[rip + data_label + 8]);
           } else if (pack_row == 4) {
@@ -130,10 +130,10 @@ class DequanS8FP {
             }
             vcvtdq2ps(Xbyak::Zmm(RegTmp), Xbyak::Zmm(RegTmp));
             vmulps(Xbyak::Zmm(RegTmp), Xbyak::Zmm(RegScale + i));
-            if (dst_dt == JBLAS_DTYPE::F32) {
+            if (dst_dt == BTLA_DTYPE::F32) {
               vmovups(ptr[reg_tmp1 + i * 64], Xbyak::Zmm(RegTmp));
             }
-            if (dst_dt == JBLAS_DTYPE::BF16) {
+            if (dst_dt == BTLA_DTYPE::BF16) {
               Xbyak::Ymm ymm_v = Xbyak::Ymm(RegTmp);
               Xbyak::Zmm zmm_v = Xbyak::Zmm(RegTmp);
               if (device::CpuDevice::getInstance()->AVX512_BF16()) {
@@ -229,8 +229,8 @@ class DequanS8FP {
   template <int PACK_ROW, typename _DST_T>
   static void forward_avx512f(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst, float* scales,
                               int8_t* zero_points) {
-    static MicroKernelAVX512F mAVX512FSym(utils::jblas_dtype<_DST_T>, true, PACK_ROW);
-    static MicroKernelAVX512F mAVX512FASym(utils::jblas_dtype<_DST_T>, false, PACK_ROW);
+    static MicroKernelAVX512F mAVX512FSym(utils::bestla_dtype<_DST_T>, true, PACK_ROW);
+    static MicroKernelAVX512F mAVX512FASym(utils::bestla_dtype<_DST_T>, false, PACK_ROW);
     auto param = MicroKernelAVX512F::params{srcptr,
                                             dstptr,
                                             row,
@@ -250,7 +250,7 @@ class DequanS8FP {
 class DequanKBlockS8Fp {
  public:
   template <int _PACK_ROW, typename _ST, typename _DST_T>
-  static inline JBLAS_CODE forward_avx512f(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
+  static inline BTLA_CODE forward_avx512f(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
                                            _ST* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
     int row0 = kblock - k_offset % kblock;
     row0 = row0 == kblock ? 0 : row0;
@@ -278,7 +278,7 @@ class DequanKBlockS8Fp {
     if (row2 > 0) {
       DequanS8FP::forward_avx512f<_PACK_ROW>(srcptr, dstptr, row2, col, ld_src, ld_dst, sptr, zptr);
     }
-    return JblasSuccess;
+    return BTLASuccess;
   }
 };
 
@@ -291,25 +291,25 @@ struct DataConvertConfig {
     FP32_TO_F16,
   };
 
-  DataConvertConfig(JBLAS_DTYPE src_t, JBLAS_DTYPE dst_t,
+  DataConvertConfig(BTLA_DTYPE src_t, BTLA_DTYPE dst_t,
                     std::vector<kernel::jit_injector::eltwise_injector> injectors) {
     input_dt = src_t;
     output_dt = dst_t;
     if (injectors.size() != 0) {
-      assert(src_t == JBLAS_DTYPE::F32 || src_t == JBLAS_DTYPE::BF16 || src_t == JBLAS_DTYPE::F16);
-      if (src_t == JBLAS_DTYPE::BF16) before_postop = DataConvertConfig::cvt_direct::BF16_TO_FP32;
-      if (src_t == JBLAS_DTYPE::F16) before_postop = DataConvertConfig::cvt_direct::F16_TO_FP32;
+      assert(src_t == BTLA_DTYPE::F32 || src_t == BTLA_DTYPE::BF16 || src_t == BTLA_DTYPE::F16);
+      if (src_t == BTLA_DTYPE::BF16) before_postop = DataConvertConfig::cvt_direct::BF16_TO_FP32;
+      if (src_t == BTLA_DTYPE::F16) before_postop = DataConvertConfig::cvt_direct::F16_TO_FP32;
     }
     // once contain postop, data_type before store will be fp32.
-    if (injectors.size() != 0 || src_t == JBLAS_DTYPE::F32) {
-      if (dst_t == JBLAS_DTYPE::BF16) before_store = DataConvertConfig::cvt_direct::FP32_TO_BF16;
-      if (dst_t == JBLAS_DTYPE::F16) {
+    if (injectors.size() != 0 || src_t == BTLA_DTYPE::F32) {
+      if (dst_t == BTLA_DTYPE::BF16) before_store = DataConvertConfig::cvt_direct::FP32_TO_BF16;
+      if (dst_t == BTLA_DTYPE::F16) {
         if (!device::CpuDevice::getInstance()->AVX512_FP16()) assert(0);
         before_store = DataConvertConfig::cvt_direct::FP32_TO_F16;
       }
-    } else if (src_t == JBLAS_DTYPE::BF16 && dst_t == JBLAS_DTYPE::F32) {
+    } else if (src_t == BTLA_DTYPE::BF16 && dst_t == BTLA_DTYPE::F32) {
       before_store = DataConvertConfig::cvt_direct::BF16_TO_FP32;
-    } else if (src_t == JBLAS_DTYPE::F16 && dst_t == JBLAS_DTYPE::F32) {
+    } else if (src_t == BTLA_DTYPE::F16 && dst_t == BTLA_DTYPE::F32) {
       assert(device::CpuDevice::getInstance()->AVX512_FP16());
       before_store = DataConvertConfig::cvt_direct::F16_TO_FP32;
     }
@@ -327,7 +327,7 @@ struct DataConvertConfig {
 
   cvt_direct before_postop = cvt_direct::NO_CVT;
   cvt_direct before_store = cvt_direct::NO_CVT;
-  JBLAS_DTYPE input_dt, output_dt;
+  BTLA_DTYPE input_dt, output_dt;
 };
 
 template <typename SIMD_REG>
@@ -338,7 +338,7 @@ struct MemcpyStoreParam {
   Xbyak::Opmask store_mask = Xbyak::util::k1;
 };
 
-class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
+class JitMemcpy2DAvx2 : protected xbyak::JitAvx2 {
  public:
   struct params {
     void *srcptr, *dstptr, *elt_const_v;
@@ -348,29 +348,29 @@ class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
 
  public:
   static int constexpr VBytes = 32;
-  JitMemcpy2DAvx2(int unroll_row, JBLAS_DTYPE src_t, JBLAS_DTYPE dst_t,
+  JitMemcpy2DAvx2(int unroll_row, BTLA_DTYPE src_t, BTLA_DTYPE dst_t,
                   std::vector<kernel::jit_injector::eltwise_injector> injectors = {}) {
     DataConvertConfig dt_cvt_cfg(src_t, dst_t, injectors);
     generate(unroll_row, injectors, dt_cvt_cfg);
   }
 
   template <typename _SRC_T, typename _DST_T>
-  static JBLAS_CODE forward(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
+  static BTLA_CODE forward(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
                             void* elt_const_v = nullptr) {
-    static JitMemcpy2DAvx2 instance_withops(1, utils::jblas_dtype<_SRC_T>, utils::jblas_dtype<_DST_T>);
+    static JitMemcpy2DAvx2 instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>);
     for (int i = 0; i < row; i++) {
       auto param = params{reinterpret_cast<char*>(const_cast<_SRC_T*>(srcptr)) + i * srcstep * sizeof(_SRC_T),
                           reinterpret_cast<char*>(dstptr) + i * dststep * sizeof(_DST_T), elt_const_v,
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  template <typename _SRC_T, typename _DST_T, JBLAS_ELTWISEOP Op>
-  static JBLAS_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
+  template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP Op>
+  static BTLA_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
                              void* elt_const_v = nullptr) {
-    static JitMemcpy2DAvx2 instance_withops(1, utils::jblas_dtype<_SRC_T>, utils::jblas_dtype<_DST_T>,
+    static JitMemcpy2DAvx2 instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>,
                                             {kernel::jit_injector::eltwise_injector(Op)});
     for (int i = 0; i < row; i++) {
       auto param = params{reinterpret_cast<char*>(const_cast<_SRC_T*>(srcptr)) + i * srcstep * sizeof(_SRC_T),
@@ -378,7 +378,7 @@ class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
  protected:
@@ -427,16 +427,16 @@ class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
 
       auto unpack_ymm_16bit_withfunc = [&](MemcpyStoreParam<Xbyak::Ymm> p,
                                            std::function<void(MemcpyStoreParam<Xbyak::Ymm>)> func,
-                                           JBLAS_DTYPE BIT16_DT) {
+                                           BTLA_DTYPE BIT16_DT) {
         vmovups(ymm_tmps[0], p.vmm_v);
         Xbyak::Ymm ymm_v = Xbyak::Ymm(p.vmm_v.getIdx());
-        if (BIT16_DT == JBLAS_DTYPE::BF16) {
+        if (BIT16_DT == BTLA_DTYPE::BF16) {
           vpmovzxwd(p.vmm_v, ymm_v);
           vpslld(p.vmm_v, p.vmm_v, 16);
         }
         func(p);
         vextractf128(Xbyak::Xmm(ymm_tmps[0].getIdx()), ymm_tmps[0], 1);
-        if (BIT16_DT == JBLAS_DTYPE::BF16) {
+        if (BIT16_DT == BTLA_DTYPE::BF16) {
           vpmovzxwd(ymm_tmps[0], Xbyak::Ymm(ymm_tmps[0].getIdx()));
           vpslld(ymm_tmps[0], ymm_tmps[0], 16);
         }
@@ -450,7 +450,7 @@ class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
         if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::NO_CVT) {
           store_ymm_v(p);
         } else if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::BF16_TO_FP32) {
-          unpack_ymm_16bit_withfunc(p, store_ymm_v, JBLAS_DTYPE::BF16);
+          unpack_ymm_16bit_withfunc(p, store_ymm_v, BTLA_DTYPE::BF16);
         } else if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::FP32_TO_BF16) {
           Xbyak::Xmm xmm_v = Xbyak::Xmm(p.vmm_v.getIdx());
           Xbyak::Xmm xmm_tmp = Xbyak::Xmm(ymm_tmps[1].getIdx());
@@ -478,7 +478,7 @@ class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
         if (dt_cvt_cfg.before_postop == DataConvertConfig::cvt_direct::NO_CVT) {
           apply_postop_and_store({ymm_v, store_addr});
         } else if (dt_cvt_cfg.before_postop == DataConvertConfig::cvt_direct::BF16_TO_FP32) {
-          unpack_ymm_16bit_withfunc({ymm_v, store_addr}, apply_postop_and_store, JBLAS_DTYPE::BF16);
+          unpack_ymm_16bit_withfunc({ymm_v, store_addr}, apply_postop_and_store, BTLA_DTYPE::BF16);
         } else {
           assert(0);
         }
@@ -548,7 +548,7 @@ class JitMemcpy2DAvx2 : protected jblas::xbyak::JitAvx2 {
   std::set<int> used_ymm_idx;
 };
 
-class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
+class JitMemcpy2DAvx512f : protected xbyak::JitAvx512f {
  public:
   struct params {
     void *srcptr, *dstptr, *elt_const_v;
@@ -558,16 +558,16 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
 
  public:
   static int constexpr VBytes = 64;
-  JitMemcpy2DAvx512f(int unroll_row, JBLAS_DTYPE src_t, JBLAS_DTYPE dst_t,
+  JitMemcpy2DAvx512f(int unroll_row, BTLA_DTYPE src_t, BTLA_DTYPE dst_t,
                      std::vector<kernel::jit_injector::eltwise_injector> injectors = {}) {
     DataConvertConfig dt_cvt_cfg(src_t, dst_t, injectors);
     generate(unroll_row, injectors, dt_cvt_cfg);
   }
 
   template <typename _SRC_T, typename _DST_T>
-  static JBLAS_CODE forward(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
+  static BTLA_CODE forward(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
                             void* elt_const_v = nullptr) {
-    static JitMemcpy2DAvx512f instance_withops(1, utils::jblas_dtype<_SRC_T>, utils::jblas_dtype<_DST_T>);
+    static JitMemcpy2DAvx512f instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>);
 
     for (int i = 0; i < row; i++) {
       auto param = params{reinterpret_cast<char*>(const_cast<_SRC_T*>(srcptr)) + i * srcstep * sizeof(_SRC_T),
@@ -575,13 +575,13 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  template <typename _SRC_T, typename _DST_T, JBLAS_ELTWISEOP Op>
-  static JBLAS_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
+  template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP Op>
+  static BTLA_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
                              void* elt_const_v = nullptr) {
-    static JitMemcpy2DAvx512f instance_withops(1, utils::jblas_dtype<_SRC_T>, utils::jblas_dtype<_DST_T>,
+    static JitMemcpy2DAvx512f instance_withops(1, utils::bestla_dtype<_SRC_T>, utils::bestla_dtype<_DST_T>,
                                                {kernel::jit_injector::eltwise_injector(Op)});
     for (int i = 0; i < row; i++) {
       auto param = params{reinterpret_cast<char*>(const_cast<_SRC_T*>(srcptr)) + i * srcstep * sizeof(_SRC_T),
@@ -589,7 +589,7 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
                           static_cast<int>(col * sizeof(_SRC_T))};
       instance_withops.mKernel(&param);
     }
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
  protected:
@@ -633,22 +633,22 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
 
       auto unpack_zmm_16bit_withfunc = [&](MemcpyStoreParam<Xbyak::Zmm> p,
                                            std::function<void(MemcpyStoreParam<Xbyak::Zmm>)> func,
-                                           JBLAS_DTYPE BIT16_DT) {
+                                           BTLA_DTYPE BIT16_DT) {
         vmovups(zmm_tmps[0], p.vmm_v);
         Xbyak::Ymm ymm_v = Xbyak::Ymm(p.vmm_v.getIdx());
-        if (BIT16_DT == JBLAS_DTYPE::BF16) {
+        if (BIT16_DT == BTLA_DTYPE::BF16) {
           vpmovzxwd(p.vmm_v, ymm_v);
           vpslld(p.vmm_v, p.vmm_v, 16);
         }
-        if (BIT16_DT == JBLAS_DTYPE::F16) vcvtph2psx(p.vmm_v, ymm_v);
+        if (BIT16_DT == BTLA_DTYPE::F16) vcvtph2psx(p.vmm_v, ymm_v);
         p.store_mask = k3;
         func(p);
         vextractf32x8(Xbyak::Ymm(zmm_tmps[0].getIdx()), zmm_tmps[0], 1);
-        if (BIT16_DT == JBLAS_DTYPE::BF16) {
+        if (BIT16_DT == BTLA_DTYPE::BF16) {
           vpmovzxwd(zmm_tmps[0], Xbyak::Ymm(zmm_tmps[0].getIdx()));
           vpslld(zmm_tmps[0], zmm_tmps[0], 16);
         }
-        if (BIT16_DT == JBLAS_DTYPE::F16) vcvtph2psx(zmm_tmps[0], Xbyak::Ymm(zmm_tmps[0].getIdx()));
+        if (BIT16_DT == BTLA_DTYPE::F16) vcvtph2psx(zmm_tmps[0], Xbyak::Ymm(zmm_tmps[0].getIdx()));
         p.vmm_v = zmm_tmps[0];
         p.store_addr = p.store_addr + VBytes;
         p.store_mask = k4;
@@ -660,9 +660,9 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
         if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::NO_CVT) {
           store_zmm_v(p);
         } else if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::BF16_TO_FP32) {
-          unpack_zmm_16bit_withfunc(p, store_zmm_v, JBLAS_DTYPE::BF16);
+          unpack_zmm_16bit_withfunc(p, store_zmm_v, BTLA_DTYPE::BF16);
         } else if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::F16_TO_FP32) {
-          unpack_zmm_16bit_withfunc(p, store_zmm_v, JBLAS_DTYPE::F16);
+          unpack_zmm_16bit_withfunc(p, store_zmm_v, BTLA_DTYPE::F16);
         } else if (dt_cvt_cfg.before_store == DataConvertConfig::cvt_direct::FP32_TO_BF16) {
           Xbyak::Ymm ymm_v = Xbyak::Ymm(p.vmm_v.getIdx());
           if (device::CpuDevice::getInstance()->AVX512_BF16()) {
@@ -704,9 +704,9 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
         if (dt_cvt_cfg.before_postop == DataConvertConfig::cvt_direct::NO_CVT) {
           apply_postop_and_store({zmm_v, store_addr, tail});
         } else if (dt_cvt_cfg.before_postop == DataConvertConfig::cvt_direct::BF16_TO_FP32) {
-          unpack_zmm_16bit_withfunc({zmm_v, store_addr, tail}, apply_postop_and_store, JBLAS_DTYPE::BF16);
+          unpack_zmm_16bit_withfunc({zmm_v, store_addr, tail}, apply_postop_and_store, BTLA_DTYPE::BF16);
         } else if (dt_cvt_cfg.before_postop == DataConvertConfig::cvt_direct::F16_TO_FP32) {
-          unpack_zmm_16bit_withfunc({zmm_v, store_addr, tail}, apply_postop_and_store, JBLAS_DTYPE::F16);
+          unpack_zmm_16bit_withfunc({zmm_v, store_addr, tail}, apply_postop_and_store, BTLA_DTYPE::F16);
         } else {
           assert(0);
         }
@@ -737,7 +737,7 @@ class JitMemcpy2DAvx512f : protected jblas::xbyak::JitAvx512f {
         int vbytes = VBytes;
         // consider a case that input==bf16 but apply postop, betore sotre will be fp32_to_bf16 but need to normal gen
         // mask.
-        if (dt_cvt_cfg.input_dt == JBLAS_DTYPE::F32) {
+        if (dt_cvt_cfg.input_dt == BTLA_DTYPE::F32) {
           shr(reg_iter, 1);
           shr(reg_size, 1);
           vbytes /= 2;
@@ -806,7 +806,7 @@ static inline Xbyak::Zmm unpack_4bit_2regs(Xbyak::CodeGenerator* jit, Xbyak::Ymm
   return dst;
 }
 
-class DecompressS4S8_AVX512F : protected jblas::xbyak::JitAvx512f {
+class DecompressS4S8_AVX512F : protected xbyak::JitAvx512f {
  public:
   struct params {
     void *srcptr, *dstptr;
@@ -878,24 +878,24 @@ class DecompressS4S8_AVX512F : protected jblas::xbyak::JitAvx512f {
     mKernel = this->getCode<func_t>();
   }
 
-  static JBLAS_CODE forward(void* srcptr, void* dstptr, size_t size) {
+  static BTLA_CODE forward(void* srcptr, void* dstptr, size_t size) {
     static DecompressS4S8_AVX512F instance;
     auto param = params{srcptr, dstptr, size};
     instance.mKernel(&param);
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
  private:
   func_t mKernel = nullptr;
 };
 
-static inline JBLAS_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src,
+static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src,
                                           int ld_dst) {
   if (col != ld_src) {  // memory is not continuous
-    return JblasNotSupport;
+    return BTLANotSupport;
   }
   DecompressS4S8_AVX512F::forward(srcptr, dstptr, (size_t)row * col);
-  return JblasSuccess;
+  return BTLASuccess;
 }
 
 // src: row x col => dst: ⌈col/n_tile⌉ x ⌈row/row_pack⌉ x n_tile x row_pack (zeor-padded)
@@ -919,11 +919,11 @@ class PaddingInterleaveCvt : protected xbyak::JitAvx512f {
       12, 28, 13, 29, 14, 30, 15, 31,  //
   };
 
-  PaddingInterleaveCvt(int n_tile, JBLAS_DTYPE dst_t) : PaddingInterleaveCvt(n_tile, dst_t, dst_t) {}
-  PaddingInterleaveCvt(int n_tile, JBLAS_DTYPE dst_t, JBLAS_DTYPE src_t, int row_pack = 0) : xbyak::JitAvx512f() {
+  PaddingInterleaveCvt(int n_tile, BTLA_DTYPE dst_t) : PaddingInterleaveCvt(n_tile, dst_t, dst_t) {}
+  PaddingInterleaveCvt(int n_tile, BTLA_DTYPE dst_t, BTLA_DTYPE src_t, int row_pack = 0) : xbyak::JitAvx512f() {
     inLocalLabel();  // use local label for multiple instance
-    const auto src_bytes = static_cast<int>(utils::jblas_dtype_size(src_t));
-    const auto dst_bytes = static_cast<int>(utils::jblas_dtype_size(dst_t));
+    const auto src_bytes = static_cast<int>(utils::bestla_dtype_size(src_t));
+    const auto dst_bytes = static_cast<int>(utils::bestla_dtype_size(dst_t));
     if (row_pack == 0) row_pack = 4 / dst_bytes;  // default value
     const auto ne_zmm = 64 / std::max(src_bytes, dst_bytes);
     const auto src_bytes_vmm = ne_zmm * src_bytes;
@@ -1004,7 +1004,7 @@ class PaddingInterleaveCvt : protected xbyak::JitAvx512f {
           vmovdqu32(reg_srcs_ii | mask_rd | T_z, ptr[reg_tmp1 + ii * reg_srcstride + jj * src_bytes]);
         }
       }
-      if (src_t == JBLAS_DTYPE::F32 && dst_t == JBLAS_DTYPE::BF16) {
+      if (src_t == BTLA_DTYPE::F32 && dst_t == BTLA_DTYPE::BF16) {
         vcvtne2ps2bf16(reg_tmps[0], reg_srcs[1], reg_srcs[0]);
         vpermt2w(reg_tmps[0], vreg_idx0, reg_tmps[0]);
         vmovups(ptr[reg_tmp + jj * row_pack * dst_bytes], reg_tmps[0]);
@@ -1048,7 +1048,7 @@ class PaddingInterleaveCvt : protected xbyak::JitAvx512f {
       } else {
         assert(false);
       }
-      if (src_t == JBLAS_DTYPE::F32 && dst_t == JBLAS_DTYPE::BF16) {
+      if (src_t == BTLA_DTYPE::F32 && dst_t == BTLA_DTYPE::BF16) {
         vcvtne2ps2bf16(reg_tmps[0], reg_srcs[1], reg_srcs[0]);
         vpermt2w(reg_tmps[0], vreg_idx0, reg_tmps[0]);
         vmovups(ptr[reg_tmp + jj * row_pack * dst_bytes], reg_tmps[0]);
@@ -1077,7 +1077,7 @@ class PaddingInterleaveCvt : protected xbyak::JitAvx512f {
     const auto src_stride = static_cast<int>(sizeof(T_SRC)) * src_step;
     const auto dst_stride = static_cast<int>(sizeof(T_DST)) * dst_step;
     params param = {src, dst, row, col, src_stride, dst_stride};
-    static const PaddingInterleaveCvt kern(NTile, utils::jblas_dtype<T_DST>, utils::jblas_dtype<T_SRC>, RowPack);
+    static const PaddingInterleaveCvt kern(NTile, utils::bestla_dtype<T_DST>, utils::bestla_dtype<T_SRC>, RowPack);
     kern(&param);
 
     // extra row and col pad
@@ -1122,11 +1122,11 @@ class PaddingTransInterleaveCvt : protected xbyak::JitAvx512f {
   const int trans_cell;  // transpose matrices of size trans_cellxtrans_cell (in terms of #elements or #packs)
 
  private:
-  PaddingTransInterleaveCvt(int m_tile, JBLAS_DTYPE dst_t) : PaddingTransInterleaveCvt(m_tile, dst_t, dst_t) {}
-  PaddingTransInterleaveCvt(int m_tile, JBLAS_DTYPE dst_t, JBLAS_DTYPE src_t, int col_pack = 0)
-      : xbyak::JitAvx512f(), trans_cell(64 / col_pack / int(utils::jblas_dtype_size(dst_t))) {
-    const auto src_bytes = static_cast<int>(utils::jblas_dtype_size(src_t));
-    const auto dst_bytes = static_cast<int>(utils::jblas_dtype_size(dst_t));
+  PaddingTransInterleaveCvt(int m_tile, BTLA_DTYPE dst_t) : PaddingTransInterleaveCvt(m_tile, dst_t, dst_t) {}
+  PaddingTransInterleaveCvt(int m_tile, BTLA_DTYPE dst_t, BTLA_DTYPE src_t, int col_pack = 0)
+      : xbyak::JitAvx512f(), trans_cell(64 / col_pack / int(utils::bestla_dtype_size(dst_t))) {
+    const auto src_bytes = static_cast<int>(utils::bestla_dtype_size(src_t));
+    const auto dst_bytes = static_cast<int>(utils::bestla_dtype_size(dst_t));
     if (col_pack == 0) col_pack = 4 / dst_bytes;  // default value
     // const auto src_bytes_vmm = ne_zmm * src_bytes;
     // const auto dst_bytes_vmm = ne_zmm * dst_bytes;
@@ -1191,7 +1191,7 @@ class PaddingTransInterleaveCvt : protected xbyak::JitAvx512f {
 
     L(".colloop");
     generate_Nbitsmask(mask_rd, reg_itercol, ptr[reg_colsize], reg_tmp2, reg_tmp3, 64 / dst_bytes);
-    if (src_t == JBLAS_DTYPE::F32 && dst_t == JBLAS_DTYPE::BF16) {
+    if (src_t == BTLA_DTYPE::F32 && dst_t == BTLA_DTYPE::BF16) {
       kshiftrq(mask_rd2, mask_rd, 16);
       assert(trans_cell == 16);
       for (int ii = 0; ii < trans_cell; ++ii) {
@@ -1234,7 +1234,7 @@ class PaddingTransInterleaveCvt : protected xbyak::JitAvx512f {
       auto& tailcolloop = l_tail_case[m_tail];
       L(tailcolloop);
       generate_Nbitsmask(mask_rd, reg_itercol, ptr[reg_colsize], reg_tmp2, reg_tmp3, 64 / dst_bytes);
-      if (src_t == JBLAS_DTYPE::F32 && dst_t == JBLAS_DTYPE::BF16) {
+      if (src_t == BTLA_DTYPE::F32 && dst_t == BTLA_DTYPE::BF16) {
         kshiftrq(mask_rd2, mask_rd, 16);
         assert(trans_cell == 16);
         for (int ii = 0; ii < trans_cell; ++ii) {
@@ -1276,7 +1276,7 @@ class PaddingTransInterleaveCvt : protected xbyak::JitAvx512f {
                       int dst_step) {
     assert(utils::padto(row, MTile) <= row_pad && row_pad % MTile == 0);
     assert(utils::padto(col, ColPack) <= col_pad && col_pad % ColPack == 0);
-    static const PaddingTransInterleaveCvt kern(MTile, utils::jblas_dtype<T_DST>, utils::jblas_dtype<T_SRC>, ColPack);
+    static const PaddingTransInterleaveCvt kern(MTile, utils::bestla_dtype<T_DST>, utils::bestla_dtype<T_SRC>, ColPack);
     // 0-padded guarantee by jit kern
     const auto kern_row_pad = utils::padto(row, kern.trans_cell),
                kern_col_pad = utils::padto(col, kern.trans_cell * ColPack);
@@ -1481,4 +1481,4 @@ class CScaleInterleavedBF16FP16 : protected xbyak::JitAvx512_fp16 {
 
 }  // namespace jit
 }  // namespace kernel
-}  // namespace jblas
+}  // namespace BTLA

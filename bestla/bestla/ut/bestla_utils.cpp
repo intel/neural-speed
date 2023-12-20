@@ -1,6 +1,4 @@
 
-namespace jblas {
-namespace ut {
-
-}  // namespace ut
-}  // namespace jblas
+namespace bestla {
+namespace ut {}  // namespace ut
+}  // namespace bestla

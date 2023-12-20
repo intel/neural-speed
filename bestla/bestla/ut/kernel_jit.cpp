@@ -1,7 +1,7 @@
 #include "kernel_jit.h"
 #include "kernel_ut.h"
 
-namespace jblas {
+namespace bestla {
 using namespace utils;
 namespace ut {
 class UT_Memcpy2D_AVX512F {
@@ -61,10 +61,10 @@ class UT_Memcpy2D_AVX512F {
     tper = tm.stop() / TestLoop;
     printf("Ref Time: %f us\n", tper);
     printf("Bandwidth: %f GB/s\n", tsize / tper / 1000);
-    jblas::ut::buffer_error<float>(dstref.data(), dst.data(), dstref.size());
+    ut::buffer_error<float>(dstref.data(), dst.data(), dstref.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_Memcpy2D_AVX512F sUT_Memcpy2D_AVX512F;
 #endif
 
@@ -88,10 +88,10 @@ class UT_Memcpy2D_AVX2 {
         src.data(),         //
         dstref.data(),      //
         row, col * sizeof(src[0]), srcstep * sizeof(src[0]), dststep * sizeof(src[0]));
-    jblas::ut::buffer_error<float>(dstref.data(), dst.data(), dstref.size());
+    ut::buffer_error<float>(dstref.data(), dst.data(), dstref.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_Memcpy2D_AVX2 sUT_Memcpy2D_AVX2;
 #endif
 
@@ -140,10 +140,10 @@ class UT_PaddngInterleaveCvt {
     const auto t_ref = tm.stop() / TestLoop;
     printf("Ref Time: %f us\n", t_ref);
     printf("Bandwidth: %f GB/s\n", data_size / t_ref / 1000);
-    jblas::ut::buffer_error<T_DST>(dst_ref.data(), dst.data(), dst_ref.size());
+    ut::buffer_error<T_DST>(dst_ref.data(), dst.data(), dst_ref.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_PaddngInterleaveCvt sUT_Pading_InterleaveCvt;
 #endif
 
@@ -191,10 +191,10 @@ class UT_PaddingTransInterleaveCvt {
     const auto t_ref = tm.stop() / TestLoop;
     printf("Ref Time: %f us\n", t_ref);
     printf("Bandwidth: %f GB/s\n", data_size / t_ref / 1000);
-    jblas::ut::buffer_error<T_DST>(dst_ref.data(), dst.data(), dst_ref.size());
+    ut::buffer_error<T_DST>(dst_ref.data(), dst.data(), dst_ref.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_PaddingTransInterleaveCvt sUT_PaddingTransInterleaveCvt;
 #endif
 
@@ -226,11 +226,11 @@ class UT_CScaleInterleavedBF16FP16 {
     kernel::jit::CScaleInterleavedBF16FP16::reference<NTile, RowPack>(  //
         data_ref.data(), scale.data(), rows, cols, src_step, n_offset);
 
-    jblas::ut::buffer_error<utils::bf16>(data.data(), data_ref.data(), data.size());
+    ut::buffer_error<utils::bf16>(data.data(), data_ref.data(), data.size());
     printf("\n");
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_CScaleInterleavedBF16FP16 sUT_CScaleInterleavedBF16FP16;
 #endif
 
@@ -264,10 +264,10 @@ class UT_DeQuant {
                                                           test.scales.data(), nullptr, 0, row * 2, col);
     kernel::jit::DequanS8FP::forward_avx512f<PACK_ROW>(test.data(), tar.data(), row, col, col, col, test.scales.data(),
                                                        nullptr);
-    jblas::ut::buffer_error<DST_T>(ref.data(), tar.data(), ref.size());
+    ut::buffer_error<DST_T>(ref.data(), tar.data(), ref.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_DeQuant sUT_DeQuant;
 #endif
 
@@ -288,13 +288,13 @@ class UT_DecompressS4S8 {
     ut::fill_buffer_randn(src8.data(), src8.size(), int8_t(-128), int8_t(127));
     kernel::ref::compress_s8_s4<48>(src8.data(), src.data(), row, col, col, col);
     aligned_vector<int8_t> ref(row * col), tar(row * col);
-    kernel::ref::decompress_s4_s8<JBLAS_DTYPE::S4_CLIP>(src.data(), ref.data(), row, col, col, col);
+    kernel::ref::decompress_s4_s8<BTLA_DTYPE::S4_CLIP>(src.data(), ref.data(), row, col, col, col);
     kernel::jit::decompress_s4_s8(src.data(), tar.data(), row, col, col, col);
-    jblas::ut::buffer_error<int8_t>(ref.data(), tar.data(), ref.size());
+    ut::buffer_error<int8_t>(ref.data(), tar.data(), ref.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_JIT
+#ifdef BTLA_UT_KERNEL_JIT
 static UT_DecompressS4S8 sUT_DecompressS4S8;
 #endif
 }  // namespace ut
-}  // namespace jblas
+}  // namespace bestla

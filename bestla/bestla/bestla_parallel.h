@@ -21,7 +21,7 @@
 #include "bestla_utils.h"
 #include "bestla_device.h"
 
-namespace jblas {
+namespace bestla {
 namespace parallel {
 struct Config2D {
   int threads;

@@ -12,12 +12,11 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
-#include "jit_base.h"
 #include "bestla.h"
 #include "bestla_gemm.h"
 #include "bestla_utils.h"
 
-namespace jblas {
+namespace bestla {
 namespace storage {
 
 constexpr size_t Alignment = 64;
@@ -154,7 +153,7 @@ class ObjectQuantCorrection : public ISerialObject {
  public:
   size_t mCSize = 0;
   int mCStep = 0;
-  JBLAS_DTYPE mScaT = JBLAS_DTYPE::F32, mZpT = JBLAS_DTYPE::F32, mRedT = JBLAS_DTYPE::F32;
+  BTLA_DTYPE mScaT = BTLA_DTYPE::F32, mZpT = BTLA_DTYPE::F32, mRedT = BTLA_DTYPE::F32;
   ObjectAlignedBuffer<Alignment> mScaleBuf;
   ObjectOptionalBuffer<Alignment> mZpBuf, mRedBuf;
 
@@ -162,7 +161,7 @@ class ObjectQuantCorrection : public ISerialObject {
  public:
   int mScaEleSize = 0, mZpEleSize = 0, mRedEleSize = 0;
 
-  size_t resize(int Rows, int Step, JBLAS_DTYPE scalet, JBLAS_DTYPE zpt, JBLAS_DTYPE redt, bool _is_asym,
+  size_t resize(int Rows, int Step, BTLA_DTYPE scalet, BTLA_DTYPE zpt, BTLA_DTYPE redt, bool _is_asym,
                 bool _has_reduce) {
     mScaT = scalet;
     mZpT = zpt;
@@ -199,16 +198,16 @@ class ObjectQuantCorrection : public ISerialObject {
   }
   virtual void deserializeBuffer(int8_t*& rptr, bool locate_buf) override {
     if (!locate_buf) {
-      mScaT = utils::deserialize<JBLAS_DTYPE>(rptr);
-      mZpT = utils::deserialize<JBLAS_DTYPE>(rptr);
-      mRedT = utils::deserialize<JBLAS_DTYPE>(rptr);
+      mScaT = utils::deserialize<BTLA_DTYPE>(rptr);
+      mZpT = utils::deserialize<BTLA_DTYPE>(rptr);
+      mRedT = utils::deserialize<BTLA_DTYPE>(rptr);
       updateSize();
       mCStep = utils::deserialize<int>(rptr);
       mCSize = utils::deserialize<size_t>(rptr);
     } else {
-      utils::serialize<JBLAS_DTYPE>(rptr, mScaT);
-      utils::serialize<JBLAS_DTYPE>(rptr, mZpT);
-      utils::serialize<JBLAS_DTYPE>(rptr, mRedT);
+      utils::serialize<BTLA_DTYPE>(rptr, mScaT);
+      utils::serialize<BTLA_DTYPE>(rptr, mZpT);
+      utils::serialize<BTLA_DTYPE>(rptr, mRedT);
       utils::serialize<int>(rptr, mCStep);
       utils::serialize<size_t>(rptr, mCSize);
     }
@@ -219,9 +218,9 @@ class ObjectQuantCorrection : public ISerialObject {
 
  protected:
   inline void updateSize() {
-    mScaEleSize = int(utils::jblas_dtype_size(mScaT));
-    mZpEleSize = int(utils::jblas_dtype_size(mZpT));
-    mRedEleSize = int(utils::jblas_dtype_size(mRedT));
+    mScaEleSize = int(utils::bestla_dtype_size(mScaT));
+    mZpEleSize = int(utils::bestla_dtype_size(mZpT));
+    mRedEleSize = int(utils::bestla_dtype_size(mRedT));
   }
 
   inline constexpr size_t getMiscSize() {
@@ -237,9 +236,9 @@ class ObjectQuantCorrection : public ISerialObject {
 
 class IWeightBase : public storage::ISerializable {
  public:
-  JBLAS_PROLOGUEB_IDS mPrologueID = JBLAS_PROLOGUEB_IDS::Undef;
+  BTLA_PROLOGUEB_IDS mPrologueID = BTLA_PROLOGUEB_IDS::Undef;
   uint64_t mCoreId = 0;
-  JBLAS_DTYPE mDType = JBLAS_DTYPE::F32;
+  BTLA_DTYPE mDType = BTLA_DTYPE::F32;
   int mNPad = 0, mKPad = 0;
   int mN = 0, mK = 0;
 
@@ -249,7 +248,7 @@ class IWeightBase : public storage::ISerializable {
   static constexpr inline size_t offset() { return sizeof(mSize); }
 
  protected:
-  void resize(int NPad, int KPad, int N, int K, JBLAS_DTYPE dtype) {
+  void resize(int NPad, int KPad, int N, int K, BTLA_DTYPE dtype) {
     mNPad = NPad;
     mKPad = KPad;
     mN = N;
@@ -273,21 +272,21 @@ class IWeightBase : public storage::ISerializable {
   virtual void deserializeBuffer(int8_t*& rptr, bool map_buf) {
     ISerializable::deserializeBuffer(rptr, map_buf);
     if (!map_buf) {
-      mPrologueID = utils::deserialize<JBLAS_PROLOGUEB_IDS>(rptr);
+      mPrologueID = utils::deserialize<BTLA_PROLOGUEB_IDS>(rptr);
       mCoreId = utils::deserialize<uint64_t>(rptr);
       mNPad = utils::deserialize<int>(rptr);
       mKPad = utils::deserialize<int>(rptr);
       mN = utils::deserialize<int>(rptr);
       mK = utils::deserialize<int>(rptr);
-      mDType = utils::deserialize<JBLAS_DTYPE>(rptr);
+      mDType = utils::deserialize<BTLA_DTYPE>(rptr);
     } else {
-      utils::serialize<JBLAS_PROLOGUEB_IDS>(rptr, mPrologueID);
+      utils::serialize<BTLA_PROLOGUEB_IDS>(rptr, mPrologueID);
       utils::serialize<uint64_t>(rptr, mCoreId);
       utils::serialize<int>(rptr, mNPad);
       utils::serialize<int>(rptr, mKPad);
       utils::serialize<int>(rptr, mN);
       utils::serialize<int>(rptr, mK);
-      utils::serialize<JBLAS_DTYPE>(rptr, mDType);
+      utils::serialize<BTLA_DTYPE>(rptr, mDType);
     }
   }
 
@@ -308,7 +307,7 @@ class IWeightKBlockBase : public IWeightBase {
  public:
   int mBlockSize = 1;
   IWeightKBlockBase(uint64_t _id) : IWeightBase(_id) {}
-  void resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE dtype) {
+  void resize(int NPad, int KPad, int Block, int N, int K, BTLA_DTYPE dtype) {
     IWeightBase::resize(NPad, KPad, N, K, dtype);
     mBlockSize = Block;
   }
@@ -341,9 +340,9 @@ class IWeightKBlockBase : public IWeightBase {
 
 class IActivationBase : public storage::ISerializable {
  public:
-  JBLAS_PROLOGUEB_IDS mPrologueID = JBLAS_PROLOGUEB_IDS::Undef;
+  BTLA_PROLOGUEB_IDS mPrologueID = BTLA_PROLOGUEB_IDS::Undef;
   uint64_t mCoreId = 0;
-  JBLAS_DTYPE mDType = JBLAS_DTYPE::F32;
+  BTLA_DTYPE mDType = BTLA_DTYPE::F32;
   int mMPad = 0, mKPad = 0;
   int mM = 0, mK = 0;
 
@@ -353,7 +352,7 @@ class IActivationBase : public storage::ISerializable {
   static constexpr inline size_t offset() { return sizeof(mSize); }
 
  protected:
-  void resize(int NPad, int KPad, int N, int K, JBLAS_DTYPE dtype) {
+  void resize(int NPad, int KPad, int N, int K, BTLA_DTYPE dtype) {
     mMPad = NPad;
     mKPad = KPad;
     mM = N;
@@ -377,21 +376,21 @@ class IActivationBase : public storage::ISerializable {
   virtual void deserializeBuffer(int8_t*& rptr, bool map_buf) {
     ISerializable::deserializeBuffer(rptr, map_buf);
     if (!map_buf) {
-      mPrologueID = utils::deserialize<JBLAS_PROLOGUEB_IDS>(rptr);
+      mPrologueID = utils::deserialize<BTLA_PROLOGUEB_IDS>(rptr);
       mCoreId = utils::deserialize<uint64_t>(rptr);
       mMPad = utils::deserialize<int>(rptr);
       mKPad = utils::deserialize<int>(rptr);
       mM = utils::deserialize<int>(rptr);
       mK = utils::deserialize<int>(rptr);
-      mDType = utils::deserialize<JBLAS_DTYPE>(rptr);
+      mDType = utils::deserialize<BTLA_DTYPE>(rptr);
     } else {
-      utils::serialize<JBLAS_PROLOGUEB_IDS>(rptr, mPrologueID);
+      utils::serialize<BTLA_PROLOGUEB_IDS>(rptr, mPrologueID);
       utils::serialize<uint64_t>(rptr, mCoreId);
       utils::serialize<int>(rptr, mMPad);
       utils::serialize<int>(rptr, mKPad);
       utils::serialize<int>(rptr, mM);
       utils::serialize<int>(rptr, mK);
-      utils::serialize<JBLAS_DTYPE>(rptr, mDType);
+      utils::serialize<BTLA_DTYPE>(rptr, mDType);
     }
   }
 
@@ -412,7 +411,7 @@ class IActivationKBlockBase : public IActivationBase {
  public:
   int mBlockSize = 1;
   IActivationKBlockBase(uint64_t _id) : IActivationBase(_id) {}
-  void resize(int MPad, int KPad, int Block, int N, int K, JBLAS_DTYPE dtype) {
+  void resize(int MPad, int KPad, int Block, int N, int K, BTLA_DTYPE dtype) {
     IActivationBase::resize(MPad, KPad, N, K, dtype);
     mBlockSize = Block;
   }
@@ -446,11 +445,11 @@ class IActivationKBlockBase : public IActivationBase {
 class StoragePackedWeight : public IWeightBase {
  public:
   ObjectAlignedBuffer<Alignment> mWBuf;
-  StoragePackedWeight(uint64_t _id) : IWeightBase(_id) { mPrologueID = JBLAS_PROLOGUEB_IDS::WeightPack; }
+  StoragePackedWeight(uint64_t _id) : IWeightBase(_id) { mPrologueID = BTLA_PROLOGUEB_IDS::WeightPack; }
 
-  size_t resize(int NPad, int KPad, int N, int K, JBLAS_DTYPE dtype) {
+  size_t resize(int NPad, int KPad, int N, int K, BTLA_DTYPE dtype) {
     IWeightBase::resize(NPad, KPad, N, K, dtype);
-    auto bsize = static_cast<size_t>(NPad) * KPad * jblas::utils::jblas_dtype_size(dtype);
+    auto bsize = static_cast<size_t>(NPad) * KPad * utils::bestla_dtype_size(dtype);
     mWBuf.resize(bsize);
     mSize = IWeightBase::getSerializedSize() + mWBuf.getSerializedSize();
     mSize = utils::padto(mSize, Alignment);
@@ -483,12 +482,12 @@ class StorageReduce : public ISerializable {
   using CorrectionType = ObjectQuantCorrection;
   int m = 0, k = 0, lda = 0, kblock = 1;
   ObjectAlignedBuffer<Alignment> mRedBuf;
-  size_t resize(int _m, int _k, int _kblock, JBLAS_DTYPE redt) {
+  size_t resize(int _m, int _k, int _kblock, BTLA_DTYPE redt) {
     kblock = _kblock;
     m = _m;
     k = _k;
     lda = utils::updiv(_k, _kblock);
-    size_t bufsize = static_cast<size_t>(m) * lda * utils::jblas_dtype_size(redt);
+    size_t bufsize = static_cast<size_t>(m) * lda * utils::bestla_dtype_size(redt);
     mRedBuf.resize(bufsize);
     mSize = getSerializedSize();
     mSize = utils::padto(mSize, Alignment);
@@ -555,11 +554,11 @@ class StorageReduce : public ISerializable {
 class StorageReorderActivation : public IActivationKBlockBase {
  public:
   ObjectAlignedBuffer<Alignment> mABuf;
-  StorageReorderActivation(uint64_t _id) : IActivationKBlockBase(_id) { mPrologueID = JBLAS_PROLOGUEB_IDS::WeightPack; }
+  StorageReorderActivation(uint64_t _id) : IActivationKBlockBase(_id) { mPrologueID = BTLA_PROLOGUEB_IDS::WeightPack; }
 
-  size_t resize(int MPad, int KPad, int M, int K, int KBlock, JBLAS_DTYPE dtype) {
+  size_t resize(int MPad, int KPad, int M, int K, int KBlock, BTLA_DTYPE dtype) {
     IActivationKBlockBase::resize(MPad, KPad, KBlock, M, K, dtype);
-    auto bsize = static_cast<size_t>(MPad) * KPad * jblas::utils::jblas_dtype_size(dtype);
+    auto bsize = static_cast<size_t>(MPad) * KPad * utils::bestla_dtype_size(dtype);
     mABuf.resize(bsize);
     mSize = IActivationKBlockBase::getSerializedSize() + mABuf.getSerializedSize();
     mSize = utils::padto(mSize, Alignment);
@@ -593,14 +592,14 @@ class StorageQuantActivation : public IActivationKBlockBase {
   CorrectionType mCorrection;
   ObjectAlignedBuffer<Alignment> mQBuf;
   StorageQuantActivation(uint64_t _id = 0) : IActivationKBlockBase(_id) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightPack;
+    mPrologueID = BTLA_PROLOGUEB_IDS::WeightPack;
   }
 
-  size_t resize(int _mpad, int _kpad, int _m, int _k, int _kblock, JBLAS_DTYPE buft, JBLAS_DTYPE scalet,
-                JBLAS_DTYPE zpt, JBLAS_DTYPE redt, bool is_asym, bool has_reduce) {
+  size_t resize(int _mpad, int _kpad, int _m, int _k, int _kblock, BTLA_DTYPE buft, BTLA_DTYPE scalet,
+                BTLA_DTYPE zpt, BTLA_DTYPE redt, bool is_asym, bool has_reduce) {
     IActivationKBlockBase::resize(_mpad, _kpad, _kblock, _m, _k, buft);
     mCorrection.resize(_mpad, utils::updiv(_kpad, _kblock), scalet, zpt, redt, is_asym, has_reduce);
-    size_t bufsize = static_cast<size_t>(_mpad) * _kpad * utils::jblas_dtype_size(buft);
+    size_t bufsize = static_cast<size_t>(_mpad) * _kpad * utils::bestla_dtype_size(buft);
     mQBuf.resize(bufsize);
     mSize = getSerializedSize();
     mSize = utils::padto(mSize, Alignment);
@@ -626,9 +625,9 @@ class StorageQuantActivation : public IActivationKBlockBase {
     return mCorrection.mRedBuf.get<QT_T>();
   }
 
-  inline constexpr JBLAS_DTYPE RDtype() { return mCorrection.mRedT; }
-  inline constexpr JBLAS_DTYPE ZDtype() { return mCorrection.mZpT; }
-  inline constexpr JBLAS_DTYPE SDtype() { return mCorrection.mScaT; }
+  inline constexpr BTLA_DTYPE RDtype() { return mCorrection.mRedT; }
+  inline constexpr BTLA_DTYPE ZDtype() { return mCorrection.mZpT; }
+  inline constexpr BTLA_DTYPE SDtype() { return mCorrection.mScaT; }
   inline constexpr bool IsAsym() { return mCorrection.mZpBuf.mNotEmpty; }
   inline constexpr bool HasReduce() { return mCorrection.mRedBuf.mNotEmpty; }
   inline constexpr size_t CSize() { return mCorrection.mCSize; }
@@ -680,20 +679,20 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
   CorrectionType mCorrection;
   ObjectOptionalBuffer<Alignment> mShuffleIndices;
   StorageWeightKBlockNInteger(uint64_t _type) : IWeightKBlockBase(_type) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger;
+    mPrologueID = BTLA_PROLOGUEB_IDS::WeightKBlockNInteger;
   }
 
-  size_t resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE qtype, JBLAS_DTYPE scalet, JBLAS_DTYPE redt,
+  size_t resize(int NPad, int KPad, int Block, int N, int K, BTLA_DTYPE qtype, BTLA_DTYPE scalet, BTLA_DTYPE redt,
                 bool IsAsym) {
-    JBLAS_DTYPE zpt = JBLAS_DTYPE::S8;
+    BTLA_DTYPE zpt = BTLA_DTYPE::S8;
     InfoType::resize(NPad, KPad, Block, N, K, qtype);
-    auto bits = utils::jblas_dtype_bits(qtype);
+    auto bits = utils::bestla_dtype_bits(qtype);
     auto elesize = static_cast<size_t>(NPad) * KPad;
     auto bytes = utils::updiv(elesize * bits, 8);  // add 3bits, 5btis, 7bits size calculation here
     mQBuf.resize(bytes);
     int nk_scale = utils::updiv(KPad, Block);
-    auto gemm_comp = jblas::gemm::CoreAttr::get_comp(mCoreId);
-    auto is_cint = jblas::gemm::CompTypeHelper::is_integer(gemm_comp);
+    auto gemm_comp = bestla::gemm::CoreAttr::get_comp(mCoreId);
+    auto is_cint = bestla::gemm::CompTypeHelper::is_integer(gemm_comp);
     mCorrection.resize(nk_scale, NPad, scalet, zpt, redt, IsAsym, is_cint);
     update_size();
     return mSize;
@@ -705,9 +704,9 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
     update_size();
   }
 
-  inline constexpr JBLAS_DTYPE RDtype() { return mCorrection.mRedT; }
-  inline constexpr JBLAS_DTYPE ZDtype() { return mCorrection.mZpT; }
-  inline constexpr JBLAS_DTYPE SDtype() { return mCorrection.mScaT; }
+  inline constexpr BTLA_DTYPE RDtype() { return mCorrection.mRedT; }
+  inline constexpr BTLA_DTYPE ZDtype() { return mCorrection.mZpT; }
+  inline constexpr BTLA_DTYPE SDtype() { return mCorrection.mScaT; }
   inline constexpr bool IsAsym() { return mCorrection.mZpBuf.mNotEmpty; }
   inline constexpr bool HasReduce() { return mCorrection.mRedBuf.mNotEmpty; }
   inline constexpr size_t CSize() { return mCorrection.mCSize; }
@@ -771,18 +770,18 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
 class StorageWeightKBlockNFloat : public StorageWeightKBlockNInteger {
  public:
   StorageWeightKBlockNFloat(uint64_t _type) : StorageWeightKBlockNInteger(_type) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightKBlockNFloat;
+    mPrologueID = BTLA_PROLOGUEB_IDS::WeightKBlockNFloat;
   }
 
-  size_t resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE ftype, JBLAS_DTYPE scalet) {
+  size_t resize(int NPad, int KPad, int Block, int N, int K, BTLA_DTYPE ftype, BTLA_DTYPE scalet) {
     StorageWeightKBlockNInteger::InfoType::resize(NPad, KPad, Block, N, K, ftype);
-    auto bits = utils::jblas_dtype_bits(ftype);
+    auto bits = utils::bestla_dtype_bits(ftype);
     auto elesize = static_cast<size_t>(NPad) * KPad;
     auto bytes = utils::updiv(elesize * bits, 8);  // add fp6 size calculation here
     StorageWeightKBlockNInteger::mQBuf.resize(bytes);
     int nk_scale = utils::updiv(KPad, Block);
-    StorageWeightKBlockNInteger::mCorrection.resize(nk_scale, NPad, scalet, JBLAS_DTYPE::EleBitsUndef,
-                                                    JBLAS_DTYPE::EleBitsUndef, false, false);
+    StorageWeightKBlockNInteger::mCorrection.resize(nk_scale, NPad, scalet, BTLA_DTYPE::EleBitsUndef,
+                                                    BTLA_DTYPE::EleBitsUndef, false, false);
     mSize = StorageWeightKBlockNInteger::InfoType::getSerializedSize() +
             StorageWeightKBlockNInteger::mQBuf.getSerializedSize() +
             StorageWeightKBlockNInteger::mCorrection.getSerializedSize();
@@ -801,17 +800,17 @@ class PackedWeightParser {
     rptr += IWeightBase::offset();
     int mProID = utils::deserialize<int>(rptr);
     IWeightBase* ptr = NULL;
-    if (mProID >= int(JBLAS_PROLOGUEB_IDS::Begin) && mProID < int(JBLAS_PROLOGUEB_IDS::End)) {
+    if (mProID >= int(BTLA_PROLOGUEB_IDS::Begin) && mProID < int(BTLA_PROLOGUEB_IDS::End)) {
       rptr = reinterpret_cast<int8_t*>(serialized_buf);
-      auto type = static_cast<JBLAS_PROLOGUEB_IDS>(mProID);
+      auto type = static_cast<BTLA_PROLOGUEB_IDS>(mProID);
       switch (type) {
-        case JBLAS_PROLOGUEB_IDS::WeightPack:
+        case BTLA_PROLOGUEB_IDS::WeightPack:
           ptr = new gemm::StoragePackedWeight(0);
           break;
         case JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger:
           ptr = new gemm::StorageWeightKBlockNInteger(0);
           break;
-        case JBLAS_PROLOGUEB_IDS::WeightKBlockNFloat:
+        case BTLA_PROLOGUEB_IDS::WeightKBlockNFloat:
           ptr = new gemm::StorageWeightKBlockNFloat(0);
           break;
         default:

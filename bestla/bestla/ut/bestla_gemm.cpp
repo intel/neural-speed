@@ -2,7 +2,7 @@
 #include "bestla_utils.h"
 #include "bestla_ut.h"
 
-namespace jblas {
+namespace bestla {
 using namespace utils;
 
 template <int NTILE>
@@ -1114,4 +1114,4 @@ class UT_GEMM_AMXINT8 {
 static UT_GEMM_AMXINT8 sUT_GEMM_AMXINT8;
 #endif
 }  // namespace ut
-}  // namespace jblas
+}  // namespace bestla

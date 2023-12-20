@@ -26,7 +26,7 @@
 #include "bestla_utils.h"
 #include "xbyak/xbyak.h"
 
-namespace jblas {
+namespace bestla {
 namespace kernel {
 namespace jit_injector {
 using Zmm = Xbyak::Zmm;
@@ -34,7 +34,7 @@ using Ymm = Xbyak::Ymm;
 using Xmm = Xbyak::Xmm;
 class eltwise_injector {
  public:
-  eltwise_injector(JBLAS_ELTWISEOP eltwiseop) : elt_op(eltwiseop) { reigster_table_entries(); }
+  eltwise_injector(BTLA_ELTWISEOP eltwiseop) : elt_op(eltwiseop) { reigster_table_entries(); }
   virtual ~eltwise_injector() {}
 
   void assign_resources(Xbyak::CodeGenerator* ptr, const std::set<int>& used_zmm_idx, const Xbyak::Reg64& table_reg,
@@ -136,9 +136,9 @@ class eltwise_injector {
 
     static constexpr std::array<float, 3> exp_approx_f32_coeff{0.35815147f, 0.96963238f, 1.f};
     static const table_t low_precision_exp_consts{
-        {low_precision_exp_const_v0, {jblas::utils::bit_cast<uint32_t>(exp_approx_f32_coeff[0]), true}},
-        {low_precision_exp_const_v1, {jblas::utils::bit_cast<uint32_t>(exp_approx_f32_coeff[1]), true}},
-        {low_precision_exp_const_v2, {jblas::utils::bit_cast<uint32_t>(exp_approx_f32_coeff[2]), true}},
+        {low_precision_exp_const_v0, {utils::bit_cast<uint32_t>(exp_approx_f32_coeff[0]), true}},
+        {low_precision_exp_const_v1, {utils::bit_cast<uint32_t>(exp_approx_f32_coeff[1]), true}},
+        {low_precision_exp_const_v2, {utils::bit_cast<uint32_t>(exp_approx_f32_coeff[2]), true}},
     };
 
     static const table_t exp_consts{{exp_log2ef, {0x3fb8aa3b, true}},
@@ -425,7 +425,7 @@ class eltwise_injector {
     };
 
     struct need_t {
-      explicit need_t(JBLAS_ELTWISEOP& op) {
+      explicit need_t(BTLA_ELTWISEOP& op) {
         if (op == EXP) exp_ = true;
         if (op == TANH) tanh_ = true;
         if (op == GELU) gelu_ = true;
@@ -835,7 +835,7 @@ class eltwise_injector {
   }
 
  private:
-  JBLAS_ELTWISEOP elt_op;
+  BTLA_ELTWISEOP elt_op;
   Xbyak::CodeGenerator* h = nullptr;
 
   /*labels*/
@@ -927,4 +927,4 @@ class eltwise_injector {
 };
 }  // namespace jit_injector
 }  // namespace kernel
-}  // namespace jblas
+}  // namespace bestla

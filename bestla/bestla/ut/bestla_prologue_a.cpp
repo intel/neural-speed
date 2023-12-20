@@ -2,7 +2,7 @@
 #include "bestla_ut.h"
 #include "kernel_avx512f.h"
 
-namespace jblas {
+namespace bestla {
 using namespace utils;
 namespace ut {
 class UT_ActivationBase {
@@ -24,8 +24,8 @@ class UT_ActivationBase {
     for (int i = 0; i < src.size(); i++) {
       src[i] = static_cast<BType>(i);
     }
-    jblas::prologue_a::gemm::ActivationBase<_T, JblasNoSIMD> reorderref;
-    jblas::prologue_a::gemm::ActivationBase<_T, JblasAVX512F> reorderavx512;
+    prologue_a::gemm::ActivationBase<_T, BTLANoSIMD> reorderref;
+    prologue_a::gemm::ActivationBase<_T, BTLAAVX512F> reorderavx512;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();
     int dststride = 0;
@@ -37,7 +37,7 @@ class UT_ActivationBase {
     }
   }
 };
-#ifdef JBLAS_UT_PROLOGUE_A
+#ifdef BTLA_UT_PROLOGUE_A
 static UT_ActivationBase sUT_ActivationBase;
 #endif
 
@@ -63,15 +63,15 @@ class UT_ActivationConverter {
     for (int i = 0; i < src.size(); i++) {
       src[i] = static_cast<SrcType>(float(i));
     }
-    jblas::prologue_a::gemm::ActivationConverter<_T, JblasNoSIMD, SRC_T> reorderref;
-    jblas::prologue_a::gemm::ActivationConverter<_T, JblasAVX512F, SRC_T> reorderavx512;
+    prologue_a::gemm::ActivationConverter<_T, BTLANoSIMD, SRC_T> reorderref;
+    prologue_a::gemm::ActivationConverter<_T, BTLAAVX512F, SRC_T> reorderavx512;
     auto dstptr = dstref.data();
     int dststride = 0;
     auto ret = reorderref.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
-    assert(ret == JblasSuccess);
+    assert(ret == BTLASuccess);
     dstptr = dst.data();
     ret = reorderavx512.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
-    assert(ret == JblasSuccess);
+    assert(ret == BTLASuccess);
     ut::buffer_error(dst.data(), dstref.data(), dst.size(), AType{0});
     aligned_vector<SrcType> revert(dst.size());
     for (size_t i = 0; i < revert.size(); i++) {
@@ -84,7 +84,7 @@ class UT_ActivationConverter {
     buffer_error_2d(src.data(), revert.data(), m, k, lda, kpad);
   }
 };
-#ifdef JBLAS_UT_PROLOGUE_A
+#ifdef BTLA_UT_PROLOGUE_A
 static UT_ActivationConverter sUT_ActivationConverter;
 #endif
 
@@ -114,7 +114,7 @@ class UT_ActivationU8KBlockQuantize {
   template <typename _T>
   void ut(int m, int k, int lda, int kblock, bool hasreduce = false) {
     int kpad = padto(k, _T::KTILE);
-    printf("Test Case core:%s: %d %d %d %d %d reduce:%d\n", jblas::gemm::CoreAttr::to_str(_T::ID), m, k, lda, kblock,
+    printf("Test Case core:%s: %d %d %d %d %d reduce:%d\n", gemm::CoreAttr::to_str(_T::ID), m, k, lda, kblock,
            kpad, hasreduce);
     int kcount = updiv(kpad, kblock);
     utils::aligned_vector<float> raw(m * lda), scales(m * kcount);
@@ -126,7 +126,7 @@ class UT_ActivationU8KBlockQuantize {
 
     kernel::ref::quantize_fp_u8_colblock(m, k, raw.data(), lda, q.data(), lda, scales.data(), kcount, zp.data(), kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    jblas::prologue_a::gemm::ActivationF32KBlockQuantize<_T, _T::ISA> actA;
+    prologue_a::gemm::ActivationF32KBlockQuantize<_T, _T::ISA> actA;
     auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
@@ -149,7 +149,7 @@ class UT_ActivationU8KBlockQuantize {
     }
   }
 };
-#ifdef JBLAS_UT_PROLOGUE_A
+#ifdef BTLA_UT_PROLOGUE_A
 static UT_ActivationU8KBlockQuantize sUT_ActivationU8KBlockQuantize;
 #endif
 
@@ -181,7 +181,7 @@ class UT_ActivationS8KBlockQuantize {
     q.resize(m * lda);
     kernel::ref::quantize_fp_s8_colblock(m, k, raw.data(), k, q.data(), lda, scales.data(), kcount, kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    jblas::prologue_a::gemm::ActivationF32KBlockQuantize<_T, JblasAVX512F> actA;
+    prologue_a::gemm::ActivationF32KBlockQuantize<_T, BTLAAVX512F> actA;
     auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
@@ -201,7 +201,7 @@ class UT_ActivationS8KBlockQuantize {
     }
   }
 };
-#ifdef JBLAS_UT_PROLOGUE_A
+#ifdef BTLA_UT_PROLOGUE_A
 static UT_ActivationS8KBlockQuantize sUT_ActivationS8KBlockQuantize;
 #endif
 
@@ -227,7 +227,7 @@ class UT_ShuffleActivationKblock {
       indices[i] = i % 2 == 0 ? (i + 1) == indices.size() ? i : i + 1 : i - 1;
     }
     for (int i = 0; i < src.size(); i++) src[i] = static_cast<_SRC_T>(i);
-    jblas::prologue_a::gemm::ShuffleActivationKBlockBase<GC, JblasNoSIMD, _SRC_T> kernel;
+    prologue_a::gemm::ShuffleActivationKBlockBase<GC, BTLANoSIMD, _SRC_T> kernel;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();
     int dststride = 0;
@@ -265,7 +265,7 @@ class UT_ShuffleActivationKblock {
     kernel::ref::shuffle_activation(raw_cp.data(), raw.data(), m, k, 0, 0, indices.data(), k, k);
     kernel::ref::quantize_fp_s8_colblock(m, k, raw.data(), k, q.data(), lda, scales.data(), kcount, kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    jblas::prologue_a::gemm::ShuffleActivationKBlockQuantize<GC, JblasNoSIMD, float> actA;
+    prologue_a::gemm::ShuffleActivationKBlockQuantize<GC, BTLANoSIMD, float> actA;
     auto quanAct = actA.createQuantStorage(m, k, kblock, hasreduce);
     auto reordAct = actA.createReorderStorage(m, k, kblock);
     avector<int8_t> bufA(quanAct.mSize + reordAct.mSize);
@@ -287,7 +287,7 @@ class UT_ShuffleActivationKblock {
     }
   }
 };
-#ifdef JBLAS_UT_PROLOGUE_A
+#ifdef BTLA_UT_PROLOGUE_A
 static UT_ShuffleActivationKblock sUT_ShuffleActivationKblock;
 #endif
 }  // namespace ut

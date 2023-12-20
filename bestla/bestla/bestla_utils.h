@@ -72,7 +72,7 @@
 #include <immintrin.h>
 #endif
 
-namespace jblas {
+namespace bestla {
 namespace utils {
 
 template <typename T2, typename T1>
@@ -243,15 +243,15 @@ struct GemmProblem {
 };
 
 template <typename T>
-inline constexpr JBLAS_DTYPE jblas_dtype = std::is_same_v<T, double>        ? JBLAS_DTYPE::F64
-                                           : std::is_same_v<T, float>       ? JBLAS_DTYPE::F32
-                                           : std::is_same_v<T, utils::bf16> ? JBLAS_DTYPE::BF16
-                                           : std::is_same_v<T, utils::fp16> ? JBLAS_DTYPE::F16
-                                           : std::is_same_v<T, int8_t>      ? JBLAS_DTYPE::S8
-                                           : std::is_same_v<T, uint8_t>     ? JBLAS_DTYPE::U8
-                                           : std::is_same_v<T, int>         ? JBLAS_DTYPE::S32
-                                           : std::is_same_v<T, f8>          ? JBLAS_DTYPE::F8_E8M0
-                                                                            : (assert(0), JBLAS_DTYPE::F32);
+inline constexpr BTLA_DTYPE bestla_dtype = std::is_same_v<T, double>        ? BTLA_DTYPE::F64
+                                           : std::is_same_v<T, float>       ? BTLA_DTYPE::F32
+                                           : std::is_same_v<T, utils::bf16> ? BTLA_DTYPE::BF16
+                                           : std::is_same_v<T, utils::fp16> ? BTLA_DTYPE::F16
+                                           : std::is_same_v<T, int8_t>      ? BTLA_DTYPE::S8
+                                           : std::is_same_v<T, uint8_t>     ? BTLA_DTYPE::U8
+                                           : std::is_same_v<T, int>         ? BTLA_DTYPE::S32
+                                           : std::is_same_v<T, f8>          ? BTLA_DTYPE::F8_E8M0
+                                                                            : (assert(0), BTLA_DTYPE::F32);
 template <typename T>
 inline constexpr const char* type_str = std::is_same_v<T, double>    ? "double"
                                         : std::is_same_v<T, float>   ? "float"
@@ -262,75 +262,75 @@ inline constexpr const char* type_str = std::is_same_v<T, double>    ? "double"
                                         : std::is_same_v<T, f8>      ? "f8"  // TODO(zhe): more f8 cases?
                                                                      : (assert(0), "undef");
 
-inline const char* jblas_dtype_str(JBLAS_DTYPE dtype) {
+inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
   switch (dtype) {
-    case JBLAS_DTYPE::F64:
+    case BTLA_DTYPE::F64:
       return "float64";
-    case JBLAS_DTYPE::F32:
+    case BTLA_DTYPE::F32:
       return "float32";
-    case JBLAS_DTYPE::F16:
+    case BTLA_DTYPE::F16:
       return "float16";
-    case JBLAS_DTYPE::BF16:
+    case BTLA_DTYPE::BF16:
       return "bfloat16";
-    case JBLAS_DTYPE::F8_E4M3:
+    case BTLA_DTYPE::F8_E4M3:
       return "fp8_e4m3";
-    case JBLAS_DTYPE::F8_E5M2:
+    case BTLA_DTYPE::F8_E5M2:
       return "fp8_e5m2";
-    case JBLAS_DTYPE::F8_E3M4:
+    case BTLA_DTYPE::F8_E3M4:
       return "fp8_e3m4";
-    case JBLAS_DTYPE::S8:
+    case BTLA_DTYPE::S8:
       return "signed_int8";
-    case JBLAS_DTYPE::U8:
+    case BTLA_DTYPE::U8:
       return "unsigned_int8";
-    case JBLAS_DTYPE::S4_CLIP:
+    case BTLA_DTYPE::S4_CLIP:
       return "int4_clip";
-    case JBLAS_DTYPE::S4_FULLRANGE:
+    case BTLA_DTYPE::S4_FULLRANGE:
       return "int4_fullrange";
-    case JBLAS_DTYPE::F4_E2M1:
+    case BTLA_DTYPE::F4_E2M1:
       return "fp4_e2m1";
-    case JBLAS_DTYPE::F4_BNB:
+    case BTLA_DTYPE::F4_BNB:
       return "fp4_bitsandbytes";
-    case JBLAS_DTYPE::F4_NF4:
+    case BTLA_DTYPE::F4_NF4:
       return "fp4_nf4";
-    case JBLAS_DTYPE::S32:
+    case BTLA_DTYPE::S32:
       return "signed_int32";
-    case JBLAS_DTYPE::U32:
+    case BTLA_DTYPE::U32:
       return "unsigned_int32";
     default:
       return "ErrType";
   }
 }
 
-template <JBLAS_DTYPE DT>
+template <BTLA_DTYPE DT>
 inline constexpr const char* dtype_str() {
-  return jblas_dtype_str(DT);
+  return bestla_dtype_str(DT);
 }
 
-inline constexpr uint32_t jblas_dtype_get_mask_val(const JBLAS_DTYPE& t, const JBLAS_DTYPE& mask,
-                                                   const JBLAS_DTYPE& shift) {
+inline constexpr uint32_t bestla_dtype_get_mask_val(const BTLA_DTYPE& t, const BTLA_DTYPE& mask,
+                                                   const BTLA_DTYPE& shift) {
   return (static_cast<uint32_t>(t) & static_cast<uint32_t>(mask)) >> static_cast<uint32_t>(shift);
 }
 
-inline constexpr size_t jblas_dtype_bits(const JBLAS_DTYPE t) {
-  return jblas_dtype_get_mask_val(t, JBLAS_DTYPE::EleBitsMask, JBLAS_DTYPE::EleBitsShift);
+inline constexpr size_t bestla_dtype_bits(const BTLA_DTYPE t) {
+  return bestla_dtype_get_mask_val(t, BTLA_DTYPE::EleBitsMask, BTLA_DTYPE::EleBitsShift);
 }
 
-inline constexpr size_t jblas_dtype_type(const JBLAS_DTYPE t) {
-  return jblas_dtype_get_mask_val(t, JBLAS_DTYPE::TypeMask, JBLAS_DTYPE::TypeShift);
+inline constexpr size_t bestla_dtype_type(const BTLA_DTYPE t) {
+  return bestla_dtype_get_mask_val(t, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift);
 }
 
-inline constexpr size_t jblas_dtype_size(const JBLAS_DTYPE t) {
-  auto bits = jblas_dtype_get_mask_val(t, JBLAS_DTYPE::EleBitsMask, JBLAS_DTYPE::EleBitsShift);
+inline constexpr size_t bestla_dtype_size(const BTLA_DTYPE t) {
+  auto bits = bestla_dtype_get_mask_val(t, BTLA_DTYPE::EleBitsMask, BTLA_DTYPE::EleBitsShift);
   return bits >> 3;  // bits to bytes
 }
 
-inline int jblas_dtype_get_f8_ebits(const JBLAS_DTYPE t) {
+inline int bestla_dtype_get_f8_ebits(const BTLA_DTYPE t) {
   int ret = -1;
   switch (t) {
-    case JBLAS_DTYPE::F8_E4M3:
+    case BTLA_DTYPE::F8_E4M3:
       ret = 4;
       break;
-    case JBLAS_DTYPE::F8_E5M2:
+    case BTLA_DTYPE::F8_E5M2:
       ret = 5;
       break;
     default:
@@ -339,13 +339,13 @@ inline int jblas_dtype_get_f8_ebits(const JBLAS_DTYPE t) {
   return ret;
 }
 
-inline int jblas_dtype_get_f8_quant_mbits(const JBLAS_DTYPE t) {
+inline int bestla_dtype_get_f8_quant_mbits(const BTLA_DTYPE t) {
   int ret = -1;
   switch (t) {
-    case JBLAS_DTYPE::F8_E4M3:
+    case BTLA_DTYPE::F8_E4M3:
       ret = 5;
       break;
-    case JBLAS_DTYPE::F8_E5M2:
+    case BTLA_DTYPE::F8_E5M2:
       ret = 4;
       break;
     default:
@@ -354,11 +354,11 @@ inline int jblas_dtype_get_f8_quant_mbits(const JBLAS_DTYPE t) {
   return ret;
 }
 
-inline float get_mxfp_maxnorm(const JBLAS_DTYPE t, int ebits, int mantissa_bits) {
+inline float get_mxfp_maxnorm(const BTLA_DTYPE t, int ebits, int mantissa_bits) {
   auto emax = std::pow(2, ebits - 1);
-  if (t == JBLAS_DTYPE::F8_E5M2) emax -= 1;
+  if (t == BTLA_DTYPE::F8_E5M2) emax -= 1;
   auto max_norm = std::pow(2, emax);
-  if (t != JBLAS_DTYPE::F8_E4M3) {
+  if (t != BTLA_DTYPE::F8_E4M3) {
     max_norm *= ((std::pow(2, mantissa_bits - 1) - 1) / std::pow(2, mantissa_bits - 2));
   } else {
     max_norm *= 1.75;
@@ -384,16 +384,16 @@ static void request_perm_xtile_data() {
 static void request_perm_xtile_data() {}
 #endif
 
-template <JBLAS_ISA ISA_T>
+template <BTLA_ISA ISA_T>
 class isa_base {
  public:
-  static bool constexpr avx = ISA_T >= JblasAVX;
-  static bool constexpr avx2 = ISA_T >= JblasAVX2;
-  static bool constexpr avx512f = ISA_T >= JblasAVX512F;
-  static bool constexpr avx512_vnni = ISA_T >= JblasAVX512_VNNI;
-  static bool constexpr avx512_fp16 = ISA_T >= JblasAVX512_FP16;
-  static bool constexpr amx_bf16 = ISA_T >= JblasAMX_BF16;
-  static bool constexpr amx_int8 = ISA_T >= JblasAMX_INT8;
+  static bool constexpr avx = ISA_T >= BTLAAVX;
+  static bool constexpr avx2 = ISA_T >= BTLAAVX2;
+  static bool constexpr avx512f = ISA_T >= BTLAAVX512F;
+  static bool constexpr avx512_vnni = ISA_T >= BTLAAVX512_VNNI;
+  static bool constexpr avx512_fp16 = ISA_T >= BTLAAVX512_FP16;
+  static bool constexpr amx_bf16 = ISA_T >= BTLAAMX_BF16;
+  static bool constexpr amx_int8 = ISA_T >= BTLAAMX_INT8;
 };
 
 static inline int padto_le(int src, int padding) { return src / padding * padding; }

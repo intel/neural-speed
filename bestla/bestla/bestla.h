@@ -13,26 +13,26 @@
 //  limitations under the License.
 #pragma once
 #include <stdint.h>
-enum JBLAS_CODE {
-  JblasSuccess = 0,
-  JblasInvalidParam = 1,
-  JblasInvalidISA = 2,
-  JblasRuntimeError = 4,
-  JblasNotSupport = 8,
+enum BTLA_CODE {
+  BTLASuccess = 0,
+  BTLAInvalidParam = 1,
+  BTLAInvalidISA = 2,
+  BTLARuntimeError = 4,
+  BTLANotSupport = 8,
 };
-enum JBLAS_ISA : uint8_t {
-  JblasNoSIMD = 0,
-  JblasAVX,
-  JblasAVX2,
-  JblasAVX_VNNI,
-  JblasAVX512F,
-  JblasAVX512_VNNI,
-  JblasAMX_BF16,
-  JblasAMX_INT8,
-  JblasAVX512_FP16,
-  JblasAVX512_BF16,
+enum BTLA_ISA : uint8_t {
+  BTLANoSIMD = 0,
+  BTLAAVX,
+  BTLAAVX2,
+  BTLAAVX_VNNI,
+  BTLAAVX512F,
+  BTLAAVX512_VNNI,
+  BTLAAMX_BF16,
+  BTLAAMX_INT8,
+  BTLAAVX512_FP16,
+  BTLAAVX512_BF16,
 };
-enum class JBLAS_DTYPE : uint32_t {
+enum class BTLA_DTYPE : uint32_t {
   EleBitsMask = 0xff,
   EleBitsShift = 0,
   EleBitsUndef = 0,
@@ -70,15 +70,15 @@ enum class JBLAS_DTYPE : uint32_t {
   U32 = EleBits32 | TypeInt | SubType1,
 };
 
-enum JBLAS_LAYOUT { JblasRowMajor = 101, JblasColMajor = 102 };
-enum JBLAS_TRANSPOSE {
-  JblasNoTrans = 111,
-  JblasTrans = 112,
-  JblasConjTrans = 113,
+enum BTLA_LAYOUT { BTLARowMajor = 101, BTLAColMajor = 102 };
+enum BTLA_TRANSPOSE {
+  BTLANoTrans = 111,
+  BTLATrans = 112,
+  BTLAConjTrans = 113,
 };
-enum JBLAS_ELTWISEOP { GELU, SWISH, TANH, EXP, LOW_PRECISION_EXP, RELU, LINEAR };
+enum BTLA_ELTWISEOP { GELU, SWISH, TANH, EXP, LOW_PRECISION_EXP, RELU, LINEAR };
 
-enum class JBLAS_PROLOGUEB_IDS : uint32_t {
+enum class BTLA_PROLOGUEB_IDS : uint32_t {
   Undef = (uint32_t)-1,
   Begin = 0,
   NormalBegin = Begin,

@@ -15,12 +15,12 @@
 #include <array>
 
 #include "bestla_utils.h"
-#include "jit_base.h"
+#include "bestla_jit.h"
 
-namespace jblas {
+namespace bestla {
 namespace gemm {
 enum class CompType : uint16_t {
-  // base type, too many bits if reuse JBLAS_DTYPE
+  // base type, too many bits if reuse BTLA_DTYPE
   tFP32 = 0,
   tBF16 = 1,
   tFP16 = 2,
@@ -87,7 +87,7 @@ class CoreAttr {
 
   static inline uint64_t get_mask_val(uint64_t raw, uint64_t mask, uint64_t shift) { return (raw & mask) >> shift; }
 
-  static constexpr uint64_t make_core_id(int NTile, int PackRow, CompType CompType, JBLAS_ISA ISA) {
+  static constexpr uint64_t make_core_id(int NTile, int PackRow, CompType CompType, BTLA_ISA ISA) {
     return (static_cast<uint64_t>(NTile) << NTILE_SHIFT) | (static_cast<uint64_t>(PackRow) << PACKROW_SHIFT) |
            (static_cast<uint64_t>(CompType) << COMP_SHIFT) | (static_cast<uint64_t>(ISA) << ISA_SHIFT);
   }
@@ -114,7 +114,7 @@ class CoreAttr {
     return size_t(4 / packrow);
   }
 
-  static inline JBLAS_ISA get_ISA(uint64_t id) { return static_cast<JBLAS_ISA>(get_mask_val(id, ISA_MASK, ISA_SHIFT)); }
+  static inline BTLA_ISA get_ISA(uint64_t id) { return static_cast<BTLA_ISA>(get_mask_val(id, ISA_MASK, ISA_SHIFT)); }
 
   static inline CompType get_comp(uint64_t id) {
     return static_cast<CompType>(get_mask_val(id, COMP_MASK, COMP_SHIFT));
@@ -124,7 +124,7 @@ class CoreAttr {
 namespace code {
 
 template <int _NTILE, int _MTILE = 0>
-class Avx2N8P1 : protected jblas::xbyak::JitAvx2 {
+class Avx2N8P1 : protected bestla::xbyak::JitAvx2 {
  public:
   static int constexpr RegLen = 8, PackRow = 1;
   static_assert(_NTILE % RegLen == 0);
@@ -133,7 +133,7 @@ class Avx2N8P1 : protected jblas::xbyak::JitAvx2 {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX2;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX2;
   static auto constexpr COMPUTE = CompType::COMP_FP32;
   typedef float AType;
   typedef float BType;
@@ -344,7 +344,7 @@ class Avx2N8P1 : protected jblas::xbyak::JitAvx2 {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512fN16P1 : protected jblas::xbyak::JitAvx512f {
+class Avx512fN16P1 : protected bestla::xbyak::JitAvx512f {
  public:
   static int constexpr RegLen = 16, PackRow = 1;
   static_assert(_NTILE % RegLen == 0);
@@ -353,7 +353,7 @@ class Avx512fN16P1 : protected jblas::xbyak::JitAvx512f {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX512F;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX512F;
   static auto constexpr COMPUTE = CompType::COMP_FP32;
   typedef float AType;
   typedef float BType;
@@ -564,7 +564,7 @@ class Avx512fN16P1 : protected jblas::xbyak::JitAvx512f {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512fp16N32P1 : protected jblas::xbyak::JitAvx512_fp16 {
+class Avx512fp16N32P1 : protected bestla::xbyak::JitAvx512_fp16 {
  public:
   static int constexpr RegLen = 32, PackRow = 1;
   static_assert(_NTILE % RegLen == 0);
@@ -573,7 +573,7 @@ class Avx512fp16N32P1 : protected jblas::xbyak::JitAvx512_fp16 {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX512_FP16;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_FP16;
   static auto constexpr COMPUTE = CompType::COMP_FP16_FP16;
   typedef utils::fp16 AType;
   typedef utils::fp16 BType;
@@ -784,7 +784,7 @@ class Avx512fp16N32P1 : protected jblas::xbyak::JitAvx512_fp16 {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512bf16N16P2 : protected jblas::xbyak::JitAvx512_bf16 {
+class Avx512bf16N16P2 : protected bestla::xbyak::JitAvx512_bf16 {
  public:
   static int constexpr RegLen = 16, PackRow = 2;
   static_assert(_NTILE % RegLen == 0);
@@ -793,7 +793,7 @@ class Avx512bf16N16P2 : protected jblas::xbyak::JitAvx512_bf16 {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 2;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX512_BF16;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_BF16;
   static auto constexpr COMPUTE = CompType::COMP_BF16_FP32;
   typedef utils::bf16 AType;
   typedef utils::bf16 BType;
@@ -1004,7 +1004,7 @@ class Avx512bf16N16P2 : protected jblas::xbyak::JitAvx512_bf16 {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512vnniN16P4 : protected jblas::xbyak::JitAvx512vnni {
+class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -1013,7 +1013,7 @@ class Avx512vnniN16P4 : protected jblas::xbyak::JitAvx512vnni {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX512_VNNI;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -1223,7 +1223,7 @@ class Avx512vnniN16P4 : protected jblas::xbyak::JitAvx512vnni {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class AvxvnniN8P4 : protected jblas::xbyak::JitAvxvnni {
+class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
  public:
   static int constexpr RegLen = 8, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -1232,7 +1232,7 @@ class AvxvnniN8P4 : protected jblas::xbyak::JitAvxvnni {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX_VNNI;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -1443,7 +1443,7 @@ class AvxvnniN8P4 : protected jblas::xbyak::JitAvxvnni {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Amxbf16N16P2 : protected jblas::xbyak::JitAmxbf16 {
+class Amxbf16N16P2 : protected bestla::xbyak::JitAmxbf16 {
  public:
   static int constexpr RegLen = 16, PackRow = 2;
   static_assert(_NTILE % RegLen == 0);
@@ -1453,7 +1453,7 @@ class Amxbf16N16P2 : protected jblas::xbyak::JitAmxbf16 {
   static_assert(NRegs * MRegs + 2 <= TileCount);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs * RegLen, KTILE = 32;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAMX_BF16;
+  static auto constexpr ISA = BTLA_ISA::BTLAAMX_BF16;
   static auto constexpr COMPUTE = CompType::COMP_BF16_FP32;
   typedef utils::bf16 AType;
   typedef utils::bf16 BType;
@@ -1706,7 +1706,7 @@ class Amxbf16N16P2 : protected jblas::xbyak::JitAmxbf16 {
 };
 
 template <typename AT, typename BT, int _NTILE, int _MTILE = 0>
-class Amxint8N16P4 : protected jblas::xbyak::JitAmxint8 {
+class Amxint8N16P4 : protected bestla::xbyak::JitAmxint8 {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -1716,7 +1716,7 @@ class Amxint8N16P4 : protected jblas::xbyak::JitAmxint8 {
   static_assert(NRegs * MRegs + 2 <= TileCount);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs * RegLen, KTILE = 64;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAMX_INT8;
+  static auto constexpr ISA = BTLA_ISA::BTLAAMX_INT8;
   static auto constexpr COMPUTE =
       (std::is_same_v<AT, int8_t>
            ? std::is_same_v<BT, int8_t> ? CompType::COMP_INT8_SS_INT32 : CompType::COMP_INT8_SU_INT32
@@ -1978,7 +1978,7 @@ using Amxint8N16P4US = Amxint8N16P4<uint8_t, int8_t, N, M>;
 template <int N, int M>
 using Amxint8N16P4SS = Amxint8N16P4<int8_t, int8_t, N, M>;
 
-class AmxConfigure : protected jblas::xbyak::JitAmxtile {
+class AmxConfigure : protected xbyak::JitAmxtile {
  public:
   typedef long long (*func_t)(tileconfig_t*);
 
@@ -2003,7 +2003,7 @@ namespace kblock {
 // optimize for kblock gemm, each block size in k dimension has dequant operation
 // all accumulators use fp32 dtype.
 template <int _NTILE, int _MTILE = 0>
-class Avx512fN16P1 : protected jblas::xbyak::JitAvx512f {
+class Avx512fN16P1 : protected bestla::xbyak::JitAvx512f {
  public:
   static int constexpr RegLen = 16, PackRow = 1;
   static_assert(_NTILE % RegLen == 0);
@@ -2012,7 +2012,7 @@ class Avx512fN16P1 : protected jblas::xbyak::JitAvx512f {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 1;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX512F;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX512F;
   static auto constexpr COMPUTE = CompType::COMP_FP32;
   typedef float AType;
   typedef float BType;
@@ -2223,7 +2223,7 @@ class Avx512fN16P1 : protected jblas::xbyak::JitAvx512f {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512vnniN16P4 : protected jblas::xbyak::JitAvx512vnni {
+class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -2232,7 +2232,7 @@ class Avx512vnniN16P4 : protected jblas::xbyak::JitAvx512vnni {
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX512_VNNI;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX512_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_FP32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -2521,7 +2521,7 @@ class Avx512vnniN16P4 : protected jblas::xbyak::JitAvx512vnni {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class AvxvnniN8P4 : protected jblas::xbyak::JitAvxvnni {
+class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
  public:
   static int constexpr RegLen = 8, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -2530,7 +2530,7 @@ class AvxvnniN8P4 : protected jblas::xbyak::JitAvxvnni {
   static_assert(NRegs * MRegs <= RegCount - 3);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAVX_VNNI;
+  static auto constexpr ISA = BTLA_ISA::BTLAAVX_VNNI;
   static auto constexpr COMPUTE = CompType::COMP_INT8_US_FP32;
   typedef uint8_t AType;
   typedef int8_t BType;
@@ -2865,7 +2865,7 @@ class AvxvnniN8P4 : protected jblas::xbyak::JitAvxvnni {
 };
 
 template <typename AT, typename BT, int _NTILE, int _MTILE = 0>
-class Amxint8N16P4 : protected jblas::xbyak::JitAmxint8 {
+class Amxint8N16P4 : protected bestla::xbyak::JitAmxint8 {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -2875,7 +2875,7 @@ class Amxint8N16P4 : protected jblas::xbyak::JitAmxint8 {
   static_assert(NRegs * MRegs + 2 <= TileCount);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs * RegLen, KTILE = 64;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = JBLAS_ISA::JblasAMX_INT8;
+  static auto constexpr ISA = BTLA_ISA::BTLAAMX_INT8;
   static auto constexpr COMPUTE = (std::is_same_v<AT, int8_t> ? std::is_same_v<BT, int8_t> ? CompType::COMP_INT8_SS_FP32
                                                                                            : CompType::COMP_INT8_SU_FP32
                                    : std::is_same_v<BT, int8_t> ? CompType::COMP_INT8_US_FP32
@@ -3541,4 +3541,4 @@ class ICoreRowNAmxint8SSKBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16
   }
 };
 }  // namespace gemm
-}  // namespace jblas
+}  // namespace bestla

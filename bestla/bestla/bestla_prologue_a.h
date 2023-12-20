@@ -25,7 +25,7 @@
 #include "bestla_utils.h"
 #include "kernel_wrapper.h"
 
-namespace jblas {
+namespace bestla {
 namespace prologue_a {
 namespace gemm {
 
@@ -34,14 +34,14 @@ struct ParamActivationBase {
   const AType* A;
   int lda;
 };
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 class ActivationBase {
  public:
   using AType = typename _GemmCore_T::AType;
   using SRCType = AType;
   using Param = ParamActivationBase<AType>;
-  JBLAS_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                           int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                          int k_offset, void* tmpcache, size_t cachesize) {
     auto aptr = const_cast<AType*>(_param.A) + m_offset * _param.lda + k_offset;
     auto alignedptr = utils::cpu_pointer_align(aptr);
     bool use_rawptr = k_size % _GemmCore_T::KTILE == 0 && m_size >= _GemmCore_T::MTILE;
@@ -49,24 +49,24 @@ class ActivationBase {
     if (use_rawptr) {
       *dstptr = aptr;
       *dststep = _param.lda;
-      return JblasSuccess;
+      return BTLASuccess;
     } else {
       auto k_pad = utils::padto(k_size, _GemmCore_T::KTILE);
       *dststep = k_pad;
-      return kernel::wrapper::Memcpy2D::forward<JblasNoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size, _param.lda,
+      return kernel::wrapper::Memcpy2D::forward<BTLANoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size, _param.lda,
                                                                            k_pad);
     }
   }
 };
 
-template <class _GemmCore_T, JBLAS_ISA ISA_T, typename SRC_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T, typename SRC_T>
 class ActivationConverter : public ActivationBase<_GemmCore_T, ISA_T> {
  public:
   using AType = typename _GemmCore_T::AType;
   using SRCType = SRC_T;
   using Param = ParamActivationBase<SRC_T>;
-  JBLAS_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                           int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                          int k_offset, void* tmpcache, size_t cachesize) {
     auto aptr = const_cast<SRC_T*>(_param.A);
     auto k_pad = utils::padto(k_size, _GemmCore_T::KTILE);
     *dststep = k_pad;
@@ -88,20 +88,20 @@ class ActivationConverter : public ActivationBase<_GemmCore_T, ISA_T> {
     } else {
       assert(0);
     }
-    return JblasNotSupport;
+    return BTLANotSupport;
   }
 };
 
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ActivationConverterFp32 = ActivationConverter<_GemmCore_T, ISA_T, float>;
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ActivationConverterBf16 = ActivationConverter<_GemmCore_T, ISA_T, utils::bf16>;
 
 template <typename AType>
 struct ParamActivationKBlockQuantize : ParamActivationBase<AType> {
   storage::gemm::StorageQuantActivation* quan;
 };
-template <class _GemmCore_T, JBLAS_ISA ISA_T, typename SRC_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T, typename SRC_T>
 class ActivationKBlockQuantize {
  public:
   using AType = typename _GemmCore_T::AType;
@@ -109,8 +109,8 @@ class ActivationKBlockQuantize {
   using QParam = storage::gemm::StorageQuantActivation;
   using SRCType = SRC_T;
   using Param = ParamActivationKBlockQuantize<SRC_T>;
-  using Parallel = jblas::parallel::Scheduler2D;
-  using ThreadProblem = jblas::parallel::ThreadProblem2D;
+  using Parallel = parallel::Scheduler2D;
+  using ThreadProblem = parallel::ThreadProblem2D;
 
   inline Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
     return Parallel({
@@ -125,8 +125,8 @@ class ActivationKBlockQuantize {
     QParam tmp;
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
-    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, JBLAS_DTYPE::U8, JBLAS_DTYPE::F32, JBLAS_DTYPE::U8,
-               JBLAS_DTYPE::F32, std::is_same_v<AType, uint8_t>, hasreduce);
+    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, BTLA_DTYPE::U8, BTLA_DTYPE::F32, BTLA_DTYPE::U8,
+               BTLA_DTYPE::F32, std::is_same_v<AType, uint8_t>, hasreduce);
     return tmp;
   }
 
@@ -153,84 +153,84 @@ class ActivationKBlockQuantize {
     }
   }
 
-  JBLAS_CODE quantize(const Param& _param, int m, int k, jblas::parallel::IThreading* threading) {
+  BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
     auto paral = Parallel({threading->num_threads(), m, k, 1, _param.quan->mBlockSize});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
       if (thdp.valid) run(_param, thdp);
     });
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
  public:  // Runtime get by launcher
-  JBLAS_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                           int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                          int k_offset, void* tmpcache, size_t cachesize) {
     (void)m_size;
     (void)k_size;
     auto quan = _param.quan;
     auto aptr = quan->template APtr<AType>();
     *dstptr = aptr + m_offset * quan->mKPad + k_offset;
     *dststep = quan->mKPad;
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  JBLAS_CODE getZp(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                   int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getZp(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset, int k_offset,
+                  void* tmpcache, size_t cachesize) {
     auto quan = _param.quan;
     auto aptr = quan->template ZPtr<AType>();
     if (aptr == nullptr) {  // optional
       *dstptr = nullptr;
-      return JblasSuccess;
+      return BTLASuccess;
     }
     int kele = utils::updiv(k_size, quan->mBlockSize);
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * quan->CStep() + k_offset / quan->mBlockSize, *dstptr, m_size,
                           kele * sizeof(AType), quan->CStep() * sizeof(AType), kele * sizeof(AType));
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  JBLAS_CODE getScale(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                      int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getScale(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                     int k_offset, void* tmpcache, size_t cachesize) {
     auto quan = _param.quan;
     auto aptr = quan->template SPtr<float>();
     int kele = utils::updiv(k_size, quan->mBlockSize);
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * quan->CStep() + k_offset / quan->mBlockSize, *dstptr, m_size,
                           kele * sizeof(float), quan->CStep() * sizeof(float), kele * sizeof(float));
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  JBLAS_CODE getReduce(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                       int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getReduce(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                      int k_offset, void* tmpcache, size_t cachesize) {
     auto quan = _param.quan;
     auto aptr = quan->template RPtr<float>();
     int kele = utils::updiv(k_size, quan->mBlockSize);
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * quan->CStep() + k_offset / quan->mBlockSize, *dstptr, m_size,
                           kele * sizeof(float), quan->CStep() * sizeof(float), kele * sizeof(float));
-    return JblasSuccess;
+    return BTLASuccess;
   }
 };
 
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ActivationF32KBlockQuantize = ActivationKBlockQuantize<_GemmCore_T, ISA_T, float>;
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ActivationBf16KBlockQuantize = ActivationKBlockQuantize<_GemmCore_T, ISA_T, utils::bf16>;
 
 template <typename AType>
 struct ParamActivationKBlockBase : ParamActivationBase<AType> {
   storage::gemm::StorageReduce* reduce;
 };
-template <class _GemmCore_T, JBLAS_ISA ISA_T, typename SRC_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T, typename SRC_T>
 class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_T> {
  public:
   using AType = typename _GemmCore_T::AType;
   using SType = storage::gemm::StorageReduce;
   using SRCType = SRC_T;
   using Param = ParamActivationKBlockBase<SRC_T>;
-  using Parallel = jblas::parallel::Scheduler2D;
-  using ThreadProblem = jblas::parallel::ThreadProblem2D;
+  using Parallel = parallel::Scheduler2D;
+  using ThreadProblem = parallel::ThreadProblem2D;
 
   inline Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
     return Parallel({
@@ -242,7 +242,7 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
   }
   inline SType createStorage(int m, int k, int kblock) {
     SType tmp;
-    tmp.resize(m, k, kblock == -1 ? k : kblock, JBLAS_DTYPE::F32);
+    tmp.resize(m, k, kblock == -1 ? k : kblock, BTLA_DTYPE::F32);
     return tmp;
   }
 
@@ -255,39 +255,39 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
       auto thdrptr = stor->template RPtr<float>() + blk_offset;
       auto ret = kernel::wrapper::ColBlockReduceSum::template forward<ISA_T, SRC_T>(
           srcptr, _param.lda, thdp.size[0], thdp.size[1], stor->kblock, thdrptr, stor->lda);
-      assert(ret == JblasSuccess);
+      assert(ret == BTLASuccess);
     }
   }
 
-  JBLAS_CODE reduce(const Param& _param, int m, int k, int kblock, jblas::parallel::IThreading* threading) {
+  BTLA_CODE reduce(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
     auto paral = Parallel({threading->num_threads(), m, k, 1, kblock});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
       if (thdp.valid) run(_param, thdp);
     });
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  JBLAS_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                           int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                          int k_offset, void* tmpcache, size_t cachesize) {
     return ActivationConverter<_GemmCore_T, ISA_T, SRC_T>::getActivation(
         dstptr, dststep, {_param.A, _param.lda}, m_size, k_size, m_offset, k_offset, tmpcache, cachesize);
   }
 
-  JBLAS_CODE getReduce(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                       int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getReduce(float** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                      int k_offset, void* tmpcache, size_t cachesize) {
     auto reduce = _param.reduce;
     auto aptr = reduce->template RPtr<float>();
     int kele = utils::updiv(k_size, reduce->kblock);
     *dststep = kele;
     kernel::ref::memcpy2d(aptr + m_offset * reduce->lda + k_offset / reduce->kblock, *dstptr, m_size,
                           kele * sizeof(float), reduce->lda * sizeof(float), kele * sizeof(float));
-    return JblasSuccess;
+    return BTLASuccess;
   }
 };
 
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ActivationKBlockBaseF32 = ActivationKBlockBase<_GemmCore_T, ISA_T, float>;
 
 template <typename AType>
@@ -295,7 +295,7 @@ struct ParamShuffleActivationKBlockBase : ParamActivationKBlockBase<AType> {
   int* indices = nullptr;
   storage::gemm::StorageReorderActivation* reordered = nullptr;
 };
-template <class _GemmCore_T, JBLAS_ISA ISA_T, typename SRC_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T, typename SRC_T>
 class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA_T, SRC_T> {
  public:
   using AType = typename _GemmCore_T::AType;
@@ -303,19 +303,19 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
   using RAType = storage::gemm::StorageReorderActivation;
   using SRCType = SRC_T;
   using Param = ParamShuffleActivationKBlockBase<SRC_T>;
-  using Parallel = jblas::parallel::Scheduler2D;
-  using ThreadProblem = jblas::parallel::ThreadProblem2D;
+  using Parallel = parallel::Scheduler2D;
+  using ThreadProblem = parallel::ThreadProblem2D;
   inline RAType createReorderStorage(int m, int k, int kblock) {
     RAType tmp(_GemmCore_T::ID);
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
-    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, utils::jblas_dtype<SRC_T>);
+    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, utils::bestla_dtype<SRC_T>);
     return tmp;
   }
 
   inline RedType createReduceStorage(int m, int k, int kblock) {
     RedType tmp;
-    tmp.resize(m, k, kblock == -1 ? k : kblock, JBLAS_DTYPE::F32);
+    tmp.resize(m, k, kblock == -1 ? k : kblock, BTLA_DTYPE::F32);
     return tmp;
   }
 
@@ -337,23 +337,23 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
         auto thdrptr = stor->template RPtr<float>() + blk_offset;
         auto ret = kernel::wrapper::ColBlockReduceSum::template forward<ISA_T, SRC_T>(
             srcptr, _param.lda, thdp.size[0], thdp.size[1], stor->kblock, thdrptr, stor->lda);
-        assert(ret == JblasSuccess);
+        assert(ret == BTLASuccess);
       }
     }
   }
 
-  JBLAS_CODE preprocess(const Param& _param, int m, int k, int kblock, jblas::parallel::IThreading* threading) {
+  BTLA_CODE preprocess(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
     auto paral = Parallel({threading->num_threads(), m, k, 1, kblock});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
       run(_param, thdp);
     });
-    return JblasSuccess;
+    return BTLASuccess;
   }
 
-  JBLAS_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                           int k_offset, void* tmpcache, size_t cachesize) {
+  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
+                          int k_offset, void* tmpcache, size_t cachesize) {
     if (_param.indices == nullptr) {
       return ActivationConverter<_GemmCore_T, ISA_T, SRC_T>::getActivation(
           dstptr, dststep, {_param.A, _param.lda}, m_size, k_size, m_offset, k_offset, tmpcache, cachesize);
@@ -365,7 +365,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
   }
 };
 
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ShuffleActivationKBlockBaseF32 = ShuffleActivationKBlockBase<_GemmCore_T, ISA_T, float>;
 
 template <typename AType>
@@ -373,7 +373,7 @@ struct ParamShuffleActivationKBlockQuantize : ParamActivationKBlockQuantize<ATyp
   int* indices = nullptr;
   storage::gemm::StorageReorderActivation* reordered = nullptr;
 };
-template <class _GemmCore_T, JBLAS_ISA ISA_T, typename SRC_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T, typename SRC_T>
 class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCore_T, ISA_T, SRC_T> {
  public:
   using AType = typename _GemmCore_T::AType;
@@ -382,15 +382,15 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
   using RAType = storage::gemm::StorageReorderActivation;
   using SRCType = SRC_T;
   using Param = ParamShuffleActivationKBlockQuantize<SRC_T>;
-  using Parallel = jblas::parallel::Scheduler2D;
-  using ThreadProblem = jblas::parallel::ThreadProblem2D;
+  using Parallel = parallel::Scheduler2D;
+  using ThreadProblem = parallel::ThreadProblem2D;
 
   inline QParam createQuantStorage(int m, int k, int kblock, bool hasreduce) {
     QParam tmp;
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
-    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, JBLAS_DTYPE::U8, JBLAS_DTYPE::F32, JBLAS_DTYPE::U8,
-               JBLAS_DTYPE::F32, std::is_same_v<AType, uint8_t>, hasreduce);
+    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, BTLA_DTYPE::U8, BTLA_DTYPE::F32, BTLA_DTYPE::U8,
+               BTLA_DTYPE::F32, std::is_same_v<AType, uint8_t>, hasreduce);
     return tmp;
   }
 
@@ -398,11 +398,11 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
     RAType tmp(_GemmCore_T::ID);
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
-    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, utils::jblas_dtype<SRC_T>);
+    tmp.resize(mpad, kpad, m, k, kblock == -1 ? kpad : kblock, utils::bestla_dtype<SRC_T>);
     return tmp;
   }
 
-  JBLAS_CODE quantize(const Param& _param, int m, int k, jblas::parallel::IThreading* threading) {
+  BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
     auto srcptr = const_cast<SRC_T*>(_param.A);
     if (_param.indices) {
       auto shuffle_src = _param.reordered->template APtr<SRC_T>();
@@ -416,12 +416,12 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
       srcptr = shuffle_src;
     }
     ActivationKBlockQuantize<_GemmCore_T, ISA_T, SRC_T>::quantize({srcptr, k, _param.quan}, m, k, threading);
-    return JblasSuccess;
+    return BTLASuccess;
   }
 };
 
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ShuffleActivationKBlockQuantizeF32 = ShuffleActivationKBlockQuantize<_GemmCore_T, ISA_T, float>;
 }  // namespace gemm
 }  // namespace prologue_a
-}  // namespace jblas
+}  // namespace bestla

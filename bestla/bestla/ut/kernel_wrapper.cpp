@@ -1,6 +1,6 @@
 #include "kernel_ut.h"
 #include "kernel_wrapper.h"
-namespace jblas {
+namespace bestla {
 using namespace utils;
 namespace ut {
 class UT_DecompressKBlockS4FP {
@@ -8,15 +8,15 @@ class UT_DecompressKBlockS4FP {
   UT_DecompressKBlockS4FP() {
     UT_START();
     CheckISA(AVX2);
-    ut_avx2<JBLAS_DTYPE::S4_CLIP, 1, float, float>(410, 24, 24, 24, 0, 128, 24);
-    ut_avx2<JBLAS_DTYPE::S4_CLIP, 1, float, float>(410, 48, 48, 48, 0, 128, 48);
+    ut_avx2<BTLA_DTYPE::S4_CLIP, 1, float, float>(410, 24, 24, 24, 0, 128, 24);
+    ut_avx2<BTLA_DTYPE::S4_CLIP, 1, float, float>(410, 48, 48, 48, 0, 128, 48);
     CheckISA(AVX512F);
-    ut<JBLAS_DTYPE::S4_CLIP, 2, float, float>(32, 128, 128, 128, 0, 32, 128);
-    ut<JBLAS_DTYPE::S4_CLIP, 1, float, float>(32, 48, 48, 128, 0, 32, 128);
-    ut<JBLAS_DTYPE::S4_CLIP, 1, float, utils::bf16>(32, 48, 48, 128, 0, 32, 128);
+    ut<BTLA_DTYPE::S4_CLIP, 2, float, float>(32, 128, 128, 128, 0, 32, 128);
+    ut<BTLA_DTYPE::S4_CLIP, 1, float, float>(32, 48, 48, 128, 0, 32, 128);
+    ut<BTLA_DTYPE::S4_CLIP, 1, float, utils::bf16>(32, 48, 48, 128, 0, 32, 128);
   }
 
-  template <JBLAS_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
+  template <BTLA_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
   void ut(int row, int col, int ld_src, int ld_dst, int k_offset, int kblock, int NPad, bool asym = false) {
     printf("Test Case %s_%d_%d: %d %d %d %d %d %d %d %d\n", __FUNCTION__, int(S4_T), PACK_ROW, row, col, ld_src, ld_dst,
            k_offset, kblock, NPad, asym);
@@ -34,16 +34,16 @@ class UT_DecompressKBlockS4FP {
       s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
       s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
     }
-    jblas::kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<JblasAVX512F, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLAAVX512F, ST_T, S4_T>(
         s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    jblas::kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<JblasNoSIMD, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLANoSIMD, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
   }
 
-  template <JBLAS_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
+  template <BTLA_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
   void ut_avx2(int row, int col, int ld_src, int ld_dst, int k_offset, int kblock, int NPad, bool asym = false) {
     printf("Test Case %s_%d_%d: %d %d %d %d %d %d %d %d\n", __FUNCTION__, int(S4_T), PACK_ROW, row, col, ld_src, ld_dst,
            k_offset, kblock, NPad, asym);
@@ -62,16 +62,16 @@ class UT_DecompressKBlockS4FP {
       s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
       s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
     }
-    jblas::kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<JblasNoSIMD, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLANoSIMD, ST_T, S4_T>(
         s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    jblas::kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<JblasAVX2, ST_T, S4_T>(
+    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLAAVX2, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
   }
 };
-#ifdef JBLAS_UT_KERNEL_WRAPPER
+#ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_DecompressKBlockS4FP sUT_DecompressKBlockS4FP;
 #endif
 
@@ -80,14 +80,14 @@ class UT_DecompressKBlockF4FP {
   UT_DecompressKBlockF4FP() {
     UT_START();
     CheckISA(AVX2);
-    ut<float, 1, JBLAS_DTYPE::F4_BNB, JblasAVX2>(35, 48, 48, 48, 0, 12, 48);
-    ut<float, 1, JBLAS_DTYPE::F4_BNB, JblasAVX2>(11, 48, 48, 48, 0, 20, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX2>(35, 48, 48, 48, 0, 12, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX2>(11, 48, 48, 48, 0, 20, 48);
     CheckISA(AVX512F);
-    ut<float, 1, JBLAS_DTYPE::F4_BNB, JblasAVX512F>(35, 48, 48, 48, 0, 12, 48);
-    ut<float, 1, JBLAS_DTYPE::F4_BNB, JblasAVX512F>(11, 48, 48, 48, 0, 20, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX512F>(35, 48, 48, 48, 0, 12, 48);
+    ut<float, 1, BTLA_DTYPE::F4_BNB, BTLAAVX512F>(11, 48, 48, 48, 0, 20, 48);
   }
 
-  template <typename T, int PACK_ROW, JBLAS_DTYPE F4_T, JBLAS_ISA ISA_T>
+  template <typename T, int PACK_ROW, BTLA_DTYPE F4_T, BTLA_ISA ISA_T>
   void ut(int row, int col, int ld_src, int ld_dst, int k_offset, int kblock, int NPad) {
     std::vector<utils::f4x2> f4_wei(row * col / 2);
     std::vector<int8_t> s8_wei(col * row);
@@ -100,15 +100,15 @@ class UT_DecompressKBlockF4FP {
       f4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
       f4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
     }
-    jblas::kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<ISA_T, T, F4_T>(
+    kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<ISA_T, T, F4_T>(
         f4_wei.data(), wei.data(), row, col, ld_src, ld_dst, scales.data(), k_offset, kblock, NPad, cache, CacheSize);
-    jblas::kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<JblasNoSIMD, T, F4_T>(
+    kernel::wrapper::DecompressKBlockF4Fp<T, PACK_ROW>::template forward<BTLANoSIMD, T, F4_T>(
         f4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), k_offset, kblock, NPad, cache,
         CacheSize);
     ut::buffer_error(ref_wei.data(), wei.data(), wei.size(), T(0.01f));
   }
 };
-#ifdef JBLAS_UT_KERNEL_WRAPPER
+#ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_DecompressKBlockF4FP sUT_DecompressKBlockF4FP;
 #endif
 
@@ -129,14 +129,14 @@ class UT_PaddingInterleaveMN {
     aligned_vector<T_DST> dst(row_pad * col_pad), ref(row_pad * col_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<JblasNoSIMD>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLANoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<JblasAVX512_FP16>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLAAVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_WRAPPER
+#ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_PaddingInterleaveMN sUT_PaddingInterleaveMN;
 #endif
 
@@ -157,14 +157,14 @@ class UT_PaddingTransInterleaveMN {
     aligned_vector<T_DST> dst(col_pad * row_pad), ref(col_pad * row_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<JblasNoSIMD>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLANoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<JblasAVX512_FP16>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLAAVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_WRAPPER
+#ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_PaddingTransInterleaveMN sUT_PaddingTransInterleaveMN;
 #endif
 
@@ -186,14 +186,14 @@ class UT_RevertPaddingInterleaveMN {
       src[i] = static_cast<T>(i);
     }
     aligned_vector<T> reverted(row * col);
-    kernel::wrapper::PaddingInterleaveMN<NTile, PackRow>::template forward<JblasNoSIMD>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, PackRow>::template forward<BTLANoSIMD>(
         src.data(), packed.data(), row, col, rowpad, colpad, col, rowpad);
-    kernel::wrapper::RevertPaddingInterleaveMN<NTile, PackRow>::template forward<JblasNoSIMD>(
+    kernel::wrapper::RevertPaddingInterleaveMN<NTile, PackRow>::template forward<BTLANoSIMD>(
         packed.data(), reverted.data(), row, col, rowpad, colpad, rowpad, col);
     ut::buffer_error(src.data(), reverted.data(), reverted.size());
   }
 };
-#ifdef JBLAS_UT_KERNEL_WRAPPER
+#ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_RevertPaddingInterleaveMN sUT_RevertPaddingInterleaveMN;
 #endif
 }  // namespace ut

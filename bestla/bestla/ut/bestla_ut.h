@@ -14,16 +14,16 @@
     }                                         \
   }
 
-namespace jblas {
+namespace bestla {
 namespace ut {
-using sAVX512F = jblas::gemm::SCoreRowNAvx512f<48, 8>;
-using sAMX_BF16 = jblas::gemm::HCoreRowNAmxbf16<64, 16>;
-using sAVX512_FP16 = jblas::gemm::HCoreRowNAvx512fp16<96, 8>;
-using sAVX_VNNI = jblas::gemm::ICoreRowNAvxvnni<24, 4>;
-using sAVX512_VNNI = jblas::gemm::ICoreRowNAvx512vnni<48, 8>;
-using sAMX_INT8_US = jblas::gemm::ICoreRowNAmxint8<64, 16>;
-using sAMX_INT8_SS = jblas::gemm::ICoreRowNAmxint8SS<64, 16>;
-using sAVX2 = jblas::gemm::SCoreRowNAvx2<24, 4>;
+using sAVX512F = gemm::SCoreRowNAvx512f<48, 8>;
+using sAMX_BF16 = gemm::HCoreRowNAmxbf16<64, 16>;
+using sAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
+using sAVX_VNNI = gemm::ICoreRowNAvxvnni<24, 4>;
+using sAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
+using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
+using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;
+using sAVX2 = gemm::SCoreRowNAvx2<24, 4>;
 #ifdef _OPENMP
 static parallel::OMPThreading DefaultThreading(4);
 #else
@@ -112,7 +112,7 @@ static void fill_buffer_randn(_T* buf, size_t size, _T minval, _T maxval) {
 }
 
 template <typename _T>
-jblas::utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
+utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   auto w1fp = fopen(filepath, "rb");
   if (w1fp == NULL) {
     return utils::aligned_vector<_T>();
@@ -130,7 +130,7 @@ jblas::utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
 #define UT_START()                                              \
   {                                                             \
     GetCPUDevice();                                             \
-    jblas::ut::DefaultThreading.set_threads(_cd->getThreads()); \
+    ut::DefaultThreading.set_threads(_cd->getThreads()); \
     printf("Test Class: %s\n", __FUNCTION__);                   \
   }
 template <typename _T>
@@ -168,7 +168,7 @@ static double buffer_error(_T* ref, _T* tar, size_t size, _T thres = _T(0)) {
 }
 
 template <>
-double buffer_error(jblas::utils::bf16* ref, jblas::utils::bf16* tar, size_t size, jblas::utils::bf16 thres) {
+double buffer_error(utils::bf16* ref, utils::bf16* tar, size_t size, utils::bf16 thres) {
   float err = 0;
   int cnt = 0;
   float max_err = 0, max_a = 0.f, max_b = 0.f;
@@ -263,7 +263,7 @@ static double buffer_error_2d(_T* ref, _T* tar, size_t row, size_t col, size_t r
 }
 
 struct UT_vector_s8 {
-  jblas::utils::aligned_vector<int8_t> data_;
+  utils::aligned_vector<int8_t> data_;
   void resize(size_t _size) { data_.resize(_size); }
   size_t size() { return data_.size(); }
   int8_t* data() { return data_.data(); }
@@ -278,7 +278,7 @@ struct UT_vector_s8 {
       scales[i] = randn(minval, maxval);
     }
   }
-  jblas::utils::aligned_vector<float> scales;
+  utils::aligned_vector<float> scales;
 };
 
 struct UT_vector_u8 {
@@ -531,7 +531,7 @@ static inline void gemmref_fp16fp16fp16(int m, int n, int k, utils::fp16* A, uti
 }
 
 struct UT_GEMMData_Row_fp16 {
-  jblas::utils::aligned_vector<utils::fp16> matA, matB, matC, matD;
+  utils::aligned_vector<utils::fp16> matA, matB, matC, matD;
   int M, N, K, LDA, LDB, LDC, LDD;
   UT_GEMMData_Row_fp16(int m, int n, int k, int lda, int ldb, int ldc, int ldd)
       : M(m), N(n), K(k), LDA(lda), LDB(ldb), LDC(ldc), LDD(ldd) {
@@ -543,9 +543,9 @@ struct UT_GEMMData_Row_fp16 {
     } else {
       matD.resize(m * ldd);
     }
-    jblas::ut::fill_buffer_randn(matA.data(), m * lda, utils::fp16(-0.5f), utils::fp16(0.5f));
-    jblas::ut::fill_buffer_randn(matB.data(), k * ldb, utils::fp16(-0.5f), utils::fp16(0.5f));
-    jblas::ut::fill_buffer_randn(matD.data(), matD.size(), utils::fp16(0.f), utils::fp16(1.f));
+    ut::fill_buffer_randn(matA.data(), m * lda, utils::fp16(-0.5f), utils::fp16(0.5f));
+    ut::fill_buffer_randn(matB.data(), k * ldb, utils::fp16(-0.5f), utils::fp16(0.5f));
+    ut::fill_buffer_randn(matD.data(), matD.size(), utils::fp16(0.f), utils::fp16(1.f));
   }
 
   void calc_ref(float alpha, float beta) {
@@ -568,7 +568,7 @@ struct UT_GEMMData_Row_fp16 {
 };
 
 struct UT_GEMMData_Row_f32 {
-  jblas::utils::aligned_vector<float> matA, matB, matC, matD, matRef;
+  utils::aligned_vector<float> matA, matB, matC, matD, matRef;
   int M, N, K, LDA, LDB, LDC, LDD;
   UT_GEMMData_Row_f32(int m, int n, int k, int lda, int ldb, int ldc, int ldd)
       : M(m), N(n), K(k), LDA(lda), LDB(ldb), LDC(ldc), LDD(ldd) {
@@ -580,9 +580,9 @@ struct UT_GEMMData_Row_f32 {
     } else {
       matD.resize(m * ldd);
     }
-    jblas::ut::fill_buffer_randn(matA.data(), m * lda, -0.5f, 0.5f);
-    jblas::ut::fill_buffer_randn(matB.data(), k * ldb, -0.5f, 0.5f);
-    jblas::ut::fill_buffer_randn(matD.data(), matD.size(), 0.f, 1.f);
+    ut::fill_buffer_randn(matA.data(), m * lda, -0.5f, 0.5f);
+    ut::fill_buffer_randn(matB.data(), k * ldb, -0.5f, 0.5f);
+    ut::fill_buffer_randn(matD.data(), matD.size(), 0.f, 1.f);
   }
 
   void calc_ref(float alpha, float beta) {

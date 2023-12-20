@@ -23,7 +23,7 @@
 #include <sched.h>
 #endif
 
-namespace jblas {
+namespace bestla {
 
 namespace device {
 
@@ -195,7 +195,7 @@ class SapphireRapids {
   static constexpr bool AMX_COMPLEX = 0;
 };
 
-template <JBLAS_ISA ISA_T>
+template <BTLA_ISA ISA_T>
 class isa_base {
  public:
   static bool constexpr avx = ISA_T >= JblasAVX;
@@ -422,7 +422,7 @@ class CpuDevice {
   float P_power = 4.8, E_power = 2.3;
 };
 
-#define GetCPUDevice() auto _cd = jblas::device::CpuDevice::getInstance();
+#define GetCPUDevice() auto _cd = bestla::device::CpuDevice::getInstance();
 
 class CpuBase {
  public:

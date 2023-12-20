@@ -16,14 +16,14 @@
 #include "kernel_avx512f.h"
 #include "bestla_utils.h"
 
-namespace jblas {
+namespace bestla {
 namespace kernel {
 namespace avx512_bf16 {
 #if CompileBF16()
 #pragma GCC push_options
 #pragma GCC target("avx512bf16", "avx512vl", "avx512bw")
 #endif
-static inline JBLAS_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
+static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
                                                      int src_step, int dst_step, bool zeropadding) {
 #if CompileBF16()
   const int npadding = (dst_step - col) * sizeof(float);
@@ -45,12 +45,12 @@ static inline JBLAS_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr,
           reinterpret_cast<__m512>(_mm512_bslli_epi128(_mm512_cvtepu16_epi32(_mm256_loadu_epi16(src + j)), 2)));
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
-  return JblasSuccess;
+  return BTLASuccess;
 #endif
   return avx512f::bf16_cvt_fp32_2D_write_back(src_ptr, dst_ptr, row, col, src_step, dst_step, zeropadding);
 }
 
-static inline JBLAS_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
+static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
                                                      int srcstride, int dststride, bool zeropadding) {
 #if CompileBF16()
   auto srcptr = reinterpret_cast<const char*>(raw_srcptr);
@@ -66,13 +66,13 @@ static inline JBLAS_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, voi
     int j = 0;
     for (; j < col_body_loop; j++) {
       _mm512_storeu_epi16(
-          (dst + (j * simd_proc_elt) * sizeof(jblas::utils::bf16)),
+          (dst + (j * simd_proc_elt) * sizeof(utils::bf16)),
           (__m512i)_mm512_cvtne2ps_pbh(_mm512_loadu_ps(src + sizeof(float) * simd_proc_elt * j + sizeof(float) * 16),
                                        _mm512_loadu_ps(src + sizeof(float) * simd_proc_elt * j + sizeof(float) * 0)));
     }
     if (col_tail > 0) {
       _mm512_mask_storeu_epi16(
-          (dst + (j * simd_proc_elt) * sizeof(jblas::utils::bf16)), tail_mask,  //
+          (dst + (j * simd_proc_elt) * sizeof(utils::bf16)), tail_mask,  //
           (__m512i)_mm512_cvtne2ps_pbh(
               _mm512_maskz_loadu_ps(tail_mask >> 16, src + sizeof(float) * simd_proc_elt * j + sizeof(float) * 16),
               _mm512_maskz_loadu_ps(tail_mask >> 0, src + sizeof(float) * simd_proc_elt * j + sizeof(float) * 0)));
@@ -89,4 +89,4 @@ static inline JBLAS_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, voi
 #endif
 }  // namespace avx512_bf16
 }  // namespace kernel
-}  // namespace jblas
+}  // namespace BTLA

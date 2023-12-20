@@ -1,9 +1,7 @@
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
-namespace jblas {
+namespace bestla {
 using namespace utils;
-using namespace parallel;
-
 namespace ut {
 class UT_Fp32Fp32 {
  public:
@@ -24,8 +22,8 @@ class UT_Fp32Fp32 {
     ut<sAVX2>(1024, 1536, 1536);
 
     CheckISA(AVX512F);
-    ut<jblas::gemm::SCoreRowNAvx512f<48, 8>>(384, 768, 768);
-    ut<jblas::gemm::SCoreRowNAvx512f<48, 8>>(1024, 1024, 1024);
+    ut<gemm::SCoreRowNAvx512f<48, 8>>(384, 768, 768);
+    ut<gemm::SCoreRowNAvx512f<48, 8>>(1024, 1024, 1024);
     ut<sAVX512F>(1, 1, 1);
     ut<sAVX512F>(8, 48, 2);
     ut<sAVX512F>(8, 4096, 4096);
@@ -35,17 +33,17 @@ class UT_Fp32Fp32 {
   }
   template <class GemmCore_T>
   void ut(int m, int n, int k) {
-    printf("Test Case: %d %d %d Core:%s\n", m, n, k, jblas::gemm::CoreAttr::to_str(GemmCore_T::ID));
+    printf("Test Case: %d %d %d Core:%s\n", m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     avector<float> matA(m * k), matB(k * n), matC(m * n), ref(m * n);
     fill_buffer_randn(matA.data(), matA.size(), -0.5f, 0.5f);
     fill_buffer_randn(matB.data(), matB.size(), -0.5f, 0.5f);
     gemmref_fp32fp32fp32(m, n, k, matA.data(), matB.data(), ref.data(), k, n, n);
     using Launcher =
-        jblas::wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, jblas::prologue_a::gemm::ActivationBase,
-                                           jblas::prologue_b::gemm::WeightPack,
-                                           jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                           prologue_b::gemm::WeightPack,
+                                           epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
@@ -53,7 +51,7 @@ class UT_Fp32Fp32 {
     launcher.mProB.packWeight(n, k, {matB.data(), n, &packw}, &DefaultThreading);
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matA.data(), k}, {matB.data(), n, &packw}, {matC.data(), n}};
-    GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
     ut::buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 
@@ -63,16 +61,16 @@ class UT_Fp32Fp32 {
   template <typename Core_T, typename LOG_T>
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = jblas::wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, jblas::prologue_a::gemm::ActivationBase,
-                                                        jblas::prologue_b::gemm::WeightPack,
-                                                        jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Parallel = parallel::gemm::SchedulerBase<Core_T>;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
+                                                        prologue_b::gemm::WeightPack,
+                                                        epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
-    auto corestr = jblas::gemm::CoreAttr::to_str(Core_T::ID);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
-    std::vector<jblas::storage::gemm::StoragePackedWeight> packBs(batch, 0);
+    std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
@@ -86,7 +84,7 @@ class UT_Fp32Fp32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("%s %s Flops:%.3f PerCoreFlops:%.3f\n ", corestr, log.get_log_str(), flops, flops / threads);
@@ -162,7 +160,7 @@ class UT_U8S8S32 {
 
   template <class GemmCore_T>
   void ut(int m, int n, int k) {
-    printf("Test Case: %d %d %d Core:%s\n", m, n, k, jblas::gemm::CoreAttr::to_str(GemmCore_T::ID));
+    printf("Test Case: %d %d %d Core:%s\n", m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n);
     avector<uint8_t> matAu8(m * k), zpAu8(m);
     avector<int8_t> matBs8(k * n);
@@ -186,11 +184,11 @@ class UT_U8S8S32 {
     }
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     using Launcher =
-        jblas::wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, jblas::prologue_a::gemm::ActivationBase,
-                                           jblas::prologue_b::gemm::WeightPack,
-                                           jblas::epilogue::gemm::ZpDequantInt32ToFp32>;
+        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                           prologue_b::gemm::WeightPack,
+                                           epilogue::gemm::ZpDequantInt32ToFp32>;
     Launcher launcher;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
@@ -202,7 +200,7 @@ class UT_U8S8S32 {
         {matAu8.data(), k},
         {matBs8.data(), n, &packw},
         {matC.data(), n, 1, scaleAf32.data(), scaleBf32.data(), zpAu8.data(), reduceB.data()}};
-    GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
     ut::buffer_error(refC.data(), matC.data(), refC.size(), 0.001f);
   }
 
@@ -212,16 +210,16 @@ class UT_U8S8S32 {
   template <typename Core_T, typename LOG_T>
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = jblas::wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, jblas::prologue_a::gemm::ActivationBase,
-                                                        jblas::prologue_b::gemm::WeightPack,
-                                                        jblas::epilogue::gemm::AccumulatorWriteBackInt32>;
+    using Parallel = parallel::gemm::SchedulerBase<Core_T>;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
+                                                        prologue_b::gemm::WeightPack,
+                                                        epilogue::gemm::AccumulatorWriteBackInt32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
-    auto corestr = jblas::gemm::CoreAttr::to_str(Core_T::ID);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
-    std::vector<jblas::storage::gemm::StoragePackedWeight> packBs(batch, 0);
+    std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
@@ -235,7 +233,7 @@ class UT_U8S8S32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -261,17 +259,17 @@ class UT_U8S8S32 {
     GetCPUDevice();
     if (_cd->AMX_INT8()) {
       request_perm_xtile_data();
-      benchmark<jblas::gemm::ICoreRowNAmxint8<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<jblas::gemm::ICoreRowNAmxint8<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<jblas::gemm::ICoreRowNAmxint8<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
     if (_cd->AVX512_VNNI()) {
-      benchmark<jblas::gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+      benchmark<gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                               48);
     }
     if (_cd->AVX_VNNI()) {
-      benchmark<jblas::gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<jblas::gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
   }
 };
@@ -300,7 +298,7 @@ class UT_S8S8S32 {
   }
   template <class GemmCore_T>
   void ut(int m, int n, int k) {
-    printf("Test Case: %d %d %d Core:%s\n", m, n, k, jblas::gemm::CoreAttr::to_str(GemmCore_T::ID));
+    printf("Test Case: %d %d %d Core:%s\n", m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n);
     avector<int8_t> matAu8(m * k);
     avector<int8_t> matBs8(k * n);
@@ -323,11 +321,11 @@ class UT_S8S8S32 {
     }
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     using Launcher =
-        jblas::wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, jblas::prologue_a::gemm::ActivationBase,
-                                           jblas::prologue_b::gemm::WeightPack,
-                                           jblas::epilogue::gemm::DequantInt32ToFp32>;
+        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                           prologue_b::gemm::WeightPack,
+                                           epilogue::gemm::DequantInt32ToFp32>;
     Launcher launcher;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
@@ -336,7 +334,7 @@ class UT_S8S8S32 {
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{
         gp, {matAu8.data(), k}, {matBs8.data(), n, &packw}, {matC.data(), n, 1, scaleAf32.data(), scaleBf32.data()}};
-    GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
     ut::buffer_error(refC.data(), matC.data(), refC.size(), 0.001f);
   }
 
@@ -346,16 +344,16 @@ class UT_S8S8S32 {
   template <typename Core_T, typename LOG_T>
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = jblas::wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, jblas::prologue_a::gemm::ActivationBase,
-                                                        jblas::prologue_b::gemm::WeightPack,
-                                                        jblas::epilogue::gemm::AccumulatorWriteBackInt32>;
+    using Parallel = parallel::gemm::SchedulerBase<Core_T>;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
+                                                        prologue_b::gemm::WeightPack,
+                                                        epilogue::gemm::AccumulatorWriteBackInt32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
-    auto corestr = jblas::gemm::CoreAttr::to_str(Core_T::ID);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
-    std::vector<jblas::storage::gemm::StoragePackedWeight> packBs(batch, 0);
+    std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
@@ -369,7 +367,7 @@ class UT_S8S8S32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -395,11 +393,11 @@ class UT_S8S8S32 {
     GetCPUDevice();
     if (_cd->AMX_INT8()) {
       request_perm_xtile_data();
-      benchmark<jblas::gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+      benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                               48);
-      benchmark<jblas::gemm::ICoreRowNAmxint8SS<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+      benchmark<gemm::ICoreRowNAmxint8SS<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                               48);
-      benchmark<jblas::gemm::ICoreRowNAmxint8SS<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+      benchmark<gemm::ICoreRowNAmxint8SS<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                               48);
     }
   }
@@ -428,13 +426,13 @@ class UT_Bf16Bf16Fp32 {
 
   template <class GemmCore_T>
   void ut(int m, int n, int k) {
-    printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, jblas::gemm::CoreAttr::to_str(GemmCore_T::ID));
+    printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     using Launcher =
-        jblas::wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, jblas::prologue_a::gemm::ActivationBase,
-                                           jblas::prologue_b::gemm::WeightPack,
-                                           jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                           prologue_b::gemm::WeightPack,
+                                           epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
@@ -446,7 +444,7 @@ class UT_Bf16Bf16Fp32 {
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};
-    GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
     buffer_error(refC.data(), matC.data(), refC.size(), 0.05f);
   }
 
@@ -456,16 +454,16 @@ class UT_Bf16Bf16Fp32 {
   template <typename Core_T, typename LOG_T>
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = jblas::wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, jblas::prologue_a::gemm::ActivationBase,
-                                                        jblas::prologue_b::gemm::WeightPack,
-                                                        jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Parallel = parallel::gemm::SchedulerBase<Core_T>;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
+                                                        prologue_b::gemm::WeightPack,
+                                                        epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
-    auto corestr = jblas::gemm::CoreAttr::to_str(Core_T::ID);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
-    std::vector<jblas::storage::gemm::StoragePackedWeight> packBs(batch, 0);
+    std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
@@ -479,7 +477,7 @@ class UT_Bf16Bf16Fp32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -505,9 +503,9 @@ class UT_Bf16Bf16Fp32 {
     GetCPUDevice();
     if (_cd->AMX_BF16()) {
       request_perm_xtile_data();
-      benchmark<jblas::gemm::HCoreRowNAmxbf16<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<jblas::gemm::HCoreRowNAmxbf16<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<jblas::gemm::HCoreRowNAmxbf16<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::HCoreRowNAmxbf16<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::HCoreRowNAmxbf16<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::HCoreRowNAmxbf16<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
   }
 };
@@ -534,13 +532,13 @@ class UT_Fp16Fp16Fp16 {
 
   template <class GemmCore_T>
   void ut(int m, int n, int k) {
-    printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, jblas::gemm::CoreAttr::to_str(GemmCore_T::ID));
+    printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     using Launcher =
-        jblas::wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, jblas::prologue_a::gemm::ActivationBase,
-                                           jblas::prologue_b::gemm::WeightPack,
-                                           jblas::epilogue::gemm::AccumulatorWriteBackFp16>;
+        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                           prologue_b::gemm::WeightPack,
+                                           epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher launcher;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
@@ -551,7 +549,7 @@ class UT_Fp16Fp16Fp16 {
     gemmref_fp16fp16fp16(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
     GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};
-    GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
     buffer_error(refC.data(), matC.data(), refC.size(), utils::fp16(0.0002f * k));
   }
 
@@ -561,16 +559,16 @@ class UT_Fp16Fp16Fp16 {
   template <typename Core_T, typename LOG_T>
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
-    using Parallel = jblas::parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = jblas::wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, jblas::prologue_a::gemm::ActivationBase,
-                                                        jblas::prologue_b::gemm::WeightPack,
-                                                        jblas::epilogue::gemm::AccumulatorWriteBackFp16>;
+    using Parallel = parallel::gemm::SchedulerBase<Core_T>;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase,
+                                                        prologue_b::gemm::WeightPack,
+                                                        epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
-    auto corestr = jblas::gemm::CoreAttr::to_str(Core_T::ID);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
-    std::vector<jblas::storage::gemm::StoragePackedWeight> packBs(batch, 0);
+    std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
@@ -584,7 +582,7 @@ class UT_Fp16Fp16Fp16 {
         log.start();
         GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -610,7 +608,7 @@ class UT_Fp16Fp16Fp16 {
     GetCPUDevice();
     if (_cd->AVX512_FP16()) {
       benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
-      benchmark<jblas::gemm::HCoreRowNAvx512fp16<64, 12>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+      benchmark<gemm::HCoreRowNAvx512fp16<64, 12>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                                56);
       benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
     }
@@ -620,4 +618,4 @@ class UT_Fp16Fp16Fp16 {
 static UT_Fp16Fp16Fp16 sUT_Fp16Fp16Fp16;
 #endif
 }  // namespace ut
-}  // namespace jblas
+}  // namespace bestla
