@@ -23,10 +23,10 @@ Abstract:
     C APIs of BesTLA GEMMs.
 --*/
 
-#include "jblas_gemm.h"
+#include "bestla_gemm.h"
 #include <cstdint>
 
-#include "jblas_defs.h"
+#include "bestla_defs.h"
 
 using namespace jblas;  // NOLINT
 

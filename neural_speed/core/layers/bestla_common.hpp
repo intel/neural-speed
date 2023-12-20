@@ -13,13 +13,13 @@
 //  limitations under the License.
 #pragma once
 #include <utility>
-#include "ne_jblas.h"
+#include "ne_bestla.h"
 #include "bestla/bestla_prologue_b.h"
 #include "bestla/bestla_device.h"
 #include "bestla/bestla_utils.h"
 #include "bestla/bestla_parallel.h"
 #include "layers/ele_wise.h"
-#include "jblas_defs.h"
+#include "bestla_defs.h"
 
 namespace ne_jblas {
 

@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#include "jblas_common.hpp"
+#include "bestla_common.hpp"
 
 using namespace jblas;     // NOLINT
 using namespace ne_jblas;  // NOLINT

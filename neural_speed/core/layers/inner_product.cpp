@@ -11,8 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-#include "jblas_common.hpp"
-#include "jblas_gemm.h"
+#include "bestla_common.hpp"
+#include "bestla_gemm.h"
 
 using namespace jblas;     // NOLINT
 using namespace ne_jblas;  // NOLINT

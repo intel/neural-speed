@@ -41,10 +41,10 @@
 #include <unordered_map>
 
 #include "application/common.h"
-#include "core/layers/jblas_common.hpp"
+#include "core/layers/bestla_common.hpp"
 #include "core/layers/mha_dense.h"
 #include "core/ne_layers.h"
-#include "core/layers/jblas_gemm.h"
+#include "core/layers/bestla_gemm.h"
 #include "bestla/bestla_parallel.h"
 
 #include "models/model_utils/model_config.h"

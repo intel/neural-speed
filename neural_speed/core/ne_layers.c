@@ -48,7 +48,7 @@
 #include "layers/ele_wise.h"
 #include "layers/mha_dense.h"
 #include "ne.h"
-#include "ne_jblas.h"
+#include "ne_bestla.h"
 
 // if C99 - static_assert is noop
 // ref: https://stackoverflow.com/a/53923785/4039976

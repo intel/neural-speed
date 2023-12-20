@@ -29,7 +29,7 @@
 #endif
 
 #include "core/data_types.h"
-#include "layers/jblas_common.hpp"
+#include "layers/bestla_common.hpp"
 #include "bestla/bestla.h"
 #include "bestla/bestla_epilogue.h"
 #include "bestla/bestla_gemm.h"

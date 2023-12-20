@@ -33,7 +33,7 @@
 #include "core/layers/mha_dense.h"
 #include "core/ne.h"
 #include "core/ne_layers.h"
-#include "core/ne_jblas.h"
+#include "core/ne_bestla.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
