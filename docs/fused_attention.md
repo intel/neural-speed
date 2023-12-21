@@ -97,7 +97,7 @@ Fused attention is designed to be able to easily support various models:
 > ✅: Supported; 🚧: WIP
 
 ### Limitations
-Currently the fused attention is only enabled when compiling the llm runtime with GCC11+.
+Currently the fused attention is only enabled when compiling the Neural Speed with GCC11+.
 
 ## Tips for parallelism
 Thanks to the mathematical nature of attention, one can simply parallel the whole kv-cache operations and fused attention on commonly-parallelizable dimensions. Just pass each part to every KV-cache operations (and merge them together if needed).
