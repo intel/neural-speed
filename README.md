@@ -296,13 +296,13 @@ Neural Speed assumes the compatible model format as [llama.cpp](https://github.c
 ```bash
 
 # convert the model directly use model id in Hugging Face. (recommended)
-python scripts/convert.py --outtype f32 --outfile ne-f32.bin EleutherAI/gpt-j-6b
+python neural_speed/scripts/convert.py --outtype f32 --outfile ne-f32.bin EleutherAI/gpt-j-6b
 
 # or you can download fp32 model (e.g., LLAMA2) from Hugging Face at first, then convert the pytorch model to ggml format.
 git clone https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
-python scripts/convert.py --outtype f32 --outfile ne-f32.bin model_path
+python neural_speed/scripts/convert.py --outtype f32 --outfile ne-f32.bin model_path
 
-# To convert model with PEFT(Parameter-Efficient Fine-Tuning) adapter, you need to merge the PEFT adapter into the model first, use below command to merge the PEFT adapter and save the merged model, afterwards you can use 'scripts/convert.py' just like above mentioned.
+# To convert model with PEFT(Parameter-Efficient Fine-Tuning) adapter, you need to merge the PEFT adapter into the model first, use below command to merge the PEFT adapter and save the merged model, afterwards you can use 'neural_speed/scripts/convert.py' just like above mentioned.
 python scripts/load_peft_and_merge.py --model_name_or_path meta-llama/Llama-2-7b-hf --peft_name_or_path dfurman/llama-2-7b-instruct-peft --save_path ./Llama-2-7b-hf-instruct-peft
 
 # quantize weights of fp32 ggml bin
