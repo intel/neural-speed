@@ -28,7 +28,9 @@ Abstract:
 
 #include "bestla_defs.h"
 
-namespace bestla {
+using namespace bestla;  // NOLINT
+
+namespace {
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
                      storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
@@ -468,10 +470,10 @@ static bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float
 
 }  // namespace bestla
 
+
 bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
                          const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool) {
   GetCPUDevice();
-  using namespace bestla;
   auto pth = reinterpret_cast<bestla::parallel::IThreading*>(ThreadPool);
   bool processed = true;
   for (size_t i = 0; i < BatchN; i++) {
@@ -589,7 +591,6 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
 
 size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
                          ne_comp_type CompType, int* shuffle_indice) {
-  using namespace bestla;
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
@@ -614,7 +615,6 @@ size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantTyp
 bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
                         BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType, bool isTrans,
                         void* ThreadPool) {
-  using namespace bestla;
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
@@ -640,7 +640,6 @@ bool BTLAGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, co
                    size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
                    ne_comp_type CompType, int* shuffle_indice, void* ThreadPool) {
   // only for integer quant
-  using namespace bestla;
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
@@ -655,7 +654,6 @@ bool BTLAGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, co
 }
 
 bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, size_t ldb, void* ThreadPool) {
-  using namespace bestla;
   auto ptr = storage::gemm::PackedWeightParser::deserialBuffer(const_cast<void*>(PackedBuf));
   auto pth = reinterpret_cast<parallel::IThreading*>(ThreadPool);
   GetCPUDevice();

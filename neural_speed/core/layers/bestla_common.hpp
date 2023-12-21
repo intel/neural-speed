@@ -55,11 +55,10 @@ static bool contains(const T& val, const T* set, size_t len) {
 }
 
 static bool hasISA(const uint64_t* coreset, size_t len) {
-  using namespace bestla;
   GetCPUDevice();
   bool support = false;
   for (size_t i = 0; i < len; i++) {
-    auto isa = gemm::CoreAttr::get_ISA(coreset[i]);
+    auto isa = bestla::gemm::CoreAttr::get_ISA(coreset[i]);
     switch (isa) {
       case BTLA_ISA::AVX:
         support |= _cd->AVX();

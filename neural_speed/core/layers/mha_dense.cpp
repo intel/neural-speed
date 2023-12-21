@@ -53,8 +53,8 @@ constexpr bool MHA_PREFER_AVX512FP16 = true;
 #endif
 #endif
 
-using namespace bestla;
-using namespace ne_bestla;
+using namespace bestla; // NOLINT
+using namespace ne_bestla; // NOLINT
 namespace {
 using bestla::utils::bf16;
 using bestla::utils::fp16;
