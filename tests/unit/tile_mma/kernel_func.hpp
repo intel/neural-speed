@@ -40,8 +40,8 @@ struct tile_mma_func {
         int start_x_b = 0;
         int start_y_b = 0;
 
-        using matA_tile_desc_t
-                = tile_desc_t<k, m, 32 / sizeof(dtypeA), 8, reg_layout::tiled>;
+        using matA_tile_desc_t = tile_desc_t<k, m, 32 / sizeof(dtypeA), 8,
+                reg_layout::transpose_tiled>;
         using matB_tile_desc_t = tile_desc_t<n, k, 16, 32 / sizeof(dtypeB),
                 reg_layout::vnni_tiled>;
         using matC_tile_desc_t = tile_desc_t<n, m, 16, 8, reg_layout::tiled>;
@@ -63,7 +63,7 @@ struct tile_mma_func {
                 = tile_t<dtypeAcc, tile_desc_t<n, m, 16, 8, reg_layout::tiled>>;
 
         using tile_mma = tile_mma_t<matAcc_t, matAcc_t, matB_t, matA_t,
-                mma_engine::xmx, gpu_arch::Xe>;
+                mma_engine::fpu, gpu_arch::Xe>;
 
         matA_t matA;
         matB_t matB;

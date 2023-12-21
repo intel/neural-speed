@@ -187,13 +187,13 @@ void kernel_run(auto nd_range, auto validate_result) {
     auto A = alloc_device_and_init<data_type>(
             Size,
             [](data_type *data, size_t idx) {
-                data[idx] = static_cast<data_type>(idx);
+                data[idx] = static_cast<data_type>(idx % 32);
             },
             queue, device, context);
     auto B = alloc_device_and_init<data_type>(
             Size,
             [](data_type *data, size_t idx) {
-                data[idx] = static_cast<data_type>(idx);
+                data[idx] = static_cast<data_type>(idx % 32);
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type>(
