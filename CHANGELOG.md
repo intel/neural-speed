@@ -1,6 +1,17 @@
 [README](/README.md) > **Changelog**
 # Changelog
 
+## [v0.3.7](https://github.com/intel/xetla/releases/tag/v0.3.7) (2023-12-22)
+- New Features
+  * Enabled multi-SKUs support.
+  * Refined the project’s coding conventions.
+  * Cleaned up building warnings.
+  * Upgraded the toolchain to oneAPI-2024.0.0
+  * Updated documents, tests, and examples.
+
+- Known Issues
+    - Refer to [Limitations](/media/docs/limitations.md).
+
 ## [v0.3.6](https://github.com/intel/xetla/releases/tag/v0.3.6) (2023-11-10)
 - New Features
   * Added GEMM new feature for any shapes support (odd shapes).
