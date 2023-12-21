@@ -229,7 +229,7 @@ cmake --build . -j --config Release
 ## How to Use
 There are two methods for utilizing the Neural Speed:
 - [Transformer-based API](#How-to-use-Transformer-based-API)
-- [Straightforward Python script](#How-to-use-Straightforward-Python-script)
+- [Straightforward Python script](#How-to-use-Python-script)
 
 
 ## How to use: Transformer-based API
@@ -262,7 +262,7 @@ outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ### 1. Run LLM with Python Script
 You can run LLM with one-click python script including conversion, quantization and inference.
 ```
-python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
+python neural_speed/scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
 ```
 
 Argument description of run.py ([supported MatMul combinations](#supported-matrix-multiplication-data-types-combinations)):
@@ -303,17 +303,17 @@ git clone https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
 python neural_speed/scripts/convert.py --outtype f32 --outfile ne-f32.bin model_path
 
 # To convert model with PEFT(Parameter-Efficient Fine-Tuning) adapter, you need to merge the PEFT adapter into the model first, use below command to merge the PEFT adapter and save the merged model, afterwards you can use 'neural_speed/scripts/convert.py' just like above mentioned.
-python scripts/load_peft_and_merge.py --model_name_or_path meta-llama/Llama-2-7b-hf --peft_name_or_path dfurman/llama-2-7b-instruct-peft --save_path ./Llama-2-7b-hf-instruct-peft
+python neural_speed/scripts/load_peft_and_merge.py --model_name_or_path meta-llama/Llama-2-7b-hf --peft_name_or_path dfurman/llama-2-7b-instruct-peft --save_path ./Llama-2-7b-hf-instruct-peft
 
 # quantize weights of fp32 ggml bin
 # model_name: llama, llama2, mpt, falcon, gptj, starcoder, dolly
 # optimized INT4 model with group size 128 (recommended)
-python scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --compute_dtype int8
+python neural_speed/scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --compute_dtype int8
 
 # Alternativly you could run ggml q4_0 format like following
-python scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_0.bin --weight_dtype int4 --use_ggml
+python neural_speed/scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_0.bin --weight_dtype int4 --use_ggml
 # optimized INT4 model with group size 32
-python scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 32 --compute_dtype int8
+python neural_speed/scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 32 --compute_dtype int8
 
 ```
 Argument description of quantize.py ([supported MatMul combinations](#supported-matrix-multiplication-data-types-combinations)):
@@ -355,17 +355,17 @@ We provide LLM inference script to run the quantized model. Please reach [us](ma
 # please type prompt about codes when run `StarCoder`, for example, -p "def fibonnaci(".
 
 #Linux and WSL
-OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
+OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python neural_speed/scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
 
 # if you want to generate fixed outputs, please set --seed arg, for example:
-OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --seed 12
+OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python neural_speed/scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --seed 12
 
 # if you want to reduce repeated generated texts, please set --repeat_penalty (value > 1.0, default = 1.0), for example:
-OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --repeat_penalty 1.2
+OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python neural_speed/scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --repeat_penalty 1.2
 
 #Windows
 #Recommend to build and run our project in WSL to get a better and stable performance
-python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores|P-cores> --color -p "She opened the door and see"
+python neural_speed/scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores|P-cores> --color -p "She opened the door and see"
 ```
 
 Argument description of inference.py:
@@ -436,4 +436,4 @@ outputs = model.generate(inputs, streamer=streamer, stopping_criteria=stopping_c
 ```
 
 ### 6. Perplexity (measuring model quality)
-You can use the [scripts/perplexity.py](./scripts/perplexity.py) script to over a given (subset of) dataset. Run `python scripts/perplexity.py --help` for detailed usage. For more infomation of the perplexity metric, see https://huggingface.co/docs/transformers/perplexity.
+You can use the [scripts/perplexity.py](neural_speed/scripts/perplexity.py) script to over a given (subset of) dataset. Run `python neural_speed/scripts/perplexity.py --help` for detailed usage. For more infomation of the perplexity metric, see https://huggingface.co/docs/transformers/perplexity.
