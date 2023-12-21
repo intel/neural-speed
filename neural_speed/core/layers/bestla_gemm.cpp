@@ -468,8 +468,7 @@ static bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float
   return false;
 }
 
-}  // namespace bestla
-
+}  // namespace
 
 bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
                          const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool) {
