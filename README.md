@@ -434,6 +434,3 @@ stopping_criteria = StoppingCriteriaList(
 
 outputs = model.generate(inputs, streamer=streamer, stopping_criteria=stopping_criteria)
 ```
-
-### 6. Perplexity (measuring model quality)
-You can use the [scripts/perplexity.py](neural_speed/scripts/perplexity.py) script to over a given (subset of) dataset. Run `python neural_speed/scripts/perplexity.py --help` for detailed usage. For more infomation of the perplexity metric, see https://huggingface.co/docs/transformers/perplexity.

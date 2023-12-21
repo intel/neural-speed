@@ -1,5 +1,5 @@
 # Highly Optimized Low Precision Kernels
-Our kernels are based on x64 template library [jblas](../../../library/jblas).
+Our kernels are based on x64 template library [BESTLA](../../bestla/README.md).
 ## Support Matrix
 Limited by the graph framework, we only add kernels which accept float tensor as input and output tensor.
 
