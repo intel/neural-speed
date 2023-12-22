@@ -1,6 +1,6 @@
 # Neural Speed
 
-Neural Speed is designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) model compression techniques. The work is highly inspired from [llama.cpp](https://github.com/ggerganov/llama.cpp), which organizes almost all the core code (e.g., kernels) in a single big file with a large number of pre-defined macros, thus making it not easy for developers to support a new model. Our Neural Speed has the following features:
+Neural Speed is designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization and sparsity. The work is highly inspired from [llama.cpp](https://github.com/ggerganov/llama.cpp) and provides the below features:
 
 - Modular design to support new models
 - [Highly optimized low precision kernels](neural_speed/core/README.md)
@@ -336,7 +336,7 @@ Argument description of quantize.py ([supported MatMul combinations](#supported-
 Our Neural Speed supports  INT4 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 weight-only quantization and FP32 / FP16 / BF16 / INT8 computation forward matmul on the Intel platforms. Here are the all supported data types combinations for matmul operations (quantization and forward).
 > This table will be updated frequently due to active development
 
-| Weight dtype | Compute dtype (default value if missing or wrong setting) | Scale dtype (default if missing or wrong setting) | algo (default if missing or wrong setting) |
+| Weight dtype | Compute dtype (default value) | Scale dtype (default value) | Quantization scheme (default value) |
 |---|:---:|:---:|:---:|
 | FP32 | FP32 | NA | NA |
 | INT8 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
