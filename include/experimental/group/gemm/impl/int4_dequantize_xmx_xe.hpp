@@ -377,8 +377,8 @@ public:
             //     subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             //             scale_prefetch_payload);
             if constexpr (compute_policy::quant_type == quant_mode::S4_CLIP) {
-                subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-                        zero_pt_prefetch_payload);
+                // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+                //         zero_pt_prefetch_payload);
             }
             scale_prefetch_addr_i++;
             matA_prefetch_payload.template update_tdesc<update_dir_a>(
@@ -423,8 +423,8 @@ public:
                 //         scale_prefetch_payload);
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_CLIP) {
-                    subgroup::tile_prefetch<cache_hint::cached,
-                            cache_hint::cached>(zero_pt_prefetch_payload);
+                    //     subgroup::tile_prefetch<cache_hint::cached,
+                    //             cache_hint::cached>(zero_pt_prefetch_payload);
                 }
                 scale_prefetch_addr_i++;
             }

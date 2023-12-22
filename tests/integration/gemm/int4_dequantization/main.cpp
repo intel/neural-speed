@@ -206,11 +206,11 @@ void dequantize_gemm_run(int iter) {
     static constexpr uint32_t prefetch_distance = 3;
 
     using mem_desc_a_t = xetla::mem_desc_t<data_type_a, mem_layout::row_major,
-            mem_space::global>;
+            mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
     using mem_desc_b_t = xetla::mem_desc_t<data_type_b, mem_layout::row_major,
-            mem_space::global>;
+            mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
     using mem_desc_c_t = xetla::mem_desc_t<data_type_c, mem_layout::row_major,
-            mem_space::global>;
+            mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_c)>;
 
     using compute_attr = xetla::group::compute_attr_t<data_type_acc_in,
             data_type_acc_in, data_type_acc>;
