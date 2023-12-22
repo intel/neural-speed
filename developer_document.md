@@ -6,7 +6,7 @@ However, LLM inference thing is complicated. It may have its own: 1. special tok
 
 For simplicity, we take [polyglot](https://huggingface.co/EleutherAI/polyglot-ko-5.8b) as the example model. It has the same architecture as `GPT-NEOX` but only fewer layers.
 
-Firstly, we need to add its temp buffer in its [related model-arch header file](https://github.com/intel/intel-extension-for-transformers/blob/1.2.1/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox.h) and [re-compile](https://github.com/intel/intel-extension-for-transformers/blob/1.2.1/intel_extension_for_transformers/llm/runtime/graph/README.md#1-install-llm-runtime).
+Firstly, we need to add its temp buffer in its [related model-arch header file](neural_speed/models/gptneox/gptneox.h) and [re-compile](README.md#Install).
 ```diff
 static const model_scratch gptneox_mem_req(int n_layers) {
   switch (n_layers) {
@@ -65,7 +65,7 @@ she open the door and see him. She looks at him and says, "How do you do?" He sa
 
 Once you make sure your model has the same generated tokens as PyTorch, you can deploy it by using low-bits precision like `INT4` data type and customized acceleration. Please refer to `Python API` section for more details.
 
-# Enable graph cpp model process
+# Enable cpp model process
 We enable a CPP model in the following four steps.
 
 ```mermaid
@@ -80,11 +80,11 @@ graph LR;
 We need to implement corresponding serialization methods from pytorch format, which is mainly divided into the following three steps.
 
 ## 1.1.	Hyperparamters
-The term **"hyperparamters"** describes a value that is used to configure the behavior of a large language model; this is in contrast to the model's parameters, which are the weight that were derived in the training process that was used to create the model. Each model defines its own hyperparameter structure that defines the hyperparameter values accepted by that model. Valid ITREX graph files must list these values in the correct order, and each value must be represented using the correct data type. Although hyperparameters are different across models, some attributes appear in the hyperparameters for most models:
+The term **"hyperparamters"** describes a value that is used to configure the behavior of a large language model; this is in contrast to the model's parameters, which are the weight that were derived in the training process that was used to create the model. Each model defines its own hyperparameter structure that defines the hyperparameter values accepted by that model. Valid ITREX model files must list these values in the correct order, and each value must be represented using the correct data type. Although hyperparameters are different across models, some attributes appear in the hyperparameters for most models:
 - n_vocab: the size of the model's vocabulary
 - n_embd: the size of the model's " embedding layer", which is used during prompt ingestion.
 - n_layer: the number of layers in the model; each layer represents a set of weights.
-Here we will use [convert_gptneox.py](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/scripts/convert_gptneox.py#L96) as an example,
+Here we will use [convert_gptneox.py](neural_speed/scripts/convert_gptneox.py#L96) as an example,
 ```python
 fout.write(struct.pack("i", hparams["num_attention_heads"]))
 fout.write(struct.pack("i", hparams.get("n_head_kv", 0)))  # multi-query attention
@@ -96,7 +96,7 @@ The above `fout` is the file we need to get, and the `num_attention`, `n_head_kv
 As the name implies, a model's vocabulary comprises components that are used by the model to generate language (text). However, unlike the vocabulary of a human, which consists of words, the vocabulary of a large language model consists of "tokens". A token can be an entire word, but oftentimes they are word fragments. Just like humans can compose millions of words from just a dozen or two letters, large language models use tokens to express a large number of words from a relatively smaller number of components. Consider a vocabulary with the following tokens: `whi`, `ch`, `le`, `who`, and `a`; this vocabulary can be used to create the English words `"which"`, `"while"`, `"who"`, `"a"`, and `"leach"`. How would the behavior change if the model contained the following tokens: `wh`, `ich`, `ile`, `o`, and `leach`? Choices such as these allow model-creators to tune the behavior and performance of their models.
 
 As described above, the model's hyperparameters typically contain a value that specifies the number of tokens in the vocabulary. The vocabulary is encoded as a list of tokens, each of which includes a 32-bit integer that specifies the length of the token. If your model has some new tokenizers, we suggest using a python tokenizer from transformers and feeding the input_ids to model Python API (python example in scripts folder)
-Here we will use [convert_gptneox.py](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/scripts/convert_gptneox.py#L122) as an example to processed the vocabulary of gptneox and written it into `fout`.
+Here we will use [convert_gptneox.py](neural_speed/scripts/convert_gptneox.py#L122) as an example to processed the vocabulary of gptneox and written it into `fout`.
 ```python
 encoder = tokenizer.vocab
 encoder.update(tokenizer.get_added_vocab())
@@ -108,7 +108,7 @@ byte_decoder = {v:k for k, v in byte_encoder.items()}
 Finally, and largest, component of a ITREX GRAPH file is the weights of the LLM that the file represents. Abstractly, a large language model is software that is used to generate language - just like software that is used to generate images can be improved by increasing the number of colors with which images can be rendered, large language models can be improved by increasing the number of weights in the model. The total number of weights in a model is referred to as the "size" of that model. For example, the dolly-v2-3b implementation of the gpt-neox-20b language model architecture is available in several sizes, like 3B and 20B, which stand for 3 billion and 20 billion, respectively. These numbers refer to the total number of weights in that model.
 
 As described in the hyperparameters section, weights are grouped in sets called "layers", which, like hyperparameters, have structures that are uniquely defined by the model architecture; within a layer, weights are grouped in structures called "tensors". So, for instance, both dolly-v2-3B and gpt-neox-20B use layers that comprise the same tensors, but dolly-v2-3B has relatively fewer layers when compared to gpt-neox-20B.
-Here we will use [convert_gptneox.py](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/scripts/convert_gptneox.py#L149) as an example to convert model weights to `fout`.
+Here we will use [convert_gptneox.py](neural_speed/scripts/convert_gptneox.py#L149) as an example to convert model weights to `fout`.
 ```python
 fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
 for i in range(n_dims):
@@ -120,7 +120,7 @@ data.tofile(fout)
 # 2.	Model enablements
 
 ## 2.1.	Model loading
-- Model type: Refers to the type of the model, This can be compared to the model type in the Transformers library, we can see model_class in [model_type.h](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/model_utils/model_types.h#L68), here defines the basic properties of an ITREX graph model, including model_hparams, model_layer, model_struct.etc. If you have a new cpp model you should update [model_archs](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/model_utils/model_types.h#L68).
+- Model type: Refers to the type of the model, This can be compared to the model type in the Transformers library, we can see model_class in [model_type.h](neural_speed/models/model_utils/model_types.h#L68), here defines the basic properties of an neural speed model, including model_hparams, model_layer, model_struct.etc. If you have a new cpp model you should update [model_archs](neural_speed/models/model_utils/model_types.h#L68).
 ```diff
 enum model_archs {
   MODEL_UNKNOWN,
@@ -138,7 +138,7 @@ enum model_archs {
 + MODEL_NEW
 };
 ```
-and update [model_name_to_arch()](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/model_utils/model_types.h#L395).
+and update [model_name_to_arch()](neural_speed/models/model_utils/model_types.h#L395).
 ```diff
  private:
   model_name_to_arch() {}
@@ -154,7 +154,7 @@ and update [model_name_to_arch()](https://github.com/intel/intel-extension-for-t
 +     {"baichuan", MODEL_BAICHUAN}},{"new_model", MODEL_NEW_MODEL}};
 };
 ```
-- Set buffer size: we need to set the corresponding buffer size in model.h according to the size of parameters for the model, just like [gptneox.h](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox.h), you should update [enum gptneox_model](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox.h#L21), [model_scratch](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox.h#L26) and [model class](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox.h#L39).
+- Set buffer size: we need to set the corresponding buffer size in model.h according to the size of parameters for the model, just like [gptneox.h](neural_speed/models/gptneox/gptneox.h), you should update [enum gptneox_model](neural_speed/models/gptneox/gptneox.h#L21), [model_scratch](neural_speed/models/gptneox/gptneox.h#L26) and [model class](neural_speed/models/gptneox/gptneox.h#L39).
 ```diff
 +#ifndef NEW_MODEL_H
 +#define NEW_MODEL_H
@@ -193,13 +193,13 @@ and update [model_name_to_arch()](https://github.com/intel/intel-extension-for-t
 
 +#endif  // NEW_MODEL_H
 ```
-- Model_load_internal: This function include model init and model load, The [model init function](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox_utils.cpp#L42) initializes the model's hyperparameter, such as `n_layer` and `n_embd parameters`.
+- Model_load_internal: This function include model init and model load, The [model init function](neural_speed/models/gptneox/gptneox_utils.cpp#L42) initializes the model's hyperparameter, such as `n_layer` and `n_embd parameters`.
 ```cpp
 n_embd = hparams.n_embd;
 n_vocab = hparams.n_vocab;
 n_layer = hparams.n_layer;
 ```
-The weights of the model in the ITREX Graph file will be loaded in [model load function](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox_utils.cpp#L71). Here, we'll re-read some of the parameters and weights of the converted binary,include ffn, attention, and norm weight and bias, We'll use the mapping between the name and the weight to read the weight we need. It is shown below.
+The weights of the model in the ITREX Graph file will be loaded in [model load function](neural_speed/models/gptneox/gptneox_utils.cpp#L71). Here, we'll re-read some of the parameters and weights of the converted binary,include ffn, attention, and norm weight and bias, We'll use the mapping between the name and the weight to read the weight we need. It is shown below.
 ```cpp
 model.others[0] = ml->get_tensor("gpt_neox.embed_in.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
 model.others[1] = ml->get_tensor("gpt_neox.final_layer_norm.weight", {n_embd}, NE_BACKEND_CPU);
@@ -212,7 +212,7 @@ So when enabling a new model, we should implement the `new_model_utils.cpp` of t
 
 
 ## 2.2.	Inference process
-- Model_eval_internal: This function can be equivalent to the forward process in pytorch, which has the same computational process. In [gptneox.cpp](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox.cpp), the model_eval_internal here will perform a complete operation on the input values, such as ffn, layernorm, mha, etc. Here's a layernorm operation:
+- Model_eval_internal: This function can be equivalent to the forward process in pytorch, which has the same computational process. In [gptneox.cpp](neural_speed/models/gptneox/gptneox.cpp), the model_eval_internal here will perform a complete operation on the input values, such as ffn, layernorm, mha, etc. Here's a layernorm operation:
 ```cpp
 cur = ne_norm(ctx0, inpL);
 cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], cur), cur),
@@ -299,7 +299,7 @@ Most of our model examples only support single prompt processing. You need to ad
 ```
 
 ## 2.3.	Application
-- Q4_0 quant : We can quantize the model generated by convert by adding a quant layer class to quantize it into an int4 low-bit file, so as to obtain better inference performance. Register quant layer class in your new_model_utils.cpp, just like [gptneox_utils.cpp](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/gptneox_utils.cpp#L163), replace `gptneox_quant_layer` to your `new_model_quant_layer`.
+- Q4_0 quant : We can quantize the model generated by convert by adding a quant layer class to quantize it into an int4 low-bit file, so as to obtain better inference performance. Register quant layer class in your new_model_utils.cpp, just like [gptneox_utils.cpp](neural_speed/models/gptneox/gptneox_utils.cpp#L163), replace `gptneox_quant_layer` to your `new_model_quant_layer`.
 ```diff
 +class new_quant_layer : public quant_layer_base {
 + public:
@@ -320,7 +320,7 @@ Most of our model examples only support single prompt processing. You need to ad
 +};
 +REGISTER_QUANT_LAYER_CLASS(new_model);
 ```
-- Add new CMakeLists.txt: We need to add the newly added model to the following CMakeList.txt. New model CMakeList.txt just like [gptneox_CMakeLists.txt](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/gptneox/CMakeLists.txt),
+- Add new CMakeLists.txt: We need to add the newly added model to the following CMakeList.txt. New model CMakeList.txt just like [gptneox_CMakeLists.txt](neural_speed/models/gptneox/CMakeLists.txt),
 ```diff
 +set(TARGET new_model)
 +add_library_w_warning(${TARGET} new_model.cpp new_model_utils.cpp ${MODEL_UTILS_SOURCE})
@@ -328,7 +328,7 @@ Most of our model examples only support single prompt processing. You need to ad
 +set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 +target_link_libraries(${TARGET} PUBLIC ne_layers jblas::jblas)
 ```
- and and new_model to [models_CMakeLists.txt](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/models/CMakeLists.txt).
+ and and new_model to [models_CMakeLists.txt](neural_speed/models/CMakeLists.txt).
  ```diff
 add_subdirectory(opt)
 add_subdirectory(bloom)
@@ -339,22 +339,22 @@ add_subdirectory(baichuan)
 
 ## 2.4. Python API
 
-We support binding LLM runtime to transformer-based Python API, which is more convenient for customers to use. You need to modify the following files.
-Please refer to [install-from-source](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md#install-from-source) and [how-to-use-transformer-based-api](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/README.md#how-to-use-transformer-based-api)  of using Python API.
+We support binding Neural Speed to transformer-based Python API, which is more convenient for customers to use. You need to modify the following files.
+Please refer to [install-from-source](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md#install-from-source) and [how-to-use-transformer-based-api](neural_speed/README.md#how-to-use-transformer-based-api)  of using Python API.
 
 > The Python API will automatically call the convert script and quantization script to convert the hugging face model into a quantified model. Please ensure that the scripts have been added.
 
 Files need to be modified:
-- `intel_extension_for_transformers/llm/runtime/graph/application/CMakeLists.txt`
-- `intel_extension_for_transformers/llm/runtime/graph/application/main_pybind.cpp`
-- `intel_extension_for_transformers/llm/runtime/graph/__init__.py`
+- `neural_speed/application/CMakeLists.txt`
+- `neural_speed/application/main_pybind.cpp`
+- `neural_speed/__init__.py`
 
 If `new_model` will be added, modify the code as follows:
 ```diff
-diff --git a/intel_extension_for_transformers/llm/runtime/graph/__init__.py b/intel_extension_for_transformers/llm/runtime/graph/__init__.py
+diff --git a/neural_speed/__init__.py b/neural_speed/__init__.py
 index aaeab8d16a..12a835e652 100644
---- a/intel_extension_for_transformers/llm/runtime/graph/__init__.py
-+++ b/intel_extension_for_transformers/llm/runtime/graph/__init__.py
+--- a/neural_speed/__init__.py
++++ b/neural_speed/__init__.py
 @@ -57,6 +57,8 @@ class Model:
              import neural_speed.baichuan_cpp as cpp_model
          elif model_name == "polyglot":
@@ -364,10 +364,10 @@ index aaeab8d16a..12a835e652 100644
          else:
              raise TypeError("Unspported model type {}!".format(model_name))
          self.module = cpp_model
-diff --git a/intel_extension_for_transformers/llm/runtime/graph/application/CMakeLists.txt b/intel_extension_for_transformers/llm/runtime/graph/application/CMakeLists.txt
+diff --git a/neural_speed/application/CMakeLists.txt b/neural_speed/application/CMakeLists.txt
 index d86107d26e..36d30cabe3 100644
---- a/intel_extension_for_transformers/llm/runtime/graph/application/CMakeLists.txt
-+++ b/intel_extension_for_transformers/llm/runtime/graph/application/CMakeLists.txt
+--- a/neural_speed/application/CMakeLists.txt
++++ b/neural_speed/application/CMakeLists.txt
 @@ -67,6 +67,7 @@ compile_quant(quant_chatglm   quant_model.cpp chatglm   chatglm)
  compile_quant(quant_chatglm2  quant_model.cpp chatglm2  chatglm2)
  compile_quant(quant_baichuan  quant_model.cpp baichuan  baichuan)
@@ -389,10 +389,10 @@ index d86107d26e..36d30cabe3 100644
  compile_run(run_baichuan  main_run.cpp baichuan  baichuan)
  compile_run(run_mistral   main_run.cpp mistral   llama)
 +compile_run(run_new_model   main_run.cpp new_model   new_model)
-diff --git a/intel_extension_for_transformers/llm/runtime/graph/application/main_pybind.cpp b/intel_extension_for_transformers/llm/runtime/graph/application/main_pybind.cpp
+diff --git a/neural_speed/application/main_pybind.cpp b/neural_speed/application/main_pybind.cpp
 index 894be0134d..a9a57c0a9e 100644
---- a/intel_extension_for_transformers/llm/runtime/graph/application/main_pybind.cpp
-+++ b/intel_extension_for_transformers/llm/runtime/graph/application/main_pybind.cpp
+--- a/neural_speed/application/main_pybind.cpp
++++ b/neural_speed/application/main_pybind.cpp
 @@ -471,6 +471,10 @@ PYBIND11_MODULE(polyglot_cpp, m)
 
  PYBIND11_MODULE(mistral_cpp, m)
@@ -412,14 +412,14 @@ Quantize model and use the jblas library for inference can lead to better perfor
 ```bash
 
 # convert the model directly use model path
-python scripts/convert_new_model.py --outtype f32 --outfile ne-f32.bin new_model_path
+python neural_speed/scripts/convert_new_model.py --outtype f32 --outfile ne-f32.bin new_model_path
 # optimized INT4 model with group size 128 (recommended)
 ./build/bin/quant_new_model --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --compute_dtype int8
 ```
-Then you can use the model to inference according to the process in the [README](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/llm/runtime/graph).
+Then you can use the model to inference according to the process in the [README](https://github.com/intel/intel-extension-for-transformers/tree/main/neural_speed).
 ## 3.2.	MHA fusion
 We can improve the performance by fusion the multihead attention process.
-- [MHA-Fusion Introduction](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/llm/runtime/graph/fused_attention.md)
+- [MHA-Fusion Introduction](neural_speed/fused_attention.md)
 - [MHA-Fusion example](https://github.com/intel/intel-extension-for-transformers/pull/567)
 ## 3.3.	FFN fusion
 We can improve the performance by fusion the FFN process.

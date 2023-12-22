@@ -91,7 +91,7 @@ make -j
 First you should download and convert the model to f32 format. You can also quantize the model to q4_0 format, but it is optional.
 
 ```shell
-python scripts/convert.py --outtype f32 --outfile EleutherAI/gpt-j-6b
+python neural_speed/scripts/convert.py --outtype f32 --outfile EleutherAI/gpt-j-6b
 ```
 Then quantize the model to q4_0 format(optional).
 
