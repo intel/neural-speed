@@ -15,9 +15,9 @@
   $ sudo apt install libgtest-dev cmake
   ```
 
-- [Install Intel GPU driver](https://dgpu-docs.intel.com/installation-guides/index.html#intel-data-center-gpu-max-series) version [Stable 602](https://dgpu-docs.intel.com/releases/stable_602_20230323.html) or later.
+- [Install Intel GPU driver](https://dgpu-docs.intel.com/installation-guides/index.html#intel-data-center-gpu-max-series) version [Stable 736.25](https://dgpu-docs.intel.com/releases/stable_736_25_20231031.html) or later.
 
-- [Install Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) version [2023.2](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) or later.
+- [Install Intel® oneAPI Base Toolkit](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) version [2024.0.1](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html) or later.
 
   Select all components and default installation location when install, the default installation location is `/opt/intel/oneapi` for root account, `${HOME}/intel/oneapi` for other accounts.
 
