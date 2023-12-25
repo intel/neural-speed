@@ -363,12 +363,7 @@ void dequantize_gemm_run(int iter) {
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
     using mem_desc_c_t = xetla::mem_desc_t<data_type_c, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_c)>;
-    using mem_desc_scale_t = xetla::mem_desc_t<data_type_scale,
-            mem_layout::row_major, mem_space::global,
-            DEVICE_MEM_ALIGNMENT / sizeof(data_type_scale)>;
-    using mem_desc_zero_pt_t = xetla::mem_desc_t<data_type_zero_pt,
-            mem_layout::row_major, mem_space::global,
-            DEVICE_MEM_ALIGNMENT / sizeof(data_type_zero_pt)>;
+
     using mem_desc_bias_t = xetla::mem_desc_t<data_type_bias,
             mem_layout::row_major, mem_space::global,
             DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;

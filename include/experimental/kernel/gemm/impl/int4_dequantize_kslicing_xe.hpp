@@ -24,20 +24,6 @@
 
 namespace gpu::xetla::kernel {
 
-// template <typename T>
-// struct has_bit4_feature {
-//     typedef char yes[1];
-//     typedef char no[2];
-
-//     template <typename C>
-//     static yes &test(decltype(&C::bit4_type));
-
-//     template <typename C>
-//     static no &test(...);
-
-//     static const bool value = sizeof(test<T>(0)) == sizeof(yes);
-// };
-
 /// @addtogroup xetla_gemm
 /// @{
 

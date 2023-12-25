@@ -38,8 +38,6 @@ class gemm_t<compute_policy_int4_dequantize_xmx<compute_attr_,
         tile_shape_, // tile shape of workgroup-level gemm
         mem_desc_a_t_, // memory attribute of matA
         mem_desc_b_t_, // memory attribute of matB
-        // mem_desc_scale_t_, // memory attribute of scale
-        // mem_desc_zero_pt_t_, // memory attribute of zero point
         pre_processing_t_> {
 public:
     using mem_desc_a_t = mem_desc_a_t_;
@@ -175,10 +173,10 @@ public:
     static constexpr uint32_t scale_addr_update_freq
             = (k_stride < dequant_s) ? dequant_s / k_stride : 1;
 
-    using mem_desc_scale_t
-            = mem_desc_t<dtype_scale, mem_layout::row_major, mem_space::global>;
+    using mem_desc_scale_t = mem_desc_t<dtype_scale, mem_layout::row_major,
+            mem_space::global, mem_desc_b_t::alignment>;
     using mem_desc_zero_pt_t = mem_desc_t<dtype_zero_pt, mem_layout::row_major,
-            mem_space::global>;
+            mem_space::global, mem_desc_b_t::alignment>;
 
     using matAcc_tile_desc_t = subgroup::tile_desc_t<tile_size_x_c,
             tile_size_y_c, block_size_x_b, block_size_y_a, reg_layout::tiled>;
