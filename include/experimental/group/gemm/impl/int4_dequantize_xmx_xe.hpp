@@ -359,9 +359,11 @@ public:
         xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
         nbarrier_a.init_nbarrier(
                 sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
-        // xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
-        // nbarrier_b.init_nbarrier(sg_idx + barrier_count_y + nbarrier_base,
-        //         nbarrier_role::producer_consumer);
+        if constexpr (arch_tag >= gpu_arch::Xe) {
+            xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
+            nbarrier_b.init_nbarrier(sg_idx + barrier_count_y + nbarrier_base,
+                    nbarrier_role::producer_consumer);
+        }
 
         int scale_prefetch_addr_i = 0;
         int scale_load_addr_i = 0;
@@ -372,9 +374,11 @@ public:
                     matA_prefetch_payload);
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     matB_prefetch_payload);
+            // TODO 1D prefetch need pack to U32/U64
             //     subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             //             scale_prefetch_payload);
             if constexpr (compute_policy::quant_type == quant_mode::S4_CLIP) {
+                // TODO 1D prefetch need pack to U32/U64
                 // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                 //         zero_pt_prefetch_payload);
             }
@@ -397,7 +401,9 @@ public:
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.arrive(); }
-                    //     if constexpr (wg_size_y > 1) { nbarrier_b.arrive(); }
+                    if constexpr (arch_tag >= gpu_arch::Xe) {
+                        if constexpr (wg_size_y > 1) { nbarrier_b.arrive(); }
+                    }
                 }
             }
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -417,10 +423,12 @@ public:
                         matA_prefetch_payload);
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         matB_prefetch_payload);
+                // TODO 1D prefetch need pack to U32/U64
                 // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                 //         scale_prefetch_payload);
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_CLIP) {
+                    // TODO 1D prefetch need pack to U32/U64
                     //     subgroup::tile_prefetch<cache_hint::cached,
                     //             cache_hint::cached>(zero_pt_prefetch_payload);
                 }
@@ -463,7 +471,9 @@ public:
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.wait(); }
-                    //     if constexpr (wg_size_y > 1) { nbarrier_b.wait(); }
+                    if constexpr (arch_tag >= gpu_arch::Xe) {
+                        if constexpr (wg_size_y > 1) { nbarrier_b.wait(); }
+                    }
                 }
             }
         }
@@ -532,7 +542,7 @@ private:
                             - zero_pt_blk.xetla_format<int8_t>());
                 }
                 if constexpr (compute_policy::quant_type
-                        == quant_mode::S4_FULLRANGE) {
+                        == quant_mode::S4_FULLRANGE_NO_ZP) {
                     xetla_vector<int8_t, block_size_x_b *block_size_y_b>
                             cvt_blk_i8
                             = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
