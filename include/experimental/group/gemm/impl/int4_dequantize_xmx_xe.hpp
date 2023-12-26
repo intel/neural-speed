@@ -359,11 +359,9 @@ public:
         xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
         nbarrier_a.init_nbarrier(
                 sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
-        if constexpr (arch_tag >= gpu_arch::Xe) {
-            xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
-            nbarrier_b.init_nbarrier(sg_idx + barrier_count_y + nbarrier_base,
-                    nbarrier_role::producer_consumer);
-        }
+        xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
+        nbarrier_b.init_nbarrier(sg_idx + barrier_count_y + nbarrier_base,
+                nbarrier_role::producer_consumer);
 
         int scale_prefetch_addr_i = 0;
         int scale_load_addr_i = 0;
