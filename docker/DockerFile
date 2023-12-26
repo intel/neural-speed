@@ -41,7 +41,7 @@ WORKDIR /neural_speed
 COPY . /neural_speed
 
 RUN pip install cmake ninja psutil && \
-    cd /neural_speed/neural_speed && \
+    cd /neural_speed && \
     git submodule update --init --recursive && \
     mkdir build && cd build && cmake .. -G Ninja && ninja && cd .. && \
     pip install -r requirements.txt
