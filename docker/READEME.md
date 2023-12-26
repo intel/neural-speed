@@ -21,14 +21,14 @@ docker build --build-arg http_proxy=${http_proxy} --build-arg https_proxy=${http
 ## Use Docker Image
 Utilize the docker container based on docker image.
 ```bash
-docker run -itd neuralspeed:latest /bin/bash
-docker exec -it <container_id> /bin/bash
+docker run -itd --name="neural-speed-docker" neuralspeed:latest /bin/bash
+docker exec -it neural-speed-docker /bin/bash
 ```
 
 ## Run Simple Test
 ```bash
-docker exec -it <container_id> /bin/bash
-cd /neural_speed/neural-speed
+docker exec -it <container_name> /bin/bash
+cd /neural_speed/neural_speed
 ## convert to model.bin
 python scripts/convert.py --outtype f32 --outfile llama-fp32.bin ${input_model_path}
 ## quantize to Q4 with groupsize=128
