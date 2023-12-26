@@ -1,0 +1,50 @@
+# Copyright (C) 2023 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+
+ARG IMAGE_NAME=ubuntu
+ARG IMAGE_TAG=22.04
+FROM ${IMAGE_NAME}:${IMAGE_TAG} as base
+
+FROM base as neural-speed
+
+ARG PYTHON=python3.10
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    ${PYTHON} \
+    python3-pip
+
+RUN ln -sf $(which ${PYTHON}) /usr/bin/python
+
+RUN ${PYTHON} -m pip install -U pip
+
+FROM neural-speed as devel
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ENV LANG C.UTF-8
+ARG PYTHON=python3.10
+
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
+    autoconf \
+    build-essential \
+    ca-certificates \
+    cmake \
+    git \
+    gcc g++ make
+
+RUN mkdir -p /neural_speed
+WORKDIR /neural_speed
+COPY . /neural_speed
+
+RUN pip install cmake ninja psutil && \
+    cd /neural_speed && \
+    git submodule update --init --recursive && \
+    mkdir build && cd build && cmake .. -G Ninja && ninja && cd .. && \
+    pip install -r requirements.txt
+
+
+
