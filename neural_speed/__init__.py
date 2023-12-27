@@ -17,7 +17,7 @@
 import os
 
 import torch
-from neural_speed.scripts.convert import convert_model
+from neural_speed.convert import convert_model
 from transformers import AutoConfig, AutoTokenizer
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
