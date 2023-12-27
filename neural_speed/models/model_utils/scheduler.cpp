@@ -37,12 +37,6 @@ il_worker::~il_worker() {
   }
 }
 
-void il_worker::set_threads(const int& n_threads) { threads = n_threads; }
-
-std::vector<int> il_worker::get_request_done_ids() const { return request_done_ids; }
-
-void il_worker::empty_request_done_ids() { request_done_ids.clear(); }
-
 // cbg_worker
 cbg_worker::cbg_worker(const gpt_params& params) : il_worker(params) { m_ctx->cont_batching = true; }
 cbg_worker::~cbg_worker() {}
@@ -146,8 +140,6 @@ il_scheduler::il_scheduler(const gpt_params& params, const serve_policy& policy)
 il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, serve_policy::FCFS) {}
 
 il_scheduler::~il_scheduler() {}
-
-bool il_scheduler::has_finished_seq() { return (finished_pool.size() > 0); }
 
 std::vector<sequence*> il_scheduler::pop_completed_requests() {
   std::vector<sequence*> ret_seqs;
