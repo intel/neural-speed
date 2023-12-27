@@ -99,9 +99,9 @@ res_f32 = torch.add(input_f32, input_int4_g32)   # dequantize to f32 and add
 res_bf16 = torch.add(input_bf16, input_fp4_g32)   # dequantize to bf16 and add
 ```
 
-### **Scales & Zero-points (Optional)**
+### **Scales & Zero-points**
 
-Scales and zero points should be the same size as ```round_up(tensor_size/group_size)```.
+Scales and zero points (optional) should be the same size as ```round_up(tensor_size/group_size)```.
 
 
 ### **Padding**
