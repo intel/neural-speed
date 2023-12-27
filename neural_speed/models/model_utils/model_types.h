@@ -281,7 +281,7 @@ struct model_context {
   model_struct model;
   model_vocab vocab;
   // maximum num of bearable requests in current env
-  int max_request_bs = 32;  // TODO
+  int max_request_num = 32;  // TODO
   // num of current execution prompts
   int request_running_bs = 1;
   // length of current execution tokens list
@@ -293,6 +293,7 @@ struct model_context {
   bool support_bestla_kv = false;  // whether the model graph supports bestla-kvcache
   int beam_size = 1;
   int kv_n_ctx_block = 1;
+  bool cont_batching = false;
   generation_config generation_conf;
   std::shared_ptr<beam_search_kv_cache_reorder> bs_kv_reorder;
   std::vector<std::vector<std::string>> tensors_name;
@@ -392,6 +393,7 @@ struct model_input {
   int padding_side = 0;
   // padding length
   uint32_t n_padding = 0;
+  generation_config gen_conf;
 };
 
 struct model_context_params {
@@ -412,6 +414,7 @@ struct model_context_params {
   bool beam_search;     // beam search or not
   int beam_size;        // number of beams for beam search
   bool shift_roped_k;   // whether to store non-RoPEd K cache
+  int max_request_num;  // maximum num of bearable requests in current env
 
   // called with a progress value between 0 and 1, pass nullptr to disable
   model_progress_callback progress_callback;

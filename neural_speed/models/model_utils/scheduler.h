@@ -27,9 +27,9 @@ class il_worker {
   // virtual bool greedy_search_step(sequence* seqs, const int& n_input) = 0;
   virtual bool beam_search_step(std::vector<sequence*>* seqs, const int& n_input) = 0;
 
-  void set_threads(const int& n_threads);
-  std::vector<int> get_request_done_ids() const;
-  void empty_request_done_ids();
+  inline void set_threads(const int& n_threads) { threads = n_threads; }
+  inline std::vector<int> get_request_done_ids() const { return request_done_ids; }
+  inline void empty_request_done_ids() { request_done_ids.clear(); }
 
  protected:
   virtual bool prepare_inputs(std::vector<sequence*>* seqs, const int& n_input, model_input* inputs) = 0;
@@ -69,7 +69,7 @@ class il_scheduler {
   virtual bool add_request(sequence* seq) = 0;
   virtual bool step() = 0;
   virtual bool done() = 0;
-  bool has_finished_seq();
+  inline bool has_finished_seq() { return (finished_pool.size() > 0); }
   std::vector<sequence*> pop_completed_requests();
   // void print_progress();
 
