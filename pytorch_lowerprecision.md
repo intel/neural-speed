@@ -1,18 +1,22 @@
 # Proposal of sub-byte low precision inference for PyTorch/IPEX
 
 **Authors:**
+
 * @xinhe3, hengyume
 
 ## **Summary**
+
 In this proposal, we mainly discuss the storage data type, compute data type, quantization, and serialization, to facilitate the low-bit (INT4/FP4) LLM inference for PyTorch/IPEX.
 
 ## **Motivation**
+
 The community is active to support sub-byte low precision inference for LLMs, where the sub-byte may include INT4, FP4, NF4, INT2/3/5/6/7, MX formats, etc. The ecosystem is bringing up new idea of group-wise sub-byte support from the recent work like [llama.cpp](https://github.com/ggerganov/llama.cpp) and [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai).
 
 ## **Storage data type**
 
-### Option 1: reuse torch.uint8 
-We follow the existing storage data type torch.uint8 to represent INT4/FP4 and there is no new storage required. In particular, uint8 is interchangeable with a pair of uint4 in PyTorch.
+### Option 1: reuse torch.uint8
+
+We follow the existing storage data type torch.uint8 to represent INT4/FP4 and there is no new storage required. In particular, uint8 is 可互换 with a pair of uint4 in PyTorch.
 
 ```cpp
 struct bit4x2 {
@@ -103,7 +107,6 @@ res_bf16 = torch.add(input_bf16, input_fp4_g32)   # dequantize to bf16 and add
 
 Scales and zero points (optional) should be the same size as ```round_up(tensor_size/group_size)```.
 
-
 ### **Padding**
 
 If tensor_size is not dividable by group_size, padding is required.
@@ -165,6 +168,7 @@ uint4_weight = torch.quantize_per_channel(weights, qparams[0], qparams[1], axis=
 ```
 
 The quantization flow in INC:
+
 ```python
 conf = PostTrainingQuantConfig(
     approach="weight_only",
@@ -184,11 +188,37 @@ int4_model = quantizer.fit(model, conf)
 
 ## **Serialization**
 
-TBD (Hengyu & Xin)
+### For Options 1 & 1.1
+
+As described in Options 1 & 1.1, 4-bit tensors will be saved as torch.uint8 or custom Bits4Tensor object. Torch.save can help serialize all necessary information into state_dict as shown below.
+
+```python
+state_dict = {
+    module_name:{
+        "data": torch.tensor(-, -).type(torch.uint8),
+        "scales": torch.tensor(-, -).type(torch.float16/32),
+        "zero_points": torch.tensor(-, -).type(torch.uint8),
+        "group_size": torch.tensor(1).type(torch.int32),
+    }
+}
+torch.save(state_dict, 'woq_model.pt')
+```
+
+### For Option 2
+
+As described in option 2, the group-wise quantization information is contained in the tensor object. Therefore, the state_dict format will be very simple as shown below.
+
+```python
+state_dict = {
+    module_name: torch.tensor(-, -).type(torch.int4_g32),
+}
+torch.save(state_dict, 'woq_model.pt')
+```
 
 ## **Conclusion**
 
-### Overview of Cons. and Pros.
+### Overview of Cons. and Pros
+
 || Option 1| Option 1.1 | Option 2|
 | --- | --- | --- | --- |
 | Architecture| No | Newly-introduced tensor data type | Newly-introduced storage data type|
@@ -213,9 +243,11 @@ Limited sub-bytes e.g., INT4, FP4.
 No need for Option 1. We are seeing the benefits for Option 1.1 and 2 in terms of performance and binary size (AOT build).
 
 ### **Other questions**
+
 * Weight-only INT4 vs. model INT4?
 * Standard data type representation (e.g., exp/mantissa) for sub-bytes (e.g., FP4)? Follow MX format?
 
 ## **Reference**
+
 * [llama.cpp](https://github.com/ggerganov/llama.cpp): 2-6bit inference.
 * [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai) proposed by AMD, Arm, Intel, Meta, Microsoft, NVIDIA, and Qualcomm, defines 4 group-wise data types: MXFP8, MXFP6, MXFP4, and MXINT8.
