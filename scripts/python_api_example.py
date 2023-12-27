@@ -14,3 +14,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+from transformers import AutoTokenizer, TextStreamer
+from neural_speed import Model
+
+if len(sys.argv) != 2:
+    print("Usage: python python_api_example.py model_path")
+model_name = sys.argv[1]
+
+prompt = "Once upon a time, a little girl"
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt").input_ids
+streamer = TextStreamer(tokenizer)
+
+model = Model()
+model.init(model_name, weight_dtype="int4", compute_dtype="int8")
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)

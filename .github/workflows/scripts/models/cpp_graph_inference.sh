@@ -13,7 +13,7 @@ function main() {
     model="$2"
     compiler_version="$3"
     working_dir="${WORKING_DIR}"
-    scripts_dir="${working_dir}/neural_speed/scripts"
+    scripts_dir="${working_dir}/neural_speed/convert"
     # init params
     if [[ "${model}" == "llama-2-7b-chat" ]]; then
         convert_script="${scripts_dir}/convert_llama.py"
