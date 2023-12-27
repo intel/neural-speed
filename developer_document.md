@@ -84,7 +84,7 @@ The term **"hyperparamters"** describes a value that is used to configure the be
 - n_vocab: the size of the model's vocabulary
 - n_embd: the size of the model's " embedding layer", which is used during prompt ingestion.
 - n_layer: the number of layers in the model; each layer represents a set of weights.
-Here we will use [convert_gptneox.py](neural_speed/scripts/convert_gptneox.py#L96) as an example,
+Here we will use [convert_gptneox.py](scripts/convert_gptneox.py#L96) as an example,
 ```python
 fout.write(struct.pack("i", hparams["num_attention_heads"]))
 fout.write(struct.pack("i", hparams.get("n_head_kv", 0)))  # multi-query attention
@@ -96,7 +96,7 @@ The above `fout` is the file we need to get, and the `num_attention`, `n_head_kv
 As the name implies, a model's vocabulary comprises components that are used by the model to generate language (text). However, unlike the vocabulary of a human, which consists of words, the vocabulary of a large language model consists of "tokens". A token can be an entire word, but oftentimes they are word fragments. Just like humans can compose millions of words from just a dozen or two letters, large language models use tokens to express a large number of words from a relatively smaller number of components. Consider a vocabulary with the following tokens: `whi`, `ch`, `le`, `who`, and `a`; this vocabulary can be used to create the English words `"which"`, `"while"`, `"who"`, `"a"`, and `"leach"`. How would the behavior change if the model contained the following tokens: `wh`, `ich`, `ile`, `o`, and `leach`? Choices such as these allow model-creators to tune the behavior and performance of their models.
 
 As described above, the model's hyperparameters typically contain a value that specifies the number of tokens in the vocabulary. The vocabulary is encoded as a list of tokens, each of which includes a 32-bit integer that specifies the length of the token. If your model has some new tokenizers, we suggest using a python tokenizer from transformers and feeding the input_ids to model Python API (python example in scripts folder)
-Here we will use [convert_gptneox.py](neural_speed/scripts/convert_gptneox.py#L122) as an example to processed the vocabulary of gptneox and written it into `fout`.
+Here we will use [convert_gptneox.py](scripts/convert_gptneox.py#L122) as an example to processed the vocabulary of gptneox and written it into `fout`.
 ```python
 encoder = tokenizer.vocab
 encoder.update(tokenizer.get_added_vocab())
@@ -108,7 +108,7 @@ byte_decoder = {v:k for k, v in byte_encoder.items()}
 Finally, and largest, component of a ITREX GRAPH file is the weights of the LLM that the file represents. Abstractly, a large language model is software that is used to generate language - just like software that is used to generate images can be improved by increasing the number of colors with which images can be rendered, large language models can be improved by increasing the number of weights in the model. The total number of weights in a model is referred to as the "size" of that model. For example, the dolly-v2-3b implementation of the gpt-neox-20b language model architecture is available in several sizes, like 3B and 20B, which stand for 3 billion and 20 billion, respectively. These numbers refer to the total number of weights in that model.
 
 As described in the hyperparameters section, weights are grouped in sets called "layers", which, like hyperparameters, have structures that are uniquely defined by the model architecture; within a layer, weights are grouped in structures called "tensors". So, for instance, both dolly-v2-3B and gpt-neox-20B use layers that comprise the same tensors, but dolly-v2-3B has relatively fewer layers when compared to gpt-neox-20B.
-Here we will use [convert_gptneox.py](neural_speed/scripts/convert_gptneox.py#L149) as an example to convert model weights to `fout`.
+Here we will use [convert_gptneox.py](scripts/convert_gptneox.py#L149) as an example to convert model weights to `fout`.
 ```python
 fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
 for i in range(n_dims):
@@ -412,7 +412,7 @@ Quantize model and use the jblas library for inference can lead to better perfor
 ```bash
 
 # convert the model directly use model path
-python neural_speed/scripts/convert_new_model.py --outtype f32 --outfile ne-f32.bin new_model_path
+python scripts/convert_new_model.py --outtype f32 --outfile ne-f32.bin new_model_path
 # optimized INT4 model with group size 128 (recommended)
 ./build/bin/quant_new_model --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --compute_dtype int8
 ```
