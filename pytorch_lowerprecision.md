@@ -37,9 +37,9 @@ struct int4x2 : bit4x2 {
 ```
 
 ```python
-x_uint8 = torch.tensor([1, 9]).to(torch.uint8)
+x_uint8 = torch.tensor([1, 7]).to(torch.uint8)
 x_uint4 = x_uint8.to(torch.uint4x2)
-# x_uint4: 00010001/b
+# x_uint4: 00011111/b
 
 scales = torch.rand(1)
 zero_points = torch.rand(1)
@@ -53,12 +53,10 @@ output = woqlinear(x_uint4, scales, zero_points)
 In addition to Option 1, we plan to introduce a native group-wise 4-bit tensor representation, which consists of data, scales, and zero points per group.
 
 ```python
-
-TBD (Hengyu)
-
 class Bits4Tensor(torch.tensor): # Scale to NBitsTensor
-    def __init__(self, group_size, data, scales, zero_points = torch.empty()):
-        assert(group_size in GROUP_SIZE_SUPPORTED) # More checkers
+    def __init__(self, shape:List[], group_size:int, data, scales, zero_points = torch.empty()):
+        super().__init__(shape)
+        assert(is_group_size_valid(shape, group_size)) # More checkers
         self.data = data
         self.scales = scales
         self.zero_points = zero_points
@@ -78,7 +76,7 @@ Note that we may just keep Option 1, if low precision op in PyTorch is trending 
 We propose native group-wise storage data type. The minimal unit is a group tensor with raw data, group size, scales, zero_points (optional), is_padded (optional), padded_size (optional).
 
 ```cpp
-template<typename SRC_T_, typename S_T_, typename DST_T_ = float>
+template<typename SRC_T_, typename S_T_>
 class StorageWeight: {
   OptionalBuffer<S_T_> scales;
   OptionalBuffer<SRC_T_> zero_points;
@@ -94,14 +92,14 @@ class StorageWeight: {
 ```python
 input_fp32 = torch.rand((128, 16))
 input_bf16 = torch.rand((128, 16), dtype=torch.bf16)
-input_int4_g32 = torch.rand((128, 16)).to(torch.int4_g32)  // group size = 32
-input_fp4_g32 = torch.rand((128, 16)).to(torch.fp4_g32) // group size = 32
+input_int4_g32 = torch.rand((128, 16)).to(torch.int4_g32)  # group size = 32
+input_fp4_g32 = torch.rand((128, 16)).to(torch.fp4_g32) /# group size = 32
 
 res_f32 = torch.add(input_f32, input_int4_g32)   # dequantize to f32 and add
 res_bf16 = torch.add(input_bf16, input_fp4_g32)   # dequantize to bf16 and add
 ```
 
-### **Scales & Zero-points (Optional) **
+### **Scales & Zero-points (Optional)**
 
 Scales and zero points should be the same size as ```round_up(tensor_size/group_size)```.
 
@@ -124,15 +122,16 @@ static_assert(sizeof(x_int4_size) == 96))
 
 Sub-byte is mainly used by low precision inference for LLMs. The recommended practice is to dequantize the weight from sub-byte to floating point, so the compute data type will be BF16/FP16 on Xeon/GPU and FP16/BF16/FP8 on Gaudi/FS1.
 
-Below is the sample code to implement the dequantization to float (TBD: HengYu)
+Below is the sample code to implement the dequantization to floating points
 
 ```cpp
-inline C10_HOST_DEVICE float* operator+(MX* a, float* b) {
-  return dequantize<float*>(a->data, a->scale) + b;
+
+inline C10_HOST_DEVICE float* operator+(_SRC_T* a, _F_T* b) {
+  return dequantize<_F_T*>(a->data, a->scale) + b;
 }
 
-inline C10_HOST_DEVICE float* operator*(MX* a, float* b) {
-  return dequantize<float*>(a->data, a->scale) * b;
+inline C10_HOST_DEVICE float* operator*(_SRC_T* a, _F_T* b) {
+  return dequantize<_F_T*>(a->data, a->scale) * b;
 }
 ```
 
@@ -184,13 +183,6 @@ int4_model = quantizer.fit(model, conf)
 ```
 
 ## **Serialization**
-```python
-torch.save(uint4_weight, 'tmp.pt')
-```
-or
-```python
-torch.save(compressed_model.state_dict(), 'tmp.pt')
-```
 
 TBD (Hengyu & Xin)
 
