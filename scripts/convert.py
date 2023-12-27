@@ -11,35 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import os
-import numpy as np
-from pathlib import Path
+
 import argparse
+from pathlib import Path
 from typing import List, Optional
-from transformers import AutoConfig
-import subprocess
-
-model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
-
-
-def convert_model(model, outfile, outtype):
-    config = AutoConfig.from_pretrained(model, trust_remote_code=True)
-    model_type = model_maps.get(config.model_type, config.model_type)
-
-    gpt_model = 'gptq' in str(model).lower()
-    if gpt_model:
-        path = Path(Path(__file__).parent.absolute(), "convert_gptq_{}.py".format(model_type))
-    else:
-        path = Path(Path(__file__).parent.absolute(), "convert_{}.py".format(model_type))
-    cmd = []
-    cmd.extend(["python", path])
-    cmd.extend(["--outfile", outfile])
-    cmd.extend(["--outtype", outtype])
-    cmd.extend([model])
-
-    print("cmd:", cmd)
-    subprocess.run(cmd)
-
+from neural_speed.convert import convert_model
 
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a PyTorch model to a NE compatible file")
