@@ -206,7 +206,7 @@ Option 1.1 is an improved version of Option 1, in which all APIs can be backward
 
 ### **Shall we expose the storage data type for all sub-bytes?**
 
-No, only limited sub-bytes e.g., INT4, FP4.
+Limited sub-bytes e.g., INT4, FP4.
 
 ### **Shall we expose the group size in the storage data type?**
 
