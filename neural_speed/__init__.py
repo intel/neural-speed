@@ -73,7 +73,9 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, not_quant=False, use_cache=False, **quant_kwargs):
+    def init(self, model_name, not_quant=False, use_cache=False,
+            weight_dtype="int4", alg="sym", group_size=32,
+            scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
@@ -83,15 +85,15 @@ class Model:
         output_path = "runtime_outs"
         os.makedirs(output_path, exist_ok=True)
         fp32_bin = "{}/ne_{}_f32.bin".format(output_path, model_type)
-        quant_desc = quant_kwargs['weight_dtype']
-        if quant_kwargs['use_ggml']:
+        quant_desc = weight_dtype
+        if use_ggml:
             quant_desc += "_ggml"
         else:
-            quant_desc += "_jblas_c" + quant_kwargs['compute_dtype']
-            if quant_kwargs['group_size'] == -1:
+            quant_desc += "_jblas_c" + compute_dtype
+            if group_size == -1:
                 quant_desc += "_pc"
             else:
-                quant_desc += "_g{}".format(quant_kwargs['group_size'])
+                quant_desc += "_g{}".format(group_size)
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not_quant:
@@ -108,7 +110,9 @@ class Model:
         if not_quant:
             print("FP32 model will be used.")
             return
-        self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin, **quant_kwargs)
+        self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin,
+                                    weight_dtype=weight_dtype, alg=alg, group_size=group_size,
+                                    scale_dtype=scale_dtype, compute_dtype=compute_dtype, use_ggml=use_ggml)
         assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
