@@ -184,7 +184,32 @@ int4_model = quantizer.fit(model, conf)
 
 ## **Serialization**
 
-TBD (Hengyu & Xin)
+### For Options 1 & 1.1
+
+As described in Options 1 & 1.1, 4-bit tensors will be saved as torch.uint8 or custom Bits4Tensor object. Torch.save can help serialize all necessary information into state_dict as shown below.
+
+```python
+state_dict = {
+    module_name:{
+        "data": torch.tensor(-, -).type(torch.uint8),
+        "scales": torch.tensor(-, -).type(torch.float16/32),
+        "zero_points": torch.tensor(-, -).type(torch.uint8),
+        "group_size": torch.tensor(1).type(torch.int32),
+    }
+}
+torch.save(state_dict, 'woq_model.pt')
+```
+
+### For Option 2
+
+As described in option 2, the group-wise quantization information is included in the tensor object. Therefore, the state_dict format will be very simple as shown below.
+
+```python
+state_dict = {
+    module_name: torch.tensor(-, -).type(torch.int4_g32),
+}
+torch.save(state_dict, 'woq_model.pt')
+```
 
 ## **Conclusion**
 
