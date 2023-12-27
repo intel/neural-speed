@@ -5,12 +5,12 @@
 
 
 ## **Motivation**
-The community is active to support sub-byte low precision inference for LLMs, where the sub-byte may include INT4, FP4, NF4, INT2/3/5/6/7, MX formats, etc. In this proposal, we mainly focus on INT4 and FP4, and discuss the storage data type, compute data type, quantization, and serialization, while we borrow the idea of block-aware sub-byte support from the recent work like [llama.cpp](https://github.com/ggerganov/llama.cpp) and [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai). This RFC proposes adding sub-byte data types to PyTorch/IPEX.
+The community is active to support sub-byte low precision inference for LLMs, where the sub-byte may include INT4, FP4, NF4, INT2/3/5/6/7, MX formats, etc. In this proposal, we mainly focus on INT4 and FP4, and discuss the storage data type, compute data type, quantization, and serialization for PyTorch/IPEX, while we borrow the idea of block-wise sub-byte support from the recent work like [llama.cpp](https://github.com/ggerganov/llama.cpp) and [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai).
 
 
 ## **Storage data type**
 
-### Option 1: Reuse torch.uint8
+### Option 1: reuse torch.uint8
 We follow the existing storage data type torch.uint8 to represent INT4/FP4 and there is no new storage required. In particular, uint8 is interchangeable with a pair of uint4 in PyTorch.
 
 ```cpp
@@ -43,11 +43,11 @@ x_uint4 = x_uint8.to(torch.uint4x2)
 scales = torch.rand(1)
 zero_points = torch.rand(1)
 
-woqlinear = nn.WOQLinear(group_size=...)
-output = woqlinear(x_uint4, scales, zero_points)
+woqlinear = nn.WOQLinear(group_size=2) # new op required
+output = woqlinear(x_uint4, scales, zero_points) 
 ```
 
-### Option 1.1: 8 bits storage with unified tensor interface
+### Option 1.1: enable unified tensor interface
 
 Odd bits need to be packed into block for higher efficiency load/store. For example, MX format is one of the most promising data format, which also needs block-wise parameters, like block size, scales, zero_points. 
 ```python
