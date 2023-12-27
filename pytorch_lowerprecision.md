@@ -3,14 +3,15 @@
 **Authors:**
 * @xinhe3, hengyume
 
+## **Summary**
+In this proposal, we mainly discuss the storage data type, compute data type, quantization, and serialization, to facilitate the low-bit (INT4/FP4) LLM inference for PyTorch/IPEX.
 
 ## **Motivation**
-The community is active to support sub-byte low precision inference for LLMs, where the sub-byte may include INT4, FP4, NF4, INT2/3/5/6/7, MX formats, etc. In this proposal, we mainly focus on INT4 and FP4, and discuss the storage data type, compute data type, quantization, and serialization for PyTorch/IPEX, while we borrow the idea of block-wise sub-byte support from the recent work like [llama.cpp](https://github.com/ggerganov/llama.cpp) and [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai).
-
+The community is active to support sub-byte low precision inference for LLMs, where the sub-byte may include INT4, FP4, NF4, INT2/3/5/6/7, MX formats, etc. The ecosystem is bringing up new idea of group-wise sub-byte support from the recent work like [llama.cpp](https://github.com/ggerganov/llama.cpp) and [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai).
 
 ## **Storage data type**
 
-### Option 1: reuse torch.uint8
+### Option 1: reuse torch.uint8 
 We follow the existing storage data type torch.uint8 to represent INT4/FP4 and there is no new storage required. In particular, uint8 is interchangeable with a pair of uint4 in PyTorch.
 
 ```cpp
@@ -47,30 +48,34 @@ woqlinear = nn.WOQLinear(group_size=2) # new op required
 output = woqlinear(x_uint4, scales, zero_points) 
 ```
 
-### Option 1.1: enable unified tensor interface
+### Option 1.1: support group-wise 4-bit tensor
 
-Odd bits need to be packed into block for higher efficiency load/store. For example, MX format is one of the most promising data format, which also needs block-wise parameters, like block size, scales, zero_points. 
+In addition to Option 1, we plan to introduce a native group-wise 4-bit tensor representation, which consists of data, scales, and zero points per group.
+
 ```python
-class Bits4Tensor(torch.tensor):
-    def __init__(self, block, data, scale, zero_points = torch.empty()):
-        assert(block in BLOCK_SIZE_SUPPORTED)
+
+TBD (Hengyu)
+
+class Bits4Tensor(torch.tensor): # Scale to NBitsTensor
+    def __init__(self, group_size, data, scales, zero_points = torch.empty()):
+        assert(group_size in GROUP_SIZE_SUPPORTED) # More checkers
         self.data = data
-        self.scale = scale
+        self.scales = scales
         self.zero_points = zero_points
 
 x = Bits4Tensor(...)
 print(x.get_scales())
 #print(x.get_zero_points())
-output = WOQLinear(X)
+
+woqlinear = nn.WOQLinear() # new op required
+output = woqlinear(x)
 ```
 
-### Option 2: block-aware storage for the future
+Note that we may just keep Option 1, if low precision op in PyTorch is trending to have group_size, scales, zero points etc.
 
-Further we propose block aware storage which is a comprehensive data format, organized in block not elements.
+### Option 2: introduce new group-wise storage data type
 
-* the basic part is a block, including raw data, block size, scales and zero_points(optional)
-* there will be a default padding, so there will be an optional "real size"
-* other parts will follow MX paper
+We propose native group-wise storage data type. The minimal unit is a group tensor with raw data, group size, scales, zero_points (optional), is_padded (optional), padded_size (optional).
 
 ```cpp
 template<typename SRC_T_, typename S_T_, typename DST_T_ = float>
@@ -89,55 +94,37 @@ class StorageWeight: {
 ```python
 input_fp32 = torch.rand((128, 16))
 input_bf16 = torch.rand((128, 16), dtype=torch.bf16)
-input_e4b32 = torch.rand((128, 16)).to(torch.mx.e4_b32)  // quantized to int4, block size = 32
-input_e2m1b32 = torch.rand((128, 16)).to(torch.mx.e2m1_b32) // quantized to e2m1, block size = 32
+input_int4_g32 = torch.rand((128, 16)).to(torch.int4_g32)  // group size = 32
+input_fp4_g32 = torch.rand((128, 16)).to(torch.fp4_g32) // group size = 32
 
-res_f32 = torch.add(input_f32, input_e4b32)   # dequantize to f32 and add
-res_bf16 = torch.add(input_bf16, input_e2m1b32)   # dequantize to bf16 and add
+res_f32 = torch.add(input_f32, input_int4_g32)   # dequantize to f32 and add
+res_bf16 = torch.add(input_bf16, input_fp4_g32)   # dequantize to bf16 and add
 ```
 
-### **Scales**
+### **Scales & Zero-points (Optional) **
 
-For all options, scales and zero points should be the same size as ```upper_bound(size/block_size)```
+Scales and zero points should be the same size as ```round_up(tensor_size/group_size)```.
 
 
 ### **Padding**
 
-mostly the blocks are distributed alone K dimensions. when K is not devisible by block size, there will be padings, which is almost the same with other padding.
+If tensor_size is not dividable by group_size, padding is required.
 
 ```python
 x = torch.rand(65)
-x_e4 = x.to(torch.mx.e4_b32)
-assert(x_e4.size == 65) // real size
-# or assert(x_e4.size == 96), showing the padded size?
+x_int4 = x.to(torch.int4_g32)
+assert(x_int4.size == 65)
+assert(x_int4.padded_size == 96)
 
 ... cpp side
-static_assert(sizeof(x_e4_buf) == 96)
+static_assert(sizeof(x_int4_size) == 96))
 ```
 
-### **Auto Quantization and Dequantization**
+## **Compute data type**
 
-for option 1, there will be no auto quantization and dequantization and scales (+ zero points) is necessary
+Sub-byte is mainly used by low precision inference for LLMs. The recommended practice is to dequantize the weight from sub-byte to floating point, so the compute data type will be BF16/FP16 on Xeon/GPU and FP16/BF16/FP8 on Gaudi/FS1.
 
-```python
-x, scales = torch.quantize(torch.randn(3,3))
-y = torch.dequantize(x, scales)
-```
-
-for option 1.1 and 2, there will be auto quantization and dequantization in the explicit data type conversion and scales (+ zero points) is not needed.
-
-```python
-x = torch.randn(3,3).to(torch.uint4x2)
-y = x.to(torch.float)
-```
-
-While option 2 is built-in functions and can be fully optimized.
-
-### **Computation support**
-
-sub-byte support are mostly for WOQ LLM acceleration. All math operators are done with default float numbers of the device: fp16 for GPU, bf16 for Xeon.
-
-It??s enough to have basic math operations implemented via casting to float:
+Below is the sample code to implement the dequantization to float (TBD: HengYu)
 
 ```cpp
 inline C10_HOST_DEVICE float* operator+(MX* a, float* b) {
@@ -149,10 +136,26 @@ inline C10_HOST_DEVICE float* operator*(MX* a, float* b) {
 }
 ```
 
+## **Tensor quantization/dequantization**
 
-## Quantization Workflows
+Sample code for Option 1:
 
-quantization flow in stock pytorch
+```python
+x, scales = torch.quantize(torch.randn(3,3))
+y = torch.dequantize(x, scales)
+```
+
+Sample code for Option 1.1 and 2 (with better user experience):
+
+```python
+x = torch.randn(3,3).to(torch.uint4x2)
+y = x.to(torch.float)
+```
+
+## **Quantization workflow/tools**
+
+The quantization flow in PyTorch:
+
 ```python
 dtype = torch.quint4x2
 from torch.ao.quantization import default_float_qparams_observer_4bit
@@ -162,12 +165,12 @@ qparams = uint4_obs.calculate_qparams()
 uint4_weight = torch.quantize_per_channel(weights, qparams[0], qparams[1], axis=0, dtype=dtype)
 ```
 
-quantization flow in INC and other ecosystem tools
+The quantization flow in INC:
 ```python
 conf = PostTrainingQuantConfig(
     approach="weight_only",
     op_type_dict={
-        ".*": {  # re.match
+        ".*": {
             "weight": {
                 "bits": 4,  # 1-8 bit
                 "group_size": -1,  # -1 (per-channel)
@@ -177,13 +180,10 @@ conf = PostTrainingQuantConfig(
         },
     },
 )
-q_model = quantization.fit(model, conf, eval_func=eval_func)
-# INT4 weight is compressed into torch.int32 tensor
-compressed_model = q_model.export_compressed_model()
+int4_model = quantizer.fit(model, conf)
 ```
 
-
-## Serialization
+## **Serialization**
 ```python
 torch.save(uint4_weight, 'tmp.pt')
 ```
@@ -192,48 +192,38 @@ or
 torch.save(compressed_model.state_dict(), 'tmp.pt')
 ```
 
+TBD (Hengyu & Xin)
 
-## Conslusion
+## **Conclusion**
 
 ### Overview of Cons. and Pros.
 || Option 1| Option 1.1 | Option 2|
 | --- | --- | --- | --- |
-|archtecture change| zero| few | new base storage introduced|
-|user friendly| poor, need tools' help | good| good|
-| performance | no change | no change | good |
-| development effort | low | medium, most tool side | high |
+| Architecture| No | Newly-introduced tensor data type | Newly-introduced storage data type|
+| Native UX| Medium | High | High |
+| Performance Benefits | - | - | Potential |
+| Engineering/Upstreaming Efforts | Low | Medium | High |
 
-### Evolution
+Based on the above table, Option 1 (and 1.1) is recommended in this proposal.
 
-Option 1.1 is a slight improvements to Option 1, in which all API can be forward compatible.
+### **Evolution**
 
-Option 1.1 and Option 2 might play different role in different stages. After being widely verified, some data types can be re-implemented as Option 2 for further performance optimization.
+Option 1.1 is an improved version of Option 1, in which all APIs can be backward compatible. We are positioning Option 1.1 as the intermediate version for Option 2, while we'll try submitting RFC for Option 2 to PyTorch though we may face the potential upstreaming challenges and uncertainties of fast-growing sub-byte low precision inference.
 
+## **Opens**
 
+### **Shall we expose the storage data type for all sub-bytes?**
 
-## **Open points**
-### **How should data types be exposed?**
+No, only limited sub-bytes e.g., INT4, FP4.
 
-For 4 bits, there in fact are only 2 kinds of data format: int4 and e2m1, we can easily expose to end users as uint4.
-For other sub-byte data types including 2/3/5/6/7 bits, there will be a lot of combination.
-Option 1: no alignment for other sub-bytes
-Option 2 & 3: be able to cover.
+### **Shall we expose the group size in the storage data type?**
 
-### **Block size**
+No need for Option 1. We are seeing the benefits for Option 1.1 and 2 in terms of performance and binary size (AOT build).
 
-Although it seems that block size could be any for option 1, block size will impact the backend kernel generation and finally the performance.
-For GPU with AOT support, various block size will make the binary redundant, we will only support limited block size which means block size is not configurable.
-
-
-There are few questions regarding details of this solution in the context of being an alternative for true dtype.
-
-* There are no difference between activation tensors and weight tensors, but lower precision only applies to weight?
-* What are the limitations comparing to native built-in type?
-* Does it have properties of floating-point format like infs/nans, underflow numbers, rounding modes?
-* Is it configurable in terms of size of exponent/mantissa, bias, special values encoding?
-* Can it be included in type promotion matrix?
-
+### **Other questions**
+* Weight-only INT4 vs. model INT4?
+* Standard data type representation (e.g., exp/mantissa) for sub-bytes (e.g., FP4)? Follow MX format?
 
 ## **Reference**
-* [llama.cpp](https://github.com/ggerganov/llama.cpp) supports 2-6bit inference.
-* [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai) proposed by AMD, Arm, Intel, Meta, Microsoft, NVIDIA, and Qualcomm, consists of 4 block-aware datatypes: MXFP8, MXFP6, MXFP4, and MXINT8
+* [llama.cpp](https://github.com/ggerganov/llama.cpp): 2-6bit inference.
+* [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai) proposed by AMD, Arm, Intel, Meta, Microsoft, NVIDIA, and Qualcomm, defines 4 group-wise data types: MXFP8, MXFP6, MXFP4, and MXINT8.
