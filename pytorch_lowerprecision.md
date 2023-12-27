@@ -1,26 +1,17 @@
-# Proposal of block-aware sub-byte dtype introduction to PyTorch
+# Proposal of sub-byte low precision inference for PyTorch/IPEX
 
 **Authors:**
 * @xinhe3, hengyume
 
 
-## **Summary**
-The community are working on Deep Learning acceleration with sub-byte support. Considering alignment, elements are organized as blocks, and each block share a scale (and maybe a zero point). Some great examples are like 
-
-* [llama.cpp](https://github.com/ggerganov/llama.cpp) supports 2-6bits.
-* [MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai) proposed by AMD, Arm, Intel, Meta, Microsoft, NVIDIA, and Qualcomm, consists of 4 block-aware datatypes: MXFP8, MXFP6, MXFP4, and MXINT8
-
-This RFC proposes adding sub-byte data types variants to PyTorch.
-
-
 ## **Motivation**
-TODO: lower precision, always organized as blocks
+The community is active to support sub-byte low precision inference for LLMs, where the sub-byte may include INT4, FP4, NF4, INT2/3/5/6/7, MX formats, etc. In this proposal, we mainly focus on INT4 and FP4, and discuss the storage data type, compute data type, quantization, and serialization, while we borrow the idea of block-aware sub-byte support from the recent work like [llama.cpp](https://github.com/ggerganov/llama.cpp) and [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai). This RFC proposes adding sub-byte data types to PyTorch/IPEX.
 
 
-## **Storage for lower precision**
+## **Storage data type**
 
-### Option 1: 4 bits based on 8 bits storage
-If we only considerd int4/fp4/nf4, we can follow pytorch int4 implementation already and no newer storage needed. Actually Pytorch refer to uint8 to store 1 pair of int4 data.
+### Option 1: Reuse torch.uint8
+We follow the existing storage data type torch.uint8 to represent INT4/FP4 and there is no new storage required. In particular, uint8 is interchangeable with a pair of uint4 in PyTorch.
 
 ```cpp
 struct bit4x2 {
@@ -241,3 +232,8 @@ There are few questions regarding details of this solution in the context of bei
 * Does it have properties of floating-point format like infs/nans, underflow numbers, rounding modes?
 * Is it configurable in terms of size of exponent/mantissa, bias, special values encoding?
 * Can it be included in type promotion matrix?
+
+
+## **Reference**
+* [llama.cpp](https://github.com/ggerganov/llama.cpp) supports 2-6bit inference.
+* [OCP MX format](https://www.opencompute.org/blog/amd-arm-intel-meta-microsoft-nvidia-and-qualcomm-standardize-next-generation-narrow-precision-data-formats-for-ai) proposed by AMD, Arm, Intel, Meta, Microsoft, NVIDIA, and Qualcomm, consists of 4 block-aware datatypes: MXFP8, MXFP6, MXFP4, and MXINT8
