@@ -125,7 +125,7 @@ class gemm_universal_t<dispatch_policy_int4_dequantize_kslicing<group_swizzle_,
 
     using global_group_reduce_t = group::global_reduce_t<reduce_op::sum,
             tile_shape, tile_shape_cnt, mem_desc_acc_t, mem_desc_cnt_t,
-            num_global_kslicing, counter_size, gpu_arch::Xe>;
+            num_global_kslicing, counter_size, arch_tag>;
 
 public:
     /// @brief GEMM arguments.
@@ -157,7 +157,7 @@ public:
         epilogue_args_t epilogue_args;
 
         scale_base_t scale_base;
-        zero_pt_base_t zero_pt_base;
+        // zero_pt_base_t zero_pt_base;
         uint32_t scale_ld;
         uint32_t zero_pt_ld;
 
@@ -182,30 +182,30 @@ public:
         /// @param matC_base_ Is the base address of matrix C.
         /// @param matC_ld_ Is the leading dimension (pitch) size of the matrix C in memory.
         /// @param epilogue_args_ Is the epilogue arguments.
-        inline arguments_t(uint32_t matrix_m_, uint32_t matrix_k_,
-                uint32_t matrix_n_, matA_base_t matA_base_, uint32_t matA_ld_,
-                matB_base_t matB_base_, uint32_t matB_ld_,
-                matC_base_t matC_base_, uint32_t matC_ld_,
-                scale_base_t scale_base_, uint32_t scale_ld_,
-                zero_pt_base_t zero_pt_base_, uint32_t zero_pt_ld_,
-                acc_base_t acc_base_ = {}, cnt_base_t cnt_base_ = {},
-                epilogue_args_t epilogue_args_ = {})
-            : matrix_m(matrix_m_)
-            , matrix_k(matrix_k_)
-            , matrix_n(matrix_n_)
-            , matA_base(matA_base_)
-            , matA_ld(matA_ld_)
-            , matB_base(matB_base_)
-            , matB_ld(matB_ld_)
-            , matC_base(matC_base_)
-            , matC_ld(matC_ld_)
-            , scale_base(scale_base_)
-            , scale_ld(scale_ld_)
-            , zero_pt_base(zero_pt_base_)
-            , zero_pt_ld(zero_pt_ld_)
-            , acc_base(acc_base_)
-            , cnt_base(cnt_base_)
-            , epilogue_args(epilogue_args_) {}
+        // inline arguments_t(uint32_t matrix_m_, uint32_t matrix_k_,
+        //         uint32_t matrix_n_, matA_base_t matA_base_, uint32_t matA_ld_,
+        //         matB_base_t matB_base_, uint32_t matB_ld_,
+        //         matC_base_t matC_base_, uint32_t matC_ld_,
+        //         scale_base_t scale_base_, uint32_t scale_ld_,
+        //         // zero_pt_base_t zero_pt_base_, uint32_t zero_pt_ld_,
+        //         acc_base_t acc_base_ = {}, cnt_base_t cnt_base_ = {},
+        //         epilogue_args_t epilogue_args_ = {})
+        //     : matrix_m(matrix_m_)
+        //     , matrix_k(matrix_k_)
+        //     , matrix_n(matrix_n_)
+        //     , matA_base(matA_base_)
+        //     , matA_ld(matA_ld_)
+        //     , matB_base(matB_base_)
+        //     , matB_ld(matB_ld_)
+        //     , matC_base(matC_base_)
+        //     , matC_ld(matC_ld_)
+        //     , scale_base(scale_base_)
+        //     , scale_ld(scale_ld_)
+        // //     , zero_pt_base(zero_pt_base_)
+        // //     , zero_pt_ld(zero_pt_ld_)
+        //     , acc_base(acc_base_)
+        //     , cnt_base(cnt_base_)
+        //     , epilogue_args(epilogue_args_) {}
 
         /// @brief Constructs arguments with initialization list.
         /// @param matrix_m_ Is the size of the m dimension of the matrix multiplication (m x k x n).
@@ -252,8 +252,6 @@ public:
             , matC_ld(args.matC_ld)
             , scale_base(args.scale_base)
             , scale_ld(args.scale_ld)
-            , zero_pt_base(args.zero_pt_base)
-            , zero_pt_ld(args.zero_pt_ld)
             , acc_base(args.acc_base)
             , cnt_base(args.cnt_base)
             , epilogue_args(args.epilogue_args) {}
@@ -272,8 +270,6 @@ public:
             this->matC_ld = args.matC_ld;
             this->scale_base = args.scale_base;
             this->scale_ld = args.scale_ld;
-            this->zero_pt_base = args.zero_pt_base;
-            this->zero_pt_ld = args.zero_pt_ld;
             this->acc_base = args.acc_base;
             this->cnt_base = args.cnt_base;
             this->epilogue_args = args.epilogue_args;
@@ -504,14 +500,15 @@ public:
         mem_desc_scale_t mem_desc_scale(args.scale_base,
                 {args.matrix_n, scale_size_y, args.scale_ld},
                 {start_x_scale, start_y_scale});
-        mem_desc_zero_pt_t mem_desc_zero_pt(args.zero_pt_base,
-                {args.matrix_n / pack_ratio, scale_size_y,
-                        args.zero_pt_ld / pack_ratio},
-                {start_x_zero_pt, start_y_zero_pt});
+        // mem_desc_zero_pt_t mem_desc_zero_pt(args.zero_pt_base,
+        //         {args.matrix_n / pack_ratio, scale_size_y,
+        //                 args.zero_pt_ld / pack_ratio},
+        //         {start_x_zero_pt, start_y_zero_pt});
 
         uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
-        gemm_args_t gemm_args(mem_desc_a, mem_desc_b, inner_loop_count,
-                mem_desc_scale, mem_desc_zero_pt);
+        gemm_args_t gemm_args(
+                mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
+        // mem_desc_scale, mem_desc_zero_pt);
         matAcc_t matAcc;
         matAcc.init(0);
         gemm_t gemm;

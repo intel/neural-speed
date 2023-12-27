@@ -373,10 +373,11 @@ void dequantize_gemm_run(int iter) {
     using perf_tuning_knob = xetla::group::perf_tuning_knob_t<sg_tile_k,
             prefetch_distance, periodic_sync_interval>;
 
-    using compute_policy = xetla::group::compute_policy_int4_dequantize_xmx<
-            compute_attr, perf_tuning_knob,
-            gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP, data_type_scale,
-            data_type_zero_pt, dequant_s, gpu_arch::Dg2>;
+    using compute_policy
+            = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
+                    perf_tuning_knob, data_type_scale, data_type_zero_pt,
+                    gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+                    dequant_s, gpu_arch::Dg2>;
 
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
             mem_desc_a_t, mem_desc_b_t>;
@@ -590,7 +591,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<test1>;
+using tests = ::testing::Types<qkv6>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7, qkv8,
 //         qkv9, qkv10>;
 

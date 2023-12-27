@@ -33,19 +33,20 @@ template <typename compute_attr_, typename perf_tuning_knob_,
         typename dtype_scale_, typename dtype_zero_pt_, int dequant_s_,
         quant_mode quant_type_, typename pre_processing_t_, gpu_arch arch_tag_>
 class gemm_t<compute_policy_int4_dequantize_xmx<compute_attr_,
-                     perf_tuning_knob_, quant_type_, dtype_scale_,
-                     dtype_zero_pt_, dequant_s_, arch_tag_>,
+                     perf_tuning_knob_, dtype_scale_, dtype_zero_pt_,
+                     quant_type_, dequant_s_, arch_tag_>,
         tile_shape_, // tile shape of workgroup-level gemm
         mem_desc_a_t_, // memory attribute of matA
         mem_desc_b_t_, // memory attribute of matB
-        pre_processing_t_> {
+        pre_processing_t_ // pre_processing functor
+        > {
 public:
     using mem_desc_a_t = mem_desc_a_t_;
     using mem_desc_b_t = mem_desc_b_t_;
     using tile_shape = tile_shape_;
     using pre_processing_t = pre_processing_t_;
     using compute_policy = compute_policy_int4_dequantize_xmx<compute_attr_,
-            perf_tuning_knob_, quant_type_, dtype_scale_, dtype_zero_pt_,
+            perf_tuning_knob_, dtype_scale_, dtype_zero_pt_, quant_type_,
             dequant_s_, arch_tag_>;
     static constexpr uint32_t k_stride = compute_policy::k_stride;
 
@@ -133,8 +134,7 @@ private:
             subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>, arch_tag>;
     using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
     using matA_prefetch_payload_t = subgroup::prefetch_payload_t<mem_desc_a_t,
-            subgroup::tile_desc_t<tile_size_x_a, tile_size_y_a, 1, 1>,
-            wg_size_x, arch_tag>;
+            matA_tile_desc_t, wg_size_x, arch_tag>;
 
     //note: plane format, row-major
     //note: 4bit x 2, row-major
@@ -423,7 +423,7 @@ public:
                         matB_prefetch_payload);
                 // TODO 1D prefetch need pack to U32/U64
                 // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-                //         scale_prefetch_payload);
+                // scale_prefetch_payload);
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_CLIP) {
                     // TODO 1D prefetch need pack to U32/U64

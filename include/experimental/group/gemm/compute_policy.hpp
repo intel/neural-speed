@@ -30,17 +30,17 @@ enum quant_mode { S4_CLIP, S4_FULLRANGE_NO_ZP };
 /// @tparam perf_tuning_knob_ Is performance-related knobs.
 /// @tparam arch_tag_ Is the HW architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
-        quant_mode quant_type_, typename dtype_scale_, typename dtype_zero_pt_,
+        typename dtype_scale_, typename dtype_zero_pt_, quant_mode quant_type_,
         int dequant_s_, gpu_arch arch_tag_ = gpu_arch::Xe,
         typename enable = void>
 struct compute_policy_int4_dequantize_xmx {};
 
 /// @brief Specialized for Xe and Dg2 architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
-        quant_mode quant_type_, typename dtype_scale_, typename dtype_zero_pt_,
+        typename dtype_scale_, typename dtype_zero_pt_, quant_mode quant_type_,
         int dequant_s_, gpu_arch arch_tag_>
 struct compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
-        quant_type_, dtype_scale_, dtype_zero_pt_, dequant_s_, arch_tag_,
+        dtype_scale_, dtype_zero_pt_, quant_type_, dequant_s_, arch_tag_,
         std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
     using compute_attr = compute_attr_;
     using perf_tuning_knob = perf_tuning_knob_;
