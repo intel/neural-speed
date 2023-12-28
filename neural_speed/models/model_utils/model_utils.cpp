@@ -2268,17 +2268,16 @@ struct logits_info {
 };
 
 void logits_processor::min_new_tokens_logits_process(const std::vector<uint32_t>& cur_lens,
-                                                     const model_vocab::id& eos_token_id) {
-  MODEL_ASSERT(ctx->generation_conf.min_new_tokens >= 0);
-  if (ctx->generation_conf.min_new_tokens == 0) {
-    return;
-  }
+                                                     const model_vocab::id& eos_token_id,
+                                                     const std::vector<uint32_t>& min_new_tokens) {
+  MODEL_ASSERT(!min_new_tokens.empty());
   int batch_size = ctx->batch_size;
   MODEL_ASSERT(batch_size == cur_lens.size());
+  MODEL_ASSERT(cur_lens.size() == min_new_tokens.size());
   size_t offset = ctx->logits.size() / ctx->batch_size - ctx->model.hparams.n_vocab;
   size_t bs_stride = ctx->logits.size() / ctx->batch_size;
   for (int i = 0; i < batch_size; ++i) {
-    if (ctx->generation_conf.min_new_tokens <= cur_lens[i]) {
+    if (min_new_tokens[i] <= cur_lens[i]) {
       continue;
     }
     // forbidden to choose eos_token if cur_len < min_new_tokens
@@ -2286,10 +2285,11 @@ void logits_processor::min_new_tokens_logits_process(const std::vector<uint32_t>
   }
 }
 
-void logits_processor::process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id) {
+void logits_processor::process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id,
+                               const std::vector<uint32_t>& min_new_tokens) {
   MODEL_ASSERT(model_get_logits(ctx) != nullptr);
-  if (min_new_tokens > 0) {
-    min_new_tokens_logits_process(cur_lens, eos_token_id);
+  if (!min_new_tokens.empty()) {
+    min_new_tokens_logits_process(cur_lens, eos_token_id, min_new_tokens);
   }
 }
 
@@ -2374,10 +2374,12 @@ std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_cont
   const int request_running_bs = ctx->request_running_bs;
   logits_info li(ctx);
   std::vector<uint32_t> cur_lens;
+  std::vector<uint32_t> min_new_tokens;
   for (int i = 0; i < ctx->batch_size; ++i) {
     cur_lens.push_back(cur_beams[i].token_ids.size());
+    min_new_tokens.push_back(next_inputs[i].gen_conf.min_new_tokens);
   }
-  lp.process(cur_lens, ctx->vocab.eos_token_id);
+  lp.process(cur_lens, ctx->vocab.eos_token_id, min_new_tokens);
   const int raw_k = sample_scale * beam_size;
   // raw logits top_k
   std::vector<std::vector<beam_next_token>> raw_top_k = li.vocab_top_k(raw_k);
@@ -2491,36 +2493,63 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
   std::vector<beam_next_token> next_tokens =
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
   MODEL_ASSERT(next_tokens.size() == batch_size * sample_scale);  // request_running_bs * beam_size * sample_scale
+  next_candidate_beams(num_beams, sample_scale, next_tokens);
+}
+
+void beam_search_flow::next_candidate_beams(const std::vector<int>& num_beams, const int& sample_scale,
+                                            const std::vector<beam_next_token>& next_top_k_tokens) {
   // DEBUG
 #ifdef NE_BEAM_SEARCH_VERBOSE_ON
   printf("top_k next_tokens: \n");
   int bb = 0;
-  for (int kk = 0; kk < next_tokens.size(); ++kk) {
-    if (kk % (beam_size * sample_scale) == 0) printf("------batch_%d------\n", bb++);
-    printf("%d: %s, score: %10.6f, beam_idx: %d \n", next_tokens[kk].id,
-           (ctx->vocab.id_to_token.at(next_tokens[kk].id).tok).c_str(), next_tokens[kk].score,
-           next_tokens[kk].beam_idx);
+  int bs_i = 0;
+  int bs_sample_n = num_beams[bs_i] == 1 ? beam_size : num_beams[bs_i] * sample_scale;
+  ++bs_i;
+  for (int kk = 0; kk < next_top_k_tokens.size(); ++kk) {
+    if (kk % bs_sample_n == 0) {
+      printf("------batch_%d------\n", bb++);
+      bs_sample_n = num_beams[bs_i] == 1 ? beam_size : num_beams[bs_i] * sample_scale;
+      ++bs_i;
+    }
+    printf("%d: %s, score: %10.6f, beam_idx: %d \n", next_top_k_tokens[kk].id,
+           (ctx->vocab.id_to_token.at(next_top_k_tokens[kk].id).tok).c_str(), next_top_k_tokens[kk].score,
+           next_top_k_tokens[kk].beam_idx);
   }
   printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
 #endif
 
-  const int rb_off = beam_size * sample_scale;
+  int rb_off = 0;
   for (int rb = 0; rb < request_running_indices.size(); ++rb) {
+    // first_token
+    if (num_beams[rb] == 1) {
+      for (int nt = 0; nt < beam_size; ++nt) {
+        beam next_beam;
+        next_beam.ctx = ctx;
+        next_beam.token_ids.push_back(next_top_k_tokens[rb_off + nt].id);
+        next_beam.score = next_top_k_tokens[rb_off + nt].score;
+        next_beam.beam_idx = nt;
+        next_beam.request_idx = request_running_indices[rb];
+        next_beams[request_running_indices[rb] * beam_size + nt] = std::move(next_beam);
+      }
+      rb_off += beam_size;
+      continue;
+    }
+    // next_token
     int record_push = 0;
-    for (int nt = 0; nt < rb_off; ++nt) {
-      int i = rb * rb_off + nt;
-      int cb_off = next_tokens[i].beam_idx + request_running_indices[rb] * beam_size;
-      if (next_tokens[i].id == ctx->vocab.eos_token_id) {
+    for (int nt = 0; nt < num_beams[rb] * sample_scale; ++nt) {
+      int i = rb_off + nt;
+      int cb_off = next_top_k_tokens[i].beam_idx + request_running_indices[rb] * beam_size;
+      if (next_top_k_tokens[i].id == ctx->vocab.eos_token_id) {
         // if beam_token does not belong to top num_beams tokens, it should not be added
         bool is_beam_token_worse_than_top_num_beams = nt >= beam_size ? true : false;
         if (is_beam_token_worse_than_top_num_beams) continue;
         // update score with eos next token
-        cur_beams[cb_off].score = next_tokens[i].score;
+        cur_beams[cb_off].score = next_top_k_tokens[i].score;
         beam_hypos[request_running_indices[rb]].add(cur_beams[cb_off], n_prompt_tokens[rb]);
       } else {
         beam next_beam = cur_beams[cb_off];
-        next_beam.token_ids.push_back(next_tokens[i].id);
-        next_beam.score = next_tokens[i].score;
+        next_beam.token_ids.push_back(next_top_k_tokens[i].id);
+        next_beam.score = next_top_k_tokens[i].score;
         next_beams[request_running_indices[rb] * beam_size + record_push] = std::move(next_beam);
         record_push++;
       }
@@ -2532,6 +2561,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
         break;
       }
     }
+    rb_off += num_beams[rb] * sample_scale;
   }
 }
 
@@ -2643,7 +2673,7 @@ void beam_search_flow::update_status() {
   next_done_request_ids.clear();
   for (int h = 0; h < beam_hypos.size(); ++h) {
     if (requests_done[h]) continue;
-    const bool enough_new_tokens = (cur_beams[h * beam_size].token_ids.size() == ctx->generation_conf.max_new_tokens);
+    const bool enough_new_tokens = (cur_beams[h * beam_size].token_ids.size() == gen_confs[h].max_new_tokens);
     if (beam_hypos[h].is_done() || enough_new_tokens) {
       requests_done[h] = true;
       next_done_request_ids.push_back(h);
@@ -2652,6 +2682,11 @@ void beam_search_flow::update_status() {
       std::for_each(cur_beams.begin() + h * beam_size, cur_beams.begin() + (h + 1) * beam_size,
                     [&](auto& b) { b.done = true; });
     }
+  }
+  // collect request final generation result if done
+  for (const auto& didx : next_done_request_ids) {
+    const beam& top_b = finalize(didx);
+    response[didx] = top_b.token_ids;
   }
 }
 
@@ -2704,6 +2739,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
   for (int ni = 0; ni < inputs.size(); ++ni) {
     padding_side[ni] = inputs[ni].padding_side;
     n_padding[ni] = inputs[ni].n_padding;
+    gen_confs[ni] = ctx->generation_conf;
   }
 
   ctx->batch_size = request_bs;
@@ -2771,11 +2807,6 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
 #endif
 
     update_status();
-    // collect request final generation result if done
-    for (const auto& didx : next_done_request_ids) {
-      const beam& top_b = finalize(didx);
-      response[didx] = top_b.token_ids;
-    }
     // return if all requests done in static batching
     if (std::find(requests_done.begin(), requests_done.end(), false) == requests_done.end()) break;
   }
@@ -2845,7 +2876,22 @@ bool beam_search_flow::step_check_and_prepare_inputs(const std::vector<model_inp
       }
     }
   }
+  ctx->request_running_bs = request_running_indices.size();
   ctx->batch_size = next_inputs.size();
+  // debug verbose
+#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+  printf("========================================================================================= \n");
+  printf("input tokens for inference: \n");
+  printf("request_running_bs: %d, batch_size for inference: %d\n", ctx->request_running_bs, ctx->batch_size);
+  for (int k = 0; k < next_inputs.size(); ++k) {
+    for (int ntk = 0; ntk < next_inputs[k].n_tokens) {
+      model_token kk = *(next_inputs[k].tokens + ntk);
+      printf("%d: %s, ", kk, (ctx->vocab.id_to_token.at(kk).tok).c_str());
+    }
+    printf("\n");
+  }
+  printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
+#endif
   return true;
 }
 
@@ -2853,6 +2899,8 @@ bool beam_search_flow::step_update_beams_and_kv_cache() {
   std::vector<int> num_beams;
   std::vector<float> beams_score;
   std::vector<int> beam_indices;
+  int num_sample_k = 0;
+  const int sample_scale = 2;
   for (int rb = 0; rb < request_running_indices.size(); ++rb) {
     const int req_idx = request_running_indices[rb];
     n_past[req_idx] += n_tokens[req_idx];
@@ -2862,35 +2910,59 @@ bool beam_search_flow::step_update_beams_and_kv_cache() {
       num_beams.push_back(1);
       beams_score.push_back(0.0f);
       beam_indices.push_back(0);
-      // beam generation
-    } else {
+      num_sample_k += beam_size;
+    } else {  // beam generation
       num_beams.push_back(beam_size);
       for (int bi = 0; bi < beam_size; ++bi) {
         int cbi = req_idx * beam_size + bi;
         beams_score.push_back(cur_beams[cbi].score);
         beam_indices.push_back(cur_beams[cbi].beam_idx);
       }
+      num_sample_k += sample_scale * beam_size;
     }
   }
-  const int sample_scale = 2;
   std::vector<beam_next_token> next_tokens =
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
+  if (next_tokens.size() != num_sample_k) {
+    fprintf(stderr, "%s: error: sampled next tokens size is %d which is not equal to %d.\n", __func__,
+            next_tokens.size(), num_sample_k);
+    return false;
+  }
+  next_candidate_beams(num_beams, sample_scale, next_tokens);
+  std::vector<std::tuple<int, int>> kv_reorder_indices = update_kv_cache_reorder_indices();
+  kv_reorder->update(n_past, n_prompt_tokens, request_running_indices, kv_reorder_indices, next_beams);
+  cur_beams.swap(next_beams);
+  // debug verbose
+#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+  printf("current beams:\n");
+  for (size_t j = 0; j < cur_beams.size(); ++j) {
+    printf("beams[%d]: ", j);
+    cur_beams[j].print();
+    fflush(stdout);
+  }
+  printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
+#endif
+  return true;
 }
 
-// TODO (YZT) consider add verbose
+bool beam_search_flow::step_check_done_requests() {
+  update_status();
+  return true;
+}
+
 bool beam_search_flow::step(const std::vector<model_input>& inputs) {
   if (!ctx->cont_batching) {
     fprintf(stderr,
             "%s: error: This api is for continuous batching mechanism. Please call"
-            " `beam_search(model_inputs, n_input)` function directly for single prompt or padding batched "
-            "prompts generation.\n",
+            " `beam_search(ctx, max_new_tokens, model_inputs, n_threads)` function directly for single prompt or"
+            " padding batched prompts generation.\n",
             __func__);
     return false;
   }
   if (!step_check_and_prepare_inputs(inputs)) return false;
   if (model_eval(ctx, next_inputs.data(), next_inputs.size(), num_threads) > 0) return false;
   if (!step_update_beams_and_kv_cache()) return false;
-
+  if (!step_check_done_requests()) return false;
   return true;
 }
 

@@ -391,15 +391,16 @@ struct logits_info;
 
 class logits_processor {
  public:
-  explicit logits_processor(model_context* lctx) : ctx(lctx), min_new_tokens(lctx->generation_conf.min_new_tokens) {}
+  explicit logits_processor(model_context* lctx) : ctx(lctx) {}
   ~logits_processor() {}
 
-  void process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id);
-  void min_new_tokens_logits_process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id);
+  void process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id,
+               const std::vector<uint32_t>& min_new_tokens = {});
+  void min_new_tokens_logits_process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id,
+                                     const std::vector<uint32_t>& min_new_tokens);
 
  private:
   model_context* ctx = nullptr;
-  const uint32_t min_new_tokens;
 };
 
 // base kv_cache reorder class for beam search
@@ -472,6 +473,8 @@ class beam_search_flow {
                                                       const std::vector<int> beam_indices, const int& sample_scale = 2,
                                                       const int& dim = -1);
   void fill_next_beams_by_top_scores();
+  void next_candidate_beams(const std::vector<int>& num_beams, const int& sample_scale,
+                            const std::vector<beam_next_token>& next_top_k_tokens);
   std::vector<std::tuple<int, int>> update_kv_cache_reorder_indices();
   void update_status();
   const beam& finalize(const int& request_idx);
