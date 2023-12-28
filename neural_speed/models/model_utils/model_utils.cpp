@@ -2447,12 +2447,8 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
   // filter cur_beams
   for (int i = 0; i < cur_beams.size(); ++i) {
     if (cur_beams[i].done) continue;
-    if (request_running_indices.empty()) {
+    if (request_running_indices.empty() || request_running_indices.back() != cur_beams[i].request_idx) {
       request_running_indices.push_back(cur_beams[i].request_idx);
-    } else {
-      if (request_running_indices.back() != cur_beams[i].request_idx) {
-        request_running_indices.push_back(cur_beams[i].request_idx);
-      }
     }
     // (batch, 1)
     // ordered by request_idx
@@ -2986,4 +2982,23 @@ std::vector<std::vector<model_token>> beam_search(model_context* lctx, const int
   lctx->generation_conf.max_new_tokens = n_predict;
   beam_search_flow bsf(lctx, inputs.size());
   return bsf.loop(inputs, n_threads);
+}
+
+std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs, const int n_input) {
+  std::vector<std::vector<int>> groups;
+  int count = 0;
+  int req_idx = (inputs + count)->request_idx;
+  std::vector<int> group;
+  while (count < n_input) {
+    if (req_idx == (inputs + count)->request_idx) {
+      group.push_back(count);
+      ++count;
+    } else {
+      groups.push_back(group);
+      group.clear();
+      req_idx = (inputs + count)->request_idx;
+    }
+  }
+  if (!group.empty()) groups.push_back(group);
+  return groups;
 }

@@ -510,7 +510,8 @@ class beam_search_flow {
 MODEL_API std::vector<std::vector<model_token>> beam_search(model_context* lctx, const int& n_predict,
                                                             const std::vector<model_input>& inputs,
                                                             const int& n_threads);
-
+// split model inputs into continuous inference groups which have num_requests length
+MODEL_API std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs, const int n_input);
 // Internal API to be implemented by model.cpp and used by tests/benchmarks only
 #ifdef MODEL_API_INTERNAL
 
