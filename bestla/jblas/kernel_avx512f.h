@@ -578,7 +578,6 @@ inline JBLAS_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int
     auto sptr = scales + kpos * NPad;
     int j = 0;
     auto quant = [&](__mmask16 mask) {
-      __m128i f8_src;
       auto sign_revert =
           _mm512_cvtepi8_epi32(_mm_maskz_loadu_epi8(mask, reinterpret_cast<__m128i*>(srcptr + i * ld_src + j)));
       auto e_revert = sign_revert;

@@ -714,6 +714,11 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
   inline constexpr int CStep() { return mCorrection.mCStep; }
 
   template <typename T>
+  inline constexpr size_t WSize() {
+    return mQBuf.size<T>();
+  }
+
+  template <typename T>
   inline constexpr T* WPtr() const {
     return mQBuf.get<T>();
   }
@@ -763,143 +768,6 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
   }
 };
 
-class StorageWeightKBlockS8 : public IWeightKBlockBase {
- public:
-  using InfoType = IWeightKBlockBase;
-  using QWeightType = ObjectAlignedBuffer<Alignment>;
-  using CorrectionType = ObjectQuantCorrection;
-  QWeightType mQBuf;
-  CorrectionType mCorrection;
-  StorageWeightKBlockS8(uint64_t _type) : IWeightKBlockBase(_type) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightKBlockS8;
-  }
-
-  size_t resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE scalet, JBLAS_DTYPE redt, bool IsAsym) {
-    JBLAS_DTYPE zpt = JBLAS_DTYPE::S8;
-    InfoType::resize(NPad, KPad, Block, N, K, JBLAS_DTYPE::S8);
-    mQBuf.resize(static_cast<size_t>(NPad) * KPad);
-    int nk_scale = utils::updiv(KPad, Block);
-    auto gemm_comp = jblas::gemm::CoreAttr::get_comp(mCoreId);
-    auto is_cint = jblas::gemm::CompTypeHelper::is_integer(gemm_comp);
-    mCorrection.resize(nk_scale, NPad, scalet, zpt, redt, IsAsym, is_cint);
-    mSize = InfoType::getSerializedSize() + mQBuf.getSerializedSize() + mCorrection.getSerializedSize();
-    mSize = utils::padto(mSize, Alignment);
-    return mSize;
-  }
-
-  inline constexpr JBLAS_DTYPE RDtype() { return mCorrection.mRedT; }
-  inline constexpr JBLAS_DTYPE ZDtype() { return mCorrection.mZpT; }
-  inline constexpr JBLAS_DTYPE SDtype() { return mCorrection.mScaT; }
-  inline constexpr bool IsAsym() { return mCorrection.mZpBuf.mNotEmpty; }
-  inline constexpr bool HasReduce() { return mCorrection.mRedBuf.mNotEmpty; }
-  inline constexpr size_t CSize() { return mCorrection.mCSize; }
-  inline constexpr int CStep() { return mCorrection.mCStep; }
-
-  template <typename T>
-  inline T* WPtr() {
-    return mQBuf.get<T>();
-  }
-
-  template <typename T>
-  inline T* SPtr() {
-    return mCorrection.mScaleBuf.get<T>();
-  }
-
-  template <typename T>
-  inline T* ZPtr() {
-    return mCorrection.mZpBuf.get<T>();
-  }
-
-  template <typename T>
-  inline T* RPtr() {
-    return mCorrection.mRedBuf.get<T>();
-  }
-
-  template <typename T>
-  inline constexpr size_t WSize() {
-    return mQBuf.size<T>();
-  }
-
-  inline constexpr int* ShfIndice() { return nullptr; }
-
-  virtual void assign(int8_t* buf) override {
-    InfoType::deserializeBuffer(buf, true);
-    mQBuf.deserializeBuffer(buf, true);
-    mCorrection.deserializeBuffer(buf, true);
-  }
-
-  virtual void serialize(int8_t* wptr) {
-    InfoType::serializeToBuffer(wptr);
-    mQBuf.serializeToBuffer(wptr);
-    mCorrection.serializeToBuffer(wptr);
-  }
-
-  virtual void deserialize(int8_t* rptr) override {
-    InfoType::deserializeBuffer(rptr, false);
-    mQBuf.deserializeBuffer(rptr, false);
-    mCorrection.deserializeBuffer(rptr, false);
-  }
-};
-
-class StorageWeightKBlockS4 : public StorageWeightKBlockS8 {
- public:
-  StorageWeightKBlockS4(uint64_t _type) : StorageWeightKBlockS8(_type) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightKBlockS4;
-  }
-
-  size_t resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE s4t, JBLAS_DTYPE scalet, JBLAS_DTYPE redt,
-                bool IsAsym) {
-    JBLAS_DTYPE zpt = JBLAS_DTYPE::S8;
-    InfoType::resize(NPad, KPad, Block, N, K, s4t);
-    auto bytes = utils::updiv(static_cast<size_t>(NPad) * KPad, 2);
-    mQBuf.resize(bytes);
-    int nk_scale = utils::updiv(KPad, Block);
-    auto gemm_comp = jblas::gemm::CoreAttr::get_comp(mCoreId);
-    auto is_cint = jblas::gemm::CompTypeHelper::is_integer(gemm_comp);
-    mCorrection.resize(nk_scale, NPad, scalet, zpt, redt, IsAsym, is_cint);
-    mSize = InfoType::getSerializedSize() + mQBuf.getSerializedSize() + mCorrection.getSerializedSize();
-    mSize = utils::padto(mSize, Alignment);
-    return mSize;
-  }
-};
-
-class StorageWeightKBlockF8 : public StorageWeightKBlockS8 {
- public:
-  StorageWeightKBlockF8(uint64_t _type) : StorageWeightKBlockS8(_type) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightKBlockF8;
-  }
-
-  size_t resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE f8t, JBLAS_DTYPE scalet) {
-    StorageWeightKBlockF8::InfoType::resize(NPad, KPad, Block, N, K, f8t);
-    StorageWeightKBlockF8::mQBuf.resize((size_t)NPad * KPad);
-    int nk_scale = utils::updiv(KPad, Block);
-    StorageWeightKBlockF8::mCorrection.resize(nk_scale, NPad, scalet, JBLAS_DTYPE::S8, JBLAS_DTYPE::F32, false, false);
-    mSize = StorageWeightKBlockF8::InfoType::getSerializedSize() + StorageWeightKBlockF8::mQBuf.getSerializedSize() +
-            StorageWeightKBlockF8::mCorrection.getSerializedSize();
-    mSize = utils::padto(mSize, Alignment);
-    return mSize;
-  }
-};
-
-class StorageWeightKBlockF4 : public StorageWeightKBlockS4 {
- public:
-  StorageWeightKBlockF4(uint64_t _type) : StorageWeightKBlockS4(_type) {
-    mPrologueID = JBLAS_PROLOGUEB_IDS::WeightKBlockF4;
-  }
-
-  size_t resize(int NPad, int KPad, int Block, int N, int K, JBLAS_DTYPE f4t, JBLAS_DTYPE scalet) {
-    StorageWeightKBlockS4::InfoType::resize(NPad, KPad, Block, N, K, f4t);
-    auto bytes = utils::updiv(static_cast<size_t>(NPad) * KPad, 2);
-    StorageWeightKBlockS4::mQBuf.resize(bytes);
-    int nk_scale = utils::updiv(KPad, Block);
-    StorageWeightKBlockS4::mCorrection.resize(nk_scale, NPad, scalet, JBLAS_DTYPE::S8, JBLAS_DTYPE::F32, false, false);
-    mSize = StorageWeightKBlockS4::InfoType::getSerializedSize() + StorageWeightKBlockS4::mQBuf.getSerializedSize() +
-            StorageWeightKBlockS4::mCorrection.getSerializedSize();
-    mSize = utils::padto(mSize, Alignment);
-    return mSize;
-  }
-};
-
 class StorageWeightKBlockNFloat : public StorageWeightKBlockNInteger {
  public:
   StorageWeightKBlockNFloat(uint64_t _type) : StorageWeightKBlockNInteger(_type) {
@@ -939,18 +807,6 @@ class PackedWeightParser {
       switch (type) {
         case JBLAS_PROLOGUEB_IDS::WeightPack:
           ptr = new gemm::StoragePackedWeight(0);
-          break;
-        case JBLAS_PROLOGUEB_IDS::WeightKBlockS8:
-          ptr = new gemm::StorageWeightKBlockS8(0);
-          break;
-        case JBLAS_PROLOGUEB_IDS::WeightKBlockF8:
-          ptr = new gemm::StorageWeightKBlockF8(0);
-          break;
-        case JBLAS_PROLOGUEB_IDS::WeightKBlockS4:
-          ptr = new gemm::StorageWeightKBlockS4(0);
-          break;
-        case JBLAS_PROLOGUEB_IDS::WeightKBlockF4:
-          ptr = new gemm::StorageWeightKBlockF4(0);
           break;
         case JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger:
           ptr = new gemm::StorageWeightKBlockNInteger(0);

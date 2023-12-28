@@ -404,7 +404,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
 
   JBLAS_CODE quantize(const Param& _param, int m, int k, jblas::parallel::IThreading* threading) {
     auto srcptr = const_cast<SRC_T*>(_param.A);
-    if (_param.reordered) {
+    if (_param.indices) {
       auto shuffle_src = _param.reordered->template APtr<SRC_T>();
       threading->parallel_for([&](int tidx) {
         auto enable_thr = threading->num_threads();

@@ -12,8 +12,16 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
+#include <map>
+#include <thread>
+#include <vector>
 #include "jit_blas.h"
 #include "xbyak/xbyak_util.h"
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sched.h>
+#endif
 
 namespace jblas {
 
@@ -201,17 +209,12 @@ class isa_base {
 
 class CpuDevice {
  public:
-  inline void setThreads(int _nth) {
-    if (_nth <= 0) {
-      numthreads = numcores;
-    } else {
-      numthreads = std::min(numcores, _nth);
-    }
-  }
   inline int getThreads() { return numthreads; }
   inline int getCores() { return numcores; }
   inline uint32_t getL2CacheSize() { return L2Cache; }
   inline uint32_t getL1CacheSize() { return L1Cache; }
+  inline uint32_t getL2CacheSize_E() { return E_L2Cache; }
+  inline uint32_t getL1CacheSize_E() { return E_L1Cache; }
   inline bool AVX() { return mHasAVX; }
   inline bool AVX2() { return mHasAVX2; }
   inline bool AVX_VNNI() { return mHasAVX_VNNI; }
@@ -221,11 +224,16 @@ class CpuDevice {
   inline bool AMX_BF16() { return mHasAMX_BF16; }
   inline bool AVX512_BF16() { return mHasAVX512_BF16; }
   inline bool AVX512_FP16() { return mHasAVX512_FP16; }
+  inline float getPE() { return (P_core.size() * P_power) / (E_core.size() * E_power); }
+  inline size_t getPcoreNum() { return P_core.size(); }
+  inline size_t getEcoreNum() { return E_core.size(); }
+  inline size_t getSMTcoreNum() { return SMT_core.size(); }
+  inline int* getPCores() { return P_core.data(); }
+  inline int* getECores() { return E_core.data(); }
+  inline int* getSMTCores() { return SMT_core.data(); }
 #define ADD_FLAG(isa) mHas##isa = _cpu.has(_cpu.t##isa)
   CpuDevice() {
     static Xbyak::util::Cpu _cpu;
-    L1Cache = _cpu.getDataCacheSize(0);
-    L2Cache = _cpu.getDataCacheSize(1);
     ADD_FLAG(AVX);
     ADD_FLAG(AVX2);
     ADD_FLAG(AVX512F);
@@ -236,7 +244,77 @@ class CpuDevice {
     ADD_FLAG(AVX512_BF16);
     ADD_FLAG(AVX512_FP16);
     numcores = _cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::CoreLevel);
-    numthreads = numcores;
+    static bool p = false;
+    {
+      uint32_t tmp[4];
+      _cpu.getCpuid(7, tmp);
+      if (tmp[3] & (1U << 15)) mHybrid = true;
+      if (p) printf("!!!Hybrid:%d\t%x\t%x\t%x\t%x!!!\n", mHybrid, tmp[0], tmp[1], tmp[2], tmp[3]);
+    }
+    if (mHybrid) {
+      int total_cores = numcores * _cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::SmtLevel);
+      std::vector<int> core_type(total_cores), core_id(total_cores), L1(total_cores), L2(total_cores);
+      std::map<int, int> core_id_count;
+
+      {
+        // classify E-core / LPE-core and  P-core / smt
+        std::vector<std::thread> thdset(total_cores);
+        for (size_t i = 0; i < total_cores; i++) {
+          thdset[i] = std::thread(
+              [&](int tidx) {
+                core_bond(tidx);
+                Xbyak::util::Cpu cpu;
+                L1[tidx] = cpu.getDataCacheSize(0);
+                L2[tidx] = cpu.getDataCacheSize(1);
+                if (isEcore(cpu))
+                  core_type[tidx] = 1;
+                else
+                  core_type[tidx] = 2;
+                core_id[tidx] = getCoreId(cpu);
+              },
+              int(i));
+        }
+        for (size_t i = 0; i < total_cores; i++) {
+          thdset[i].join();
+          core_id_count[core_id[i]] = core_id_count[core_id[i]] + 1;
+        }
+        if (p) {
+          for (int i = 0; i < total_cores; i++) printf("%d %d\n", core_type[i], core_id[i]);
+          for (auto& kv : core_id_count) printf("%d,%d\n", kv.first, kv.second);
+        }
+        for (int i = 0; i < total_cores; i++) {
+          if (core_type[i] == 2) {
+            if (core_id_count[core_id[i]] > 0) {
+              P_core.push_back(i);
+              core_id_count[core_id[i]] = 0;
+            } else {
+              SMT_core.push_back(i);
+            }
+          } else {
+            if (core_id_count[core_id[i]] == 4) E_core.push_back(i);
+          }
+        }
+        if (p) {
+          printf("Pcore:");
+          for (auto& i : P_core) printf("%d,", i);
+          printf("\nEcore:");
+          for (auto& i : E_core) printf("%d,", i);
+          printf("\nsmt:");
+          for (auto& i : SMT_core) printf("%d,", i);
+          printf("\n");
+        }
+        E_L1Cache = L1[E_core[0]];
+        E_L2Cache = L2[E_core[0]] / 4;
+        L1Cache = E_L1Cache > L1[P_core[0]] / 2 ? L1[P_core[0]] / 2 : E_L1Cache;
+        L2Cache = E_L2Cache > L2[P_core[0]] / 2 ? L2[P_core[0]] / 2 : E_L2Cache;
+      }
+      numcores = P_core.size() + E_core.size();
+      numthreads = P_core.size() * 2 + E_core.size();
+    } else {
+      L1Cache = _cpu.getDataCacheSize(0);
+      L2Cache = _cpu.getDataCacheSize(1);
+      numthreads = numcores;
+    }
   }
 
   static CpuDevice* getInstance() {
@@ -252,12 +330,96 @@ class CpuDevice {
   }
 #undef ADD_FLAG
 
+  static bool isEcore() {
+    Xbyak::util::Cpu cpu;
+    uint32_t tmp[4];
+    cpu.getCpuid(0x1A, tmp);
+    int core_type = (tmp[0] >> 24) & ((1u << 7) - 1);  // cpu.extractBit(a[0], 24, 31);
+    switch (core_type) {
+      case 32:
+        // printf("Atom\n");
+        return true;  // E-core or LPE-core
+        break;
+      case 64:
+        // printf("Core\n");
+        return false;  // P-core
+        break;
+      default:
+        // printf("No hyper\n");
+        return false;
+        break;
+    }
+    return false;
+  }
+
+  int getCoreId(Xbyak::util::Cpu& cpu) {
+    uint32_t tmp[4];
+    cpu.getCpuidEx(0x1F, 1, tmp);  // sub-leaf 1 is core domain
+    // printf("!!!%x\t%x\t%x\t%x!!!\n", tmp[0], tmp[1], tmp[2], tmp[3]);
+    if (tmp[0] != 0 && tmp[1] != 0)
+      return tmp[3] >> 3;  // tmp[3] is APIC
+    else
+      return tmp[3];
+  }
+
+  bool isEcore(Xbyak::util::Cpu& cpu) {
+    uint32_t tmp[4];
+    cpu.getCpuid(0x1A, tmp);
+    int core_type = (tmp[0] >> 24) & ((1u << 7) - 1);  // cpu.extractBit(a[0], 24, 31);
+    switch (core_type) {
+      case 32:
+        // printf("Atom\n");
+        return true;  // E-core or LPE-core
+        break;
+      case 64:
+        // printf("Core\n");
+        return false;  // P-core
+        break;
+      default:
+        // printf("No hyper\n");
+        return false;
+        break;
+    }
+    return false;
+  }
+  static void core_bond(int core) {
+#ifdef _WIN32
+    SetThreadAffinityMask(GetCurrentThread(), 1 << core);
+#else
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core, &cpuset);
+    int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) printf("ERROR\n");
+#endif
+  }
+
+  static void core_bond(std::thread& thread, int core) {
+#ifdef _WIN32
+    HANDLE handle = thread.native_handle();
+    SetThreadAffinityMask(handle, 1 << core);
+#else
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core, &cpuset);
+    pthread_t pt = thread.native_handle();
+    int s = pthread_setaffinity_np(pt, sizeof(cpuset), &cpuset);
+    if (s != 0) printf("ERROR\n");
+#endif
+  }
+
+  bool isHybrid() { return mHybrid; }
+
  protected:
   uint32_t L2Cache, L1Cache;
+  bool mHybrid = false;
   bool mHasAVX2, mHasAVX_VNNI, mHasAVX, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512F, mHasAVX512_BF16,
       mHasAVX512_FP16;
   int numcores;
   int numthreads;
+  std::vector<int> P_core, E_core, SMT_core;
+  uint32_t E_L2Cache, E_L1Cache;
+  float P_power = 4.8, E_power = 2.3;
 };
 
 #define GetCPUDevice() auto _cd = jblas::device::CpuDevice::getInstance();
