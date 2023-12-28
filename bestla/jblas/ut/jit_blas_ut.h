@@ -19,11 +19,11 @@ namespace ut {
 using sAVX512F = jblas::gemm::SCoreRowNAvx512f<48, 8>;
 using sAMX_BF16 = jblas::gemm::HCoreRowNAmxbf16<64, 16>;
 using sAVX512_FP16 = jblas::gemm::HCoreRowNAvx512fp16<96, 8>;
-using sAVX_VNNI = jblas::gemm::ICoreRowNAvxvnni<48, 2>;
+using sAVX_VNNI = jblas::gemm::ICoreRowNAvxvnni<24, 4>;
 using sAVX512_VNNI = jblas::gemm::ICoreRowNAvx512vnni<48, 8>;
 using sAMX_INT8_US = jblas::gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = jblas::gemm::ICoreRowNAmxint8SS<64, 16>;
-using sAVX2 = jblas::gemm::SCoreRowNAvx2<48, 2>;
+using sAVX2 = jblas::gemm::SCoreRowNAvx2<24, 4>;
 #ifdef _OPENMP
 static parallel::OMPThreading DefaultThreading(4);
 #else
@@ -43,6 +43,33 @@ static int8_t cache[CacheSize];
 #define F8_ERR 1.2f
 #define INT4_ERR 2.f
 #define FP4_ERR 3.f
+
+static inline float get_ut_err(JBLAS_DTYPE qtype){
+  auto dbits = utils::jblas_dtype_bits(qtype);
+  auto type = utils::jblas_dtype_type(qtype);
+  auto err = FP32_ERR;
+  auto constexpr dtype_int = utils::jblas_dtype_type(JBLAS_DTYPE::TypeInt);
+  if (type == dtype_int) {
+    if (dbits == 8) {
+      err = INT8_ERR;
+    } else {
+      err = INT4_ERR;
+    }
+  } else {
+    if (dbits==4) {
+      err = FP4_ERR;
+    } else if (dbits == 8) {
+      err = F8_ERR;
+    } else if (dbits == 16) {
+      if (qtype==JBLAS_DTYPE::F16) {
+        err = FP16_ERR;
+      } else {
+        err = BF16_ERR;
+      }
+	}
+  }
+  return err;
+}
 
 template <typename _T>
 inline _T randn(_T minval, _T maxval) {

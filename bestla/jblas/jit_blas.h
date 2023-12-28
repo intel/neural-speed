@@ -87,10 +87,6 @@ enum class JBLAS_PROLOGUEB_IDS : uint32_t {
   KBlockBegin = NormalEnd,
   WeightKBlockNInteger = KBlockBegin,
   WeightKBlockNFloat,
-  WeightKBlockS8,
-  WeightKBlockS4,
-  WeightKBlockF4,
-  WeightKBlockF8,
   KBlockEnd,
   End,
 };
