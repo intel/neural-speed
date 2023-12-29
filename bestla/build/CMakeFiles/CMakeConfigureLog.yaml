@@ -1,0 +1,511 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineSystem.cmake:211 (message)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      The system is: Linux - 5.16.0-rc1-intel-next-00543-g5867b0a2a125 - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineCXXCompiler.cmake:126 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler: /home/wangzhe/.local/envs/cuda/bin/c++ 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "a.out"
+      
+      The CXX compiler identification is GNU, found in:
+        /home/wangzhe/neural-speed/bestla/build/CMakeFiles/3.27.9/CompilerIdCXX/a.out
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    checks:
+      - "Detecting CXX compiler ABI info"
+    directories:
+      source: "/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf"
+      binary: "/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "CMAKE_CXX_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf'
+        
+        Run Build Command(s): /home/wangzhe/.local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_3f6cf/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_3f6cf.dir/build.make CMakeFiles/cmTC_3f6cf.dir/build
+        gmake[1]: Entering directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf'
+        Building CXX object CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o
+        /home/wangzhe/.local/envs/cuda/bin/c++   -v -o CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o -c /home/wangzhe/.local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp
+        Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs
+        could not find specs file conda.specs
+        COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++
+        Target: x86_64-conda-linux-gnu
+        Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c,c++,fortran,objc,obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 13.1.0 (conda-forge gcc 13.1.0-0) 
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_3f6cf.dir/'
+         /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/cc1plus -quiet -v -iprefix /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/ -isysroot /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot -D_GNU_SOURCE /home/wangzhe/.local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_3f6cf.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -o /tmp/cc0dF9Nv.s
+        GNU C++17 (conda-forge gcc 13.1.0-0) version 13.1.0 (x86_64-conda-linux-gnu)
+        	compiled by GNU C version 12.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include"
+        ignoring nonexistent directory "/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/local/include"
+        ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed"
+        ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/backward
+         /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/include
+        End of search list.
+        Compiler executable checksum: 564b911ccccc40eeed26f9ce6376dab3
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_3f6cf.dir/'
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/as -v --64 -o CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc0dF9Nv.s
+        GNU assembler version 2.40 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.40
+        COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/
+        LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.'
+        Linking CXX executable cmTC_3f6cf
+        /home/wangzhe/.local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3f6cf.dir/link.txt --verbose=1
+        /home/wangzhe/.local/envs/cuda/bin/c++  -v CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_3f6cf 
+        Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs
+        could not find specs file conda.specs
+        COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++
+        COLLECT_LTO_WRAPPER=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper
+        Target: x86_64-conda-linux-gnu
+        Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c,c++,fortran,objc,obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 13.1.0 (conda-forge gcc 13.1.0-0) 
+        COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/
+        LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_3f6cf' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_3f6cf.'
+         /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/collect2 -plugin /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/liblto_plugin.so -plugin-opt=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccix4SiB.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -o cmTC_3f6cf /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0 -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib -L. -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../.. -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o -rpath /home/wangzhe/.local/envs/cuda/lib
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_3f6cf' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_3f6cf.'
+        gmake[1]: Leaving directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineCompilerABI.cmake:127 (message)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed CXX implicit include dir info: rv=done
+        found start of include info
+        found start of implicit include info
+          add: [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include]
+          add: [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed]
+          add: [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include]
+          add: [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0]
+          add: [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu]
+          add: [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/backward]
+          add: [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/include]
+        end of search list found
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/include]
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed]
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include]
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include/c++/13.1.0]
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu]
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/backward] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include/c++/13.1.0/backward]
+        collapse include dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/include] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/include]
+        implicit include dirs: [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/include;/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include/c++/13.1.0;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/include/c++/13.1.0/backward;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/include]
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeDetermineCompilerABI.cmake:152 (message)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed CXX implicit link information:
+        link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf']
+        ignore line: []
+        ignore line: [Run Build Command(s): /home/wangzhe/.local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_3f6cf/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_3f6cf.dir/build.make CMakeFiles/cmTC_3f6cf.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-7qe7Nf']
+        ignore line: [Building CXX object CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o]
+        ignore line: [/home/wangzhe/.local/envs/cuda/bin/c++   -v -o CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o -c /home/wangzhe/.local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs]
+        ignore line: [could not find specs file conda.specs]
+        ignore line: [COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++]
+        ignore line: [Target: x86_64-conda-linux-gnu]
+        ignore line: [Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c c++ fortran objc obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 13.1.0 (conda-forge gcc 13.1.0-0) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_3f6cf.dir/']
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/cc1plus -quiet -v -iprefix /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/ -isysroot /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot -D_GNU_SOURCE /home/wangzhe/.local/share/cmake-3.27/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_3f6cf.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -o /tmp/cc0dF9Nv.s]
+        ignore line: [GNU C++17 (conda-forge gcc 13.1.0-0) version 13.1.0 (x86_64-conda-linux-gnu)]
+        ignore line: [	compiled by GNU C version 12.2.0  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version isl-0.24-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include"]
+        ignore line: [ignoring nonexistent directory "/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/local/include"]
+        ignore line: [ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed"]
+        ignore line: [ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/backward]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/include]
+        ignore line: [End of search list.]
+        ignore line: [Compiler executable checksum: 564b911ccccc40eeed26f9ce6376dab3]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_3f6cf.dir/']
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/as -v --64 -o CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc0dF9Nv.s]
+        ignore line: [GNU assembler version 2.40 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.40]
+        ignore line: [COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.']
+        ignore line: [Linking CXX executable cmTC_3f6cf]
+        ignore line: [/home/wangzhe/.local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3f6cf.dir/link.txt --verbose=1]
+        ignore line: [/home/wangzhe/.local/envs/cuda/bin/c++  -v CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_3f6cf ]
+        ignore line: [Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs]
+        ignore line: [could not find specs file conda.specs]
+        ignore line: [COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++]
+        ignore line: [COLLECT_LTO_WRAPPER=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper]
+        ignore line: [Target: x86_64-conda-linux-gnu]
+        ignore line: [Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c c++ fortran objc obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 13.1.0 (conda-forge gcc 13.1.0-0) ]
+        ignore line: [COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_3f6cf' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-dumpdir' 'cmTC_3f6cf.']
+        link line: [ /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/collect2 -plugin /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/liblto_plugin.so -plugin-opt=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccix4SiB.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -o cmTC_3f6cf /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0 -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib -L. -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../.. -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o -rpath /home/wangzhe/.local/envs/cuda/lib]
+          arg [/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/collect2] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/liblto_plugin.so] ==> ignore
+          arg [-plugin-opt=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccix4SiB.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [--sysroot=/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf_x86_64] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+          arg [-pie] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_3f6cf] ==> ignore
+          arg [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o] ==> obj [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o]
+          arg [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o] ==> obj [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o]
+          arg [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o] ==> obj [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib]
+          arg [-L.] ==> ignore
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../..] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../..]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib]
+          arg [CMakeFiles/cmTC_3f6cf.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+          arg [-lstdc++] ==> lib [stdc++]
+          arg [-lm] ==> lib [m]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lc] ==> lib [c]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o] ==> obj [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o]
+          arg [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o] ==> obj [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o]
+          arg [-rpath] ==> ignore
+          arg [/home/wangzhe/.local/envs/cuda/lib] ==> ignore
+        collapse obj [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib/Scrt1.o]
+        collapse obj [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib/crti.o]
+        collapse obj [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o]
+        collapse obj [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o]
+        collapse obj [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib/crtn.o]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib] ==> [/home/wangzhe/.local/envs/cuda/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../..] ==> [/home/wangzhe/.local/envs/cuda/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib]
+        implicit libs: [stdc++;m;gcc_s;gcc;c;gcc_s;gcc]
+        implicit objs: [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib/Scrt1.o;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib/crti.o;/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o;/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib/crtn.o]
+        implicit dirs: [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0;/home/wangzhe/.local/envs/cuda/lib/gcc;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/lib;/home/wangzhe/.local/envs/cuda/lib;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/lib;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/FindOpenMP.cmake:219 (try_compile)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/FindOpenMP.cmake:485 (_OPENMP_GET_FLAGS)"
+      - "CMakeLists.txt:95 (include)"
+    description: "Detecting CXX OpenMP compiler info"
+    directories:
+      source: "/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg"
+      binary: "/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "OpenMP_COMPILE_RESULT_CXX_fopenmp"
+      cached: true
+      stdout: |
+        Change Dir: '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg'
+        
+        Run Build Command(s): /home/wangzhe/.local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_6b337/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_6b337.dir/build.make CMakeFiles/cmTC_6b337.dir/build
+        gmake[1]: Entering directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg'
+        Building CXX object CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o
+        /home/wangzhe/.local/envs/cuda/bin/c++   -fopenmp -v -o CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o -c /home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg/OpenMPTryFlag.cpp
+        Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs
+        could not find specs file conda.specs
+        COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++
+        Target: x86_64-conda-linux-gnu
+        Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c,c++,fortran,objc,obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 13.1.0 (conda-forge gcc 13.1.0-0) 
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_6b337.dir/'
+         /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/cc1plus -quiet -v -iprefix /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/ -isysroot /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot -D_GNU_SOURCE -D_REENTRANT /home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg/OpenMPTryFlag.cpp -quiet -dumpdir CMakeFiles/cmTC_6b337.dir/ -dumpbase OpenMPTryFlag.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -fopenmp -o /tmp/ccDJxUUx.s
+        GNU C++17 (conda-forge gcc 13.1.0-0) version 13.1.0 (x86_64-conda-linux-gnu)
+        	compiled by GNU C version 12.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include"
+        ignoring nonexistent directory "/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/local/include"
+        ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed"
+        ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/backward
+         /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/include
+        End of search list.
+        Compiler executable checksum: 564b911ccccc40eeed26f9ce6376dab3
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_6b337.dir/'
+         /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/as -v --64 -o CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o /tmp/ccDJxUUx.s
+        GNU assembler version 2.40 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.40
+        COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/
+        LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.'
+        Linking CXX executable cmTC_6b337
+        /home/wangzhe/.local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_6b337.dir/link.txt --verbose=1
+        /home/wangzhe/.local/envs/cuda/bin/c++  -fopenmp -v CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o -o cmTC_6b337  -v 
+        Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs
+        could not find specs file conda.specs
+        COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++
+        COLLECT_LTO_WRAPPER=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper
+        Target: x86_64-conda-linux-gnu
+        Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c,c++,fortran,objc,obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose
+        Thread model: posix
+        Supported LTO compression algorithms: zlib
+        gcc version 13.1.0 (conda-forge gcc 13.1.0-0) 
+        COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/
+        LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/
+        Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/libgomp.spec
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'cmTC_6b337' '-v' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'cmTC_6b337.'
+         /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/collect2 -plugin /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/liblto_plugin.so -plugin-opt=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/cchz58Rk.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -o cmTC_6b337 /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0 -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib -L. -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../.. -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o -lstdc++ -lm -lgomp -lgcc_s -lgcc -lpthread -lc -lgcc_s -lgcc /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o -rpath /home/wangzhe/.local/envs/cuda/lib
+        COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'cmTC_6b337' '-v' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'cmTC_6b337.'
+        gmake[1]: Leaving directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/FindOpenMP.cmake:262 (message)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/FindOpenMP.cmake:485 (_OPENMP_GET_FLAGS)"
+      - "CMakeLists.txt:95 (include)"
+    message: |
+      Parsed CXX OpenMP implicit link information from above output:
+        link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg']
+        ignore line: []
+        ignore line: [Run Build Command(s): /home/wangzhe/.local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_6b337/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_6b337.dir/build.make CMakeFiles/cmTC_6b337.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg']
+        ignore line: [Building CXX object CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o]
+        ignore line: [/home/wangzhe/.local/envs/cuda/bin/c++   -fopenmp -v -o CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o -c /home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg/OpenMPTryFlag.cpp]
+        ignore line: [Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs]
+        ignore line: [could not find specs file conda.specs]
+        ignore line: [COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++]
+        ignore line: [Target: x86_64-conda-linux-gnu]
+        ignore line: [Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c c++ fortran objc obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 13.1.0 (conda-forge gcc 13.1.0-0) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_6b337.dir/']
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/cc1plus -quiet -v -iprefix /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/ -isysroot /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot -D_GNU_SOURCE -D_REENTRANT /home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-8sNayg/OpenMPTryFlag.cpp -quiet -dumpdir CMakeFiles/cmTC_6b337.dir/ -dumpbase OpenMPTryFlag.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -version -fopenmp -o /tmp/ccDJxUUx.s]
+        ignore line: [GNU C++17 (conda-forge gcc 13.1.0-0) version 13.1.0 (x86_64-conda-linux-gnu)]
+        ignore line: [	compiled by GNU C version 12.2.0  GMP version 6.2.1  MPFR version 4.1.0  MPC version 1.2.1  isl version isl-0.24-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include"]
+        ignore line: [ignoring nonexistent directory "/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/local/include"]
+        ignore line: [ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed"]
+        ignore line: [ignoring duplicate directory "/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/include-fixed]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/include]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/x86_64-conda-linux-gnu]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/../../x86_64-conda-linux-gnu/include/c++/13.1.0/backward]
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/include]
+        ignore line: [End of search list.]
+        ignore line: [Compiler executable checksum: 564b911ccccc40eeed26f9ce6376dab3]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_6b337.dir/']
+        ignore line: [ /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/as -v --64 -o CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o /tmp/ccDJxUUx.s]
+        ignore line: [GNU assembler version 2.40 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.40]
+        ignore line: [COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.']
+        ignore line: [Linking CXX executable cmTC_6b337]
+        ignore line: [/home/wangzhe/.local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_6b337.dir/link.txt --verbose=1]
+        ignore line: [/home/wangzhe/.local/envs/cuda/bin/c++  -fopenmp -v CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o -o cmTC_6b337  -v ]
+        ignore line: [Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/specs]
+        ignore line: [could not find specs file conda.specs]
+        ignore line: [COLLECT_GCC=/home/wangzhe/.local/envs/cuda/bin/c++]
+        ignore line: [COLLECT_LTO_WRAPPER=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper]
+        ignore line: [Target: x86_64-conda-linux-gnu]
+        ignore line: [Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-default-pie --enable-languages=c c++ fortran objc obj-c++ --enable-__cxa_atexit --disable-libmudflap --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --enable-libsanitizer --enable-lto --enable-threads=posix --enable-target-optspace --enable-plugin --enable-gold --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_build_env/x86_64-conda-linux-gnu/sysroot --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1685813977163/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/include/c++/13.1.0 --with-pkgversion='conda-forge gcc 13.1.0-0' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose]
+        ignore line: [Thread model: posix]
+        ignore line: [Supported LTO compression algorithms: zlib]
+        ignore line: [gcc version 13.1.0 (conda-forge gcc 13.1.0-0) ]
+        ignore line: [COMPILER_PATH=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:./:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/:/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/]
+        ignore line: [Reading specs from /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib/libgomp.spec]
+        ignore line: [COLLECT_GCC_OPTIONS='-fopenmp' '-v' '-o' 'cmTC_6b337' '-v' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-pthread' '-dumpdir' 'cmTC_6b337.']
+        link line: [ /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/collect2 -plugin /home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/liblto_plugin.so -plugin-opt=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper -plugin-opt=-fresolution=/tmp/cchz58Rk.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -o cmTC_6b337 /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crti.o /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtbeginS.o -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0 -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib -L. -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib -L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../.. -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib -L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o -lstdc++ -lm -lgomp -lgcc_s -lgcc -lpthread -lc -lgcc_s -lgcc /home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/crtendS.o /home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/crtn.o -rpath /home/wangzhe/.local/envs/cuda/lib]
+          arg [/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/collect2] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/liblto_plugin.so] ==> ignore
+          arg [-plugin-opt=/home/wangzhe/.local/envs/cuda/bin/../libexec/gcc/x86_64-conda-linux-gnu/13.1.0/lto-wrapper] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/cchz58Rk.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lpthread] ==> ignore
+          arg [-plugin-opt=-pass-through=-lc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [--sysroot=/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf_x86_64] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+          arg [-pie] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_6b337] ==> ignore
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib]
+          arg [-L.] ==> ignore
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../..] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../..]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib]
+          arg [-L/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib] ==> dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib]
+          arg [CMakeFiles/cmTC_6b337.dir/OpenMPTryFlag.cpp.o] ==> ignore
+          arg [-lstdc++] ==> lib [stdc++]
+          arg [-lm] ==> lib [m]
+          arg [-lgomp] ==> lib [gomp]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lpthread] ==> lib [pthread]
+          arg [-lc] ==> lib [c]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-rpath] ==> ignore
+          arg [/home/wangzhe/.local/envs/cuda/lib] ==> ignore
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc] ==> [/home/wangzhe/.local/envs/cuda/lib/gcc]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib/../lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../lib] ==> [/home/wangzhe/.local/envs/cuda/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../../../x86_64-conda-linux-gnu/lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../lib/gcc/x86_64-conda-linux-gnu/13.1.0/../../..] ==> [/home/wangzhe/.local/envs/cuda/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/lib]
+        collapse library dir [/home/wangzhe/.local/envs/cuda/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib] ==> [/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib]
+        implicit libs: [stdc++;m;gomp;gcc_s;gcc;pthread;c;gcc_s;gcc]
+        implicit objs: []
+        implicit dirs: [/home/wangzhe/.local/envs/cuda/lib/gcc/x86_64-conda-linux-gnu/13.1.0;/home/wangzhe/.local/envs/cuda/lib/gcc;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/lib;/home/wangzhe/.local/envs/cuda/lib;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/lib;/home/wangzhe/.local/envs/cuda/x86_64-conda-linux-gnu/sysroot/usr/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/FindOpenMP.cmake:419 (try_compile)"
+      - "/home/wangzhe/.local/share/cmake-3.27/Modules/FindOpenMP.cmake:559 (_OPENMP_GET_SPEC_DATE)"
+      - "CMakeLists.txt:95 (include)"
+    description: "Detecting CXX OpenMP version"
+    directories:
+      source: "/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-QAU69f"
+      binary: "/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-QAU69f"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "OpenMP_SPECTEST_CXX_"
+      cached: true
+      stdout: |
+        Change Dir: '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-QAU69f'
+        
+        Run Build Command(s): /home/wangzhe/.local/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_1fa24/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_1fa24.dir/build.make CMakeFiles/cmTC_1fa24.dir/build
+        gmake[1]: Entering directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-QAU69f'
+        Building CXX object CMakeFiles/cmTC_1fa24.dir/OpenMPCheckVersion.cpp.o
+        /home/wangzhe/.local/envs/cuda/bin/c++   -fopenmp -o CMakeFiles/cmTC_1fa24.dir/OpenMPCheckVersion.cpp.o -c /home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-QAU69f/OpenMPCheckVersion.cpp
+        Linking CXX executable cmTC_1fa24
+        /home/wangzhe/.local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1fa24.dir/link.txt --verbose=1
+        /home/wangzhe/.local/envs/cuda/bin/c++  -fopenmp CMakeFiles/cmTC_1fa24.dir/OpenMPCheckVersion.cpp.o -o cmTC_1fa24 
+        gmake[1]: Leaving directory '/home/wangzhe/neural-speed/bestla/build/CMakeFiles/CMakeScratch/TryCompile-QAU69f'
+        
+      exitCode: 0
+...
