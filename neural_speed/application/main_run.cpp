@@ -407,7 +407,7 @@ int main(int argc, char** argv) {  // NOLINT
 
   if (params.warmup) {
     {
-      const std::vector<model_token> tmp(params.n_batch, ctx->vocab.bos_token_id);
+      const std::vector<model_token> tmp(32, ctx->vocab.bos_token_id);
       std::vector<model_input> inputs = {model_input{
           /*.tokens              =*/tmp.data(),
           /*.n_tokens           =*/(uint32_t)tmp.size(),

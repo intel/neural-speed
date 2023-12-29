@@ -1995,6 +1995,8 @@ void model_print_timings(struct model_context* ctx) {
 
 void model_reset_timings(struct model_context* ctx) {
   ctx->t_start_us = ne_time_us();
+  ctx->has_evaluated_once = false;
+  ctx->eval_times.clear();
   ctx->t_sample_us = ctx->n_sample = 0;
   ctx->t_eval_us = ctx->n_eval = 0;
   ctx->t_p_eval_us = ctx->n_p_eval = 0;
