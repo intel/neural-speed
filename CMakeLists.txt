@@ -143,6 +143,8 @@ endif()
 if (NE_BTLA_UT)
   set(BTLA_UT_ALL ON)
 endif()
+include(FindOpenMP)
+
 add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)
