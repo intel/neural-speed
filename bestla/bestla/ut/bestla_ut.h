@@ -44,11 +44,11 @@ static int8_t cache[CacheSize];
 #define INT4_ERR 2.f
 #define FP4_ERR 3.f
 
-static inline float get_ut_err(JBLAS_DTYPE qtype){
-  auto dbits = utils::jblas_dtype_bits(qtype);
-  auto type = utils::jblas_dtype_type(qtype);
+static inline float get_ut_err(BTLA_DTYPE qtype) {
+  auto dbits = utils::bestla_dtype_bits(qtype);
+  auto type = utils::bestla_dtype_type(qtype);
   auto err = FP32_ERR;
-  auto constexpr dtype_int = utils::jblas_dtype_type(JBLAS_DTYPE::TypeInt);
+  auto constexpr dtype_int = utils::bestla_dtype_type(BTLA_DTYPE::TypeInt);
   if (type == dtype_int) {
     if (dbits == 8) {
       err = INT8_ERR;
@@ -56,17 +56,17 @@ static inline float get_ut_err(JBLAS_DTYPE qtype){
       err = INT4_ERR;
     }
   } else {
-    if (dbits==4) {
+    if (dbits == 4) {
       err = FP4_ERR;
     } else if (dbits == 8) {
       err = F8_ERR;
     } else if (dbits == 16) {
-      if (qtype==JBLAS_DTYPE::F16) {
+      if (qtype == BTLA_DTYPE::F16) {
         err = FP16_ERR;
       } else {
         err = BF16_ERR;
       }
-	}
+    }
   }
   return err;
 }

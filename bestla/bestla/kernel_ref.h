@@ -251,7 +251,7 @@ inline void convert_s4_s8_8_lowbits(int8_t* dstptr, int8_t* srcptr) {
 }
 
 template <>
-inline void convert_s4_s8_8<JBLAS_DTYPE::S4_FULLRANGE>(int8_t* dstptr, int8_t* srcptr) {
+inline void convert_s4_s8_8<BTLA_DTYPE::S4_FULLRANGE>(int8_t* dstptr, int8_t* srcptr) {
   convert_s4_s8_8_lowbits(dstptr, srcptr);
   for (size_t i = 0; i < 8; i++) {
     dstptr[i] -= 8;
@@ -259,17 +259,17 @@ inline void convert_s4_s8_8<JBLAS_DTYPE::S4_FULLRANGE>(int8_t* dstptr, int8_t* s
 }
 
 template <>
-inline void convert_s4_s8_8<JBLAS_DTYPE::F4_BNB>(int8_t* dstptr, int8_t* srcptr) {
+inline void convert_s4_s8_8<BTLA_DTYPE::F4_BNB>(int8_t* dstptr, int8_t* srcptr) {
   convert_s4_s8_8_lowbits(dstptr, srcptr);
 }
 
 template <>
-inline void convert_s4_s8_8<JBLAS_DTYPE::F4_NF4>(int8_t* dstptr, int8_t* srcptr) {
+inline void convert_s4_s8_8<BTLA_DTYPE::F4_NF4>(int8_t* dstptr, int8_t* srcptr) {
   convert_s4_s8_8_lowbits(dstptr, srcptr);
 }
 
 template <>
-inline void convert_s4_s8_8<JBLAS_DTYPE::F4_E2M1>(int8_t* dstptr, int8_t* srcptr) {
+inline void convert_s4_s8_8<BTLA_DTYPE::F4_E2M1>(int8_t* dstptr, int8_t* srcptr) {
   convert_s4_s8_8_lowbits(dstptr, srcptr);
 }
 

@@ -62,10 +62,10 @@ class UT_BlockQunatize_INT8 {
       }
     }
 
-    auto constexpr RuntimeISA = BTLAAVX512F;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, bestla_dtype<float>, bestla_dtype<float>, asym);
+    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packWeight(n, k, dequanRef.data(), ldb, &ptr, &DefaultThreading);
@@ -112,10 +112,10 @@ class UT_BlockQunatize_INT8 {
       }
     }
 
-    auto constexpr RuntimeISA = BTLAAVX512F;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, bestla_dtype<float>, bestla_dtype<float>, asym);
+    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packTransposeWeight(n, k, dequanT.data(), k, &ptr, &DefaultThreading);
@@ -148,9 +148,9 @@ class UT_BlockQunatize_F8 {
     utils::aligned_vector<float> raw(n * k);
     ut::fill_buffer_randn(raw.data(), raw.size(), -3.f, 3.f);
 
-    auto constexpr RuntimeISA = BTLAAVX512F;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
-    using refPorB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, BTLANoSIMD>;
+    using refPorB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, BTLA_ISA::NoSIMD>;
     PrologueB kernel;
     refPorB ref_ker;
     auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F8_E8M0);
@@ -243,7 +243,7 @@ class UT_TransposeBlockQuantize_F4 {
       }
     }
 
-    auto constexpr RuntimeISA = BTLAAVX512F;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
     auto packedW = kernel.createStorage(n, k, blocksize, F4_T, bestla_dtype<float>);
@@ -303,9 +303,9 @@ class UT_BlockQuantize_INT4 {
       }
     }
 
-    auto constexpr RuntimeISA = BTLAAVX2;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx2<48, 2>, BTLAAVX2>;
-    using PrologueB512 = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx2<48, 2>, BTLAAVX512F>;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX2;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx2<48, 2>, BTLA_ISA::AVX2>;
+    using PrologueB512 = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx2<48, 2>, BTLA_ISA::AVX512F>;
     PrologueB kernel;
     PrologueB512 kernel512;
     utils::aligned_vector<int8_t> retW(n * k);
@@ -346,7 +346,7 @@ class UT_BlockQuantize_INT4 {
       }
     }
 
-    auto constexpr RuntimeISA = BTLAAVX512_VNNI;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512_VNNI;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::ICoreRowNAvx512vnni<48, 8>, RuntimeISA>;
 
     PrologueB kernel;
@@ -399,7 +399,7 @@ class UT_StorageMemCheck {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = gemm::HCoreRowNAmxbf16<64, 16>;
-    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<GemmCore, BTLAAMX_BF16>;
+    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<GemmCore, BTLA_ISA::AMX_BF16>;
     PrologueB ProWei;
 
     auto packedW = ProWei.createStorage(n, k, blocksize, qtype, bestla_dtype<float>);
@@ -523,23 +523,15 @@ class UT_CompFp32 {
 
   void ut_f8() {
     CheckISA(AVX2);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32,
-                                                        BTLA_DTYPE::F8_E4M3);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32,
-                                                           BTLA_DTYPE::F8_E4M3);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32,
-                                                        BTLA_DTYPE::F8_E5M2);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
     CheckISA(AVX512F);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32,
-                                                           BTLA_DTYPE::F8_E4M3);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32,
-                                                           BTLA_DTYPE::F8_E5M2);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
   }
   void ut_s4() {
     CheckISA(AVX2);
@@ -597,44 +589,26 @@ class UT_CompFp32 {
 
   void ut_f4() {
     CheckISA(AVX2);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32,
-                                                           BTLA_DTYPE::F4_BNB);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1,
-                                                           BTLA_DTYPE::F4_BNB);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32,
-                                                           BTLA_DTYPE::F4_E2M1);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1,
-                                                           BTLA_DTYPE::F4_E2M1);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32,
-                                                           BTLA_DTYPE::F4_NF4);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1,
-                                                           BTLA_DTYPE::F4_NF4);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
 
     CheckISA(AVX512F);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
   }
 
   template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei>
@@ -653,9 +627,7 @@ class UT_CompFp32 {
     WType packedw(0);
     if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>>) {
       packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        prologue_b::gemm::WeightKBlockNFloat<
-                                            GemmCore_T, ISA>>) {
+    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNFloat<GemmCore_T, ISA>>) {
       packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype);
     }
 
@@ -705,7 +677,7 @@ class UT_CompFp32 {
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
-    packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
+    packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
 
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
@@ -746,10 +718,8 @@ class UTBenchmark_CompFp32 {
   }
 
   void ut_s4() {
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(
-        1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(
-        1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
     //  benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
@@ -793,13 +763,11 @@ class UTBenchmark_CompFp32 {
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
     WType tmpB(0);
     if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 prologue_b::gemm::WeightKBlockNInteger<
-                                     Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+                                 prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
+      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
 
     } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        prologue_b::gemm::WeightKBlockNFloat<
-                                            Core_T, Core_T::ISA>>) {
+                                        prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
       tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
     std::vector<WType> packBs(batch, 0);
@@ -847,13 +815,11 @@ class UTBenchmark_CompFp32 {
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
     WType tmpB(0);
     if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 prologue_b::gemm::WeightKBlockNInteger<
-                                     Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+                                 prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
+      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
 
     } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        prologue_b::gemm::WeightKBlockNFloat<
-                                            Core_T, Core_T::ISA>>) {
+                                        prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
       tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
     std::vector<WType> packBs(batch, 0);
@@ -1290,14 +1256,10 @@ class UT_CompBf16 {
   }
 
   void ut_f8() {
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, f8>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, f8>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(
-        2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
   }
 
   void ut_s4() {
@@ -1319,16 +1281,16 @@ class UT_CompBf16 {
   }
 
   void ut_f4() {
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
   }
 
   template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -1345,13 +1307,9 @@ class UT_CompBf16 {
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockS8<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
+    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>>) {
       packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockF8<GemmCore_T, ISA>>) {
+    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNFloat<GemmCore_T, ISA>>) {
       packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
 
@@ -1378,15 +1336,7 @@ class UT_CompBf16 {
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
-    auto err = INT8_ERR;
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
-      err = INT4_ERR;
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      err = FP4_ERR;
-    }
-
-    if (qtype == BTLA_DTYPE::F8_E5M2 || qtype == BTLA_DTYPE::F8_E4M3) err = F8_ERR;
-
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.05f);
   }
@@ -1407,10 +1357,10 @@ class UTBenchmark_CompBf16 {
   }
 
   void ut_s4() {
-    benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockS4, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
@@ -1452,14 +1402,10 @@ class UTBenchmark_CompBf16 {
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
     WType tmpB(0);
     if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 jblas::prologue_b::gemm::WeightKBlockNInteger<
-                                     Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype,
-                                        bestla_dtype<Scale_T>,
-                                        bestla_dtype<float>, false);
+                                 prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
+      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
     } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        prologue_b::gemm::WeightKBlockNFloat<
-                                            Core_T, Core_T::ISA>>) {
+                                        prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
       tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
     std::vector<WType> packBs(batch, 0);
@@ -1548,10 +1494,10 @@ class UT_ORT_NBits {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s asym:%d \n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), isasym);
     auto constexpr ISA = GemmCore_T::ISA;
-    using Launcher = wrapper::gemm::LauncherKBlock<ISA, GemmCore_T,
-                                      prologue_a::gemm::ActivationKBlockBaseF32,
-                                      prologue_b::gemm::WeightKBlockNInteger,
-        epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Launcher =
+        wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
+                                      prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
+                                      epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;

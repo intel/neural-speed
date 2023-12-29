@@ -807,7 +807,7 @@ class PackedWeightParser {
         case BTLA_PROLOGUEB_IDS::WeightPack:
           ptr = new gemm::StoragePackedWeight(0);
           break;
-        case JBLAS_PROLOGUEB_IDS::WeightKBlockNInteger:
+        case BTLA_PROLOGUEB_IDS::WeightKBlockNInteger:
           ptr = new gemm::StorageWeightKBlockNInteger(0);
           break;
         case BTLA_PROLOGUEB_IDS::WeightKBlockNFloat:

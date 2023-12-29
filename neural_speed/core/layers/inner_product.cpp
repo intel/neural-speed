@@ -121,7 +121,7 @@ bool bestla_fusion_add_f32f32_support(void* weiptr, int _m, int _n, int _k) {
       constexpr size_t EleNum = sizeof(AllKBlockCores) / sizeof(AllKBlockCores[0]);  // supported cores
       support = contains(wtmp->mCoreId, AllKBlockCores, EleNum);
       support &= hasISA(AllKBlockCores, EleNum);
-    } else if (wtmp->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNFloat) {
+    } else if (wtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNFloat) {
       constexpr size_t EleNum = sizeof(FloatCores) / sizeof(FloatCores[0]);
       support = contains(wtmp->mCoreId, FloatCores, EleNum);
       support &= hasISA(FloatCores, EleNum);
@@ -188,15 +188,15 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
         }
       }
     }
-    if (ptr->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNFloat) {
-      auto bptr = reinterpret_cast<jblas::storage::gemm::IWeightKBlockBase*>(ptr);
+    if (ptr->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNFloat) {
+      auto bptr = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(ptr);
       auto BlkSize = bptr->mBlockSize;
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
-          ip_add::JblasGemmCompF32<tAVX512F, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
+          ip_add::BTLAGemmCompF32<tAVX512F, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
                                                                        bias, broadcast_bias, workspace, pth);
         } else if (NTile == tAVX2::NTILE && _cd->AVX2() && BlkSize % tAVX2::KTILE == 0) {
-          ip_add::JblasGemmCompF32<tAVX2, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
+          ip_add::BTLAGemmCompF32<tAVX2, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
                                                                     broadcast_bias, workspace, pth);
         }
       }
@@ -204,10 +204,10 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
           if (_m <= tAVX512_BF16::MTILE) {
             static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            ip_add::JblasGemmCompF32<tAVX512_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output,
+            ip_add::BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output,
                                                                              ldo, bias, broadcast_bias, workspace, pth);
           } else {
-            ip_add::JblasGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
+            ip_add::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
                                                                           bias, broadcast_bias, workspace, pth);
           }
         }

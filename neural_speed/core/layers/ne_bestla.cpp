@@ -66,12 +66,12 @@ void bestla_packweight_copyattr(const float* f32ptr, void* dstptr, int n, int k,
       if (kwtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
         auto niptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(kwtmp);
 
-        JblasGemmQuantPackB(dstptr, f32ptr, n, k, ld, niptr->mBlockSize, niptr->mDType, niptr->SDtype(),
-                            niptr->IsAsym(), ne_comptype, false, ne_jblas::ne_threading::get());
-      } else if (kwtmp->mPrologueID == JBLAS_PROLOGUEB_IDS::WeightKBlockNFloat) {
+        BTLAGemmQuantPackB(dstptr, f32ptr, n, k, ld, niptr->mBlockSize, niptr->mDType, niptr->SDtype(), niptr->IsAsym(),
+                           ne_comptype, false, ne_bestla::ne_threading::get());
+      } else if (kwtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNFloat) {
         auto f4ptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNFloat*>(kwtmp);
-        JblasGemmQuantPackB(dstptr, f32ptr, n, k, ld, f4ptr->mBlockSize, f4ptr->mDType, f4ptr->SDtype(), false,
-                            ne_comptype, false, ne_jblas::ne_threading::get());
+        BTLAGemmQuantPackB(dstptr, f32ptr, n, k, ld, f4ptr->mBlockSize, f4ptr->mDType, f4ptr->SDtype(), false,
+                           ne_comptype, false, ne_bestla::ne_threading::get());
       }
     }
   }

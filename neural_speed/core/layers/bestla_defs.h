@@ -42,10 +42,10 @@ using tAVX512_VNNI_KBlock = gemm::ICoreRowNAvx512vnniKBlock<48, 4>;
 using tAMX_INT8_US_KBlock = gemm::ICoreRowNAmxint8KBlock<48, 16>;
 using tAMX_INT8_SS_KBlock = gemm::ICoreRowNAmxint8SSKBlock<48, 16>;
 
-template <class GC_T, JBLAS_ISA ISA_T>
-using tWeiNInt = jblas::prologue_b::gemm::WeightKBlockNInteger<GC_T, ISA_T>;
-template <class GC_T, JBLAS_ISA ISA_T>
-using tWeiNFloat = jblas::prologue_b::gemm::WeightKBlockNFloat<GC_T, ISA_T>;
+template <class GC_T, BTLA_ISA ISA_T>
+using tWeiNInt = prologue_b::gemm::WeightKBlockNInteger<GC_T, ISA_T>;
+template <class GC_T, BTLA_ISA ISA_T>
+using tWeiNFloat = prologue_b::gemm::WeightKBlockNFloat<GC_T, ISA_T>;
 
 template <class GC_T, BTLA_ISA ISA_T>
 using tActKBaseF32 = prologue_a::gemm::ShuffleActivationKBlockBaseF32<GC_T, ISA_T>;
