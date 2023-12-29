@@ -64,9 +64,9 @@ class UT_BlockQunatize_INT8 {
     }
 
     auto constexpr RuntimeISA = JblasAVX512F;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockS8<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    using PrologueB = jblas::prologue_b::gemm::WeightKBlockNInteger<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, jblas_dtype<float>, jblas_dtype<float>, asym);
+    auto ptr = kernel.createStorage(n, k, blocksize, JBLAS_DTYPE::S8, jblas_dtype<float>, jblas_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packWeight(n, k, dequanRef.data(), ldb, &ptr, &DefaultThreading);
@@ -114,9 +114,9 @@ class UT_BlockQunatize_INT8 {
     }
 
     auto constexpr RuntimeISA = JblasAVX512F;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockS8<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    using PrologueB = jblas::prologue_b::gemm::WeightKBlockNInteger<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, jblas_dtype<float>, jblas_dtype<float>, asym);
+    auto ptr = kernel.createStorage(n, k, blocksize, JBLAS_DTYPE::S8, jblas_dtype<float>, jblas_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packTransposeWeight(n, k, dequanT.data(), k, &ptr, &DefaultThreading);
@@ -150,8 +150,8 @@ class UT_BlockQunatize_F8 {
     ut::fill_buffer_randn(raw.data(), raw.size(), -3.f, 3.f);
 
     auto constexpr RuntimeISA = JblasAVX512F;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockF8<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
-    using refPorB = jblas::prologue_b::gemm::WeightKBlockF8<jblas::gemm::SCoreRowNAvx512f<48, 8>, JblasNoSIMD>;
+    using PrologueB = jblas::prologue_b::gemm::WeightKBlockNFloat<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    using refPorB = jblas::prologue_b::gemm::WeightKBlockNFloat<jblas::gemm::SCoreRowNAvx512f<48, 8>, JblasNoSIMD>;
     PrologueB kernel;
     refPorB ref_ker;
     auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, JBLAS_DTYPE::F8_E8M0);
@@ -245,7 +245,7 @@ class UT_TransposeBlockQuantize_F4 {
     }
 
     auto constexpr RuntimeISA = JblasAVX512F;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockF4<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    using PrologueB = jblas::prologue_b::gemm::WeightKBlockNFloat<jblas::gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
     auto packedW = kernel.createStorage(n, k, blocksize, F4_T, jblas_dtype<float>);
     auto packedW1 = kernel.createStorage(n, k, blocksize, F4_T, jblas_dtype<float>);
@@ -253,9 +253,9 @@ class UT_TransposeBlockQuantize_F4 {
     packedW.assign(buf.data());
     packedW1.assign(buf1.data());
     kernel.packTransposeWeight(n, k, dequanRef.data(), k, &packedW, &DefaultThreading);
-    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), &packedW1, &DefaultThreading);
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &packedW1, &DefaultThreading);
     ut::buffer_error(packedW.SPtr<float>(), packedW1.SPtr<float>(), packedW1.CSize());
-    ut::buffer_error(packedW.WPtr<int8_t>(), packedW1.WPtr<int8_t>(), packedW1.WSize<int8_t>());
+    ut::buffer_error(packedW.WPtr<int8_t>(), packedW1.WPtr<int8_t>(), packedW1.mQBuf.size<int8_t>());
     avector<float> dequant(n * k);
     kernel.unpackTransposeWeight(n, k, &packedW1, dequant.data(), k, &DefaultThreading);
     ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size());
@@ -305,8 +305,8 @@ class UT_BlockQuantize_INT4 {
     }
 
     auto constexpr RuntimeISA = JblasAVX2;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockS4<jblas::gemm::SCoreRowNAvx2<48, 2>, JblasAVX2>;
-    using PrologueB512 = jblas::prologue_b::gemm::WeightKBlockS4<jblas::gemm::SCoreRowNAvx2<48, 2>, JblasAVX512F>;
+    using PrologueB = jblas::prologue_b::gemm::WeightKBlockNInteger<jblas::gemm::SCoreRowNAvx2<48, 2>, JblasAVX2>;
+    using PrologueB512 = jblas::prologue_b::gemm::WeightKBlockNInteger<jblas::gemm::SCoreRowNAvx2<48, 2>, JblasAVX512F>;
     PrologueB kernel;
     PrologueB512 kernel512;
     utils::aligned_vector<int8_t> retW(n * k);
@@ -348,7 +348,8 @@ class UT_BlockQuantize_INT4 {
     }
 
     auto constexpr RuntimeISA = JblasAVX512_VNNI;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockS4<jblas::gemm::ICoreRowNAvx512vnni<48, 8>, RuntimeISA>;
+    using PrologueB =
+        jblas::prologue_b::gemm::WeightKBlockNInteger<jblas::gemm::ICoreRowNAvx512vnni<48, 8>, RuntimeISA>;
 
     PrologueB kernel;
     utils::aligned_vector<int8_t> retW(n * k);
@@ -400,13 +401,13 @@ class UT_StorageMemCheck {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = jblas::gemm::HCoreRowNAmxbf16<64, 16>;
-    using PrologueB = jblas::prologue_b::gemm::WeightKBlockF4<GemmCore, JblasAMX_BF16>;
+    using PrologueB = jblas::prologue_b::gemm::WeightKBlockNFloat<GemmCore, JblasAMX_BF16>;
     PrologueB ProWei;
 
     auto packedW = ProWei.createStorage(n, k, blocksize, qtype, jblas_dtype<float>);
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());
-    storage::gemm::StorageWeightKBlockF4 tmp(GemmCore::ID);
+    storage::gemm::StorageWeightKBlockNFloat tmp(GemmCore::ID);
     tmp.deserialize(buf0.data());
     tmp.serialize(buf1.data());
     buffer_error(buf0.data(), buf1.data(), buf0.size());
@@ -525,15 +526,15 @@ class UT_CompFp32 {
 
   void ut_f8() {
     CheckISA(AVX2);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF8, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF8, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
     CheckISA(AVX512F);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF8, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF8, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
   }
   void ut_s4() {
     CheckISA(AVX2);
@@ -597,26 +598,26 @@ class UT_CompFp32 {
 
   void ut_f4() {
     CheckISA(AVX2);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_BNB);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_E2M1);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_NF4);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_BNB);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_E2M1);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_NF4);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAVX2, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
 
     CheckISA(AVX512F);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_BNB);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_E2M1);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_NF4);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_BNB);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_E2M1);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_NF4);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAVX512F, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
   }
 
   template <class GemmCore_T, template <class _T, JBLAS_ISA> class Wei>
@@ -636,8 +637,8 @@ class UT_CompFp32 {
                                  jblas::prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>>) {
       packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, jblas_dtype<float>, isAsym);
     } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype);
+                                        jblas::prologue_b::gemm::WeightKBlockNFloat<GemmCore_T, ISA>>) {
+      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, JBLAS_DTYPE::EleBitsUndef, false);
     }
 
     utils::avector<int8_t> buffer(packedw.mSize);
@@ -656,19 +657,7 @@ class UT_CompFp32 {
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
     GemmRun<Parallel>(launcher, args, &DefaultThreading);
-    auto err = INT8_ERR;
-    auto dbits = jblas_dtype_bits(qtype);
-    auto type = jblas_dtype_type(qtype);
-    auto constexpr dtype_int = jblas_dtype_type(JBLAS_DTYPE::TypeInt);
-    if (type == dtype_int) {
-      if (dbits == 8) {
-        err = INT8_ERR;
-      } else {
-        err = INT4_ERR;
-      }
-    } else {
-      err = FP4_ERR;
-    }
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
@@ -686,18 +675,7 @@ class UT_CompFp32 {
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, jblas::prologue_b::gemm::WeightKBlockS8<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF8<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
-    }
+    packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
 
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
@@ -715,13 +693,7 @@ class UT_CompFp32 {
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
     GemmRun<Parallel>(launcher, args, &DefaultThreading);
-    auto err = INT8_ERR;
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, jblas::prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
-      err = INT4_ERR;
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      err = FP4_ERR;
-    }
+    auto err = FP4_ERR;
 
     if (qtype == JBLAS_DTYPE::F8_E5M2 || qtype == JBLAS_DTYPE::F8_E4M3) err = F8_ERR;
 
@@ -744,8 +716,8 @@ class UTBenchmark_CompFp32 {
   }
 
   void ut_s4() {
-    benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
-    benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, utils::bf16>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
+    benchmark_all<jblas::prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
+    benchmark_all<jblas::prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
     // benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
     // benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, JBLAS_DTYPE::S4_CLIP);
     //  benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_FULLRANGE);
@@ -789,17 +761,11 @@ class UTBenchmark_CompFp32 {
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
     WType tmpB(0);
     if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 jblas::prologue_b::gemm::WeightKBlockS8<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockS4<Core_T, Core_T::ISA>>) {
+                                 jblas::prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
       tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
     } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF8<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, JBLAS_DTYPE::F8_E8M0);
+                                        jblas::prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
+      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, JBLAS_DTYPE::EleBitsUndef, false);
     }
     std::vector<WType> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
@@ -846,17 +812,11 @@ class UTBenchmark_CompFp32 {
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
     WType tmpB(0);
     if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 jblas::prologue_b::gemm::WeightKBlockS8<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockS4<Core_T, Core_T::ISA>>) {
+                                 jblas::prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
       tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
     } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF8<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, JBLAS_DTYPE::F8_E8M0);
+                                        jblas::prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
+      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, JBLAS_DTYPE::EleBitsUndef, false);
     }
     std::vector<WType> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
@@ -1290,45 +1250,46 @@ class UT_CompBf16 {
   }
 
   void ut_f8() {
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF8, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF8, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E4M3);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F8_E5M2);
   }
 
   void ut_s4() {
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_CLIP);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S4_CLIP);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_FULLRANGE);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S4_FULLRANGE);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S4_FULLRANGE);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_CLIP);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_FULLRANGE);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_CLIP);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S4_CLIP);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_FULLRANGE);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S4_FULLRANGE);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S4_FULLRANGE);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_CLIP);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2, 4096, 4096, 32,
+                                                                              JBLAS_DTYPE::S4_FULLRANGE);
   }
 
   void ut_s8() {
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS8, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S8);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS8, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S8);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS8, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S8);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockS8, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::S8);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S8);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S8);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S8);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::S8);
   }
 
   void ut_f4() {
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_BNB);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_NF4);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
-    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockF4, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_BNB);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, JBLAS_DTYPE::F4_NF4);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_BNB);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_E2M1);
+    ut<sAMX_BF16, jblas::prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, JBLAS_DTYPE::F4_NF4);
   }
 
   template <class GemmCore_T, template <class _T, JBLAS_ISA> class Wei, typename Scale_T>
-  void ut(int m, int n, int k, int blocksize, JBLAS_DTYPE qtype) {
+  void ut(int m, int n, int k, int blocksize, JBLAS_DTYPE qtype, bool isAsym = false) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
            jblas_dtype_str(qtype), jblas::gemm::CoreAttr::to_str(GemmCore_T::ID), type_str<Scale_T>);
     auto constexpr ISA = GemmCore_T::ISA;
@@ -1341,16 +1302,10 @@ class UT_CompBf16 {
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, jblas::prologue_b::gemm::WeightKBlockS8<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF8<GemmCore_T, ISA>>) {
+    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
+                                 jblas::prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>>) {
+      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, jblas_dtype<float>, isAsym);
+    } else {
       packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
     }
 
@@ -1378,13 +1333,8 @@ class UT_CompBf16 {
                                   {matC.data(), n}};
     GemmRun<Parallel>(launcher, args, &DefaultThreading);
     auto err = INT8_ERR;
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, jblas::prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
-      err = INT4_ERR;
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      err = FP4_ERR;
-    }
-
+    if (qtype == JBLAS_DTYPE::S4_CLIP || qtype == JBLAS_DTYPE::S4_FULLRANGE) err = INT4_ERR;
+    if (qtype == JBLAS_DTYPE::F4_E2M1 || qtype == JBLAS_DTYPE::F4_BNB || qtype == JBLAS_DTYPE::F4_NF4) err = FP4_ERR;
     if (qtype == JBLAS_DTYPE::F8_E5M2 || qtype == JBLAS_DTYPE::F8_E4M3) err = F8_ERR;
 
     buffer_error(refC.data(), matC.data(), refC.size(), err);
@@ -1407,10 +1357,10 @@ class UTBenchmark_CompBf16 {
   }
 
   void ut_s4() {
-    benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
-    benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, utils::bf16>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
-    benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
-    benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, JBLAS_DTYPE::S4_CLIP);
+    benchmark_all<jblas::prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
+    benchmark_all<jblas::prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
+    benchmark_all<jblas::prologue_b::gemm::WeightKBlockNInteger, float>(2048, 4096, 4096, 128, JBLAS_DTYPE::S4_CLIP);
+    benchmark_all<jblas::prologue_b::gemm::WeightKBlockNInteger, float>(4096, 4096, 11008, 128, JBLAS_DTYPE::S4_CLIP);
     // benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, JBLAS_DTYPE::S4_FULLRANGE);
     // benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 128, JBLAS_DTYPE::S4_FULLRANGE);
     // benchmark_all<jblas::prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, -1, JBLAS_DTYPE::S4_FULLRANGE);
@@ -1453,14 +1403,11 @@ class UTBenchmark_CompBf16 {
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
     WType tmpB(0);
     if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 jblas::prologue_b::gemm::WeightKBlockS8<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockS4<Core_T, Core_T::ISA>>) {
+                                 jblas::prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
       tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, jblas_dtype<float>, false);
     } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        jblas::prologue_b::gemm::WeightKBlockF4<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>);
+                                        jblas::prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
+      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<Scale_T>, JBLAS_DTYPE::EleBitsUndef, false);
     }
     std::vector<WType> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
@@ -1549,12 +1496,12 @@ class UT_ORT_NBits {
            jblas_dtype_str(qtype), jblas::gemm::CoreAttr::to_str(GemmCore_T::ID), isasym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher = jblas::wrapper::gemm::LauncherKBlock<
-        ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32, jblas::prologue_b::gemm::WeightKBlockS4,
+        ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32, jblas::prologue_b::gemm::WeightKBlockNInteger,
         jblas::epilogue::gemm::CompFp32BlockEpilogue, jblas::epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = jblas::parallel::gemm::SchedulerKBlock<GemmCore_T>;
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
-    using WType = storage::gemm::StorageWeightKBlockS4;
+    using WType = storage::gemm::StorageWeightKBlockNInteger;
     WType packedw(0);
     packedw =
         launcher.mProB.createStorage(n, k, blocksize, qtype, jblas_dtype<float>, jblas_dtype<utils::bf16>, isasym);
@@ -1603,8 +1550,8 @@ class UT_ORT_NBits {
             zpBs8[i * blks + j / blocksize] | zpBs8[i * blks + j / blocksize + 1] << 4;
       }
     }
-    launcher.mProB.packNbitsWeight(n, k, isasym, (uint8_t*)matBs4.data(), k, scalesB.data(), (uint8_t*)zpBs4.data(),
-                                   &packedw, &DefaultThreading);
+    launcher.mProB.packNbitsWeightQ4(n, k, isasym, (uint8_t*)matBs4.data(), k, scalesB.data(), (uint8_t*)zpBs4.data(),
+                                     &packedw, &DefaultThreading);
     launcher.mProB.reduceWeight(&packedw, &DefaultThreading);
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     avector<float> revB(matBf32.size());

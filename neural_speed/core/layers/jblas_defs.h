@@ -46,13 +46,7 @@ using tAMX_INT8_SS_KBlock = jblas::gemm::ICoreRowNAmxint8SSKBlock<48, 16>;
 template <class GC_T, JBLAS_ISA ISA_T>
 using tWeiNInt = jblas::prologue_b::gemm::WeightKBlockNInteger<GC_T, ISA_T>;
 template <class GC_T, JBLAS_ISA ISA_T>
-using tWeiS8 = jblas::prologue_b::gemm::WeightKBlockS8<GC_T, ISA_T>;
-template <class GC_T, JBLAS_ISA ISA_T>
-using tWeiS4 = jblas::prologue_b::gemm::WeightKBlockS4<GC_T, ISA_T>;
-template <class GC_T, JBLAS_ISA ISA_T>
-using tWeiF4 = jblas::prologue_b::gemm::WeightKBlockF4<GC_T, ISA_T>;
-template <class GC_T, JBLAS_ISA ISA_T>
-using tWeiF8 = jblas::prologue_b::gemm::WeightKBlockF8<GC_T, ISA_T>;
+using tWeiNFloat = jblas::prologue_b::gemm::WeightKBlockNFloat<GC_T, ISA_T>;
 
 template <class GC_T, JBLAS_ISA ISA_T>
 using tActKBaseF32 = jblas::prologue_a::gemm::ShuffleActivationKBlockBaseF32<GC_T, ISA_T>;
