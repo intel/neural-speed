@@ -84,6 +84,7 @@ struct gpt_params {
   bool embedding = false;          // get only sentence embedding
   bool interactive_first = false;  // wait for user input immediately
   bool multiline_input = false;    // reverse the usage of `\`
+  bool warmup = true;
 
   bool instruct = false;        // instruction mode (used for Alpaca models)
   bool penalize_nl = true;      // consider newlines as a repeatable token

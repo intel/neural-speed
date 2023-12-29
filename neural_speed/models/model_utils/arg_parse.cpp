@@ -272,6 +272,8 @@ bool gpt_params_parse(int argc, char** argv, gpt_params& params) {  // NOLINT
       params.interactive = true;
     } else if (arg == "--embedding") {
       params.embedding = true;
+    } else if (arg == "--no-warmup") {
+      params.warmup = false;
     } else if (arg == "--interactive-first") {
       params.interactive_first = true;
     } else if (arg == "-ins" || arg == "--instruct") {
