@@ -2992,6 +2992,7 @@ std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs
   while (count < n_input) {
     if (req_idx == (inputs + count)->request_idx) {
       group.push_back(count);
+      MODEL_ASSERT((inputs + group.front())->n_tokens == (inputs + group.back())->n_tokens);
       ++count;
     } else {
       groups.push_back(group);
