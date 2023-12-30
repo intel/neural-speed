@@ -506,14 +506,17 @@ private:
 
                 //2: int8 includes 2 4bits data.
                 xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
-                cvt_blk.xetla_select<matB_t::block_elems, 2>(0)
-                        = matB_blk & 0x0f;
-                cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
+                xetla_vector<int8_t, block_size_x_b * block_size_y_b>
+                        cvt_blk_i8;
 
                 xetla_vector<int32_t, block_size_x_b * block_size_y_b>
                         cvt_blk_i32;
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_CLIP) {
+                    cvt_blk.xetla_select<matB_t::block_elems, 2>(0)
+                            = matB_blk & 0x0f;
+                    cvt_blk.xetla_select<matB_t::block_elems, 2>(1)
+                            = matB_blk >> 4;
                     auto zero_pt_vec
                             = zero_pt.reg
                                       .xetla_select<zero_pt_t::block_size_x, 1>(
@@ -541,9 +544,24 @@ private:
                 }
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_FULLRANGE_NO_ZP) {
-                    xetla_vector<int8_t, block_size_x_b *block_size_y_b>
-                            cvt_blk_i8
-                            = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
+                    cvt_blk_i8 = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
+                    cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
+                }
+
+                if constexpr (compute_policy::quant_type
+                        == quant_mode::S4_SYM) {
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            = matB_blk & 0x0f;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            = (cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(
+                                       0)
+                                      << 4)
+                            >> 4;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
+                            = matB_blk;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
+                            = cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
+                            >> 4;
                     cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
                 }
 

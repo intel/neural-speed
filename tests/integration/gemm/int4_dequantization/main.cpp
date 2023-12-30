@@ -356,16 +356,32 @@ void dequantize_gemm_run(int iter) {
             int start_out = i * dequant_s * matrix_n + j * 2;
             int start_scale = i * size_scale_n + j * 2;
             for (int ii = 0; ii < dequant_s; ii++) {
-                uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
-                uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
-                int8_t data_0 = int8_t(data_in & 0x0f);
-                int8_t data_1 = int8_t(data_in >> 4);
-                int8_t zero_pt_0 = int8_t((data_zero_pt & 0x0f) + 1);
-                int8_t zero_pt_1 = int8_t((data_zero_pt >> 4) + 1);
-                dequantize_b[start_out + ii * matrix_n]
-                        = fp16(data_0 - zero_pt_0) * scale_h[start_scale];
-                dequantize_b[start_out + ii * matrix_n + 1]
-                        = fp16(data_1 - zero_pt_1) * scale_h[start_scale + 1];
+                int8_t data_0, data_1;
+                if constexpr (QUANT_MODE
+                        == gpu::xetla::group::quant_mode::S4_CLIP) {
+                    uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
+                    uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
+                    data_0 = int8_t(data_in & 0x0f);
+                    data_1 = int8_t(data_in >> 4);
+                    int8_t zero_pt_0 = int8_t((data_zero_pt & 0x0f) + 1);
+                    int8_t zero_pt_1 = int8_t((data_zero_pt >> 4) + 1);
+                    dequantize_b[start_out + ii * matrix_n]
+                            = fp16(data_0 - zero_pt_0) * scale_h[start_scale];
+                    dequantize_b[start_out + ii * matrix_n + 1]
+                            = fp16(data_1 - zero_pt_1)
+                            * scale_h[start_scale + 1];
+                }
+                if constexpr (QUANT_MODE
+                        == gpu::xetla::group::quant_mode::S4_SYM) {
+                    int8_t data_in = B_h[start_in + ii * matrix_n / 2];
+                    int8_t data_zero_pt = zero_pt_h[start_zero_pt];
+                    data_0 = int8_t(data_in & 0x0f);
+                    data_1 = int8_t(data_in >> 4);
+                    dequantize_b[start_out + ii * matrix_n]
+                            = fp16(data_0) * scale_h[start_scale];
+                    dequantize_b[start_out + ii * matrix_n + 1]
+                            = fp16(data_1) * scale_h[start_scale + 1];
+                }
             }
         }
     }
@@ -396,8 +412,7 @@ class dequantize_gemm_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(dequantize_gemm_test);
 
 TYPED_TEST_P(dequantize_gemm_test, esimd) {
-    dequantize_gemm_run<TypeParam, gpu::xetla::group::quant_mode::S4_CLIP>(
-            ITER);
+    dequantize_gemm_run<TypeParam, gpu::xetla::group::quant_mode::S4_SYM>(ITER);
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
