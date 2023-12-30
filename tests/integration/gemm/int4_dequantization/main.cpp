@@ -150,7 +150,7 @@ public:
     using data_type_c = fp16;
 };
 
-template <class Test>
+template <class Test, gpu::xetla::group::quant_mode QUANT_MODE>
 void dequantize_gemm_run(int iter) {
     using namespace gpu;
     //Accept incoming parameters
@@ -218,9 +218,8 @@ void dequantize_gemm_run(int iter) {
             prefetch_distance, periodic_sync_interval>;
     using compute_policy
             = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
-                    perf_tuning_knob, gpu::xetla::group::quant_mode::S4_CLIP,
-                    data_type_scale, data_type_zero_pt, dequant_s,
-                    gpu_arch::Dg2>;
+                    perf_tuning_knob, QUANT_MODE, data_type_scale,
+                    data_type_zero_pt, dequant_s, gpu_arch::Dg2>;
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
             mem_desc_a_t, mem_desc_b_t>;
 
@@ -348,6 +347,7 @@ void dequantize_gemm_run(int iter) {
     //performance
     prof.print_profiling_result(profiling_selector::GPU);
 
+    //TODO(zhe): different dequant logic in different quant_mode
     std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
     for (int i = 0; i < matrix_k / dequant_s; i++) {
         for (int j = 0; j < matrix_n / 2; j++) {
@@ -396,7 +396,8 @@ class dequantize_gemm_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(dequantize_gemm_test);
 
 TYPED_TEST_P(dequantize_gemm_test, esimd) {
-    dequantize_gemm_run<TypeParam>(ITER);
+    dequantize_gemm_run<TypeParam, gpu::xetla::group::quant_mode::S4_CLIP>(
+            ITER);
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
