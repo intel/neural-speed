@@ -48,7 +48,7 @@
 #include "layers/ele_wise.h"
 #include "layers/mha_dense.h"
 #include "ne.h"
-#include "ne_jblas.h"
+#include "ne_bestla.h"
 
 // if C99 - static_assert is noop
 // ref: https://stackoverflow.com/a/53923785/4039976
@@ -358,7 +358,7 @@ static_assert(NE_TYPE_COUNT == 14, "NE_TYPE_NAME is outdated");
 static bool NE_IS_QUANTIZED[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = false, [NE_TYPE_F16] = false, [NE_TYPE_Q4_0] = true, [NE_TYPE_Q4_1] = true,
     [NE_TYPE_Q5_0] = true, [NE_TYPE_Q5_1] = true, [NE_TYPE_Q8_0] = true, [NE_TYPE_Q8_1] = true,
-    [NE_TYPE_I8] = false,  [NE_TYPE_I16] = false, [NE_TYPE_I32] = false, [NE_TYPE_JBLAS] = true,
+    [NE_TYPE_I8] = false,  [NE_TYPE_I16] = false, [NE_TYPE_I32] = false, [NE_TYPE_BTLA] = true,
 };
 static_assert(NE_TYPE_COUNT == 14, "NE_IS_QUANTIZED is outdated");
 
@@ -708,8 +708,8 @@ struct ne_context* ne_init(struct ne_init_params params) {
   if (is_first_call) {
     // initialize time system (required on Windows)
     ne_time_init();
-    // initialize jblas's amx instruction.
-    jblas_init();
+    // initialize bestla's amx instruction.
+    bestla_init();
     // initialize GELU, SILU and EXP F32 tables
     {
       const uint64_t t_start = ne_time_us();
@@ -882,7 +882,7 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
   size_t size_needed = 0;
 
   if (data == NULL && !ctx->no_alloc) {
-    if (type == NE_TYPE_JBLAS) {
+    if (type == NE_TYPE_BTLA) {
       size_needed = size;
     } else {
       size_needed += NE_TYPE_SIZE[type] * (ne[0] / NE_BLCK_SIZE[type]);
@@ -974,7 +974,7 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
     result->ne[i] = ne[i];
   }
   result->nb[0] = NE_TYPE_SIZE[type];
-  if (type != NE_TYPE_JBLAS) {
+  if (type != NE_TYPE_BTLA) {
     result->nb[1] = result->nb[0] * (result->ne[0] / NE_BLCK_SIZE[type]);
   }
 
@@ -3272,7 +3272,7 @@ struct ne_tensor* ne_flash_attn(struct ne_context* ctx, struct ne_tensor* q, str
   bool is_node = true;
   struct ne_tensor* result = ne_new_tensor_4d(ctx, NE_TYPE_F32, headsize, headnum, seq_cur, batch, NE_SIZE_CALC);
   attn_shape_t atte_shape = {batch, headnum, headsize, seq_cur, seq_all};
-  size_t tmpsize = jblas_fusion_attn_workspace_size(&atte_shape);
+  size_t tmpsize = bestla_fusion_attn_workspace_size(&atte_shape);
   struct ne_tensor* tmp_t = ne_new_tensor_1d(ctx, NE_TYPE_I8, tmpsize, NE_SIZE_CALC);
   result->op = NE_OP_FLASH_ATTN;
   result->grad = NULL;
@@ -6692,8 +6692,9 @@ static void ne_compute_forward_mul_mat_q_f32(const struct ne_compute_params* par
   //}
 }
 
-static void ne_compute_forward_mul_mat_q_f32_jblas(const struct ne_compute_params* params, const struct ne_tensor* src0,
-                                                   const struct ne_tensor* src1, struct ne_tensor* dst) {
+static void ne_compute_forward_mul_mat_q_f32_bestla(const struct ne_compute_params* params,
+                                                    const struct ne_tensor* src0, const struct ne_tensor* src1,
+                                                    struct ne_tensor* dst) {
   int64_t t0 = ne_perf_time_us();
   UNUSED(t0);
 
@@ -6765,8 +6766,8 @@ static void ne_compute_forward_mul_mat_q_f32_jblas(const struct ne_compute_param
   if (params->type == NE_TASK_FINALIZE) {
     return;
   }
-  jblas_f32f32_forward((float*)src1->data, src0->data, (float*)dst->data, ne1, ne0, ne10, nb11 / ne_element_size(src1),
-                       nb1 / ne_element_size(dst), params->wdata);
+  bestla_f32f32_forward((float*)src1->data, src0->data, (float*)dst->data, ne1, ne0, ne10, nb11 / ne_element_size(src1),
+                        nb1 / ne_element_size(dst), params->wdata);
 }
 
 static void ne_compute_forward_mul_mat(const struct ne_compute_params* params, const struct ne_tensor* src0,
@@ -6780,8 +6781,8 @@ static void ne_compute_forward_mul_mat(const struct ne_compute_params* params, c
     case NE_TYPE_Q8_1: {
       ne_compute_forward_mul_mat_q_f32(params, src0, src1, dst);
     } break;
-    case NE_TYPE_JBLAS: {
-      ne_compute_forward_mul_mat_q_f32_jblas(params, src0, src1, dst);
+    case NE_TYPE_BTLA: {
+      ne_compute_forward_mul_mat_q_f32_bestla(params, src0, src1, dst);
     } break;
     case NE_TYPE_F16: {
       ne_compute_forward_mul_mat_f16_f32(params, src0, src1, dst);
@@ -6795,9 +6796,9 @@ static void ne_compute_forward_mul_mat(const struct ne_compute_params* params, c
   }
 }
 
-static void ne_compute_forward_mul_mat_bias_q_f32_jblas(const struct ne_compute_params* params,
-                                                        const struct ne_tensor* src0, const struct ne_tensor* src1,
-                                                        const struct ne_tensor* bias, struct ne_tensor* dst) {
+static void ne_compute_forward_mul_mat_bias_q_f32_bestla(const struct ne_compute_params* params,
+                                                         const struct ne_tensor* src0, const struct ne_tensor* src1,
+                                                         const struct ne_tensor* bias, struct ne_tensor* dst) {
   int64_t t0 = ne_perf_time_us();
   UNUSED(t0);
 
@@ -6870,16 +6871,16 @@ static void ne_compute_forward_mul_mat_bias_q_f32_jblas(const struct ne_compute_
     return;
   }
   const bool boardcast_bias = bias->ne[1] == 1;
-  jblas_fusion_add_f32f32_forward((float*)src1->data, src0->data, (float*)bias->data, (float*)dst->data, ne1, ne0, ne10,
-                                  ne10, ne0, boardcast_bias, params->wdata);
+  bestla_fusion_add_f32f32_forward((float*)src1->data, src0->data, (float*)bias->data, (float*)dst->data, ne1, ne0,
+                                   ne10, ne10, ne0, boardcast_bias, params->wdata);
 }
 
 static void ne_compute_forward_mul_mat_bias(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                             const struct ne_tensor* src1, const struct ne_tensor* bias,
                                             struct ne_tensor* dst) {
   switch (src0->type) {
-    case NE_TYPE_JBLAS: {
-      ne_compute_forward_mul_mat_bias_q_f32_jblas(params, src0, src1, bias, dst);
+    case NE_TYPE_BTLA: {
+      ne_compute_forward_mul_mat_bias_q_f32_bestla(params, src0, src1, bias, dst);
     } break;
     default: {
       NE_ASSERT(false);
@@ -6900,8 +6901,8 @@ static void ne_compute_forward_mul_qkv(const struct ne_compute_params* params, c
   const int n = dst->ne[0];
   const int m = dst->ne[1];
   const int k = src->ne[0];
-  jblas_fusion_QKV_f32f32_forward((float*)src->data, qw->data, kw->data, vw->data, (float*)dst->data, m, n, k, k, n,
-                                  params->wdata);
+  bestla_fusion_QKV_f32f32_forward((float*)src->data, qw->data, kw->data, vw->data, (float*)dst->data, m, n, k, k, n,
+                                   params->wdata);
 }
 
 static void ne_compute_forward_ffn_silu(const struct ne_compute_params* params, const struct ne_tensor* src,
@@ -6918,8 +6919,8 @@ static void ne_compute_forward_ffn_silu(const struct ne_compute_params* params, 
   const int fout = dst->ne[0];
   const int fmid = w1->ne[1];
   const int seq = dst->ne[1];
-  jblas_fusion_FFN_SiLu_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
-                                       (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
+  bestla_fusion_FFN_SiLu_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
+                                        (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
 }
 
 static void ne_compute_forward_ffn_add_gelu(const struct ne_compute_params* params, const struct ne_tensor* src,
@@ -6938,9 +6939,9 @@ static void ne_compute_forward_ffn_add_gelu(const struct ne_compute_params* para
   const int fmid = w1->ne[1];
   const int seq = dst->ne[1];
   const bool boardcast_bias = b1->ne[1] == 1 || b2->ne[1] == 1;
-  jblas_fusion_FFN_Add_GeLu_f32f32_forward((float*)src->data, w1->data, w2->data, (float*)b1->data, (float*)b2->data,
-                                           (float*)tmp->data, (float*)dst->data, seq, fin, fmid, fout, boardcast_bias,
-                                           params->wdata);
+  bestla_fusion_FFN_Add_GeLu_f32f32_forward((float*)src->data, w1->data, w2->data, (float*)b1->data, (float*)b2->data,
+                                            (float*)tmp->data, (float*)dst->data, seq, fin, fmid, fout, boardcast_bias,
+                                            params->wdata);
 }
 
 static void ne_compute_forward_ffn_gelu(const struct ne_compute_params* params, const struct ne_tensor* src,
@@ -6957,8 +6958,8 @@ static void ne_compute_forward_ffn_gelu(const struct ne_compute_params* params, 
   const int fout = dst->ne[0];
   const int fmid = w1->ne[1];
   const int seq = dst->ne[1];
-  jblas_fusion_FFN_GeLu_f32f32_forward((float*)src->data, w1->data, w2->data, (float*)tmp->data, (float*)dst->data, seq,
-                                       fin, fmid, fout, params->wdata);
+  bestla_fusion_FFN_GeLu_f32f32_forward((float*)src->data, w1->data, w2->data, (float*)tmp->data, (float*)dst->data,
+                                        seq, fin, fmid, fout, params->wdata);
 }
 
 // ne_compute_forward_scale
@@ -8147,8 +8148,8 @@ static void ne_compute_forward_rope_f16(const struct ne_compute_params* params, 
   }
 }
 
-static void ne_compute_forward_rope_jblas(const struct ne_compute_params* params, const struct ne_tensor* src0,
-                                          const struct ne_tensor* src1, struct ne_tensor* dst) {
+static void ne_compute_forward_rope_bestla(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                                           const struct ne_tensor* src1, struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) return;
   NE_ASSERT(("use internal multi-threading", params->nth == 1));
 
@@ -8184,7 +8185,7 @@ static void ne_compute_forward_rope_jblas(const struct ne_compute_params* params
         theta *= theta_scale;
       }
     }
-    jblas_reordered_attn_fp32_shift_rope_k(dst->data, cossin, batch_size, head_num, head_size, seq_len, n_keep);
+    bestla_reordered_attn_fp32_shift_rope_k(dst->data, cossin, batch_size, head_num, head_size, seq_len, n_keep);
     if (dst->opt[0] == NULL) free(cossin);
     return;
   }
@@ -8200,8 +8201,8 @@ static void ne_compute_forward_rope(const struct ne_compute_params* params, cons
     case NE_TYPE_F32: {
       ne_compute_forward_rope_f32(params, src0, src1, dst);
     } break;
-    case NE_TYPE_JBLAS: {
-      ne_compute_forward_rope_jblas(params, src0, src1, dst);
+    case NE_TYPE_BTLA: {
+      ne_compute_forward_rope_bestla(params, src0, src1, dst);
     } break;
     default: {
       NE_ASSERT(false);
@@ -8738,7 +8739,7 @@ static void ne_compute_forward_flash_attn_f32_f16_f16(const struct ne_compute_pa
       .step_dst_head_num = headsize,
       .step_dst_sl = embedsize,
   };
-  jblas_fusion_attn_fp32_fp16_fp16_fp32_forward(&args);
+  bestla_fusion_attn_fp32_fp16_fp16_fp32_forward(&args);
 }
 
 static void ne_compute_forward_flash_attn_reordered(const struct ne_compute_params* params, const struct ne_tensor* q,
@@ -8759,11 +8760,11 @@ static void ne_compute_forward_flash_attn_reordered(const struct ne_compute_para
   float scale = *(float*)dst->padding;
   ne_attn_flags_t flags = *(ne_attn_flags_t*)&dst->padding[sizeof(scale)];
 
-  NE_ASSERT(k->type == NE_TYPE_JBLAS && v->type == NE_TYPE_JBLAS);
+  NE_ASSERT(k->type == NE_TYPE_BTLA && v->type == NE_TYPE_BTLA);
   ATTN_FWD_LAYOUT K_layout = *(ATTN_FWD_LAYOUT*)(&k->nb[0]);
   ATTN_FWD_LAYOUT V_layout = *(ATTN_FWD_LAYOUT*)(&v->nb[0]);
 
-  jblas_reordered_attn_fp32_fp32_fwd_args_t args = {
+  bestla_reordered_attn_fp32_fp32_fwd_args_t args = {
       .Q = (float*)q->data,
       .K = (char*)k->data,
       .V = (char*)v->data,
@@ -8804,7 +8805,7 @@ static void ne_compute_forward_flash_attn_reordered(const struct ne_compute_para
       .step_dst_head_num = dst->nb[1] / dst_ele_size,
       .step_dst_sl = dst->nb[2] / dst_ele_size,
   };
-  jblas_reordered_attn_fp32_forward(&args);
+  bestla_reordered_attn_fp32_forward(&args);
 }
 
 static void ne_compute_forward_flash_attn_f16(const struct ne_compute_params* params, const struct ne_tensor* q,
@@ -9041,7 +9042,7 @@ static void ne_compute_forward_flash_attn(const struct ne_compute_params* params
     case NE_TYPE_F32: {
       if (k->type == NE_TYPE_F16) {
         ne_compute_forward_flash_attn_f32_f16_f16(params, q, k, v, tmp, dst);
-      } else if (k->type == NE_TYPE_JBLAS && v->type == NE_TYPE_JBLAS) {
+      } else if (k->type == NE_TYPE_BTLA && v->type == NE_TYPE_BTLA) {
         ne_compute_forward_flash_attn_reordered(params, q, k, v, tmp, dst);
       } else {
         NE_ASSERT(false);
@@ -9062,7 +9063,7 @@ static void ne_compute_forward_flash_attn_kv_update(const struct ne_compute_para
   const bool is_v = (bool)p_data[1];
   const bool no_zeroing = (bool)p_data[2];
   NE_ASSERT(cur->type == NE_TYPE_F32);
-  jblas_fusion_attn_fp32_update_kv_args_t args = {
+  bestla_fusion_attn_fp32_update_kv_args_t args = {
       .src = cur->data,
       .cache = cache->data,
       .batch_size = cur->ne[3],
@@ -9078,9 +9079,9 @@ static void ne_compute_forward_flash_attn_kv_update(const struct ne_compute_para
       .no_zeroing = no_zeroing,
   };
   if (is_v)
-    jblas_reordered_attn_fp32_update_v(&args);
+    bestla_reordered_attn_fp32_update_v(&args);
   else
-    jblas_reordered_attn_fp32_update_k(&args);
+    bestla_reordered_attn_fp32_update_k(&args);
 }
 
 // ne_compute_forward_flash_ff
@@ -10352,7 +10353,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
     }
   }
 #else
-  n_threads = jblas_set_threads(n_threads);  // prevent from using two sockets
+  n_threads = bestla_set_threads(n_threads);  // prevent from using two sockets
   omp_set_num_threads(n_threads);
 #endif
   // initialize tasks + work buffer
@@ -10450,9 +10451,9 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           // printf("nr0 = %8d, nr1 = %8d, nr0*nr1 = %8d, n_tasks = %d\n", nr0, nr1, nr0*nr1, node->n_tasks);
 
           size_t cur = 0;
-          if (node->src0->type == NE_TYPE_JBLAS) {
-            cur = jblas_f32f32_get_workspace_size(node->src1->ne[1], node->src0->ne[1], node->src1->ne[0],
-                                                  node->src0->data);
+          if (node->src0->type == NE_TYPE_BTLA) {
+            cur = bestla_f32f32_get_workspace_size(node->src1->ne[1], node->src0->ne[1], node->src1->ne[0],
+                                                   node->src0->data);
             node->n_tasks = 1;
           } else if (node->src0->type == NE_TYPE_F16 && node->src1->type == NE_TYPE_F32) {
             cur = NE_TYPE_SIZE[NE_TYPE_F16] * ne_nelements(node->src1);
@@ -10473,15 +10474,15 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_MUL_FFN_GELU:
         case NE_OP_MUL_FFN_ADD_GELU: {
           size_t cur = 0;
-          cur = jblas_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->src1->ne[1],
-                                                           node->opt[0]->ne[1], node->src1->data, node->opt[0]->data);
+          cur = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->src1->ne[1],
+                                                            node->opt[0]->ne[1], node->src1->data, node->opt[0]->data);
           work_size = MAX(work_size, cur);
           node->n_tasks = 1;
         } break;
         case NE_OP_MUL_QKV: {
           size_t cur = 0;
-          cur = jblas_fusion_QKV_f32f32_get_workspace_size(node->src0->ne[1], node->src1->ne[1], node->src1->ne[0],
-                                                           node->src1->data);
+          cur = bestla_fusion_QKV_f32f32_get_workspace_size(node->src0->ne[1], node->src1->ne[1], node->src1->ne[0],
+                                                            node->src1->data);
           work_size = MAX(work_size, cur);
           node->n_tasks = 1;
         } break;
@@ -10504,7 +10505,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_DIAG_MASK_INF:
         case NE_OP_PADDING_MASK_INF:
         case NE_OP_ROPE:
-          if (node->type == NE_TYPE_JBLAS) {
+          if (node->type == NE_TYPE_BTLA) {
             node->n_tasks = 1;
           } else if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
@@ -10629,7 +10630,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
     const int64_t perf_node_start_cycles = ne_perf_cycles();
     const int64_t perf_node_start_time_us = ne_perf_time_us();
 #if NE_DEBUG
-    jblas_timer(true);
+    bestla_timer(true);
 #endif
 #ifndef _OPENMP
     // INIT
@@ -10791,7 +10792,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 #endif
 #if NE_DEBUG
     printf("Node %d ", node->op);
-    jblas_timer(false);
+    bestla_timer(false);
 #endif
     // performance stats (node)
     {

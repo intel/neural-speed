@@ -70,6 +70,7 @@ if (NE_GPU)
 endif()
 
 option(NE_BUILD_TESTS            "neural_engine: build tests"    ${NE_STANDALONE})
+option(NE_BTLA_UT                "enable BesTLA's unit tests"    OFF)
 option(NE_BUILD_EXAMPLES         "neural_engine: build examples" ${NE_STANDALONE})
 if(NE_BUILD_TESTS)
   add_compile_definitions(NE_BUILD_TESTS)
@@ -139,6 +140,11 @@ if (NE_PYTHON_API)
   add_subdirectory(third_party/pybind11)
 endif()
 
-add_subdirectory(bestla jblas)
+if (NE_BTLA_UT)
+  set(BTLA_UT_ALL ON)
+endif()
+include(FindOpenMP)
+
+add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)

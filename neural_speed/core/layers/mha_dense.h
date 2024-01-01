@@ -24,7 +24,7 @@ extern "C" {
 typedef struct attn_shape_t {
   int batch_size, head_num, heads_kv, head_size, sl_q, sl_kv;
 } attn_shape_t;
-size_t jblas_fusion_attn_workspace_size(const attn_shape_t* params);
+size_t bestla_fusion_attn_workspace_size(const attn_shape_t* params);
 
 typedef struct kv_shape_t {
   uint32_t heads_kv;   // number of heads in K/V matrix
@@ -63,7 +63,7 @@ typedef struct attn_bf16_fwd_args_t {
   int step_v_bs, step_v_head_num, step_v_sl, step_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
 } attn_bf16_fwd_args_t;
-void jblas_fusion_attn_bf16_forward(const attn_bf16_fwd_args_t* params);
+void bestla_fusion_attn_bf16_forward(const attn_bf16_fwd_args_t* params);
 
 typedef struct attn_fp32_fp16_fp16_fp32_fwd_args_t {
   float* Q;
@@ -82,10 +82,10 @@ typedef struct attn_fp32_fp16_fp16_fp32_fwd_args_t {
   int step_dst_bs, step_dst_head_num, step_dst_sl;
 } attn_fp32_fp16_fp16_fp32_fwd_args_t;
 
-void jblas_fusion_attn_bf16_forward(const attn_bf16_fwd_args_t* params);
+void bestla_fusion_attn_bf16_forward(const attn_bf16_fwd_args_t* params);
 
-bool jblas_fusion_attn_fp32_fp16_fp16_fp32_support(const attn_shape_t* params);
-void jblas_fusion_attn_fp32_fp16_fp16_fp32_forward(const attn_fp32_fp16_fp16_fp32_fwd_args_t* params);
+bool bestla_fusion_attn_fp32_fp16_fp16_fp32_support(const attn_shape_t* params);
+void bestla_fusion_attn_fp32_fp16_fp16_fp32_forward(const attn_fp32_fp16_fp16_fp32_fwd_args_t* params);
 
 typedef struct attn_fp16_fwd_args_t {
   ne_fp16_t *Q, *K, *V, *dst;
@@ -100,8 +100,8 @@ typedef struct attn_fp16_fwd_args_t {
   int step_v_bs, step_v_head_num, step_v_sl, step_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
 } attn_fp16_fwd_args_t;
-bool jblas_fusion_attn_fp16_support(const attn_shape_t* params);
-void jblas_fusion_attn_fp16_forward(const attn_fp16_fwd_args_t* params);
+bool bestla_fusion_attn_fp16_support(const attn_shape_t* params);
+void bestla_fusion_attn_fp16_forward(const attn_fp16_fwd_args_t* params);
 
 typedef struct attn_int8_fwd_args_t {
   int8_t *Q, *K, *V, *dst;
@@ -116,44 +116,44 @@ typedef struct attn_int8_fwd_args_t {
   int step_v_bs, step_v_head_num, step_v_sl, step_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
 } attn_int8_fwd_args_t;
-void jblas_fusion_attn_int8_forward(const attn_int8_fwd_args_t* params);
+void bestla_fusion_attn_int8_forward(const attn_int8_fwd_args_t* params);
 
-// check if jblas_reordered_attn is supported at runtime
-bool jblas_reordered_attn_fp32_support(const attn_shape_t* params);
+// check if bestla_reordered_attn is supported at runtime
+bool bestla_reordered_attn_fp32_support(const attn_shape_t* params);
 
 // kv cache sizes in bytes per layer per batch per beam
-void jblas_reordered_attn_fp32_batch_kv_info(const kv_shape_t* params, kv_cache_info_t* out);
+void bestla_reordered_attn_fp32_batch_kv_info(const kv_shape_t* params, kv_cache_info_t* out);
 
-typedef struct jblas_fusion_attn_fp32_update_kv_args_t {
+typedef struct bestla_fusion_attn_fp32_update_kv_args_t {
   float* src;
   char* cache;
   int batch_size, heads_kv, head_size, seq_off, seq_size, seq_max;
   int step_bs, step_head_num, step_seq, step_head_size;
   bool no_zeroing;  // set to true to prevent zeroing unaligned seq
-} jblas_fusion_attn_fp32_update_kv_args_t;
+} bestla_fusion_attn_fp32_update_kv_args_t;
 // update k-cache and output the memory layout of it
-void jblas_reordered_attn_fp32_update_k(const jblas_fusion_attn_fp32_update_kv_args_t* params);
+void bestla_reordered_attn_fp32_update_k(const bestla_fusion_attn_fp32_update_kv_args_t* params);
 // update v-cache and output the memory layout of it
-void jblas_reordered_attn_fp32_update_v(const jblas_fusion_attn_fp32_update_kv_args_t* params);
+void bestla_reordered_attn_fp32_update_v(const bestla_fusion_attn_fp32_update_kv_args_t* params);
 // shift-RoPE k-cache with pre-computed cos/sin values
-void jblas_reordered_attn_fp32_shift_rope_k(char* cache, const ne_fp16_t* cossin, int batch_size, int heads_kv,
-                                            int head_size, int seq_max, int seq_keep);
+void bestla_reordered_attn_fp32_shift_rope_k(char* cache, const ne_fp16_t* cossin, int batch_size, int heads_kv,
+                                             int head_size, int seq_max, int seq_keep);
 
-typedef struct jblas_fusion_attn_fp32_batch_cpy_kv_args_t {
+typedef struct bestla_fusion_attn_fp32_batch_cpy_kv_args_t {
   char* src;
   char* dst;
   int heads_kv, head_size, seq_off, seq_size, seq_max;
   bool no_zeroing;  // set to true to prevent zeroing unaligned seq
-} jblas_fusion_attn_fp32_batch_cpy_kv_args_t;
+} bestla_fusion_attn_fp32_batch_cpy_kv_args_t;
 // copy k-cache across batch from seq_off to (seq_off + seq_size)
-void jblas_fusion_attn_fp32_batch_cpy_k(const jblas_fusion_attn_fp32_batch_cpy_kv_args_t* params);
+void bestla_fusion_attn_fp32_batch_cpy_k(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params);
 // copy v-cache across batch from seq_off to (seq_off + seq_size)
-void jblas_fusion_attn_fp32_batch_cpy_v(const jblas_fusion_attn_fp32_batch_cpy_kv_args_t* params);
+void bestla_fusion_attn_fp32_batch_cpy_v(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params);
 
-typedef struct jblas_reordered_attn_fp32_fp32_fwd_args_t {
+typedef struct bestla_reordered_attn_fp32_fp32_fwd_args_t {
   float* Q;
-  char* K;  // K/V should be of type and layout used in corrsponding jblas_reordered_attn_xxx_update_kv
-  char* V;  // K/V should be of type and layout used in corrsponding jblas_reordered_attn_xxx_update_kv
+  char* K;  // K/V should be of type and layout used in corrsponding bestla_reordered_attn_xxx_update_kv
+  char* V;  // K/V should be of type and layout used in corrsponding bestla_reordered_attn_xxx_update_kv
   float* dst;
   float Q_sc, K_sc, V_sc, dst_sc;
   char* tmp;
@@ -165,8 +165,8 @@ typedef struct jblas_reordered_attn_fp32_fp32_fwd_args_t {
   int stride_k_bs, stride_k_head_num, stride_k_sl, stride_k_head_size;
   int stride_v_bs, stride_v_head_num, stride_v_sl, stride_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
-} jblas_reordered_attn_fp32_fp32_fwd_args_t;
-void jblas_reordered_attn_fp32_forward(const jblas_reordered_attn_fp32_fp32_fwd_args_t* params);
+} bestla_reordered_attn_fp32_fp32_fwd_args_t;
+void bestla_reordered_attn_fp32_forward(const bestla_reordered_attn_fp32_fp32_fwd_args_t* params);
 
 #ifdef __cplusplus
 }

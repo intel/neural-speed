@@ -405,6 +405,43 @@ int main(int argc, char** argv) {  // NOLINT
   const bool penalize_nl = params.penalize_nl;
   model_token id = 0;
 
+  if (params.warmup) {
+    {
+      const std::vector<model_token> tmp(32, ctx->vocab.bos_token_id);
+      std::vector<model_input> inputs = {model_input{
+          /*.tokens              =*/tmp.data(),
+          /*.n_tokens           =*/(uint32_t)tmp.size(),
+          /*.n_prompt_tokens    =*/0,
+          /*.n_past             =*/0,
+          /*.n_total            =*/0,
+          /*.request_idx        =*/0,
+          /*.beam_idx           =*/0,
+          /*.padding_side       =*/0,
+          /*n_padding           =*/0,
+      }};
+      model_eval(ctx, inputs.data(), inputs.size(), params.n_threads);
+    }
+
+    {
+      const std::vector<model_token> tmp = {
+          0,
+      };
+      std::vector<model_input> inputs = {model_input{
+          /*.tokens              =*/tmp.data(),
+          /*.n_tokens           =*/(uint32_t)tmp.size(),
+          /*.n_prompt_tokens    =*/0,
+          /*.n_past             =*/(uint32_t)(params.n_predict - 1),
+          /*.n_total            =*/(uint32_t)(params.n_predict - 1),
+          /*.request_idx        =*/0,
+          /*.beam_idx           =*/0,
+          /*.padding_side       =*/0,
+          /*n_padding           =*/0,
+      }};
+      model_eval(ctx, inputs.data(), inputs.size(), params.n_threads);
+    }
+    model_reset_timings(ctx);
+  }
+
   while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
     // predict
     if (embd.size() > 0) {

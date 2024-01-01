@@ -31,7 +31,7 @@
 #include "core/data_types.h"
 #include "core/ne.h"
 #include "core/ne_layers.h"
-#include "core/ne_jblas.h"
+#include "core/ne_bestla.h"
 #include "core/layers/mha_dense.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
@@ -246,7 +246,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
 
     // mlp.forward
     struct ne_tensor* mlp_output;
-    bool status = jblas_fusion_FFN_Add_GeLu_f32f32_support(
+    bool status = bestla_fusion_FFN_Add_GeLu_f32f32_support(
         model.layers[il].ffn[0]->data, model.layers[il].ffn[2]->data, N * batch_size, mlp_input->ne[0],
         model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[2]->ne[1]);
     if (status) {

@@ -30,7 +30,7 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
-#include "jblas/jit_blas_utils.h"  // borrow aligned_malloc
+#include "bestla/bestla_utils.h"  // borrow aligned_malloc
 
 #ifdef __has_include
 #if __has_include(<unistd.h>)
@@ -407,12 +407,12 @@ struct model_buffer {
   model_buffer() = default;
 
   void resize(size_t len) {
-    jblas::utils::afree(addr);
-    addr = jblas::utils::amalloc<uint8_t>(len);
+    bestla::utils::afree(addr);
+    addr = bestla::utils::amalloc<uint8_t>(len);
     size = len;
   }
 
-  ~model_buffer() { jblas::utils::afree(addr); }
+  ~model_buffer() { bestla::utils::afree(addr); }
 
   // disable copy and move
   model_buffer(const model_buffer&) = delete;

@@ -196,7 +196,7 @@ for name in list_vars.keys():
 
     ftype_cur = 0
     if ".weight" in name and list_vars[name].dim() == 2:
-        ftype_cur = 2  # TODO(Zhenwei) support jblas
+        ftype_cur = 2  # TODO(Zhenwei) support bestla
 
     data = list_vars[src].squeeze().numpy()
     data = data.astype(np.float32)
@@ -213,7 +213,7 @@ for name in list_vars.keys():
         # to quantize
         k = name.replace(".weight", "")
         if k in weight_config and weight_config[k]["dtype"] != "fp32":
-            print(f"jblas {k}")
+            print(f"bestla {k}")
             int_weight, gptq_scale, gptq_zp = extract_gptq(new_model, k, weight_config[k])
 
             tensor = int_weight.view(-1, 32) + 8

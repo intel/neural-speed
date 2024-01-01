@@ -175,5 +175,5 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
   ms->init(fname.c_str(), ctx, n_gpu_layers, use_mmap, use_mlock, vocab_only);
   ms->load(ctx, progress_callback, progress_callback_user_data);
   model_context& lctx = *ctx;
-  lctx.support_jblas_kv = true;
+  lctx.support_bestla_kv = true;
 }

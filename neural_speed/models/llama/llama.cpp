@@ -33,7 +33,7 @@
 #include "core/data_types.h"
 #include "core/layers/mha_dense.h"
 #include "core/ne.h"
-#include "core/ne_jblas.h"
+#include "core/ne_bestla.h"
 #include "core/ne_layers.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_files.h"
@@ -119,27 +119,27 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
-  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_JBLAS;
+  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {0, 0};
   if (run_mha_reordered) {
-    NE_ASSERT(kv_self.v->type == NE_TYPE_JBLAS);  // kv type should be the same
+    NE_ASSERT(kv_self.v->type == NE_TYPE_BTLA);  // kv type should be the same
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
         /* .heads_kv = */ n_head_kv,
         /* .head_size = */ head_size,
-        /* .sl_q = */ N,  // Note: make sure that jblas reordered attn supports next token inferencing
+        /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inferencing
         /* .sl_kv = */ n_cached,
     };
 
-    NE_ASSERT(("jblas managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
-               jblas_reordered_attn_fp32_support(&attn_shape)));
+    NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
+               bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
         /* .heads_kv = */ static_cast<uint32_t>(n_head_kv),
         /* .head_size = */ static_cast<uint32_t>(head_size),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
-    jblas_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
 
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
@@ -171,9 +171,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
     }
     ne_tensor *Qcur, *Kcur, *Vcur;
-    if (jblas_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
-                                        model.layers[il].attn[2]->data, N, model.layers[il].attn[0]->ne[1],
-                                        model.layers[il].attn[0]->ne[0]) &&
+    if (bestla_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
+                                         model.layers[il].attn[2]->data, N, model.layers[il].attn[0]->ne[1],
+                                         model.layers[il].attn[0]->ne[0]) &&
         n_head == n_head_kv) {  // fused execution of QKV
       struct ne_tensor* QKVcur =
           ne_mul_qkv(ctx0, model.layers[il].attn[0], model.layers[il].attn[1], model.layers[il].attn[2], cur);
@@ -274,14 +274,14 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       {
         const auto k_cache = ne_view_3d(ctx0, kv_self.k,              // tensor
                                         head_size, n_ctx, n_head_kv,  // ne
-                                        0, 0,                         // nb (jblas managed)
+                                        0, 0,                         // nb (bestla managed)
                                         il * k_size);                 // offset
         ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, is_ring_full));
         const auto v_cache = ne_view_3d(ctx0, kv_self.v,              // tensor
                                         head_size, n_ctx, n_head_kv,  // ne
-                                        0, 0,                         // nb (jblas managed)
+                                        0, 0,                         // nb (bestla managed)
                                         il * v_size);                 // offset
-        // jblas alway view V as (D, n_head, seq)
+        // bestla alway view V as (D, n_head, seq)
         const auto Vcur_plain =
             ne_reshape_3d(ctx0, ne_view_1d(ctx0, Vcur, n_embd_gqa * N, 0), n_embd_gqa / n_head_kv, n_head_kv, N);
         ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur_plain, n_past, is_ring_full));
@@ -293,7 +293,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       struct ne_tensor* K =
           ne_view_3d(ctx0, kv_self.k,                                             // tensor
                      head_size, n_cached, n_head_kv,                              // ne
-                     kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (jblas managed)
+                     kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
                      il * k_size);                                                // offset
       *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
       if (is_ring_full) {
@@ -308,7 +308,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       struct ne_tensor* V =
           ne_view_3d(ctx0, kv_self.v,                                                    // tensor
                      n_cached, head_size, n_head_kv,                                     // ne
-                     kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (jblas managed)
+                     kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
                      il * v_size);                                                       // offset
       *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout
       ne_set_name(V, "V");
@@ -343,9 +343,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
       }
 
-      if (jblas_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
-                                               model.layers[il].ffn[2]->data, N, cur->ne[0],
-                                               model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
+      if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
+                                                model.layers[il].ffn[2]->data, N, cur->ne[0],
+                                                model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
         cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
       } else {
         struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);

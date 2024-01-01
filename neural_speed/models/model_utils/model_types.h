@@ -84,7 +84,7 @@ enum model_archs {
 static const size_t MB = 1024 * 1024;
 
 typedef enum KV_MEM_TYPE {  // Memory kv data type
-  KV_MEM_TYPE_AUTO,         // Try with jblas flash attn managed format; fall back to fp16 if failed
+  KV_MEM_TYPE_AUTO,         // Try with bestla flash attn managed format; fall back to fp16 if failed
   KV_MEM_TYPE_F16,          // Use F16 for memory kv
   KV_MEM_TYPE_F32,          // Use F32 for memory kv
 } KV_MEM_TYPE;
@@ -287,8 +287,8 @@ struct model_context {
   // next tokens (decoding) generation may be larger than `request_running_bs`(for example, beam search)
   int batch_size = 1;
   bool beam_search = false;
-  bool shift_roped_k = false;     // whether to store non-RoPEd K cache
-  bool support_jblas_kv = false;  // whether the model graph supports jblas-kvcache
+  bool shift_roped_k = false;      // whether to store non-RoPEd K cache
+  bool support_bestla_kv = false;  // whether the model graph supports bestla-kvcache
   int beam_size = 1;
   int kv_n_ctx_block = 1;
   generation_config generation_conf;

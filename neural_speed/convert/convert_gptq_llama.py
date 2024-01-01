@@ -104,21 +104,21 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
 
     for i in range(n_layer):
-        convert_q4_jblas_tensor(f"model.layers.{i}.self_attn.q_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
                     f"layers.{i}.attention.wq.weight", list_vars, f, quantize_config, n_head, n_head,
                     permute_func=permute_func)
-        convert_q4_jblas_tensor(f"model.layers.{i}.self_attn.k_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.k_proj",
                     f"layers.{i}.attention.wk.weight", list_vars, f, quantize_config, n_head, n_head_kv,
                     permute_func=permute_func)
-        convert_q4_jblas_tensor(f"model.layers.{i}.self_attn.v_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.v_proj",
                     f"layers.{i}.attention.wv.weight", list_vars, f, quantize_config, n_head)
-        convert_q4_jblas_tensor(f"model.layers.{i}.self_attn.o_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.o_proj",
                     f"layers.{i}.attention.wo.weight", list_vars, f, quantize_config, n_head)
-        convert_q4_jblas_tensor(f"model.layers.{i}.mlp.gate_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.mlp.gate_proj",
                     f"layers.{i}.feed_forward.w1.weight", list_vars, f, quantize_config, n_head)
-        convert_q4_jblas_tensor(f"model.layers.{i}.mlp.down_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.mlp.down_proj",
                     f"layers.{i}.feed_forward.w2.weight", list_vars, f, quantize_config, n_head)
-        convert_q4_jblas_tensor(f"model.layers.{i}.mlp.up_proj",
+        convert_q4_bestla_tensor(f"model.layers.{i}.mlp.up_proj",
                     f"layers.{i}.feed_forward.w3.weight", list_vars, f, quantize_config, n_head)
 
         convert_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",

@@ -19,7 +19,7 @@
 #include <vector>
 #include <algorithm>
 
-#include "jblas/jit_blas_utils.h"
+#include "bestla/jit_blas_utils.h"
 
 #ifndef NE_TESTS
 static_assert(false, "Only include this header file for testing!");
@@ -34,17 +34,17 @@ inline void init_vector(T* v, size_t size, float v_min = -10, float v_max = 10, 
 }
 
 template <>
-inline void init_vector<jblas::utils::bf16>(jblas::utils::bf16* v, size_t size, float v_min, float v_max, int seed) {
+inline void init_vector<bestla::utils::bf16>(bestla::utils::bf16* v, size_t size, float v_min, float v_max, int seed) {
   std::mt19937 gen(seed);
   std::uniform_real_distribution<float> u(v_min, v_max);
-  for (size_t i = 0; i < size; ++i) v[i] = jblas::utils::bf16(u(gen));
+  for (size_t i = 0; i < size; ++i) v[i] = bestla::utils::bf16(u(gen));
 }
 
 template <>
-inline void init_vector<jblas::utils::fp16>(jblas::utils::fp16* v, size_t size, float v_min, float v_max, int seed) {
+inline void init_vector<bestla::utils::fp16>(bestla::utils::fp16* v, size_t size, float v_min, float v_max, int seed) {
   std::mt19937 gen(seed);
   std::uniform_real_distribution<float> u(v_min, v_max);
-  for (size_t i = 0; i < size; ++i) v[i] = jblas::utils::fp16(u(gen));
+  for (size_t i = 0; i < size; ++i) v[i] = bestla::utils::fp16(u(gen));
 }
 
 template <typename T>

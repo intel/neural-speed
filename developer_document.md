@@ -326,7 +326,7 @@ Most of our model examples only support single prompt processing. You need to ad
 +add_library_w_warning(${TARGET} new_model.cpp new_model_utils.cpp ${MODEL_UTILS_SOURCE})
 +target_compile_features(${TARGET} PUBLIC cxx_std_11) # don't bump
 +set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-+target_link_libraries(${TARGET} PUBLIC ne_layers jblas::jblas)
++target_link_libraries(${TARGET} PUBLIC ne_layers bestla::bestla)
 ```
  and and new_model to [models_CMakeLists.txt](neural_speed/models/CMakeLists.txt).
  ```diff
@@ -408,7 +408,7 @@ index 894be0134d..a9a57c0a9e 100644
 
 # 3.	Performance optimization
 ## 3.1.	Quantize model and use Jblas library for better performance
-Quantize model and use the jblas library for inference can lead to better performance.
+Quantize model and use the bestla library for inference can lead to better performance.
 ```bash
 
 # convert the model directly use model path
