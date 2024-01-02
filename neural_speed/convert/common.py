@@ -355,7 +355,7 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
 
 def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
     # unpack weight and repack into jblas format
-    import intel_extension_for_transformers.llm.runtime.graph.llama_cpp as cpp_model
+    import neural_speed.llama_cpp as cpp_model
     qzeros = model[f"{src_name}.qzeros"]
     zeros = qzeros_to_zeros(qzeros)
     scales = model[f"{src_name}.scales"]
