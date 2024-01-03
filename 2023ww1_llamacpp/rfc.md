@@ -26,8 +26,8 @@ We will implement the key operators of GGML in SYCL similar to the approach of s
 >Note:
 <br>Since llama.cpp has been evolving rapidly and new features will probably be supported through CUDA first, we plan to enable [SYCLomatic](https://github.com/oneapi-src/SYCLomatic) to help migrate the code from CUDA to SYCL.</br>
 
-We plan to furtherintroduce the template-based library e.g., [XeTLA](https://github.com/intel/xetla) as mentioned in [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965) as the next stage, while we will be focusing on native SYCL support in this proposal.
+We plan to further introduce the template-based library e.g., [XeTLA](https://github.com/intel/xetla) as mentioned in [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965) as the next stage, while we will be focusing on native SYCL support in this proposal.
 
 ## Summary
 
-We will work on native SYCL kernels and enable SYCL backend in llama.cpp for Intel GPUs. Please feel free to drop a note. Thanks.
+We will start working on native SYCL kernels and enable SYCL backend in llama.cpp for Intel GPUs. Please feel free to drop a note. Thanks.
