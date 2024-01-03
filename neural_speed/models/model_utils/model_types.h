@@ -414,6 +414,7 @@ struct model_context_params {
   bool beam_search;     // beam search or not
   int beam_size;        // number of beams for beam search
   bool shift_roped_k;   // whether to store non-RoPEd K cache
+  bool cont_batching;   // whether to use continuous batching
   int max_request_num;  // maximum num of bearable requests in current env
 
   // called with a progress value between 0 and 1, pass nullptr to disable

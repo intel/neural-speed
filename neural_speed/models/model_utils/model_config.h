@@ -96,6 +96,7 @@ struct gpt_params {
   int batch_size = 1;           // number batch of prompt
   bool beam_search = false;     // use beam_search or not
   int beam_size = 1;            // only valid if use beam search
+  int cont_batching = false;    // whether to use continuous batching (concat multi sequences)
   int max_request_num = 32;     // TODO maximum num of bearable requests in current env
 };
 
