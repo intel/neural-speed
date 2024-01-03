@@ -2,7 +2,7 @@
 
 Authors: [@airMeng](https://github.com/airMeng) [@hshen14](https://github.com/hshen14)
 
-Hi the community, following the discussion [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965), we are ready to contribute native SYCL backend to llama.cpp. Here is the proposal:
+Hi the community, following the discussion [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965), we plan to contribute native SYCL backend to llama.cpp. Here is the proposal:
 
 ## Motivation
 
