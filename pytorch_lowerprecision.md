@@ -44,8 +44,8 @@ x_uint4 = x_uint8.to(torch.uint4x2)
 scales = torch.rand(1)
 zero_points = torch.rand(1)
 
-woqlinear = nn.WOQLinear(group_size=2) # new op required
-output = woqlinear(x_uint4, scales, zero_points) 
+woqlinear = nn.WOQLinear(group_size=2, x_uint4, scales, zero_points) # new op required
+output = woqlinear(input)
 ```
 
 ### Option 1.1: support group-wise 4-bit tensor
@@ -61,12 +61,12 @@ class Bits4Tensor(torch.tensor): # Scale to NBitsTensor
         self.scales = scales
         self.zero_points = zero_points
 
-x = Bits4Tensor(...)
-print(x.get_scales())
-#print(x.get_zero_points())
+w = Bits4Tensor(...)
+print(w.get_scales())
+#print(w.get_zero_points())
 
-woqlinear = nn.WOQLinear() # new op required
-output = woqlinear(x)
+woqlinear = nn.WOQLinear(..., w) # new op required
+output = woqlinear(input)
 ```
 
 Note that we may just keep Option 1, if low precision op in PyTorch is trending to have group_size, scales, zero points etc.
