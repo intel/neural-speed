@@ -8,9 +8,9 @@ Hi the community, following the discussion [#3965](https://github.com/ggerganov/
 
 Intel Arc series GPU provides accountable VRAM size and bandwidth, which the current OpenCL backend can't fully utilize especially on LLM. We shall expect huge performance improvement with native SYCL backend.
 
-reference:
-<br>[SYCL](https://www.khronos.org/sycl/)</br>
-[Intel SYCL implementation](https://www.intel.com/content/www/us/en/developer/tools/oneapi/data-parallel-c-plus-plus.html)
+References:
+* [SYCL](https://www.khronos.org/sycl/)
+* [DPC++](https://www.intel.com/content/www/us/en/developer/tools/oneapi/data-parallel-c-plus-plus.html)
 
 ## Proposal
 
