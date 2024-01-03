@@ -36,7 +36,7 @@
 #include "common.h"
 #include "core/layers/bestla_common.hpp"
 #include "core/layers/bestla_gemm.h"
-#include "bestla/jit_blas_parallel.h"
+#include "bestla/bestla_parallel.h"
 #include "models/model_utils/model_types.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
