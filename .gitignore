@@ -4,5 +4,7 @@
 
 /.vs
 /out
+.vscode/
 .vscode/*
+bestla/build/
 bestla/build/*

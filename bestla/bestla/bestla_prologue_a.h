@@ -367,7 +367,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
 
 template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ShuffleActivationKBlockBaseF32 = ShuffleActivationKBlockBase<_GemmCore_T, ISA_T, float>;
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ShuffleActivationKBlockBaseBf16 = ShuffleActivationKBlockBase<_GemmCore_T, ISA_T, utils::bf16>;
 
 template <typename AType>
@@ -424,7 +424,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
 
 template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ShuffleActivationKBlockQuantizeF32 = ShuffleActivationKBlockQuantize<_GemmCore_T, ISA_T, float>;
-template <class _GemmCore_T, JBLAS_ISA ISA_T>
+template <class _GemmCore_T, BTLA_ISA ISA_T>
 using ShuffleActivationKBlockQuantizeBf16 = ShuffleActivationKBlockQuantize<_GemmCore_T, ISA_T, utils::bf16>;
 }  // namespace gemm
 }  // namespace prologue_a
