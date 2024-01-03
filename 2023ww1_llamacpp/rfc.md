@@ -16,15 +16,15 @@ References:
 
 ### Native Kernels
 
-We will implement the key operators of GGML in SYCL like [Metal](https://github.com/ggerganov/llama.cpp/blob/master/ggml-metal.metal) and [Vulkan](https://github.com/ggerganov/llama.cpp/pull/2059). The steps are described as below:
+We will implement the key operators of GGML in SYCL similar to the approach of supporting [Metal](https://github.com/ggerganov/llama.cpp/blob/master/ggml-metal.metal) and [Vulkan](https://github.com/ggerganov/llama.cpp/pull/2059). Basically, the steps are described as below:
 
 1. new backend; h2d & d2h
-2. OneMKL-dpcpp based FP32 & FP16 GEMM
+2. oneMKL-dpcpp based FP32 & FP16 GEMM
 3. native SYCL kernels for de-quantization
 4. native SYCL kernels for other operators
 
 >Note:
-<br>Since llama.cpp is evolving rapidly and new features will probably be supported through CUDA first, we plan to enable [SYCLomatic ](https://github.com/oneapi-src/SYCLomatic) to help migrate the code from CUDA to SYCL.</br>
+<br>Since llama.cpp has been evolving rapidly and new features will probably be supported through CUDA first, we plan to enable [SYCLomatic](https://github.com/oneapi-src/SYCLomatic) to help migrate the code from CUDA to SYCL.</br>
 
 We plan to furtherintroduce the template-based library e.g., [XeTLA](https://github.com/intel/xetla) as mentioned in [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965) as the next stage, while we will be focusing on native SYCL support in this proposal.
 
