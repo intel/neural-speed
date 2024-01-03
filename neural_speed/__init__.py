@@ -174,7 +174,12 @@ class Model:
         if interactive:
             self.model.reset_token_end()
         out_count = 0
-        input_list = input_ids.tolist()
+        input_list = None
+        pad_token_id = generate_kwargs.get("pad_token", None)
+        if generate_kwargs.get("continuous_batching", False):
+            input_list = self._cont_batching_input(input_ids, pad_token_id)
+        else:
+            input_list = input_ids.tolist()
         while True:
             response = self.model.generate(input_ids=input_list)
             input_list = []  # next-token stage will use previous output
@@ -203,6 +208,20 @@ class Model:
 
     def is_token_end(self):
         return self.model.is_token_end()
+
+    def _cont_batching_input(self, input_ids, pad_token_id=None):
+        assert isinstance(input_ids, torch.Tensor), "Input must be torch.Tensor."
+        input_list = input_ids.tolist()
+        pti = pad_token_id
+        if pti == None:
+            pti = self.tokenizer.pad_token_id
+        assert pti != None, "Please supply pad token id."
+        for il in range(len(input_list)):
+            count = input_list[il].count(pti)
+            # padding left
+            del input_list[il][0: count]
+            assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
+        return input_list
 
     def __call__(self, input_ids, reinit=False, **kwargs):
         if self.model is None:

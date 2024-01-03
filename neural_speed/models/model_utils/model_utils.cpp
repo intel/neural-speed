@@ -191,6 +191,7 @@ struct model_context_params model_context_default_params() {
       /*.beam_search                 =*/false,
       /*.beam_size                   =*/1,
       /*.shift_roped_k               =*/false,
+      /*cont_batching                =*/false,
       /*.max_request_num             =*/1,
       /*.progress_callback           =*/nullptr,
       /*.progress_callback_user_data =*/nullptr,
@@ -1161,6 +1162,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   } else {
     ctx->kv_n_ctx_block = ctx->batch_size;
   }
+  ctx->cont_batching = params.cont_batching;
   ctx->max_request_num = params.max_request_num;
   const model_archs arch = params.arch;
 
@@ -1538,6 +1540,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   NE_ASSERT(("non-RoPEd K cache is not supported by this model!",  //
              !lparams.shift_roped_k || lparams.arch == MODEL_LLAMA));
   lparams.shift_roped_k = params.shift_roped_k;
+  lparams.cont_batching = params.cont_batching;
   lparams.max_request_num = params.max_request_num;
 
   NE_ASSERT(("Start size cannot be greater than the maximun context size!", lparams.n_keep < lparams.n_ctx));

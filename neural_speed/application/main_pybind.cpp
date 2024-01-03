@@ -67,7 +67,8 @@ class Model {
   void init_model(const std::string& model_path, int n_predict, int n_batch, int ctx_size, int seed, int threads,
                   float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p, float temperature,
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
-                  bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype);
+                  bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype,
+                  const bool& continuous_batching);
   void reinit();
   std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
   // deprecated API
@@ -157,7 +158,7 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                        int threads, float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p,
                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
-                       const std::string& memory_dtype) {
+                       const std::string& memory_dtype, const bool& continuous_batching) {
 #ifdef MODEL_NAME
   params.model_name = MODEL_NAME;
 #endif
@@ -188,9 +189,10 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
   else
     fprintf(stderr, "Unexpected memory dtype!");
   if (batch_size > 1) params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi): NO MHA IN MULTI-BATCH
+  params.cont_batching = continuous_batching;
 
-  printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f\n", params.beam_size, params.do_sample, params.top_k,
-         params.top_p);
+  printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d\n", params.beam_size,
+         params.do_sample, params.top_k, params.top_p, params.cont_batching);
 
   n_past = 0;
   n_total = 0;
@@ -251,6 +253,10 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
       return false;
     }
     if (!padding_count.empty()) padding_count.clear();
+    if (ctx->cont_batching) {
+      padding_count.assign(input_ids.size(), 0);
+      return true;
+    }
     for (int bs = 0; bs < input_ids.size(); ++bs) {
       model_vocab::id pad_token_id = ctx->vocab.pad_token_id;
       auto iter = std::find_if(input_ids[bs].begin(), input_ids[bs].end(),
@@ -669,7 +675,8 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("do_sample") = false, py::arg("top_k") = 40, py::arg("top_p") = 0.95, py::arg("temperature") = 0.8,
            py::arg("min_new_tokens") = 0, py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false,
            py::arg("n_keep") = 0, py::arg("n_discard") = -1, py::arg("shift_roped_k") = false,
-           py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto")
+           py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto",
+           py::arg("continuous_batching") = false)
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
            py::arg("input_ids") = std::vector<std::vector<model_token>>{})

@@ -82,7 +82,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     }
   }
   const int seq_len_sum = std::accumulate(n_tokens.begin(), n_tokens.end(), 0);
-  MODEL_ASSERT(seq_len_sum == N * batch_size);
+  if (!lctx.cont_batching) MODEL_ASSERT(seq_len_sum == N * batch_size);
   const int infer_bs = lctx.cont_batching ? 1 : batch_size;
   const int infer_seq_len = lctx.cont_batching ? seq_len_sum : N;
   const std::vector<std::vector<int>> infer_groups = split_inputs_into_groups(inputs, n_input);
