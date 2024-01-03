@@ -1,6 +1,6 @@
-<h3> Adding Native Support of SYCL for Intel GPUs </h3>
+<h2> Adding Native Support of SYCL for Intel GPUs </h2>
 
-Author: @airMeng @hshen14
+Authors: [@airMeng](https://github.com/airMeng) [@hshen14](https://github.com/hshen14)
 
 Hi the community, following the discussion [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965), we are ready to contribute native SYCL backend to llama.cpp. Here is the proposal:
 
