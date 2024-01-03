@@ -6,7 +6,7 @@ Hi the community, following the discussion [#3965](https://github.com/ggerganov/
 
 ## Motivation
 
-Intel Arc series GPU provides accountable VRAM size and bandwidth, which the current OpenCL backend can't fully utilize especially on LLM. We shall expect huge performance improvement with native SYCL backend.
+Intel Arc series GPU provides accountable VRAM size and bandwidth, which the current OpenCL backend can't fully utilize especially on LLM. We expect a significant performance improvement with native SYCL backend.
 
 References:
 * [SYCL](https://www.khronos.org/sycl/)
@@ -18,16 +18,16 @@ References:
 
 We will implement the key operators of GGML in SYCL like [Metal](https://github.com/ggerganov/llama.cpp/blob/master/ggml-metal.metal) and [Vulkan](https://github.com/ggerganov/llama.cpp/pull/2059). The steps are described as below:
 
-1. new backend, h2d & d2h
+1. new backend; h2d & d2h
 2. OneMKL-dpcpp based FP32 & FP16 GEMM
-3. native SYCL kernels for de-quantization GEMM
-3. native SYCL kernels for other operators
+3. native SYCL kernels for de-quantization
+4. native SYCL kernels for other operators
 
->note:
+>Note:
 <br>Since llama.cpp is evolving rapidly and new features will probably be supported through CUDA first, we plan to enable [SYCLomatic ](https://github.com/oneapi-src/SYCLomatic) to help migrate the code from CUDA to SYCL.</br>
 
-We plan to introduce the template-based library e.g., [XeTLA](https://github.com/intel/xetla) as mentioned in [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965) as the next stage, while we will be focusing on native SYCL support in this proposal.
+We plan to furtherintroduce the template-based library e.g., [XeTLA](https://github.com/intel/xetla) as mentioned in [#3965](https://github.com/ggerganov/llama.cpp/discussions/3965) as the next stage, while we will be focusing on native SYCL support in this proposal.
 
 ## Summary
 
-We will work on native SYCL kernels and enable in llama.cpp for Intel GPUs. Please feel free to drop a note. Thanks.
+We will work on native SYCL kernels and enable SYCL backend in llama.cpp for Intel GPUs. Please feel free to drop a note. Thanks.
