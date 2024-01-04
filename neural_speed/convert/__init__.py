@@ -18,24 +18,16 @@
 from pathlib import Path
 from transformers import AutoConfig
 import subprocess
+from .convert_llama import convert_llama
+from .convert_gptj import convert_gptj
+from .convert_chatglm import convert_chatglm
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper"}
 
 
-def convert_model(model, outfile, outtype, whisper_repo_path=None):
+def convert_model(model, outfile, quant_config, whisper_repo_path=None):
     config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
-    quantized_model = 'gptq' in str(model).lower() or 'awq' in str(model).lower()
-    if quantized_model:
-        path = Path(Path(__file__).parent.absolute(), "convert_quantized_{}.py".format(model_type))
-    else:
-        path = Path(Path(__file__).parent.absolute(), "convert_{}.py".format(model_type))
-    cmd = []
-    cmd.extend(["python", path])
-    cmd.extend(["--outfile", outfile])
-    cmd.extend(["--outtype", outtype])
-    cmd.extend([model])
-
-    print("cmd:", cmd)
-    subprocess.run(cmd)
+    func = eval(f"convert_{model_type}")
+    func(model, outfile, quant_config)
