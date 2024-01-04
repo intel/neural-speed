@@ -189,6 +189,8 @@ class Model:
             streamer.end()
 
         self.generate_round += 1
+        if os.getenv("NEURAL_SPEED_VERBOSE") and os.getenv("NEURAL_SPEED_VERBOSE") in ["1", "0"]:
+            self.model.print_time()
         return ret
 
     def is_token_end(self):
