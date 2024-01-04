@@ -497,7 +497,7 @@ public:
         implementable &= ((args.matB_ld % pack_ratio == 0)
                 && (args.matrix_n % pack_ratio == 0));
         if constexpr (gemm_t::compute_policy::quant_type
-                == group::quant_mode::S4_CLIP) {
+                != group::quant_mode::S4_FULLRANGE_NO_ZP) {
             implementable &= (args.zero_pt_ld % pack_ratio == 0);
         }
 

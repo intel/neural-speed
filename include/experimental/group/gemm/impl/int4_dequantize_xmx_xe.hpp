@@ -375,7 +375,8 @@ public:
             // TODO 1D prefetch need pack to U32/U64
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     scale_prefetch_payload);
-            if constexpr (compute_policy::quant_type == quant_mode::S4_CLIP) {
+            if constexpr (compute_policy::quant_type
+                    != quant_mode::S4_FULLRANGE_NO_ZP) {
                 // TODO 1D prefetch need pack to U32/U64
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         zero_pt_prefetch_payload);
@@ -410,7 +411,8 @@ public:
                     matB, matB_payload);
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     scale, scale_payload);
-            if constexpr (compute_policy::quant_type == quant_mode::S4_CLIP) {
+            if constexpr (compute_policy::quant_type
+                    != quant_mode::S4_FULLRANGE_NO_ZP) {
                 subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                         zero_pt, zero_pt_payload);
             }
@@ -425,7 +427,7 @@ public:
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         scale_prefetch_payload);
                 if constexpr (compute_policy::quant_type
-                        == quant_mode::S4_CLIP) {
+                        != quant_mode::S4_FULLRANGE_NO_ZP) {
                     // TODO 1D prefetch need pack to U32/U64
                     subgroup::tile_prefetch<cache_hint::cached,
                             cache_hint::cached>(zero_pt_prefetch_payload);
@@ -513,7 +515,7 @@ private:
                 xetla_vector<int32_t, block_size_x_b * block_size_y_b>
                         cvt_blk_i32;
                 if constexpr (compute_policy::quant_type
-                        == quant_mode::S4_CLIP) {
+                        == quant_mode::S4_ASYM) {
                     auto zero_pt_vec
                             = zero_pt.reg
                                       .xetla_select<zero_pt_t::block_size_x, 1>(
