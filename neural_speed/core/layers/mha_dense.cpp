@@ -687,8 +687,8 @@ class MHAInterface {
     };
 
     // prepare parallel scheduler for packed weight
-    using Scheduler2D = typename parallel::Scheduler2D;
-    using ThreadProblem2D = typename parallel::ThreadProblem2D;
+    using Scheduler2D = bestla::parallel::Scheduler2D;
+    using ThreadProblem2D = bestla::parallel::ThreadProblem2D;
     const auto schK = p.step_k_head_size == 1
                           ? Scheduler2D({th.num_threads(), {num_heads, p.sl_kv}, {1, GemmQK::NTILE}})
                           : Scheduler2D({th.num_threads(), {num_heads, p.head_size}, {1, GemmQK::KTILE}});
@@ -1352,7 +1352,7 @@ class MHAStableInterface {
     const auto m_tiles = updiv(p.sl_q, M_TILE);
     const auto num_tasks = num_heads * m_tiles;
 
-    using Scheduler2D = typename parallel::Scheduler2D;
+    using Scheduler2D = bestla::parallel::Scheduler2D;
     const Scheduler2D parl({th.num_threads(), {num_tasks, 1}, {1, 1}});  // main parallel scheduler
 
     th.parallel_for([&](int tid) {
