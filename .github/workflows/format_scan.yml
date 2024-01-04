@@ -32,7 +32,7 @@ jobs:
             "bandit",
             "clangformat",
             "cloc",
-            "cpplint",
+            "clangtidy",
             # "pydocstyle",
             #"pyspelling",
           ]
