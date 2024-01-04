@@ -460,9 +460,10 @@ class beam_search_flow {
   ~beam_search_flow() {}
 
   // public interface
-  // static batching (padding inputs or batch = 1)
+  // static batching (batched inputs -> generate max new tokens -> emit batched outputs, like offline scenario)
+  // this api doesn't care about if each sequence in batch has the same length or not (padding or not padding)
   const std::vector<std::vector<model_token>>& loop(const std::vector<model_input>& inputs, const int& n_threads);
-  // continuous batching (scheduling from the outside)
+  // continuous batching (scheduling from the outside, like server scenario)
   bool step(const std::vector<model_input>& inputs);
   std::vector<int> request_done_ids();
   std::vector<std::vector<model_token>> request_done_reponse();

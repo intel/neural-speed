@@ -2127,7 +2127,7 @@ static ne_tensor* ne_model_kv_cache_seq_concat(struct ne_cgraph* cgraph, struct 
                                                const int64_t& ne2, const int64_t& ne3,
                                                const std::vector<int>& block_ids, const int& layer_idx,
                                                const bool& concat_k) {
-  MODEL_ASSERT(ne3 == block_ids.size());  // moctx->batch_size
+  MODEL_ASSERT(ne3 == block_ids.size());
   struct ne_tensor* cache = concat_k ? moctx->model.kv_self.k : moctx->model.kv_self.v;
   // K = [head_dim, n_past+N, n_head, batch_size]
   // V = [N_past+N, head_dim, n_head, batch_size]
@@ -2503,12 +2503,11 @@ void beam_search_flow::next_candidate_beams(const std::vector<int>& num_beams, c
   int bb = 0;
   int bs_i = 0;
   int bs_sample_n = num_beams[bs_i] == 1 ? beam_size : num_beams[bs_i] * sample_scale;
-  ++bs_i;
   for (int kk = 0; kk < next_top_k_tokens.size(); ++kk) {
     if (kk % bs_sample_n == 0) {
       printf("------batch_%d------\n", bb++);
-      bs_sample_n = num_beams[bs_i] == 1 ? beam_size : num_beams[bs_i] * sample_scale;
       ++bs_i;
+      if (bs_i < num_beams.size()) bs_sample_n = num_beams[bs_i] == 1 ? beam_size : num_beams[bs_i] * sample_scale;
     }
     printf("%d: %s, score: %10.6f, beam_idx: %d \n", next_top_k_tokens[kk].id,
            (ctx->vocab.id_to_token.at(next_top_k_tokens[kk].id).tok).c_str(), next_top_k_tokens[kk].score,
@@ -2725,17 +2724,18 @@ const beam& beam_search_flow::finalize(const int& request_idx) {
 
 const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::vector<model_input>& inputs,
                                                                     const int& n_threads) {
-  // n_past, n_tokens, n_prompt_tokens should be same among batches in static batching inference
-  n_tokens.assign(request_bs, inputs[0].n_tokens);
-  if (n_tokens[0] > model_n_ctx(ctx)) {
-    fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, n_tokens[0], model_n_ctx(ctx) - 4);
-    return response;
-  }
+  MODEL_ASSERT(inputs.size() == request_bs);
   num_threads = n_threads;
-  n_past.assign(request_bs, 0);
-  n_prompt_tokens.assign(request_bs, n_tokens[0]);
-  n_total.assign(request_bs, 0);
   for (int ni = 0; ni < inputs.size(); ++ni) {
+    n_tokens[ni] = inputs[ni].n_tokens;
+    if (n_tokens[ni] > model_n_ctx(ctx)) {
+      fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, n_tokens[ni],
+              model_n_ctx(ctx) - 4);
+      return response;
+    }
+    n_prompt_tokens[ni] = inputs[ni].n_tokens;
+    n_past[ni] = 0;
+    n_total[ni] = 0;
     padding_side[ni] = inputs[ni].padding_side;
     n_padding[ni] = inputs[ni].n_padding;
     gen_confs[ni] = ctx->generation_conf;
@@ -2751,10 +2751,12 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
   // Loop ends in: 1. all requests done; or 2. reach max_new_tokens length
   for (int n = 0; n < max_new_tokens; ++n) {
     // first step
-    if (n_past[0] == 0) {
+    if (n_past.front() == 0) {
       model_eval(ctx, inputs.data(), inputs.size(), num_threads);
-      std::for_each(n_past.begin(), n_past.end(), [&](auto& n) { n += n_tokens[0]; });
-      std::for_each(n_total.begin(), n_total.end(), [&](auto& n) { n += n_tokens[0]; });
+      for (int ni = 0; ni < inputs.size(); ++ni) {
+        n_past[ni] += n_tokens[ni];
+        n_total[ni] += n_tokens[ni];
+      }
       kv_reorder->update(n_past, n_prompt_tokens, request_running_indices);
       std::vector<float> beam_scores(ctx->batch_size, 0.0f);
       std::vector<int> num_beams(ctx->request_running_bs, 1);
@@ -2883,7 +2885,7 @@ bool beam_search_flow::step_check_and_prepare_inputs(const std::vector<model_inp
   printf("input tokens for inference: \n");
   printf("request_running_bs: %d, batch_size for inference: %d\n", ctx->request_running_bs, ctx->batch_size);
   for (int k = 0; k < next_inputs.size(); ++k) {
-    for (int ntk = 0; ntk < next_inputs[k].n_tokens) {
+    for (int ntk = 0; ntk < next_inputs[k].n_tokens; ++ntk) {
       model_token kk = *(next_inputs[k].tokens + ntk);
       printf("%d: %s, ", kk, (ctx->vocab.id_to_token.at(kk).tok).c_str());
     }
