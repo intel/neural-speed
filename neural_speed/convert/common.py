@@ -254,7 +254,9 @@ def load_quantized_model(model_path):
     return model, config, config["quantization_config"]
 
 
-def convert_fp32_tensor(src_name, dst_name, model, fout):
+def convert_fp32_tensor(src_name, dst_name, model, fout, n_head=0, n_head2=0, permute_func=None):
+    if ".weight" not in src_name:
+        src_name = src_name + ".weight"
     v = model[src_name]
     shape = v.shape
     # print("Processing non-Q4 variable: " + src_name +
@@ -265,7 +267,8 @@ def convert_fp32_tensor(src_name, dst_name, model, fout):
 
     # header
     write_header(fout, shape, dst_name, ftype_cur)
-
+    if permute_func:
+        v = permute_func(v, n_head, n_head2).contiguous()
     # data
     v.numpy().tofile(fout)
     print(f"converting {dst_name} float tensor")
