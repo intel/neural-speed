@@ -1,7 +1,7 @@
 #!/bin/bash
-source /intel-extension-for-transformers/.github/workflows/scripts/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 
-cd /intel-extension-for-transformers
+cd /neural-speed
 export CMAKE_ARGS="-DNE_DNNL_CACHE_DIR=/cache"
 $BOLD_YELLOW && echo "---------------- git submodule update --init --recursive -------------" && $RESET
 git config --global --add safe.directory "*"
@@ -13,5 +13,5 @@ python setup.py bdist_wheel
 
 
 $BOLD_YELLOW && echo "---------------- pip install binary -------------" && $RESET
-pip install dist/intel_extension_for_transformers*.whl
+pip install dist/neural_speed*.whl
 pip list
