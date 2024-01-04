@@ -59,7 +59,9 @@
 #define CompileFP16() (__GNUC__ >= 13)
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
-#else
+#endif
+
+#ifdef _MSC_VER
 #define CompileAVX512F() _MSC_VER && (_MSC_VER >= 1911)
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
 #define CompileAMX() 0
@@ -68,6 +70,17 @@
 #define CompileAMXBF16() 0
 #define CompileAMXINT8() 0
 #endif
+
+#ifdef __clang_major__
+#define CompileAVX512F() (__clang_major__ >= 4)
+#define CompileAVX2() (__clang_major__ >= 3)
+#define CompileAMX() (__clang_major__ >= 11)
+#define CompileBF16() (__clang_major__ >= 11)
+#define CompileFP16() (__clang_major__ >= 16)
+#define CompileAMXBF16() (CompileAMX())
+#define CompileAMXINT8() (CompileAMX())
+#endif
+
 #if CompileBF16() || CompileFP16()
 #include <immintrin.h>
 #endif
