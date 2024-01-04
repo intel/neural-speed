@@ -54,7 +54,7 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # check output ids
         itrex_model = Model()
-        itrex_model.init(model_name, use_quant=False, trust_remote_code=True)
+        itrex_model.init(model_name, not_quant=True, trust_remote_code=True)
         itrex_generate_ids = itrex_model.generate(inputs.input_ids, do_sample=False, max_new_tokens=100)[0]
         print(tokenizer.decode(itrex_generate_ids))
         for i in range(len(pt_generate_ids)):
@@ -98,7 +98,7 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # llm runtime fp32
         itrex_model = Model()
-        itrex_model.init(model_name, use_quant=False, trust_remote_code=True)
+        itrex_model.init(model_name, not_quant=True, trust_remote_code=True)
         itrex_generate_ids = itrex_model.generate(
             inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True, pad_token=pad_token)
         for i in range(len(itrex_generate_ids)):
