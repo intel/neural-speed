@@ -614,7 +614,7 @@ model_token model_sample_top_k_top_p(struct model_context* ctx, const int n_logi
   {
     const double scale = 1.0 / temp;
     for (int i = 0; i < n_logits; ++i) {
-      logits_id.emplace_back(std::make_pair(logits[i] * scale, i));
+      logits_id.emplace_back(logits[i] * scale, i);
     }
   }
 
@@ -1076,7 +1076,7 @@ __WRITE_FILE:
   printf("\n");
 }
 
-static void model_quantize_internal(const quant_params& params, std::shared_ptr<quant_layer_base> quant_layer) {
+static void model_quantize_internal(const quant_params& params, std::shared_ptr<quant_layer_base>& quant_layer) {
   auto ftype = quant_params_to_ftype(params);
   quant_layer->set_global_config(params.nthread, quant_params_to_internal(params));
   int nthread = params.nthread;
@@ -2293,7 +2293,7 @@ void logits_processor::process(const std::vector<uint32_t>& cur_lens, const mode
 
 void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
                                           const std::vector<uint32_t>& n_prompt_tokens,
-                                          const std::vector<int> request_running_indices,
+                                          const std::vector<int>& request_running_indices,
                                           const std::vector<std::tuple<int, int>>& kv_reorder_indices,
                                           const std::vector<beam>& next_beams) {
   // beam search unsupport shift kv cache when prompt + new_tokens > nctx
@@ -2362,7 +2362,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
 std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_context* ctx,
                                                                       const std::vector<float>& beams_score,
                                                                       const std::vector<int>& num_beams,
-                                                                      const std::vector<int> beam_indices,
+                                                                      const std::vector<int>& beam_indices,
                                                                       const int& sample_scale, const int& dim) {
   MODEL_ASSERT(dim == -1);  // raise unimplemented error
   // different requests may have different num_beams (ctx->beam_size >= num_beams[i])?

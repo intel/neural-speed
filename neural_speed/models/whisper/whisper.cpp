@@ -2434,9 +2434,7 @@ void whisper_free(struct whisper_context* ctx) {
     if (ctx->model.ctx) {
       ne_free(ctx->model.ctx);
     }
-    if (ctx->model.buf) {
-      delete ctx->model.buf;
-    }
+    delete ctx->model.buf;
 
     whisper_free_state(ctx->state);
     delete ctx;
@@ -3285,7 +3283,7 @@ static std::vector<whisper_token_data> whisper_sample_token_topk(whisper_context
 
   logits_id.clear();
   for (int i = 0; i < n_logits; ++i) {
-    logits_id.push_back({logits[i], i});
+    logits_id.emplace_back(logits[i], i);
   }
 
   std::partial_sort(logits_id.begin(), logits_id.begin() + k, logits_id.end(),

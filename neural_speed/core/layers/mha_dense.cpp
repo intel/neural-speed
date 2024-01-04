@@ -352,7 +352,7 @@ class WeightPackBatchBf16Trans : public WeightPackBatchBf16Base<GemmCore_T, ISA_
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const Param& p, const parallel::ThreadProblem2D& thdp, std::function<int(int)> step_batch) {
+  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -394,7 +394,7 @@ class WeightPackBatchBf16NonTr : public WeightPackBatchBf16Base<GemmCore_T, ISA_
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const Param& p, const parallel::ThreadProblem2D& thdp, std::function<int(int)> step_batch) {
+  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -431,7 +431,7 @@ class ActivationIdentity {
     const AType* A;
     int lda;
   };
-  ActivationIdentity() {}
+  ActivationIdentity() = default;
 
   BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
                           int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
@@ -1059,7 +1059,7 @@ class WeightBase {
     int ldb;
     bool is_padded;
   };
-  WeightBase() {}
+  WeightBase() = default;
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     if ((n_size % _GemmCore_T::NTILE == 0) && std::is_same<SType, BType>::value &&
@@ -1092,7 +1092,7 @@ class WeightForwardNTile48 {
     int ldb;
     bool is_padded;
   };
-  WeightForwardNTile48() {}
+  WeightForwardNTile48() = default;
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);

@@ -195,8 +195,8 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
 }
 
 template <typename T>
-static size_t BTLABuSize(int block_size, size_t N, size_t K, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
-                         int* shuffle_indice) {
+size_t BTLABuSize(int block_size, size_t N, size_t K, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
+                  int* shuffle_indice) {
   static T launcher;
   using WType = typename T::PrologueB::StorageWeight;
   WType stor(0);
@@ -215,8 +215,8 @@ static size_t BTLABuSize(int block_size, size_t N, size_t K, BTLA_DTYPE QuantTyp
   return stor.mSize;
 }
 template <template <class, BTLA_ISA> class Wei_T>
-static size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype,
-                                     bool isAsym, ne_comp_type CompType, int* shuffle_indice) {
+size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype,
+                              bool isAsym, ne_comp_type CompType, int* shuffle_indice) {
   GetCPUDevice();
   auto dtype_type = utils::bestla_dtype_type(QuantType);
   auto constexpr dtype_int = utils::bestla_dtype_type(BTLA_DTYPE::TypeInt);
@@ -303,9 +303,9 @@ void BTLAGemmQuantPackB(void* PackedBuf, int BlkSize, const float* FpData, int N
 }
 
 template <template <class, BTLA_ISA> class Wei_T>
-static bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb,
-                                    size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
-                                    ne_comp_type CompType, bool isTrans, void* ThreadPool) {
+bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
+                             BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType,
+                             bool isTrans, void* ThreadPool) {
   GetCPUDevice();
   auto dtype_type = utils::bestla_dtype_type(QuantType);
   auto constexpr dtype_int = utils::bestla_dtype_type(BTLA_DTYPE::TypeInt);
@@ -408,7 +408,7 @@ void BTLAGemmPackBImpl(void* PackedBuf, int BlkSize, const int8_t* QData, const 
 }
 
 template <template <class, BTLA_ISA> class Wei_T>
-static bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N,
+bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N,
                                size_t K, size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype,
                                bool isAsym, ne_comp_type CompType, int* shuffle_indice, void* ThreadPool) {
   GetCPUDevice();

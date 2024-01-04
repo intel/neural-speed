@@ -414,7 +414,7 @@ class beam_search_kv_cache_reorder {
   virtual ~beam_search_kv_cache_reorder() {}
 
   virtual void update(const std::vector<uint32_t>& n_past, const std::vector<uint32_t>& n_prompt_tokens,
-                      const std::vector<int> request_running_indices,
+                      const std::vector<int>& request_running_indices,
                       const std::vector<std::tuple<int, int>>& kv_reorder_indices = {},
                       const std::vector<beam>& next_beams = {});
 
@@ -455,7 +455,7 @@ class beam_search_flow {
  private:
   std::vector<beam_next_token> beam_top_k_next_tokens(model_context* ctx, const std::vector<float>& beams_score,
                                                       const std::vector<int>& num_beams,
-                                                      const std::vector<int> beam_indices, const int& sample_scale = 2,
+                                                      const std::vector<int>& beam_indices, const int& sample_scale = 2,
                                                       const int& dim = -1);
   void fill_next_beams_by_top_scores();
   std::vector<std::tuple<int, int>> update_kv_cache_reorder_indices();
