@@ -434,3 +434,12 @@ stopping_criteria = StoppingCriteriaList(
 
 outputs = model.generate(inputs, streamer=streamer, stopping_criteria=stopping_criteria)
 ```
+
+### 6. Verbose Mode
+
+Enable verbose mode and control tracing information using the `NEURAL_SPEED_VERBOSE` environment variable.
+
+Available modes:
+- 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling.
+- 1: Print evaluation time. Time taken for each evaluation.
+- 2: Profile individual operator. Identify performance bottleneck within the model.
