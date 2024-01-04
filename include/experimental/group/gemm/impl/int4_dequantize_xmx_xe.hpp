@@ -136,8 +136,8 @@ private:
     using matA_prefetch_payload_t = subgroup::prefetch_payload_t<mem_desc_a_t,
             matA_tile_desc_t, wg_size_x, arch_tag>;
 
-    //note: plane format, row-major
-    //note: 4bit x 2, row-major
+    // note: plane format, row-major
+    // note: 4bit x 2, row-major
     using matB_tile_desc_t = subgroup::tile_desc_t<tile_size_x_b / pack_ratio,
             tile_size_y_b, block_size_x_b / pack_ratio, block_size_y_b,
             reg_layout::tiled>;
@@ -373,12 +373,12 @@ public:
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     matB_prefetch_payload);
             // TODO 1D prefetch need pack to U32/U64
-            //     subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-            //             scale_prefetch_payload);
+            subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+                    scale_prefetch_payload);
             if constexpr (compute_policy::quant_type == quant_mode::S4_CLIP) {
                 // TODO 1D prefetch need pack to U32/U64
-                // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-                //         zero_pt_prefetch_payload);
+                subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+                        zero_pt_prefetch_payload);
             }
             scale_prefetch_addr_i++;
             matA_prefetch_payload.template update_tdesc<update_dir_a>(
@@ -422,13 +422,13 @@ public:
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         matB_prefetch_payload);
                 // TODO 1D prefetch need pack to U32/U64
-                // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-                // scale_prefetch_payload);
+                subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+                        scale_prefetch_payload);
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_CLIP) {
                     // TODO 1D prefetch need pack to U32/U64
-                    //     subgroup::tile_prefetch<cache_hint::cached,
-                    //             cache_hint::cached>(zero_pt_prefetch_payload);
+                    subgroup::tile_prefetch<cache_hint::cached,
+                            cache_hint::cached>(zero_pt_prefetch_payload);
                 }
                 scale_prefetch_addr_i++;
             }

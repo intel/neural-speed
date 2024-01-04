@@ -202,8 +202,8 @@ void dequantize_gemm_run(int iter) {
 
     using tile_shape = xetla::group::tile_shape_t<wg_tile_n, wg_tile_m,
             sg_tile_n, sg_tile_m>;
-    static constexpr uint32_t periodic_sync_interval = 1;
-    static constexpr uint32_t prefetch_distance = 3;
+    static constexpr uint32_t periodic_sync_interval = 0;
+    static constexpr uint32_t prefetch_distance = 0;
 
     using mem_desc_a_t = xetla::mem_desc_t<data_type_a, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
@@ -216,11 +216,9 @@ void dequantize_gemm_run(int iter) {
             data_type_acc_in, data_type_acc>;
     using perf_tuning_knob = xetla::group::perf_tuning_knob_t<sg_tile_k,
             prefetch_distance, periodic_sync_interval>;
-    using compute_policy
-            = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
-                    perf_tuning_knob, gpu::xetla::group::quant_mode::S4_CLIP,
-                    data_type_scale, data_type_zero_pt, dequant_s,
-                    gpu_arch::Dg2>;
+    using compute_policy = xetla::group::compute_policy_int4_dequantize_xmx<
+            compute_attr, perf_tuning_knob, data_type_scale, data_type_zero_pt,
+            gpu::xetla::group::quant_mode::S4_CLIP, dequant_s, gpu_arch::Dg2>;
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
             mem_desc_a_t, mem_desc_b_t>;
 
@@ -311,9 +309,10 @@ void dequantize_gemm_run(int iter) {
             .wait();
 
     // set up gemm arguments
-    typename gemm_op_t::arguments_t gemm_arg(matrix_m, matrix_k, matrix_n, A_d,
-            matrix_k, B_d, matrix_n, C_d, matrix_n, scale_d, matrix_n,
-            zero_pt_d, matrix_n, Acc_d, Cnt_d);
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+            gemm_arg(matrix_m, matrix_k, matrix_n, A_d, matrix_k, B_d, matrix_n,
+                    C_d, matrix_n, scale_d, matrix_n, zero_pt_d, matrix_n,
+                    Acc_d, Cnt_d);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
     if (!gemm_op_t::can_implement(gemm_arg)) {

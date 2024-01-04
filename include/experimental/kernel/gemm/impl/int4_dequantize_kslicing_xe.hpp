@@ -130,6 +130,7 @@ class gemm_universal_t<dispatch_policy_int4_dequantize_kslicing<group_swizzle_,
 public:
     /// @brief GEMM arguments.
     /// This is the interface for users to pass the application-related runtime variables.
+    template <group::quant_mode quant_mode = group::S4_FULLRANGE_NO_ZP>
     struct arguments_t {
         /// @brief Is the size of the m dimension of the matrix multiplication (m x k x n).
         uint32_t matrix_m;
@@ -157,7 +158,7 @@ public:
         epilogue_args_t epilogue_args;
 
         scale_base_t scale_base;
-        // zero_pt_base_t zero_pt_base;
+        zero_pt_base_t zero_pt_base;
         uint32_t scale_ld;
         uint32_t zero_pt_ld;
 
@@ -182,30 +183,111 @@ public:
         /// @param matC_base_ Is the base address of matrix C.
         /// @param matC_ld_ Is the leading dimension (pitch) size of the matrix C in memory.
         /// @param epilogue_args_ Is the epilogue arguments.
-        // inline arguments_t(uint32_t matrix_m_, uint32_t matrix_k_,
-        //         uint32_t matrix_n_, matA_base_t matA_base_, uint32_t matA_ld_,
-        //         matB_base_t matB_base_, uint32_t matB_ld_,
-        //         matC_base_t matC_base_, uint32_t matC_ld_,
-        //         scale_base_t scale_base_, uint32_t scale_ld_,
-        //         // zero_pt_base_t zero_pt_base_, uint32_t zero_pt_ld_,
-        //         acc_base_t acc_base_ = {}, cnt_base_t cnt_base_ = {},
-        //         epilogue_args_t epilogue_args_ = {})
-        //     : matrix_m(matrix_m_)
-        //     , matrix_k(matrix_k_)
-        //     , matrix_n(matrix_n_)
-        //     , matA_base(matA_base_)
-        //     , matA_ld(matA_ld_)
-        //     , matB_base(matB_base_)
-        //     , matB_ld(matB_ld_)
-        //     , matC_base(matC_base_)
-        //     , matC_ld(matC_ld_)
-        //     , scale_base(scale_base_)
-        //     , scale_ld(scale_ld_)
-        // //     , zero_pt_base(zero_pt_base_)
-        // //     , zero_pt_ld(zero_pt_ld_)
-        //     , acc_base(acc_base_)
-        //     , cnt_base(cnt_base_)
-        //     , epilogue_args(epilogue_args_) {}
+        inline arguments_t(uint32_t matrix_m_, uint32_t matrix_k_,
+                uint32_t matrix_n_, matA_base_t matA_base_, uint32_t matA_ld_,
+                matB_base_t matB_base_, uint32_t matB_ld_,
+                matC_base_t matC_base_, uint32_t matC_ld_,
+                scale_base_t scale_base_, uint32_t scale_ld_,
+                zero_pt_base_t zero_pt_base_, uint32_t zero_pt_ld_,
+                acc_base_t acc_base_ = {}, cnt_base_t cnt_base_ = {},
+                epilogue_args_t epilogue_args_ = {})
+            : matrix_m(matrix_m_)
+            , matrix_k(matrix_k_)
+            , matrix_n(matrix_n_)
+            , matA_base(matA_base_)
+            , matA_ld(matA_ld_)
+            , matB_base(matB_base_)
+            , matB_ld(matB_ld_)
+            , matC_base(matC_base_)
+            , matC_ld(matC_ld_)
+            , scale_base(scale_base_)
+            , scale_ld(scale_ld_)
+            , zero_pt_base(zero_pt_base_)
+            , zero_pt_ld(zero_pt_ld_)
+            , acc_base(acc_base_)
+            , cnt_base(cnt_base_)
+            , epilogue_args(epilogue_args_) {}
+
+        inline arguments_t(const arguments_t &args)
+            : matrix_m(args.matrix_m)
+            , matrix_k(args.matrix_k)
+            , matrix_n(args.matrix_n)
+            , matA_base(args.matA_base)
+            , matA_ld(args.matA_ld)
+            , matB_base(args.matB_base)
+            , matB_ld(args.matB_ld)
+            , matC_base(args.matC_base)
+            , matC_ld(args.matC_ld)
+            , scale_base(args.scale_base)
+            , scale_ld(args.scale_ld)
+            , zero_pt_base(args.zero_pt_base)
+            , zero_pt_ld(args.zero_pt_ld)
+            , acc_base(args.acc_base)
+            , cnt_base(args.cnt_base)
+            , epilogue_args(args.epilogue_args) {}
+        // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
+        // Please check if you need to add self-define destructor
+        // inline ~arguments_t(){}
+        inline arguments_t &operator=(const arguments_t &args) {
+            this->matrix_m = args.matrix_m;
+            this->matrix_k = args.matrix_k;
+            this->matrix_n = args.matrix_n;
+            this->matA_base = args.matA_base;
+            this->matA_ld = args.matA_ld;
+            this->matB_base = args.matB_base;
+            this->matB_ld = args.matB_ld;
+            this->matC_base = args.matC_base;
+            this->matC_ld = args.matC_ld;
+            this->scale_base = args.scale_base;
+            this->scale_ld = args.scale_ld;
+            this->zero_pt_base = args.zero_pt_base_;
+            this->zero_pt_ld = args.zero_pt_ld;
+            this->acc_base = args.acc_base;
+            this->cnt_base = args.cnt_base;
+            this->epilogue_args = args.epilogue_args;
+            return *this;
+        }
+    };
+
+    template <>
+    struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
+        /// @brief Is the size of the m dimension of the matrix multiplication (m x k x n).
+        uint32_t matrix_m;
+        /// @brief Is the size of the k dimension of the matrix multiplication (m x k x n).
+        uint32_t matrix_k;
+        /// @brief Is the size of the n dimension of the matrix multiplication (m x k x n).
+        uint32_t matrix_n;
+        /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
+        uint32_t matA_ld;
+        /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
+        uint32_t matB_ld;
+        /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
+        uint32_t matC_ld;
+        /// @brief Is the base address of matrix A.
+        matA_base_t matA_base;
+        /// @brief Is the base address of matrix B.
+        matB_base_t matB_base;
+        /// @brief Is the base address of matrix C.
+        matC_base_t matC_base;
+        /// @brief Is the base address of accumulation buffer.
+        acc_base_t acc_base;
+        /// @brief Is the base address of counter buffer.
+        cnt_base_t cnt_base;
+        /// @brief Is the epilogue arguments.
+        epilogue_args_t epilogue_args;
+
+        scale_base_t scale_base;
+        uint32_t scale_ld;
+
+        /// @brief Constructs arguments with default method.
+        inline arguments_t() = default;
+
+        /// @brief Set for device copyable
+        static constexpr bool host_callable = true;
+
+        // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
+        // Please check if you need to add self-define destructor
+        // ~arguments_t(){}
 
         /// @brief Constructs arguments with initialization list.
         /// @param matrix_m_ Is the size of the m dimension of the matrix multiplication (m x k x n).
@@ -335,7 +417,8 @@ public:
     /// @brief Host helper function to get the expected nd_range under the current GEMM config.
     /// @param args Is the GEMM arguments for application-related runtime variables.
     /// @return Expected nd_range.
-    static cl::sycl::nd_range<3> get_nd_range(arguments_t &args) {
+    template <group::quant_mode quant_mode>
+    static cl::sycl::nd_range<3> get_nd_range(arguments_t<quant_mode> &args) {
         cl::sycl::range<3> local_range = get_local_range();
         cl::sycl::range<3> group_range
                 = get_group_range(args.matrix_m, args.matrix_n);
@@ -364,7 +447,8 @@ public:
     /// @brief Check if the arguments can be implemented.
     /// @param args Is the GEMM arguments for application-related runtime variables.
     /// @return Check result.
-    static bool can_implement(arguments_t &args) {
+    template <group::quant_mode quant_mode>
+    static bool can_implement(arguments_t<quant_mode> &args) {
         bool implementable = true;
         if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
             if (gemm_t::msg_type_a == msg_type::block_2d) {
@@ -427,8 +511,9 @@ public:
     /// @param args Is the GEMM arguments for application-related runtime variables.
     /// @param slm_base Is the slm base address.
     /// @param nbarrier_base Is the named barrier base.
+    template <group::quant_mode quant_mode>
     __XETLA_API KERNEL_FUNC void operator()(sycl::nd_item<3> &item,
-            const arguments_t &args, uint32_t slm_base = 0,
+            const arguments_t<quant_mode> &args, uint32_t slm_base = 0,
             uint32_t nbarrier_base = 0) {
         // set up workgroup level coordinates and boundaries
         work_group_t g(item.get_local_linear_id() % work_group_size);
@@ -487,7 +572,7 @@ public:
         mem_desc_a_t mem_desc_a;
         mem_desc_b_t mem_desc_b;
         mem_desc_c_t mem_desc_c;
-        //setup for matA
+        // setup for matA
 
         mem_desc_a.init(args.matA_base, {boundary_k, boundary_m, args.matA_ld},
                 {start_k, start_m});
@@ -500,15 +585,21 @@ public:
         mem_desc_scale_t mem_desc_scale(args.scale_base,
                 {args.matrix_n, scale_size_y, args.scale_ld},
                 {start_x_scale, start_y_scale});
-        // mem_desc_zero_pt_t mem_desc_zero_pt(args.zero_pt_base,
-        //         {args.matrix_n / pack_ratio, scale_size_y,
-        //                 args.zero_pt_ld / pack_ratio},
-        //         {start_x_zero_pt, start_y_zero_pt});
 
         uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
-        gemm_args_t gemm_args(
-                mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
-        // mem_desc_scale, mem_desc_zero_pt);
+        gemm_args_t gemm_args;
+        if constexpr (gemm_t::compute_policy::quant_type
+                == group::quant_mode::S4_FULLRANGE_NO_ZP) {
+            gemm_args = gemm_args_t(
+                    mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
+        } else {
+            mem_desc_zero_pt_t mem_desc_zero_pt(args.zero_pt_base,
+                    {args.matrix_n / pack_ratio, scale_size_y,
+                            args.zero_pt_ld / pack_ratio},
+                    {start_x_zero_pt, start_y_zero_pt});
+            gemm_args = gemm_args_t(mem_desc_a, mem_desc_b, inner_loop_count,
+                    mem_desc_scale, mem_desc_zero_pt);
+        }
         matAcc_t matAcc;
         matAcc.init(0);
         gemm_t gemm;
