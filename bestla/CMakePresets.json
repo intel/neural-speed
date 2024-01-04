@@ -1,4 +1,4 @@
-﻿{
+{
   "version": 3,
   "configurePresets": [
     {
@@ -9,7 +9,9 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_ALL": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -25,7 +27,7 @@
       "inherits": "linux-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "JBLAS_UT_ALL": "ON"
+        "BTLA_UT_ALL": "ON"
       }
     },
     {
@@ -33,10 +35,7 @@
       "displayName": "linux Release",
       "description": "Release",
       "inherits": "linux-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "JBLAS_UT_ALL": "OFF"
-      }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
       "name": "windows-base",
@@ -48,7 +47,7 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe",
-        "JBLAS_UT_ALL": "OFF"
+        "BTLA_UT_ALL": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -67,7 +66,8 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "JBLAS_UT_DEBUG": "ON"
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_ALL": "OFF"
       }
     },
     {
@@ -82,7 +82,7 @@
       "displayName": "x64 Release for UT",
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
       "inherits": "x64-release",
-      "cacheVariables": { "JBLAS_UT_ALL": "ON" }
+      "cacheVariables": { "BTLA_UT_ALL": "ON" }
     }
   ]
 }
