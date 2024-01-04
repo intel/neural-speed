@@ -73,7 +73,7 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, not_quant=False, use_cache=False,
+    def init(self, model_name, not_quant=False, use_cache=False, use_gptq=False, use_awq=False,
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
@@ -94,6 +94,10 @@ class Model:
                 quant_desc += "_pc"
             else:
                 quant_desc += "_g{}".format(group_size)
+        if use_gptq:
+            quant_desc = "gptq"
+        if use_awq:
+            quant_desc = "awq"
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not_quant:
@@ -103,6 +107,10 @@ class Model:
         if use_cache and os.path.exists(self.bin_file):
             return
 
+        if use_gptq or use_awq:
+            convert_model(model_name, quant_bin, "f32")
+            return
+        
         if not use_cache or not os.path.exists(fp32_bin):
             convert_model(model_name, fp32_bin, "f32")
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
