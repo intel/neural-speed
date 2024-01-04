@@ -300,10 +300,10 @@ int gemm_result_validate(data_type_a *A, data_type_b *B, data_type_c *C,
     return result ? 0 : 1;
 }
 
-template <class Test, gpu_arch arch>
-void dequantize_gemm_run_1(sycl::queue &queue, int iter) {
+template <class Test>
+void dequantize_gemm_run(int iter) {
     using namespace gpu;
-    //Accept incoming parameters
+    // Accept incoming parameters
     constexpr size_t matrix_m = Test::mat_m;
     constexpr size_t matrix_n = Test::mat_n;
     constexpr size_t matrix_k = Test::mat_k;
@@ -344,9 +344,9 @@ void dequantize_gemm_run_1(sycl::queue &queue, int iter) {
     uint32_t ld_scale = size_scale_n;
     uint32_t ld_zero_pt = size_zero_pt_n;
 
-    //Turn on the enable_profiling property to facilitate subsequent profiling
-    //     sycl::property_list properties {sycl::property::queue::enable_profiling()};
-    //     auto queue = sycl::queue(properties);
+    // Turn on the enable_profiling property to facilitate subsequent profiling
+    sycl::property_list properties {sycl::property::queue::enable_profiling()};
+    auto queue = sycl::queue(properties);
     auto context = queue.get_info<info::queue::context>();
     auto device = queue.get_info<info::queue::device>();
 
@@ -373,22 +373,24 @@ void dequantize_gemm_run_1(sycl::queue &queue, int iter) {
     using perf_tuning_knob = xetla::group::perf_tuning_knob_t<sg_tile_k,
             prefetch_distance, periodic_sync_interval>;
 
-    using compute_policy = xetla::group::compute_policy_int4_dequantize_xmx<
-            compute_attr, perf_tuning_knob, data_type_scale, data_type_zero_pt,
-            gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP, dequant_s, arch>;
+    using compute_policy
+            = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
+                    perf_tuning_knob, data_type_scale, data_type_zero_pt,
+                    gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+                    dequant_s, gpu_arch::Xe>;
 
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
             mem_desc_a_t, mem_desc_b_t>;
 
-    using bias_op_t
-            = gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, arch>;
+    using bias_op_t = gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t,
+            gpu_arch::Xe>;
     using tile_op_t = gpu::xetla::subgroup::chained_tile_op_t<bias_op_t>;
 
     using epilogue_t = xetla::group::epilogue_t<
-            xetla::group::epilogue_policy_tile_op<tile_op_t, arch>, tile_shape,
-            mem_desc_c_t>;
+            xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>,
+            tile_shape, mem_desc_c_t>;
 
-    using group_swizzle = xetla::kernel::group_swizzle_default<arch>;
+    using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
     using gemm_op_t = xetla::kernel::gemm_universal_t<
             gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
                     group_swizzle, global_kslicing, local_kslicing>,
@@ -520,7 +522,7 @@ void dequantize_gemm_run_1(sycl::queue &queue, int iter) {
         for (int i = 0; i < iter; i++) {
             prof.cpu_start();
             auto e_esimd = queue.submit([&](handler &cgh) {
-                cgh.parallel_for(
+                cgh.parallel_for<Test>(
                         nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
                             // allocate slm and nbarrier resource
                             slm_barrier_init<gemm_op_t>();
@@ -579,24 +581,6 @@ void dequantize_gemm_run_1(sycl::queue &queue, int iter) {
     free(Cnt_h, context);
     free(Acc_d, context);
     free(Cnt_d, context);
-}
-
-template <class Test>
-void dequantize_gemm_run(int iter) {
-    sycl::property_list properties {sycl::property::queue::enable_profiling()};
-
-    // Define SYCL queue, context and device
-    auto queue = sycl::queue(properties);
-    auto device = queue.get_device();
-    int ExecSize
-            = device.get_info<ext::intel::info::device::gpu_eu_simd_width>();
-    if (ExecSize == 8) {
-        std::cout << "ExecSize0" << ExecSize << std::endl;
-        dequantize_gemm_run_1<Test, gpu_arch::Dg2>(queue, iter);
-    } else {
-        std::cout << "ExecSize1" << ExecSize << std::endl;
-        // dequantize_gemm_run_1<Test, gpu_arch::Xe>(queue, iter);
-    }
 }
 
 template <typename T>
