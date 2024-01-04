@@ -207,7 +207,7 @@ void model_init_backend() {
 
   // needed to initialize f16 tables
   {
-    struct ne_init_params params = {0, NULL, false};
+    struct ne_init_params params = {0, nullptr, false};
     struct ne_context* ctx = ne_init(params);
     ne_free(ctx);
   }
@@ -614,7 +614,7 @@ model_token model_sample_top_k_top_p(struct model_context* ctx, const int n_logi
   {
     const double scale = 1.0 / temp;
     for (int i = 0; i < n_logits; ++i) {
-      logits_id.push_back(std::make_pair(logits[i] * scale, i));
+      logits_id.emplace_back(std::make_pair(logits[i] * scale, i));
     }
   }
 
@@ -1042,7 +1042,7 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   work.resize(nelements * 4);  // upper bound on size
   void* new_data = work.addr;
   size_t new_size = 0;
-  float* f32_data = NULL;
+  float* f32_data = nullptr;
   model_buffer f32_conv_buf;
   if (tensor.type == NE_TYPE_F32) {
     f32_data = reinterpret_cast<float*>(tensor.data);
@@ -1127,11 +1127,11 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   model_context* ctx = new model_context;
 
   if (params.seed < 0) {
-    params.seed = time(NULL);
+    params.seed = time(nullptr);
   }
 
   unsigned cur_percentage = 0;
-  if (params.progress_callback == NULL) {
+  if (params.progress_callback == nullptr) {
     params.progress_callback_user_data = &cur_percentage;
     params.progress_callback = [](float progress, void* ctx) {
       unsigned* cur_percentage_p = reinterpret_cast<unsigned*>(ctx);
@@ -1311,7 +1311,7 @@ int model_apply_lora_from_file_internal(struct model_context* ctx, const char* p
 
   // load base model
   std::unique_ptr<model_model_loader> model_loader;
-  ne_context* base_ctx = NULL;
+  ne_context* base_ctx = nullptr;
   model_buffer base_buf;
   if (path_base_model) {
     fprintf(stderr, "%s: loading base model from '%s'\n", __func__, path_base_model);
@@ -1558,17 +1558,18 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
                                                                 : lctx->model.layers[0].k_cache;  // chatglm style
   NE_ASSERT(k_cache_example->type != NE_TYPE_BTLA || bestla_reordered_attn_fp32_support(&attn_shape));
 
-  if (lctx == NULL) {
+  if (lctx == nullptr) {
     fprintf(stderr, "%s: error: failed to load model '%s'\n", __func__, params.model.c_str());
-    return NULL;
+    return nullptr;
   }
 
   if (!params.lora_adapter.empty()) {
-    int err = model_apply_lora_from_file(lctx, params.lora_adapter.c_str(),
-                                         params.lora_base.empty() ? NULL : params.lora_base.c_str(), params.n_threads);
+    int err =
+        model_apply_lora_from_file(lctx, params.lora_adapter.c_str(),
+                                   params.lora_base.empty() ? nullptr : params.lora_base.c_str(), params.n_threads);
     if (err != 0) {
       fprintf(stderr, "%s: error: failed to apply lora adapter\n", __func__);
-      return NULL;
+      return nullptr;
     }
   }
 
@@ -1601,7 +1602,7 @@ int model_get_kv_cache_token_count(const struct model_context* ctx) { return ctx
 
 void model_set_rng_seed(struct model_context* ctx, int seed) {
   if (seed < 0) {
-    seed = time(NULL);
+    seed = time(nullptr);
   }
   ctx->rng.seed(seed);
 }
@@ -2369,7 +2370,7 @@ std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_cont
   logits_info li(ctx);
   std::vector<uint32_t> cur_lens;
   for (int i = 0; i < ctx->batch_size; ++i) {
-    cur_lens.push_back(cur_beams[i].token_ids.size());
+    cur_lens.emplace_back(cur_beams[i].token_ids.size());
   }
   lp.process(cur_lens, ctx->vocab.eos_token_id);
   const int raw_k = sample_scale * (*std::max_element(num_beams.begin(), num_beams.end()));

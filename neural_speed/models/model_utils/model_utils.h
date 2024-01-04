@@ -74,7 +74,7 @@ MODEL_API int64_t model_time_us();
 
 // Various functions for loading a ne model model.
 // Allocate (almost) all memory needed for the model.
-// Return NULL on failure
+// Return nullptr on failure
 MODEL_API struct model_context* model_init_from_file(const char* path_model, struct model_context_params params);
 
 // Frees all allocated memory
@@ -91,7 +91,7 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
                        size_t k);
 // Apply a LoRA adapter to a loaded model
 // path_base_model is the path to a higher quality model to use as a base for
-// the layers modified by the adapter. Can be NULL to use the current loaded
+// the layers modified by the adapter. Can be nullptr to use the current loaded
 // model. The model needs to be reloaded before applying a new adapter,
 // otherwise the adapter will be applied on top of the previous one Returns 0 on
 // success

@@ -489,7 +489,7 @@ static inline _T* cpu_pointer_align(_T* src) {
 template <typename _T>
 static inline _T* amalloc(size_t _size, size_t _alignment = 64) {
   if (_size == 0) {
-    return NULL;
+    return nullptr;
   }
   auto psize = padto(_size * sizeof(_T), static_cast<int>(_alignment));
 #ifdef _WIN32
@@ -500,7 +500,7 @@ static inline _T* amalloc(size_t _size, size_t _alignment = 64) {
 }
 
 static inline void afree(void* ptr) {
-  if (ptr == NULL) {
+  if (ptr == nullptr) {
     return;
   }
 #ifdef _WIN32
@@ -528,7 +528,7 @@ class aligned_vector {
       auto uptr = reinterpret_cast<uint64_t>(mVec.data());
       mPtr = reinterpret_cast<_T*>((uptr + _Alignment - 1) / _Alignment * _Alignment);
     } else {
-      mPtr = NULL;
+      mPtr = nullptr;
     }
   }
   _T* data() const { return mPtr; }

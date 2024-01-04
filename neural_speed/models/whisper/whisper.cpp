@@ -2439,16 +2439,11 @@ void whisper_free(struct whisper_context* ctx) {
     }
 
     whisper_free_state(ctx->state);
-
     delete ctx;
   }
 }
 
-void whisper_free_params(struct whisper_full_params* params) {
-  if (params) {
-    delete params;
-  }
-}
+void whisper_free_params(struct whisper_full_params* params) { delete params; }
 
 int whisper_pcm_to_mel_with_state(struct whisper_context* ctx, struct whisper_state* state, const float* samples,
                                   int n_samples, int n_threads) {
@@ -2991,7 +2986,7 @@ static void whisper_process_logits(struct whisper_context* ctx, struct whisper_s
   const auto& vocab = ctx->vocab;
   const auto& tokens_cur = decoder->sequence.tokens;
 
-  const bool is_initial = tokens_cur.size() == 0;
+  const bool is_initial = tokens_cur.empty();
   const int n_logits = vocab.id_to_token.size();
 
   NE_ASSERT(n_logits == ctx->vocab.n_vocab);
@@ -3080,7 +3075,7 @@ static void whisper_process_logits(struct whisper_context* ctx, struct whisper_s
     // logits accordingly
     // https://github.com/openai/whisper/blob/0b1ba3d46ebf7fe6f953acfd8cad62a4f851b49f/whisper/decoding.py#L414-L424
     {
-      const bool last_was_timestamp = tokens_cur.size() > 0 && tokens_cur.back().id >= vocab.token_beg;
+      const bool last_was_timestamp = !tokens_cur.empty() && tokens_cur.back().id >= vocab.token_beg;
       const bool penultimate_was_timestamp =
           tokens_cur.size() < 2 || tokens_cur[tokens_cur.size() - 2].id >= vocab.token_beg;
 
@@ -4209,8 +4204,8 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
     params_cur.progress_callback = nullptr;
     params_cur.progress_callback_user_data = nullptr;
 
-    workers[i] = std::thread(whisper_full_with_state, ctx, states[i], std::move(params_cur), samples + start_samples,
-                             n_samples_cur);
+    workers[i] =
+        std::thread(whisper_full_with_state, ctx, states[i], params_cur, samples + start_samples, n_samples_cur);
   }
 
   {
@@ -4222,8 +4217,7 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
 
     // Run the first transformation using default state but only for the first
     // chunk.
-    ret = whisper_full_with_state(ctx, ctx->state, std::move(params_cur), samples,
-                                  offset_samples + n_samples_per_processor);
+    ret = whisper_full_with_state(ctx, ctx->state, params_cur, samples, offset_samples + n_samples_per_processor);
   }
 
   for (int i = 0; i < n_processors - 1; ++i) {

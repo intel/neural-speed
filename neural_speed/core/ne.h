@@ -210,7 +210,7 @@ struct ne_cgraph {
 struct ne_init_params {
   // memory pool
   size_t mem_size;   // bytes
-  void* mem_buffer;  // if NULL, memory will be allocated internally
+  void* mem_buffer;  // if nullptr, memory will be allocated internally
   bool no_alloc;     // don't allocate memory for the tensor data
 };
 

@@ -82,11 +82,11 @@ int32_t get_num_physical_cores() {
 #elif defined(__APPLE__) && defined(__MACH__)
   int32_t num_physical_cores;
   size_t len = sizeof(num_physical_cores);
-  int result = sysctlbyname("hw.perflevel0.physicalcpu", &num_physical_cores, &len, NULL, 0);
+  int result = sysctlbyname("hw.perflevel0.physicalcpu", &num_physical_cores, &len, nullptr, 0);
   if (result == 0) {
     return num_physical_cores;
   }
-  result = sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, NULL, 0);
+  result = sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, nullptr, 0);
   if (result == 0) {
     return num_physical_cores;
   }
@@ -766,7 +766,7 @@ void console_init(console_state& con_st) {  // NOLINT
   if (con_st.hConsole == INVALID_HANDLE_VALUE || !GetConsoleMode(con_st.hConsole, &dwMode)) {
     con_st.hConsole = GetStdHandle(STD_ERROR_HANDLE);
     if (con_st.hConsole != INVALID_HANDLE_VALUE && (!GetConsoleMode(con_st.hConsole, &dwMode))) {
-      con_st.hConsole = NULL;
+      con_st.hConsole = nullptr;
     }
   }
   if (con_st.hConsole) {
@@ -863,7 +863,7 @@ char32_t getchar32() {
 
 void pop_cursor(const console_state& con_st) {
 #if defined(_WIN32)
-  if (con_st.hConsole != NULL) {
+  if (con_st.hConsole != nullptr) {
     CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
     GetConsoleScreenBufferInfo(con_st.hConsole, &bufferInfo);
 
@@ -899,7 +899,7 @@ int put_codepoint(const console_state& con_st, const char* utf8_codepoint, size_
   }
   COORD initialPosition = bufferInfo.dwCursorPosition;
   DWORD nNumberOfChars = length;
-  WriteConsole(con_st.hConsole, utf8_codepoint, nNumberOfChars, &nNumberOfChars, NULL);
+  WriteConsole(con_st.hConsole, utf8_codepoint, nNumberOfChars, &nNumberOfChars, nullptr);
 
   CONSOLE_SCREEN_BUFFER_INFO newBufferInfo;
   GetConsoleScreenBufferInfo(con_st.hConsole, &newBufferInfo);
@@ -907,7 +907,7 @@ int put_codepoint(const console_state& con_st, const char* utf8_codepoint, size_
   // Figure out our real position if we're in the last column
   if (utf8_codepoint[0] != 0x09 && initialPosition.X == newBufferInfo.dwSize.X - 1) {
     DWORD nNumberOfChars;
-    WriteConsole(con_st.hConsole, &" \b", 2, &nNumberOfChars, NULL);
+    WriteConsole(con_st.hConsole, &" \b", 2, &nNumberOfChars, nullptr);
     GetConsoleScreenBufferInfo(con_st.hConsole, &newBufferInfo);
   }
 

@@ -188,7 +188,7 @@ class Add_Gelu {
     }
     using GeluKernel = bestla::epilogue::gemm::AccumulatorWriteBackWithGeluFp32<ISA_T>;
     static GeluKernel ker;
-    typename GeluKernel::Param param{_param.C, _param.ldc, NULL};
+    typename GeluKernel::Param param{_param.C, _param.ldc, nullptr};
     auto ret = ker.forward(cptr, _param.ldc, M_offset, N_offset, M, N, param, tmpcache, cachesize);
     return ret;
   }

@@ -94,7 +94,7 @@ struct model_load_tensor {
   model_split_type split_type = SPLIT_NONE;
   std::vector<uint32_t> ne;
   size_t size;
-  struct ne_tensor* ne_tensor = NULL;
+  struct ne_tensor* ne_tensor = nullptr;
   uint8_t* data;
 
   model_load_tensor(const std::string& name) : name(name) {}
@@ -450,7 +450,7 @@ struct model_model_loader {
   model_load_tensors_map tensors_map;
   bool use_mmap;
   size_t num_ne_tensors_created = 0;
-  struct ne_context* ne_ctx = NULL;
+  struct ne_context* ne_ctx = nullptr;
   std::unique_ptr<model_mmap> mapping;
 
   model_model_loader(const std::string& fname_base, bool use_mmap, bool vocab_only) {
@@ -572,7 +572,7 @@ struct model_model_loader {
       tensor = ne_new_tensor_1d(ne_ctx, lt.type, lt.ne.at(0), NE_SIZE_CALC);
     }
     ne_set_name(tensor, lt.name.c_str());
-    MODEL_ASSERT(lt.ne_tensor == NULL);  // if this fails, we called get_tensor twice on the same tensor
+    MODEL_ASSERT(lt.ne_tensor == nullptr);  // if this fails, we called get_tensor twice on the same tensor
     tensor->backend = backend;
     lt.ne_tensor = tensor;
     num_ne_tensors_created++;
@@ -601,7 +601,7 @@ struct model_model_loader {
       if (!lmlock) {
         // Don't call the callback since the actual loading will be lazy
         // and we can't measure it.
-        progress_callback = NULL;
+        progress_callback = nullptr;
       }
       if (lmlock) {
         lmlock->init(mapping->addr);

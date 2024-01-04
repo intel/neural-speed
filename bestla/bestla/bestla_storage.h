@@ -71,7 +71,7 @@ class ObjectAlignedBuffer : public ISerialObject {
   void resize(size_t bytes) { mBufSize = bytes; }
 
   // ser
-  int8_t* mBufPtr = NULL;
+  int8_t* mBufPtr = nullptr;
   size_t mBufSize = 0;
   size_t mBufOffset = 0;
 
@@ -800,7 +800,7 @@ class PackedWeightParser {
     auto rptr = reinterpret_cast<int8_t*>(tmpptr);
     rptr += IWeightBase::offset();
     int mProID = utils::deserialize<int>(rptr);
-    IWeightBase* ptr = NULL;
+    IWeightBase* ptr = nullptr;
     if (mProID >= int(BTLA_PROLOGUEB_IDS::Begin) && mProID < int(BTLA_PROLOGUEB_IDS::End)) {
       rptr = reinterpret_cast<int8_t*>(tmpptr);
       auto type = static_cast<BTLA_PROLOGUEB_IDS>(mProID);
