@@ -1,5 +1,5 @@
 #!/bin/bash
-source /neural-speed/.github/workflows/script/change_color.sh
+source /neural-speed/.github/workflows/scripts/change_color.sh
 test_install_backend="true"
 LOG_DIR=/neural-speed/log_dir
 mkdir -p ${LOG_DIR}
@@ -31,7 +31,7 @@ function llmruntime_test() {
 }
 
 function main() {
-    bash /neural-speed/.github/workflows/script/unitTest/env_setup.sh "${WORKING_DIR}"
+    bash /neural-speed/.github/workflows/unitTest/env_setup.sh "${WORKING_DIR}"
     llmruntime_test
 }
 
