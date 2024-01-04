@@ -87,7 +87,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   int n_head_kv = hparams.n_head_kv;
 
   bool enable_tp = false;
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
   int32_t world_size = get_tp_size(p_ctx);
   int32_t rank = get_tp_rank(p_ctx);
@@ -148,7 +148,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   if (enable_tp) {
     // need to broadcast the ids
     broadcast(p_ctx, reinterpret_cast<float*>(embd->data), N * ne_element_size(embd));
@@ -323,7 +323,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       // projection (no bias)
       cur = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
     }
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (enable_tp) {
       cur = ne_all_reduce(ctx0, cur);
     }
@@ -354,7 +354,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         cur = ne_mul(ctx0, cur, tmp);
         cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
       }
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
       // ffn2 and ffn0 use split row, ffn1 use split column
       if (enable_tp) {
         cur = ne_all_reduce(ctx0, cur);

@@ -588,7 +588,7 @@ class IThreading {
  public:
   explicit IThreading(int nthreads) : mThreadNum(nthreads) {}
   virtual void parallel_for(const thread_func& func) const = 0;
-  virtual inline void sync() const = 0;
+  virtual inline void sync() const { assert(0); };
   virtual int num_threads() const { return mThreadNum; };
   virtual void set_threads(int nthreads) = 0;
 

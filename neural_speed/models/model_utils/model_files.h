@@ -82,7 +82,7 @@ enum model_split_type { SPLIT_NONE, SPLIT_BY_COLUMNS, SPLIT_BY_ROWS, TP_1D_ROW, 
 struct model_load_tensor {
   std::vector<model_load_tensor_shard> shards;
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
   int32_t world_size = get_tp_size(p_ctx);
   int32_t rank = get_tp_rank(p_ctx);
@@ -131,7 +131,7 @@ struct model_load_tensor {
       split_type = SPLIT_BY_ROWS;
     }
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (enable_tp) {
       // TODO it's not good to check type here, mmaybe move to specific model files
       if (name.find(".attn.q_proj.weight") != std::string::npos ||
@@ -181,7 +181,7 @@ struct model_load_tensor {
       case SPLIT_BY_ROWS:
         ne = {first_shard.ne[0], checked_mul<uint32_t>(first_shard.ne[1], n_shards)};
         break;
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
       case TP_1D_ROW:
         MODEL_ASSERT(first_shard.ne.size() > 1);
         MODEL_ASSERT(first_shard.ne[1] % world_size == 0);
@@ -541,7 +541,7 @@ struct model_model_loader {
       throw format("model.cpp: tensor '%s' is missing from model", name.c_str());
     }
     model_load_tensor& lt = tensors_map.tensors.at(it->second);
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (lt.enable_tp && (lt.split_type == TP_1D_ROW || lt.split_type == TP_1D_COLUMN)) {
       // check the split dim
       size_t split_dim_size =
@@ -678,7 +678,7 @@ struct model_model_loader {
       }
       MODEL_ASSERT(out_offset == lt.size);
     }
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     else if (lt.split_type == TP_1D_ROW) {
       model_load_tensor_shard& shard = lt.shards.at(0);
       model_buffer tmp_buf;

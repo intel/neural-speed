@@ -31,7 +31,7 @@ def check_env_flag(name: str, default: bool = False) -> bool:
     else:
         return os.getenv(name, "").upper() in ["ON", "1", "TRUE", "YES", "Y"]
 
-NE_WITH_AVX2 = check_env_flag("NE_WITH_AVX2", 'avx512f' not in cpu_flags)
+NS_WITH_AVX2 = check_env_flag("NS_WITH_AVX2", 'avx512f' not in cpu_flags)
 """ Whether to limit the max ISA used to AVX2; otherwise AVX512 will be used; set to ON/OFF """
 
 cwd = os.path.dirname(os.path.abspath(__file__))
@@ -100,10 +100,10 @@ class CMakeBuild(build_ext):
             f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{CMAKE_BUILD_TYPE.upper()}={output_dir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={CMAKE_BUILD_TYPE}",
-            f"-DNE_VERSION_STRING={self.distribution.get_version()}",
-            f"-DNE_WITH_AVX2={'ON' if NE_WITH_AVX2 else 'OFF'}",
-            f"-DNE_WITH_TESTS=OFF",
-            f"-DNE_PYTHON_API=ON",
+            f"-DNS_VERSION_STRING={self.distribution.get_version()}",
+            f"-DNS_WITH_AVX2={'ON' if NS_WITH_AVX2 else 'OFF'}",
+            f"-DNS_WITH_TESTS=OFF",
+            f"-DNS_PYTHON_API=ON",
         ]
         if sys.platform == "linux":  # relative_rpath
             cmake_args.append('-DCMAKE_BUILD_RPATH=$ORIGIN/')

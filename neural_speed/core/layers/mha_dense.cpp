@@ -21,7 +21,7 @@
 #include <random>
 #include <vector>
 
-#ifdef NE_TESTS
+#ifdef NS_TESTS
 #include <memory>
 #include <tuple>
 
@@ -1693,7 +1693,7 @@ void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>&
   const auto workspace_size = bestla_fusion_attn_workspace_size(&attn_shape);
   static std::mt19937 rng;
   static std::uniform_int_distribution<> dist;
-#ifdef NE_TESTS
+#ifdef NS_TESTS
   init_vector(p.tmp, workspace_size, INT8_MIN - 1, INT8_MAX + 1, dist(rng));
 #else
   std::fill_n(p.tmp, workspace_size, 'f');
@@ -2106,7 +2106,7 @@ void bestla_fusion_attn_fp32_batch_cpy_v(const bestla_fusion_attn_fp32_batch_cpy
 #pragma GCC pop_options
 #endif
 
-#ifdef NE_TESTS
+#ifdef NS_TESTS
 #define CheckISA(ISA)                         \
   {                                           \
     GetCPUDevice();                           \
@@ -2533,7 +2533,7 @@ static const TestMhaDese inst_;
 }  // namespace
 
 int main() {
-  printf("NE_TESTS: mha_dense ");
+  printf("NS_TESTS: mha_dense ");
   printf(ret_ok ? "OK\n" : "FAILED\n");
   return ret_ok ? 0 : -1;
 }

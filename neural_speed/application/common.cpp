@@ -76,7 +76,7 @@ int32_t get_num_physical_cores() {
       siblings.insert(line);
     }
   }
-  if (siblings.size() > 0) {
+  if (!siblings.empty()) {
     return static_cast<int32_t>(siblings.size());
   }
 #elif defined(__APPLE__) && defined(__MACH__)
@@ -274,8 +274,8 @@ std::map<std::string, int32_t> json_parse(const std::string& fname) {
     bool has_key = false;
     bool in_token = false;
 
-    std::string str_key = "";
-    std::string str_val = "";
+    std::string str_key;
+    std::string str_val;
 
     int n = json.size();
     for (int i = 1; i < n; ++i) {
@@ -469,7 +469,7 @@ gpt_vocab::id gpt_sample_top_k_top_p(const gpt_vocab& vocab, const float* logits
   {
     const double scale = 1.0 / temp;
     for (int i = 0; i < n_logits; ++i) {
-      logits_id.push_back(std::make_pair(logits[i] * scale, i));
+      logits_id.emplace_back(logits[i] * scale, i);
     }
   }
 
@@ -568,12 +568,12 @@ gpt_vocab::id gpt_sample_top_k_top_p_repeat(const gpt_vocab& vocab, const float*
           std::find(last_n_tokens.end() - repeat_last_n, last_n_tokens.end(), i) != last_n_tokens.end()) {
         // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
         if (plogits[i] < 0.0f) {
-          logits_id.push_back(std::make_pair(plogits[i] * scale * repeat_penalty, i));
+          logits_id.emplace_back(plogits[i] * scale * repeat_penalty, i);
         } else {
-          logits_id.push_back(std::make_pair(plogits[i] * scale / repeat_penalty, i));
+          logits_id.emplace_back(plogits[i] * scale / repeat_penalty, i);
         }
       } else {
-        logits_id.push_back(std::make_pair(plogits[i] * scale, i));
+        logits_id.emplace_back(plogits[i] * scale, i);
       }
     }
   }
@@ -1123,7 +1123,7 @@ std::string build_prompt_glm1(const std::vector<std::string>& history) {
 }
 
 static std::string regex_replace(const std::string& input, const std::regex& regex,
-                                 std::function<std::string(const std::smatch&)> format) {
+                                 const std::function<std::string(const std::smatch&)>& format) {
   std::ostringstream oss;
   int last_index = 0;
   for (auto it = std::sregex_iterator(input.begin(), input.end(), regex); it != std::sregex_iterator(); it++) {

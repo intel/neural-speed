@@ -88,7 +88,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   const int n_rot = hparams.n_rot;
 
   bool enable_tp = false;
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
   int32_t world_size = get_tp_size(p_ctx);
   int32_t rank = get_tp_rank(p_ctx);
@@ -116,9 +116,9 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   gf.n_threads = n_threads;
 
   const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
-  const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && bestla_fusion_attn_fp16_support(NULL);
+  const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && bestla_fusion_attn_fp16_support(nullptr);
   const bool run_mha_bf16_first =
-      !run_mha_reordered && MHA_FUSION && !MHA_FP16 && bestla_fusion_attn_fp32_fp16_fp16_fp32_support(NULL);
+      !run_mha_reordered && MHA_FUSION && !MHA_FP16 && bestla_fusion_attn_fp32_fp16_fp16_fp32_support(nullptr);
   kv_cache_info_t kv_cache_info = {0, 0};
   if (run_mha_reordered) {
     NE_ASSERT(kv_self.v->type == NE_TYPE_BTLA);  // kv type should be the same
@@ -146,7 +146,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   if (enable_tp) {
     // need to broadcast the ids
     broadcast(p_ctx, reinterpret_cast<float*>(embd->data), N * batch_size * ne_element_size(embd));
@@ -406,7 +406,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     struct ne_tensor* KQV_out = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
     ne_set_name(KQV_out, "KQV_out");
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (enable_tp) {
       KQV_out = ne_all_reduce(ctx0, KQV_out);
     }
@@ -436,7 +436,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       // NOTICE: when TP, only master node add this bias
       cur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].ffn[3], FFN_out), FFN_out);
     }
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     // if tp model then all reduce as the weight has been split
     if (enable_tp) {
       cur = ne_all_reduce(ctx0, cur);
@@ -453,7 +453,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   lctx.use_buf(ctx0, 0);
 
   // used at the end to optionally extract the embeddings
-  struct ne_tensor* embeddings = NULL;
+  struct ne_tensor* embeddings = nullptr;
 
   // norm
   {

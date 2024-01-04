@@ -76,7 +76,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
   int64_t layer_ne_k = batch_size * beam_size * k_size;
   int64_t layer_ne_v = batch_size * beam_size * v_size;
   const auto wsize = wtype == NE_TYPE_BTLA ? 1 : ne_type_size(wtype);
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   // when use TP, cached kv will also have smaller size
   parallel_context* p_ctx = init_parallel_context();
   int32_t world_size = get_tp_size(p_ctx);
@@ -2297,7 +2297,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
                                           const std::vector<beam>& next_beams) {
   // beam search unsupport shift kv cache when prompt + new_tokens > nctx
   NE_ASSERT(("error: unimplement shifted kv cache update\n", !ctx->model.kv_self.has_shift));
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("start to update kv cache for next step...\n");
 #endif
   MODEL_ASSERT(request_running_indices.size() == ctx->request_running_bs);
@@ -2308,13 +2308,13 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
     const uint32_t off = ctx->beam_size * request_idx;
     const uint32_t cur_n_past = n_past[request_idx];
     const uint32_t cur_n_prompt_tokens = n_prompt_tokens[request_idx];
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("------request_idx: %d, n_past: %d, n_prompt_tokens: %d, offset: %d------ \n", request_idx, cur_n_past,
            cur_n_prompt_tokens, off);
 #endif
     // first step
     if (cur_n_past == cur_n_prompt_tokens) {
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
       printf("copy beam 1 first token to the left beams\n");
 #endif
       for (int b = 1; b < ctx->beam_size; ++b) {
@@ -2335,7 +2335,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
           p0 = 0;
           p1 = n_ctx;
         }
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
         printf("copy beam %d to beam %d in pos [%d, %d] \n", cpy_id, cur_id, p0, p1);
 #endif
         model_kv_cache_seq_cpy(ctx, cpy_id + off, cur_id + off, p0, p1);
@@ -2345,7 +2345,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
       return;
     }
   }
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
 #endif
 }
@@ -2465,7 +2465,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
   ctx->batch_size = batch_size;
   ctx->request_running_bs = request_running_indices.size();
   // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("========================================================================================= \n");
   printf("next_tokens for inference: \n");
   printf("request_running_bs: %d, batch_size for inference: %d\n", ctx->request_running_bs, ctx->batch_size);
@@ -2484,7 +2484,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
   MODEL_ASSERT(next_tokens.size() == batch_size * sample_scale);  // request_running_bs * beam_size * sample_scale
   // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("top_k next_tokens: \n");
   int bb = 0;
   for (int kk = 0; kk < next_tokens.size(); ++kk) {
@@ -2542,7 +2542,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
 // if kv_cache_reorder_indices = {0:0, 1:1}, then do not need reorder (cpy)
 std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indices() {
   // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("kv cache update indices info: \n");
   printf("cur_beams:\n");
   for (int bb = 0; bb < request_running_indices.size(); ++bb) {
@@ -2606,7 +2606,7 @@ std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indi
       }
     }
     // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("batch_%d cpy_final_bs_ids: ", rb);
     for (int i = 0; i < beam_size; ++i) {
       printf("%d, ", cpy_final_bs_ids[i]);
@@ -2645,7 +2645,7 @@ void beam_search_flow::update_status() {
 
 // Return beam with highest probability.
 const beam& beam_search_flow::finalize(const int& request_idx) {
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("========================================================================================= \n");
   printf("request_idx_%d finalize:\n", request_idx);
   printf("before: \n");
@@ -2659,7 +2659,7 @@ const beam& beam_search_flow::finalize(const int& request_idx) {
       beam b = cur_beams[request_idx * beam_size + i];
       beam_hypos[request_idx].add(b, n_prompt_tokens[request_idx]);
     }
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("after (adding more beams from outside): \n");
     for (auto b : beam_hypos[request_idx].beams) {
       b.print();
@@ -2668,7 +2668,7 @@ const beam& beam_search_flow::finalize(const int& request_idx) {
 #endif
   }
   const beam& top_b = beam_hypos[request_idx].top1();
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("final beam of request_idx %d:\n", request_idx);
   top_b.print();
   printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
@@ -2706,7 +2706,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
   kv_reorder = ctx->bs_kv_reorder;
   if (kv_reorder == nullptr) {
     kv_reorder = std::make_shared<beam_search_kv_cache_reorder>(ctx);
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf(
         "WARNING: Using default kv cache update function. Ignore this warning if your K shape = [head_dim, N, n_head], "
         "V shape = [N, head_dim, n_head]\n");
@@ -2726,7 +2726,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
           beam_top_k_next_tokens(ctx, beam_scores, num_beams, beam_indices, beam_size);
       MODEL_ASSERT(next_tokens.size() == ctx->request_running_bs * beam_size);
       // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
       printf("========================================================================================== \n");
       printf("top_k next_tokens: \n");
       int bb = 0;
@@ -2759,7 +2759,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
     }
 
     // DEBUG: print current beams for this iteration
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("current beams:\n");
     for (size_t j = 0; j < cur_beams.size(); ++j) {
       printf("beams[%d]: ", j);

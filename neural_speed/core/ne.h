@@ -32,7 +32,7 @@
 
 #include "core/data_types.h"
 #include "layers/Ops.h"
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
 #include "core/parallel_context.h"
 #endif
 
