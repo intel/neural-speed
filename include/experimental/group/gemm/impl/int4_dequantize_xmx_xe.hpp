@@ -493,7 +493,8 @@ private:
                 int block_id = (i * num_block_x + j);
                 auto matB_blk = matB.reg.xetla_select<matB_t::block_elems, 1>(
                                                 block_id * matB_t::block_elems)
-                                        .xetla_format<uint8_t>();
+                                        .xetla_format<int8_t>();
+                // .xetla_format<uint8_t>();
                 int scale_block_id
                         = (i / block_b_y_per_scale * num_block_x + j);
                 auto scale_vec
@@ -553,15 +554,13 @@ private:
                     cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
                             = matB_blk & 0x0f;
                     cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
-                            = (cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(
-                                       0)
-                                      << 4)
+                            = cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            << 4;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            = cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
                             >> 4;
                     cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
-                            = matB_blk;
-                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
-                            = cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
-                            >> 4;
+                            = matB_blk.xetla_format<int8_t>() >> 4;
                     cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
                 }
 

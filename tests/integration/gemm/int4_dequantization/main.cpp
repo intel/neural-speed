@@ -373,10 +373,13 @@ void dequantize_gemm_run(int iter) {
                 }
                 if constexpr (QUANT_MODE
                         == gpu::xetla::group::quant_mode::S4_SYM) {
-                    int8_t data_in = B_h[start_in + ii * matrix_n / 2];
+                    uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
                     int8_t data_zero_pt = zero_pt_h[start_zero_pt];
-                    data_0 = int8_t(data_in & 0x0f);
-                    data_1 = int8_t(data_in >> 4);
+                    uint8_t data_even = (data_in & 0x0f) << 4;
+                    memcpy(&data_0, &data_even, 1);
+                    memcpy(&data_1, &data_in, 1);
+                    data_0 = data_0 >> 4;
+                    data_1 = data_1 >> 4;
                     dequantize_b[start_out + ii * matrix_n]
                             = fp16(data_0) * scale_h[start_scale];
                     dequantize_b[start_out + ii * matrix_n + 1]
