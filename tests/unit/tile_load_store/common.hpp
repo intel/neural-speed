@@ -33,11 +33,10 @@ int tile_load_store_result_validate(dtype *A, dtype *B, dtype *C,
                 c_index = i / ele_per_dw * Sizex * ele_per_dw + j * ele_per_dw
                         + i % ele_per_dw;
 
-                if (A[a_index] != C[c_index]) {
+                if (true) { //A[a_index] != C[c_index]) {
                     if (++err_cnt < 100) {
-                        std::cout << "failed at index " << i * Blockx + j
-                                  << ", " << C[c_index] << " != " << A[a_index]
-                                  << "\n";
+                        std::cout << "failed at index " << i + j * Sizey << ", "
+                                  << C[c_index] << " != " << A[a_index] << "\n";
                     }
                 }
             }

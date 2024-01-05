@@ -1,18 +1,18 @@
 /*******************************************************************************
-* Copyright (c) 2022-2023 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright (c) 2022-2023 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 /// @file
 /// C++ API
@@ -151,7 +151,14 @@ struct default_gemm_selector_config_t
                                               wg_shape>,
                                       elem_v_t<tune_key::WG_TILE_K, wg_tile_k>,
                                       elem_v_t<tune_key::GPU_ARCH,
-                                              gpu_arch_tag>>>>::type> {};
+                                              gpu_arch_tag>,
+                                      elem_t_t<tune_key::GROUP_SWIZZLE_POLICY,
+                                              kernel::group_swizzle_default<
+                                                      gpu_arch_tag>>,
+                                      elem_t_t<tune_key::EPILOGUE_POLICY,
+                                              group::epilogue_policy_default<
+                                                      gpu_arch_tag>>>>>::type> {
+};
 
 template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         mem_space mem_space_a, typename dtype_b, mem_layout mem_layout_b,

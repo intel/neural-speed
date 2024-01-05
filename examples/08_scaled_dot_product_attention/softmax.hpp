@@ -57,7 +57,7 @@ struct xetla_softmax_fwd_t {
             mem_desc_t<dtype_in, mem_layout::row_major, mem_space_in>,
             softmax_tile_desc_t,
             subgroup::msg_type_v<softmax_tile_desc_t, mem_space_in>,
-            gpu_arch::Xe>;
+            gpu_arch::Dg2>;
 
     // this tile will store the softmax result to global memory
     using softmax_store_t = subgroup::tile_t<dtype_out, softmax_tile_desc_t>;
@@ -65,7 +65,7 @@ struct xetla_softmax_fwd_t {
             mem_desc_t<dtype_out, mem_layout::row_major, mem_space_out>,
             softmax_tile_desc_t,
             subgroup::msg_type_v<softmax_tile_desc_t, mem_space_out>,
-            gpu_arch::Xe>;
+            gpu_arch::Dg2>;
 
     struct arguments_t {
         // available while original data is from SLM
