@@ -896,18 +896,18 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   ctx->rng = std::mt19937(params.seed);
   ctx->logits_all = params.logits_all;
   ctx->batch_size = params.batch_size;
+  ctx->max_request_num = params.max_request_num;
   ctx->n_ctx = params.n_ctx;
   ctx->n_keep = params.n_keep;
   ctx->shift_roped_k = params.shift_roped_k;
   if (params.beam_search) {
     ctx->beam_search = true;
     ctx->beam_size = params.beam_size;
-    ctx->kv_n_ctx_block = ctx->batch_size * ctx->beam_size;
+    ctx->kv_n_ctx_block = ctx->max_request_num * ctx->beam_size;
   } else {
-    ctx->kv_n_ctx_block = ctx->batch_size;
+    ctx->kv_n_ctx_block = ctx->max_request_num;
   }
   ctx->cont_batching = params.cont_batching;
-  ctx->max_request_num = params.max_request_num;
   const model_archs arch = params.arch;
 
   // the type so that kv-cache allocated according to this type must be large enough
@@ -946,8 +946,8 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
     NE_ASSERT(memory_type != NE_TYPE_COUNT);
 
     const bool kv_in_layers = (arch == MODEL_CHATGLM2 || arch == MODEL_CHATGLM || arch == MODEL_BAICHUAN);
-    if (!kv_cache_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->batch_size, ctx->beam_size,
-                       params.shift_roped_k, (kv_in_layers ? &ctx->model : nullptr))) {
+    if (!kv_cache_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->max_request_num,
+                       ctx->beam_size, params.shift_roped_k, (kv_in_layers ? &ctx->model : nullptr))) {
       fprintf(stderr, "%s: kv_cache_init() failed for self-attention cache\n", __func__);
       model_free(ctx);
       return nullptr;
