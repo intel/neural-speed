@@ -86,18 +86,18 @@ struct gpt_params {
   bool multiline_input = false;    // reverse the usage of `\`
   bool warmup = true;
 
-  bool instruct = false;        // instruction mode (used for Alpaca models)
-  bool penalize_nl = true;      // consider newlines as a repeatable token
-  bool perplexity = false;      // compute perplexity over the prompt
-  bool use_mmap = false;        // use mmap for faster loads
-  bool use_mlock = false;       // use mlock to keep model in memory
-  bool mem_test = false;        // compute maximum memory usage
-  bool verbose_prompt = false;  // print prompt tokens before generation
-  int batch_size = 1;           // number batch of prompt
-  bool beam_search = false;     // use beam_search or not
-  int beam_size = 1;            // only valid if use beam search
-  int cont_batching = false;    // whether to use continuous batching (concat multi sequences)
-  int max_request_num = 32;     // TODO maximum num of bearable requests in current env
+  bool instruct = false;                        // instruction mode (used for Alpaca models)
+  bool penalize_nl = true;                      // consider newlines as a repeatable token
+  bool perplexity = false;                      // compute perplexity over the prompt
+  bool use_mmap = false;                        // use mmap for faster loads
+  bool use_mlock = false;                       // use mlock to keep model in memory
+  bool mem_test = false;                        // compute maximum memory usage
+  bool verbose_prompt = false;                  // print prompt tokens before generation
+  int batch_size = 1;                           // number batch of prompt
+  bool beam_search = false;                     // use beam_search or not
+  int beam_size = 1;                            // only valid if use beam search
+  int cont_batching = false;                    // whether to use continuous batching (concat multi sequences)
+  int max_request_num = MODEL_MAX_REQUEST_NUM;  // maximum num of bearable requests in current env
 };
 
 bool gpt_params_parse(int argc, char** argv, gpt_params& params);

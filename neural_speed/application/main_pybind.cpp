@@ -68,7 +68,7 @@ class Model {
                   float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p, float temperature,
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype,
-                  const bool& continuous_batching);
+                  const bool& continuous_batching, const int& max_request_num);
   void reinit();
   std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
   // deprecated API
@@ -88,7 +88,7 @@ class Model {
   void reset_token_end() {
     token_eos = false;
     curr_input_ids.clear();
-    curr_input_ids.resize(params.batch_size);
+    curr_input_ids.resize(params.max_request_num);
     generate_count = 0;
   }
   void print_time() { model_print_timings(ctx); }
@@ -158,7 +158,7 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                        int threads, float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p,
                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
-                       const std::string& memory_dtype, const bool& continuous_batching) {
+                       const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num) {
 #ifdef MODEL_NAME
   params.model_name = MODEL_NAME;
 #endif
@@ -192,20 +192,21 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
     params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
   }
   params.cont_batching = continuous_batching;
+  params.max_request_num = std::max(batch_size, max_request_num);
 
-  printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d\n", params.beam_size,
-         params.do_sample, params.top_k, params.top_p, params.cont_batching);
+  printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d\n",
+         params.beam_size, params.do_sample, params.top_k, params.top_p, params.cont_batching, params.max_request_num);
 
   n_past = 0;
   n_total = 0;
   token_eos = false;
   curr_input_ids.clear();
-  curr_input_ids.resize(params.batch_size);
+  curr_input_ids.resize(params.max_request_num);
   ctx = model_init_from_gpt_params(params);
   n_vocab = model_n_vocab(ctx);
   n_ctx = model_n_ctx(ctx);
-  last_n_tokens.resize(params.batch_size);
-  for (int i = 0; i < params.batch_size; ++i) {
+  last_n_tokens.resize(params.max_request_num);
+  for (int i = 0; i < params.max_request_num; ++i) {
     last_n_tokens[i].resize(n_ctx, 0);
   }
   ctx->generation_conf.min_new_tokens = min_new_tokens;
@@ -218,13 +219,13 @@ void Model::reinit() {
   n_past = 0;
   n_total = 0;
   last_n_tokens.clear();
-  last_n_tokens.resize(params.batch_size);
-  for (int i = 0; i < params.batch_size; ++i) {
+  last_n_tokens.resize(params.max_request_num);
+  for (int i = 0; i < params.max_request_num; ++i) {
     last_n_tokens[i].resize(n_ctx, 0);
   }
   token_eos = false;
   curr_input_ids.clear();
-  curr_input_ids.resize(params.batch_size);
+  curr_input_ids.resize(params.max_request_num);
   ctx->n_sample = 0;
   ctx->t_sample_us = 0;
   generate_count = 0;
@@ -241,10 +242,12 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
     return true;
   } else if (input_ids.size() == 1) {
     padding_count = {0};
+    ctx->batch_size = 1;
     n_prompt_tokens = input_ids[STATIC_INPUT_HEAD_IDX].size();
     return true;
   } else {  // multi-batch inputs (first token)
-    MODEL_ASSERT(input_ids.size() == ctx->batch_size);
+    ctx->batch_size = input_ids.size();
+    MODEL_ASSERT(input_ids.size() <= ctx->max_request_num);
     static std::set<model_archs> batched_model_archs = {MODEL_GPTJ, MODEL_GPTNEOX, MODEL_CHATGLM};
     if (batched_model_archs.count(params.model_arch) == 0) {
       fprintf(stderr, "\nERROR: Only gpt-j, gpt-neox, chatglm support multi-batch generation!\n");
@@ -678,7 +681,7 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("min_new_tokens") = 0, py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false,
            py::arg("n_keep") = 0, py::arg("n_discard") = -1, py::arg("shift_roped_k") = false,
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto",
-           py::arg("continuous_batching") = false)
+           py::arg("continuous_batching") = false, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM)
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
            py::arg("input_ids") = std::vector<std::vector<model_token>>{})

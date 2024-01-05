@@ -61,6 +61,8 @@
 #define MODEL_SESSION_MAGIC MODEL_FILE_MAGIC_GGSN
 #define MODEL_SESSION_VERSION 1
 
+#define MODEL_MAX_REQUEST_NUM 8
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -279,7 +281,7 @@ struct model_context {
   model_struct model;
   model_vocab vocab;
   // maximum num of bearable requests in current env
-  int max_request_num = 32;  // TODO
+  int max_request_num = MODEL_MAX_REQUEST_NUM;
   // num of current execution prompts
   int request_running_bs = 1;
   // length of current execution tokens list
