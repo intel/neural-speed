@@ -21,6 +21,48 @@ using namespace gpu::xetla;
 //The number of times the kernel is executed
 constexpr int ITER = 100;
 
+class test1 {
+public:
+    //Extract the parameters required by different test cases
+    static constexpr size_t mat_m = 1;
+    static constexpr size_t mat_n = 16384;
+    static constexpr size_t mat_k = 4096;
+    static constexpr size_t wg_m = 8;
+    static constexpr size_t wg_n = 64;
+    static constexpr size_t sg_m = 8;
+    static constexpr size_t sg_n = 16;
+    static constexpr size_t sg_k = 16;
+    static constexpr size_t dequant_s = 64;
+    static constexpr size_t num_buffer = 64;
+    static constexpr size_t local_kslicing = 8;
+    static constexpr size_t global_kslicing = 1;
+    static constexpr mem_layout layout_a = mem_layout::row_major;
+    static constexpr mem_layout layout_b = mem_layout::row_major;
+    using data_type_a = fp16;
+    using data_type_b = int4x2;
+    using data_type_c = fp16;
+};
+class test2 {
+public:
+    //Extract the parameters required by different test cases
+    static constexpr size_t mat_m = 1;
+    static constexpr size_t mat_n = 4096;
+    static constexpr size_t mat_k = 22016;
+    static constexpr size_t wg_m = 8;
+    static constexpr size_t wg_n = 128;
+    static constexpr size_t sg_m = 8;
+    static constexpr size_t sg_n = 16;
+    static constexpr size_t sg_k = 16;
+    static constexpr size_t dequant_s = 128;
+    static constexpr size_t num_buffer = 64;
+    static constexpr size_t local_kslicing = 4;
+    static constexpr size_t global_kslicing = 1;
+    static constexpr mem_layout layout_a = mem_layout::row_major;
+    static constexpr mem_layout layout_b = mem_layout::row_major;
+    using data_type_a = fp16;
+    using data_type_b = int4x2;
+    using data_type_c = fp16;
+};
 class qkv1 {
 public:
     //Extract the parameters required by different test cases
@@ -261,7 +303,7 @@ int gemm_result_validate(data_type_a *A, data_type_b *B, data_type_c *C,
 template <class Test>
 void dequantize_gemm_run(int iter) {
     using namespace gpu;
-    //Accept incoming parameters
+    // Accept incoming parameters
     constexpr size_t matrix_m = Test::mat_m;
     constexpr size_t matrix_n = Test::mat_n;
     constexpr size_t matrix_k = Test::mat_k;
@@ -302,7 +344,7 @@ void dequantize_gemm_run(int iter) {
     uint32_t ld_scale = size_scale_n;
     uint32_t ld_zero_pt = size_zero_pt_n;
 
-    //Turn on the enable_profiling property to facilitate subsequent profiling
+    // Turn on the enable_profiling property to facilitate subsequent profiling
     sycl::property_list properties {sycl::property::queue::enable_profiling()};
     auto queue = sycl::queue(properties);
     auto context = queue.get_info<info::queue::context>();
@@ -312,8 +354,8 @@ void dequantize_gemm_run(int iter) {
 
     using tile_shape = xetla::group::tile_shape_t<wg_tile_n, wg_tile_m,
             sg_tile_n, sg_tile_m>;
-    static constexpr uint32_t periodic_sync_interval = 8;
-    static constexpr uint32_t prefetch_distance = 3;
+    static constexpr uint32_t periodic_sync_interval = 0;
+    static constexpr uint32_t prefetch_distance = 0;
 
     using mem_desc_a_t = xetla::mem_desc_t<data_type_a, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
@@ -321,9 +363,7 @@ void dequantize_gemm_run(int iter) {
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
     using mem_desc_c_t = xetla::mem_desc_t<data_type_c, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_c)>;
-    using mem_desc_scale_t = xetla::mem_desc_t<data_type_scale,
-            mem_layout::row_major, mem_space::global,
-            DEVICE_MEM_ALIGNMENT / sizeof(data_type_scale)>;
+
     using mem_desc_bias_t = xetla::mem_desc_t<data_type_bias,
             mem_layout::row_major, mem_space::global,
             DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
@@ -334,23 +374,23 @@ void dequantize_gemm_run(int iter) {
             prefetch_distance, periodic_sync_interval>;
 
     using compute_policy
-            = xetla::group::compute_policy_bit4_dequantize_xmx<compute_attr,
-                    perf_tuning_knob,
-                    gpu::xetla::group::quant_type::S4_FULLRANGE,
-                    data_type_scale, dequant_s, gpu_arch::Dg2>;
+            = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
+                    perf_tuning_knob, data_type_scale, data_type_zero_pt,
+                    gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+                    dequant_s, gpu_arch::Xe>;
 
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
-            mem_desc_a_t, mem_desc_b_t, mem_desc_scale_t>;
+            mem_desc_a_t, mem_desc_b_t>;
 
     using bias_op_t = gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t,
-            gpu::xetla::gpu_arch::Dg2>;
+            gpu_arch::Xe>;
     using tile_op_t = gpu::xetla::subgroup::chained_tile_op_t<bias_op_t>;
 
     using epilogue_t = xetla::group::epilogue_t<
-            xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Dg2>,
+            xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>,
             tile_shape, mem_desc_c_t>;
 
-    using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
+    using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
     using gemm_op_t = xetla::kernel::gemm_universal_t<
             gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
                     group_swizzle, global_kslicing, local_kslicing>,
@@ -457,16 +497,17 @@ void dequantize_gemm_run(int iter) {
             .wait();
 
     // set up gemm arguments
-    bias_op_t::shape_t bias_add_shape(matrix_n, 1, matrix_n);
+    typename bias_op_t::shape_t bias_add_shape(matrix_n, 1, matrix_n);
     using epilogue_args_t = epilogue_t::arguments_t;
 
     epilogue_args_t epilogue_args({//epilogue_args init list
             // It accepts the base pointer to matrix D, and its dimensions
             {bias_d, bias_add_shape}});
 
-    typename gemm_op_t::arguments_t gemm_arg(matrix_m, matrix_k, matrix_n, A_d,
-            matrix_k, B_d, matrix_n, C_d, matrix_n, scale_d, matrix_n, Acc_d,
-            Cnt_d, epilogue_args);
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+            gemm_arg(matrix_m, matrix_k, matrix_n, A_d, matrix_k, B_d, matrix_n,
+                    C_d, matrix_n, scale_d, matrix_n, Acc_d, Cnt_d,
+                    epilogue_args);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
     if (!gemm_op_t::can_implement(gemm_arg)) {
@@ -551,7 +592,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<qkv2>;
+using tests = ::testing::Types<qkv6>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7, qkv8,
 //         qkv9, qkv10>;
 
