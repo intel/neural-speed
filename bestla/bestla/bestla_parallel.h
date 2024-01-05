@@ -15,7 +15,7 @@
 #include <functional>
 #include <thread>
 #include <vector>
-#ifdef _OPENMP
+#if BTLA_OPENMP
 #include <omp.h>
 #endif
 #include "bestla_utils.h"
@@ -595,7 +595,7 @@ class IThreading {
  protected:
   int mThreadNum;
 };
-#ifdef _OPENMP
+#if BTLA_OPENMP
 class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }

@@ -13,7 +13,15 @@
 //  limitations under the License.
 #pragma once
 #include <type_traits>
-#ifdef _OPENMP
+
+#ifdef CLANGTIDY
+#define NO_CLANGTIDY false
+#else
+#define NO_CLANGTIDY true
+#endif
+
+#define BTLA_OPENMP ((_OPENMP) && (NO_CLANGTIDY))
+#if BTLA_OPENMP
 #include <omp.h>
 #endif
 
