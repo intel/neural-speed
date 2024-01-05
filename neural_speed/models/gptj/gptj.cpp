@@ -139,14 +139,13 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   gf.n_threads = n_threads;
 
   // no padding input for optimized MHA kernel
-  const bool run_mha_reordered = (kv_self.k->type == NE_TYPE_BTLA && infer_bs == 1);
+  const bool run_mha_reordered = (kv_self.k->type == NE_TYPE_BTLA);
   const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && bestla_fusion_attn_fp16_support(nullptr);
   const bool run_mha_bf16_first =
       !run_mha_reordered && MHA_FUSION && !MHA_FP16 && bestla_fusion_attn_fp32_fp16_fp16_fp32_support(nullptr);
   kv_cache_info_t kv_cache_info = {0, 0};
   if (run_mha_reordered) {
     NE_ASSERT(kv_self.v->type == NE_TYPE_BTLA);  // kv type should be the same
-    // TODO(YI & YZT) multi seq shapes check?
     attn_shape_t attn_shape = {
         /* .batch_size = */ batch_size,
         /* .head_num = */ n_head,
@@ -314,7 +313,6 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
         off_N_i += head_size * n_head * N_i;
       }
     } else {
-      // TODO (YI) check here
       const auto k_size = kv_cache_info.k_bytes;
       const auto v_size = kv_cache_info.v_bytes;
       size_t off_sl = 0;
@@ -341,7 +339,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
             ne_view_4d(ctx0, Vcur, head_size, n_head, update_sl, update_bs, ne_element_size(Vcur) * head_size,
                        ne_element_size(Vcur) * head_size * n_head,
                        ne_element_size(Vcur) * head_size * n_head * update_sl, ne_element_size(Vcur) * off_sl);
-        ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, v_cache_g, v_cur_g, update_n_past, is_ring_full));
+        ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache_g, v_cur_g, update_n_past, is_ring_full));
         off_sl += head_size * n_head * update_sl * update_bs;
       }
     }
