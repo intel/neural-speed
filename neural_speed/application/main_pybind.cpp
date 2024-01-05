@@ -188,7 +188,9 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
     params.memory_type = KV_MEM_TYPE_AUTO;
   else
     fprintf(stderr, "Unexpected memory dtype!");
-  if (batch_size > 1) params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi): NO MHA IN MULTI-BATCH
+  if (batch_size > 1 && (!continuous_batching || params.model_arch != model_archs::MODEL_GPTJ)) {
+    params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
+  }
   params.cont_batching = continuous_batching;
 
   printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d\n", params.beam_size,

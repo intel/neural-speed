@@ -72,16 +72,16 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   std::vector<int> n_padding;
   bool no_padding = true;
   for (int i = 0; i < batch_size; ++i) {
-    if (request_indices.empty() || request_indices.back() != (inputs + i)->request_idx) {
-      request_indices.push_back((inputs + i)->request_idx);
+    if (request_indices.empty() || request_indices.back() != inputs[i].request_idx) {
+      request_indices.push_back(inputs[i].request_idx);
     }
-    n_tokens[i] = (inputs + i)->n_tokens;
-    n_pasts[i] = (inputs + i)->n_past;
-    n_totals[i] = (inputs + i)->n_total;
-    block_ids[i] = (inputs + i)->request_idx * beam_size + (inputs + i)->beam_idx;
+    n_tokens[i] = inputs[i].n_tokens;
+    n_pasts[i] = inputs[i].n_past;
+    n_totals[i] = inputs[i].n_total;
+    block_ids[i] = inputs[i].request_idx * beam_size + inputs[i].beam_idx;
     if (!lctx.cont_batching) {
-      n_padding.push_back((inputs + i)->n_padding);
-      if (no_padding && (inputs + i)->n_padding != 0) no_padding = false;
+      n_padding.push_back(inputs[i].n_padding);
+      if (no_padding && inputs[i].n_padding != 0) no_padding = false;
     }
   }
   const int seq_len_sum = std::accumulate(n_tokens.begin(), n_tokens.end(), 0);
@@ -169,7 +169,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   ne_set_name(embd, "embd");
   int cpy_off = 0;
   for (int i = 0; i < batch_size; ++i) {
-    memcpy(static_cast<model_token*>(embd->data) + cpy_off, (inputs + i)->tokens, n_tokens[i] * ne_element_size(embd));
+    memcpy(static_cast<model_token*>(embd->data) + cpy_off, inputs[i].tokens, n_tokens[i] * ne_element_size(embd));
     cpy_off += n_tokens[i];
   }
 
