@@ -1,6 +1,6 @@
 # Neural Speed
 
-Neural Speed is designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization and sparsity. The work is highly inspired from [llama.cpp](https://github.com/ggerganov/llama.cpp) and provides the below features:
+Neural Speed is an innovation library designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization and sparsity powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor) and [llama.cpp](https://github.com/ggerganov/llama.cpp). We provide the experimental features as below:
 
 - Modular design to support new models
 - [Highly optimized low precision kernels](neural_speed/core/README.md)
