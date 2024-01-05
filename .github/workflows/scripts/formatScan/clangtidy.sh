@@ -2,7 +2,7 @@
 
 source /neural-speed/.github/workflows/scripts/change_color.sh
 
-pip install cmake ninja clang-tidy
+pip install cmake ninja clang-tidy==16.0.4
 REPO_DIR=/neural-speed
 log_dir=/neural-speed/.github/workflows/scripts/formatScan
 log_path=${log_dir}/clangtidy.log
