@@ -8,6 +8,12 @@ on:
       - .github/workflows/unit-test-bestla.yml
       - '!bestla/README.md'
   workflow_dispatch:
+    inputs:
+        compiler_version:
+          description: 'compiler_version'
+          required: false
+          type: string
+          default: '13.1.0'
 
 # If there is a new commit, the previous jobs will be canceled
 concurrency:
@@ -15,67 +21,42 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKER_CONFIG_NAME: "commonDockerConfig"
-  REPO_NAME: "neural-speed"
-  REPO_TAG: "py38"
-  DOCKER_FILE_NAME: "devel"
-  CONTAINER_NAME: "utTest"
+  INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '13.1.0' }}
 
 jobs:
   unit-test:
     runs-on: [self-hosted, linux, X64, spr]
     steps:
-      - name: Docker Clean Up
-        run: |
-          docker ps -a
-          if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}-${{ runner.name }}'$) ]]; then
-              docker start ${{ env.CONTAINER_NAME }}-${{ runner.name }}
-              echo "remove left files through container ..."
-              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /neural-speed && rm -fr /neural-speed/* && rm -fr /neural-speed/.* || true"
-          fi
-
       - name: Checkout out Repo
         uses: actions/checkout@v3
         with:
           submodules: "recursive"
           fetch-tags: true
-
-      - name: Docker Build
-        run: |
-          docker build -f ${{ github.workspace }}/.github/workflows/docker/${{ env.DOCKER_FILE_NAME }}.dockerfile -t ${{ env.REPO_NAME }}:${{ env.REPO_TAG }} .
-
-      - name: Docker Run
-        run: |
-          if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}'$) ]]; then
-            docker stop ${{ env.CONTAINER_NAME }}
-            docker rm -vf ${{ env.CONTAINER_NAME }} || true
-          fi
-          docker run -dit --disable-content-trust --privileged --name=${{ env.CONTAINER_NAME }}-${{ runner.name }} -v /dev/shm:/dev/shm \
-          -v ${{ github.workspace }}:/neural-speed \
-          -v /dataset/tf_dataset2:/tf_dataset2 \
-          -v ~/.cache/oneAPI:/cache \
-          ${{ env.REPO_NAME }}:${{ env.REPO_TAG }}
-
+      
       - name: Env build
         run: |
-          docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash /neural-speed/.github/workflows/scripts/prepare_env.sh
-
+          bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "unit-test-bestla" "3.8"
+          conda activate unit-test-bestla || source activate unit-test-bestla
+          if [[ "${{ env.INPUT_COMPILER_VERSION }}" != "11.4.1" ]]; then
+            conda install --update-deps -c conda-forge gxx==${{ env.INPUT_COMPILER_VERSION }} gcc==${{ env.INPUT_COMPILER_VERSION }} gxx_linux-64==${{ env.INPUT_COMPILER_VERSION }} libstdcxx-ng sysroot_linux-64 -y
+          fi
+  
       - name: Run UT
         run: |
-          docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash -c "cd /neural-speed/bestla && mkdir build && cd build && cmake .. -DBTLA_UT_ALL=ON && make -j \
-          && ./bestla_ut 2>&1 | tee unit_test_bestla.log"
+          conda activate unit-test-bestla || source activate unit-test-bestla
+          cd ${{ github.workspace }}/bestla && mkdir build && cd build && cmake .. -DBTLA_UT_ALL=ON && make -j
+          ./bestla_ut 2>&1 | tee unit_test_bestla.log
 
       - name: Check Result
         run: |
-          docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
-          bash -c "cd /neural-speed/bestla \
-          && [[ $(grep -c "Case Failed" unit_test_bestla.log) != 0 ]] && echo "UT Failed! Please check UT log."
+          if [[ $(grep -c "Case Failed" ${{ github.workspace }}/bestla/build/unit_test_bestla.log) != 0 ]]; then
+            echo "UT Failed! Please check UT log."
+            exit 1
+          fi
 
       - name: Publish pipeline artifact
         uses: actions/upload-artifact@v3
         if: ${{ !cancelled() }}
         with:
           name: Bestla Unit Test
-          path: ${{ github.workspace }}/unit_test*.*
+          path: ${{ github.workspace }}/bestla/build/unit_test*.*
