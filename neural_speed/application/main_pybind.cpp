@@ -18,6 +18,7 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
 #include <pybind11/stl.h>
 #include <stdlib.h>
 
@@ -53,6 +54,87 @@
 #endif
 
 namespace py = pybind11;
+
+namespace {
+struct Query {
+  int id;
+  std::vector<int> token_ids;
+  Query(int id, const pybind11::array_t<int, py::array::c_style | py::array::forcecast>& token_ids)
+      : id(id), token_ids(token_ids.data(), token_ids.data() + token_ids.size()) {
+    assert(token_ids.ndim() == 1);
+  }
+
+  std::string to_string() const {
+    const std::string repr_ids(py::str(py::array_t<int, py::array::c_style>(token_ids.size(), token_ids.data())));
+    return std::to_string(id) + ": " + repr_ids;
+  }
+};
+
+using Response = Query;
+using ResponseCallback = std::function<void(std::vector<Response>, int)>;
+}  // namespace
+
+class ModelServer {
+ public:
+  explicit ModelServer(const ResponseCallback& response)
+      : response(response), waiting(), running(true), worker([&]() {
+          std::deque<Query> queue_finished;
+          std::deque<Query> queue_running;
+          while (running) {
+            {                                               // add waitting tasks queue to running queue
+              std::lock_guard<std::mutex> lock(queue_mtx);  // need lock as issueQuery may also access waiting
+
+              // TODO(Yi): should have some limitations
+              std::copy(waiting.cbegin(), waiting.cend(), std::back_inserter(queue_running));
+              waiting.clear();
+            }
+            if (!queue_running.empty()) {
+              {  // Pretend running a step of inference
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                std::vector<Query> finished = {queue_running.front()};
+                queue_running.pop_front();
+
+                if (!finished.empty()) {
+                  py::gil_scoped_acquire acquirer;
+                  py::print("ID", finished[0].id ,"finished in CPP server!");
+                  this->response(finished, queue_running.size());
+                }
+              }
+            } else {
+              _mm_pause();
+            }
+          }
+          {
+            py::gil_scoped_acquire acquirer;
+            py::print("Worker stopped!");
+          }
+        }) {
+    py::print("CPP server launched!");
+  };
+  int issueQuery(std::vector<Query>& qs) {
+    std::lock_guard<std::mutex> lock(queue_mtx);
+    std::copy(qs.cbegin(), qs.cend(), std::back_inserter(waiting));
+    return waiting.size();
+  }
+  ~ModelServer() {
+    // "synchronized" function
+    // stop spinning after calling ResponseCallback for the last query
+    py::print("Stopping CPP server...");
+    running = false;
+    {
+      py::gil_scoped_release releaser;
+      worker.join();
+    }
+    py::print("CPP server stopped!");
+  }
+
+ private:
+  const ResponseCallback response;
+  std::vector<Query> waiting;
+  std::mutex queue_mtx;
+  bool running;
+  std::thread worker;
+};
 
 std::shared_ptr<quant_layer_base> get_model_quant_layer(const std::string model_name) {
   return ql_registry::create_ql(model_name);
@@ -710,4 +792,12 @@ PYBIND11_MODULE(qwen_cpp, m)
       .def("print_time", &Model::print_time)
       .def("get_eos_id", &Model::get_eos_id)
       .def("reinit", &Model::reinit);
+  py::class_<Query>(m, "Query")
+      .def(py::init<int, py::array_t<float>>())
+      .def("__repr__", &Query::to_string)
+      .def_readwrite("id", &Query::id)
+      .def_readwrite("token_ids", &Query::token_ids);
+  py::class_<ModelServer>(m, "ModelServer", py::module_local())
+      .def(py::init<ResponseCallback>(), py::arg("response"))
+      .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"));
 }

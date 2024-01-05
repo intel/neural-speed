@@ -42,28 +42,28 @@ cbg_worker::cbg_worker(const gpt_params& params) : il_worker(params) { m_ctx->co
 cbg_worker::~cbg_worker() {}
 
 bool cbg_worker::prepare_inputs(std::vector<sequence*>* seqs, const int& n_input, model_input* inputs) {
-  for (int ni = 0; ni < n_input; ++ni) {
-    if ((seqs->at(ni))->status != seq_status::PREFILL || (seqs->at(ni))->status != seq_status::DECODING) {
+  for (int i = 0; i < n_input; ++i) {
+    if ((seqs->at(i))->status != seq_status::PREFILL || (seqs->at(i))->status != seq_status::DECODING) {
       fprintf(stderr, "%s: error: request status is unright.\n", __func__);
       return false;
-    } else if ((seqs->at(ni))->status == seq_status::PREFILL) {
-      inputs[ni].tokens = (seqs->at(ni))->prompt_ids.data();
-      inputs[ni].n_tokens = (seqs->at(ni))->n_prompt_tokens;
-      inputs[ni].n_prompt_tokens = (seqs->at(ni))->n_prompt_tokens;
-      inputs[ni].n_past = 0;
-      inputs[ni].n_total = 0;
-      inputs[ni].request_idx = (seqs->at(ni))->request_idx;
+    } else if ((seqs->at(i))->status == seq_status::PREFILL) {
+      inputs[i].tokens = (seqs->at(i))->prompt_ids.data();
+      inputs[i].n_tokens = (seqs->at(i))->n_prompt_tokens;
+      inputs[i].n_prompt_tokens = (seqs->at(i))->n_prompt_tokens;
+      inputs[i].n_past = 0;
+      inputs[i].n_total = 0;
+      inputs[i].request_idx = (seqs->at(i))->request_idx;
       // do not support padding for now
-      inputs[ni].n_padding = 0;
-      inputs[ni].gen_conf = (seqs->at(ni))->gen_conf;
-    } else if ((seqs->at(ni))->status == seq_status::DECODING) {
-      inputs[ni].tokens = &(seqs->at(ni))->generated_ids.back();
-      inputs[ni].n_tokens = 1;
-      inputs[ni].n_past = (seqs->at(ni))->n_past;
-      inputs[ni].n_total = (seqs->at(ni))->n_total;
-      inputs[ni].request_idx = (seqs->at(ni))->request_idx;
+      inputs[i].n_padding = 0;
+      inputs[i].gen_conf = (seqs->at(i))->gen_conf;
+    } else if ((seqs->at(i))->status == seq_status::DECODING) {
+      inputs[i].tokens = &(seqs->at(i))->generated_ids.back();
+      inputs[i].n_tokens = 1;
+      inputs[i].n_past = (seqs->at(i))->n_past;
+      inputs[i].n_total = (seqs->at(i))->n_total;
+      inputs[i].request_idx = (seqs->at(i))->request_idx;
       // do not support padding for now
-      inputs[ni].n_padding = 0;
+      inputs[i].n_padding = 0;
     } else {
       continue;
     }
