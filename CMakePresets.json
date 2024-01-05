@@ -1,4 +1,4 @@
-﻿{
+{
   "version": 3,
   "configurePresets": [
     {
@@ -9,7 +9,9 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_ALL": "OFF"
       },
       "condition": {
         "type": "equals",
@@ -33,10 +35,7 @@
       "displayName": "linux Release",
       "description": "Release",
       "inherits": "linux-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "BTLA_UT_ALL": "OFF"
-      }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
       "name": "windows-base",
@@ -67,7 +66,8 @@
       },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "BTLA_UT_DEBUG": "ON"
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_ALL": "OFF"
       }
     },
     {
