@@ -45,7 +45,7 @@ print(pt_ans)
 
 # itrex infer
 # fp32 config
-woq_config = WeightOnlyQuantConfig(use_quant=False)
+woq_config = WeightOnlyQuantConfig(not_quant=True)
 # model file should be in `runtime_outs` folder
 model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_config, trust_remote_code=True)
 outputs = model.generate(inputs, do_sample=False, max_new_tokens=128)

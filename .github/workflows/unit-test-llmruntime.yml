@@ -1,0 +1,87 @@
+name: Python Unit Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - neural_speed/**
+      - tests/**
+      - .github/workflows/unit-test-llmruntime.yml
+      - .github/workflows/unitTest/**
+  workflow_dispatch:
+
+# If there is a new commit, the previous jobs will be canceled
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_CONFIG_NAME: "commonDockerConfig"
+  REPO_NAME: "neural-speed"
+  REPO_TAG: "py39"
+  DOCKER_FILE_NAME: "devel"
+  CONTAINER_NAME: "utTest"
+
+jobs:
+  unit-test:
+    runs-on: [self-hosted, linux, X64, llmruntime-node]
+    steps:
+      - name: Load environment variables
+        run: cat ~/actions-runner3/.env >> $GITHUB_ENV
+      
+      - name: Docker Clean Up
+        run: |
+          docker ps -a
+          if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}-${{ runner.name }}'$) ]]; then
+              docker start ${{ env.CONTAINER_NAME }}-${{ runner.name }}
+              echo "remove left files through container ..."
+              docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} bash -c "ls -a /neural-speed && rm -fr /neural-speed/* && rm -fr /neural-speed/.* || true"
+          fi
+
+      - name: Checkout out Repo
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+          fetch-tags: true
+
+      - name: Docker Build
+        run: |
+          docker build -f ${{ github.workspace }}/.github/workflows/docker/${{ env.DOCKER_FILE_NAME }}.dockerfile --build-arg http_proxy="${{ env.HTTP_PROXY }}" --build-arg https_proxy="${{ env.HTTPS_PROXY }}" -t ${{ env.REPO_NAME }}:${{ env.REPO_TAG }} .
+
+      - name: Docker Run
+        run: |
+          if [[ $(docker ps -a | grep -i '${{ env.CONTAINER_NAME }}-${{ runner.name }}'$) ]]; then
+            docker stop ${{ env.CONTAINER_NAME }}-${{ runner.name }}
+            docker rm -vf ${{ env.CONTAINER_NAME }}-${{ runner.name }} || true
+          fi
+          docker run -dit --disable-content-trust --privileged --name=${{ env.CONTAINER_NAME }}-${{ runner.name }} -v /dev/shm:/dev/shm \
+          -e http_proxy="${{ env.HTTP_PROXY }}" \
+          -e https_proxy="${{ env.HTTPS_PROXY }}" \
+          -v ${{ github.workspace }}:/neural-speed \
+          -v /tf_dataset2:/tf_dataset2 \
+          -v ~/.cache/oneAPI:/cache \
+          ${{ env.REPO_NAME }}:${{ env.REPO_TAG }}
+
+      - name: Env build
+        run: |
+          docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
+          bash /neural-speed/.github/workflows/scripts/prepare_env.sh
+
+      - name: Binary build
+        run: |
+          docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
+          bash -c "cd /neural-speed/.github/workflows/scripts \
+          && bash install_binary.sh"
+
+      - name: Run UT
+        run: |
+          docker exec ${{ env.CONTAINER_NAME }}-${{ runner.name }} \
+          bash -c "cd /neural-speed/.github/workflows/unitTest \
+          && bash unittest_llmruntime.sh"
+
+      - name: Publish pipeline artifact
+        uses: actions/upload-artifact@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: Python Unit Test
+          path: ${{ github.workspace }}/log_dir/unit_test*.*
