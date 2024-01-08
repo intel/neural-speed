@@ -12,38 +12,14 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 
 ## Quick Start
 There are two methods for utilizing the Neural Speed:
-- [Transformer-based API](#How-to-use-Transformer-based-API)
-- [Straightforward Python/C++](#Straight-Forward)
+You can refer to [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) for [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code). 
 
+Or you can use Neural Speed straight forward.
 
-### How to use: Transformer-based API
-
-> Please refer to [intel extension for transformers](https://github.com/intel/intel-extension-for-transformers) for detailed usage.
-> warning: **If you want to use ```from_pretrain``` API**: please follow [Transformer-based API](#How-to-use-Transformer-based-API)
-
-You can use Python API to run Hugging Face model simply. Here is the sample code:
-
-```python
-from transformers import AutoTokenizer, TextStreamer
-from intel_extension_for_transformers.transformers import AutoModelForCausalLM
-model_name = "Intel/neural-chat-7b-v1-1"     # Hugging Face model_id or local model
-prompt = "Once upon a time, there existed a little girl,"
-
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-inputs = tokenizer(prompt, return_tensors="pt").input_ids
-streamer = TextStreamer(tokenizer)
-
-model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
-outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
-```
-
-
-### Straight Forward
-
-For details please refer to [Advanced Usage](#Advanced-usage).
+> For details please refer to [Advanced Usage](#Advanced-usage).
 
 #### One-click Python scripts
-You can run LLM with one-click python script including conversion, quantization and inference.
+Run LLM with one-click python script including conversion, quantization and inference.
 ```
 python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
 ```
