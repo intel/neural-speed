@@ -140,19 +140,23 @@ struct gelu_fwd_op_t {
         // total flag register
         constexpr int elems = 8 * 16;
         constexpr int rounds = matAcc_t::tile_elems / elems;
+
+        if constexpr (rounds > 0) {
 #pragma unroll
-        for (uint32_t i = 0; i < rounds; ++i) {
-            auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
-            xetla_vector<dtype, elems> sub_vec_x = (sqrt_two_over_pi * sub_vec
-                    * (1.f + C0 * sub_vec * sub_vec));
-            xetla_vector<dtype, elems> tanh_value
-                    = xetla_tanh<dtype, elems>(sub_vec_x);
-            sub_vec = 0.5f * sub_vec * (1.f + tanh_value);
+            for (uint32_t i = 0; i < rounds; ++i) {
+                auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
+                xetla_vector<dtype, elems> sub_vec_x = (sqrt_two_over_pi
+                        * sub_vec * (1.f + C0 * sub_vec * sub_vec));
+                xetla_vector<dtype, elems> tanh_value
+                        = xetla_tanh<dtype, elems>(sub_vec_x);
+                sub_vec = 0.5f * sub_vec * (1.f + tanh_value);
+            }
         }
+
         constexpr int remained_elems = matAcc_t::tile_elems % elems;
         if constexpr (remained_elems != 0) {
             auto sub_vec = matAcc.reg.xetla_select<remained_elems, 1>(
-                    elems * (matAcc_t::tile_elems / elems));
+                    elems * rounds);
             xetla_vector<dtype, remained_elems> sub_vec_x = (sqrt_two_over_pi
                     * sub_vec * (1.f + C0 * sub_vec * sub_vec));
             xetla_vector<dtype, remained_elems> tanh_value

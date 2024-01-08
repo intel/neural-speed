@@ -18,12 +18,18 @@
 
 #include <algorithm>
 #include <iostream>
-#include <math.h>
 #include <stdlib.h>
 #include <string>
 #include <vector>
 #include <CL/sycl.hpp>
 #include <gtest/gtest.h>
+
+#if (__LIBSYCL_MAJOR_VERSION >= 7) && (__LIBSYCL_MINOR_VERSION >= 1)
+#include <cmath>
+using namespace sycl::_V1;
+#else
+#include <math.h>
+#endif
 
 enum class profiling_selector : uint8_t { CPU = 0, GPU = 1, ALL = 2 };
 
@@ -96,7 +102,11 @@ class profiling_helper {
 
         //time mean square error
         for (int i = 1; i < iter; i++) {
+#if (__LIBSYCL_MAJOR_VERSION >= 7) && (__LIBSYCL_MINOR_VERSION >= 1)
+            stat.variance += sycl::pow(time[i] - stat.mean, 2);
+#else
             stat.variance += pow(time[i] - stat.mean, 2);
+#endif
         }
         stat.variance /= iter;
     }
