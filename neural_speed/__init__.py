@@ -118,14 +118,14 @@ class Model:
         if not_quant:
             print("FP32 model will be used.")
             return
-        self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin,
-                                    weight_dtype=weight_dtype, alg=alg, group_size=group_size,
-                                    scale_dtype=scale_dtype, compute_dtype=compute_dtype, use_ggml=use_ggml)
-        assert os.path.exists(quant_bin), "Fail to quantize model"
+        # self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin,
+        #                             weight_dtype=weight_dtype, alg=alg, group_size=group_size,
+        #                             scale_dtype=scale_dtype, compute_dtype=compute_dtype, use_ggml=use_ggml)
+        # assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
-        if not use_cache:
-            os.remove(fp32_bin)
+        # if not use_cache:
+        #     os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)

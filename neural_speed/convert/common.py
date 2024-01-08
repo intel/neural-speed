@@ -273,6 +273,29 @@ def convert_fp32_tensor(src_name, dst_name, model, fout, n_head=0, n_head2=0, pe
     v.numpy().tofile(fout)
     print(f"converting {dst_name} float tensor")
 
+def convert_fp32_to_q4_tensor(src_name, dst_name, model, fout, n_head=0, n_head2=0, permute_func=None):
+    if ".weight" not in src_name:
+        src_name = src_name + ".weight"
+    v = model[src_name]
+    shape = v.shape
+    # print("Processing non-Q4 variable: " + src_name +
+    #       " with shape: ", shape, " and type: ", v.dtype)
+    v = v.to(torch.float32)
+
+    if permute_func:
+        v = permute_func(v, n_head, n_head2).contiguous()
+
+    qv = quantize_q4_0(v)
+    ftype_cur = GGML_QK4_0_TYPE
+
+    # header
+    write_header(fout, shape, dst_name, ftype_cur)
+
+    # data
+    qv.numpy().tofile(fout)
+    print(f"converting {dst_name} float to q4_0 tensor")
+
+
 def convert_q4_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2=0, permute_func=None):
     qzeros = model[f"{src_name}.qzeros"]
     zeros = qzeros_to_zeros(qzeros)
