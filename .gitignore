@@ -24,3 +24,6 @@ debug/
 dist/
 .cache/
 .clangd
+runtime_outs/
+CMakeUserPresets.json
+*.egg-info
