@@ -234,7 +234,9 @@ There are two methods for utilizing the Neural Speed:
 
 ## How to use: Transformer-based API
 
-> Please refer to [intel extension for transformers](https://github.com/intel/intel-extension-for-transformers) for detailed usage.
+> Please refer to [intel extension for transformers](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/llm/runtime/graph#how-to-use-transformer-based-api) for detailed usage.
+
+You can use this API to do inference, there are two mode: 1). use_llm_runtime = False, this mode support broad models 2). use_llm_runtime = True, this mode support models in [model list](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/llm/runtime/graph#supported-models), but performance is better than 1).
 
 ### 1. Basic usage of Running LLM with Transformer-based API
 
