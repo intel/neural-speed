@@ -296,6 +296,33 @@ def convert_fp32_to_q4_tensor(src_name, dst_name, model, fout, n_head=0, n_head2
     print(f"converting {dst_name} float to q4_0 tensor")
 
 
+def convert_fp32_to_jblas_tensor(src_name, dst_name, model, fout, n_head=0, n_head2=0, permute_func=None):
+    import neural_speed.llama_cpp as cpp_model
+    if ".weight" not in src_name:
+        src_name = src_name + ".weight"
+    v = model[src_name]
+    shape = v.shape
+    v = v.to(torch.float32)
+
+    if permute_func:
+        v = permute_func(v, n_head, n_head2).contiguous()
+
+    ftype_cur = GGML_QJBLAS_TYPE
+
+    # header
+    write_header(fout, shape, dst_name, ftype_cur)
+
+    # pack int weight in bestla format
+    dst = np.zeros((v.shape[0], v.shape[1] * 4), dtype=np.int8)
+    byte_size = cpp_model.Model.np_bestla_quantize(v.numpy(), dst,
+                                               weight_dtype="int4",
+                                               group_size=32,
+                                               alg="sym",
+                                               compute_dtype="int8")
+    dst.flatten()[:byte_size].tofile(fout)
+    # data
+    print(f"converting {dst_name} float to jblas tensor")
+
 def convert_q4_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2=0, permute_func=None):
     qzeros = model[f"{src_name}.qzeros"]
     zeros = qzeros_to_zeros(qzeros)
