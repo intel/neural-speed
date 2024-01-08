@@ -10,6 +10,63 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 
 > Neural Speed is under active development so APIs are subject to change.
 
+## Quick Start
+There are two methods for utilizing the Neural Speed:
+- [Transformer-based API](#How-to-use-Transformer-based-API)
+- [Straightforward Python/C++](#Straight-Forward)
+
+
+### How to use: Transformer-based API
+
+> Please refer to [intel extension for transformers](https://github.com/intel/intel-extension-for-transformers) for detailed usage.
+> warning: **If you want to use ```from_pretrain``` API**: please follow [Transformer-based API](#How-to-use-Transformer-based-API)
+
+You can use Python API to run Hugging Face model simply. Here is the sample code:
+
+```python
+from transformers import AutoTokenizer, TextStreamer
+from intel_extension_for_transformers.transformers import AutoModelForCausalLM
+model_name = "Intel/neural-chat-7b-v1-1"     # Hugging Face model_id or local model
+prompt = "Once upon a time, there existed a little girl,"
+
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt").input_ids
+streamer = TextStreamer(tokenizer)
+
+model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
+```
+
+
+### Straight Forward
+
+For details please refer to [Advanced Usage](#Advanced-usage).
+
+#### One-click Python scripts
+You can run LLM with one-click python script including conversion, quantization and inference.
+```
+python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
+```
+
+#### Quantize and Inference Step By Step
+Besides the one-click script, Neural Speed also offers the detailed script: 1) convert and quantize, and 2) inference.
+
+##### 1. Convert and Quantize LLM
+Neural Speed assumes the compatible model format as [llama.cpp](https://github.com/ggerganov/llama.cpp) and [ggml](https://github.com/ggerganov/ggml). You can also convert the model by following the below steps:
+
+```bash
+# convert the model directly use model id in Hugging Face. (recommended)
+python scripts/convert.py --outtype f32 --outfile ne-f32.bin EleutherAI/gpt-j-6b
+```
+
+##### 2. Inference
+
+We provide LLM inference script to run the quantized model. Please reach [us](mailto:itrex.maintainers@intel.com) if you want to run using C++ API directly.
+```bash
+#Linux and WSL
+OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
+```
+
 ## Supported Hardware
 | Hardware | Optimization |
 |-------------|:-------------:|
@@ -226,44 +283,10 @@ cmake ..
 cmake --build . -j --config Release
 ```
 
-## How to Use
-There are two methods for utilizing the Neural Speed:
-- [Transformer-based API](#How-to-use-Transformer-based-API)
-- [Straightforward Python script](#How-to-use-Python-script)
 
+## Advanced Usage
 
-## How to use: Transformer-based API
-
-> Please refer to [intel extension for transformers](https://github.com/intel/intel-extension-for-transformers) for detailed usage.
-
-### 1. Basic usage of Running LLM with Transformer-based API
-
-You can use Python API to run Hugging Face model simply. Here is the sample code:
-```python
-from transformers import AutoTokenizer, TextStreamer
-from intel_extension_for_transformers.transformers import AutoModelForCausalLM
-model_name = "Intel/neural-chat-7b-v1-1"     # Hugging Face model_id or local model
-prompt = "Once upon a time, there existed a little girl,"
-
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-inputs = tokenizer(prompt, return_tensors="pt").input_ids
-streamer = TextStreamer(tokenizer)
-
-model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
-outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
-```
-
-
-## How to use: Python script
-
-
-> warning: **If you want to use ```from_pretrain``` API**: please follow [Transformer-based API](#How-to-use-Transformer-based-API)
-
-### 1. Run LLM with Python Script
-You can run LLM with one-click python script including conversion, quantization and inference.
-```
-python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
-```
+### One-click scripts
 
 Argument description of run.py ([supported MatMul combinations](#supported-matrix-multiplication-data-types-combinations)):
 | Argument                    | Description                                                                                                   |
@@ -287,10 +310,7 @@ Argument description of run.py ([supported MatMul combinations](#supported-matri
 | --shift-roped-k             | Use [ring-buffer](./docs/infinite_inference.md#shift-rope-k-and-ring-buffer) and thus do not re-computing after reaching ctx_size (default: False) |
 
 
-## Advanced Usage
-Besides the one-click script, Neural Speed also offers the detailed script: 1) convert and quantize, and 2) inference.
-
-### 1. Convert and Quantize LLM
+### 1. Conversion and Quantization
 Neural Speed assumes the compatible model format as [llama.cpp](https://github.com/ggerganov/llama.cpp) and [ggml](https://github.com/ggerganov/ggml). You can also convert the model by following the below steps:
 
 ```bash
@@ -346,7 +366,7 @@ Our Neural Speed supports  INT4 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 wei
 | NF4 | BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym (sym) |
 
 
-### 2. Inference LLM
+### 2. Inference
 
 We provide LLM inference script to run the quantized model. Please reach [us](mailto:itrex.maintainers@intel.com) if you want to run using C++ API directly.
 ```bash
