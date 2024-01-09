@@ -14,9 +14,7 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 There are two methods for utilizing the Neural Speed:
 You can refer to [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) for [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code). 
 
-Or you can use Neural Speed straight forward.
-
-> For details please refer to [Advanced Usage](./docs/advanced_usage.md).
+Or you can use Neural Speed straight forward:
 
 #### One-click Python scripts
 Run LLM with one-click python script including conversion, quantization and inference.
@@ -42,6 +40,8 @@ We provide LLM inference script to run the quantized model. Please reach [us](ma
 #Linux and WSL
 OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
 ```
+
+> For details please refer to [Advanced Usage](./docs/advanced_usage.md).
 
 ## Supported Hardware
 | Hardware | Optimization |
