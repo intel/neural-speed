@@ -127,6 +127,25 @@ class Model:
         if not use_cache:
             os.remove(fp32_bin)
 
+    def init2(self, model_name, not_quant=False, use_cache=False, use_gptq=False, use_awq=False,
+            weight_dtype="int4", alg="sym", group_size=32,
+            scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
+        self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        model_type = Model.get_model_type(self.config)
+        self.__import_package(model_type)
+
+        # check cache and quantization
+        output_path = "runtime_outs"
+        os.makedirs(output_path, exist_ok=True)
+        quant_bin = "{}/ne_{}_q.bin".format(output_path, model_type)
+        self.bin_file = quant_bin
+
+        if use_cache and os.path.exists(self.bin_file):
+            return
+        convert_model(model_name, quant_bin, "f32")
+
+
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)
         self.model = self.module.Model()
