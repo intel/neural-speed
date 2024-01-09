@@ -28,5 +28,5 @@ inputs = tokenizer(prompt, return_tensors="pt").input_ids
 streamer = TextStreamer(tokenizer)
 
 model = Model()
-model.init(model_name, weight_dtype="int4", compute_dtype="int8")
+model.init2(model_name, weight_dtype="int4", compute_dtype="int8", not_quant=True, use_cache=True)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)
