@@ -213,20 +213,16 @@ struct model_load_tensors_map {
   std::unordered_map<std::string, size_t> name_to_idx;
 };
 
-struct model_file_loader {
-  model_file file;
-  model_file_version file_version;
-  model_hparams hparams;
-  model_vocab vocab;
+struct gguf_loader {
+  // model_file file;
+  FILE* gguf_file;
 
-  size_t gguf_data_offset = 0;  // offset of the GGUF tensor data from the beginning of the file.
-  enum model_format model_magic = UNKNOWN;
+  // gguf_loader(const char* fname) : file(fname, "rb") {
+  //   fprintf(stderr, "model.cpp: loading GGUF model from %s\n", fname);
+  //   gguf_file = file.fp;
+  // }
 
-  model_file_loader(const char* fname, size_t file_idx, model_load_tensors_map& tensors_map) : file(fname, "rb") {
-    fprintf(stderr, "model.cpp: loading model from %s\n", fname);
-    read_magic(tensors_map);
-    read_tensor_metadata(file_idx, tensors_map);
-  }
+  gguf_loader(FILE* ne_file) : gguf_file(ne_file) {}
 
   const char* gguf_type_name(enum gguf_type type) { return GGUF_TYPE_NAME[type]; }
 
@@ -569,16 +565,66 @@ struct model_file_loader {
     }
   }
 
-  struct gguf_context* read_gguf(model_load_tensors_map& tensors_map) {
-    FILE* file_gguf = file.fp;
-    if (!file_gguf) {
+  void gguf_free(struct gguf_context* ctx) {
+    if (ctx == NULL) {
+      return;
+    }
+
+    if (ctx->kv) {
+      // free string memory - not great..
+      for (uint32_t i = 0; i < ctx->header.n_kv; ++i) {
+        struct gguf_kv* kv = &ctx->kv[i];
+
+        if (kv->key.data) {
+          free(kv->key.data);
+        }
+
+        if (kv->type == GGUF_TYPE_STRING) {
+          if (kv->value.str.data) {
+            free(kv->value.str.data);
+          }
+        }
+
+        if (kv->type == GGUF_TYPE_ARRAY) {
+          if (kv->value.arr.data) {
+            if (kv->value.arr.type == GGUF_TYPE_STRING) {
+              for (uint32_t j = 0; j < kv->value.arr.n; ++j) {
+                struct gguf_str* str = &((struct gguf_str*)kv->value.arr.data)[j];
+                if (str->data) {
+                  free(str->data);
+                }
+              }
+            }
+            free(kv->value.arr.data);
+          }
+        }
+      }
+
+      free(ctx->kv);
+    }
+
+    if (ctx->infos) {
+      for (uint32_t i = 0; i < ctx->header.n_tensors; ++i) {
+        struct gguf_tensor_info* info = &ctx->infos[i];
+
+        if (info->name.data) {
+          free(info->name.data);
+        }
+      }
+
+      free(ctx->infos);
+    }
+  }
+
+  struct gguf_context* gguf_init_from_file(model_load_tensors_map& tensors_map, size_t& gguf_data_offset) {
+    if (!gguf_file) {
       return nullptr;
     }
 
     size_t offset = 0;
     char magic[4];
 
-    gguf_fread_el(file_gguf, &magic, sizeof(magic), &offset);
+    gguf_fread_el(gguf_file, &magic, sizeof(magic), &offset);
 
     struct gguf_context* ctx = reinterpret_cast<struct gguf_context*>(GGML_ALIGNED_MALLOC(sizeof(struct gguf_context)));
     ctx->offset = 0;
@@ -590,21 +636,21 @@ struct model_file_loader {
     ctx->infos = NULL;
     ctx->data = NULL;
 
-    ok = ok && gguf_fread_el(file_gguf, &ctx->header.version, sizeof(ctx->header.version), &offset);
-    ok = ok && gguf_fread_el(file_gguf, &ctx->header.n_tensors, sizeof(ctx->header.n_tensors), &offset);
-    ok = ok && gguf_fread_el(file_gguf, &ctx->header.n_kv, sizeof(ctx->header.n_kv), &offset);
+    ok = ok && gguf_fread_el(gguf_file, &ctx->header.version, sizeof(ctx->header.version), &offset);
+    ok = ok && gguf_fread_el(gguf_file, &ctx->header.n_tensors, sizeof(ctx->header.n_tensors), &offset);
+    ok = ok && gguf_fread_el(gguf_file, &ctx->header.n_kv, sizeof(ctx->header.n_kv), &offset);
 
     if (ctx->header.version == 1) {
       fprintf(stderr, "%s: GGUFv1 is no longer supported. please use a more up-to-date version\n", __func__);
-      fclose(file_gguf);
-      // gguf_free(ctx);
+      fclose(gguf_file);
+      gguf_free(ctx);
       return nullptr;
     }
 
     if (!ok) {
       fprintf(stderr, "%s: failed to read header\n", __func__);
-      fclose(file_gguf);
-      // gguf_free(ctx);
+      fclose(gguf_file);
+      gguf_free(ctx);
       return nullptr;
     }
 
@@ -614,49 +660,49 @@ struct model_file_loader {
     for (uint64_t i = 0; i < ctx->header.n_kv; ++i) {
       struct gguf_kv* kv = &ctx->kv[i];
 
-      ok = ok && gguf_fread_str(file_gguf, &kv->key, &offset);
-      ok = ok && gguf_fread_el(file_gguf, &kv->type, sizeof(kv->type), &offset);
+      ok = ok && gguf_fread_str(gguf_file, &kv->key, &offset);
+      ok = ok && gguf_fread_el(gguf_file, &kv->type, sizeof(kv->type), &offset);
 
       switch (kv->type) {
         case GGUF_TYPE_UINT8:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.uint8, sizeof(kv->value.uint8), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.uint8, sizeof(kv->value.uint8), &offset);
           break;
         case GGUF_TYPE_INT8:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.int8, sizeof(kv->value.int8), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.int8, sizeof(kv->value.int8), &offset);
           break;
         case GGUF_TYPE_UINT16:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.uint16, sizeof(kv->value.uint16), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.uint16, sizeof(kv->value.uint16), &offset);
           break;
         case GGUF_TYPE_INT16:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.int16, sizeof(kv->value.int16), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.int16, sizeof(kv->value.int16), &offset);
           break;
         case GGUF_TYPE_UINT32:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.uint32, sizeof(kv->value.uint32), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.uint32, sizeof(kv->value.uint32), &offset);
           break;
         case GGUF_TYPE_INT32:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.int32, sizeof(kv->value.int32), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.int32, sizeof(kv->value.int32), &offset);
           break;
         case GGUF_TYPE_FLOAT32:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.float32, sizeof(kv->value.float32), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.float32, sizeof(kv->value.float32), &offset);
           break;
         case GGUF_TYPE_UINT64:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.uint64, sizeof(kv->value.uint64), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.uint64, sizeof(kv->value.uint64), &offset);
           break;
         case GGUF_TYPE_INT64:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.int64, sizeof(kv->value.int64), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.int64, sizeof(kv->value.int64), &offset);
           break;
         case GGUF_TYPE_FLOAT64:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.float64, sizeof(kv->value.float64), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.float64, sizeof(kv->value.float64), &offset);
           break;
         case GGUF_TYPE_BOOL:
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.bool_, sizeof(kv->value.bool_), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.bool_, sizeof(kv->value.bool_), &offset);
           break;
         case GGUF_TYPE_STRING:
-          ok = ok && gguf_fread_str(file_gguf, &kv->value.str, &offset);
+          ok = ok && gguf_fread_str(gguf_file, &kv->value.str, &offset);
           break;
         case GGUF_TYPE_ARRAY: {
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.arr.type, sizeof(kv->value.arr.type), &offset);
-          ok = ok && gguf_fread_el(file_gguf, &kv->value.arr.n, sizeof(kv->value.arr.n), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.arr.type, sizeof(kv->value.arr.type), &offset);
+          ok = ok && gguf_fread_el(gguf_file, &kv->value.arr.n, sizeof(kv->value.arr.n), &offset);
 
           switch (kv->value.arr.type) {
             case GGUF_TYPE_UINT8:
@@ -671,13 +717,13 @@ struct model_file_loader {
             case GGUF_TYPE_FLOAT64:
             case GGUF_TYPE_BOOL: {
               kv->value.arr.data = malloc(kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type]);
-              ok = ok && gguf_fread_el(file_gguf, kv->value.arr.data,
+              ok = ok && gguf_fread_el(gguf_file, kv->value.arr.data,
                                        kv->value.arr.n * GGUF_TYPE_SIZE[kv->value.arr.type], &offset);
             } break;
             case GGUF_TYPE_STRING: {
               kv->value.arr.data = malloc(kv->value.arr.n * sizeof(struct gguf_str));
               for (uint64_t j = 0; j < kv->value.arr.n; ++j) {
-                ok = ok && gguf_fread_str(file_gguf, &((struct gguf_str*)kv->value.arr.data)[j], &offset);
+                ok = ok && gguf_fread_str(gguf_file, &((struct gguf_str*)kv->value.arr.data)[j], &offset);
               }
             } break;
             case GGUF_TYPE_ARRAY:
@@ -706,19 +752,19 @@ struct model_file_loader {
         info->ne[j] = 1;
       }
 
-      ok = ok && gguf_fread_str(file_gguf, &info->name, &offset);
-      ok = ok && gguf_fread_el(file_gguf, &info->n_dims, sizeof(info->n_dims), &offset);
+      ok = ok && gguf_fread_str(gguf_file, &info->name, &offset);
+      ok = ok && gguf_fread_el(gguf_file, &info->n_dims, sizeof(info->n_dims), &offset);
       for (uint32_t j = 0; j < info->n_dims; ++j) {
-        ok = ok && gguf_fread_el(file_gguf, &info->ne[j], sizeof(info->ne[j]), &offset);
+        ok = ok && gguf_fread_el(gguf_file, &info->ne[j], sizeof(info->ne[j]), &offset);
       }
-      ok = ok && gguf_fread_el(file_gguf, &info->type, sizeof(info->type), &offset);
-      ok = ok && gguf_fread_el(file_gguf, &info->offset, sizeof(info->offset), &offset);
+      ok = ok && gguf_fread_el(gguf_file, &info->type, sizeof(info->type), &offset);
+      ok = ok && gguf_fread_el(gguf_file, &info->offset, sizeof(info->offset), &offset);
 
       if (!ok) {
         fprintf(stderr, "%s: failed to read tensor info\n", __func__);
-        // fclose(file_gguf);
-        // gguf_free(ctx);
-        // return NULL;
+        fclose(gguf_file);
+        gguf_free(ctx);
+        return nullptr;
       }
 
       model_load_tensor_shard shard;
@@ -787,94 +833,7 @@ struct model_file_loader {
     return ctx;
   }
 
-  size_t ggml_nbytes(const struct ne_tensor* tensor) {
-    size_t nbytes;
-
-    // bloc_size of FP32 == 1
-    size_t blck_size = 1;
-    // size_t blck_size = ggml_blck_size(tensor->type);
-    if (blck_size == 1) {
-      // fp32 nbytes = 4;
-      nbytes = 4;
-      // nbytes = ggml_type_size(tensor->type);
-      for (int i = 0; i < GGML_MAX_DIMS; ++i) {
-        nbytes += (tensor->ne[i] - 1) * tensor->nb[i];
-      }
-    } else {
-      nbytes = tensor->ne[0] * tensor->nb[0] / blck_size;
-      for (int i = 1; i < GGML_MAX_DIMS; ++i) {
-        nbytes += (tensor->ne[i] - 1) * tensor->nb[i];
-      }
-    }
-
-    return nbytes;
-  }
-
-  void read_ne_magic() {
-    uint32_t magic = file.read_u32();
-
-    if (magic == MODEL_FILE_MAGIC_NE) {
-      file_version = MODEL_FILE_VERSION_NE;
-      return;
-    }
-
-    uint32_t version = file.read_u32();
-
-    switch (magic) {
-      case MODEL_FILE_MAGIC_GGMF:
-        switch (version) {
-          case 1:
-            file_version = MODEL_FILE_VERSION_GGMF_V1;
-            return;
-        }
-        break;
-      case MODEL_FILE_MAGIC_GGJT:
-        switch (version) {
-          case 1:
-            file_version = MODEL_FILE_VERSION_GGJT_V1;
-            return;
-          case 2:
-            file_version = MODEL_FILE_VERSION_GGJT_V2;
-            return;
-          case 3:
-            file_version = MODEL_FILE_VERSION_GGJT_V3;
-            return;
-        }
-    }
-
-    throw format("unknown (magic, version) combination: %08x, %08x; is this really a NE file?", magic, version);
-  }
-
-
-  void read_magic(model_load_tensors_map& tensors_map) {
-    char gguf_magic[4];
-    const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
-    bool ok = true;
-    ok = ok & gguf_magic[0] == 'G';
-    ok = ok & gguf_magic[1] == 'G';
-    ok = ok & gguf_magic[2] == 'U';
-    ok = ok & gguf_magic[3] == 'F';
-
-    if (ok) {
-      std::cout << "Loading the bin file with GGUF format..." << std::endl;
-      fseek(file.fp, 0, SEEK_SET);
-      model_magic = GGUF;
-    } else {
-      std::cout << "Loading the bin file with NE format..." << std::endl;
-      fseek(file.fp, 0, SEEK_SET);
-      read_ne_magic();
-      read_hparams();
-      read_vocab();
-      model_magic = NE;
-      return;
-    }
-
-    struct gguf_context* ctx_gguf = NULL;
-    ctx_gguf = read_gguf(tensors_map);
-    if (!ctx_gguf) {
-      throw std::runtime_error(format("%s: failed to load model\n", __func__));
-    }
-
+  void gguf_load_from_file(struct gguf_context* ctx_gguf, model_hparams& hparams, model_vocab& vocab) {
     int n_kv = 0;
     n_kv = gguf_get_n_kv(ctx_gguf);
 
@@ -885,17 +844,6 @@ struct model_file_loader {
     fver = (enum llama_fver)gguf_get_version(ctx_gguf);
     printf("%s: loaded meta data with %d key-value pairs and %d tensors (version %s)\n", __func__, n_kv, n_tensors,
            llama_file_version_name(fver));
-
-    // struct ne_context* ctx_meta = NULL;
-    // calcaute the tensor data size
-    // int64_t n_elements = 0;
-    // size_t  n_bytes    = 0;
-    // for (int i = 0; i < n_tensors; i++) {
-    //     const char * name = gguf_get_tensor_name(ctx_gguf, i);
-    //     struct ggml_tensor * t = ggml_get_tensor(ctx_meta, name);
-    //     n_elements += ne_nelements(t);
-    //     n_bytes    += ggml_nbytes(t);
-    // }
 
     for (int i = 0; i < n_kv; i++) {
       const char* name = gguf_get_key(ctx_gguf, i);
@@ -982,13 +930,100 @@ struct model_file_loader {
       tok_score.tok = std::move(word);
       tok_score.score = scores ? scores[i] : 0.0f;
     }
+  }
+};
 
-    // std::cout << " vocab.id_to_token.size() = " << vocab.id_to_token.size() << std::endl;
-    // std::cout << " vocab.token_to_id.size() = " << vocab.token_to_id.size() << std::endl;
-    // NE_ASSERT(vocab.id_to_token.size() == vocab.token_to_id.size());
+struct model_file_loader {
+  model_file file;
+  model_file_version file_version;
+  model_hparams hparams;
+  model_vocab vocab;
+
+  size_t gguf_data_offset = 0;  // offset of the GGUF tensor data from the beginning of the file.
+  enum model_format model_magic = UNKNOWN;
+
+  model_file_loader(const char* fname, size_t file_idx, model_load_tensors_map& tensors_map) : file(fname, "rb") {
+    fprintf(stderr, "model.cpp: loading model from %s\n", fname);
+    model_magic = read_file_magic();
+    if (model_magic == GGUF) {
+      std::cout << "Loading the bin file with GGUF format..." << std::endl;
+      fseek(file.fp, 0, SEEK_SET);
+      model_magic = GGUF;
+
+      gguf_loader gguf_loader(file.fp);
+      
+      struct gguf_context* ctx_gguf = NULL;
+      ctx_gguf = gguf_loader.gguf_init_from_file(tensors_map, gguf_data_offset);
+      if (!ctx_gguf) {
+        throw std::runtime_error(format("%s: failed to load model\n", __func__));
+      }
+
+      gguf_loader.gguf_load_from_file(ctx_gguf, hparams, vocab);
+    } else if (model_magic == NE) {
+      std::cout << "Loading the bin file with NE format..." << std::endl;
+      fseek(file.fp, 0, SEEK_SET);
+      read_ne_magic();
+      read_ne_hparams();
+      read_ne_vocab();
+      read_tensor_metadata(file_idx, tensors_map);
+    } else {
+      throw format("unknown file format model_maigc = %d", model_magic);
+    }
   }
 
-  void read_hparams() {
+  void read_ne_magic() {
+    uint32_t magic = file.read_u32();
+
+    if (magic == MODEL_FILE_MAGIC_NE) {
+      file_version = MODEL_FILE_VERSION_NE;
+      return;
+    }
+
+    uint32_t version = file.read_u32();
+
+    switch (magic) {
+      case MODEL_FILE_MAGIC_GGMF:
+        switch (version) {
+          case 1:
+            file_version = MODEL_FILE_VERSION_GGMF_V1;
+            return;
+        }
+        break;
+      case MODEL_FILE_MAGIC_GGJT:
+        switch (version) {
+          case 1:
+            file_version = MODEL_FILE_VERSION_GGJT_V1;
+            return;
+          case 2:
+            file_version = MODEL_FILE_VERSION_GGJT_V2;
+            return;
+          case 3:
+            file_version = MODEL_FILE_VERSION_GGJT_V3;
+            return;
+        }
+    }
+
+    throw format("unknown (magic, version) combination: %08x, %08x; is this really a NE file?", magic, version);
+  }
+
+  enum model_format read_file_magic() {
+    char gguf_magic[4];
+    const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
+    bool ok = true;
+    ok = ok & gguf_magic[0] == 'G';
+    ok = ok & gguf_magic[1] == 'G';
+    ok = ok & gguf_magic[2] == 'U';
+    ok = ok & gguf_magic[3] == 'F';
+
+    if (ok) {
+      model_magic = GGUF;
+    } else {
+      model_magic = NE;
+    }
+    return model_magic;
+  }
+
+  void read_ne_hparams() {
     hparams.n_vocab = file.read_u32();
     hparams.n_embd = file.read_u32();
     hparams.n_mult = file.read_u32();
@@ -1016,7 +1051,7 @@ struct model_file_loader {
     file.read_raw(&hparams.freq_base, sizeof(float));
   }
 
-  void read_vocab() {
+  void read_ne_vocab() {
     file.read_raw(&vocab.bos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.eos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.pad_token_id, sizeof(model_vocab::id));
@@ -1040,10 +1075,6 @@ struct model_file_loader {
     }
   }
   void read_tensor_metadata(size_t file_idx, model_load_tensors_map& tensors_map) {
-    if (model_magic != NE) {
-      return;
-    }
-
     while (file.tell() < file.size) {
       model_load_tensor_shard shard;
       uint32_t n_dims = file.read_u32();
