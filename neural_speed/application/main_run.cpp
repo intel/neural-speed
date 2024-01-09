@@ -404,10 +404,11 @@ int main(int argc, char** argv) {  // NOLINT
   const float mirostat_eta = params.mirostat_eta;
   const bool penalize_nl = params.penalize_nl;
   model_token id = 0;
-
-  if (params.warmup) {
+  if (ns_log_level() >= 0 && params.warmup) {
+    // Warmup phase is used to generate static objects(e.g. JIT kernels)
+    int constexpr WarmUpPromptLen = 32;
     {
-      const std::vector<model_token> tmp(32, ctx->vocab.bos_token_id);
+      const std::vector<model_token> tmp(WarmUpPromptLen, ctx->vocab.bos_token_id);
       std::vector<model_input> inputs = {model_input{
           /*.tokens              =*/tmp.data(),
           /*.n_tokens           =*/(uint32_t)tmp.size(),
@@ -430,8 +431,8 @@ int main(int argc, char** argv) {  // NOLINT
           /*.tokens              =*/tmp.data(),
           /*.n_tokens           =*/(uint32_t)tmp.size(),
           /*.n_prompt_tokens    =*/0,
-          /*.n_past             =*/(uint32_t)(params.n_predict - 1),
-          /*.n_total            =*/(uint32_t)(params.n_predict - 1),
+          /*.n_past             =*/WarmUpPromptLen,
+          /*.n_total            =*/WarmUpPromptLen,
           /*.request_idx        =*/0,
           /*.beam_idx           =*/0,
           /*.padding_side       =*/0,
