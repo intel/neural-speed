@@ -14,7 +14,14 @@
 #pragma once
 #include <type_traits>
 
-#define BTLA_OPENMP ((_OPENMP) && (BTLA_USE_OPENMP))
+#define BTLA_OPENMP 0
+
+#ifdef BTLA_USE_OPENMP
+#ifdef _OPENMP
+#define BTLA_OPENMP 1
+#endif
+#endif
+
 #if BTLA_OPENMP
 #include <omp.h>
 #endif
