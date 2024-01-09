@@ -8,8 +8,8 @@ log_path=${log_dir}/clangformat.log
 cd /neural-speed
 git config --global --add safe.directory "*"
 
-cd /neural-speed/neural_speed
-python scripts/clang-format.py
+cd /neural-speed
+python clang-format.py
 
 echo "run git diff"
 git diff 2>&1 | tee -a ${log_path}

@@ -796,7 +796,7 @@ class PackedWeightParser {
     if (serialized_buf == nullptr) {
       return nullptr;
     }
-    auto tmpptr=const_cast<void*>(serialized_buf);
+    auto tmpptr = const_cast<void*>(serialized_buf);
     auto rptr = reinterpret_cast<int8_t*>(tmpptr);
     rptr += IWeightBase::offset();
     int mProID = utils::deserialize<int>(rptr);

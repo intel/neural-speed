@@ -408,9 +408,9 @@ void BTLAGemmPackBImpl(void* PackedBuf, int BlkSize, const int8_t* QData, const 
 }
 
 template <template <class, BTLA_ISA> class Wei_T>
-bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N,
-                               size_t K, size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype,
-                               bool isAsym, ne_comp_type CompType, int* shuffle_indice, void* ThreadPool) {
+bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N, size_t K,
+                        size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
+                        ne_comp_type CompType, int* shuffle_indice, void* ThreadPool) {
   GetCPUDevice();
   auto dtype_type = utils::bestla_dtype_type(QuantType);
   auto constexpr dtype_int = utils::bestla_dtype_type(BTLA_DTYPE::TypeInt);
