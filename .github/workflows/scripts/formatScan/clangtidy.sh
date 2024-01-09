@@ -11,7 +11,7 @@ log_path=${log_dir}/clangtidy.log
 cd ${REPO_DIR}
 mkdir build
 cd build
-cmake .. -G Ninja -DNS_USE_CLANG_TIDY=CHECK
+cmake .. -G Ninja -DNS_USE_CLANG_TIDY=CHECK -DBTLA_USE_OPENMP=OFF
 ninja 2>&1 | tee ${log_path}
 
 if [[ ! -f ${log_path} ]] || [[ $(grep -c "warning:" ${log_path}) != 0 ]]; then

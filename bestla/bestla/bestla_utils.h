@@ -14,13 +14,7 @@
 #pragma once
 #include <type_traits>
 
-#ifdef CLANGTIDY
-#define NO_CLANGTIDY false
-#else
-#define NO_CLANGTIDY true
-#endif
-
-#define BTLA_OPENMP ((_OPENMP) && (NO_CLANGTIDY))
+#define BTLA_OPENMP ((_OPENMP) && (BTLA_USE_OPENMP))
 #if BTLA_OPENMP
 #include <omp.h>
 #endif
