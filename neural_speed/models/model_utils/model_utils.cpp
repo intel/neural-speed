@@ -2731,13 +2731,18 @@ std::vector<std::vector<model_token>> beam_search(model_context* lctx, const int
 }
 
 std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs, const int n_input) {
-  NE_ASSERT(("There should be some input!", n_input > 0));
+  MODEL_ASSERT(("There should be some input!", n_input > 0));
   std::vector<std::vector<int>> groups{{0}};
   for (int i = 1; i < n_input; ++i) {
     const auto last_idx = inputs[i - 1].request_idx;
     const auto curr_idx = inputs[i].request_idx;
-    if (curr_idx != last_idx) groups.emplace_back();  // Here is the beginning of a new group
-    (*groups.end()).push_back(i);
+    if (curr_idx != last_idx)  {
+      groups.emplace_back();  // Here is the beginning of a new group
+    } else {
+      MODEL_ASSERT(("n_tokens should be same", inputs[i - 1].n_tokens == inputs[i].n_tokens));
+      MODEL_ASSERT(("n_past should be same", inputs[i - 1].n_past == inputs[i].n_past));
+    }
+    groups.back().push_back(i);
   }
   return groups;
 }
