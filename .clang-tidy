@@ -13,7 +13,7 @@ Checks: >
     readability-static-definition-in-anonymous-namespace,
     readability-uniqueptr-delete-release,
     readability-container-size-empty,
-    readability-delete-null-pointer,
+    # readability-delete-null-pointer,  // not applicable for gcc/msvc
     readability-make-member-function-const,
     readability-redundant-access-specifiers,
     performance-for-range-copy,

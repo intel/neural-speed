@@ -2434,14 +2434,19 @@ void whisper_free(struct whisper_context* ctx) {
     if (ctx->model.ctx) {
       ne_free(ctx->model.ctx);
     }
-    delete ctx->model.buf;
-
+    if (ctx->model.buf) {
+      delete ctx->model.buf;
+    }
     whisper_free_state(ctx->state);
     delete ctx;
   }
 }
 
-void whisper_free_params(struct whisper_full_params* params) { delete params; }
+void whisper_free_params(struct whisper_full_params* params) {
+  if (params) {
+    delete params;
+  }
+}
 
 int whisper_pcm_to_mel_with_state(struct whisper_context* ctx, struct whisper_state* state, const float* samples,
                                   int n_samples, int n_threads) {
