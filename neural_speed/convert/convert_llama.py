@@ -47,10 +47,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     model, config, quantize_config = load_hf_model(model_path)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    # import pdb; pdb.set_trace()
-    # for key in tokenizer.vocab:
-    #     print(key, tokenizer.vocab[key])
-    # import sys; sys.exit()
     config = config.to_dict()
     model = model.state_dict()
     f = open(out_path, "wb")
@@ -105,24 +101,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))
 
     # 2. vocab
-    tokenizer_path = os.path.join(model_path, "tokenizer.model")
-    if os.path.exists(tokenizer_path):
-        vocab = load_vocab(Path(tokenizer_path))
-        for text, score in vocab.all_tokens():
-            f.write(struct.pack("i", len(text)))
-            f.write(text)
-            f.write(struct.pack("f", score))
-    # import pdb; pdb.set_trace()
-    else:
-        # dummy vocab
-        for text in tokenizer.vocab:
-            score = tokenizer.vocab[text]
-            
-            text = bytearray(text, encoding="utf-8")
-            f.write(struct.pack("i", len(text)))
-            f.write(text)
-            f.write(struct.pack("f", score))
-
+    tokenizer_path = tokenizer.vocab_file
+    vocab = load_vocab(Path(tokenizer_path))
+    for text, score in vocab.all_tokens():
+        f.write(struct.pack("i", len(text)))
+        f.write(text)
+        f.write(struct.pack("f", score))
 
     # 3. write tensors
     list_vars = model
@@ -131,7 +115,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
 
     for i in range(n_layer):
-        # import pdb; pdb.set_trace()
         convert_fp32_to_jblas_tensor(f"model.layers.{i}.self_attn.q_proj",
                     f"layers.{i}.attention.wq.weight", list_vars, f, n_head, n_head,
                     permute_func=permute_func)
