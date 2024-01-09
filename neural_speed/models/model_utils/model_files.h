@@ -743,7 +743,7 @@ struct model_file_loader {
         case NE_TYPE_Q5_0:
         case NE_TYPE_Q5_1:
         case NE_TYPE_Q8_0:
-        case NE_TYPE_JBLAS:
+        case NE_TYPE_BTLA:
           break;
         default: {
           throw format("unrecognized tensor type %u\n", shard.type);
@@ -846,15 +846,20 @@ struct model_file_loader {
   }
 
   void read_magic(model_load_tensors_map& tensors_map) {
-    std::string gguf = "GGUF";
     char gguf_magic[4];
     const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
-    if (strcmp(gguf.c_str(), gguf_magic) == 0) {
-      std::cout << "loading the bin file with GGUF format." << std::endl;
+    bool ok = true;
+    ok = ok & gguf_magic[0] == 'G';
+    ok = ok & gguf_magic[1] == 'G';
+    ok = ok & gguf_magic[2] == 'U';
+    ok = ok & gguf_magic[3] == 'F';
+
+    if (ok) {
+      std::cout << "Loading the bin file with GGUF format..." << std::endl;
       fseek(file.fp, 0, SEEK_SET);
       model_magic = 0;
     } else {
-      std::cout << "loading the bin file with NE format." << std::endl;
+      std::cout << "Loading the bin file with NE format..." << std::endl;
       fseek(file.fp, 0, SEEK_SET);
       read_ne_magic();
       read_hparams();

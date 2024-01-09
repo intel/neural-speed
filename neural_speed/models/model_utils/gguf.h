@@ -23,7 +23,7 @@
 #include <cstdio>
 #endif
 
-#include "core/layers/jblas_common.hpp"
+#include "core/layers/bestla_common.hpp"
 #include "core/ne_layers.h"
 #include "models/model_utils/util.h"
 
