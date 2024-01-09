@@ -303,10 +303,20 @@ class CpuDevice {
           for (auto& i : SMT_core) printf("%d,", i);
           printf("\n");
         }
-        E_L1Cache = L1[E_core[0]];
-        E_L2Cache = L2[E_core[0]] / 4;
-        L1Cache = E_L1Cache > L1[P_core[0]] / 2 ? L1[P_core[0]] / 2 : E_L1Cache;
-        L2Cache = E_L2Cache > L2[P_core[0]] / 2 ? L2[P_core[0]] / 2 : E_L2Cache;
+        if (E_core.size() > 0 && P_core.size() > 0) {
+          E_L1Cache = L1[E_core[0]];
+          E_L2Cache = L2[E_core[0]] / 4;
+          L1Cache = E_L1Cache > L1[P_core[0]] / 2 ? L1[P_core[0]] / 2 : E_L1Cache;
+          L2Cache = E_L2Cache > L2[P_core[0]] / 2 ? L2[P_core[0]] / 2 : E_L2Cache;
+        } else if (P_core.size() > 0) {
+          L1Cache = L1[P_core[0]] / 2;
+          L2Cache = L2[P_core[0]] / 2;
+          mHybrid = false;
+        } else {
+          L1Cache = L1[E_core[0]];
+          L2Cache = L2[E_core[0]] / 4;
+          mHybrid = false;
+        }
       }
       numcores = P_core.size() + E_core.size();
       numthreads = P_core.size() * 2 + E_core.size();
