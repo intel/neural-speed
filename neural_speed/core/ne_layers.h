@@ -188,7 +188,7 @@ NE_API struct ne_tensor* ne_acc(struct ne_context* ctx, struct ne_tensor* a, str
 
 NE_API struct ne_tensor* ne_acc_inplace(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b, size_t nb1,
                                         size_t nb2, size_t nb3, size_t offset);
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
 NE_API struct ne_tensor* ne_split(struct ne_context* ctx, struct ne_tensor* a, enum parallel_mode p_mode, bool trans);
 
 NE_API struct ne_tensor* ne_all_reduce(struct ne_context* ctx, struct ne_tensor* a);

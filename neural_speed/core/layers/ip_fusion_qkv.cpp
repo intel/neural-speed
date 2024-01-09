@@ -71,8 +71,8 @@ void GemmRunWithA_QKV(Launch_T* launcher, const typename Launch_T::Param* args, 
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
-                      storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK, storage::gemm::IWeightBase* _BV,
-                      float* C, const int ldc, int8_t* WorkSpace, parallel::IThreading* th) {
+                     storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK, storage::gemm::IWeightBase* _BV,
+                     float* C, const int ldc, int8_t* WorkSpace, parallel::IThreading* th) {
   if (M <= 16) {
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     using Launcher = tLauncher_Fp_F32F32<GemmCore_T, Wei_T>;
@@ -131,9 +131,8 @@ void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, cons
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompInt8(const int M, const int N, const int K, const float* A, const int lda,
-                       storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK,
-                       storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
-                       parallel::IThreading* th) {
+                      storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK, storage::gemm::IWeightBase* _BV,
+                      float* C, const int ldc, int8_t* WorkSpace, parallel::IThreading* th) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher = tLauncher_Int8_F32F32<GemmCore_T, Wei_T>;
   auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
@@ -212,21 +211,21 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
     if (btype == gemm::CompType::tFP32 && PackRow == 1) {
       if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
         ip_qkv::BTLAGemmCompF32<tAVX512F, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                     workspace, pth);
+                                                    workspace, pth);
       } else if (NTile == tAVX2::NTILE && _cd->AVX2() && BlkSize % tAVX2::KTILE == 0) {
         ip_qkv::BTLAGemmCompF32<tAVX2, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                  workspace, pth);
+                                                 workspace, pth);
       }
     }
     if (btype == gemm::CompType::tBF16 && PackRow == 2) {
       if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
         if (_m <= tAVX512_BF16::MTILE) {
           static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-          ip_qkv::BTLAGemmCompF32<tAVX512_BF16, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                           ldo, workspace, pth);
+          ip_qkv::BTLAGemmCompF32<tAVX512_BF16, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
+                                                          workspace, pth);
         } else {
           ip_qkv::BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                        workspace, pth);
+                                                       workspace, pth);
         }
       }
     }
@@ -235,19 +234,19 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
         if (_m <= tAVX512_VNNI_KBlock::MTILE) {
           static_assert(tAVX512_VNNI_KBlock::NTILE == tAMX_INT8_SS_KBlock::NTILE);
           ip_qkv::BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                   output, ldo, workspace, pth);
+                                                                  output, ldo, workspace, pth);
         } else {
           ip_qkv::BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                   output, ldo, workspace, pth);
+                                                                  output, ldo, workspace, pth);
         }
 
       } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                  BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
         ip_qkv::BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                 output, ldo, workspace, pth);
+                                                                output, ldo, workspace, pth);
       } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
         ip_qkv::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                              ldo, workspace, pth);
+                                                             ldo, workspace, pth);
       }
     }
   }
@@ -257,10 +256,10 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
     if (btype == gemm::CompType::tFP32 && PackRow == 1) {
       if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
         ip_qkv::BTLAGemmCompF32<tAVX512F, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                       workspace, pth);
+                                                      workspace, pth);
       } else if (NTile == tAVX2::NTILE && _cd->AVX2() && BlkSize % tAVX2::KTILE == 0) {
         ip_qkv::BTLAGemmCompF32<tAVX2, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                    workspace, pth);
+                                                   workspace, pth);
       }
     }
     if (btype == gemm::CompType::tBF16 && PackRow == 2) {
@@ -268,10 +267,10 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
         if (_m <= tAVX512_BF16::MTILE) {
           static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
           ip_qkv::BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                             ldo, workspace, pth);
+                                                            ldo, workspace, pth);
         } else {
           ip_qkv::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                          workspace, pth);
+                                                         workspace, pth);
         }
       }
     }

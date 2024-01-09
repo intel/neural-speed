@@ -38,7 +38,7 @@ bool gptj_model_eval_ids(model_context* ctx, model_token* tokens, size_t n_eval,
   if (static_cast<int>(n_eval) > n_ctx - 4) {
     fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, static_cast<int>(n_eval),
             n_ctx - 4);
-    return 1;
+    return true;
   }
 
   std::vector<model_input> inputs = {model_input{
@@ -50,9 +50,9 @@ bool gptj_model_eval_ids(model_context* ctx, model_token* tokens, size_t n_eval,
       /*.request_idx        =*/0,
       /*.beam_idx           =*/0,
   }};
-  if (model_eval(ctx, inputs.data(), inputs.size(), n_threads)) {
+  if (!model_eval(ctx, inputs.data(), inputs.size(), n_threads)) {
     fprintf(stderr, "%s : failed to eval\n", __func__);
-    return 1;
+    return false;
   }
   return true;
 }
@@ -86,7 +86,7 @@ void* init_gptj(int seed, int n_predict, int n_batch, int top_k, float top_p, fl
   model_context* ctx;
   g_ctx = &ctx;
   ctx = model_init_from_gpt_params(params);
-  if (ctx == NULL) {
+  if (ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model\n", __func__);
     return nullptr;
   }
@@ -123,7 +123,7 @@ int32_t* eval_gptj_ids(void* ctx, int32_t* embd_inp_ptr, int ind_size, int n_pre
     std::vector<model_token> embd;
     for (int i = embd.size(); i < embd_inp.size() + n_predict; i++) {
       // predict
-      if (embd.size() > 0) {
+      if (!embd.empty()) {
         if (!gptj_model_eval_ids(lctx, embd.data(), embd.size(), n_past, n_threads)) {
           printf("Failed to predict\n");
           return {};
@@ -198,7 +198,7 @@ char* eval_gptj_char(void* ctx, const char* prom, int n_predict, int top_k, floa
     std::vector<float> logits;
     for (int i = embd.size(); i < embd_inp.size() + n_predict; i++) {
       // predict
-      if (embd.size() > 0) {
+      if (!embd.empty()) {
         if (!gptj_model_eval_ids(lctx, embd.data(), embd.size(), n_past, N_threads)) {
           printf("Failed to predict\n");
           return {};

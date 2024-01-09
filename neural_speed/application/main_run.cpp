@@ -115,7 +115,7 @@ int main(int argc, char** argv) {  // NOLINT
   }
 
   if (params.seed < 0) {
-    params.seed = time(NULL);
+    params.seed = time(nullptr);
   }
 
   fprintf(stderr, "%s: seed  = %d\n", __func__, params.seed);
@@ -132,7 +132,7 @@ int main(int argc, char** argv) {  // NOLINT
 
   // load the model and apply lora adapter, if any
   ctx = model_init_from_gpt_params(params);
-  if (ctx == NULL) {
+  if (ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model\n", __func__);
     return 1;
   }
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {  // NOLINT
 
     // fopen to check for existing session
     FILE* fp = std::fopen(path_session.c_str(), "rb");
-    if (fp != NULL) {
+    if (fp != nullptr) {
       std::fclose(fp);
 
       session_tokens.resize(params.n_ctx);
@@ -250,7 +250,7 @@ int main(int argc, char** argv) {  // NOLINT
 
   // debug message about similarity of saved session, if applicable
   size_t n_matching_session_tokens = 0;
-  if (session_tokens.size()) {
+  if (!session_tokens.empty()) {
     for (model_token id : session_tokens) {
       if (n_matching_session_tokens >= embd_inp.size() || id != embd_inp[n_matching_session_tokens]) {
         break;
@@ -281,7 +281,7 @@ int main(int argc, char** argv) {  // NOLINT
   // in instruct mode, we inject a prefix and a suffix to each input by the user
   if (params.instruct) {
     params.interactive_first = true;
-    params.antiprompt.push_back("### Instruction:\n\n");
+    params.antiprompt.emplace_back("### Instruction:\n\n");
   }
 
   // enable interactive mode if interactive start is specified
@@ -315,7 +315,7 @@ int main(int argc, char** argv) {  // NOLINT
     sigint_action.sa_handler = sigint_handler;
     sigemptyset(&sigint_action.sa_mask);
     sigint_action.sa_flags = 0;
-    sigaction(SIGINT, &sigint_action, NULL);
+    sigaction(SIGINT, &sigint_action, nullptr);
 #elif defined(_WIN32)
     auto console_ctrl_handler =
         +[](DWORD ctrl_type) -> BOOL { return (ctrl_type == CTRL_C_EVENT) ? (sigint_handler(SIGINT), true) : false; };
@@ -324,8 +324,8 @@ int main(int argc, char** argv) {  // NOLINT
 
     fprintf(stderr, "%s: interactive mode on.\n", __func__);
 
-    if (params.antiprompt.size()) {
-      for (auto antiprompt : params.antiprompt) {
+    if (!params.antiprompt.empty()) {
+      for (auto& antiprompt : params.antiprompt) {
         fprintf(stderr, "Reverse prompt: '%s'\n", antiprompt.c_str());
       }
     }
@@ -444,7 +444,7 @@ int main(int argc, char** argv) {  // NOLINT
 
   while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
     // predict
-    if (embd.size() > 0) {
+    if (!embd.empty()) {
       // infinite text generation via context swapping
       // if we run out of context:
       // - take the n_keep first tokens from the original prompt (via n_past)
@@ -532,7 +532,7 @@ int main(int argc, char** argv) {  // NOLINT
         }
         model_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
 
-#ifdef NE_BUILD_TESTS
+#ifdef NS_BUILD_TESTS
         std::ofstream outFile("logits.txt", std::ios::app);
         for (model_token token_id = 0; token_id < n_vocab; token_id++) {
           outFile << logits[token_id] << " ";
@@ -576,7 +576,7 @@ int main(int argc, char** argv) {  // NOLINT
         }
         // printf("`%d`", candidates_p.size);
 
-        if (embd.size() > 0 && !path_session.empty()) {
+        if (!embd.empty() && !path_session.empty()) {
           session_tokens.insert(session_tokens.end(), embd.begin(), embd.end());
           n_session_consumed = session_tokens.size();
         }
@@ -598,7 +598,7 @@ int main(int argc, char** argv) {  // NOLINT
       // replace end of text token with newline token when in interactive mode
       if (id == ctx->vocab.eos_token_id && params.interactive && !params.instruct) {
         id = model_token_newline.front();
-        if (params.antiprompt.size() != 0) {
+        if (!params.antiprompt.empty()) {
           // tokenize and inject first reverse prompt
           const auto first_antiprompt = ::model_tokenize(ctx, params.antiprompt.front(), false);
           embd_inp.insert(embd_inp.end(), first_antiprompt.begin(), first_antiprompt.end());
@@ -659,7 +659,7 @@ int main(int argc, char** argv) {  // NOLINT
     // if not currently processing queued inputs;
     if (static_cast<int>(embd_inp.size()) <= n_consumed) {
       // check for reverse prompt
-      if (params.antiprompt.size()) {
+      if (!params.antiprompt.empty()) {
         std::string last_output;
         for (auto id : last_n_tokens) {
           last_output += model_token_to_str(ctx, id);
@@ -676,7 +676,7 @@ int main(int argc, char** argv) {  // NOLINT
                   ? last_output.length() - static_cast<size_t>(antiprompt.length() + extra_padding)
                   : 0;
 
-          if (last_output.find(antiprompt.c_str(), search_start_pos) != std::string::npos) {
+          if (last_output.find(antiprompt, search_start_pos) != std::string::npos) {
             if (params.interactive) {
               is_interacting = true;
               console_set_color(con_st, CONSOLE_COLOR_USER_INPUT);

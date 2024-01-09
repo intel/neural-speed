@@ -21,7 +21,7 @@
 
 #include "bestla/jit_blas_utils.h"
 
-#ifndef NE_TESTS
+#ifndef NS_TESTS
 static_assert(false, "Only include this header file for testing!");
 #endif
 

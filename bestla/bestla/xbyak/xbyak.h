@@ -439,7 +439,7 @@ namespace util {
 inline int getMacOsVersionPure() {
   char buf[64];
   size_t size = sizeof(buf);
-  int err = sysctlbyname("kern.osrelease", buf, &size, NULL, 0);
+  int err = sysctlbyname("kern.osrelease", buf, &size, nullptr, 0);
   if (err != 0) return 0;
   char* endp;
   int major = strtol(buf, &endp, 10);
@@ -495,7 +495,7 @@ class MmapAllocator : public Allocator {
       }
     }
 #endif
-    void* p = mmap(NULL, size, PROT_READ | PROT_WRITE, mode, fd, 0);
+    void* p = mmap(nullptr, size, PROT_READ | PROT_WRITE, mode, fd, 0);
     if (p == MAP_FAILED) {
       if (fd != -1) close(fd);
       XBYAK_THROW_RET(ERR_CANT_ALLOC, 0)

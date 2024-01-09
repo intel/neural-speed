@@ -103,9 +103,9 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Laun
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <class, BTLA_ISA> class Act_T,
           template <BTLA_ISA> class Epi_T1, template <BTLA_ISA> class Epi_T2>
 void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
-                      float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
-                      parallel::IThreading* th, typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                      typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                     float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
+                     parallel::IThreading* th, typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
+                     typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
   if (seq <= 16) {
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     using Launcher_epi = wrapper::gemm::LauncherKBlock<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T,
@@ -185,9 +185,9 @@ void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, stora
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <BTLA_ISA> class Epi_T1,
           template <BTLA_ISA> class Epi_T2>
 void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
-                       float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
-                       parallel::IThreading* th, typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                       typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                      float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
+                      parallel::IThreading* th, typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
+                      typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher_epi =
       wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
@@ -423,10 +423,10 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <class, BTLA_ISA> class Act_T,
           template <BTLA_ISA> class Epi_T1, template <BTLA_ISA> class Epi_T2>
 void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
-                      storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
-                      int fmid, int fout, void* workspace, parallel::IThreading* th,
-                      typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                      typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                     storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
+                     int fmid, int fout, void* workspace, parallel::IThreading* th,
+                     typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
+                     typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
   if (seq <= 16) {
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     using Launcher_epi = wrapper::gemm::LauncherKBlock<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T,
@@ -504,10 +504,10 @@ void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, stora
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <BTLA_ISA> class Epi_T1,
           template <BTLA_ISA> class Epi_T2>
 void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
-                       storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
-                       int fmid, int fout, void* workspace, parallel::IThreading* th,
-                       typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                       typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                      storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
+                      int fmid, int fout, void* workspace, parallel::IThreading* th,
+                      typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
+                      typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher_epi =
       wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
@@ -596,13 +596,13 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
       auto BlkSize = bptr->mBlockSize;
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
-          BTLAGemmCompF32<tAVX512F, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
-              activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-              epi_args2);
+          BTLAGemmCompF32<tAVX512F, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+                                                                                  tmp2, output, seq, fin, fmid, fout,
+                                                                                  workspace, pth, epi_args1, epi_args2);
         } else if (NTile == tAVX2::NTILE && _cd->AVX2() && BlkSize % tAVX2::KTILE == 0) {
-          BTLAGemmCompF32<tAVX2, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
-                                                                                tmp2, output, seq, fin, fmid, fout,
-                                                                                workspace, pth, epi_args1, epi_args2);
+          BTLAGemmCompF32<tAVX2, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
+                                                                               output, seq, fin, fmid, fout, workspace,
+                                                                               pth, epi_args1, epi_args2);
         }
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
@@ -623,24 +623,24 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
         if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           if (seq <= tAVX512_VNNI_KBlock::MTILE) {
             static_assert(tAVX512_VNNI_KBlock::NTILE == tAMX_INT8_SS_KBlock::NTILE);
-            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-                epi_args2);
+            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+                                                                                  tmp2, output, seq, fin, fmid, fout,
+                                                                                  workspace, pth, epi_args1, epi_args2);
           } else {
-            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-                epi_args2);
+            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+                                                                                  tmp2, output, seq, fin, fmid, fout,
+                                                                                  workspace, pth, epi_args1, epi_args2);
           }
 
         } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                    BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
           BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
-                                                                                 tmp2, output, seq, fin, fmid, fout,
-                                                                                 workspace, pth, epi_args1, epi_args2);
+                                                                                tmp2, output, seq, fin, fmid, fout,
+                                                                                workspace, pth, epi_args1, epi_args2);
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
-                                                                              output, seq, fin, fmid, fout, workspace,
-                                                                              pth, epi_args1, epi_args2);
+                                                                             output, seq, fin, fmid, fout, workspace,
+                                                                             pth, epi_args1, epi_args2);
         }
       }
     }
@@ -654,8 +654,8 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
               epi_args2);
         } else if (NTile == tAVX2::NTILE && _cd->AVX2() && BlkSize % tAVX2::KTILE == 0) {
           BTLAGemmCompF32<tAVX2, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
-                                                                                  tmp2, output, seq, fin, fmid, fout,
-                                                                                  workspace, pth, epi_args1, epi_args2);
+                                                                                 tmp2, output, seq, fin, fmid, fout,
+                                                                                 workspace, pth, epi_args1, epi_args2);
         }
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {

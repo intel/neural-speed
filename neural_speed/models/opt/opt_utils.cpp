@@ -177,7 +177,7 @@ void OPT::load(model_context* ctx, model_progress_callback progress_callback, vo
     model.tensors_by_name.emplace_back(lt.name, lt.ne_tensor);
   }
 
-  ml->load_all_data(progress_callback, progress_callback_user_data, use_mlock ? &lctx.model.mlock_mmap : NULL);
+  ml->load_all_data(progress_callback, progress_callback_user_data, use_mlock ? &lctx.model.mlock_mmap : nullptr);
 
   if (progress_callback) {
     progress_callback(1.0f, progress_callback_user_data);

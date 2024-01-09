@@ -28,7 +28,7 @@
 #include "common.h"
 #include "models/model_utils/model_utils.h"
 
-std::shared_ptr<quant_layer_base> get_model_quant_layer(const std::string model_name) {
+std::shared_ptr<quant_layer_base> get_model_quant_layer(const std::string& model_name) {
   return ql_registry::create_ql(model_name);
 }
 

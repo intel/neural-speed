@@ -65,7 +65,7 @@
       "inherits": "x64-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "NE_BTLA_UT": "ON"
+        "NS_BTLA_UT": "ON"
       }
     }
   ]

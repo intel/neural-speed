@@ -19,7 +19,7 @@ class parallel_class {
  public:
   parallel_class(const parallel_class& obj) = delete;
   static parallel_class* get_instance() {
-    if (instance_p == NULL) {
+    if (instance_p == nullptr) {
       instance_p = new parallel_class();
       return instance_p;
     } else {
@@ -52,7 +52,7 @@ class parallel_class {
   static parallel_class* instance_p;
   parallel_class() {
     ccl::init();
-    MPI_Init(NULL, NULL);
+    MPI_Init(nullptr, nullptr);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -93,7 +93,7 @@ struct parallel_context {
   parallel_class* p_ctx;
 };
 
-parallel_class* parallel_class::instance_p = NULL;
+parallel_class* parallel_class::instance_p = nullptr;
 
 parallel_context* init_parallel_context() {
   parallel_context* p_struct = new parallel_context();

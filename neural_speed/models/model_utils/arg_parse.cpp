@@ -301,7 +301,7 @@ bool gpt_params_parse(int argc, char** argv, gpt_params& params) {  // NOLINT
         invalid_param = true;
         break;
       }
-      params.antiprompt.push_back(argv[i]);
+      params.antiprompt.emplace_back(argv[i]);
     } else if (arg == "--perplexity") {
       params.perplexity = true;
     } else if (arg == "--ignore-eos") {
@@ -383,7 +383,7 @@ bool gpt_params_parse(int argc, char** argv, gpt_params& params) {  // NOLINT
     exit(1);
   }
   if (params.prompt_cache_all &&
-      (params.interactive || params.interactive_first || params.instruct || params.antiprompt.size())) {
+      (params.interactive || params.interactive_first || params.instruct || !params.antiprompt.empty())) {
     fprintf(stderr, "error: --prompt-cache-all not supported in interactive mode yet\n");
     gpt_print_usage(argc, argv, default_params);
     exit(1);

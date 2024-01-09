@@ -26,7 +26,7 @@ namespace ne_bestla {
 class ne_threading {
  public:
   static bestla::parallel::IThreading* get() {
-#ifdef _OPENMP
+#if BTLA_OPENMP
     static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
     static bestla::parallel::StdThreading DefaultThreading(4);
@@ -188,7 +188,7 @@ class Add_Gelu {
     }
     using GeluKernel = bestla::epilogue::gemm::AccumulatorWriteBackWithGeluFp32<ISA_T>;
     static GeluKernel ker;
-    typename GeluKernel::Param param{_param.C, _param.ldc, NULL};
+    typename GeluKernel::Param param{_param.C, _param.ldc, nullptr};
     auto ret = ker.forward(cptr, _param.ldc, M_offset, N_offset, M, N, param, tmpcache, cachesize);
     return ret;
   }

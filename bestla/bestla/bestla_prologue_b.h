@@ -382,8 +382,7 @@ class WeightKBlockNInteger {
   void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
                    const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
     setQuantCorrection(N, K, zero_points, scales, stor, threading);
-    if (stor->mDType == BTLA_DTYPE::S8 || stor->mDType == BTLA_DTYPE::F8_E4M3 ||
-        stor->mDType == BTLA_DTYPE::F8_E5M2) {
+    if (stor->mDType == BTLA_DTYPE::S8 || stor->mDType == BTLA_DTYPE::F8_E4M3 || stor->mDType == BTLA_DTYPE::F8_E5M2) {
       reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
     } else {
       auto reorded = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
@@ -774,8 +773,8 @@ class WeightKBlockNInteger {
     auto ptr = reinterpret_cast<StorageWeight*>(stor);
     auto quant_dtype = ptr->mDType;
     if (quant_dtype == BTLA_DTYPE::S8) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S8>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
+      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S8>(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                               scales, zero_points, ptr->mBlockSize);
     } else if (quant_dtype == BTLA_DTYPE::S4_FULLRANGE) {
       kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S4_FULLRANGE>(
           srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
@@ -953,20 +952,20 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
     auto ptr = reinterpret_cast<StorageWeight*>(stor);
     auto quant_dtype = ptr->mDType;
     if (quant_dtype == BTLA_DTYPE::F8_E4M3) {
-      kernel::wrapper::QuantizeF8RowBlock::forward<ISA_T, BTLA_DTYPE::F8_E4M3>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, ptr->mBlockSize, ptr->SDtype());
+      kernel::wrapper::QuantizeF8RowBlock::forward<ISA_T, BTLA_DTYPE::F8_E4M3>(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                               scales, ptr->mBlockSize, ptr->SDtype());
     } else if (quant_dtype == BTLA_DTYPE::F8_E5M2) {
-      kernel::wrapper::QuantizeF8RowBlock::forward<ISA_T, BTLA_DTYPE::F8_E5M2>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, ptr->mBlockSize, ptr->SDtype());
+      kernel::wrapper::QuantizeF8RowBlock::forward<ISA_T, BTLA_DTYPE::F8_E5M2>(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                               scales, ptr->mBlockSize, ptr->SDtype());
     } else if (quant_dtype == BTLA_DTYPE::F4_BNB) {
       kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_BNB>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                               scales, zero_points, ptr->mBlockSize);
+                                                                              scales, zero_points, ptr->mBlockSize);
     } else if (quant_dtype == BTLA_DTYPE::F4_E2M1) {
-      kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_E2M1>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
+      kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_E2M1>(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                               scales, zero_points, ptr->mBlockSize);
     } else if (quant_dtype == BTLA_DTYPE::F4_NF4) {
       kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_NF4>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                               scales, zero_points, ptr->mBlockSize);
+                                                                              scales, zero_points, ptr->mBlockSize);
     } else {
       assert(0);
     }

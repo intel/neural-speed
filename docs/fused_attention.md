@@ -118,7 +118,7 @@ Thanks to the mathematical nature of attention, one can simply parallel the whol
 Row logs:
 ```
 # fused attn enabled
-rm -rf bin && cmake .. -GNinja -DNE_BUILD_TESTS=ON -DNE_PROFILING=ON -DCMAKE_BUILD_TYPE=Release && ninja run_llama && env ENGINE_PROFILING=1 numactl -m 1 -C 56-111 bin/run_llama -m llama-7b-hf-pr447-q4j-sym-int8-fp32-g128.bin --seed 1234 -t 56 -b 2048 -c 2048 -n 4 --memory-auto -p "$(echo "$LUOYU_PROMPT" | cut -d' ' -f 1-1500)"
+rm -rf bin && cmake .. -GNinja -DNS_BUILD_TESTS=ON -DNE_PROFILING=ON -DCMAKE_BUILD_TYPE=Release && ninja run_llama && env ENGINE_PROFILING=1 numactl -m 1 -C 56-111 bin/run_llama -m llama-7b-hf-pr447-q4j-sym-int8-fp32-g128.bin --seed 1234 -t 56 -b 2048 -c 2048 -n 4 --memory-auto -p "$(echo "$LUOYU_PROMPT" | cut -d' ' -f 1-1500)"
 Welcome to use the llama on the ITREX!
 ...
 === GRAPH Profiling ===
@@ -199,7 +199,7 @@ prediction   2, time: 41.22ms
 prediction   3, time: 41.27ms
 
 # fused attn disabled
-rm -rf bin && cmake .. -GNinja -DNE_BUILD_TESTS=ON -DNE_PROFILING=ON -DCMAKE_BUILD_TYPE=Release && ninja run_llama && env ENGINE_PROFILING=1 numactl -m 1 -C 56-111 bin/run_llama -m llama-7b-hf-pr447-q4j-sym-int8-fp32-g128.bin --seed 1234 -t 56 -b 2048 -c 2048 -n 4 --memory-f16 -p "$(echo "$LUOYU_PROMPT" | cut -d' ' -f 1-1500)"
+rm -rf bin && cmake .. -GNinja -DNS_BUILD_TESTS=ON -DNE_PROFILING=ON -DCMAKE_BUILD_TYPE=Release && ninja run_llama && env ENGINE_PROFILING=1 numactl -m 1 -C 56-111 bin/run_llama -m llama-7b-hf-pr447-q4j-sym-int8-fp32-g128.bin --seed 1234 -t 56 -b 2048 -c 2048 -n 4 --memory-f16 -p "$(echo "$LUOYU_PROMPT" | cut -d' ' -f 1-1500)"
 Welcome to use the llama on the ITREX!
 ...
 === GRAPH Profiling ===

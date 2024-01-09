@@ -14,9 +14,10 @@
 
 include(cmake/ISA.cmake)
 include(cmake/Common.cmake)
+include(cmake/ClangTidy.cmake)
 
 set(COMMON_HEADER_DIRS ./)
-if(NE_GPU)
+if(NS_GPU)
   list(APPEND COMMON_HEADER_DIRS ${GPU_ROOT}/include)
   list(APPEND COMMON_LIB_DIRS ${GPU_ROOT})
 endif()
@@ -28,6 +29,6 @@ add_subdirectory(core)
 add_subdirectory(vectors)
 add_subdirectory(models)
 
-if (NE_BUILD_APPLICATIONS)
+if (NS_BUILD_APPLICATIONS)
     add_subdirectory(application)
 endif()

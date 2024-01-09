@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 add_subdirectory(cpu)
-if (NE_GPU)
+if (NS_GPU)
   add_subdirectory(gpu)
 endif()
 

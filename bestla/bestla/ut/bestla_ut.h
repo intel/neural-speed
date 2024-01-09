@@ -114,7 +114,7 @@ static void fill_buffer_randn(_T* buf, size_t size, _T minval, _T maxval) {
 template <typename _T>
 utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   auto w1fp = fopen(filepath, "rb");
-  if (w1fp == NULL) {
+  if (w1fp == nullptr) {
     return utils::aligned_vector<_T>();
   }
   fseek(w1fp, 0, SEEK_END);

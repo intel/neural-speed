@@ -8,3 +8,8 @@
 .vscode/*
 bestla/build/
 bestla/build/*
+neural_speed.egg-info/
+build/
+debug/
+.eggs/
+dist/
