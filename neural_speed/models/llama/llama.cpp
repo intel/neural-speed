@@ -221,7 +221,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         struct ne_tensor* cossin_cache = nullptr;
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
-        if (N == 1) cossin_cache = kv_self.cossin;
+        if (N == 1) {
+          cossin_cache = kv_self.cossin;
+        }
          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
                                   hparams.freq_scale);
       }
