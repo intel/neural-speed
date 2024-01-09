@@ -130,14 +130,14 @@ bool cbg_worker::update_seqs(std::vector<sequence*>* seqs, const int& n_input) {
 }
 
 // il_scheduler
-il_scheduler::il_scheduler(const gpt_params& params, const serve_policy& policy)
+il_scheduler::il_scheduler(const gpt_params& params, const std::string& policy)
     : params(params),
-      policy(policy),
+      policy(parse_serve_policy(policy)),
       waiting_pool(pool_property::WAITING),
       running_pool(pool_property::RUNNING),
       finished_pool(pool_property::FINISHED) {}
 
-il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, serve_policy::FCFS) {}
+il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, "fcfs") {}
 
 il_scheduler::~il_scheduler() {}
 
@@ -165,7 +165,7 @@ cbg_scheduler::cbg_scheduler(const gpt_params& params)
       free_req_idx(max_requests, true),
       max_input_length(max_requests * params.n_ctx) {}
 
-cbg_scheduler::cbg_scheduler(const gpt_params& params, const serve_policy& policy)
+cbg_scheduler::cbg_scheduler(const gpt_params& params, const std::string& policy)
     : il_scheduler(params, policy),
       max_requests(params.max_request_num),
       wr(params),

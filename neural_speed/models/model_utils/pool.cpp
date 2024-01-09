@@ -14,6 +14,15 @@
 
 #include "models/model_utils/pool.h"
 
+serve_policy parse_serve_policy(const std::string& policy) {
+  if (policy == "fcfs") {
+    return serve_policy::FCFS;
+  } else {
+    fprintf(stderr, "Unexpected serve_policy %s!", policy.c_str());
+    return serve_policy::UNKNOWN;
+  }
+}
+
 // fcfs_pool
 bool fcfs_pool::add(sequence* seq) {
   context.push(seq);

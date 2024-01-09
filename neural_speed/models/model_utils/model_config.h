@@ -98,6 +98,7 @@ struct gpt_params {
   int beam_size = 1;                            // only valid if use beam search
   int cont_batching = false;                    // whether to use continuous batching (concat multi sequences)
   int max_request_num = MODEL_MAX_REQUEST_NUM;  // maximum num of bearable requests in current env
+  std::string model_serve_policy = "fcfs";      // serve policy
 };
 
 bool gpt_params_parse(int argc, char** argv, gpt_params& params);

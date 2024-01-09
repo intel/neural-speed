@@ -62,7 +62,7 @@ class cbg_worker : public il_worker {
 class il_scheduler {
  public:
   explicit il_scheduler(const gpt_params& params);
-  il_scheduler(const gpt_params& params, const serve_policy& policy);
+  il_scheduler(const gpt_params& params, const std::string& policy);
   virtual ~il_scheduler();
 
   // TODO (YZT) kv cache ptr as input params
@@ -88,7 +88,7 @@ class il_scheduler {
 class cbg_scheduler : public il_scheduler {
  public:
   explicit cbg_scheduler(const gpt_params& params);
-  cbg_scheduler(const gpt_params& params, const serve_policy& policy);
+  cbg_scheduler(const gpt_params& params, const std::string& policy);
   ~cbg_scheduler();
 
   bool add_request(sequence* seq) override;

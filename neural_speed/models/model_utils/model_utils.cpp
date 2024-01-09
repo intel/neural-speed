@@ -2736,7 +2736,7 @@ std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs
   for (int i = 1; i < n_input; ++i) {
     const auto last_idx = inputs[i - 1].request_idx;
     const auto curr_idx = inputs[i].request_idx;
-    if (curr_idx != last_idx)  {
+    if (curr_idx != last_idx) {
       groups.emplace_back();  // Here is the beginning of a new group
     } else {
       MODEL_ASSERT(("n_tokens should be same", inputs[i - 1].n_tokens == inputs[i].n_tokens));

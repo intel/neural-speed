@@ -42,6 +42,7 @@
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/quant_utils.h"
+#include "models/model_utils/scheduler.h"
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <signal.h>
@@ -74,12 +75,72 @@ using Response = Query;
 using ResponseCallback = std::function<void(std::vector<Response>, int)>;
 }  // namespace
 
+void init_gpt_params(gpt_params* params, const std::string& model_path, int max_new_tokens = -1, int n_batch = 512,
+                     int ctx_size = 512, int seed = -1, int threads = 8, float repetition_penalty = 1.1f,
+                     int num_beams = 1, bool do_sample = false, int top_k = 40, float top_p = 0.95,
+                     float temperature = 0.8, int min_new_tokens = 0, float length_penalty = 1.0f,
+                     bool early_stopping = false, int n_keep = 0, int n_discard = -1, bool shift_roped_k = false,
+                     int batch_size = 1, model_vocab::id pad_token = -1, const std::string& memory_dtype = "auto",
+                     const bool& continuous_batching = false, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
+                     const std::string& serve_policy = "unknown") {
+  MODEL_ASSERT(params != nullptr);
+#ifdef MODEL_NAME
+  params->model_name = MODEL_NAME;
+#endif
+  params->model_arch = model_name_to_arch::init().find(params->model_name);
+  params->model = model_path;
+  params->n_predict = max_new_tokens;
+  params->n_batch = n_batch;
+  params->n_ctx = ctx_size;
+  params->seed = seed;
+  params->n_threads = threads;
+  params->repeat_penalty = repetition_penalty;
+  params->beam_size = num_beams;
+  params->do_sample = do_sample;
+  params->batch_size = batch_size;
+  params->beam_search = (num_beams > 1 && !do_sample);
+  params->top_k = top_k;
+  params->top_p = top_p;
+  params->temp = temperature;
+  params->n_keep = n_keep;
+  params->n_discard = n_discard;
+  params->shift_roped_k = shift_roped_k;
+  if (memory_dtype == "f32")
+    params->memory_type = KV_MEM_TYPE_F32;
+  else if (memory_dtype == "f16")
+    params->memory_type = KV_MEM_TYPE_F16;
+  else if (memory_dtype == "auto")
+    params->memory_type = KV_MEM_TYPE_AUTO;
+  else
+    fprintf(stderr, "Unexpected memory dtype %s!", memory_dtype.c_str());
+  if (batch_size > 1 && (!continuous_batching || params->model_arch != model_archs::MODEL_GPTJ)) {
+    params->memory_type = KV_MEM_TYPE_F16;  // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
+  }
+  params->cont_batching = continuous_batching;
+  params->max_request_num = std::max(batch_size, max_request_num);
+  params->model_serve_policy = serve_policy;
+
+  printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d\n",
+         params->beam_size, params->do_sample, params->top_k, params->top_p, params->cont_batching,
+         params->max_request_num);
+}
+
 class ModelServer {
  public:
-  explicit ModelServer(const ResponseCallback& response)
-      : response(response), waiting(), running(true), worker([&]() {
+  explicit ModelServer(const ResponseCallback& response, const std::string& model_path, int max_new_tokens, int n_batch,
+                       int ctx_size, int seed, int threads, float repetition_penalty, int num_beams, bool do_sample,
+                       int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty,
+                       bool early_stopping, int n_keep, int n_discard, bool shift_roped_k, int batch_size,
+                       model_vocab::id pad_token, const std::string& memory_dtype, const bool& continuous_batching,
+                       const int& max_request_num, const std::string& policy)
+      : response(response), waiting(), running(true), params(), policy(policy), worker([=]() {
+          init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
+                          num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
+                          early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
+                          continuous_batching, max_request_num);
           std::deque<Query> queue_finished;
           std::deque<Query> queue_running;
+          cbg_scheduler scheduler(params, policy);
           while (running) {
             {                                               // add waitting tasks queue to running queue
               std::lock_guard<std::mutex> lock(queue_mtx);  // need lock as issueQuery may also access waiting
@@ -96,7 +157,7 @@ class ModelServer {
 
                 if (!finished.empty()) {
                   py::gil_scoped_acquire acquirer;
-                  py::print("ID", finished[0].id ,"finished in CPP server!");
+                  py::print("ID", finished[0].id, "finished in CPP server!");
                   this->response(finished, queue_running.size());
                 }
               }
@@ -109,7 +170,7 @@ class ModelServer {
             py::print("Worker stopped!");
           }
         }) {
-    py::print("CPP server launched!");
+    py::print("CPP server launched! The serve policy is", policy);
   };
   int issueQuery(std::vector<Query>& qs) {
     std::lock_guard<std::mutex> lock(queue_mtx);
@@ -134,6 +195,8 @@ class ModelServer {
   std::mutex queue_mtx;
   bool running;
   std::thread worker;
+  gpt_params params;
+  std::string policy;
 };
 
 std::shared_ptr<quant_layer_base> get_model_quant_layer(const std::string model_name) {
@@ -147,7 +210,7 @@ class Model {
   ~Model() {
     if (ctx) model_free(ctx);
   }
-  void init_model(const std::string& model_path, int n_predict, int n_batch, int ctx_size, int seed, int threads,
+  void init_model(const std::string& model_path, int max_new_tokens, int n_batch, int ctx_size, int seed, int threads,
                   float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p, float temperature,
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype,
@@ -244,43 +307,9 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
                        const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num) {
-#ifdef MODEL_NAME
-  params.model_name = MODEL_NAME;
-#endif
-  params.model_arch = model_name_to_arch::init().find(params.model_name);
-  params.model = model_path;
-  params.n_predict = max_new_tokens;
-  params.n_batch = n_batch;
-  params.n_ctx = ctx_size;
-  params.seed = seed;
-  params.n_threads = threads;
-  params.repeat_penalty = repetition_penalty;
-  params.beam_size = num_beams;
-  params.do_sample = do_sample;
-  params.batch_size = batch_size;
-  params.beam_search = (num_beams > 1 && !do_sample);
-  params.top_k = top_k;
-  params.top_p = top_p;
-  params.temp = temperature;
-  params.n_keep = n_keep;
-  params.n_discard = n_discard;
-  params.shift_roped_k = shift_roped_k;
-  if (memory_dtype == "f32")
-    params.memory_type = KV_MEM_TYPE_F32;
-  else if (memory_dtype == "f16")
-    params.memory_type = KV_MEM_TYPE_F16;
-  else if (memory_dtype == "auto")
-    params.memory_type = KV_MEM_TYPE_AUTO;
-  else
-    fprintf(stderr, "Unexpected memory dtype!");
-  if (batch_size > 1 && (!continuous_batching || params.model_arch != model_archs::MODEL_GPTJ)) {
-    params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
-  }
-  params.cont_batching = continuous_batching;
-  params.max_request_num = std::max(batch_size, max_request_num);
-
-  printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d\n",
-         params.beam_size, params.do_sample, params.top_k, params.top_p, params.cont_batching, params.max_request_num);
+  init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty, num_beams,
+                  do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping, n_keep,
+                  n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching, max_request_num);
 
   n_past = 0;
   n_total = 0;
@@ -798,6 +827,16 @@ PYBIND11_MODULE(qwen_cpp, m)
       .def_readwrite("id", &Query::id)
       .def_readwrite("token_ids", &Query::token_ids);
   py::class_<ModelServer>(m, "ModelServer", py::module_local())
-      .def(py::init<ResponseCallback>(), py::arg("response"))
+      .def(py::init<const ResponseCallback&, const std::string&, int, int, int, int, int, float, int, bool, int, float,
+                    float, int, float, bool, int, int, bool, int, model_vocab::id, const std::string&, const bool&,
+                    const int&, const std::string&>(),
+           py::arg("response"), py::arg("model_path"), py::arg("max_new_tokens") = -1, py::arg("n_batch") = 512,
+           py::arg("ctx_size") = 512, py::arg("seed") = -1, py::arg("threads") = 8,
+           py::arg("repetition_penalty") = 1.1f, py::arg("num_beams") = 1, py::arg("do_sample") = false,
+           py::arg("top_k") = 40, py::arg("top_p") = 0.95, py::arg("temperature") = 0.8, py::arg("min_new_tokens") = 0,
+           py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
+           py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
+           py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = false,
+           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs")
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"));
 }

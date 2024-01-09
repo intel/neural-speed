@@ -34,8 +34,11 @@ enum class pool_property : int {
 };
 
 enum class serve_policy : int {
-  FCFS = 0,  // first come first serve
+  UNKNOWN = 0,
+  FCFS,  // first come first serve
 };
+
+serve_policy parse_serve_policy(const std::string& policy);
 
 struct sequence {
   int request_idx = -1;  // -1 means unknown
