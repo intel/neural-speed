@@ -85,6 +85,8 @@ struct gguf_str {
   char* data;
 };
 
+enum model_format { GGUF = 0, NE = 1, UNKNOWN = 2 };
+
 enum llama_fver {
   GGUF_FILE_VERSION_V1 = 1,
   GGUF_FILE_VERSION_V2 = 2,

@@ -220,7 +220,7 @@ struct model_file_loader {
   model_vocab vocab;
 
   size_t gguf_data_offset = 0;  // offset of the GGUF tensor data from the beginning of the file.
-  size_t model_magic = -1;
+  enum model_format model_magic = UNKNOWN;
 
   model_file_loader(const char* fname, size_t file_idx, model_load_tensors_map& tensors_map) : file(fname, "rb") {
     fprintf(stderr, "model.cpp: loading model from %s\n", fname);
@@ -845,6 +845,7 @@ struct model_file_loader {
     throw format("unknown (magic, version) combination: %08x, %08x; is this really a NE file?", magic, version);
   }
 
+
   void read_magic(model_load_tensors_map& tensors_map) {
     char gguf_magic[4];
     const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
@@ -857,36 +858,35 @@ struct model_file_loader {
     if (ok) {
       std::cout << "Loading the bin file with GGUF format..." << std::endl;
       fseek(file.fp, 0, SEEK_SET);
-      model_magic = 0;
+      model_magic = GGUF;
     } else {
       std::cout << "Loading the bin file with NE format..." << std::endl;
       fseek(file.fp, 0, SEEK_SET);
       read_ne_magic();
       read_hparams();
       read_vocab();
-      model_magic = 1;
+      model_magic = NE;
       return;
     }
 
-    int n_kv = 0;
-    int n_tensors = 0;
-    llama_fver fver;
-
     struct gguf_context* ctx_gguf = NULL;
-    struct ne_context* ctx_meta = NULL;
-
     ctx_gguf = read_gguf(tensors_map);
     if (!ctx_gguf) {
       throw std::runtime_error(format("%s: failed to load model\n", __func__));
     }
 
+    int n_kv = 0;
     n_kv = gguf_get_n_kv(ctx_gguf);
+
+    int n_tensors = 0;
     n_tensors = gguf_get_n_tensors(ctx_gguf);
 
+    llama_fver fver;
     fver = (enum llama_fver)gguf_get_version(ctx_gguf);
     printf("%s: loaded meta data with %d key-value pairs and %d tensors (version %s)\n", __func__, n_kv, n_tensors,
            llama_file_version_name(fver));
 
+    // struct ne_context* ctx_meta = NULL;
     // calcaute the tensor data size
     // int64_t n_elements = 0;
     // size_t  n_bytes    = 0;
@@ -1040,7 +1040,7 @@ struct model_file_loader {
     }
   }
   void read_tensor_metadata(size_t file_idx, model_load_tensors_map& tensors_map) {
-    if (model_magic != 1) {
+    if (model_magic != NE) {
       return;
     }
 
