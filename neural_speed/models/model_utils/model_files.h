@@ -859,14 +859,20 @@ struct gguf_loader {
 
     uint32_t magic = -1;
     uint32_t version = -1;
-    std::string arch = "unknown";
-    GGUF_GET_KEY(ctx_gguf, arch, gguf_get_val_str, GGUF_TYPE_STRING, false, "general.architecuture");
+
+    // get model name
+    uint32_t general_architecture_idex = 0;
+    std::string arch_name = gguf_kv_to_str(ctx_gguf, general_architecture_idex);
+    llm_arch arch = llm_arch_from_string(arch_name);
+    const auto kv = LLM_KV(arch);
+
+    // get general kv
     GGUF_GET_KEY(ctx_gguf, magic, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "magic");
     GGUF_GET_KEY(ctx_gguf, version, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "version");
 
     // get hparams kv
     GGUF_GET_KEY(ctx_gguf, hparams.n_vocab, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_vocab");
-    GGUF_GET_KEY(ctx_gguf, hparams.n_embd, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_embd");
+    GGUF_GET_KEY(ctx_gguf, hparams.n_embd, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_EMBEDDING_LENGTH));
     GGUF_GET_KEY(ctx_gguf, hparams.n_mult, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_mult");
     GGUF_GET_KEY(ctx_gguf, hparams.n_head, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_head");
     GGUF_GET_KEY(ctx_gguf, hparams.n_head_kv, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_head_kv");

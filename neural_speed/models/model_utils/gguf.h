@@ -231,6 +231,7 @@ enum llm_arch {
   LLM_ARCH_BLOOM,
   LLM_ARCH_STABLELM,
   LLM_ARCH_QWEN,
+  LLM_ARCH_CHATGLM,
   LLM_ARCH_CHATGLM2,
   LLM_ARCH_UNKNOWN,
 };
@@ -240,7 +241,7 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
     {LLM_ARCH_GPTJ, "gptj"},         {LLM_ARCH_GPTNEOX, "gptneox"},     {LLM_ARCH_MPT, "mpt"},
     {LLM_ARCH_BAICHUAN, "baichuan"}, {LLM_ARCH_STARCODER, "starcoder"}, {LLM_ARCH_PERSIMMON, "persimmon"},
     {LLM_ARCH_REFACT, "refact"},     {LLM_ARCH_BLOOM, "bloom"},         {LLM_ARCH_STABLELM, "stablelm"},
-    {LLM_ARCH_QWEN, "qwen"},         {LLM_ARCH_CHATGLM2, "chatglm2"},
+    {LLM_ARCH_QWEN, "qwen"},         {LLM_ARCH_CHATGLM, "chatglm"},     {LLM_ARCH_CHATGLM2, "chatglm2"},
 };
 
 struct gguf_tensor_info {
@@ -491,6 +492,15 @@ static std::map<llm_kv, std::string> LLM_KV_NAMES = {
     {LLM_KV_TOKENIZER_RWKV, "tokenizer.rwkv.world"},
 };
 
+static llm_arch llm_arch_from_string(const std::string& name) {
+  for (const auto& kv : LLM_ARCH_NAMES) {  // NOLINT
+    if (kv.second == name) {
+      return kv.first;
+    }
+  }
+
+  return LLM_ARCH_UNKNOWN;
+}
 struct LLM_KV {
   LLM_KV(llm_arch arch) : arch(arch) {}
 
