@@ -186,8 +186,8 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_size, n_head, N, batch_size);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
     }
-    Qcur = 
-    ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+    Qcur =
+        ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
     Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
         ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
     ne_set_name(Qcur, "Qcur");
