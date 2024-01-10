@@ -247,7 +247,7 @@ function main() {
         infer_cmd="./build/bin/run_qwen"
     elif [[ "${model}" == "magicoder" ]]; then
         quant_script="./build/bin/quant_llama"
-        convert_script="${convert_script}/convert_bmagicoder.py"
+        convert_script="${convert_script}/convert_llama.py"
         infer_cmd="./build/bin/run_llama"
     elif [[ "${model}" == "whisper" ]]; then
         quant_script="./build/bin/quant_whisper"

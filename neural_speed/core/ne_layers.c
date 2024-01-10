@@ -3043,7 +3043,7 @@ struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, i
 }
 
 struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
-                                                                                int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
+                                        int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
                       freq_scale);
@@ -3082,7 +3082,7 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
 }
 
 struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
-                                                                              int prompt_size, int* n_padding, float freq_base, float freq_scale) {
+                                       int prompt_size, int* n_padding, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, n_padding, true, freq_base,
                       freq_scale);
 }
@@ -10027,7 +10027,7 @@ static void ne_compute_backward(struct ne_context* ctx, struct ne_tensor* tensor
         const int n_dims = ((int32_t*)src1->data)[1];
         const int mode = ((int32_t*)src1->data)[2];
         src0->grad =
-             ne_add_impl(ctx, src0->grad, ne_rope(ctx, tensor->grad, n_past, n_dims, mode, 0, 10000.0, 1.0), inplace);
+            ne_add_impl(ctx, src0->grad, ne_rope(ctx, tensor->grad, n_past, n_dims, mode, 0, 10000.0, 1.0), inplace);
       }
       if (src1->grad) {
         // noop

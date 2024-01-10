@@ -224,7 +224,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         if (N == 1) {
           cossin_cache = kv_self.cossin;
         }
-         K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
                                   hparams.freq_scale);
       }
       K = ne_permute(ctx0, K, 0, 2, 1, 3);
