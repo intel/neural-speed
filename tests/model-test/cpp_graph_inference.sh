@@ -122,7 +122,7 @@ function ppl_eval() {
                 local ppl_task_name="$task_name-ppl-$(basename -- "$ppl_dataset")-nctx$ppl_nctx-M$memory_dtype"
                 echo "***** PPL: $ppl_task_name *****"
                 OMP_NUM_THREADS=$(($n_cores * 1)) numactl -m 0 -C 0-$(($n_cores * 1 - 1)) \
-                    python scripts/perplexity.py --model_name "$model_path" --dataset_name "$ppl_dataset" --quantized_weight_path "$quantized_weight_path" --ctx_size $ppl_nctx --n_threads $n_cores --memory_dtype $memory_dtype 2>&1 |
+                    python $working_dir/scripts/perplexity.py --model_name "$model_path" --dataset_name "$ppl_dataset" --quantized_weight_path "$quantized_weight_path" --ctx_size $ppl_nctx --n_threads $n_cores --memory_dtype $memory_dtype 2>&1 |
                     tee "$WORKSPACE/$ppl_task_name.log"
                 mv out/ppl.png "$WORKSPACE/$ppl_task_name.png"
                 mv out/ppl_data.json "$WORKSPACE/$ppl_task_name.json"
@@ -221,19 +221,19 @@ function main() {
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"
         convert_script="${convert_script}/convert_chatglm.py"
-        infer_cmd="python ./scripts/inference.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name chatglm --tokenizer $model_path"
         requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
     elif [[ "${model}" == "baichuan2-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
-        infer_cmd="python ./scripts/inference.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
         requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
         extension=" --model_name baichuan --tokenizer $model_path"
     elif [[ "${model}" == "baichuan-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
-        infer_cmd="python ./scripts/inference.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name baichuan --tokenizer $model_path"
         requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
     elif [[ "${model}" == "mistral-7b" ]]; then
