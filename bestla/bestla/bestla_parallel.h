@@ -12,6 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
+#include <atomic>
 #include <functional>
 #include <thread>
 #include <vector>
@@ -622,15 +623,55 @@ class OMPThreading : public IThreading {
 
 class StdThreading : public IThreading {
  public:
-  explicit StdThreading(int nthreads) : IThreading(nthreads) {
+  explicit StdThreading(int nthreads) : IThreading(nthreads) { create_threads(); }
+  void parallel_for(const thread_func& func) override {
+    if (mThreadNum > 1) {
+      func_ = &func;
+      for (size_t i = 0; i < mThreadNum - 1; i++) {
+        locks[i] = true;
+      }
+      func(0);
+      while (true) {
+        bool is_lock = false;
+        for (size_t i = 0; is_lock && i < mThreadNum - 1; i++) {
+          is_lock |= locks[i];
+        }
+        if (!is_lock) break;
+      }
+    } else {
+      func(0);
+    }
+  }
+
+  void set_threads(int nthreads) override {
+    stop_threads();
+    mThreadNum = nthreads;
+    create_threads();
+  }
+
+  inline void sync() const override { assert(0); }
+
+  ~StdThreading() { stop_threads(); }
+
+ private:
+  void stop_threads() {
+    for (int i = 0; i < mThreadNum - 1; i++) stop[i] = true;
+    for (int i = 0; i < mThreadNum - 1; i++) thdset[i].join();
+  }
+  void create_threads() {
+    printf("1111111\n");
+    thdset.clear();
     thdset.resize(mThreadNum - 1);
     locks.resize(mThreadNum - 1);
+    stop.resize(mThreadNum - 1);
 
     for (size_t i = 0; i < mThreadNum - 1; i++) {
+      stop[i] = false;
       locks[i] = false;
       thdset[i] = std::thread(
           [&](int tidx) {
-            while (true) {
+            while (!stop[tidx]) {
+              _mm_pause();
               if (locks[tidx]) {
                 (*func_)(tidx + 1);
                 locks[tidx] = false;
@@ -640,33 +681,10 @@ class StdThreading : public IThreading {
           int(i));
     }
   }
-  void parallel_for(const thread_func& func) override {
-    if (mThreadNum > 1) {
-      func_ = &func;
-      for (size_t i = 0; i < mThreadNum - 1; i++) {
-        locks[i] = true;
-      }
-      func(0);
-      while (1) {
-        bool is_join = true;
-        for (size_t i = 0; is_join && i < mThreadNum - 1; i++) {
-          is_join &= locks[i];
-        }
-        if (is_join) break;
-      }
-    } else {
-      func(0);
-    }
-  }
 
-  void set_threads(int nthreads) override { mThreadNum = nthreads; }
-
-  inline void sync() const override { assert(0); }
-
- private:
   std::vector<std::thread> thdset;
-  std::vector<bool> locks;
-  const thread_func* func_;
+  std::vector<bool> locks, stop;
+  const thread_func* func_ = nullptr;
 };
 
 class SingleThread : public StdThreading {
