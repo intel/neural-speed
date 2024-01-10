@@ -306,7 +306,8 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
                 data = data.astype(np.float32)
                 ftype_cur = 0
 
-        #print(f"[{i+1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4}")
+        # print(f"[{i+1:{padi}d}/{len(model)}]
+        # Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4}")
 
         gguf_writer.add_tensor(name, data)
 
