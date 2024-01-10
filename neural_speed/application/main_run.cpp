@@ -443,6 +443,15 @@ int main(int argc, char** argv) {  // NOLINT
     model_reset_timings(ctx);
   }
 
+#ifdef NS_TP_MODEL
+  // sync here to make multi node run into inference at the same time
+  parallel_context* p_ctx = init_parallel_context();
+  if (get_tp_size(p_ctx) > 1) {
+    barrier(p_ctx);
+  }
+
+#endif
+
   while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
     // predict
     if (!embd.empty()) {
