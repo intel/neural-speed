@@ -214,13 +214,7 @@ struct model_load_tensors_map {
 };
 
 struct gguf_loader {
-  // model_file file;
   FILE* gguf_file;
-
-  // gguf_loader(const char* fname) : file(fname, "rb") {
-  //   fprintf(stderr, "model.cpp: loading GGUF model from %s\n", fname);
-  //   gguf_file = file.fp;
-  // }
 
   gguf_loader(FILE* ne_file) : gguf_file(ne_file) {}
 
@@ -951,7 +945,7 @@ struct model_file_loader {
       model_magic = GGUF;
 
       gguf_loader gguf_loader(file.fp);
-      
+
       struct gguf_context* ctx_gguf = NULL;
       ctx_gguf = gguf_loader.gguf_init_from_file(tensors_map, gguf_data_offset);
       if (!ctx_gguf) {
