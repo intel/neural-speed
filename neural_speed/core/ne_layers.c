@@ -121,7 +121,7 @@ static_assert(sizeof(block_q8_1) == 2 * sizeof(float) + QK8_1, "wrong q8_1 block
 #endif
 #endif
 
-/*#define NE_PERF*/
+/*#define NS_PERF*/
 #define NE_GELU_FP16
 #define NE_SILU_FP16
 
@@ -242,7 +242,7 @@ int64_t ne_cycles(void) { return clock(); }
 
 int64_t ne_cycles_per_ms(void) { return CLOCKS_PER_SEC / 1000; }
 
-#ifdef NE_PERF
+#ifdef NS_PERF
 #define ne_perf_time_ms() ne_time_ms()
 #define ne_perf_time_us() ne_time_us()
 #define ne_perf_cycles() ne_cycles()
@@ -1279,7 +1279,7 @@ struct ne_tensor* ne_view_tensor(struct ne_context* ctx, const struct ne_tensor*
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
 // ne_dump_tensor
 
 struct ne_tensor* ne_dump_tensor(struct ne_context* ctx, struct ne_tensor* a) {
@@ -1439,7 +1439,7 @@ struct ne_tensor* ne_acc_inplace(struct ne_context* ctx, struct ne_tensor* a, st
   return ne_acc_impl(ctx, a, b, nb1, nb2, nb3, offset, true);
 }
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
 // ne_tp_concat
 
 struct ne_tensor* ne_tp_concat(struct ne_context* ctx, struct ne_tensor* a, enum parallel_mode p_mode) {
@@ -4808,7 +4808,7 @@ static void ne_compute_forward_acc(const struct ne_compute_params* params, const
   }
 }
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
 static void ne_compute_forward_tp_concat_single_thread(const struct ne_compute_params* params,
                                                        const struct ne_tensor* src0, const struct ne_tensor* opt0,
                                                        struct ne_tensor* dst) {
@@ -9549,7 +9549,7 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
     case NE_OP_COUNT: {
       NE_ASSERT(false);
     } break;
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     case NE_OP_SPLIT: {
       ne_compute_forward_split(params, tensor->src0, tensor->opt[0], tensor);
     } break;

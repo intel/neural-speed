@@ -184,7 +184,7 @@ inline static void ne_vec_tanh_f32(const int n, float* y, const float* x) {
 }
 
 inline static void ne_vec_gelu_f32(const int n, float* y, const float* x) {
-#ifdef NE_GELU_USE_VEC
+#ifdef NS_GELU_USE_VEC
   // compute G(x) = sqrt_root_two_over_pi * x * (1 + fitting_const * x * x)
   float* aux0 = (float*)malloc(n * sizeof(float));
   ne_vec_sqr_f32(n, aux0, x);

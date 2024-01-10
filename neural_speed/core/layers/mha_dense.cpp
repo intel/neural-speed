@@ -21,7 +21,7 @@
 #include <random>
 #include <vector>
 
-#ifdef NE_TESTS
+#ifdef NS_TESTS
 #include <memory>
 #include <tuple>
 
@@ -352,7 +352,7 @@ class WeightPackBatchBf16Trans : public WeightPackBatchBf16Base<GemmCore_T, ISA_
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const Param& p, const parallel::ThreadProblem2D& thdp, std::function<int(int)> step_batch) {
+  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -394,7 +394,7 @@ class WeightPackBatchBf16NonTr : public WeightPackBatchBf16Base<GemmCore_T, ISA_
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const Param& p, const parallel::ThreadProblem2D& thdp, std::function<int(int)> step_batch) {
+  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -431,7 +431,7 @@ class ActivationIdentity {
     const AType* A;
     int lda;
   };
-  ActivationIdentity() {}
+  ActivationIdentity() = default;
 
   BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
                           int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
@@ -687,8 +687,8 @@ class MHAInterface {
     };
 
     // prepare parallel scheduler for packed weight
-    using Scheduler2D = typename parallel::Scheduler2D;
-    using ThreadProblem2D = typename parallel::ThreadProblem2D;
+    using Scheduler2D = bestla::parallel::Scheduler2D;
+    using ThreadProblem2D = bestla::parallel::ThreadProblem2D;
     const auto schK = p.step_k_head_size == 1
                           ? Scheduler2D({th.num_threads(), {num_heads, p.sl_kv}, {1, GemmQK::NTILE}})
                           : Scheduler2D({th.num_threads(), {num_heads, p.head_size}, {1, GemmQK::KTILE}});
@@ -1059,7 +1059,7 @@ class WeightBase {
     int ldb;
     bool is_padded;
   };
-  WeightBase() {}
+  WeightBase() = default;
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     if ((n_size % _GemmCore_T::NTILE == 0) && std::is_same<SType, BType>::value &&
@@ -1092,7 +1092,7 @@ class WeightForwardNTile48 {
     int ldb;
     bool is_padded;
   };
-  WeightForwardNTile48() {}
+  WeightForwardNTile48() = default;
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);
@@ -1352,7 +1352,7 @@ class MHAStableInterface {
     const auto m_tiles = updiv(p.sl_q, M_TILE);
     const auto num_tasks = num_heads * m_tiles;
 
-    using Scheduler2D = typename parallel::Scheduler2D;
+    using Scheduler2D = bestla::parallel::Scheduler2D;
     const Scheduler2D parl({th.num_threads(), {num_tasks, 1}, {1, 1}});  // main parallel scheduler
 
     th.parallel_for([&](int tid) {
@@ -1693,7 +1693,7 @@ void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>&
   const auto workspace_size = bestla_fusion_attn_workspace_size(&attn_shape);
   static std::mt19937 rng;
   static std::uniform_int_distribution<> dist;
-#ifdef NE_TESTS
+#ifdef NS_TESTS
   init_vector(p.tmp, workspace_size, INT8_MIN - 1, INT8_MAX + 1, dist(rng));
 #else
   std::fill_n(p.tmp, workspace_size, 'f');
@@ -2106,7 +2106,7 @@ void bestla_fusion_attn_fp32_batch_cpy_v(const bestla_fusion_attn_fp32_batch_cpy
 #pragma GCC pop_options
 #endif
 
-#ifdef NE_TESTS
+#ifdef NS_TESTS
 #define CheckISA(ISA)                         \
   {                                           \
     GetCPUDevice();                           \
@@ -2533,7 +2533,7 @@ static const TestMhaDese inst_;
 }  // namespace
 
 int main() {
-  printf("NE_TESTS: mha_dense ");
+  printf("NS_TESTS: mha_dense ");
   printf(ret_ok ? "OK\n" : "FAILED\n");
   return ret_ok ? 0 : -1;
 }

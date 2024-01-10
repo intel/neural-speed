@@ -31,10 +31,11 @@ import zipfile
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
-                    Union)
+from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple,
+                    TypeVar, Union)
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
+import gguf
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -156,8 +157,9 @@ class Params:
 
     @staticmethod
     def guessed(model: 'LazyModel') -> 'Params':
-        n_vocab, n_embd = model["model.embed_tokens.weight"].shape if "model.embed_tokens.weight" in model else model[
-            "tok_embeddings.weight"].shape
+        n_vocab, n_embd = model[
+            "model.embed_tokens.weight"].shape if "model.embed_tokens.weight" in model else model[
+                "tok_embeddings.weight"].shape
 
         return Params(
             n_vocab=n_vocab,
@@ -203,7 +205,7 @@ class Params:
         )
 
     # LLaMA v2 70B params.json
-    # {"dim": 8192, "multiple_of": 4096, "ffn_dim_multiplier": 1.3, "n_heads": 64, "n_kv_heads": 8, 
+    # {"dim": 8192, "multiple_of": 4096, "ffn_dim_multiplier": 1.3, "n_heads": 64, "n_kv_heads": 8,
     #  "n_layers": 80, "norm_eps": 1e-05, "vocab_size": -1}
     @staticmethod
     def loadOriginalParamsJson(model: 'LazyModel', config_path: Path) -> 'Params':
@@ -441,7 +443,8 @@ class NEQuantizedTensor(Tensor):
         assert isinstance(data_type, QuantizedDataType)  # redundant, but mypy complains without this
         assert columns % data_type.groupsize == 0
         words_in_block = 6 if data_type == DT_Q4_1 else 5
-        self.ndarray = ndarray.view(dtype=np.uint32).reshape((rows, columns // data_type.groupsize, words_in_block))
+        self.ndarray = ndarray.view(dtype=np.uint32).reshape(
+            (rows, columns // data_type.groupsize, words_in_block))
         self.shape = shape[:]
         self.data_type = data_type
 
@@ -633,8 +636,7 @@ class LazyTensor:
                 sys.stderr.write(
                     "Error: Input uses the newer GPTQ-for-LLaMa format (using g_idx), which is not yet natively\
                      supported by NE.  For now you can still convert this model by passing `--outtype f16` to \
-                     dequantize, but that will result in a much larger output file for no quality benefit.\n"
-                )
+                     dequantize, but that will result in a much larger output file for no quality benefit.\n")
                 sys.exit(1)
             assert not data_type.have_g_idx and self.data_type.have_addends and data_type.have_addends
 
@@ -823,6 +825,7 @@ class LazyUnpickler(pickle.Unpickler):
 
         description = f'storage data_type={data_type} path-in-zip={filename} path={self.zip_file.filename}'
         return LazyStorage(load=load, kind=pid[1], description=description)
+
 
 # @staticmethod
 
@@ -1086,7 +1089,7 @@ class OutputFile:
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
-        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json 
+        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
         self.fout.write(struct.pack("i", params.bos_token_id))
         self.fout.write(struct.pack("i", params.eos_token_id))
@@ -1109,7 +1112,12 @@ class OutputFile:
     @staticmethod
     def write_vocab_only(fname_out: Path, vocab: Vocab) -> None:
         of = OutputFile(fname_out)
-        params = Params(n_vocab=vocab.vocab_size, n_embd=0, n_mult=0, n_head=1, n_layer=0, file_type=NEFileType.AllF32)
+        params = Params(n_vocab=vocab.vocab_size,
+                        n_embd=0,
+                        n_mult=0,
+                        n_head=1,
+                        n_layer=0,
+                        file_type=NEFileType.AllF32)
         of = OutputFile(fname_out)
         of.write_file_header(params)
         of.write_vocab(vocab)
@@ -1129,14 +1137,127 @@ class OutputFile:
 
         ndarrays = bounded_parallel_map(do_item, model.items(), concurrency=8)
         for i, ((name, lazy_tensor), ndarray) in enumerate(zip(model.items(), ndarrays)):
+
             size = ' x '.join(f"{dim:6d}" for dim in lazy_tensor.shape)
             padi = len(str(len(model)))
-            print(
-                f"[{i+1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} | \
-                 type {lazy_tensor.data_type}"
+            print(f"[{i+1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} | \
+                 type {lazy_tensor.data_type}")
+            of.write_tensor_header(
+                name,
+                lazy_tensor.shape,
+                lazy_tensor.data_type,
             )
-            of.write_tensor_header(name, lazy_tensor.shape, lazy_tensor.data_type)
             ndarray.tofile(of.fout)
+        of.fout.close()
+
+
+class OutputFile_GGUF:
+    def __init__(self, fname_out: Path) -> None:
+        self.fout = open(fname_out, "wb")
+        self.gguf_file = str(fname_out) + '.gguf'
+        self.gguf_writer = gguf.GGUFWriter(self.gguf_file, "llama_ITREX")
+
+    def write_file_header(self, params: Params, file_type: NEFileType) -> None:
+        # # [1, 32000, 4096, 256, 32, 32, 32, 128, 0]
+        self.gguf_writer.add_uint32('magic', 0x67676d66)
+        self.gguf_writer.add_uint32('version', 1)
+        self.gguf_writer.add_uint32('n_vocab', params.n_vocab)
+        self.gguf_writer.add_uint32('n_embd', params.n_embd)
+        self.gguf_writer.add_uint32('n_mult', params.n_mult)
+        self.gguf_writer.add_uint32('n_head', params.n_head)
+        self.gguf_writer.add_uint32('n_head_kv', params.n_head_kv)
+        self.gguf_writer.add_uint32('n_layer', params.n_layer)
+        self.gguf_writer.add_uint32('n_rot', params.n_embd // params.n_head)
+        self.gguf_writer.add_uint32('ftype', file_type.value)
+
+        self.gguf_writer.add_uint32('ffn_hidden_size', params.ffn_hidden_size)
+        self.gguf_writer.add_float32('rms_norm_eps', params.rms_norm_eps)
+        self.gguf_writer.add_float32('rope_theta', params.rope_theta)
+
+        # TODO:
+        # bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
+        # but bos_token_id = 1 in llama.cpp
+        self.gguf_writer.add_int32('bos_token_id', 1)
+        self.gguf_writer.add_int32('eos_token_id', 2)
+        self.gguf_writer.add_int32('pad_token_id', 0)
+        self.gguf_writer.add_int32('sep_token_id', 0)
+
+    def write_tensor_header_gguf(self, name: str, shape: Sequence[int], data_type: DataType, data) -> None:
+        # sname = name.encode('utf-8')
+        # self.fout.write(struct.pack("iii", len(shape), len(sname), DATA_TYPE_TO_FTYPE[data_type]))
+        # self.fout.write(struct.pack("i" * len(shape), *shape[::-1]))
+        # self.fout.write(sname)
+        # self.fout.seek((self.fout.tell() + 31) & -32)
+        self.gguf_writer.add_tensor(name, data)
+
+    def end(self):
+
+        print("gguf: write header")
+        self.gguf_writer.write_header_to_file()
+        print("gguf: write metadata")
+        self.gguf_writer.write_kv_data_to_file()
+        print("gguf: write tensors")
+        self.gguf_writer.write_tensors_to_file()
+
+        self.gguf_writer.close()
+
+    def write_vocab_gguf(self, vocab: Vocab) -> None:
+        # for text, score in vocab.all_tokens():
+        #     self.fout.write(struct.pack("i", len(text)))
+        #     self.fout.write(text)
+        #     self.fout.write(struct.pack("f", score))
+
+        print("gguf: get tokenizer metadata")
+
+        tokens: List[bytes] = []
+        scores: List[float] = []
+        toktypes: List[int] = []
+
+        for text, score in vocab.all_tokens():
+            tokens.append(text)
+            scores.append(score)
+
+        self.gguf_writer.add_tokenizer_model("llama")
+        self.gguf_writer.add_token_list(tokens)
+        self.gguf_writer.add_token_scores(scores)
+
+        print("gguf: get tokenizer metadata done")
+
+    @staticmethod
+    def write_vocab_only(fname_out: Path, vocab: Vocab) -> None:
+        of = OutputFile_GGUF(fname_out)
+        params = Params(n_vocab=vocab.vocab_size,
+                        n_embd=0,
+                        n_mult=0,
+                        n_head=1,
+                        n_layer=0,
+                        file_type=NEFileType.AllF32)
+        of = OutputFile_GGUF(fname_out)
+        of.write_file_header(params)
+        of.write_vocab_gguf(vocab)
+        of.fout.close()
+
+    @staticmethod
+    def write_all(fname_out: Path, params: Params, model: LazyModel, vocab: Vocab, file_type: NEFileType) -> None:
+        check_vocab_size(params, vocab)
+        of = OutputFile_GGUF(fname_out)
+        of.write_file_header(params, file_type)
+        print("Writing vocab...")
+        of.write_vocab_gguf(vocab)
+
+        def do_item(item: Tuple[str, LazyTensor]) -> NDArray:
+            name, lazy_tensor = item
+            return lazy_tensor.load().to_ne().ndarray
+
+        ndarrays = bounded_parallel_map(do_item, model.items(), concurrency=8)
+        for i, ((name, lazy_tensor), ndarray) in enumerate(zip(model.items(), ndarrays)):
+            size = ' x '.join(f"{dim:6d}" for dim in lazy_tensor.shape)
+            padi = len(str(len(model)))
+            print(f"[{i+1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} | \
+                 type {lazy_tensor.data_type}")
+            of.write_tensor_header_gguf(name, lazy_tensor.shape, lazy_tensor.data_type, ndarray)
+
+        of.end()
         of.fout.close()
 
 
@@ -1261,8 +1382,7 @@ def load_vocab(path: Path, params_vocab_size: int) -> SentencePieceVocab:
         else:
             raise FileNotFoundError(
                 f"Could not find tokenizer.model in {path} or its parent; if it's in another directory, \
-                pass the directory as --vocab-dir"
-            )
+                pass the directory as --vocab-dir")
     added_tokens_path = path.parent / "added_tokens.json"
     print(f"Loading vocab file {path}")
     return SentencePieceVocab(path, params_vocab_size, added_tokens_path if added_tokens_path.exists() else None)
@@ -1280,8 +1400,7 @@ def default_outfile(model_paths: List[Path], params: Params) -> Path:
     if ret in model_paths:
         sys.stderr.write(
             f"Error: Default output path ({ret}) would overwrite the input.  Please explicitly specify\
-            a path using --outfile.\n"
-        )
+            a path using --outfile.\n")
         sys.exit(1)
     return ret
 
@@ -1311,6 +1430,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
+    parser.add_argument("--format",
+                        type=str,
+                        default="NE",
+                        choices=["NE", "GGUF"],
+                        help="convert to the GGUF or NE format")
     args = parser.parse_args(args_in)
 
     vocab: Vocab
@@ -1330,6 +1454,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             return
         model = model_plus.model
         params = Params.load(model_plus)
+
         if model_plus.vocab is not None and args.vocab_dir is None:
             vocab = model_plus.vocab
         else:
@@ -1339,7 +1464,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
         output_type = pick_output_type(model, args.outtype)
         model = convert_to_output_type(model, output_type)
         outfile = args.outfile or default_outfile(model_plus.paths, params)
-        OutputFile.write_all(outfile, params, model, vocab, output_type)
+
+        if args.format == "GGUF":
+            OutputFile_GGUF.write_all(outfile, params, model, vocab, output_type)
+        else:
+            OutputFile.write_all(outfile, params, model, vocab, output_type)
+
         print(f"Wrote {outfile}")
 
 

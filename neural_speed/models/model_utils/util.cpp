@@ -27,17 +27,17 @@ int32_t get_num_physical_cores() {
       siblings.insert(line);
     }
   }
-  if (siblings.size() > 0) {
+  if (!siblings.empty()) {
     return static_cast<int32_t>(siblings.size());
   }
 #elif defined(__APPLE__) && defined(__MACH__)
   int32_t num_physical_cores;
   size_t len = sizeof(num_physical_cores);
-  int result = sysctlbyname("hw.perflevel0.physicalcpu", &num_physical_cores, &len, NULL, 0);
+  int result = sysctlbyname("hw.perflevel0.physicalcpu", &num_physical_cores, &len, nullptr, 0);
   if (result == 0) {
     return num_physical_cores;
   }
-  result = sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, NULL, 0);
+  result = sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, nullptr, 0);
   if (result == 0) {
     return num_physical_cores;
   }
