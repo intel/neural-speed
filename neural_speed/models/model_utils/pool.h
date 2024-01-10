@@ -52,6 +52,7 @@ struct sequence {
   uint32_t n_tokens;
   generation_config gen_conf;
   seq_status status = seq_status::UNKNOWN;
+  int query_id = -1;  // query_id for pybind reponse
 };
 
 // abstract class
@@ -59,7 +60,7 @@ class pool {
  public:
   explicit pool(const pool_property& property) : property(property) {}
   virtual ~pool() {}
-  virtual bool add(sequence* seq) = 0;
+  virtual bool add(sequence seq) = 0;
   virtual bool pop(sequence* seq) = 0;
   virtual void clear() = 0;
   virtual bool empty() = 0;
@@ -73,14 +74,14 @@ class fcfs_pool : public pool {
  public:
   explicit fcfs_pool(const pool_property& property) : pool(property) {}
   ~fcfs_pool() {}
-  bool add(sequence* seq) override;
+  bool add(sequence seq) override;
   bool pop(sequence* seq) override;
   void clear() override;
   bool empty() override;
   int size() override;
 
  protected:
-  std::queue<sequence*> context;
+  std::queue<sequence> context;
 };
 
 class serve_pool {
@@ -88,7 +89,7 @@ class serve_pool {
   explicit serve_pool(const pool_property& property);
   serve_pool(const serve_policy& policy, const pool_property& property);
   ~serve_pool();
-  bool add(sequence* seq);
+  bool add(sequence seq);
   bool pop(sequence* seq);
   void clear();
   bool empty();

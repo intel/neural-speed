@@ -98,7 +98,10 @@ struct gpt_params {
   int beam_size = 1;                            // only valid if use beam search
   int cont_batching = false;                    // whether to use continuous batching (concat multi sequences)
   int max_request_num = MODEL_MAX_REQUEST_NUM;  // maximum num of bearable requests in current env
-  std::string model_serve_policy = "fcfs";      // serve policy
+
+  uint32_t min_new_tokens = 0;     // min new tokens for beam search generation
+  float length_penalty = 1.0f;     // exponential penalty to the length in beam search generation
+  bool do_early_stopping = false;  // early stopping in beam search generation
 };
 
 bool gpt_params_parse(int argc, char** argv, gpt_params& params);

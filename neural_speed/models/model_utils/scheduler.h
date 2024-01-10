@@ -23,17 +23,17 @@ class il_worker {
  public:
   explicit il_worker(const gpt_params& params);
   virtual ~il_worker();
-  virtual bool step(std::vector<sequence*>* seqs, const int& n_input) = 0;
-  // virtual bool greedy_search_step(sequence* seqs, const int& n_input) = 0;
-  virtual bool beam_search_step(std::vector<sequence*>* seqs, const int& n_input) = 0;
+  virtual bool step(std::vector<sequence>* seqs, const int& n_input) = 0;
+  // virtual bool greedy_search_step(sequence seqs, const int& n_input) = 0;
+  virtual bool beam_search_step(std::vector<sequence>* seqs, const int& n_input) = 0;
 
   inline void set_threads(const int& n_threads) { threads = n_threads; }
   inline std::vector<int> get_request_done_ids() const { return request_done_ids; }
   inline void empty_request_done_ids() { request_done_ids.clear(); }
 
  protected:
-  virtual bool prepare_inputs(std::vector<sequence*>* seqs, const int& n_input, model_input* inputs) = 0;
-  virtual bool update_seqs(std::vector<sequence*>* seqs, const int& n_input) = 0;
+  virtual bool prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) = 0;
+  virtual bool update_seqs(std::vector<sequence>* seqs, const int& n_input) = 0;
 
   model_context* m_ctx = NULL;
   int threads;
@@ -49,13 +49,13 @@ class cbg_worker : public il_worker {
   cbg_worker(const gpt_params& params, const int& n_threads);
   ~cbg_worker();
 
-  bool step(std::vector<sequence*>* seqs, const int& n_input) override;
-  // bool greedy_search_step(sequence* seqs, const int& n_input) override;
-  bool beam_search_step(std::vector<sequence*>*, const int& n_input) override;
+  bool step(std::vector<sequence>* seqs, const int& n_input) override;
+  // bool greedy_search_step(sequence seqs, const int& n_input) override;
+  bool beam_search_step(std::vector<sequence>*, const int& n_input) override;
 
  protected:
-  bool prepare_inputs(std::vector<sequence*>*, const int& n_input, model_input* inputs) override;
-  bool update_seqs(std::vector<sequence*>* seqs, const int& n_input) override;
+  bool prepare_inputs(std::vector<sequence>*, const int& n_input, model_input* inputs) override;
+  bool update_seqs(std::vector<sequence>* seqs, const int& n_input) override;
 };
 
 // iteration-level scheduler
@@ -66,11 +66,11 @@ class il_scheduler {
   virtual ~il_scheduler();
 
   // TODO (YZT) kv cache ptr as input params
-  virtual bool add_request(sequence* seq) = 0;
+  virtual bool add_request(sequence seq) = 0;
   virtual bool step() = 0;
   virtual bool done() = 0;
   inline bool has_finished_seq() { return (finished_pool.size() > 0); }
-  std::vector<sequence*> pop_completed_requests();
+  std::vector<sequence> pop_completed_requests();
   // void print_progress();
 
  protected:
@@ -91,7 +91,7 @@ class cbg_scheduler : public il_scheduler {
   cbg_scheduler(const gpt_params& params, const std::string& policy);
   ~cbg_scheduler();
 
-  bool add_request(sequence* seq) override;
+  bool add_request(sequence seq) override;
   bool step() override;
   bool done() override;
 
@@ -102,7 +102,7 @@ class cbg_scheduler : public il_scheduler {
 
   const int max_requests;
   cbg_worker wr;
-  std::vector<sequence*> executed_seqs;
+  std::vector<sequence> executed_seqs;
   std::vector<bool> free_req_idx;
   // TODO (YZT) too long will hurt performance?
   int64_t max_input_length;

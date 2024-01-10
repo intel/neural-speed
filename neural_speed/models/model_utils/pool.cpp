@@ -24,8 +24,8 @@ serve_policy parse_serve_policy(const std::string& policy) {
 }
 
 // fcfs_pool
-bool fcfs_pool::add(sequence* seq) {
-  context.push(seq);
+bool fcfs_pool::add(sequence seq) {
+  context.emplace(seq);
   return true;
 }
 
@@ -34,13 +34,13 @@ bool fcfs_pool::pop(sequence* seq) {
     fprintf(stderr, "%s: pool is empty.\n", __func__);
     return false;
   }
-  seq = context.front();
+  *seq = context.front();
   context.pop();
   return true;
 }
 
 void fcfs_pool::clear() {
-  std::queue<sequence*> empty_q;
+  std::queue<sequence> empty_q;
   context.swap(empty_q);
 }
 
@@ -74,7 +74,7 @@ serve_pool::~serve_pool() {
   }
 }
 
-bool serve_pool::add(sequence* seq) {
+bool serve_pool::add(sequence seq) {
   std::lock_guard<std::mutex> lock(mtx);
   return internel_pool->add(seq);
 }

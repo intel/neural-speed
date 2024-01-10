@@ -451,7 +451,8 @@ class beam_search_flow {
       kv_reorder = std::make_shared<beam_search_kv_cache_reorder>(ctx);
 #ifdef NS_BEAM_SEARCH_VERBOSE_ON
       printf(
-          "WARNING: Using default kv cache update function. Ignore this warning if your K shape = [head_dim, N, n_head], "
+          "WARNING: Using default kv cache update function. Ignore this warning if your K shape = [head_dim, N, "
+          "n_head], "
           "V shape = [N, head_dim, n_head]\n");
 #endif
     }

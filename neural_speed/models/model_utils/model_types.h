@@ -296,7 +296,7 @@ struct model_context {
   int beam_size = 1;
   int kv_n_ctx_block = 1;
   bool cont_batching = false;
-  generation_config generation_conf;
+  generation_config generation_conf;  // global generation config
   std::shared_ptr<beam_search_kv_cache_reorder> bs_kv_reorder;
   std::vector<std::vector<std::string>> tensors_name;
 
@@ -418,6 +418,8 @@ struct model_context_params {
   bool shift_roped_k;   // whether to store non-RoPEd K cache
   bool cont_batching;   // whether to use continuous batching
   int max_request_num;  // maximum num of bearable requests in current env
+  // global generation config
+  generation_config gen_conf;
 
   // called with a progress value between 0 and 1, pass nullptr to disable
   model_progress_callback progress_callback;

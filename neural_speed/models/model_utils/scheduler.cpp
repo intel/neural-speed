@@ -41,27 +41,27 @@ il_worker::~il_worker() {
 cbg_worker::cbg_worker(const gpt_params& params) : il_worker(params) { m_ctx->cont_batching = true; }
 cbg_worker::~cbg_worker() {}
 
-bool cbg_worker::prepare_inputs(std::vector<sequence*>* seqs, const int& n_input, model_input* inputs) {
+bool cbg_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) {
   for (int i = 0; i < n_input; ++i) {
-    if ((seqs->at(i))->status != seq_status::PREFILL || (seqs->at(i))->status != seq_status::DECODING) {
+    if ((seqs->at(i)).status != seq_status::PREFILL || (seqs->at(i)).status != seq_status::DECODING) {
       fprintf(stderr, "%s: error: request status is unright.\n", __func__);
       return false;
-    } else if ((seqs->at(i))->status == seq_status::PREFILL) {
-      inputs[i].tokens = (seqs->at(i))->prompt_ids.data();
-      inputs[i].n_tokens = (seqs->at(i))->n_prompt_tokens;
-      inputs[i].n_prompt_tokens = (seqs->at(i))->n_prompt_tokens;
+    } else if ((seqs->at(i)).status == seq_status::PREFILL) {
+      inputs[i].tokens = (seqs->at(i)).prompt_ids.data();
+      inputs[i].n_tokens = (seqs->at(i)).n_prompt_tokens;
+      inputs[i].n_prompt_tokens = (seqs->at(i)).n_prompt_tokens;
       inputs[i].n_past = 0;
       inputs[i].n_total = 0;
-      inputs[i].request_idx = (seqs->at(i))->request_idx;
+      inputs[i].request_idx = (seqs->at(i)).request_idx;
       // do not support padding for now
       inputs[i].n_padding = 0;
-      inputs[i].gen_conf = (seqs->at(i))->gen_conf;
-    } else if ((seqs->at(i))->status == seq_status::DECODING) {
-      inputs[i].tokens = &(seqs->at(i))->generated_ids.back();
+      inputs[i].gen_conf = (seqs->at(i)).gen_conf;
+    } else if ((seqs->at(i)).status == seq_status::DECODING) {
+      inputs[i].tokens = &(seqs->at(i)).generated_ids.back();
       inputs[i].n_tokens = 1;
-      inputs[i].n_past = (seqs->at(i))->n_past;
-      inputs[i].n_total = (seqs->at(i))->n_total;
-      inputs[i].request_idx = (seqs->at(i))->request_idx;
+      inputs[i].n_past = (seqs->at(i)).n_past;
+      inputs[i].n_total = (seqs->at(i)).n_total;
+      inputs[i].request_idx = (seqs->at(i)).request_idx;
       // do not support padding for now
       inputs[i].n_padding = 0;
     } else {
@@ -71,7 +71,7 @@ bool cbg_worker::prepare_inputs(std::vector<sequence*>* seqs, const int& n_input
   return true;
 }
 
-bool cbg_worker::beam_search_step(std::vector<sequence*>* seqs, const int& n_input) {
+bool cbg_worker::beam_search_step(std::vector<sequence>* seqs, const int& n_input) {
   std::vector<model_input> step_inputs(n_input);
   if (!prepare_inputs(seqs, n_input, step_inputs.data())) {
     return false;
@@ -83,10 +83,10 @@ bool cbg_worker::beam_search_step(std::vector<sequence*>* seqs, const int& n_inp
   return true;
 }
 
-bool cbg_worker::step(std::vector<sequence*>* seqs, const int& n_input) {
+bool cbg_worker::step(std::vector<sequence>* seqs, const int& n_input) {
   reqidx_to_vecid.clear();
   for (int ni = 0; ni < n_input; ++ni) {
-    reqidx_to_vecid.emplace(std::make_pair(seqs->at(ni)->request_idx, ni));
+    reqidx_to_vecid.emplace(std::make_pair(seqs->at(ni).request_idx, ni));
   }
   if (m_ctx->beam_search && bsf != nullptr) {
     if (!beam_search_step(seqs, n_input)) {
@@ -97,12 +97,12 @@ bool cbg_worker::step(std::vector<sequence*>* seqs, const int& n_input) {
   return update_seqs(seqs, n_input);
 }
 
-bool cbg_worker::update_seqs(std::vector<sequence*>* seqs, const int& n_input) {
+bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
   empty_request_done_ids();
   for (int ni = 0; ni < n_input; ++ni) {
-    if (seqs->at(ni)->status == seq_status::PREFILL) {
-      seqs->at(ni)->status = seq_status::DECODING;
-      seqs->at(ni)->n_past = seqs->at(ni)->n_prompt_tokens;
+    if (seqs->at(ni).status == seq_status::PREFILL) {
+      seqs->at(ni).status = seq_status::DECODING;
+      seqs->at(ni).n_past = seqs->at(ni).n_prompt_tokens;
     }
   }
   if (m_ctx->beam_search && bsf != nullptr) {
@@ -121,8 +121,8 @@ bool cbg_worker::update_seqs(std::vector<sequence*>* seqs, const int& n_input) {
         fprintf(stderr, "%s: error: done request idx: %d not in executed_seqs.\n", __func__, idx);
         return false;
       }
-      seqs->at(reqidx_to_vecid[idx])->generated_ids = std::move(req_done_res[r]);
-      seqs->at(reqidx_to_vecid[idx])->status = seq_status::FINISHED;
+      seqs->at(reqidx_to_vecid[idx]).generated_ids = std::move(req_done_res[r]);
+      seqs->at(reqidx_to_vecid[idx]).status = seq_status::FINISHED;
     }
     return true;
   }
@@ -141,17 +141,17 @@ il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, "fcf
 
 il_scheduler::~il_scheduler() {}
 
-std::vector<sequence*> il_scheduler::pop_completed_requests() {
-  std::vector<sequence*> ret_seqs;
+std::vector<sequence> il_scheduler::pop_completed_requests() {
+  std::vector<sequence> ret_seqs;
   const int length = finished_pool.size();
   if (length > 0) {
     return ret_seqs;
   }
   ret_seqs.resize(length);
   for (int l = 0; l < length; ++l) {
-    if (!finished_pool.pop(ret_seqs[l])) {
+    if (!finished_pool.pop(&ret_seqs[l])) {
       fprintf(stderr, "%s: error: pop finished_pool %dth seq failed.\n", __func__, l);
-      return std::vector<sequence*>();
+      return std::vector<sequence>();
     }
   }
   return ret_seqs;
@@ -183,14 +183,14 @@ int cbg_scheduler::query_free_req_idx() {
   }
 }
 
-bool cbg_scheduler::add_request(sequence* seq) {
-  if (seq->status != seq_status::UNKNOWN) {
+bool cbg_scheduler::add_request(sequence seq) {
+  if (seq.status != seq_status::UNKNOWN) {
     fprintf(stderr, "%s: error: seq status is not UNKNOWN, can not decide to add into which pool.\n", __func__);
     return false;
   }
   // add into waiting_pool by default
-  seq->status = seq_status::WAITING;
-  seq->request_idx = query_free_req_idx();
+  seq.status = seq_status::WAITING;
+  seq.request_idx = query_free_req_idx();
   return waiting_pool.add(seq);
 }
 
@@ -207,15 +207,15 @@ bool cbg_scheduler::prepare_seqs() {
     // pop prompts
     if (cur_running_num < max_requests) {
       for (int np = 0; np < n_perfill_seqs; ++np) {
-        if (waiting_pool.pop(executed_seqs[cur_running_num + np])) {
-          executed_seqs[cur_running_num + np]->status == seq_status::PREFILL;
-          if (executed_seqs[cur_running_num + np]->request_idx == -1) {
+        if (waiting_pool.pop(&executed_seqs[cur_running_num + np])) {
+          executed_seqs[cur_running_num + np].status == seq_status::PREFILL;
+          if (executed_seqs[cur_running_num + np].request_idx == -1) {
             const int fidx = query_free_req_idx();
             if (fidx == -1) {
               fprintf(stderr, "%s: error: no free position to put the request.\n", __func__);
               return false;
             }
-            executed_seqs[cur_running_num + np]->request_idx = fidx;
+            executed_seqs[cur_running_num + np].request_idx = fidx;
           }
         } else {
           fprintf(stderr, "%s: error: pop waiting seq failed.\n", __func__);
@@ -229,7 +229,7 @@ bool cbg_scheduler::prepare_seqs() {
   }
   // step generation
   for (int dn = 0; dn < cur_running_num; ++dn) {
-    if (!running_pool.pop(executed_seqs[dn]) || executed_seqs[dn]->status != seq_status::DECODING) {
+    if (!running_pool.pop(&executed_seqs[dn]) || executed_seqs[dn].status != seq_status::DECODING) {
       fprintf(stderr, "%s: error: pop running_pool %dth seq failed.\n", __func__, dn);
       return false;
     }
@@ -270,11 +270,11 @@ bool cbg_scheduler::step() {
 
 bool cbg_scheduler::update_pools() {
   for (int ns = 0; ns < executed_seqs.size(); ++ns) {
-    if (executed_seqs[ns]->status == seq_status::DECODING) {
+    if (executed_seqs[ns].status == seq_status::DECODING) {
       running_pool.add(executed_seqs[ns]);
-    } else if (executed_seqs[ns]->status == seq_status::FINISHED) {
+    } else if (executed_seqs[ns].status == seq_status::FINISHED) {
       finished_pool.add(executed_seqs[ns]);
-      free_req_idx[executed_seqs[ns]->request_idx] = true;
+      free_req_idx[executed_seqs[ns].request_idx] = true;
     } else {
       fprintf(stderr, "%s: error: wrong seq status, seq_idx: %d should be in DECODING OR FINISHED.\n", __func__);
       return false;

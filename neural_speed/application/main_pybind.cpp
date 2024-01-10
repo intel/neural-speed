@@ -60,6 +60,7 @@ namespace {
 struct Query {
   int id;
   std::vector<int> token_ids;
+  Query() {}
   Query(int id, const pybind11::array_t<int, py::array::c_style | py::array::forcecast>& token_ids)
       : id(id), token_ids(token_ids.data(), token_ids.data() + token_ids.size()) {
     assert(token_ids.ndim() == 1);
@@ -81,8 +82,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
                      float temperature = 0.8, int min_new_tokens = 0, float length_penalty = 1.0f,
                      bool early_stopping = false, int n_keep = 0, int n_discard = -1, bool shift_roped_k = false,
                      int batch_size = 1, model_vocab::id pad_token = -1, const std::string& memory_dtype = "auto",
-                     const bool& continuous_batching = false, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
-                     const std::string& serve_policy = "unknown") {
+                     const bool& continuous_batching = false, const int& max_request_num = MODEL_MAX_REQUEST_NUM) {
   MODEL_ASSERT(params != nullptr);
 #ifdef MODEL_NAME
   params->model_name = MODEL_NAME;
@@ -118,7 +118,9 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   }
   params->cont_batching = continuous_batching;
   params->max_request_num = std::max(batch_size, max_request_num);
-  params->model_serve_policy = serve_policy;
+  params->min_new_tokens = min_new_tokens;
+  params->length_penalty = length_penalty;
+  params->do_early_stopping = early_stopping;
 
   printf("beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d\n",
          params->beam_size, params->do_sample, params->top_k, params->top_p, params->cont_batching,
@@ -141,29 +143,56 @@ class ModelServer {
           std::deque<Query> queue_finished;
           std::deque<Query> queue_running;
           cbg_scheduler scheduler(params, policy);
+          std::vector<sequence> added_seqs;
           while (running) {
             {                                               // add waitting tasks queue to running queue
               std::lock_guard<std::mutex> lock(queue_mtx);  // need lock as issueQuery may also access waiting
 
               // TODO(Yi): should have some limitations
-              std::copy(waiting.cbegin(), waiting.cend(), std::back_inserter(queue_running));
+              // std::copy(waiting.cbegin(), waiting.cend(), std::back_inserter(queue_running));
+              added_seqs.resize(waiting.size());
+              std::transform(waiting.cbegin(), waiting.cend(), added_seqs.begin(),
+                             [&](const Query& q) { return this->Query2Sequence(q); });
               waiting.clear();
             }
-            if (!queue_running.empty()) {
-              {  // Pretend running a step of inference
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                std::vector<Query> finished = {queue_running.front()};
-                queue_running.pop_front();
-
-                if (!finished.empty()) {
-                  py::gil_scoped_acquire acquirer;
-                  py::print("ID", finished[0].id, "finished in CPP server!");
-                  this->response(finished, queue_running.size());
-                }
+            if (!added_seqs.empty()) {
+              for (int i = 0; i < added_seqs.size(); ++i) {
+                scheduler.add_request(added_seqs[i]);
               }
-            } else {
-              _mm_pause();
+              added_seqs.clear();
             }
+            if (!scheduler.done()) {
+              scheduler.step();
+            } else {
+              py::print("Server has no requests now, waiting new query...");
+            }
+            std::vector<sequence> finished_seqs;
+            if (scheduler.has_finished_seq()) {
+              finished_seqs = scheduler.pop_completed_requests();
+            }
+            if (!finished_seqs.empty()) {
+              py::gil_scoped_acquire acquirer;
+              std::vector<Query> finished(finished_seqs.size());
+              std::transform(finished_seqs.cbegin(), finished_seqs.cend(), finished.begin(),
+                             [&](const sequence& seq) { return this->Sequence2Query(seq); });
+              py::print("ID", finished[0].id, "finished in CPP server!");
+              this->response(finished, finished.size());
+            }
+            // if (!queue_running.empty()) {
+            //   {  // Pretend running a step of inference
+            //     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            //     std::vector<Query> finished = {queue_running.front()};
+            //     queue_running.pop_front();
+
+            //     if (!finished.empty()) {
+            //       py::gil_scoped_acquire acquirer;
+            //       py::print("ID", finished[0].id, "finished in CPP server!");
+            //       this->response(finished, queue_running.size());
+            //     }
+            //   }
+            // } else {
+            //   _mm_pause();
+            // }
           }
           {
             py::gil_scoped_acquire acquirer;
@@ -172,11 +201,38 @@ class ModelServer {
         }) {
     py::print("CPP server launched! The serve policy is", policy);
   };
+
   int issueQuery(std::vector<Query>& qs) {
     std::lock_guard<std::mutex> lock(queue_mtx);
     std::copy(qs.cbegin(), qs.cend(), std::back_inserter(waiting));
     return waiting.size();
   }
+
+  sequence Query2Sequence(const Query& query) {
+    sequence ret_seq;
+    ret_seq.request_idx = -1;  // let scheduler decides it
+    ret_seq.prompt_ids = query.token_ids;
+    ret_seq.n_prompt_tokens = query.token_ids.size();
+    ret_seq.n_tokens = query.token_ids.size();
+    ret_seq.n_past = 0;
+    ret_seq.n_total = 0;
+    ret_seq.gen_conf.max_new_tokens = params.n_predict;
+    ret_seq.gen_conf.min_new_tokens = params.min_new_tokens;
+    ret_seq.gen_conf.length_penalty = params.length_penalty;
+    ret_seq.gen_conf.do_early_stopping = params.do_early_stopping;
+    ret_seq.query_id = query.id;
+    return ret_seq;
+  }
+
+  Query Sequence2Query(const sequence& seq) {
+    Query ret_query;
+    ret_query.id = seq.query_id;
+    ret_query.token_ids.resize(seq.prompt_ids.size() + seq.generated_ids.size());
+    std::copy(seq.prompt_ids.cbegin(), seq.prompt_ids.cend(), std::back_inserter(ret_query.token_ids));
+    std::copy(seq.generated_ids.cbegin(), seq.generated_ids.cend(), std::back_inserter(ret_query.token_ids));
+    return ret_query;
+  }
+
   ~ModelServer() {
     // "synchronized" function
     // stop spinning after calling ResponseCallback for the last query
@@ -323,9 +379,6 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
   for (int i = 0; i < params.max_request_num; ++i) {
     last_n_tokens[i].resize(n_ctx, 0);
   }
-  ctx->generation_conf.min_new_tokens = min_new_tokens;
-  ctx->generation_conf.length_penalty = length_penalty;
-  ctx->generation_conf.do_early_stopping = early_stopping;
   if (pad_token != -1) ctx->vocab.pad_token_id = pad_token;
 }
 
