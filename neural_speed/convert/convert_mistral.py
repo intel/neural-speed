@@ -180,7 +180,9 @@ class Params:
         ffn_hidden_size = config["intermediate_size"]
         rms_norm_eps = config["rms_norm_eps"]
         rope_theta = config["rope_theta"] if "rope_theta" in config else 10000
-        rope_scale = config["factor"] if "factor" in config else 1
+        rope_scale = 1
+        if "rope_scaling" in config and config["rope_scaling"] is not None:
+            rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
 
 
         return Params(
@@ -193,6 +195,7 @@ class Params:
             ffn_hidden_size=ffn_hidden_size,
             rms_norm_eps=rms_norm_eps,
             rope_theta=rope_theta,
+            rope_scale=rope_scale,
         )
 
     # LLaMA v2 70B params.json
