@@ -223,24 +223,24 @@ function main() {
         convert_script="${convert_script}/convert_chatglm.py"
         infer_cmd="python ./scripts/inference.py"
         extension=" --model_name chatglm --tokenizer $model_path"
-        requirements_file="scripts/requirements/chatglm-6b.sh"
+        requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
     elif [[ "${model}" == "baichuan2-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
         infer_cmd="python ./scripts/inference.py"
-        requirements_file="scripts/requirements/baichuan.sh"
+        requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
         extension=" --model_name baichuan --tokenizer $model_path"
     elif [[ "${model}" == "baichuan-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
         infer_cmd="python ./scripts/inference.py"
         extension=" --model_name baichuan --tokenizer $model_path"
-        requirements_file="scripts/requirements/baichuan.sh"
+        requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
     elif [[ "${model}" == "mistral-7b" ]]; then
         quant_script="./build/bin/quant_mistral"
         convert_script="${convert_script}/convert_mistral.py"
         infer_cmd="./build/bin/run_mistral"
-        requirements_file="scripts/requirements/mistral.txt"
+        requirements_file="$working_dir/neural_speed/models/requirements/mistral.txt"
     elif [[ "${model}" == "qwen-7b" ]]; then
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
