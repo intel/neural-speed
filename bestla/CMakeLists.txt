@@ -4,6 +4,8 @@ project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
+option(BTLA_USE_OPENMP "Enable OpenMP thread pool" ON)
+
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
 option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
 option(BTLA_UT_EPILOGUE "Enable unit test for epilogue" OFF)
@@ -41,7 +43,12 @@ endif()
 include(GNUInstallDirs)
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-	
+
+if(BTLA_USE_OPENMP)
+message(STATUS "BesTLA using OpenMP")
+target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
+endif(BTLA_USE_OPENMP)
+
 target_include_directories(
 	${PROJECT_NAME} INTERFACE
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"

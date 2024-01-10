@@ -82,7 +82,7 @@ enum model_split_type { SPLIT_NONE, SPLIT_BY_COLUMNS, SPLIT_BY_ROWS, TP_1D_ROW, 
 struct model_load_tensor {
   std::vector<model_load_tensor_shard> shards;
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
   int32_t world_size = get_tp_size(p_ctx);
   int32_t rank = get_tp_rank(p_ctx);
@@ -94,7 +94,7 @@ struct model_load_tensor {
   model_split_type split_type = SPLIT_NONE;
   std::vector<uint32_t> ne;
   size_t size;
-  struct ne_tensor* ne_tensor = NULL;
+  struct ne_tensor* ne_tensor = nullptr;
   uint8_t* data;
 
   model_load_tensor(const std::string& name) : name(name) {}
@@ -131,7 +131,7 @@ struct model_load_tensor {
       split_type = SPLIT_BY_ROWS;
     }
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (enable_tp) {
       // TODO it's not good to check type here, mmaybe move to specific model files
       if (name.find(".attn.q_proj.weight") != std::string::npos ||
@@ -181,7 +181,7 @@ struct model_load_tensor {
       case SPLIT_BY_ROWS:
         ne = {first_shard.ne[0], checked_mul<uint32_t>(first_shard.ne[1], n_shards)};
         break;
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
       case TP_1D_ROW:
         MODEL_ASSERT(first_shard.ne.size() > 1);
         MODEL_ASSERT(first_shard.ne[1] % world_size == 0);
@@ -450,7 +450,7 @@ struct model_model_loader {
   model_load_tensors_map tensors_map;
   bool use_mmap;
   size_t num_ne_tensors_created = 0;
-  struct ne_context* ne_ctx = NULL;
+  struct ne_context* ne_ctx = nullptr;
   std::unique_ptr<model_mmap> mapping;
 
   model_model_loader(const std::string& fname_base, bool use_mmap, bool vocab_only) {
@@ -541,7 +541,7 @@ struct model_model_loader {
       throw format("model.cpp: tensor '%s' is missing from model", name.c_str());
     }
     model_load_tensor& lt = tensors_map.tensors.at(it->second);
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (lt.enable_tp && (lt.split_type == TP_1D_ROW || lt.split_type == TP_1D_COLUMN)) {
       // check the split dim
       size_t split_dim_size =
@@ -572,7 +572,7 @@ struct model_model_loader {
       tensor = ne_new_tensor_1d(ne_ctx, lt.type, lt.ne.at(0), NE_SIZE_CALC);
     }
     ne_set_name(tensor, lt.name.c_str());
-    MODEL_ASSERT(lt.ne_tensor == NULL);  // if this fails, we called get_tensor twice on the same tensor
+    MODEL_ASSERT(lt.ne_tensor == nullptr);  // if this fails, we called get_tensor twice on the same tensor
     tensor->backend = backend;
     lt.ne_tensor = tensor;
     num_ne_tensors_created++;
@@ -601,7 +601,7 @@ struct model_model_loader {
       if (!lmlock) {
         // Don't call the callback since the actual loading will be lazy
         // and we can't measure it.
-        progress_callback = NULL;
+        progress_callback = nullptr;
       }
       if (lmlock) {
         lmlock->init(mapping->addr);
@@ -678,7 +678,7 @@ struct model_model_loader {
       }
       MODEL_ASSERT(out_offset == lt.size);
     }
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     else if (lt.split_type == TP_1D_ROW) {
       model_load_tensor_shard& shard = lt.shards.at(0);
       model_buffer tmp_buf;
