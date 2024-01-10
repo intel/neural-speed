@@ -114,7 +114,11 @@ function ppl_eval() {
     if [[ "$ppl_mf16_test" = true ]]; then
         memory_dtype_list+=('f16')
     fi
-
+    echo "======   Prepare Env  ==============="
+    [[ $(pip list | grep intel_extension_for_transformers | wc -l) == 0 ]] && pip install intel_extension_for_transformers
+    [[ $(pip list | grep datasets | wc -l) == 0 ]] && pip install datasets
+    [[ $(pip list | grep transformers | wc -l) == 0 ]] && pip install transformers
+    pip list
     echo "=======  PPL Evaluation Start  ======="
     for memory_dtype in ${memory_dtype_list[@]}; do
         for ppl_dataset in ${ppl_dataset_list[@]}; do
