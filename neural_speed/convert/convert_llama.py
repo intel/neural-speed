@@ -31,8 +31,8 @@ import zipfile
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple,
-                    TypeVar, Union)
+from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
+                    Union)
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
 import gguf
@@ -154,9 +154,8 @@ class Params:
 
     @staticmethod
     def guessed(model: 'LazyModel') -> 'Params':
-        n_vocab, n_embd = model[
-            "model.embed_tokens.weight"].shape if "model.embed_tokens.weight" in model else model[
-                "tok_embeddings.weight"].shape
+        n_vocab, n_embd = model["model.embed_tokens.weight"].shape if "model.embed_tokens.weight" in model else model[
+            "tok_embeddings.weight"].shape
 
         return Params(
             n_vocab=n_vocab,
@@ -422,8 +421,7 @@ class NEQuantizedTensor(Tensor):
         assert isinstance(data_type, QuantizedDataType)  # redundant, but mypy complains without this
         assert columns % data_type.groupsize == 0
         words_in_block = 6 if data_type == DT_Q4_1 else 5
-        self.ndarray = ndarray.view(dtype=np.uint32).reshape(
-            (rows, columns // data_type.groupsize, words_in_block))
+        self.ndarray = ndarray.view(dtype=np.uint32).reshape((rows, columns // data_type.groupsize, words_in_block))
         self.shape = shape[:]
         self.data_type = data_type
 
@@ -1090,12 +1088,7 @@ class OutputFile:
     @staticmethod
     def write_vocab_only(fname_out: Path, vocab: Vocab) -> None:
         of = OutputFile(fname_out)
-        params = Params(n_vocab=vocab.vocab_size,
-                        n_embd=0,
-                        n_mult=0,
-                        n_head=1,
-                        n_layer=0,
-                        file_type=NEFileType.AllF32)
+        params = Params(n_vocab=vocab.vocab_size, n_embd=0, n_mult=0, n_head=1, n_layer=0, file_type=NEFileType.AllF32)
         of = OutputFile(fname_out)
         of.write_file_header(params)
         of.write_vocab(vocab)
@@ -1133,24 +1126,24 @@ class OutputFile_GGUF:
     def __init__(self, fname_out: Path) -> None:
         self.fout = open(fname_out, "wb")
         self.gguf_file = str(fname_out) + '.gguf'
-        self.gguf_writer = gguf.GGUFWriter(self.gguf_file, "llama_ITREX")
+        self.gguf_writer = gguf.GGUFWriter(self.gguf_file, "llama")
 
     def write_file_header(self, params: Params, file_type: NEFileType) -> None:
         # # [1, 32000, 4096, 256, 32, 32, 32, 128, 0]
         self.gguf_writer.add_uint32('magic', 0x67676d66)
         self.gguf_writer.add_uint32('version', 1)
         self.gguf_writer.add_uint32('n_vocab', params.n_vocab)
-        self.gguf_writer.add_uint32('n_embd', params.n_embd)
+        self.gguf_writer.add_embedding_length(params.n_embd)
         self.gguf_writer.add_uint32('n_mult', params.n_mult)
-        self.gguf_writer.add_uint32('n_head', params.n_head)
-        self.gguf_writer.add_uint32('n_head_kv', params.n_head_kv)
-        self.gguf_writer.add_uint32('n_layer', params.n_layer)
-        self.gguf_writer.add_uint32('n_rot', params.n_embd // params.n_head)
+        self.gguf_writer.add_head_count(params.n_head)
+        self.gguf_writer.add_head_count_kv(params.n_head_kv)
+        self.gguf_writer.add_block_count(params.n_layer)
+        self.gguf_writer.add_rope_dimension_count(params.n_embd // params.n_head)
         self.gguf_writer.add_uint32('ftype', file_type.value)
 
-        self.gguf_writer.add_uint32('ffn_hidden_size', params.ffn_hidden_size)
-        self.gguf_writer.add_float32('rms_norm_eps', params.rms_norm_eps)
-        self.gguf_writer.add_float32('rope_theta', params.rope_theta)
+        self.gguf_writer.add_feed_forward_length(params.ffn_hidden_size)
+        self.gguf_writer.add_layer_norm_rms_eps(params.rms_norm_eps)
+        self.gguf_writer.add_rope_freq_base(params.rope_theta)
 
         # TODO:
         # bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
@@ -1204,12 +1197,7 @@ class OutputFile_GGUF:
     @staticmethod
     def write_vocab_only(fname_out: Path, vocab: Vocab) -> None:
         of = OutputFile_GGUF(fname_out)
-        params = Params(n_vocab=vocab.vocab_size,
-                        n_embd=0,
-                        n_mult=0,
-                        n_head=1,
-                        n_layer=0,
-                        file_type=NEFileType.AllF32)
+        params = Params(n_vocab=vocab.vocab_size, n_embd=0, n_mult=0, n_head=1, n_layer=0, file_type=NEFileType.AllF32)
         of = OutputFile_GGUF(fname_out)
         of.write_file_header(params)
         of.write_vocab_gguf(vocab)
@@ -1376,8 +1364,7 @@ def default_outfile(model_paths: List[Path], params: Params) -> Path:
     }[params.file_type]
     ret = model_paths[0].parent / f"ne-model-{namestr}.bin"
     if ret in model_paths:
-        sys.stderr.write(
-            f"Error: Default output path ({ret}) would overwrite the input.  Please explicitly specify\
+        sys.stderr.write(f"Error: Default output path ({ret}) would overwrite the input.  Please explicitly specify\
             a path using --outfile.\n")
         sys.exit(1)
     return ret

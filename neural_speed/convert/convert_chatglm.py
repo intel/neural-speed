@@ -156,25 +156,23 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     gguf_file = fname_out + '.gguf'
     gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm2")
 
+    arch = "chatglm2."
     gguf_writer.add_uint32('magic', 0x67676d66)
     gguf_writer.add_uint32('version', 1)
-    gguf_writer.add_uint32('n_vocab', hparams["padded_vocab_size"])
-    gguf_writer.add_embedding_length(hparams["hidden_size"])  # gguf_writer.add_uint32('n_embd', hparams["hidden_size"])
+    gguf_writer.add_uint32(arch + 'n_vocab', hparams["padded_vocab_size"])
+    gguf_writer.add_embedding_length(hparams["hidden_size"])
 
-    gguf_writer.add_uint32('n_mult', 0)
-    gguf_writer.add_head_count(
-        hparams["num_attention_heads"])  # #gguf_writer.add_uint32('n_head', hparams["num_attention_heads"])
+    gguf_writer.add_uint32(arch + 'n_mult', 0)
+    gguf_writer.add_head_count(hparams["num_attention_heads"])
+    gguf_writer.add_head_count_kv(0)
+    gguf_writer.add_block_count(hparams["num_layers"])
 
-    gguf_writer.add_head_count_kv(0)  # gguf_writer.add_uint32('n_head_kv', 0)
-
-    gguf_writer.add_block_count(hparams["num_layers"])  # gguf_writer.add_uint32('n_layer', hparams["num_layers"])
-
-    gguf_writer.add_rope_dimension_count(0)  # gguf_writer.add_uint32('n_rot', 0)
+    gguf_writer.add_rope_dimension_count(0)
     gguf_writer.add_uint32('ftype', ftype)
 
-    gguf_writer.add_context_length(hparams["seq_length"])  #gguf_writer.add_uint32('max_seq_len', hparams["seq_length"])
+    gguf_writer.add_context_length(hparams["seq_length"])
 
-    gguf_writer.add_max_alibi_bias(0)  # gguf_writer.add_uint32('alibi_bias_max', 0)
+    gguf_writer.add_max_alibi_bias(0)
 
     gguf_writer.add_uint32('clip_qkv', 0)
     gguf_writer.add_uint32('par_res', 0)
@@ -184,8 +182,7 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
 
     gguf_writer.add_uint32('multi_query_group_num', hparams["multi_query_group_num"])
 
-    gguf_writer.add_feed_forward_length(
-        hparams["ffn_hidden_size"])  # gguf_writer.add_uint32('ffn_hidden_size', hparams["ffn_hidden_size"])
+    gguf_writer.add_feed_forward_length(hparams["ffn_hidden_size"])
 
     gguf_writer.add_uint32('inner_hidden_size', 0)
 
