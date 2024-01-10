@@ -17,8 +17,8 @@ import json
 import numpy as np
 from pathlib import Path
 import argparse
-from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List,
-                    Literal, Optional, Sequence, Tuple, TypeVar, Union)
+from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple,
+                    TypeVar, Union)
 from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
 from sentencepiece import SentencePieceProcessor  # type: ignore
 import gguf
@@ -36,10 +36,9 @@ def bytes_to_unicode():
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
     bs = list(range(ord("!"),
-                    ord("~") + 1)) + list(range(
-                        ord("¡"),
-                        ord("¬") + 1)) + list(range(ord("®"),
-                                                    ord("ÿ") + 1))
+                    ord("~") + 1)) + list(range(ord("¡"),
+                                                ord("¬") + 1)) + list(range(ord("®"),
+                                                                            ord("ÿ") + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -54,10 +53,8 @@ def bytes_to_unicode():
 
 
 class SentencePieceVocab:
-    def __init__(self, fname_tokenizer: Path,
-                 fname_added_tokens: Optional[Path]) -> None:
-        self.sentencepiece_tokenizer = SentencePieceProcessor(
-            str(fname_tokenizer))
+    def __init__(self, fname_tokenizer: Path, fname_added_tokens: Optional[Path]) -> None:
+        self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
         if fname_added_tokens is not None:
             added_tokens = json.load(open(fname_added_tokens))
@@ -68,13 +65,11 @@ class SentencePieceVocab:
         actual_ids = sorted(added_tokens.values())
         if expected_ids != actual_ids:
             raise Exception(
-                f"Expected added token IDs to be sequential and start at {len(added_tokens)}; got {actual_ids}"
-            )
+                f"Expected added token IDs to be sequential and start at {len(added_tokens)}; got {actual_ids}")
         items = sorted(added_tokens.items(), key=lambda text_idx: text_idx[1])
         self.added_tokens_list = [text for (text, idx) in items]
         self.vocab_size_base: int = vocab_size
-        self.vocab_size: int = self.vocab_size_base + len(
-            self.added_tokens_list)
+        self.vocab_size: int = self.vocab_size_base + len(self.added_tokens_list)
         self.fname_tokenizer = fname_tokenizer
         self.fname_added_tokens = fname_added_tokens
 
@@ -93,8 +88,7 @@ class SentencePieceVocab:
                 byte_value = int(piece[3:-1], 16)
                 text = struct.pack("B", byte_value)
             else:
-                text = tokenizer.id_to_piece(i).replace("\u2581",
-                                                        " ").encode("utf-8")
+                text = tokenizer.id_to_piece(i).replace("\u2581", " ").encode("utf-8")
             score: float = tokenizer.get_score(i)
             yield text, score
 
@@ -130,8 +124,7 @@ def load_vocab_for_glm1(path: Path) -> SentencePieceVocab:
                 pass the directory as --vocab-dir")
     added_tokens_path = path.parent / "added_tokens.json"
     print(f"Loading vocab file {path}")
-    return SentencePieceVocab(
-        path, added_tokens_path if added_tokens_path.exists() else None)
+    return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
 
 
 def load_vocab_for_glm2(path: Path) -> SentencePieceVocab:
@@ -152,12 +145,10 @@ def load_vocab_for_glm2(path: Path) -> SentencePieceVocab:
                 pass the directory as --vocab-dir")
     added_tokens_path = path.parent / "added_tokens.json"
     print(f"Loading vocab file {path}")
-    return SentencePieceVocab(
-        path, added_tokens_path if added_tokens_path.exists() else None)
+    return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
 
 
-def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype,
-                          hparams):
+def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("ChatGLM-2.gguf converting: ")
     list_vars = model.state_dict()
     for name in list_vars.keys():
@@ -188,23 +179,14 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype,
     gguf_writer.add_uint32('word_embed_proj_dim', 0)
     gguf_writer.add_uint32('do_layer_norm_before', 0)
 
-    gguf_writer.add_uint32('multi_query_group_num',
-                           hparams["multi_query_group_num"])
+    gguf_writer.add_uint32('multi_query_group_num', hparams["multi_query_group_num"])
     gguf_writer.add_uint32('ffn_hidden_size', hparams["ffn_hidden_size"])
     gguf_writer.add_uint32('inner_hidden_size', 0)
 
-    gguf_writer.add_int32(
-        'bos_token_id',
-        tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1)
-    gguf_writer.add_int32(
-        'eos_token_id',
-        tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1)
-    gguf_writer.add_int32(
-        'pad_token_id',
-        tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1)
-    gguf_writer.add_int32(
-        'sep_token_id',
-        tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1)
+    gguf_writer.add_int32('bos_token_id', tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1)
+    gguf_writer.add_int32('eos_token_id', tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1)
+    gguf_writer.add_int32('pad_token_id', tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1)
+    gguf_writer.add_int32('sep_token_id', tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1)
 
     def write_vocab_gguf(dir_model):
         print("gguf: get tokenizer metadata")
@@ -215,9 +197,7 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype,
 
         if Path(dir_model + "/tokenizer.model").is_file():
             # vocab type sentencepiece
-            print(
-                "gguf: get sentencepiece tokenizer vocab, scores and token types"
-            )
+            print("gguf: get sentencepiece tokenizer vocab, scores and token types")
 
             vocab = load_vocab_for_glm2(Path(dir_model))
 
@@ -227,9 +207,7 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype,
                 scores.append(score)
 
             if Path(dir_model + "/added_tokens.json").is_file():
-                with open(dir_model + "/added_tokens.json",
-                          "r",
-                          encoding="utf-8") as f:
+                with open(dir_model + "/added_tokens.json", "r", encoding="utf-8") as f:
                     addtokens_json = json.load(f)
 
                     print("gguf: get added tokens")
@@ -248,51 +226,37 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype,
         if Path(dir_model + "/tokenizer.json").is_file():
             # Look for special tokens in tokenizer.json if it exists
 
-            with open(dir_model + "/tokenizer.json", "r",
-                      encoding="utf-8") as f:
+            with open(dir_model + "/tokenizer.json", "r", encoding="utf-8") as f:
                 tokenizer = json.load(f)
 
-            if "added_tokens" in tokenizer and Path(
-                    dir_model + "/tokenizer_config.json").is_file():
+            if "added_tokens" in tokenizer and Path(dir_model + "/tokenizer_config.json").is_file():
 
-                with open(dir_model + "/tokenizer_config.json",
-                          "r",
-                          encoding="utf-8") as f:
+                with open(dir_model + "/tokenizer_config.json", "r", encoding="utf-8") as f:
                     tokenizer_config = json.load(f)
 
-                if "bos_token" in tokenizer_config and tokenizer_config[
-                        "bos_token"] != None:
+                if "bos_token" in tokenizer_config and tokenizer_config["bos_token"] != None:
                     for key in tokenizer["added_tokens"]:
-                        if key["content"] == tokenizer_config["bos_token"][
-                                "content"]:
+                        if key["content"] == tokenizer_config["bos_token"]["content"]:
                             gguf_writer.add_bos_token_id(key["id"])
 
-                if "eos_token" in tokenizer_config and tokenizer_config[
-                        "eos_token"] != None:
+                if "eos_token" in tokenizer_config and tokenizer_config["eos_token"] != None:
                     for key in tokenizer["added_tokens"]:
-                        if key["content"] == tokenizer_config["eos_token"][
-                                "content"]:
+                        if key["content"] == tokenizer_config["eos_token"]["content"]:
                             gguf_writer.add_eos_token_id(key["id"])
 
-                if "unk_token" in tokenizer_config and tokenizer_config[
-                        "unk_token"] != None:
+                if "unk_token" in tokenizer_config and tokenizer_config["unk_token"] != None:
                     for key in tokenizer["added_tokens"]:
-                        if key["content"] == tokenizer_config["unk_token"][
-                                "content"]:
+                        if key["content"] == tokenizer_config["unk_token"]["content"]:
                             gguf_writer.add_unk_token_id(key["id"])
 
-                if "sep_token" in tokenizer_config and tokenizer_config[
-                        "sep_token"] != None:
+                if "sep_token" in tokenizer_config and tokenizer_config["sep_token"] != None:
                     for key in tokenizer["added_tokens"]:
-                        if key["content"] == tokenizer_config["sep_token"][
-                                "content"]:
+                        if key["content"] == tokenizer_config["sep_token"]["content"]:
                             gguf_writer.add_sep_token_id(key["id"])
 
-                if "pad_token" in tokenizer_config and tokenizer_config[
-                        "pad_token"] != None:
+                if "pad_token" in tokenizer_config and tokenizer_config["pad_token"] != None:
                     for key in tokenizer["added_tokens"]:
-                        if key["content"] == tokenizer_config["pad_token"][
-                                "content"]:
+                        if key["content"] == tokenizer_config["pad_token"]["content"]:
                             gguf_writer.add_pad_token_id(key["id"])
         else:
             # If no tokenizer.json: Look for special tokens in config.json
@@ -391,26 +355,13 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["multi_query_group_num"]))
     fout.write(struct.pack("i", hparams["ffn_hidden_size"]))
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("f", hparams.get("layernorm_epsilon",
-                                            1e-6)))  # rms norm eps
+    fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
 
-    fout.write(
-        struct.pack(
-            "i", tokenizer.bos_token_id
-            if tokenizer.bos_token_id is not None else 1))
-    fout.write(
-        struct.pack(
-            "i", tokenizer.eos_token_id
-            if tokenizer.eos_token_id is not None else 2))
-    fout.write(
-        struct.pack(
-            "i", tokenizer.pad_token_id
-            if tokenizer.pad_token_id is not None else -1))
-    fout.write(
-        struct.pack(
-            "i", tokenizer.sep_token_id
-            if tokenizer.sep_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
+    fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
+    fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
     vocab = load_vocab_for_glm2(Path(dir_model))
     counter = 0
@@ -499,26 +450,13 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", hparams["inner_hidden_size"]))
-    fout.write(struct.pack("f", hparams.get("rms_norm_eps",
-                                            1e-6)))  # rms norm eps
+    fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
 
-    fout.write(
-        struct.pack(
-            "i", tokenizer.bos_token_id
-            if tokenizer.bos_token_id is not None else -1))
-    fout.write(
-        struct.pack(
-            "i", tokenizer.eos_token_id
-            if tokenizer.eos_token_id is not None else -1))
-    fout.write(
-        struct.pack(
-            "i", tokenizer.pad_token_id
-            if tokenizer.pad_token_id is not None else -1))
-    fout.write(
-        struct.pack(
-            "i", tokenizer.sep_token_id
-            if tokenizer.sep_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
     vocab = load_vocab_for_glm1(Path(dir_model))
     counter = 0
@@ -576,17 +514,10 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
-    parser = argparse.ArgumentParser(
-        description="Convert a model to a NE compatible file")
-    parser.add_argument("--outtype",
-                        choices=["f32", "f16"],
-                        help="output format (default: based on input)")
-    parser.add_argument("--outfile",
-                        type=Path,
-                        help="path to write to; default: based on input")
-    parser.add_argument("model",
-                        type=Path,
-                        help="directory containing model file")
+    parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
+    parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
+    parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("model", type=Path, help="directory containing model file")
     parser.add_argument("--format",
                         type=str,
                         default="NE",
@@ -607,22 +538,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if args.outtype == "f16":
         ftype = 1
 
-    tokenizer = AutoTokenizer.from_pretrained(dir_model,
-                                              trust_remote_code=True)
-    model = AutoModel.from_pretrained(dir_model,
-                                      low_cpu_mem_usage=True,
-                                      trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
+    model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
 
     if hasattr(model.config, "multi_query_attention"):
         if args.format == "GGUF":
-            chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out,
-                                  ftype, hparams)
+            chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
         else:
-            chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype,
-                             hparams)
+            chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
     else:
-        chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype,
-                         hparams)
+        chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
 
 
 if __name__ == '__main__':
