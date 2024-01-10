@@ -587,8 +587,8 @@ using thread_func = std::function<void(int tid)>;
 class IThreading {
  public:
   explicit IThreading(int nthreads) : mThreadNum(nthreads) {}
-  virtual void parallel_for(const thread_func& func) const = 0;
-  virtual inline void sync() const { assert(0); };
+  virtual void parallel_for(const thread_func& func) = 0;
+  virtual inline void sync() const = 0;
   virtual int num_threads() const { return mThreadNum; };
   virtual void set_threads(int nthreads) = 0;
 
@@ -599,8 +599,7 @@ class IThreading {
 class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }
-  void parallel_for(const thread_func& func) const override {
-    if (mThreadNum > 1) {
+  void parallel_for(const thread_func& func) override {
 #pragma omp parallel
       {
         int tidx = omp_get_thread_num();
@@ -623,16 +622,37 @@ class OMPThreading : public IThreading {
 
 class StdThreading : public IThreading {
  public:
-  explicit StdThreading(int nthreads) : IThreading(nthreads) {}
-  void parallel_for(const thread_func& func) const override {
+  explicit StdThreading(int nthreads) : IThreading(nthreads) {
+    thdset.resize(mThreadNum - 1);
+    locks.resize(mThreadNum - 1);
+
+    for (size_t i = 0; i < mThreadNum - 1; i++) {
+      locks[i] = false;
+      thdset[i] = std::thread(
+          [&](int tidx) {
+            while (true) {
+              if (locks[tidx]) {
+                (*func_)(tidx + 1);
+                locks[tidx] = false;
+              }
+            }
+          },
+          int(i));
+    }
+  }
+  void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
-      std::vector<std::thread> thdset(mThreadNum - 1);
+      func_ = &func;
       for (size_t i = 0; i < mThreadNum - 1; i++) {
-        thdset[i] = std::thread([&](int tidx) { func(tidx); }, int(i + 1));
+        locks[i] = true;
       }
       func(0);
-      for (size_t i = 0; i < mThreadNum - 1; i++) {
-        thdset[i].join();
+      while (1) {
+        bool is_join = true;
+        for (size_t i = 0; is_join && i < mThreadNum - 1; i++) {
+          is_join &= locks[i];
+        }
+        if (is_join) break;
       }
     } else {
       func(0);
@@ -644,6 +664,9 @@ class StdThreading : public IThreading {
   inline void sync() const override { assert(0); }
 
  private:
+  std::vector<std::thread> thdset;
+  std::vector<bool> locks;
+  const thread_func* func_;
 };
 
 class SingleThread : public StdThreading {
