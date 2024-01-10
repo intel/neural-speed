@@ -148,7 +148,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
     const auto cossin_dtype = wtype == NE_TYPE_BTLA ? NE_TYPE_F16 : wtype;
     cache.cossin = ne_new_tensor_1d(cache.ctx, cossin_dtype, head_size, NE_SIZE_CALC);
     ne_set_name(cache.cossin, "cossin(-1)");
-      float freq_base = hparams.freq_base;
+    float freq_base = hparams.freq_base;
     float theta = -1 * hparams.freq_scale;
     float theta_scale = (model != nullptr && model->arch == MODEL_CHATGLM2)
                             ? std::pow(freq_base, -2.0f / (head_size / 2))  // chatglm2 has their DIM_SCALE of 2
