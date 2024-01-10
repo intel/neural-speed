@@ -303,12 +303,12 @@ class CpuDevice {
           for (auto& i : SMT_core) printf("%d,", i);
           printf("\n");
         }
-        if (E_core.size() > 0 && P_core.size() > 0) {
+        if (!E_core.empty() && !P_core.empty()) {
           E_L1Cache = L1[E_core[0]];
           E_L2Cache = L2[E_core[0]] / 4;
           L1Cache = E_L1Cache > L1[P_core[0]] / 2 ? L1[P_core[0]] / 2 : E_L1Cache;
           L2Cache = E_L2Cache > L2[P_core[0]] / 2 ? L2[P_core[0]] / 2 : E_L2Cache;
-        } else if (P_core.size() > 0) {
+        } else if (!P_core.empty()) {
           L1Cache = L1[P_core[0]] / 2;
           L2Cache = L2[P_core[0]] / 2;
           mHybrid = false;
