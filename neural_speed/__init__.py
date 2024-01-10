@@ -62,6 +62,8 @@ class Model:
             import neural_speed.polyglot_cpp as cpp_model
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
+        elif model_type == "whisper":
+            import neural_speed.whisper_cpp as cpp_model
         else:
             raise TypeError("Unspported model type {}!".format(model_type))
         self.module = cpp_model
@@ -204,11 +206,24 @@ class Model:
     def is_token_end(self):
         return self.model.is_token_end()
 
-    def __call__(self, input_ids, reinit=False, **kwargs):
-        if self.model is None:
-            self.init_from_bin(self.model_type, self.bin_file, **kwargs)
-            self.generate_round = 0
-        elif reinit:
-            self.model.reinit()
-            self.generate_round = 0
-        return self.model.evaluate(input_ids.tolist())
+    def __call__(self, model_input, reinit=False, **kwargs):
+        if self.model_type == 'whisper':
+            if self.model is None:
+                self.model = self.module.Model()
+                self.model.init_model(self.bin_file)
+            if os.path.isfile(model_input):
+                self.model.inference(model_input)
+            else:
+                print("Please input an audio file")
+            return
+        if isinstance(model_input, torch.Tensor):
+            if self.model is None:
+                self.init_from_bin(self.model_type, self.bin_file, **kwargs)
+                self.generate_round = 0
+            elif reinit:
+                self.model.reinit()
+                self.generate_round = 0
+            return self.model.evaluate(model_input.tolist())
+        else:
+            print("Please input torch.Tensor")
+        return

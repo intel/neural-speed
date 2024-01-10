@@ -155,6 +155,18 @@ Neural Speed supports the following models:
     <td> </td>
     <td>Latest</td>
   </tr>
+    <tr>
+    <td><a href="https://huggingface.co/openai/whisper-tiny" target="_blank" rel="noopener noreferrer">Whisper-tiny</a>,
+    <a href="https://huggingface.co/openai/whisper-base" target="_blank" rel="noopener noreferrer">Whisper-base</a>
+    <a href="https://huggingface.co/openai/whisper-small" target="_blank" rel="noopener noreferrer">Whisper-small</a>
+    <a href="https://huggingface.co/openai/whisper-medium" target="_blank" rel="noopener noreferrer">Whisper-medium</a>
+    <a href="https://huggingface.co/openai/whisper-large" target="_blank" rel="noopener noreferrer">Whisper-large</a></td>
+    <td>✅</td>
+    <td> </td>
+    <td>✅</td>
+    <td> </td>
+    <td>Latest</td>
+  </tr>
 </tbody>
 </table>
 
@@ -253,6 +265,14 @@ model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
 
+To use whisper to Audio-to-text, here is the sample code
+```python
+from intel_extension_for_transformers.transformers import AutoModelForCausalLM, WeightOnlyQuantConfig
+model_name = "Local path for whisper"     # please use local path
+woq_config = WeightOnlyQuantConfig(use_ggml=True) #Currently, only Q40 is supported
+model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_config)
+model('Local audio file')
+```
 
 ## How to use: Python script
 

@@ -34,7 +34,7 @@
 #include "core/ne_bestla.h"
 #include "core/layers/mha_dense.h"
 #include "models/model_utils/model_config.h"
-#include "models/model_utils/model_utils.h"
+#include "models/model_utils/quant_utils.h"
 #include "models/model_utils/util.h"
 
 // evaluate the transformer
