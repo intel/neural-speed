@@ -306,11 +306,11 @@ class CpuDevice {
         if (!E_core.empty() && !P_core.empty()) {
           E_L1Cache = L1[E_core[0]];
           E_L2Cache = L2[E_core[0]] / 4;
-          int scale = SMT_core.empty() ? 1 : 2;
+          uint32_t scale = SMT_core.empty() ? 1 : 2;
           L1Cache = E_L1Cache > L1[P_core[0]] / scale ? L1[P_core[0]] / scale : E_L1Cache;
           L2Cache = E_L2Cache > L2[P_core[0]] / scale ? L2[P_core[0]] / scale : E_L2Cache;
         } else if (!P_core.empty()) {
-          int scale = SMT_core.empty() ? 1 : 2;
+          uint32_t scale = SMT_core.empty() ? 1 : 2;
           L1Cache = L1[P_core[0]] / scale;
           L2Cache = L2[P_core[0]] / scale;
           mHybrid = false;
