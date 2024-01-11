@@ -1129,36 +1129,36 @@ class OutputFile_GGUF:
         self.gguf_writer = gguf.GGUFWriter(self.gguf_file, "llama")
 
     def write_file_header(self, params: Params, file_type: NEFileType) -> None:
-        # # [1, 32000, 4096, 256, 32, 32, 32, 128, 0]
+        # Customized
         self.gguf_writer.add_uint32('magic', 0x67676d66)
         self.gguf_writer.add_uint32('version', 1)
         self.gguf_writer.add_uint32('n_vocab', params.n_vocab)
-        self.gguf_writer.add_embedding_length(params.n_embd)
         self.gguf_writer.add_uint32('n_mult', params.n_mult)
-        self.gguf_writer.add_head_count(params.n_head)
-        self.gguf_writer.add_head_count_kv(params.n_head_kv)
-        self.gguf_writer.add_block_count(params.n_layer)
-        self.gguf_writer.add_rope_dimension_count(params.n_embd // params.n_head)
         self.gguf_writer.add_uint32('ftype', file_type.value)
 
+        # LLM
+        self.gguf_writer.add_embedding_length(params.n_embd)
+        self.gguf_writer.add_context_length(4096)
+        self.gguf_writer.add_block_count(params.n_layer)
         self.gguf_writer.add_feed_forward_length(params.ffn_hidden_size)
+
+        # Attention
+        self.gguf_writer.add_head_count(params.n_head)
+        self.gguf_writer.add_head_count_kv(params.n_head_kv)
+        self.gguf_writer.add_rope_dimension_count(params.n_embd // params.n_head)
         self.gguf_writer.add_layer_norm_rms_eps(params.rms_norm_eps)
         self.gguf_writer.add_rope_freq_base(params.rope_theta)
 
         # TODO:
         # bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
+        # Tokenizer
         self.gguf_writer.add_bos_token_id(1)
         self.gguf_writer.add_eos_token_id(2)
         self.gguf_writer.add_pad_token_id(0)
         self.gguf_writer.add_sep_token_id(0)
 
     def write_tensor_header_gguf(self, name: str, shape: Sequence[int], data_type: DataType, data) -> None:
-        # sname = name.encode('utf-8')
-        # self.fout.write(struct.pack("iii", len(shape), len(sname), DATA_TYPE_TO_FTYPE[data_type]))
-        # self.fout.write(struct.pack("i" * len(shape), *shape[::-1]))
-        # self.fout.write(sname)
-        # self.fout.seek((self.fout.tell() + 31) & -32)
         self.gguf_writer.add_tensor(name, data)
 
     def end(self):
