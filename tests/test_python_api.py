@@ -99,7 +99,7 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # llm runtime fp32
         itrex_model = Model()
-        woq_config={"use_quant":False, "compute_dtype":"int8", "weight_dtype":"int4", "use_ggml":False, "group_size":128},
+        woq_config={"use_quant":False, "compute_dtype":"int8", "weight_dtype":"int4", "use_ggml":False, "group_size":128}
         itrex_model.init(model_name, **woq_config)
         itrex_generate_ids = itrex_model.generate(
             inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True, pad_token=pad_token)
