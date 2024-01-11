@@ -70,11 +70,11 @@ class Model {
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype);
   void reinit();
-  std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
+  std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids, bool logits_all);
   // deprecated API
   std::vector<std::vector<model_token>> generate_tokens(const std::vector<std::vector<model_token>>& input_ids);
   const std::vector<float>& evaluate_(const std::vector<std::vector<model_token>>& input_ids);
-  py::array_t<float> evaluate(const std::vector<std::vector<model_token>>& input_ids) {
+  py::array_t<float> evaluate(const std::vector<std::vector<model_token>>& input_ids, bool logits_all = false) {
     if (!check_input_and_count_padding(input_ids)) return py::array_t<float>();
     const auto& logits = evaluate_(input_ids);
     for (auto& input_id : curr_input_ids) input_id.clear();  // clear curr_input_ids after eval
@@ -348,6 +348,7 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
 }
 
 std::vector<std::vector<model_token>> Model::generate(const std::vector<std::vector<model_token>>& input_ids) {
+  if (logits_all) ctx->logits_all = true;
   if (!check_input_and_count_padding(input_ids)) return {};
   if (ctx->beam_search) return beam_generate(input_ids);
 
@@ -673,7 +674,7 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto")
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
-           py::arg("input_ids") = std::vector<std::vector<model_token>>{})
+           py::arg("input_ids") = std::vector<std::vector<model_token>>{}, py::arg("logits_all") = false)
       // deprecated API
       .def("generate_tokens", &Model::generate_tokens, "Generate tokens with input ids", py::arg("input_ids"))
       .def_static("quant_model", &Model::quant_model, "Quantize model", py::arg("model_path"), py::arg("out_path"),
