@@ -41,11 +41,11 @@
 #include <unordered_map>
 
 #include "application/common.h"
-#include "core/layers/jblas_common.hpp"
+#include "core/layers/bestla_common.hpp"
 #include "core/layers/mha_dense.h"
 #include "core/ne_layers.h"
-#include "core/layers/jblas_gemm.h"
-#include "jblas/jit_blas_parallel.h"
+#include "core/layers/bestla_gemm.h"
+#include "bestla/bestla_parallel.h"
 // #include "jblas/jblas/jit_blas_weight_compression.h"
 // #include "models/model_utils/model_config.h"
 
@@ -225,18 +225,22 @@ quant_params_internal quant_params_to_internal(const quant_params& params) {
                                parse_compute_type(params.compute_dtype, params.use_ggml)};
 }
 
-size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
-                   const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
+size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
+                    const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
-  jblas::parallel::OMPThreading threading(nthread);
-  JBLAS_DTYPE quant_type = JBLAS_DTYPE::S4_CLIP;
+#ifdef __OPENMP
+  bestla::parallel::OMPThreading threading(nthread);
+#else
+  bestla::parallel::StdThreading threading(nthread);
+#endif
+  BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
-    quant_type = JBLAS_DTYPE::S8;
+    quant_type = BTLA_DTYPE::S8;
   }
-  auto dtype_type = static_cast<JBLAS_DTYPE>(
-      jblas::utils::jblas_dtype_get_mask_val(quant_type, JBLAS_DTYPE::TypeMask, JBLAS_DTYPE::TypeShift));
-  if (dtype_type == JBLAS_DTYPE::TypeFloat) {
+  auto dtype_type = static_cast<BTLA_DTYPE>(
+      bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
+  if (dtype_type == BTLA_DTYPE::TypeFloat) {
     printf("Not support float dtype in qpack\n");
     if (params.alg == quant_alg::asym) {
       printf("Invalid alg for float quant types, will be igonred\n");
@@ -245,18 +249,18 @@ size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* s
       printf("Compute Int8 is not supported by float quant types, will be igonred\n");
     }
   }
-  JBLAS_DTYPE scale_type = JBLAS_DTYPE::BF16;
+  BTLA_DTYPE scale_type = BTLA_DTYPE::BF16;
   if (params.scale_dtype == quant_sdtype::fp32) {
-    scale_type = JBLAS_DTYPE::F32;
+    scale_type = BTLA_DTYPE::F32;
   }
   if (params.scale_dtype == quant_sdtype::fp16) {
     printf("Current not support float16 scale, reset to bf16\n");
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
-  auto size = JblasGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
+  auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
   if (size) {
-    if (!JblasGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
-                        params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
+    if (!BTLAGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
+                       params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
       printf("Failed to quant this weight\n");
       return 0;
     }
@@ -266,30 +270,34 @@ size_t jblas_qpack(const int8_t* src_w, const float* src_scales, const int8_t* s
 }
 
 // dstptr: default maximum workspace = float array size
-size_t jblas_quantize(const float* f32ptr, void* dstpr, const quant_params_internal params, int nthread, size_t n,
-                      size_t k) {
+size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_internal params, int nthread, size_t n,
+                       size_t k) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
-  jblas::parallel::OMPThreading threading(nthread);
-  JBLAS_DTYPE quant_type = JBLAS_DTYPE::S4_CLIP;
+#ifdef __OPENMP
+  bestla::parallel::OMPThreading threading(nthread);
+#else
+  bestla::parallel::StdThreading threading(nthread);
+#endif
+  BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
-    quant_type = JBLAS_DTYPE::S8;
+    quant_type = BTLA_DTYPE::S8;
   }
   if (params.bits == quant_bits::fp4_e2m1) {
-    quant_type = JBLAS_DTYPE::F4_E2M1;
+    quant_type = BTLA_DTYPE::F4_E2M1;
   }
   if (params.bits == quant_bits::nf4) {
-    quant_type = JBLAS_DTYPE::F4_NF4;
+    quant_type = BTLA_DTYPE::F4_NF4;
   }
   if (params.bits == quant_bits::fp8_e4m3) {
-    quant_type = JBLAS_DTYPE::F8_E4M3;
+    quant_type = BTLA_DTYPE::F8_E4M3;
   }
   if (params.bits == quant_bits::fp8_e5m2) {
-    quant_type = JBLAS_DTYPE::F8_E5M2;
+    quant_type = BTLA_DTYPE::F8_E5M2;
   }
-  auto dtype_type = static_cast<JBLAS_DTYPE>(
-      jblas::utils::jblas_dtype_get_mask_val(quant_type, JBLAS_DTYPE::TypeMask, JBLAS_DTYPE::TypeShift));
-  if (dtype_type == JBLAS_DTYPE::TypeFloat) {
+  auto dtype_type = static_cast<BTLA_DTYPE>(
+      bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
+  if (dtype_type == BTLA_DTYPE::TypeFloat) {
     if (params.alg == quant_alg::asym) {
       printf("Invalid alg for float quant types, will be igonred\n");
     }
@@ -297,25 +305,25 @@ size_t jblas_quantize(const float* f32ptr, void* dstpr, const quant_params_inter
       printf("Compute Int8 is not supported by float quant types, will be igonred\n");
     }
   }
-  JBLAS_DTYPE scale_type = JBLAS_DTYPE::BF16;
+  BTLA_DTYPE scale_type = BTLA_DTYPE::BF16;
   if (params.scale_dtype == quant_sdtype::fp32) {
-    scale_type = JBLAS_DTYPE::F32;
+    scale_type = BTLA_DTYPE::F32;
   }
   if (params.scale_dtype == quant_sdtype::fp16) {
     printf("Current not support float16 scale, reset to bf16\n");
   }
-  if (quant_type == JBLAS_DTYPE::F8_E4M3 || quant_type == JBLAS_DTYPE::F8_E5M2) {
+  if (quant_type == BTLA_DTYPE::F8_E4M3 || quant_type == BTLA_DTYPE::F8_E5M2) {
     if (params.scale_dtype != quant_sdtype::fp8 && params.scale_dtype != quant_sdtype::fp32) {
       printf("Warning: fp8 weight only supports fp8 / fp32 scale now! Fall back to fp8.\n");
     }
-    scale_type = JBLAS_DTYPE::F8_E8M0;
+    scale_type = BTLA_DTYPE::F8_E8M0;
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
-  auto size = JblasGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, nullptr);
+  auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, nullptr);
   bool constexpr IsTrans_TorchWeight = true;
   if (size) {
-    if (!JblasGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym,
-                             ctype, IsTrans_TorchWeight, &threading)) {
+    if (!BTLAGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype,
+                            IsTrans_TorchWeight, &threading)) {
       printf("Failed to quant this weight\n");
       return 0;
     }
@@ -383,7 +391,7 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   work.resize(nelements * 4);  // upper bound on size
   void* new_data = work.addr;
   size_t new_size = 0;
-  float* f32_data = NULL;
+  float* f32_data = nullptr;
   model_buffer f32_conv_buf;
   if (tensor.type == NE_TYPE_F32) {
     f32_data = reinterpret_cast<float*>(tensor.data);
@@ -399,12 +407,12 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   }
   printf("quantizing .. ");
   fflush(stdout);
-  if (new_type == NE_TYPE_JBLAS) {
+  if (new_type == NE_TYPE_BTLA) {
     size_t k_ = tensor.ne.at(0);
     size_t n_ = tensor.ne.at(1);
     printf("JBLAS ");
-    new_size = jblas_quantize(f32_data, work.addr, params, nthread, n_, k_);
-  } else if (new_type >= NE_TYPE_Q4_0 && new_type < NE_TYPE_JBLAS) {
+    new_size = bestla_quantize(f32_data, work.addr, params, nthread, n_, k_);
+  } else if (new_type >= NE_TYPE_Q4_0 && new_type < NE_TYPE_BTLA) {
     printf("GGML ");
     new_size = ggml_quantize(f32_data, work.addr, new_type, nthread, nelements);
   }
@@ -417,7 +425,7 @@ __WRITE_FILE:
   printf("\n");
 }
 
-static void model_quantize_internal(const quant_params& params, std::shared_ptr<quant_layer_base> quant_layer) {
+static void model_quantize_internal(const quant_params& params, std::shared_ptr<quant_layer_base>& quant_layer) {
   auto ftype = quant_params_to_ftype(params);
   quant_layer->set_global_config(params.nthread, quant_params_to_internal(params));
   int nthread = params.nthread;
@@ -458,6 +466,7 @@ static void model_quantize_internal(const quant_params& params, std::shared_ptr<
   printf("%s: quant size  = %8.2f MB\n", __func__, total_size_new / 1024.0 / 1024.0);
 }
 
+
 size_t jblas_special_quantize(const float* f32ptr, void* dstpr, int group_size, int nthread, int n, int k) { return 0; }
 
 bool model_quantize_special(std::ifstream& finp, std::ofstream& fout, const ne_ftype ftype,
@@ -468,8 +477,8 @@ bool model_quantize_special(std::ifstream& finp, std::ofstream& fout, const ne_f
     case NE_FTYPE_MOSTLY_Q4_0:
       qtype = NE_TYPE_Q4_0;
       break;
-    case NE_FTYPE_MOSTLY_Q_JBLAS:
-      qtype = NE_TYPE_JBLAS;
+    case NE_FTYPE_MOSTLY_Q_BTLA:
+      qtype = NE_TYPE_BTLA;
       break;
     case NE_FTYPE_MOSTLY_F16: {
       fprintf(stderr, "%s: invalid model type %d\n", __func__, ftype);
@@ -583,7 +592,7 @@ bool model_quantize_special(std::ifstream& finp, std::ofstream& fout, const ne_f
         case NE_TYPE_Q4_0: {
           cur_size = ne_quantize_chunk((ne_type)ttype, data_f32.data(), work.data(), 0, nelements, hist_cur.data());
         } break;
-        case NE_TYPE_JBLAS: {
+        case NE_TYPE_BTLA: {
           cur_size = jblas_special_quantize(data_f32.data(), work.data(), 32, 1, ne[0], ne[1]);
           printf("JBLAS");
         } break;
