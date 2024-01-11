@@ -70,11 +70,12 @@ class Model {
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype);
   void reinit();
-  std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids, bool logits_all);
+  std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
   // deprecated API
   std::vector<std::vector<model_token>> generate_tokens(const std::vector<std::vector<model_token>>& input_ids);
   const std::vector<float>& evaluate_(const std::vector<std::vector<model_token>>& input_ids);
   py::array_t<float> evaluate(const std::vector<std::vector<model_token>>& input_ids, bool logits_all = false) {
+    if (logits_all) ctx->logits_all = true;
     if (!check_input_and_count_padding(input_ids)) return py::array_t<float>();
     const auto& logits = evaluate_(input_ids);
     for (auto& input_id : curr_input_ids) input_id.clear();  // clear curr_input_ids after eval
@@ -348,7 +349,6 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
 }
 
 std::vector<std::vector<model_token>> Model::generate(const std::vector<std::vector<model_token>>& input_ids) {
-  if (logits_all) ctx->logits_all = true;
   if (!check_input_and_count_padding(input_ids)) return {};
   if (ctx->beam_search) return beam_generate(input_ids);
 
