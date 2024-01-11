@@ -45,7 +45,6 @@ jobs:
   
       - name: Run UT
         run: |
-          conda deactivate
           source /opt/rh/gcc-toolset-12/enable
           #conda activate unit-test-bestla || source activate unit-test-bestla
           #export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
