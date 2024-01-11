@@ -22,6 +22,7 @@ concurrency:
 
 env:
   INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '13.1.0' }}
+  WORKING_DIR: ${{ github.workspace }}
 
 jobs:
   unit-test:
