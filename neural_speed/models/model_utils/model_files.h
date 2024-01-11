@@ -783,6 +783,7 @@ struct gguf_loader {
         case NE_TYPE_Q5_0:
         case NE_TYPE_Q5_1:
         case NE_TYPE_Q8_0:
+        case NE_TYPE_Q6_K:
         case NE_TYPE_BTLA:
           break;
         default: {
