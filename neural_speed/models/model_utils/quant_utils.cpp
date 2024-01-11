@@ -466,7 +466,6 @@ static void model_quantize_internal(const quant_params& params, std::shared_ptr<
   printf("%s: quant size  = %8.2f MB\n", __func__, total_size_new / 1024.0 / 1024.0);
 }
 
-
 size_t jblas_special_quantize(const float* f32ptr, void* dstpr, int group_size, int nthread, int n, int k) { return 0; }
 
 bool model_quantize_special(std::ifstream& finp, std::ofstream& fout, const ne_ftype ftype,

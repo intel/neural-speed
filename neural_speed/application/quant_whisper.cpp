@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 
   // needed to initialize f16 tables
   {
-    struct ne_init_params params = {0, NULL, false};
+    struct ne_init_params params = {0, nullptr, false};
     struct ne_context* ctx = ne_init(params);
     ne_free(ctx);
   }
