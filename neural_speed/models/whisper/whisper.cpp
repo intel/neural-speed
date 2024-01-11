@@ -583,8 +583,8 @@ static bool kv_cache_reinit(struct whisper_kv_cache* cache) {
   NE_ASSERT(cache->buf.size >= 2 * n_elements * ne_type_sizef(wtype));
 
   struct ne_init_params params = {
-      /*.mem_size   =*/cache->buf.size(),
-      /*.mem_buffer =*/cache->buf.data(),
+      /*.mem_size   =*/cache->buf.size,
+      /*.mem_buffer =*/cache->buf.addr,
       /*.no_alloc   =*/false,
   };
 
