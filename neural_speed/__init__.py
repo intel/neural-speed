@@ -51,37 +51,33 @@ class Model:
         if self.module:
             return
         if model_type == "gptj":
-            import intel_extension_for_transformers.llm.runtime.graph.gptj_cpp as cpp_model
+            import neural_speed.gptj_cpp as cpp_model
         elif model_type == "falcon":
-            import intel_extension_for_transformers.llm.runtime.graph.falcon_cpp as cpp_model
+            import neural_speed.falcon_cpp as cpp_model
         elif model_type == "gptneox":
-            import intel_extension_for_transformers.llm.runtime.graph.gptneox_cpp as cpp_model
+            import neural_speed.gptneox_cpp as cpp_model
         elif model_type == "dolly":
-            import intel_extension_for_transformers.llm.runtime.graph.dolly_cpp as cpp_model
+            import neural_speed.dolly_cpp as cpp_model
         elif model_type == "llama" or model_type == "llama2":
-            import intel_extension_for_transformers.llm.runtime.graph.llama_cpp as cpp_model
+            import neural_speed.llama_cpp as cpp_model
         elif model_type == "mpt":
-            import intel_extension_for_transformers.llm.runtime.graph.mpt_cpp as cpp_model
+            import neural_speed.mpt_cpp as cpp_model
         elif model_type == "gpt_bigcode" or model_type == "starcoder":
-            import intel_extension_for_transformers.llm.runtime.graph.starcoder_cpp as cpp_model
+            import neural_speed.starcoder_cpp as cpp_model
         elif model_type == "opt":
-            import intel_extension_for_transformers.llm.runtime.graph.opt_cpp as cpp_model
+            import neural_speed.opt_cpp as cpp_model
         elif model_type == "bloom":
-            import intel_extension_for_transformers.llm.runtime.graph.bloom_cpp as cpp_model
+            import neural_speed.bloom_cpp as cpp_model
         elif model_type == "chatglm":
-            import intel_extension_for_transformers.llm.runtime.graph.chatglm_cpp as cpp_model
+            import neural_speed.chatglm_cpp as cpp_model
         elif model_type == "chatglm2":
-            import intel_extension_for_transformers.llm.runtime.graph.chatglm2_cpp as cpp_model
+            import neural_speed.chatglm2_cpp as cpp_model
         elif model_type == "baichuan":
-            import intel_extension_for_transformers.llm.runtime.graph.baichuan_cpp as cpp_model
+            import neural_speed.baichuan_cpp as cpp_model
         elif model_type == "polyglot":
-            import intel_extension_for_transformers.llm.runtime.graph.polyglot_cpp as cpp_model
-        elif model_type == "qwen":
-            import intel_extension_for_transformers.llm.runtime.graph.qwen_cpp as cpp_model
+            import neural_speed.polyglot_cpp as cpp_model
         elif model_type == "mistral":
-            import intel_extension_for_transformers.llm.runtime.graph.mistral_cpp as cpp_model
-        elif model_type == "whisper":
-            import intel_extension_for_transformers.llm.runtime.graph.whisper_cpp as cpp_model
+            import neural_speed.mistral_cpp as cpp_model
         else:
             raise TypeError("Unspported model type {}!".format(model_type))
         self.module = cpp_model
