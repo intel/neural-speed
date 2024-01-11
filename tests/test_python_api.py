@@ -65,7 +65,7 @@ class TestLLMRUNTIME(unittest.TestCase):
         woq_configs = {
             # "fp32": {"use_cache":True, "use_quant":False},
             # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":True},
-            "jblas_int4": {"use_quant":True, "compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":False, "group_size":128},
+            "jblas_int4": {"use_quant":True, "compute_dtype":"int8", "weight_dtype":"int4", "use_ggml":False, "group_size":128},
             # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8", "use_cache":True},
         }
         for config_type in woq_configs:
@@ -99,8 +99,8 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # llm runtime fp32
         itrex_model = Model()
-        woq_config={"use_quant":False, "compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":False, "group_size":128},
-        itrex_model.init(model_name, **woq_configs)
+        woq_config={"use_quant":False, "compute_dtype":"int8", "weight_dtype":"int4", "use_ggml":False, "group_size":128},
+        itrex_model.init(model_name, **woq_config)
         itrex_generate_ids = itrex_model.generate(
             inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True, pad_token=pad_token)
         for i in range(len(itrex_generate_ids)):
