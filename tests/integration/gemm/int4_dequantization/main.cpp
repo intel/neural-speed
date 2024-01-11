@@ -1,24 +1,24 @@
 /*******************************************************************************
-* Copyright (c) 2022-2023 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright (c) 2022-2023 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
 
 using namespace gpu::xetla;
-//The number of times the kernel is executed
+// The number of times the kernel is executed
 constexpr int ITER = 1;
 
 template <typename data_type_a, typename data_type_b, typename data_type_c,
@@ -40,9 +40,9 @@ int gemm_result_validate(data_type_a *A, data_type_b *B, data_type_c *C,
     return result ? 0 : 1;
 }
 
-class qkv {
+class qkv_asym {
 public:
-    //Extract the parameters required by different test cases
+    // Extract the parameters required by different test cases
     static constexpr size_t mat_m = 1;
     static constexpr size_t mat_n = 4096 * 3;
     static constexpr size_t mat_k = 4096;
@@ -62,9 +62,11 @@ public:
     using data_type_c = fp16;
 };
 
+class qkv_sym : public qkv_asym {};
+
 class output_proj {
 public:
-    //Extract the parameters required by different test cases
+    // Extract the parameters required by different test cases
     static constexpr size_t mat_m = 1;
     static constexpr size_t mat_n = 4096;
     static constexpr size_t mat_k = 4096;
@@ -86,7 +88,7 @@ public:
 
 class ffn1 {
 public:
-    //Extract the parameters required by different test cases
+    // Extract the parameters required by different test cases
     static constexpr size_t mat_m = 1;
     static constexpr size_t mat_n = 16384;
     static constexpr size_t mat_k = 4096;
@@ -108,7 +110,7 @@ public:
 
 class ffn2 {
 public:
-    //Extract the parameters required by different test cases
+    // Extract the parameters required by different test cases
     static constexpr size_t mat_m = 1;
     static constexpr size_t mat_n = 4096;
     static constexpr size_t mat_k = 16384;
@@ -130,7 +132,7 @@ public:
 
 class last {
 public:
-    //Extract the parameters required by different test cases
+    // Extract the parameters required by different test cases
     static constexpr size_t mat_m = 1;
     static constexpr size_t mat_n = 50400;
     static constexpr size_t mat_k = 4096;
@@ -150,10 +152,10 @@ public:
     using data_type_c = fp16;
 };
 
-template <class Test, gpu::xetla::group::quant_mode QUANT_MODE>
+template <class Test>
 void dequantize_gemm_run(int iter) {
     using namespace gpu;
-    //Accept incoming parameters
+    // Accept incoming parameters
     constexpr size_t matrix_m = Test::mat_m;
     constexpr size_t matrix_n = Test::mat_n;
     constexpr size_t matrix_k = Test::mat_k;
@@ -187,7 +189,12 @@ void dequantize_gemm_run(int iter) {
 
     constexpr size_t size_c = matrix_m * matrix_n;
 
-    //Turn on the enable_profiling property to facilitate subsequent profiling
+    constexpr gpu::xetla::group::quant_mode Q_MODE
+            = std::is_same_v<Test, qkv_asym>
+            ? gpu::xetla::group::quant_mode::S4_ASYM
+            : gpu::xetla::group::quant_mode::S4_SYM;
+
+    // Turn on the enable_profiling property to facilitate subsequent profiling
     sycl::property_list properties {sycl::property::queue::enable_profiling()};
     auto queue = sycl::queue(properties);
     auto context = queue.get_info<info::queue::context>();
@@ -214,7 +221,7 @@ void dequantize_gemm_run(int iter) {
     using compute_policy
             = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
                     perf_tuning_knob, data_type_scale, data_type_zero_pt,
-                    QUANT_MODE, dequant_s, gpu_arch::Dg2>;
+                    Q_MODE, dequant_s, gpu_arch::Dg2>;
     using gemm_t = xetla::group::gemm_t<compute_policy, tile_shape,
             mem_desc_a_t, mem_desc_b_t>;
 
@@ -230,7 +237,7 @@ void dequantize_gemm_run(int iter) {
     size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
     size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
 
-    //Define and initialize the data required for the calculation
+    // Define and initialize the data required for the calculation
     auto *A_h = static_cast<data_type_a *>(
             malloc_host(size_a * sizeof(data_type_a), context));
     auto *B_h = static_cast<data_type_b *>(
@@ -306,10 +313,16 @@ void dequantize_gemm_run(int iter) {
 
     // set up gemm arguments
     typename gemm_op_t::template arguments_t<compute_policy::quant_type>
-            gemm_arg(matrix_m, matrix_k, matrix_n, A_d, matrix_k, B_d, matrix_n,
-                    C_d, matrix_n, scale_d, matrix_n, zero_pt_d, matrix_n,
-                    Acc_d, Cnt_d);
-
+            gemm_arg;
+    if constexpr (std::is_same_v<Test, qkv_sym>) {
+        gemm_arg = {matrix_m, matrix_k, matrix_n, A_d, matrix_k, B_d, matrix_n,
+                C_d, matrix_n, scale_d, matrix_n, Acc_d, Cnt_d};
+    }
+    if constexpr (std::is_same_v<Test, qkv_asym>) {
+        gemm_arg = {matrix_m, matrix_k, matrix_n, A_d, matrix_k, B_d, matrix_n,
+                C_d, matrix_n, scale_d, matrix_n, zero_pt_d, matrix_n, Acc_d,
+                Cnt_d};
+    }
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
     if (!gemm_op_t::can_implement(gemm_arg)) {
         std::cout << "The arguments cannot be supported, aborting ... "
@@ -340,7 +353,7 @@ void dequantize_gemm_run(int iter) {
         FAIL();
     }
 
-    //performance
+    // performance
     prof.print_profiling_result(profiling_selector::GPU);
 
     std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
@@ -352,8 +365,7 @@ void dequantize_gemm_run(int iter) {
                 int start_out = i * dequant_s * matrix_n + j * 2;
                 int start_scale = i * size_scale_n + j * 2;
                 int8_t data_0, data_1;
-                if constexpr (QUANT_MODE
-                        == gpu::xetla::group::quant_mode::S4_ASYM) {
+                if constexpr (std::is_same_v<Test, qkv_asym>) {
                     uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
                     uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
                     data_0 = int8_t(data_in & 0x0f);
@@ -366,8 +378,7 @@ void dequantize_gemm_run(int iter) {
                             = fp16(data_1 - zero_pt_1)
                             * scale_h[start_scale + 1];
                 }
-                if constexpr (QUANT_MODE
-                        == gpu::xetla::group::quant_mode::S4_SYM) {
+                if constexpr (std::is_same_v<Test, qkv_sym>) {
                     uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
                     int8_t data_zero_pt = zero_pt_h[start_zero_pt];
                     uint8_t data_even = (data_in & 0x0f) << 4;
@@ -410,13 +421,12 @@ class dequantize_gemm_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(dequantize_gemm_test);
 
 TYPED_TEST_P(dequantize_gemm_test, esimd) {
-    dequantize_gemm_run<TypeParam, gpu::xetla::group::quant_mode::S4_ASYM>(
-            ITER);
+    dequantize_gemm_run<TypeParam>(ITER);
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
 // using tests = ::testing::Types<qkv, output_proj, ffn1, ffn2, last>;
-using tests = ::testing::Types<qkv>;
+using tests = ::testing::Types<qkv_sym, qkv_asym>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
         dequantize_gemm_test_suite, dequantize_gemm_test, tests);
