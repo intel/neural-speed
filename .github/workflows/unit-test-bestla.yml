@@ -45,6 +45,7 @@ jobs:
       - name: Run UT
         run: |
           conda activate unit-test-bestla || source activate unit-test-bestla
+          export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
           cd ${{ github.workspace }}/bestla && mkdir build && cd build && cmake .. -DBTLA_UT_ALL=ON && make -j
           ./bestla_ut 2>&1 | tee unit_test_bestla.log
 
