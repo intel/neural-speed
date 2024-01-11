@@ -63,7 +63,7 @@ struct Query {
   Query() {}
   Query(int id, const pybind11::array_t<int, py::array::c_style | py::array::forcecast>& token_ids)
       : id(id), token_ids(token_ids.data(), token_ids.data() + token_ids.size()) {
-    assert(token_ids.ndim() == 1);
+    assert(token_ids.ndim() == 1 || (token_ids.ndim() == 2 && token_ids.shape(0) == 1));
   }
 
   std::string to_string() const {
@@ -129,20 +129,21 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
 
 class ModelServer {
  public:
-  explicit ModelServer(const ResponseCallback& response, const std::string& model_path, int max_new_tokens, int n_batch,
-                       int ctx_size, int seed, int threads, float repetition_penalty, int num_beams, bool do_sample,
-                       int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty,
-                       bool early_stopping, int n_keep, int n_discard, bool shift_roped_k, int batch_size,
-                       model_vocab::id pad_token, const std::string& memory_dtype, const bool& continuous_batching,
-                       const int& max_request_num, const std::string& policy)
+  ModelServer(const ResponseCallback& response, const std::string& model_path, int max_new_tokens, int n_batch,
+              int ctx_size, int seed, int threads, float repetition_penalty, int num_beams, bool do_sample, int top_k,
+              float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
+              int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
+              const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
+              const std::string& policy)
       : response(response), waiting(), running(true), params(), policy(policy), worker([=]() {
-          init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
-                          num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
-                          early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
-                          continuous_batching, max_request_num);
-          std::deque<Query> queue_finished;
-          std::deque<Query> queue_running;
-          cbg_scheduler scheduler(params, policy);
+          if (!continuous_batching) fprintf(stderr, "Warning: ModelServer only supports continuous_batching.\n");
+          this->InitServerParams(model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
+                                 num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
+                                 early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
+                                 true, max_request_num);
+          // std::deque<Query> queue_finished;
+          // std::deque<Query> queue_running;
+          cbg_scheduler scheduler(this->params, policy);
           std::vector<sequence> added_seqs;
           while (running) {
             {                                               // add waitting tasks queue to running queue
@@ -162,16 +163,17 @@ class ModelServer {
               added_seqs.clear();
             }
             if (!scheduler.done()) {
-              scheduler.step();
+              if (!scheduler.step()) {
+                fprintf(stderr, "Server has running errors, exiting...\n");
+                running = false;
+              }
             } else {
-              py::print("Server has no requests now, waiting new query...");
+              fprintf(stdout, "Server has no requests now, waiting new query...\n");
+              _mm_pause();  //  spin-wait loop
             }
-            std::vector<sequence> finished_seqs;
             if (scheduler.has_finished_seq()) {
-              finished_seqs = scheduler.pop_completed_requests();
-            }
-            if (!finished_seqs.empty()) {
               py::gil_scoped_acquire acquirer;
+              std::vector<sequence> finished_seqs = scheduler.pop_completed_requests();
               std::vector<Query> finished(finished_seqs.size());
               std::transform(finished_seqs.cbegin(), finished_seqs.cend(), finished.begin(),
                              [&](const sequence& seq) { return this->Sequence2Query(seq); });
@@ -233,6 +235,17 @@ class ModelServer {
     return ret_query;
   }
 
+  void InitServerParams(const std::string& model_path, int max_new_tokens, int n_batch, int ctx_size, int seed,
+                        int threads, float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p,
+                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
+                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
+                        const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num) {
+    init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
+                    num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping,
+                    n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching,
+                    max_request_num);
+  }
+
   ~ModelServer() {
     // "synchronized" function
     // stop spinning after calling ResponseCallback for the last query
@@ -250,9 +263,9 @@ class ModelServer {
   std::vector<Query> waiting;
   std::mutex queue_mtx;
   bool running;
-  std::thread worker;
   gpt_params params;
   std::string policy;
+  std::thread worker;
 };
 
 std::shared_ptr<quant_layer_base> get_model_quant_layer(const std::string model_name) {

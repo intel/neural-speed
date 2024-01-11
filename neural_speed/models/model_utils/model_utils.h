@@ -427,8 +427,12 @@ class beam_search_kv_cache_reorder {
 
 class beam_search_flow {
  public:
-  beam_search_flow(model_context* lctx, const int batch_size = 1)
-      : ctx(lctx), beam_size(lctx->beam_size), request_bs(batch_size), lp(logits_processor(lctx)) {
+  beam_search_flow(model_context* lctx, const int batch_size = 1, const int n_threads = 4)
+      : ctx(lctx),
+        beam_size(lctx->beam_size),
+        request_bs(batch_size),
+        num_threads(n_threads),
+        lp(logits_processor(lctx)) {
     cur_beams.resize(batch_size * beam_size);
     next_beams.resize(batch_size * beam_size);
     for (int i = 0; i < batch_size; ++i) {
@@ -462,7 +466,7 @@ class beam_search_flow {
   // public interface
   // static batching (batched inputs -> generate max new tokens -> emit batched outputs, like offline scenario)
   // this api doesn't care about if each sequence in batch has the same length or not (padding or not padding)
-  const std::vector<std::vector<model_token>>& loop(const std::vector<model_input>& inputs, const int& n_threads);
+  const std::vector<std::vector<model_token>>& loop(const std::vector<model_input>& inputs);
   // continuous batching (scheduling from the outside, like server scenario)
   bool step(const std::vector<model_input>& inputs);
   std::vector<int> request_done_ids();
@@ -501,7 +505,7 @@ class beam_search_flow {
   std::vector<uint32_t> n_padding;
   std::vector<generation_config> gen_confs;
   std::vector<model_input> next_inputs;
-  int num_threads = 4;  // default by 4
+  int num_threads;  // default by 4
   logits_processor lp;
   std::shared_ptr<beam_search_kv_cache_reorder> kv_reorder;
   std::vector<std::vector<model_token>> response;

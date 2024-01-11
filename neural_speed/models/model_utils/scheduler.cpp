@@ -22,7 +22,7 @@ il_worker::il_worker(const gpt_params& params) {
     exit(0);
   }
   if (m_ctx->beam_search && bsf == nullptr) {
-    bsf = new beam_search_flow(m_ctx, m_ctx->max_request_num);
+    bsf = new beam_search_flow(m_ctx, m_ctx->max_request_num, params.n_threads);
   }
   threads = params.n_threads;
 }
@@ -43,8 +43,9 @@ cbg_worker::~cbg_worker() {}
 
 bool cbg_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) {
   for (int i = 0; i < n_input; ++i) {
-    if ((seqs->at(i)).status != seq_status::PREFILL || (seqs->at(i)).status != seq_status::DECODING) {
-      fprintf(stderr, "%s: error: request status is unright.\n", __func__);
+    if ((seqs->at(i)).status != seq_status::PREFILL && (seqs->at(i)).status != seq_status::DECODING) {
+      fprintf(stderr, "%s: error: request %d status is unright (%d).\n", __func__, seqs->at(i).request_idx,
+              static_cast<int>((seqs->at(i)).status));
       return false;
     } else if ((seqs->at(i)).status == seq_status::PREFILL) {
       inputs[i].tokens = (seqs->at(i)).prompt_ids.data();
@@ -121,8 +122,9 @@ bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
         fprintf(stderr, "%s: error: done request idx: %d not in executed_seqs.\n", __func__, idx);
         return false;
       }
-      seqs->at(reqidx_to_vecid[idx]).generated_ids = std::move(req_done_res[r]);
-      seqs->at(reqidx_to_vecid[idx]).status = seq_status::FINISHED;
+      const int vecid = reqidx_to_vecid[idx];
+      seqs->at(vecid).generated_ids = std::move(req_done_res[r]);
+      seqs->at(vecid).status = seq_status::FINISHED;
     }
     return true;
   }
@@ -144,7 +146,7 @@ il_scheduler::~il_scheduler() {}
 std::vector<sequence> il_scheduler::pop_completed_requests() {
   std::vector<sequence> ret_seqs;
   const int length = finished_pool.size();
-  if (length > 0) {
+  if (length == 0) {
     return ret_seqs;
   }
   ret_seqs.resize(length);
@@ -179,7 +181,9 @@ int cbg_scheduler::query_free_req_idx() {
   if (iter == free_req_idx.end()) {
     return -1;
   } else {
-    return std::distance(free_req_idx.begin(), iter) - 1;
+    int idx = std::distance(free_req_idx.begin(), iter);
+    free_req_idx[idx] = false;
+    return idx;
   }
 }
 
@@ -203,12 +207,14 @@ bool cbg_scheduler::prepare_seqs() {
   }
   const int n_perfill_seqs = std::min(max_requests - cur_running_num, waiting_pool.size());
   executed_seqs.resize(n_perfill_seqs + cur_running_num);
+  fprintf(stdout, "%s: info: prefilling seqs num is %d, decoding seqs num is %d.\n", __func__, n_perfill_seqs,
+          cur_running_num);
   if (waiting_pool.size() > 0) {
     // pop prompts
     if (cur_running_num < max_requests) {
       for (int np = 0; np < n_perfill_seqs; ++np) {
         if (waiting_pool.pop(&executed_seqs[cur_running_num + np])) {
-          executed_seqs[cur_running_num + np].status == seq_status::PREFILL;
+          executed_seqs[cur_running_num + np].status = seq_status::PREFILL;
           if (executed_seqs[cur_running_num + np].request_idx == -1) {
             const int fidx = query_free_req_idx();
             if (fidx == -1) {
@@ -217,6 +223,8 @@ bool cbg_scheduler::prepare_seqs() {
             }
             executed_seqs[cur_running_num + np].request_idx = fidx;
           }
+          fprintf(stdout, "%s: info: added seq query_id: %d, request_idx: %d \n", __func__,
+                  executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
         } else {
           fprintf(stderr, "%s: error: pop waiting seq failed.\n", __func__);
           return false;
@@ -242,7 +250,7 @@ bool cbg_scheduler::step() {
   if (done()) {
     fprintf(stderr,
             "%s: warning: scheduler has no more requests, please add extra requests or just stop "
-            "calling.\n",
+            "calling it.\n",
             __func__);
     return true;
   }
@@ -275,6 +283,8 @@ bool cbg_scheduler::update_pools() {
     } else if (executed_seqs[ns].status == seq_status::FINISHED) {
       finished_pool.add(executed_seqs[ns]);
       free_req_idx[executed_seqs[ns].request_idx] = true;
+      fprintf(stdout, "%s: info: seq query_id: %d, request_idx: %d finished.\n", __func__, executed_seqs[ns].query_id,
+              executed_seqs[ns].request_idx);
     } else {
       fprintf(stderr, "%s: error: wrong seq status, seq_idx: %d should be in DECODING OR FINISHED.\n", __func__);
       return false;

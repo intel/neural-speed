@@ -2418,7 +2418,8 @@ void beam_search_flow::update_status() {
   next_done_request_ids.clear();
   for (int h = 0; h < beam_hypos.size(); ++h) {
     if (requests_done[h]) continue;
-    const bool enough_new_tokens = (cur_beams[h * beam_size].token_ids.size() == gen_confs[h].max_new_tokens);
+    const bool enough_new_tokens = (cur_beams[h * beam_size].token_ids.size() > 0 &&
+                                    cur_beams[h * beam_size].token_ids.size() == gen_confs[h].max_new_tokens);
     if (beam_hypos[h].is_done() || enough_new_tokens) {
       requests_done[h] = true;
       next_done_request_ids.push_back(h);
@@ -2469,10 +2470,8 @@ const beam& beam_search_flow::finalize(const int& request_idx) {
   return top_b;
 }
 
-const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::vector<model_input>& inputs,
-                                                                    const int& n_threads) {
+const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::vector<model_input>& inputs) {
   MODEL_ASSERT(inputs.size() == request_bs);
-  num_threads = n_threads;
   for (int ni = 0; ni < inputs.size(); ++ni) {
     n_tokens[ni] = inputs[ni].n_tokens;
     if (n_tokens[ni] > model_n_ctx(ctx)) {
@@ -2600,10 +2599,10 @@ bool beam_search_flow::step_check_and_prepare_inputs(const std::vector<model_inp
           /*gen_conf            =*/input.gen_conf,
       });
     } else {
-      bool free = std::all_of(cur_beams.begin() + req_idx * beam_size, cur_beams.begin() + (req_idx + 1) * beam_size,
-                              [](beam& b) { return (!b.done); });
-      if (free) {
-        fprintf(stderr, "%s: decoding error: beam is free for request_idx: %d.\n", __func__, req_idx);
+      bool occupancy = std::all_of(cur_beams.begin() + req_idx * beam_size,
+                                   cur_beams.begin() + (req_idx + 1) * beam_size, [](beam& b) { return (!b.done); });
+      if (!occupancy) {
+        fprintf(stderr, "%s: decoding error: beam is not in usage for request_idx: %d.\n", __func__, req_idx);
         return false;
       }
       n_tokens[req_idx] = 1;
@@ -2732,8 +2731,8 @@ std::vector<std::vector<model_token>> beam_search_flow::request_done_reponse() {
 std::vector<std::vector<model_token>> beam_search(model_context* lctx, const int& n_predict,
                                                   const std::vector<model_input>& inputs, const int& n_threads) {
   lctx->generation_conf.max_new_tokens = n_predict;
-  beam_search_flow bsf(lctx, inputs.size());
-  return bsf.loop(inputs, n_threads);
+  beam_search_flow bsf(lctx, inputs.size(), n_threads);
+  return bsf.loop(inputs);
 }
 
 std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs, const int n_input) {
