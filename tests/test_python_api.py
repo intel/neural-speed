@@ -53,8 +53,9 @@ class TestLLMRUNTIME(unittest.TestCase):
         print(tokenizer.decode(pt_generate_ids))
 
         # check output ids
+        woq_config_fp32 = {"use_quant":False, "compute_dtype":"fp32", "weight_dtype":"fp32", "use_cache":True, "use_ggml":False, "group_size":128}
         itrex_model = Model()
-        itrex_model.init(model_name, not_quant=True)
+        itrex_model.init(model_name, **woq_config_fp32)
         itrex_generate_ids = itrex_model.generate(inputs.input_ids, do_sample=False, max_new_tokens=100)[0]
         print(tokenizer.decode(itrex_generate_ids))
         for i in range(len(pt_generate_ids)):
@@ -62,9 +63,9 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # check diff of logits
         woq_configs = {
-            "fp32": {"use_cache":True, "use_quant":True},
+            # "fp32": {"use_cache":True, "use_quant":False},
             # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":True},
-            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":False, "group_size":128},
+            "jblas_int4": {"use_quant":True, "compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":False, "group_size":128},
             # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8", "use_cache":True},
         }
         for config_type in woq_configs:
@@ -98,7 +99,8 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # llm runtime fp32
         itrex_model = Model()
-        itrex_model.init(model_name, not_quant=True)
+        woq_config={"use_quant":False, "compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":False, "group_size":128},
+        itrex_model.init(model_name, **woq_configs)
         itrex_generate_ids = itrex_model.generate(
             inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True, pad_token=pad_token)
         for i in range(len(itrex_generate_ids)):
