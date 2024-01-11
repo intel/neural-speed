@@ -296,6 +296,7 @@ class Model {
     generate_count = 0;
   }
   void print_time() { model_print_timings(ctx); }
+  void reset_time() { model_reset_timings(ctx); }
   static size_t np_bestla_qpack(py::array_t<int8_t> src_w, py::array_t<float> src_scales, py::array_t<int8_t> src_zeros,
                                 py::array_t<int32_t> g_idx, py::array_t<int8_t> dst, const std::string& weight_dtype,
                                 const std::string& alg, int group_size, const std::string& scale_dtype,
@@ -872,6 +873,7 @@ PYBIND11_MODULE(qwen_cpp, m)
                   py::arg("group_size") = 32, py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8",
                   py::arg("threads") = 8)
       .def("print_time", &Model::print_time)
+      .def("reset_time", &Model::reset_time)
       .def("get_eos_id", &Model::get_eos_id)
       .def("reinit", &Model::reinit);
   py::class_<Query>(m, "Query")
