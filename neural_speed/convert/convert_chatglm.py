@@ -159,10 +159,10 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     arch = "chatglm2."
     gguf_writer.add_uint32('magic', 0x67676d66)
     gguf_writer.add_uint32('version', 1)
-    gguf_writer.add_uint32(arch + 'n_vocab', hparams["padded_vocab_size"])
+    gguf_writer.add_uint32('n_vocab', hparams["padded_vocab_size"])
     gguf_writer.add_embedding_length(hparams["hidden_size"])
 
-    gguf_writer.add_uint32(arch + 'n_mult', 0)
+    gguf_writer.add_uint32('n_mult', 0)
     gguf_writer.add_head_count(hparams["num_attention_heads"])
     gguf_writer.add_head_count_kv(0)
     gguf_writer.add_block_count(hparams["num_layers"])
@@ -186,10 +186,10 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
 
     gguf_writer.add_uint32('inner_hidden_size', 0)
 
-    gguf_writer.add_int32('bos_token_id', tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1)
-    gguf_writer.add_int32('eos_token_id', tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1)
-    gguf_writer.add_int32('pad_token_id', tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1)
-    gguf_writer.add_int32('sep_token_id', tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1)
+    gguf_writer.add_bos_token_id(tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 0)
+    gguf_writer.add_eos_token_id(tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 0)
+    gguf_writer.add_pad_token_id(tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0)
+    gguf_writer.add_sep_token_id(tokenizer.sep_token_id if tokenizer.sep_token_id is not None else 0)
 
     def write_vocab_gguf(dir_model):
         print("gguf: get tokenizer metadata")

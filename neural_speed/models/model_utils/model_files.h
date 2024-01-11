@@ -764,7 +764,7 @@ struct gguf_loader {
       model_load_tensor_shard shard;
       std::string name = gguf_get_tensor_name(ctx, i);
       uint32_t name_len = name.length();
-      shard.type = (enum ne_type)0;
+      shard.type = (enum ne_type)info->type;
 
       uint32_t n_dims = info->n_dims;
       shard.ne.resize(n_dims);
@@ -907,10 +907,14 @@ struct gguf_loader {
     GGUF_GET_KEY(ctx_gguf, hparams.inner_hidden_size, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "inner_hidden_size");
 
     // Get special vocab ids
-    GGUF_GET_KEY(ctx_gguf, vocab.bos_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "bos_token_id");
-    GGUF_GET_KEY(ctx_gguf, vocab.eos_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "eos_token_id");
-    GGUF_GET_KEY(ctx_gguf, vocab.pad_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "pad_token_id");
-    GGUF_GET_KEY(ctx_gguf, vocab.sep_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "sep_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.bos_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.bos_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.eos_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.eos_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.pad_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.pad_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.sep_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.sep_token_id");
 
     // load vocab
     std::string tokens = "tokenizer.ggml.tokens";
@@ -1273,16 +1277,19 @@ struct model_model_loader {
         if (it == tensors_map.name_to_idx.end()) {
           it = tensors_map.name_to_idx.find("model/wte");
           if (it == tensors_map.name_to_idx.end()) {
-            it = tensors_map.name_to_idx.find("model.embed_tokens.weight");  // baichuan13B
+            it = tensors_map.name_to_idx.find("token_embd.weight");  // llama-2-chat-hf
             if (it == tensors_map.name_to_idx.end()) {
-              it = tensors_map.name_to_idx.find("transformer.word_embeddings.weight");  // ChatGLM-1
+              it = tensors_map.name_to_idx.find("model.embed_tokens.weight");  // baichuan13B
               if (it == tensors_map.name_to_idx.end()) {
-                it = tensors_map.name_to_idx.find("transformer.embedding.word_embeddings.weight");  // ChatGLM-2
+                it = tensors_map.name_to_idx.find("transformer.word_embeddings.weight");  // ChatGLM-1
                 if (it == tensors_map.name_to_idx.end()) {
-                  it = tensors_map.name_to_idx.find("model.decoder.embed_tokens.weight");
-                  if (it != tensors_map.name_to_idx.end()) return 1;  // hacky solution for OPT loading
+                  it = tensors_map.name_to_idx.find("transformer.embedding.word_embeddings.weight");  // ChatGLM-2
                   if (it == tensors_map.name_to_idx.end()) {
-                    throw std::string("missing tok_embeddings.weight");
+                    it = tensors_map.name_to_idx.find("model.decoder.embed_tokens.weight");
+                    if (it != tensors_map.name_to_idx.end()) return 1;  // hacky solution for OPT loading
+                    if (it == tensors_map.name_to_idx.end()) {
+                      throw std::string("missing tok_embeddings.weight");
+                    }
                   }
                 }
               }
@@ -1307,6 +1314,15 @@ struct model_model_loader {
       }
       *(use_mmap ? mmapped_size_p : ctx_size_p) += size_needed;
     }
+  }
+
+  bool verify_tensor(const std::string& name) {
+    auto it = tensors_map.name_to_idx.find(name);
+    if (it == tensors_map.name_to_idx.end()) {
+      return false;
+    }
+
+    return true;
   }
 
   struct ne_tensor* get_tensor(const std::string& name, const std::vector<uint32_t>& ne, ne_backend backend) {

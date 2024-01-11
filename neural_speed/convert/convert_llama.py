@@ -1148,10 +1148,10 @@ class OutputFile_GGUF:
         # TODO:
         # bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
-        self.gguf_writer.add_int32('bos_token_id', 1)
-        self.gguf_writer.add_int32('eos_token_id', 2)
-        self.gguf_writer.add_int32('pad_token_id', 0)
-        self.gguf_writer.add_int32('sep_token_id', 0)
+        self.gguf_writer.add_bos_token_id(1)
+        self.gguf_writer.add_eos_token_id(2)
+        self.gguf_writer.add_pad_token_id(0)
+        self.gguf_writer.add_sep_token_id(0)
 
     def write_tensor_header_gguf(self, name: str, shape: Sequence[int], data_type: DataType, data) -> None:
         # sname = name.encode('utf-8')
