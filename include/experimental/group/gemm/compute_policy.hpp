@@ -23,7 +23,7 @@
 
 namespace gpu::xetla::group {
 
-enum quant_mode { S4_ASYM, S4_FULLRANGE_NO_ZP };
+enum quant_mode { S4_ASYM, S4_SYM };
 
 /// @brief Compute policy for unaligned shape and xmx engine.
 /// @tparam compute_attr_ Is compute-related attributes.

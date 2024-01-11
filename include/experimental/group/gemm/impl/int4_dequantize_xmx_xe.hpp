@@ -375,8 +375,7 @@ public:
             // TODO 1D prefetch need pack to U32/U64
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     scale_prefetch_payload);
-            if constexpr (compute_policy::quant_type
-                    != quant_mode::S4_FULLRANGE_NO_ZP) {
+            if constexpr (compute_policy::quant_type != quant_mode::S4_SYM) {
                 // TODO 1D prefetch need pack to U32/U64
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         zero_pt_prefetch_payload);
@@ -411,8 +410,7 @@ public:
                     matB, matB_payload);
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     scale, scale_payload);
-            if constexpr (compute_policy::quant_type
-                    != quant_mode::S4_FULLRANGE_NO_ZP) {
+            if constexpr (compute_policy::quant_type != quant_mode::S4_SYM) {
                 subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                         zero_pt, zero_pt_payload);
             }
@@ -427,7 +425,7 @@ public:
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         scale_prefetch_payload);
                 if constexpr (compute_policy::quant_type
-                        != quant_mode::S4_FULLRANGE_NO_ZP) {
+                        != quant_mode::S4_SYM) {
                     // TODO 1D prefetch need pack to U32/U64
                     subgroup::tile_prefetch<cache_hint::cached,
                             cache_hint::cached>(zero_pt_prefetch_payload);
@@ -508,14 +506,14 @@ private:
 
                 //2: int8 includes 2 4bits data.
                 xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
-                cvt_blk.xetla_select<matB_t::block_elems, 2>(0)
-                        = matB_blk & 0x0f;
-                cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
-
                 xetla_vector<int32_t, block_size_x_b * block_size_y_b>
                         cvt_blk_i32;
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_ASYM) {
+                    cvt_blk.xetla_select<matB_t::block_elems, 2>(0)
+                            = matB_blk & 0x0f;
+                    cvt_blk.xetla_select<matB_t::block_elems, 2>(1)
+                            = matB_blk >> 4;
                     auto zero_pt_vec
                             = zero_pt.reg
                                       .xetla_select<zero_pt_t::block_size_x, 1>(
@@ -542,10 +540,19 @@ private:
                             - zero_pt_blk.xetla_format<int8_t>());
                 }
                 if constexpr (compute_policy::quant_type
-                        == quant_mode::S4_FULLRANGE_NO_ZP) {
-                    xetla_vector<int8_t, block_size_x_b *block_size_y_b>
-                            cvt_blk_i8
-                            = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
+                        == quant_mode::S4_SYM) {
+                    xetla_vector<int8_t, block_size_x_b * block_size_y_b>
+                            cvt_blk_i8;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            = matB_blk & 0x0f;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            = cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            << 4;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            = cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0)
+                            >> 4;
+                    cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1)
+                            = matB_blk.xetla_format<int8_t>() >> 4;
                     cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
                 }
 

@@ -130,7 +130,7 @@ class gemm_universal_t<dispatch_policy_int4_dequantize_kslicing<group_swizzle_,
 public:
     /// @brief GEMM arguments.
     /// This is the interface for users to pass the application-related runtime variables.
-    template <group::quant_mode quant_mode = group::S4_FULLRANGE_NO_ZP>
+    template <group::quant_mode quant_mode = group::S4_SYM>
     struct arguments_t {
         /// @brief Is the size of the m dimension of the matrix multiplication (m x k x n).
         uint32_t matrix_m;
@@ -249,7 +249,7 @@ public:
     };
 
     template <>
-    struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
+    struct arguments_t<group::S4_SYM> {
         /// @brief Is the size of the m dimension of the matrix multiplication (m x k x n).
         uint32_t matrix_m;
         /// @brief Is the size of the k dimension of the matrix multiplication (m x k x n).
@@ -496,7 +496,7 @@ public:
         implementable &= ((args.matB_ld % pack_ratio == 0)
                 && (args.matrix_n % pack_ratio == 0));
         if constexpr (gemm_t::compute_policy::quant_type
-                != group::quant_mode::S4_FULLRANGE_NO_ZP) {
+                != group::quant_mode::S4_SYM) {
             implementable &= (args.zero_pt_ld % pack_ratio == 0);
         }
 
@@ -588,7 +588,7 @@ public:
         uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
         gemm_args_t gemm_args;
         if constexpr (gemm_t::compute_policy::quant_type
-                == group::quant_mode::S4_FULLRANGE_NO_ZP) {
+                == group::quant_mode::S4_SYM) {
             gemm_args = gemm_args_t(
                     mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
         } else {
