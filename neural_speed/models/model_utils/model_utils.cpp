@@ -993,15 +993,6 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
 
 void model_free(struct model_context* ctx) { delete ctx; }
 
-int model_quantize(const quant_params& params, std::shared_ptr<quant_layer_base> quant_layer) {
-  try {
-    model_quantize_internal(params, quant_layer);
-    return 0;
-  } catch (const std::string& err) {
-    fprintf(stderr, "%s: failed to quantize: %s\n", __func__, err.c_str());
-    return 1;
-  }
-}
 
 int model_apply_lora_from_file_internal(struct model_context* ctx, const char* path_lora, const char* path_base_model,
                                         int n_threads) {
