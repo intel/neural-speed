@@ -62,9 +62,9 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # check diff of logits
         woq_configs = {
-            "fp32": {"use_cache":True, "not_quant":True},
+            "fp32": {"use_cache":True, "use_quant":True},
             # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":True},
-            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True},
+            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":False, "group_size":128},
             # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8", "use_cache":True},
         }
         for config_type in woq_configs:
