@@ -4,6 +4,8 @@ project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
+option(BTLA_USE_OPENMP "Enable OpenMP thread pool" ON)
+
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
 option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
 option(BTLA_UT_EPILOGUE "Enable unit test for epilogue" OFF)
@@ -41,7 +43,12 @@ endif()
 include(GNUInstallDirs)
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-	
+
+if(BTLA_USE_OPENMP)
+message(STATUS "BesTLA using OpenMP")
+target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
+endif(BTLA_USE_OPENMP)
+
 target_include_directories(
 	${PROJECT_NAME} INTERFACE
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
@@ -81,14 +88,6 @@ install(
 
 if(WIN32)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE _CRT_SECURE_NO_WARNINGS NOMINMAX)
-	target_compile_options(${PROJECT_NAME} INTERFACE /wd4068 /wd4849 /wd6262 /wd4702 /wd4100) 
-	#4068 ignore unroll and GCC flags
-	#4849 ignore collapse
-	#6262 ignore stack too large
-	#4702 unreachable code(false warning on constexpr condition)
-	#4100 unreferenced formal parameter
-
-	target_link_options(${PROJECT_NAME} INTERFACE /STACK:5242880) #Stack requires up to L2 cache size
 endif(WIN32)
 
 
@@ -106,12 +105,12 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_17)
 if(UT_BUILD)
 	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everthing even run parts of UTs
 	file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
-	include_directories(${PROJECT_NAME})
+  include_directories(${PROJECT_NAME})
 	add_executable(${PROJECT_NAME}_ut ${srcs} ${headers} ${ut_headers})
-	if(BTLA_UT_OPENMP)
-		include(FindOpenMP)
-		target_link_libraries(${PROJECT_NAME}_ut PRIVATE OpenMP::OpenMP_CXX)
-	endif()
+  if(BTLA_UT_OPENMP)
+    include(FindOpenMP)
+    target_link_libraries(${PROJECT_NAME}_ut PRIVATE OpenMP::OpenMP_CXX)
+  endif()
 	if(NOT WIN32)
 		if(NOT BTLA_UT_NOASAN)
 		  target_compile_options(${PROJECT_NAME}_ut PRIVATE -fsanitize=address)
