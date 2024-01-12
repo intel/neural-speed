@@ -29,9 +29,11 @@ class parallel_class {
   }
   ~parallel_class() {
     delete pcomm;
+#ifndef _WIN32
     if (use_shm) {
       shared_close(shm_name, cbuffer, world_size * sizeof(struct ccl_buffer));
     }
+#endif
   }
 
   bool is_master() { return rank == 0; }
@@ -43,11 +45,15 @@ class parallel_class {
 
   // From some example code of oneCCL, inplace reducing is supported
   void reduce_add(float* sendBuf, float* recvBuf, size_t count) {
+#ifndef _WIN32
     if (use_shm) {
       shm_all_reduce(sendBuf, recvBuf, count, rank, world_size);
     } else {
       ccl::allreduce(sendBuf, recvBuf, count, ccl::reduction::sum, *pcomm).wait();
     }
+#else
+    ccl::allreduce(sendBuf, recvBuf, count, ccl::reduction::sum, *pcomm).wait();
+#endif
   }
 
   void broadcast(float* buf, size_t count) {
@@ -83,6 +89,7 @@ class parallel_class {
     rank = pcomm->rank();
     world_size = pcomm->size();
 
+#ifndef _WIN32
     // Check whether all ranks is on the same physical machine.
     // If true use SHM allreduce
     auto local_size = std::getenv("TP_LOCAL_SIZE");
@@ -91,7 +98,7 @@ class parallel_class {
     }
     if (use_shm) {
       void* shared_ptr = nullptr;
-      snprintf(shm_name, 100, "%s_%d", "shared_memory_tp", getuid());
+      snprintf(shm_name, sizeof(shm_name), "%s_%d", "shared_memory_tp", getuid());
       if (rank == 0) {
         cbuffer = (struct ccl_buffer*)malloc(world_size * sizeof(struct ccl_buffer));
         shared_ptr = shared_create(shm_name, cbuffer, world_size * sizeof(struct ccl_buffer));
@@ -108,6 +115,7 @@ class parallel_class {
         cbuffer = (struct ccl_buffer*)shared_ptr;
       }
     }
+#endif
   }
   static void mpi_finalize() {
     int is_finalized = 0;

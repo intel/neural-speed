@@ -11,12 +11,14 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+#include <algorithm>
 #include <assert.h>
-#include <fcntl.h>
 #include <immintrin.h>
-#include <omp.h>
+#ifndef _WIN32
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#endif
 #include "oneapi/ccl.hpp"
 #include "layers/ele_wise.h"
 
@@ -27,7 +29,7 @@ enum ccl_state {
   reduce_done,
   copy_out_done,
 };
-
+#ifndef _WIN32
 void* shared_open(const char* name, size_t nbytes) {
   int d = shm_open(name, O_RDWR, S_IRUSR | S_IWUSR);
   if (d != -1) {
@@ -55,8 +57,9 @@ void shared_close(const char* name, void* bytes, size_t nbytes) {
     shm_unlink(name);
   }
 }
+#endif
 
-#define CCL_BUF_SIZE 1048576
+static constexpr size_t CCL_BUF_SIZE = 1048576;
 struct ccl_buffer {
   enum ccl_state state;
   char data[CCL_BUF_SIZE];
@@ -78,15 +81,15 @@ void wait_state_change(int index, enum ccl_state state) {
 }
 
 void reduce_fp32_buffers(int num_elements, int num_buffers, struct ccl_buffer* cbuffer) {
-  auto rank_0 = (float*)(cbuffer[0].data);
+  auto rank_0 = reinterpret_cast<float*>(cbuffer[0].data);
   // all buffers reduce to rank 0 and then broadcast
   for (int i = 1; i < num_buffers; ++i) {
-    ne_vec_add_f32(num_elements, rank_0, rank_0, (float*)(cbuffer[i].data));
+    ne_vec_add_f32(num_elements, rank_0, rank_0, reinterpret_cast<float*>(cbuffer[i].data));
   }
 }
 
 void reduce_buffers(struct ccl_buffer* cbuffer, int num_elements, int num_buffers) {
-  // TODO only support fp32 reduce, add other data type if needed
+  // TODO(chenxi) only support fp32 reduce, add other data type if needed
   if (num_buffers >= 2) {
     reduce_fp32_buffers(num_elements, num_buffers, cbuffer);
   } else {
@@ -96,8 +99,8 @@ void reduce_buffers(struct ccl_buffer* cbuffer, int num_elements, int num_buffer
 
 void shm_all_reduce(float* sendBuf, float* recvBuf, size_t count, size_t rank, size_t world_size) {
   for (int offset = 0; offset < count * sizeof(float); offset += CCL_BUF_SIZE) {
-    auto send_ptr = (char*)sendBuf + offset;
-    auto recv_ptr = (char*)recvBuf + offset;
+    auto send_ptr = reinterpret_cast<char*>(sendBuf) + offset;
+    auto recv_ptr = reinterpret_cast<char*>(recvBuf) + offset;
     size_t chunk_size = std::min(count * sizeof(float) - offset, (size_t)CCL_BUF_SIZE);
     size_t chunk_count = chunk_size / sizeof(float);
 
