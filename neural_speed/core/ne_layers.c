@@ -7653,7 +7653,7 @@ static void ne_compute_forward_alibi_f32(const struct ne_compute_params* params,
   }
 
   const int n_past = ((int32_t*)src1->data)[0];
-  const int n_head = ((int32_t*)src1->data)[1];
+  int n_head = ((int32_t*)src1->data)[1];
   const float max_bias = ((float*)src1->data)[2];
 
   assert(n_past >= 0);
@@ -7674,6 +7674,15 @@ static void ne_compute_forward_alibi_f32(const struct ne_compute_params* params,
   assert(nb0 == sizeof(float));
   assert(ne1 + n_past == ne0);
   (void)n_past;
+  // TP will need the real rank oder of k
+  int32_t k_offset = 0;
+#ifdef NS_TP_MODEL
+  parallel_context* p_ctx = init_parallel_context();
+  int32_t world_size = get_tp_size(p_ctx);
+  int32_t rank = get_tp_rank(p_ctx);
+  if (world_size > 1) k_offset += rank * n_head;
+  n_head *= world_size;
+#endif
 
   // add alibi to src0 (KQ_scaled)
   const int n_heads_log2_floor = 1 << (int)floor(log2(n_head));
@@ -7691,10 +7700,10 @@ static void ne_compute_forward_alibi_f32(const struct ne_compute_params* params,
 
         float m_k;
 
-        if (k < n_heads_log2_floor) {
-          m_k = powf(m0, k + 1);
+        if (k + k_offset < n_heads_log2_floor) {
+          m_k = powf(m0, k + k_offset + 1);
         } else {
-          m_k = powf(m1, 2 * (k - n_heads_log2_floor) + 1);
+          m_k = powf(m1, 2 * (k + k_offset - n_heads_log2_floor) + 1);
         }
 
         pdst[0] = (i - ne0 + 1) * m_k + src[0];
@@ -7714,7 +7723,7 @@ static void ne_compute_forward_alibi_f16(const struct ne_compute_params* params,
   }
 
   const int n_past = ((int32_t*)src1->data)[0];
-  const int n_head = ((int32_t*)src1->data)[1];
+  int n_head = ((int32_t*)src1->data)[1];
   const float max_bias = ((float*)src1->data)[2];
 
   assert(n_past >= 0);
@@ -7735,7 +7744,15 @@ static void ne_compute_forward_alibi_f16(const struct ne_compute_params* params,
   assert(nb0 == sizeof(ne_fp16_t));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-
+  // TP will need the real rank oder of k
+  int32_t k_offset = 0;
+#ifdef NS_TP_MODEL
+  parallel_context* p_ctx = init_parallel_context();
+  int32_t world_size = get_tp_size(p_ctx);
+  int32_t rank = get_tp_rank(p_ctx);
+  if (world_size > 1) k_offset += rank * n_head;
+  n_head *= world_size;
+#endif
   // add alibi to src0 (KQ_scaled)
   const int n_heads_log2_floor = 1 << (int)floor(log2(n_head));
 
@@ -7753,10 +7770,10 @@ static void ne_compute_forward_alibi_f16(const struct ne_compute_params* params,
 
         float m_k;
 
-        if (k < n_heads_log2_floor) {
-          m_k = powf(m0, k + 1);
+        if (k + k_offset < n_heads_log2_floor) {
+          m_k = powf(m0, k + k_offset + 1);
         } else {
-          m_k = powf(m1, 2 * (k - n_heads_log2_floor) + 1);
+          m_k = powf(m1, 2 * (k + k_offset - n_heads_log2_floor) + 1);
         }
 
         // we return F32

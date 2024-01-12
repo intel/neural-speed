@@ -146,13 +146,6 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
 
-#ifdef NS_TP_MODEL
-  if (enable_tp) {
-    // need to broadcast the ids
-    broadcast(p_ctx, reinterpret_cast<float*>(embd->data), N * batch_size * ne_element_size(embd));
-  }
-#endif
-
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
 
   for (int il = 0; il < n_layer; ++il) {

@@ -77,12 +77,12 @@ Copyright 2003-2023, Intel Corporation.
 
 ```
 ### Enable the CMake option and build executable file
-Compile an executable file that supports tensor parallelism by enabling the CMake option `NE_TP`. You can build the executable file like below.
+Compile an executable file that supports tensor parallelism by enabling the CMake option `NS_TP`. You can build the executable file like below.
 
 ```shell
 mkdir build
 cd build
-cmake -DNE_TP=ON .. 
+cmake -DNS_TP=ON .. 
 make -j
 
 ```
