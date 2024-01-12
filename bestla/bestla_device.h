@@ -17,11 +17,15 @@
 #include <vector>
 #include "bestla.h"
 #include "xbyak/xbyak_util.h"
+#include "bestla_utils.h"
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <sched.h>
 #endif
+
+#define FIXED_CACHE_SIZE ((1 << 20) - (32 << 10))
+#define FIXED_CACHE 1
 
 namespace bestla {
 
@@ -244,6 +248,9 @@ class CpuDevice {
     ADD_FLAG(AVX512_BF16);
     ADD_FLAG(AVX512_FP16);
     numcores = _cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::CoreLevel);
+    if (mHasAMX_BF16 || mHasAMX_INT8) {
+      utils::request_perm_xtile_data();
+    }
     static bool p = false;
     {
       uint32_t tmp[4];
@@ -315,6 +322,10 @@ class CpuDevice {
       L2Cache = _cpu.getDataCacheSize(1);
       numthreads = numcores;
     }
+#if FIXED_CACHE
+    L2Cache = L2Cache >= FIXED_CACHE_SIZE ? FIXED_CACHE_SIZE : L2Cache;
+    E_L2Cache = E_L2Cache >= FIXED_CACHE_SIZE ? FIXED_CACHE_SIZE : E_L2Cache;
+#endif
   }
 
   static CpuDevice* getInstance() {
