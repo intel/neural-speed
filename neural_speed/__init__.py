@@ -73,73 +73,71 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, use_quant=True, use_gptq=False, **quant_kwargs):
+    def init(self, model_name, use_quant=True, use_cache=False, use_gptq=False, use_awq=False,
+            weight_dtype="int4", alg="sym", group_size=32,
+            scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        self.model_type = Model.get_model_type(self.config)
-        self.__import_package(self.model_type)
+        model_type = Model.get_model_type(self.config)
+        self.__import_package(model_type)
 
         # check cache and quantization
         output_path = "runtime_outs"
         os.makedirs(output_path, exist_ok=True)
-        fp32_bin = "{}/ne_{}_f32.bin".format(output_path, self.model_type)
-        quant_desc = quant_kwargs['weight_dtype']
-        if quant_kwargs['use_ggml']:
+        fp32_bin = "{}/ne_{}_f32.bin".format(output_path, model_type)
+        quant_desc = weight_dtype
+        if use_ggml:
             quant_desc += "_ggml"
         else:
-            quant_desc += "_jblas_c" + quant_kwargs['compute_dtype']
-            if quant_kwargs['group_size'] == -1:
+            quant_desc += "_bestla_c" + compute_dtype
+            if group_size == -1:
                 quant_desc += "_pc"
             else:
-                quant_desc += "_g{}".format(quant_kwargs['group_size'])
+                quant_desc += "_g{}".format(group_size)
         if use_gptq:
             quant_desc = "gptq"
-        quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, self.model_type, quant_desc)
+        if use_awq:
+            quant_desc = "awq"
+        quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
             self.bin_file = fp32_bin
         else:
             self.bin_file = quant_bin
-
-        if os.path.exists(self.bin_file):
-            print("{} existed, will use cache file. Otherwise please remove the file".
-                  format(self.bin_file))
+        if use_cache and os.path.exists(self.bin_file):
             return
 
-        if use_gptq:
+        if use_gptq or use_awq:
             convert_model(model_name, quant_bin, "f32")
             return
-
-
-        if not os.path.exists(fp32_bin):
+        
+        if not use_cache or not os.path.exists(fp32_bin):
             convert_model(model_name, fp32_bin, "f32")
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
 
         if not use_quant:
             print("FP32 model will be used.")
             return
-        self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin, **quant_kwargs)
+        self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin,
+                                    weight_dtype=weight_dtype, alg=alg, group_size=group_size,
+                                    scale_dtype=scale_dtype, compute_dtype=compute_dtype, use_ggml=use_ggml)
         assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
-        os.remove(fp32_bin)
+        if not use_cache:
+            os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)
         self.model = self.module.Model()
         if "threads" not in generate_kwargs:
             threads = os.getenv("OMP_NUM_THREADS")
-            import platform
-            sys_platform = platform.platform().lower()
             if threads is None:
-                if "windows" in sys_platform:
-                    cpu_count = os.cpu_count()
-                    generate_kwargs["threads"] = int(cpu_count)
-                else:
-                    generate_kwargs["threads"] = len(os.sched_getaffinity(0))
+                generate_kwargs["threads"] = len(os.sched_getaffinity(0))
             else:
                 generate_kwargs["threads"] = int(threads)
         self.model.init_model(model_path, **generate_kwargs)
+
 
     def quant_model(self, model_type, model_path, out_path, **quant_kwargs):
         self.__import_package(model_type)
