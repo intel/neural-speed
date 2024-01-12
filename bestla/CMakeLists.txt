@@ -88,14 +88,6 @@ install(
 
 if(WIN32)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE _CRT_SECURE_NO_WARNINGS NOMINMAX)
-	target_compile_options(${PROJECT_NAME} INTERFACE /wd4068 /wd4849 /wd6262 /wd4702 /wd4100) 
-	#4068 ignore unroll and GCC flags
-	#4849 ignore collapse
-	#6262 ignore stack too large
-	#4702 unreachable code(false warning on constexpr condition)
-	#4100 unreferenced formal parameter
-
-	target_link_options(${PROJECT_NAME} INTERFACE /STACK:5242880) #Stack requires up to L2 cache size
 endif(WIN32)
 
 
