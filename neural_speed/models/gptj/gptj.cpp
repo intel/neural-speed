@@ -63,7 +63,6 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   // continuous batching
   // if each sequence length l_i ! = l_k
   // input shape will be [1, l_sum]
-  std::vector<int> request_indices;
   std::vector<int> n_tokens(batch_size);
   std::vector<int> n_pasts(batch_size);
   std::vector<int> n_totals(batch_size);
@@ -72,9 +71,6 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   std::vector<int> n_padding;
   bool no_padding = true;
   for (int i = 0; i < batch_size; ++i) {
-    if (request_indices.empty() || request_indices.back() != inputs[i].request_idx) {
-      request_indices.push_back(inputs[i].request_idx);
-    }
     n_tokens[i] = inputs[i].n_tokens;
     n_pasts[i] = inputs[i].n_past;
     n_totals[i] = inputs[i].n_total;

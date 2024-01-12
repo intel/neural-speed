@@ -2196,7 +2196,10 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
   std::vector<float> beams_score;
   // filter cur_beams
   for (int i = 0; i < cur_beams.size(); ++i) {
-    if (cur_beams[i].done) continue;
+    if (cur_beams[i].done) {
+      next_beams[i].done = true;
+      continue;
+    }
     if (request_running_indices.empty() || request_running_indices.back() != cur_beams[i].request_idx) {
       request_running_indices.push_back(cur_beams[i].request_idx);
     }
@@ -2212,6 +2215,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
         /*.beam_idx           =*/cur_beams[i].beam_idx,
         /*.padding_side       =*/padding_side[request_running_indices.back()],
         /*n_padding           =*/n_padding[request_running_indices.back()],
+        /*gen_conf            =*/gen_confs[request_running_indices.back()],
     });
     batch_size++;
     beam_indices.push_back(cur_beams[i].beam_idx);
@@ -2346,11 +2350,13 @@ std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indi
 #endif
   std::vector<std::tuple<int, int>> kv_reorder_indices;
   int cur_decoding_reqs = 0;
-  std::vector<int> nb_shuffle_ids;
+  for (int rb = 0; rb < request_running_indices.size(); ++rb) {
+    if (n_past[request_running_indices[rb]] > n_prompt_tokens[request_running_indices[rb]]) cur_decoding_reqs++;
+  }
+  kv_reorder_indices.resize(cur_decoding_reqs * beam_size);
   for (int rb = 0; rb < request_running_indices.size(); ++rb) {
     // skip first token
     if (n_past[request_running_indices[rb]] == n_prompt_tokens[request_running_indices[rb]]) continue;
-    cur_decoding_reqs++;
     std::vector<int> cpy_final_bs_ids;
     const int rb_off = request_running_indices[rb] * beam_size;
     for (int i = 0; i < beam_size; ++i) {
@@ -2378,17 +2384,16 @@ std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indi
         break;
       }
     }
-    kv_reorder_indices.resize(cur_decoding_reqs * beam_size);
     if (cpy_from_head) {
       int insert_idx = 0;
       for (int i = 0; i < cpy_final_bs_ids.size(); ++i) {
-        kv_reorder_indices[insert_idx + rb_off] = std::move(std::make_tuple(i, cpy_final_bs_ids[i]));
+        kv_reorder_indices[insert_idx + rb * beam_size] = std::move(std::make_tuple(i, cpy_final_bs_ids[i]));
         insert_idx++;
       }
     } else {
       int insert_idx = 0;
       for (int i = cpy_final_bs_ids.size() - 1; i >= 0; --i) {
-        kv_reorder_indices[insert_idx + rb_off] = std::move(std::make_tuple(i, cpy_final_bs_ids[i]));
+        kv_reorder_indices[insert_idx + rb * beam_size] = std::move(std::make_tuple(i, cpy_final_bs_ids[i]));
         insert_idx++;
       }
     }
