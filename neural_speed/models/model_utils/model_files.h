@@ -790,6 +790,7 @@ struct gguf_loader {
           throw format("unrecognized tensor type %u\n", shard.type);
         }
       }
+
       shard.file_idx = 0;
       const size_t offs = file_offset(ctx, name.c_str());
       int length = info->ne[0] * info->ne[1] * info->ne[2] * info->ne[3] * 4;
@@ -932,6 +933,9 @@ struct gguf_loader {
     }
 
     const uint32_t n_vocab = gguf_get_arr_n(ctx_gguf, token_idx);
+    if (hparams.n_vocab != n_vocab) {
+      hparams.n_vocab = n_vocab;
+    }
 
     vocab.id_to_token.resize(hparams.n_vocab);
     for (uint32_t i = 0; i < n_vocab; i++) {

@@ -117,7 +117,6 @@ typedef struct {
   int8_t qs[QK8_1];  // quants
 } block_q8_1;
 
-
 // Super-block size
 #ifdef GGML_QKK_64
 #define QK_K 64
@@ -132,16 +131,16 @@ typedef struct {
 // 16 blocks of 16 elements each
 // Effectively 6.5625 bits per weight
 typedef struct {
-    uint8_t ql[QK_K/2];      // quants, lower 4 bits
-    uint8_t qh[QK_K/4];      // quants, upper 2 bits
-    int8_t  scales[QK_K/16]; // scales, quantized with 8 bits
-    ne_fp16_t d;           // super-block scale
+  uint8_t ql[QK_K / 2];      // quants, lower 4 bits
+  uint8_t qh[QK_K / 4];      // quants, upper 2 bits
+  int8_t scales[QK_K / 16];  // scales, quantized with 8 bits
+  ne_fp16_t d;               // super-block scale
 } block_q6_K;
 
 typedef struct {
-    float   d;              // delta
-    int8_t  qs[QK_K];       // quants
-    int16_t bsums[QK_K/16]; // sum of quants in groups of 16
+  float d;                   // delta
+  int8_t qs[QK_K];           // quants
+  int16_t bsums[QK_K / 16];  // sum of quants in groups of 16
 } block_q8_K;
 
 // ne_fp16_t related

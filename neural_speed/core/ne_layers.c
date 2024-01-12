@@ -345,7 +345,8 @@ quantize_fns_t ne_internal_get_quantize_fn(size_t i) {
 static const int NE_BLCK_SIZE[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = 1,      [NE_TYPE_F16] = 1,      [NE_TYPE_Q4_0] = QK4_0, [NE_TYPE_Q4_1] = QK4_1,
     [NE_TYPE_Q5_0] = QK5_0, [NE_TYPE_Q5_1] = QK5_1, [NE_TYPE_Q8_0] = QK8_0, [NE_TYPE_Q8_1] = QK8_1,
-    [NE_TYPE_Q6_K] = QK_K,  [NE_TYPE_Q8_K] = QK_K,  [NE_TYPE_I8] = 1,       [NE_TYPE_I16] = 1,      [NE_TYPE_I32] = 1,
+    [NE_TYPE_Q6_K] = QK_K,  [NE_TYPE_Q8_K] = QK_K,  [NE_TYPE_I8] = 1,       [NE_TYPE_I16] = 1,
+    [NE_TYPE_I32] = 1,
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_BLCK_SIZE is outdated");
 
@@ -353,23 +354,23 @@ static const size_t NE_TYPE_SIZE[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = sizeof(float),       [NE_TYPE_F16] = sizeof(ne_fp16_t),   [NE_TYPE_Q4_0] = sizeof(block_q4_0),
     [NE_TYPE_Q4_1] = sizeof(block_q4_1), [NE_TYPE_Q5_0] = sizeof(block_q5_0), [NE_TYPE_Q5_1] = sizeof(block_q5_1),
     [NE_TYPE_Q8_0] = sizeof(block_q8_0), [NE_TYPE_Q8_1] = sizeof(block_q8_1), [NE_TYPE_Q6_K] = sizeof(block_q6_K),
-    [NE_TYPE_Q8_K] = sizeof(block_q8_K),
-    [NE_TYPE_I8] = sizeof(int8_t),       [NE_TYPE_I16] = sizeof(int16_t),     [NE_TYPE_I32] = sizeof(int32_t),
+    [NE_TYPE_Q8_K] = sizeof(block_q8_K), [NE_TYPE_I8] = sizeof(int8_t),       [NE_TYPE_I16] = sizeof(int16_t),
+    [NE_TYPE_I32] = sizeof(int32_t),
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_TYPE_SIZE is outdated");
 
 static const char* NE_TYPE_NAME[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = "f32",   [NE_TYPE_F16] = "f16",   [NE_TYPE_Q4_0] = "q4_0", [NE_TYPE_Q4_1] = "q4_1",
     [NE_TYPE_Q5_0] = "q5_0", [NE_TYPE_Q5_1] = "q5_1", [NE_TYPE_Q8_0] = "q8_0", [NE_TYPE_Q8_1] = "q8_1",
-    [NE_TYPE_Q6_K] = "q6_k", [NE_TYPE_Q8_K] = "q8_k", [NE_TYPE_I8] = "i8",     [NE_TYPE_I16] = "i16",   [NE_TYPE_I32] = "i32",
+    [NE_TYPE_Q6_K] = "q6_k", [NE_TYPE_Q8_K] = "q8_k", [NE_TYPE_I8] = "i8",     [NE_TYPE_I16] = "i16",
+    [NE_TYPE_I32] = "i32",
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_TYPE_NAME is outdated");
 
 static bool NE_IS_QUANTIZED[NE_TYPE_COUNT] = {
-    [NE_TYPE_F32] = false, [NE_TYPE_F16] = false, [NE_TYPE_Q4_0] = true, [NE_TYPE_Q4_1] = true,
-    [NE_TYPE_Q5_0] = true, [NE_TYPE_Q5_1] = true, [NE_TYPE_Q8_0] = true, [NE_TYPE_Q8_1] = true,
-    [NE_TYPE_Q6_K] = true, [NE_TYPE_Q6_K] = true, [NE_TYPE_I8] = false,  [NE_TYPE_I16] = false, [NE_TYPE_I32] = false, 
-    [NE_TYPE_BTLA] = true,
+    [NE_TYPE_F32] = false, [NE_TYPE_F16] = false, [NE_TYPE_Q4_0] = true, [NE_TYPE_Q4_1] = true, [NE_TYPE_Q5_0] = true,
+    [NE_TYPE_Q5_1] = true, [NE_TYPE_Q8_0] = true, [NE_TYPE_Q8_1] = true, [NE_TYPE_Q6_K] = true, [NE_TYPE_Q6_K] = true,
+    [NE_TYPE_I8] = false,  [NE_TYPE_I16] = false, [NE_TYPE_I32] = false, [NE_TYPE_BTLA] = true,
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_IS_QUANTIZED is outdated");
 
@@ -6701,7 +6702,6 @@ static void ne_compute_forward_mul_mat_q_f32(const struct ne_compute_params* par
   //    printf("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX task %d/%d: %d us, acc = %d\n", ith, nth, (int) (t1
   //    - t0), (int) acc);
   //}
-
 }
 
 static void ne_compute_forward_mul_mat_q_f32_bestla(const struct ne_compute_params* params,
