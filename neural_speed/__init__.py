@@ -144,12 +144,11 @@ class Model:
         self.module.Model.quant_model(model_path=model_path, out_path=out_path, **quant_kwargs)
 
 
-    def generate(self, input_ids, streamer=None, interactive=False, ignore_prompt=False, stopping_criteria=None,
-                 **generate_kwargs):
+    def generate(self, input_ids, streamer=None, interactive=False, ignore_prompt=False,
+                 stopping_criteria=None,  **generate_kwargs):
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
-        self.batch_size = input_ids.shape[0]
         if self.model is None:
-            self.init_from_bin(self.model_type, self.bin_file, batch_size=self.batch_size,
+            self.init_from_bin(self.model_type, self.bin_file, batch_size=input_ids.shape[0],
                                **generate_kwargs)
             self.generate_round = 0
         elif not interactive:
@@ -163,6 +162,9 @@ class Model:
         beam_search = False
         if (generate_kwargs.get("num_beams", 1) > 1) and not generate_kwargs.get("do_sample", False):
             beam_search = True
+        if not beam_search:
+            # TODO support multi batch
+            assert input_ids.shape[0] == 1, "Unsupport multi-batch input ids."
 
         if streamer:
             assert input_ids.shape[0] == 1, "Streamer only supports batch size 1."
@@ -184,22 +186,21 @@ class Model:
                 streamer.put(torch.tensor([response[0]]))
             for i in range(len(response)):
                 ret[i].extend(response[i])
-            out_count += 1
             if beam_search:
                 break
             if stopping_criteria is not None:
                 if stopping_criteria(torch.tensor(ret), None):
                     break
-            elif (max_new_tokens != -1 and out_count >= max_new_tokens):
+            elif ret[0][-1] == self.tokenizer.eos_token_id or \
+                    (max_new_tokens != -1 and out_count > max_new_tokens):
                 break
-            else:
-                all_done = [(r[-1] in [self.eos_token_id(), self.pad_token_id()]) for r in ret]
-                if False not in all_done:
-                    break
+            out_count += 1
         if streamer:
             streamer.end()
 
         self.generate_round += 1
+        if os.getenv("NEURAL_SPEED_VERBOSE") and os.getenv("NEURAL_SPEED_VERBOSE") in ["1", "0"]:
+            self.model.print_time()
         return ret
 
     def is_token_end(self):
