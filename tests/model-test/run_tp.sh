@@ -52,21 +52,33 @@ function main {
     if [[ "${compiler_version}" != "12.3.0" ]]; then
         conda install --update-deps -c conda-forge gxx==${compiler_version} gcc==${compiler_version} gxx_linux-64==${compiler_version} libstdcxx-ng sysroot_linux-64 -y
     fi
-
-    # check oneCCL and build
+    # check oneCCL from oneapi or build from source
+    if [ -z ${ONEAPI_ROOT} ]; then
+      if [ -d /opt/intel/oneapi ]; then
+        ONEAPI_ROOT=/opt/intel/oneapi
+      elif [ -d ~/intel/oneapi ]; then
+        ONEAPI_ROOT=~/intel/oneapi
+      fi
+    fi
+    
+    if [ ! -z ${ONEAPI_ROOT} ]; then
+      source ${ONEAPI_ROOT}/setvars.sh
+    fi
+    # check oneCCL existence 
     if ! [ -x "$(command -v mpirun)" ]; then
-        ccl_dir=${working_dir}/oneCCL/build/_install
-        if [ ! -d "$ccl_dir" ]; then
-            cd ${working_dir}
-            git clone https://github.com/intel/oneCCL.git
-            cd ${working_dir}/oneCCL
-            git checkout 2021.9
-            sed -i 's/cpu_gpu_dpcpp/./g' cmake/templates/oneCCLConfig.cmake.in
-            mkdir build && cd build
-            cmake ..
-            make -j install
-        fi
-        source ${ccl_dir}/env/setvars.sh
+      # check oneCCL and build
+      ccl_dir=${working_dir}/oneCCL/build/_install
+      if [ ! -d "$ccl_dir" ]; then
+          cd ${working_dir}
+          git clone https://github.com/intel/oneCCL.git
+          cd ${working_dir}/oneCCL
+          git checkout 2021.9
+          sed -i 's/cpu_gpu_dpcpp/./g' cmake/templates/oneCCLConfig.cmake.in
+          mkdir build && cd build
+          cmake ..
+          make -j install
+      fi
+      source ${ccl_dir}/env/setvars.sh
     fi
 
     # compile binary
