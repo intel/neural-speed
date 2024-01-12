@@ -4,7 +4,6 @@ project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
-set(CMAKE_CXX_FLAGS "-Wall -Werror")
 option(BTLA_USE_OPENMP "Enable OpenMP thread pool" ON)
 
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
