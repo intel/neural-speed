@@ -293,16 +293,19 @@ inline static void* ggml_aligned_malloc(size_t size) {
     return NULL;
   }
   void* aligned_memory = NULL;
+#ifdef _MSC_VER
+  aligned_memory = _aligned_malloc(size, GGML_MEM_ALIGN);
+  int result = aligned_memory ? 0 : 1;
+#else
 #ifdef GGML_USE_CPU_HBM
   int result = hbw_posix_memalign(&aligned_memory, 16, size);
 #elif GGML_USE_METAL
   int result = posix_memalign(&aligned_memory, sysconf(_SC_PAGESIZE), size);
-#elif defined(__GNUC__)
-  int result = posix_memalign(&aligned_memory, GGML_MEM_ALIGN, size);
 #else
-  aligned_memory = _aligned_malloc(size, GGML_MEM_ALIGN);
-  int result = aligned_memory ? 0 : 1;
+  int result = posix_memalign(&aligned_memory, GGML_MEM_ALIGN, size);
 #endif
+#endif
+
   if (result != 0) {
     // Handle allocation failure
     const char* error_desc = "unknown allocation error";
