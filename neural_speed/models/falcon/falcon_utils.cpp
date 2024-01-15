@@ -173,10 +173,10 @@ void FALCON::load(model_context* ctx, model_progress_callback progress_callback,
         layer.norm[0] = ml->get_tensor(layers_i + ".attn_norm.weight", {n_embd}, backend);
         layer.norm[1] = ml->get_tensor(layers_i + ".attn_norm.bias", {n_embd}, backend);
       } else if (n_head_kv == 8) {  // 40B
-        layer.norm[0] = ml->get_tensor(layers_i + ".ln_mlp.weight", {n_embd}, backend);
-        layer.norm[1] = ml->get_tensor(layers_i + ".ln_mlp.bias", {n_embd}, backend);
-        layer.norm[2] = ml->get_tensor(layers_i + ".ln_attn.weight", {n_embd}, backend);
-        layer.norm[3] = ml->get_tensor(layers_i + ".ln_attn.bias", {n_embd}, backend);
+        layer.norm[0] = ml->get_tensor(layers_i + ".attn_norm.weight", {n_embd}, backend);
+        layer.norm[1] = ml->get_tensor(layers_i + ".attn_norm.bias", {n_embd}, backend);
+        layer.norm[2] = ml->get_tensor(layers_i + ".attn_norm_2.weight", {n_embd}, backend);
+        layer.norm[3] = ml->get_tensor(layers_i + ".attn_norm_2.bias", {n_embd}, backend);
       } else {
         fprintf(stderr, "n_head_kv should be 1 (7B) or 8 (40B) in Falcon model, rather %d \n", n_head_kv);
       }
