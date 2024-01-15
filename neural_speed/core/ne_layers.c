@@ -1263,8 +1263,7 @@ float* ne_get_data_f32(const struct ne_tensor* tensor) {
 const char* ne_get_name(const struct ne_tensor* tensor) { return tensor->name; }
 
 void ne_set_name(struct ne_tensor* tensor, const char* name) {
-  strncpy(tensor->name, name, sizeof(tensor->name));
-  tensor->name[sizeof(tensor->name) - 1] = '\0';
+  strncpy(tensor->name, name, sizeof(tensor->name) - 1);
 }
 
 struct ne_tensor* ne_view_tensor(struct ne_context* ctx, const struct ne_tensor* src) {
@@ -3428,7 +3427,7 @@ static void ne_compute_forward_dump_tensor(const struct ne_compute_params* param
   // make sure each file different as the multi-node will use the file
   int random_num = rand();
   char file_name[255];
-  sprintf(file_name, "%s_%d.txt", src0->name, random_num);
+  snprintf(file_name, 255, "%s_%d.txt", src0->name, random_num);
   FILE* file = fopen(file_name, "w");
   if (file == NULL) {
     NE_ASSERT(false);
