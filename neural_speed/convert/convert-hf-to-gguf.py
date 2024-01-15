@@ -34,8 +34,8 @@ if 'NO_LOCAL_GGUF' not in os.environ:
     sys.path.insert(1, str(Path(__file__).parent / 'gguf-py'))
 import gguf
 
-
 ###### MODEL DEFINITIONS ######
+
 
 class SentencePieceTokenTypes(IntEnum):
     NORMAL = 1
@@ -80,9 +80,11 @@ class Model:
 
     def set_gguf_parameters(self):
         self.gguf_writer.add_name(self.dir_model.name)
-        self.gguf_writer.add_block_count(self.hparams.get(
-            "n_layers", self.hparams.get("num_hidden_layers", self.hparams.get("n_layer")),
-        ))
+        self.gguf_writer.add_block_count(
+            self.hparams.get(
+                "n_layers",
+                self.hparams.get("num_hidden_layers", self.hparams.get("n_layer")),
+            ))
         if (n_ctx := self.hparams.get("max_position_embeddings")) is not None:
             self.gguf_writer.add_context_length(n_ctx)
         if (n_embd := self.hparams.get("hidden_size")) is not None:
@@ -94,7 +96,8 @@ class Model:
         self.gguf_writer.add_parallel_residual(self.hparams.get("use_parallel_residual", True))
 
     def write_tensors(self):
-        import pdb;pdb.set_trace()
+        import pdb
+        pdb.set_trace()
         block_count = self.hparams.get("n_layers", self.hparams.get("num_hidden_layers", self.hparams.get("n_layer")))
         tensor_map = gguf.get_tensor_name_map(self.model_arch, block_count)
         for name, data_torch in self.get_tensors():
@@ -189,11 +192,11 @@ class Model:
     def _get_part_names(self):
         if self.is_safetensors:
             if self.num_parts == 1:  # there's only one .safetensors file
-                return ("model.safetensors",)
+                return ("model.safetensors", )
             return (f"model-{n:05}-of-{self.num_parts:05}.safetensors" for n in range(1, self.num_parts + 1))
 
         if self.num_parts == 1:  # there's only one .bin file
-            return ("pytorch_model.bin",)
+            return ("pytorch_model.bin", )
         return (f"pytorch_model-{n:05}-of-{self.num_parts:05}.bin" for n in range(1, self.num_parts + 1))
 
     def _get_model_architecture(self) -> gguf.MODEL_ARCH:
@@ -311,8 +314,7 @@ class StableLMModel(Model):
     def set_gguf_parameters(self):
         super().set_gguf_parameters()
         self.gguf_writer.add_rope_dimension_count(
-            int(self.hparams["rope_pct"] * (self.hparams["hidden_size"] // self.hparams["num_attention_heads"])),
-        )
+            int(self.hparams["rope_pct"] * (self.hparams["hidden_size"] // self.hparams["num_attention_heads"])), )
         self.gguf_writer.add_layer_norm_eps(1e-5)
 
 
@@ -326,8 +328,7 @@ class GPTNeoXModel(Model):
         self.gguf_writer.add_block_count(block_count)
         self.gguf_writer.add_feed_forward_length(self.hparams["intermediate_size"])
         self.gguf_writer.add_rope_dimension_count(
-            int(self.hparams["rotary_pct"] * (self.hparams["hidden_size"] // self.hparams["num_attention_heads"])),
-        )
+            int(self.hparams["rotary_pct"] * (self.hparams["hidden_size"] // self.hparams["num_attention_heads"])), )
         self.gguf_writer.add_head_count(self.hparams["num_attention_heads"])
         self.gguf_writer.add_parallel_residual(self.hparams.get("use_parallel_residual", True))
         self.gguf_writer.add_layer_norm_eps(self.hparams["layer_norm_eps"])
@@ -387,9 +388,9 @@ class BloomModel(Model):
                 qkv_bias = data.reshape((n_head, 3, n_embed // n_head))
                 data = np.concatenate(
                     (
-                        qkv_bias[:, 0, :].reshape((n_embed,)),
-                        qkv_bias[:, 1, :].reshape((n_embed,)),
-                        qkv_bias[:, 2, :].reshape((n_embed,)),
+                        qkv_bias[:, 0, :].reshape((n_embed, )),
+                        qkv_bias[:, 1, :].reshape((n_embed, )),
+                        qkv_bias[:, 2, :].reshape((n_embed, )),
                     ),
                     axis=0,
                 )
@@ -586,14 +587,15 @@ class BaichuanModel(Model):
         if n_kv_head is not None and n_head != n_kv_head:
             n_head //= n_kv_head
 
-        return (
-            weights.reshape(n_head, 2, weights.shape[0] // n_head // 2, *weights.shape[1:])
-            .swapaxes(1, 2)
-            .reshape(weights.shape)
-        )
+        return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
+                                *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
     def _reverse_hf_permute_part(
-        self, weights: Tensor, n_part: int, n_head: int, n_head_kv: int | None = None,
+        self,
+        weights: Tensor,
+        n_part: int,
+        n_head: int,
+        n_head_kv: int | None = None,
     ) -> Tensor:
         r = weights.shape[0] // 3
         return self._reverse_hf_permute(weights[r * n_part:r * n_part + r, ...], n_head, n_head_kv)
@@ -770,7 +772,7 @@ class RefactModel(Model):
             data = data_torch.squeeze().numpy()
 
             # map tensor names
-            new_name = tensor_map.get_name(name, try_suffixes=(".weight",))
+            new_name = tensor_map.get_name(name, try_suffixes=(".weight", ))
             if new_name is None:
                 print(f"Can not map tensor {name!r}")
                 sys.exit()
@@ -839,23 +841,30 @@ class PersimmonModel(Model):
 
 ###### CONVERSION LOGIC ######
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Convert a huggingface model to a GGML compatible file")
     parser.add_argument(
-        "--vocab-only", action="store_true",
+        "--vocab-only",
+        action="store_true",
         help="extract only the vocab",
     )
     parser.add_argument(
-        "--outfile", type=Path,
+        "--outfile",
+        type=Path,
         help="path to write to; default: based on input",
     )
     parser.add_argument(
-        "--outtype", type=str, choices=["f32", "f16"], default="f16",
+        "--outtype",
+        type=str,
+        choices=["f32", "f16"],
+        default="f16",
         help="output format - use f32 for float32, f16 for float16",
     )
     parser.add_argument("--bigendian", action="store_true", help="model is executed on big endian machine")
     parser.add_argument(
-        "model", type=Path,
+        "model",
+        type=Path,
         help="directory containing model file",
     )
 

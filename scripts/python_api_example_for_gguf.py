@@ -27,6 +27,7 @@ from neural_speed import Model
 # --model_path /home/zhenzhong/model/falcon-7b \
 # -m /home/zhenzhong/model/falcon-7b/ggml-model-f32.gguf
 
+
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="main program llm running")
     parser.add_argument("--model_name", type=str, help="Model name: String", required=True)
@@ -48,23 +49,17 @@ def main(args_in: Optional[List[str]] = None) -> None:
     args = parser.parse_args(args_in)
     print(args)
 
+    gguf_path = args.model.as_posix()
+
     prompt = "Once upon a time"
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     inputs = tokenizer(prompt, return_tensors="pt").input_ids
     streamer = TextStreamer(tokenizer)
 
-    import pdb;pdb.set_trace()
     model = Model()
-    
-    gguf_path = args.model.as_posix()
     model.init_from_bin(args.model_name, gguf_path)
     outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
