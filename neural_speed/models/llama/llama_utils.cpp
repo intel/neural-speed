@@ -65,6 +65,7 @@ void Llama::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   auto& hparams = model.hparams;
   n_ff = hparams.ffn_hidden_size;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
+  fprintf(stderr, "%s: n_ctx      = %u\n", __func__, hparams.max_seq_len);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
@@ -214,8 +215,9 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
 class llama_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
-    bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
-    if (layername.find("embedding") != std::string::npos) {
+    bool quantize = layername.rfind("weight") == layername.size() - 6;
+    if ((layername.find("embedding") != std::string::npos) ||
+        (layername == "token_embd.weight" || layername == "tok_embeddings.weight")) {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
     }
