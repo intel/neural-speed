@@ -106,6 +106,7 @@ class cbg_scheduler : public il_scheduler {
   std::vector<bool> free_req_idx;
   // TODO (YZT) too long will hurt performance?
   int64_t max_input_length;
+  int waiting_free_req_idx_seqs_num;
   int cur_running_num = -1;
   // reserve at least one position for next prompt hidden states prefilling
   // when running_pool is full (size == max_requests)

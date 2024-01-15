@@ -2579,6 +2579,8 @@ bool beam_search_flow::step_check_and_prepare_inputs(const std::vector<model_inp
         fprintf(stderr, "%s: prefilling error: beam is not free for request_idx: %d.\n", __func__, req_idx);
         return false;
       }
+      requests_done[req_idx] = false;
+      beam_hypos[req_idx].clear();
       std::for_each(cur_beams.begin() + req_idx * beam_size, cur_beams.begin() + (req_idx + 1) * beam_size,
                     [](beam& b) { b.clear(); });
       n_tokens[req_idx] = input.n_tokens;

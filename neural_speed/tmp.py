@@ -9,7 +9,7 @@ prompts = [
            "To be, or not to be, that is the question: Whether 'tis nobler in the mind to suffer"\
             " The slings and arrows of outrageous fortune, "\
             "Or to take arms against a sea of troubles."\
-            "And by opposing end them. To die—to sleep,"
+            "And by opposing end them. To die—to sleep,",
             "Tell me an interesting fact about llamas.",
             "What is the best way to cook a steak?",
             "Are you familiar with the Special Theory of Relativity and can you explain it to me?",
@@ -26,18 +26,22 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 def f(res, working):
     ans = tokenizer.batch_decode([r.token_ids for r in res], skip_special_tokens=True,
                                  clean_up_tokenization_spaces=False)
-    print(f"ans: {ans}, working_size: {working}")
+    print(f"working_size: {working}, ans:", flush=True)
+    for a in ans:
+        print(a)
+        print("================")
 
 model_path = "/home/zhentao/ils/runtime_outs/ne_gptj_q_int4_bestla_cint8_g32.bin"
+added_count = 0
 s = cpp.ModelServer(f, model_path, max_new_tokens=128, max_request_num=8, threads=56, num_beams=4,
                     min_new_tokens=30, early_stopping=True, continuous_batching=True)
 for i in range(len(prompts)):
     p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
     s.issueQuery([cpp.Query(i, p_token_ids)])
+    added_count += 1
     time.sleep(2)
 
-# while (count < len(prompts)):
-#     time.sleep(1)
-# del s
-time.sleep(100000)
+while (added_count != len(prompts) or not s.Empty()):
+    time.sleep(1)
+del s
 print("should finished")

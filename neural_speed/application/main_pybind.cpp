@@ -135,7 +135,7 @@ class ModelServer {
               int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
               const std::string& policy)
-      : response(response), waiting(), running(true), params(), policy(policy), worker([=]() {
+      : response(response), waiting(), running(true), params(), policy(policy), scheduler_empty(false), worker([=]() {
           if (!continuous_batching) fprintf(stderr, "Warning: ModelServer only supports continuous_batching.\n");
           this->InitServerParams(model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
@@ -167,8 +167,12 @@ class ModelServer {
                 fprintf(stderr, "Server has running errors, exiting...\n");
                 running = false;
               }
+              scheduler_empty = false;
             } else {
-              fprintf(stdout, "Server has no requests now, waiting new query...\n");
+              if (!scheduler_empty) {
+                fprintf(stdout, "Server has no requests now, waiting new query...\n");
+                scheduler_empty = true;
+              }
               _mm_pause();  //  spin-wait loop
             }
             if (scheduler.has_finished_seq()) {
@@ -177,7 +181,9 @@ class ModelServer {
               std::vector<Query> finished(finished_seqs.size());
               std::transform(finished_seqs.cbegin(), finished_seqs.cend(), finished.begin(),
                              [&](const sequence& seq) { return this->Sequence2Query(seq); });
-              py::print("ID", finished[0].id, "finished in CPP server!");
+              for (int i = 0; i < finished.size(); ++i) {
+                py::print("ID", finished[i].id, "finished in CPP server!");
+              }
               this->response(finished, finished.size());
             }
             // if (!queue_running.empty()) {
@@ -210,6 +216,11 @@ class ModelServer {
     return waiting.size();
   }
 
+  bool Empty() {
+    std::lock_guard<std::mutex> lock(queue_mtx);
+    return (waiting.empty() && scheduler_empty);
+  }
+
   sequence Query2Sequence(const Query& query) {
     sequence ret_seq;
     ret_seq.request_idx = -1;  // let scheduler decides it
@@ -230,8 +241,9 @@ class ModelServer {
     Query ret_query;
     ret_query.id = seq.query_id;
     ret_query.token_ids.resize(seq.prompt_ids.size() + seq.generated_ids.size());
-    std::copy(seq.prompt_ids.cbegin(), seq.prompt_ids.cend(), std::back_inserter(ret_query.token_ids));
-    std::copy(seq.generated_ids.cbegin(), seq.generated_ids.cend(), std::back_inserter(ret_query.token_ids));
+    std::copy(seq.prompt_ids.cbegin(), seq.prompt_ids.cend(), ret_query.token_ids.begin());
+    std::copy(seq.generated_ids.cbegin(), seq.generated_ids.cend(),
+              ret_query.token_ids.begin() + seq.prompt_ids.size());
     return ret_query;
   }
 
@@ -265,6 +277,7 @@ class ModelServer {
   bool running;
   gpt_params params;
   std::string policy;
+  bool scheduler_empty;
   std::thread worker;
 };
 
@@ -906,5 +919,6 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
            py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = false,
            py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs")
-      .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"));
+      .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))
+      .def("Empty", &ModelServer::Empty, "No more queries to execute");
 }

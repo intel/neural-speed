@@ -104,6 +104,15 @@ bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
     if (seqs->at(ni).status == seq_status::PREFILL) {
       seqs->at(ni).status = seq_status::DECODING;
       seqs->at(ni).n_past = seqs->at(ni).n_prompt_tokens;
+      seqs->at(ni).n_total = seqs->at(ni).n_prompt_tokens;
+      seqs->at(ni).n_tokens = 1;
+    } else if (seqs->at(ni).status == seq_status::DECODING) {
+      seqs->at(ni).n_tokens = 1;
+      seqs->at(ni).n_past += seqs->at(ni).n_tokens;
+      seqs->at(ni).n_total += seqs->at(ni).n_tokens;
+    } else {
+      fprintf(stderr, "%s: error: wrong sequence status %d.\n", __func__, static_cast<int>(seqs->at(ni).status));
+      return false;
     }
   }
   if (m_ctx->beam_search && bsf != nullptr) {
@@ -165,14 +174,16 @@ cbg_scheduler::cbg_scheduler(const gpt_params& params)
       max_requests(params.max_request_num),
       wr(params),
       free_req_idx(max_requests, true),
-      max_input_length(max_requests * params.n_ctx) {}
+      max_input_length(max_requests * params.n_ctx),
+      waiting_free_req_idx_seqs_num(0) {}
 
 cbg_scheduler::cbg_scheduler(const gpt_params& params, const std::string& policy)
     : il_scheduler(params, policy),
       max_requests(params.max_request_num),
       wr(params),
       free_req_idx(max_requests, true),
-      max_input_length(max_requests * params.n_ctx) {}
+      max_input_length(max_requests * params.n_ctx),
+      waiting_free_req_idx_seqs_num(0) {}
 
 cbg_scheduler::~cbg_scheduler() {}
 
@@ -194,7 +205,9 @@ bool cbg_scheduler::add_request(sequence seq) {
   }
   // add into waiting_pool by default
   seq.status = seq_status::WAITING;
-  seq.request_idx = query_free_req_idx();
+  seq.request_idx = waiting_free_req_idx_seqs_num > 0 ? -1 : query_free_req_idx();
+  fprintf(stdout, "%s: info: added seq query_id: %d, request_idx: %d \n", __func__, seq.query_id, seq.request_idx);
+  if (seq.request_idx == -1) waiting_free_req_idx_seqs_num++;
   return waiting_pool.add(seq);
 }
 
@@ -222,9 +235,10 @@ bool cbg_scheduler::prepare_seqs() {
               return false;
             }
             executed_seqs[cur_running_num + np].request_idx = fidx;
+            fprintf(stdout, "%s: info: updated seq query_id: %d, request_idx: %d \n", __func__,
+                    executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
+            waiting_free_req_idx_seqs_num--;
           }
-          fprintf(stdout, "%s: info: added seq query_id: %d, request_idx: %d \n", __func__,
-                  executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
         } else {
           fprintf(stderr, "%s: error: pop waiting seq failed.\n", __func__);
           return false;
@@ -259,6 +273,7 @@ bool cbg_scheduler::step() {
   }
   // one step
   if (!steps_decoding_for_next_prefill) {
+    fprintf(stdout, "%s: info: running_pool size < max request num, will execute one step.\n", __func__);
     if (!wr.step(&executed_seqs, executed_seqs.size())) {
       return false;
     }
