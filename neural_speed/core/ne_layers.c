@@ -1262,9 +1262,7 @@ float* ne_get_data_f32(const struct ne_tensor* tensor) {
 
 const char* ne_get_name(const struct ne_tensor* tensor) { return tensor->name; }
 
-void ne_set_name(struct ne_tensor* tensor, const char* name) {
-  strncpy(tensor->name, name, sizeof(tensor->name) - 1);
-}
+void ne_set_name(struct ne_tensor* tensor, const char* name) { strncpy(tensor->name, name, sizeof(tensor->name) - 1);
 
 struct ne_tensor* ne_view_tensor(struct ne_context* ctx, const struct ne_tensor* src) {
   struct ne_tensor* result = ne_new_tensor_impl(ctx, src->type, src->n_dims, src->ne, src->data, src->size);
