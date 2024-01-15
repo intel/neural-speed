@@ -1,18 +1,18 @@
 /*******************************************************************************
-* Copyright (c) 2022-2023 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright (c) 2022-2023 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 /// @file
 /// C++ API
@@ -53,6 +53,12 @@ struct default_gemm_config_t
                                               alignment_c>,
                                       elem_t_t<tune_key::DATA_TYPE_ACC,
                                               dtype_acc>,
+                                      elem_t_t<tune_key::GROUP_SWIZZLE_POLICY,
+                                              kernel::group_swizzle_default<
+                                                      gpu_arch_tag>>,
+                                      elem_t_t<tune_key::EPILOGUE_POLICY,
+                                              group::epilogue_policy_default<
+                                                      gpu_arch_tag>>,
                                       elem_v_t<tune_key::GPU_ARCH,
                                               gpu_arch_tag>>>>::type> {};
 
@@ -69,11 +75,11 @@ struct default_gemm_t
 
 template <typename dict_t_>
 struct param_optimizer<param_optimizer_tag::KERNEL, dict_t_> {
-    static constexpr bool use_rule
-            = (dict_t_::impl::template find_elem_index<tune_key::
-                               PARAM_OPTIMZER_TYPE> != dict_t_::impl::key_not_found)
-            && (dict_t_::template find_elem_v<tune_key::
-                                PARAM_OPTIMZER_TYPE> == tune_key_value::PARAM_OPTIMZER_DECISION_TREE);
+    static constexpr bool use_rule = (dict_t_::impl::template find_elem_index<
+                                              tune_key::PARAM_OPTIMZER_TYPE>
+                                             != dict_t_::impl::key_not_found)
+            && (dict_t_::template find_elem_v<tune_key::PARAM_OPTIMZER_TYPE>
+                    == tune_key_value::PARAM_OPTIMZER_DECISION_TREE);
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::KERNEL, dict_t_>,
             dummy_optimizer<param_optimizer_tag::KERNEL, dict_t_,
@@ -151,7 +157,14 @@ struct default_gemm_selector_config_t
                                               wg_shape>,
                                       elem_v_t<tune_key::WG_TILE_K, wg_tile_k>,
                                       elem_v_t<tune_key::GPU_ARCH,
-                                              gpu_arch_tag>>>>::type> {};
+                                              gpu_arch_tag>,
+                                      elem_t_t<tune_key::GROUP_SWIZZLE_POLICY,
+                                              kernel::group_swizzle_default<
+                                                      gpu_arch_tag>>,
+                                      elem_t_t<tune_key::EPILOGUE_POLICY,
+                                              group::epilogue_policy_default<
+                                                      gpu_arch_tag>>>>>::type> {
+};
 
 template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         mem_space mem_space_a, typename dtype_b, mem_layout mem_layout_b,
@@ -196,11 +209,11 @@ struct default_epilogue_selector_t
 
 template <typename dict_t_>
 struct param_optimizer<param_optimizer_tag::WORKGROUP, dict_t_> {
-    static constexpr bool use_rule
-            = (dict_t_::impl::template find_elem_index<tune_key::
-                               PARAM_OPTIMZER_TYPE> != dict_t_::impl::key_not_found)
-            && (dict_t_::template find_elem_v<tune_key::
-                                PARAM_OPTIMZER_TYPE> == tune_key_value::PARAM_OPTIMZER_DECISION_TREE);
+    static constexpr bool use_rule = (dict_t_::impl::template find_elem_index<
+                                              tune_key::PARAM_OPTIMZER_TYPE>
+                                             != dict_t_::impl::key_not_found)
+            && (dict_t_::template find_elem_v<tune_key::PARAM_OPTIMZER_TYPE>
+                    == tune_key_value::PARAM_OPTIMZER_DECISION_TREE);
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::WORKGROUP, dict_t_>,
             dummy_optimizer<param_optimizer_tag::WORKGROUP, dict_t_,

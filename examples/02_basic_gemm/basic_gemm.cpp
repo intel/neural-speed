@@ -135,7 +135,7 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                         data_type_acc, // accumulator data type for intermediate resutls
                         wg_shape, // computation tile shape
                         k_stride, // elements in each iteration
-                        gpu_arch::Xe, // GPU arch
+                        arch_tag_, // GPU arch
                         gemm_tune_option>;
                 gemm_t gemm;
 
@@ -149,7 +149,7 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                         mem_space::global, // memory writing to global mem for C
                         wg_shape, // computation tile shape
                         k_stride, // elements in each iteration
-                        gpu_arch::Xe, // GPU arch
+                        arch_tag_, // GPU arch
                         epilogue_tune_option>;
 
                 // Step 3: define the shared local memory usages

@@ -223,7 +223,7 @@ xetla_tload_global(xetla_tdescriptor tdesc) {
 ///
 template <typename Ty, uint32_t N, cache_hint L1H = cache_hint::none,
         cache_hint L2H = cache_hint::none, gpu_arch arch_tag = gpu_arch::Xe>
-__XETLA_API std::enable_if_t<arch_tag == gpu_arch::Xe, void>
+__XETLA_API std::enable_if_t<arch_tag <= gpu_arch::Xe, void>
 xetla_tstore_global(xetla_tdescriptor tdesc, xetla_vector<Ty, N> data) {
     DEBUG_INVOKE(
             dbg_level::core, core::block_2d<arch_tag, Ty>::check_store(tdesc));

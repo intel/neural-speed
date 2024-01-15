@@ -43,7 +43,7 @@ using param_memspace_ggg
 using param_performance_default
         = dict_t<elem_v_t<tune_key::WG_TILE_K, 32UL, uint32_t>,
                 elem_v_t<tune_key::PREFETCH_DISTANCE, 3UL, uint32_t>,
-                elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL, 8UL, uint32_t>>;
+                elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL, 2UL, uint32_t>>;
 
 using param_runtime_default
         = dict_t<elem_v_t<tune_key::PRE_PROCESSING,

@@ -255,14 +255,14 @@ void sdp_fwd_run(uint32_t iter) {
                     using wg_shape0 = shape<wg_tile_n_qk, wg_tile_m_qk>;
                     using sg_shape0 = shape<sg_tile_n_qk, sg_tile_m_qk>;
 
-                    using post_op0_t = scalar_mul_op_t<float, gpu_arch::Xe>;
+                    using post_op0_t = scalar_mul_op_t<float, gpu_arch::Dg2>;
                     using post_op1_t = elemwise_reduce_op_t<reduce_op::sum,
-                            dtype_in, gpu_arch::Xe>;
+                            dtype_in, gpu_arch::Dg2>;
                     using post_op_t = chained_tile_op_t<post_op0_t, post_op1_t>;
                     using epilogue_policy0
                             = xetla::group::epilogue_policy_tile_op<post_op_t,
-                                    gpu_arch::Xe>;
-                    using group_swizzle = group_swizzle_default<gpu_arch::Xe>;
+                                    gpu_arch::Dg2>;
+                    using group_swizzle = group_swizzle_default<gpu_arch::Dg2>;
 
                     using tune_option0 = dict_t<
                             elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
@@ -289,7 +289,7 @@ void sdp_fwd_run(uint32_t iter) {
                             float, // accumulator data type for intermediate resutls
                             wg_shape0, // computation tile shape
                             wg_tile_k_qk, // elements in each iteration
-                            gpu_arch::Xe, // GPU arch
+                            gpu_arch::Dg2, // GPU arch
                             tune_option0>;
                     using epilogue0_t = xetla::group::default_epilogue_selector_t<
                             dtype_sfx, // onput datatype for C
@@ -299,7 +299,7 @@ void sdp_fwd_run(uint32_t iter) {
                                     local, // memory writing to local mem for C
                             wg_shape0, // computation tile shape
                             wg_tile_k_qk, // elements in each iteration
-                            gpu_arch::Xe, // GPU arch
+                            gpu_arch::Dg2, // GPU arch
                             tune_option0>;
                     using gemm_op0_t = gemm_universal_t<
                             dispatch_policy_default<group_swizzle>, gemm0_t,
@@ -316,7 +316,7 @@ void sdp_fwd_run(uint32_t iter) {
                     // we only need to do thread sync while store gemm results to SLM
                     // one barrier is enough for that
                     xetla_nbarrier_init<1>();
-                    xetla_nbarrier_t<thread_num, thread_num, gpu_arch::Xe>
+                    xetla_nbarrier_t<thread_num, thread_num, gpu_arch::Dg2>
                             nbarrier;
                     nbarrier.init_nbarrier(0, nbarrier_role::producer_consumer);
 
@@ -387,7 +387,7 @@ void sdp_fwd_run(uint32_t iter) {
                             float, // accumulator data type for intermediate resutls
                             wg_shape1, // computation tile shape
                             wg_tile_k_sv, // elements in each iteration
-                            gpu_arch::Xe, // GPU arch
+                            gpu_arch::Dg2, // GPU arch
                             tune_option1>;
 
                     using tile_shape1 = typename gemm1_t::tile_shape;
@@ -473,7 +473,7 @@ void sdp_fwd_run(uint32_t iter) {
                                 0);
                         xetla_tstore_global<dtype_out, sg_tile_n_sv,
                                 cache_hint::write_back, cache_hint::write_back,
-                                gpu_arch::Xe>(transpose_tdecs, out_reg);
+                                gpu_arch::Dg2>(transpose_tdecs, out_reg);
                     }
                 });
             });

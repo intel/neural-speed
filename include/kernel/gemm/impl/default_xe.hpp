@@ -35,7 +35,7 @@ namespace gpu::xetla::kernel {
 template <typename gemm_t_, typename epilogue_t_, typename group_swizzle_>
 class gemm_universal_t<dispatch_policy_default<group_swizzle_>, gemm_t_,
         epilogue_t_,
-        std::enable_if_t<(group_swizzle_::arch_tag == gpu_arch::Xe)>> {
+        std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::Xe)>> {
     using gemm_t = gemm_t_;
     using epilogue_t = epilogue_t_;
     using gemm_args_t = typename gemm_t::arguments_t;
@@ -56,6 +56,7 @@ class gemm_universal_t<dispatch_policy_default<group_swizzle_>, gemm_t_,
     using work_group_t = typename gemm_t::work_group_t;
 
     static constexpr gpu_arch arch_tag = group_swizzle_t::arch_tag;
+    static_assert(gemm_t::arch_tag == gpu_arch::Dg2);
     static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
     static_assert(
             arch_tag == epilogue_t::arch_tag, "arch_tag should be the same");

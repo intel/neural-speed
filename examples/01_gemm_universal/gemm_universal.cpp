@@ -25,9 +25,9 @@ void gemm_universal_run(uint32_t iter) {
     // Please contact us for support.
 
     //GEMM_UNIVERSAL input size
-    size_t matrix_m = 4096;
-    size_t matrix_n = 4096;
-    size_t matrix_k = 4096;
+    size_t matrix_m = 256;
+    size_t matrix_n = 256;
+    size_t matrix_k = 256;
 
     size_t size_a = matrix_m * matrix_k;
     size_t size_b = matrix_k * matrix_n;
@@ -51,13 +51,13 @@ void gemm_universal_run(uint32_t iter) {
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
             [](data_type_a *data, size_t idx) {
-                data[idx] = static_cast<data_type_a>(random_float());
+                data[idx] = static_cast<data_type_a>(1.f);
             },
             queue, device, context);
     auto B = alloc_device_and_init<data_type_b>(
             size_b,
             [](data_type_b *data, size_t idx) {
-                data[idx] = static_cast<data_type_b>(random_float());
+                data[idx] = static_cast<data_type_b>(1.f);
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type_c>(
@@ -103,7 +103,7 @@ void gemm_universal_run(uint32_t iter) {
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
             data_type_acc, // accumulator data type for intermediate resutls
-            gpu_arch::Xe, // GPU arch
+            gpu_arch::Dg2, // GPU arch
             tune_option>;
 
     // allocate temp buffers for global split
