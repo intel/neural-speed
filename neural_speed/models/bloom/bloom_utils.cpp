@@ -64,10 +64,10 @@ void BLOOM::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_ctx      = %u\n", __func__, hparams.max_seq_len);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
-  fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
+  fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);  // unused
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
   fprintf(stderr, "%s: n_layer    = %u\n", __func__, hparams.n_layer);
-  fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
+  fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);  // unused
   fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
@@ -157,7 +157,7 @@ void BLOOM::load(model_context* ctx, model_progress_callback progress_callback, 
     model.others[2] = ml->get_tensor("token_embd_norm.bias", {n_embd}, NE_BACKEND_CPU);
     model.others[3] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[4] = ml->get_tensor("output_norm.bias", {n_embd}, NE_BACKEND_CPU);
-    model.others[5] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[5] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
