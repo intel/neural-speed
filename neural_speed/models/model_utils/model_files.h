@@ -1073,6 +1073,7 @@ struct model_file_loader {
 
     file.read_raw(&hparams.rms_norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
+    file.read_raw(&hparams.freq_scale, sizeof(float));
   }
 
   void read_ne_vocab() {
@@ -1192,6 +1193,7 @@ struct model_file_saver {
 
     file.write_raw(&hparams.rms_norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
+    file.write_raw(&hparams.freq_scale, sizeof(float));
   }
   void write_vocab() {
     if (any_file_loader->file_version == MODEL_FILE_VERSION_NE) {
