@@ -31,18 +31,6 @@
 #define QUANT_API
 #endif
 
-#define MODEL_FILE_MAGIC_GGJT 0x67676a74u  // 'ggjt'
-#define MODEL_FILE_MAGIC_GGLA 0x67676c61u  // 'ggla'
-#define MODEL_FILE_MAGIC_GGMF 0x67676d66u  // 'ggmf'
-#define MODEL_FILE_MAGIC_NE 0x67676d6cu    // 'ne'
-#define MODEL_FILE_MAGIC_GGSN 0x6767736eu  // 'ggsn'
-
-#define MODEL_FILE_VERSION 3
-#define MODEL_FILE_MAGIC MODEL_FILE_MAGIC_GGJT
-#define MODEL_FILE_MAGIC_UNVERSIONED MODEL_FILE_MAGIC_NE
-#define MODEL_SESSION_MAGIC MODEL_FILE_MAGIC_GGSN
-#define MODEL_SESSION_VERSION 1
-
 QUANT_API int model_quantize(const quant_params& param, std::shared_ptr<quant_layer_base> quant_layer);
 size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* src_zps, void* dstpr,
                     const quant_params_internal params, int nthread, int n, int k, int* g_idx);
