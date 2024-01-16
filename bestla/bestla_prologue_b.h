@@ -147,6 +147,13 @@ class WeightKBlockNInteger {
   }
 
   static void enableShuffle(StorageWeight* stor) { stor->enable_shuffle(); }
+  void setDoubleQuantBlkSize(StorageWeight* stor, BTLA_DTYPE stype, int dq_blksize) {
+    stor->mDqBlockSize = dq_blksize;
+    auto nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
+    if (stor->IsAsym() || dq_blksize % 8 != 0) assert(0);
+    stor->mCorrection.enable_double_quant(utils::updiv(nk_scale * stor->mN, dq_blksize), stype);
+    stor->update_size();
+  }
 
   void packTransposeWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* stor,
                            parallel::IThreading* threading) {
@@ -294,6 +301,25 @@ class WeightKBlockNInteger {
           }
         }
       });
+    } else if (stor->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+      threading->parallel_for([&](int tidx) {
+        parallel::ThreadProblem2D thdp{tidx};
+        _para.getIndex(thdp);
+        if (thdp.valid) {
+          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
+            if (i < rawnk_scale) {
+              if (scales != nullptr) {
+                for (size_t j = 0; j < N; j++) {
+                  stor->template SPtr<uint8_t>()[j + i * stor->mNPad] = static_cast<uint8_t>(scales[i * N + j]);
+                }
+              }
+            } else {
+              if (scales != nullptr)
+                std::memset(stor->template SPtr<uint8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(uint8_t));
+            }
+          }
+        }
+      });
     } else {
       assert(0);
     }
@@ -402,6 +428,7 @@ class WeightKBlockNInteger {
 
   void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
                    const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
+    if (stor->SDtype() == BTLA_DTYPE::DQ8_BNB) assert(stor->mDqBlockSize != 0);
     if (stor->IsDoubleQuant()) {
       int nk_scale = utils::updiv(K, stor->mBlockSize);
       auto ssize = static_cast<size_t>(N) * nk_scale;

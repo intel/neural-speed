@@ -252,18 +252,27 @@ class UT_TransposeBlockQuantize_F4 {
     // using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     using PrologueB = prologue_b::gemm::WeightKBlockNFloat<sAVX2, RuntimeISA>;
     PrologueB kernel;
-    auto packedW = kernel.createStorage(n, k, blocksize, F4_T, bestla_dtype<float>);
-    auto packedW1 = kernel.createStorage(n, k, blocksize, F4_T, bestla_dtype<float>);
+    auto packedW = kernel.createStorage(n, k, blocksize, F4_T, SCA_T);
+    auto packedW1 = kernel.createStorage(n, k, blocksize, F4_T, SCA_T);
+    if (SCA_T == BTLA_DTYPE::DQ8_BNB) {
+      kernel.setDoubleQuantBlkSize(&packedW, SCA_T, dq_blksize);
+      kernel.setDoubleQuantBlkSize(&packedW1, SCA_T, dq_blksize);
+    }
     avector<int8_t> buf(packedW.mSize), buf1(packedW1.mSize);
     packedW.assign(buf.data());
     packedW1.assign(buf1.data());
     kernel.packTransposeWeight(n, k, dequanRef.data(), k, &packedW, &DefaultThreading);
     kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &packedW1, &DefaultThreading);
-    ut::buffer_error(packedW.SPtr<float>(), packedW1.SPtr<float>(), packedW1.CSize());
-    ut::buffer_error(packedW.WPtr<int8_t>(), packedW1.WPtr<int8_t>(), packedW1.mQBuf.size<int8_t>());
     avector<float> dequant(n * k);
     kernel.unpackTransposeWeight(n, k, &packedW1, dequant.data(), k, &DefaultThreading);
-    ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size());
+    if (SCA_T != BTLA_DTYPE::DQ8_BNB) {
+      ut::buffer_error(packedW.SPtr<float>(), packedW1.SPtr<float>(), packedW1.CSize());
+      ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size());
+    } else {
+      ut::buffer_error(packedW.SPtr<int8_t>(), packedW1.SPtr<int8_t>(), packedW1.CSize());
+      ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size(), 0.1f);
+    }
+    ut::buffer_error(packedW.WPtr<int8_t>(), packedW1.WPtr<int8_t>(), packedW1.mQBuf.size<int8_t>());
   }
 };
 static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;

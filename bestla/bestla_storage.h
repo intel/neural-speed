@@ -217,6 +217,7 @@ class ObjectQuantCorrection : public ISerialObject {
     mScaleBuf.deserializeBuffer(rptr, locate_buf);
     mZpBuf.deserializeBuffer(rptr, locate_buf);
     mRedBuf.deserializeBuffer(rptr, locate_buf);
+    mDQCorrectionBuf.deserializeBuffer(rptr, locate_buf);
   }
   void enable_double_quant(size_t scale_size, BTLA_DTYPE stype) {
     if (stype == BTLA_DTYPE::DQ8_BNB) {
