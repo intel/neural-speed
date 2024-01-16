@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 set(TARGET whisper)
-add_library_w_warning(${TARGET} whisper.cpp whisper_utils.cpp)  # no (gpt) model utils needed
-target_compile_features(${TARGET} PUBLIC cxx_std_11) # don't bump
-set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(${TARGET} PUBLIC ne_layers ${LLAMA_EXTRA_LIBS} bestla::bestla)
+set(ModelSrcs whisper.cpp whisper_utils.cpp)
+set(ModelLibs)
+add_model()

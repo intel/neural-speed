@@ -13,6 +13,14 @@
 #  limitations under the License.
 
 file(GLOB MODEL_UTILS_SOURCE "model_utils/*.cpp")
+
+function(add_model)
+  add_library_w_warning(${TARGET} ${ModelSrcs})  # no (gpt) model utils needed
+  target_compile_features(${TARGET} PUBLIC cxx_std_11) # don't bump
+  set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(${TARGET} PUBLIC ne_layers bestla ${ModelLibs})
+endfunction()
+
 add_subdirectory(llama)
 add_subdirectory(gptj)
 add_subdirectory(mpt)
