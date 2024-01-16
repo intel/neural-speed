@@ -56,24 +56,24 @@ int main(int argc, char** argv) {
   printf("ne_ftype: %d\n", ftype);
   const int nthread = q_params.nthread;
 
-  const int64_t t_main_start_us = common_time_us();
+  const int64_t t_main_start_us = ne_time_us();
 
   int64_t t_quantize_us = 0;
   auto quant_layer = get_model_quant_layer(q_params.model_name);
   // load the model
   {
-    const int64_t t_start_us = common_time_us();
+    const int64_t t_start_us = ne_time_us();
 
     if (model_quantize(q_params, quant_layer)) {
       fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
       return 1;
     }
 
-    t_quantize_us = common_time_us() - t_start_us;
+    t_quantize_us = ne_time_us() - t_start_us;
   }
   // report timing
   {
-    const int64_t t_main_end_us = common_time_us();
+    const int64_t t_main_end_us = ne_time_us();
 
     printf("\n");
     printf("%s: quantize time = %8.2f ms\n", __func__, t_quantize_us / 1000.0);

@@ -56,7 +56,7 @@
 #include "models/models.h"
 
 // default hparams (Whisper tiny)
-struct whisper_hparams {
+struct whisper_hparams_t {
   int32_t n_vocab = 51864;
   int32_t n_audio_ctx = 1500;
   int32_t n_audio_state = 384;
@@ -70,7 +70,7 @@ struct whisper_hparams {
   int32_t ftype = 1;
 };
 
-struct whisper_filters {
+struct whisper_filters_t {
   int32_t n_mel;
   int32_t n_fft;
 
@@ -107,7 +107,7 @@ bool whisper_model_quantize(const std::string& fname_inp, const std::string& fna
     fout.write(reinterpret_cast<char*>(&magic), sizeof(magic));
   }
 
-  whisper_hparams hparams;
+  whisper_hparams_t hparams;
 
   // load hparams
   {
@@ -156,7 +156,7 @@ bool whisper_model_quantize(const std::string& fname_inp, const std::string& fna
 
   // load mel filters
   {
-    whisper_filters filters;
+    whisper_filters_t filters;
 
     finp.read(reinterpret_cast<char*>(&filters.n_mel), sizeof(filters.n_mel));
     fout.write(reinterpret_cast<char*>(&filters.n_mel), sizeof(filters.n_mel));

@@ -245,7 +245,7 @@ static size_t utf8_len(char src) {
   return lookup[highbits];
 }
 
-struct model_sp_symbol {
+struct model_sp_symbol_t {
   using index = int;
   index prev;
   index next;
@@ -253,33 +253,33 @@ struct model_sp_symbol {
   size_t n;
 };
 
-static_assert(std::is_trivially_copyable<model_sp_symbol>::value, "model_sp_symbol is not trivially copyable");
+static_assert(std::is_trivially_copyable<model_sp_symbol_t>::value, "model_sp_symbol_t is not trivially copyable");
 
-struct model_sp_bigram {
-  struct comparator {
-    bool operator()(model_sp_bigram& l, model_sp_bigram& r) {  // NOLINT
+struct model_sp_bigram_t {
+  struct comparator_t {
+    bool operator()(model_sp_bigram_t& l, model_sp_bigram_t& r) {  // NOLINT
       return (l.score < r.score) || (l.score == r.score && l.left > r.left);
     }
   };
-  using queue_storage = std::vector<model_sp_bigram>;
-  using queue = std::priority_queue<model_sp_bigram, queue_storage, comparator>;
-  model_sp_symbol::index left;
-  model_sp_symbol::index right;
+  using queue_storage = std::vector<model_sp_bigram_t>;
+  using queue = std::priority_queue<model_sp_bigram_t, queue_storage, comparator_t>;
+  model_sp_symbol_t::index left;
+  model_sp_symbol_t::index right;
   float score;
   size_t size;
 };
 
 // original implementation:
 // https://github.com/ggerganov/model.cpp/commit/074bea2eb1f1349a0118239c4152914aecaa1be4
-struct model_tokenizer {
-  model_tokenizer(const model_vocab& vocab) : vocab_(vocab) {}  // NOLINT
+struct model_tokenizer_t {
+  model_tokenizer_t(const model_vocab& vocab) : vocab_(vocab) {}  // NOLINT
 
   void tokenize(const std::string& text, std::vector<model_vocab::id>& output) {
     // split string into utf8 chars
     int index = 0;
     size_t offs = 0;
     while (offs < text.size()) {
-      model_sp_symbol sym;
+      model_sp_symbol_t sym;
       size_t char_len = std::min(text.size() - offs, utf8_len(text[offs]));
       sym.text = text.c_str() + offs;
       sym.n = char_len;
@@ -362,7 +362,7 @@ struct model_tokenizer {
 
     const auto& tok_score = vocab_.id_to_token[(*token).second];
 
-    model_sp_bigram bigram;
+    model_sp_bigram_t bigram;
     bigram.left = left;
     bigram.right = right;
     bigram.score = tok_score.score;
@@ -371,12 +371,12 @@ struct model_tokenizer {
   }
 
   const model_vocab& vocab_;
-  std::vector<model_sp_symbol> symbols_;
-  model_sp_bigram::queue work_queue_;
+  std::vector<model_sp_symbol_t> symbols_;
+  model_sp_bigram_t::queue work_queue_;
 };
 
 static std::vector<model_vocab::id> model_tokenize(const model_vocab& vocab, const std::string& text, bool bos) {
-  model_tokenizer tokenizer(vocab);
+  model_tokenizer_t tokenizer(vocab);
   std::vector<model_vocab::id> output;
 
   if (text.empty()) {
@@ -1950,7 +1950,7 @@ struct logits_info {
   std::vector<float> max_ls;
   // 1 / exp sum (batch,)
   std::vector<float> normalizers;
-  struct sum_exp {
+  struct sum_exp_t {
     float max_l;
     float operator()(float sum, float l) const { return sum + std::exp(l - max_l); }
   };
@@ -1970,7 +1970,7 @@ struct logits_info {
     for (int i = 0; i < batch_size; ++i) {
       max_ls[i] = *std::max_element(logits + i * bs_stride + offset, logits + i * bs_stride + offset + n_vocab);
       normalizers[i] = 1.0f / std::accumulate(logits + i * bs_stride + offset,
-                                              logits + i * bs_stride + offset + n_vocab, 0.0f, sum_exp{max_ls[i]});
+                                              logits + i * bs_stride + offset + n_vocab, 0.0f, sum_exp_t{max_ls[i]});
     }
   }
 
