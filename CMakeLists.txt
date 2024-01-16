@@ -7,7 +7,7 @@ file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 option(BTLA_USE_OPENMP "Enable OpenMP thread pool" ON)
 
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
-option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
+option(BTLA_UT_DEBUG "Enable debug unit tests" ON)
 option(BTLA_UT_EPILOGUE "Enable unit test for epilogue" OFF)
 option(BTLA_UT_PROLOGUE_A "Enable unit test for activation prologue" OFF)
 option(BTLA_UT_PROLOGUE_B "Enable unit test for weight prologue" OFF)

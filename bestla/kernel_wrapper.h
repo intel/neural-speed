@@ -222,6 +222,21 @@ class Memcpy2DBf16CvtFp32 {
   }
 };
 
+template <typename _DST_T, int _PACK_ROW>
+class DecompressDQKBlockS4Fp {
+ public:
+  template <BTLA_ISA ISA_T, BTLA_DTYPE S4_T>
+  static inline BTLA_CODE forward(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
+                                  uint8_t* scales, float* dq_scale, int k_offset, int n_offset, int kblock, int NPad,
+                                  int N, int dq_blk, int dq_offset_idx, void* tmp, size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+    ret = ref::decompress_dq_kblock_s4_fp<S4_T, _DST_T, _PACK_ROW>(
+        srcptr, dstptr, row, col, ld_src, ld_dst, scales, dq_scale, k_offset, n_offset, kblock, dq_blk, dq_offset_idx,
+        NPad, N, reinterpret_cast<int8_t*>(tmp), tmpsize);
+    return ret;
+  }
+};
+
 template <int NTILE>
 class CompressS8S4 {
  public:
@@ -465,6 +480,19 @@ class DecompressKBlockF4Fp {
     return ref::decompress_kblock_f4_fp<F4_T, _DST_T, _PACK_ROW, SCA_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                                         scales, k_offset, kblock, NPad,
                                                                         reinterpret_cast<int8_t*>(tmp), tmpsize);
+  }
+};
+
+template <typename _DST_T, int _PACK_ROW>
+class DecompressDqKBlockF4Fp {
+ public:
+  template <BTLA_ISA ISA_T, BTLA_DTYPE F4_T, typename SCA_T>
+  static inline BTLA_CODE forward(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
+                                  SCA_T* scales, float* dq_scale, int k_offset, int n_offset, int kblock, int dq_blk,
+                                  int dq_offset_idx, int NPad, int N, void* tmp, size_t tmpsize) {
+    return ref::decompress_dq_kblock_f4_fp<F4_T, _PACK_ROW>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, dq_scale,
+                                                            k_offset, n_offset, kblock, dq_blk, dq_offset_idx, NPad, N,
+                                                            tmp, tmpsize);
   }
 };
 

@@ -156,6 +156,7 @@ class ObjectQuantCorrection : public ISerialObject {
   BTLA_DTYPE mScaT = BTLA_DTYPE::F32, mZpT = BTLA_DTYPE::F32, mRedT = BTLA_DTYPE::F32;
   ObjectAlignedBuffer<Alignment> mScaleBuf;
   ObjectOptionalBuffer<Alignment> mZpBuf, mRedBuf;
+  ObjectOptionalBuffer<Alignment> mDQCorrectionBuf;
 
   // non-ser
  public:
@@ -184,6 +185,7 @@ class ObjectQuantCorrection : public ISerialObject {
     totalsize += mScaleBuf.getSerializedSize();
     totalsize += mZpBuf.getSerializedSize();
     totalsize += mRedBuf.getSerializedSize();
+    totalsize += mDQCorrectionBuf.getSerializedSize();
     return totalsize;
   }
   virtual void serializeToBuffer(int8_t*& wptr) override {
@@ -195,6 +197,7 @@ class ObjectQuantCorrection : public ISerialObject {
     mScaleBuf.serializeToBuffer(wptr);
     mZpBuf.serializeToBuffer(wptr);
     mRedBuf.serializeToBuffer(wptr);
+    mDQCorrectionBuf.serializeToBuffer(wptr);
   }
   virtual void deserializeBuffer(int8_t*& rptr, bool locate_buf) override {
     if (!locate_buf) {
@@ -215,6 +218,15 @@ class ObjectQuantCorrection : public ISerialObject {
     mZpBuf.deserializeBuffer(rptr, locate_buf);
     mRedBuf.deserializeBuffer(rptr, locate_buf);
   }
+  void enable_double_quant(size_t scale_size, BTLA_DTYPE stype) {
+    if (stype == BTLA_DTYPE::DQ8_BNB) {
+      auto super_scale_size = scale_size * sizeof(float);
+      auto super_zp_size = sizeof(float);
+      mDQCorrectionBuf.resize(super_scale_size + super_zp_size);
+    } else {
+      assert(0);
+    }
+  };
 
  protected:
   inline void updateSize() {
@@ -306,6 +318,7 @@ class IWeightBase : public storage::ISerializable {
 class IWeightKBlockBase : public IWeightBase {
  public:
   int mBlockSize = 1;
+  int mDqBlockSize = 0;
   IWeightKBlockBase(uint64_t _id) : IWeightBase(_id) {}
   void resize(int NPad, int KPad, int Block, int N, int K, BTLA_DTYPE dtype) {
     IWeightBase::resize(NPad, KPad, N, K, dtype);
@@ -321,19 +334,23 @@ class IWeightKBlockBase : public IWeightBase {
   virtual void serializeToBuffer(int8_t*& wptr) {
     IWeightBase::serializeToBuffer(wptr);
     utils::serialize(wptr, mBlockSize);
+    utils::serialize(wptr, mDqBlockSize);
   }
 
   virtual void deserializeBuffer(int8_t*& rptr, bool map_buf) {
     IWeightBase::deserializeBuffer(rptr, map_buf);
     if (!map_buf) {
       mBlockSize = utils::deserialize<int>(rptr);
+      mDqBlockSize = utils::deserialize<int>(rptr);
     } else {
       utils::serialize(rptr, mBlockSize);
+      utils::serialize(rptr, mDqBlockSize);
     }
   }
 
   inline constexpr size_t getMiscSize() {
     size_t totalsize = sizeof(mBlockSize);
+    totalsize += sizeof(mDqBlockSize);
     return totalsize;
   }
 };
@@ -709,6 +726,7 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
   inline constexpr BTLA_DTYPE SDtype() { return mCorrection.mScaT; }
   inline constexpr bool IsAsym() { return mCorrection.mZpBuf.mNotEmpty; }
   inline constexpr bool HasReduce() { return mCorrection.mRedBuf.mNotEmpty; }
+  inline constexpr bool IsDoubleQuant() { return mCorrection.mDQCorrectionBuf.mNotEmpty; }
   inline constexpr size_t CSize() { return mCorrection.mCSize; }
   inline constexpr int CStep() { return mCorrection.mCStep; }
 
@@ -735,6 +753,11 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
   template <typename T>
   inline constexpr T* RPtr() {
     return mCorrection.mRedBuf.get<T>();
+  }
+
+  template <typename T>
+  inline constexpr T* DQPtr() {
+    return mCorrection.mDQCorrectionBuf.get<T>();
   }
 
   inline constexpr int* ShfIndice() { return mShuffleIndices.get<int>(); }

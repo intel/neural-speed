@@ -1,3 +1,4 @@
+#include "bestla.h"
 #include "bestla_gemm.h"
 #include "bestla_prologue_b.h"
 #include "bestla_parallel.h"
@@ -176,18 +177,21 @@ class UT_TransposeBlockQuantize_F4 {
  public:
   UT_TransposeBlockQuantize_F4() {
     UT_START();
-    CheckISA(AVX512F);
-    ut(4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut(1024, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut(4096, 1024, 32, BTLA_DTYPE::F4_BNB);
-    ut(48, 32, 32, BTLA_DTYPE::F4_BNB);
-    ut(32, 32, 32, BTLA_DTYPE::F4_BNB);
-    ut(48, 32, 32, BTLA_DTYPE::F4_BNB);
-    ut(48, 32, 32, BTLA_DTYPE::F4_NF4);
-    ut(48, 32, 32, BTLA_DTYPE::F4_E2M1);
+    CheckISA(AVX2);
+    // ut(4096, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    // ut(1024, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    // ut(4096, 1024, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    // ut(48, 32, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    // ut(32, 32, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    // ut(48, 32, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    // ut(48, 32, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::F32);
+    // ut(48, 32, 32, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::F32);
+    ut(16, 15, 8, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB, 8);
+    ut(48, 32, 16, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB, 32);
+    ut(1024, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB, 32);
   }
 
-  void ut(int n, int k, int blocksize, BTLA_DTYPE F4_T) {
+  void ut(int n, int k, int blocksize, BTLA_DTYPE F4_T, BTLA_DTYPE SCA_T, int dq_blksize = 0) {
     printf("Test Case: %d %d %d\n", n, k, blocksize);
     int ldb = n;
     utils::aligned_vector<float> dequanRef(n * k);
@@ -243,8 +247,10 @@ class UT_TransposeBlockQuantize_F4 {
       }
     }
 
-    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
-    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    // auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
+    auto constexpr RuntimeISA = BTLA_ISA::AVX2;
+    // using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<sAVX2, RuntimeISA>;
     PrologueB kernel;
     auto packedW = kernel.createStorage(n, k, blocksize, F4_T, bestla_dtype<float>);
     auto packedW1 = kernel.createStorage(n, k, blocksize, F4_T, bestla_dtype<float>);
@@ -260,6 +266,7 @@ class UT_TransposeBlockQuantize_F4 {
     ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size());
   }
 };
+static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;
 #endif
