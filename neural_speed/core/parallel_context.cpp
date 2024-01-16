@@ -14,6 +14,7 @@
 #include <mpi.h>
 #include "oneapi/ccl.hpp"
 #include "parallel_context.h"
+#include "shared_memory_ccl.hpp"
 
 class parallel_class {
  public:
@@ -26,7 +27,14 @@ class parallel_class {
       return instance_p;
     }
   }
-  ~parallel_class() { delete pcomm; }
+  ~parallel_class() {
+    delete pcomm;
+#ifndef _WIN32
+    if (use_shm) {
+      shared_close(shm_name, cbuffer, world_size * sizeof(struct ccl_buffer));
+    }
+#endif
+  }
 
   bool is_master() { return rank == 0; }
 
@@ -37,8 +45,17 @@ class parallel_class {
 
   // From some example code of oneCCL, inplace reducing is supported
   void reduce_add(float* sendBuf, float* recvBuf, size_t count) {
+#ifndef _WIN32
+    if (use_shm) {
+      shm_all_reduce(sendBuf, recvBuf, count, rank, world_size);
+    } else {
+      ccl::allreduce(sendBuf, recvBuf, count, ccl::reduction::sum, *pcomm).wait();
+    }
+#else
     ccl::allreduce(sendBuf, recvBuf, count, ccl::reduction::sum, *pcomm).wait();
+#endif
   }
+
   void broadcast(float* buf, size_t count) {
     int root = 0;  // assume always broadcast from master
     ccl::broadcast(buf, count, root, *pcomm).wait();
@@ -71,6 +88,34 @@ class parallel_class {
 
     rank = pcomm->rank();
     world_size = pcomm->size();
+
+#ifndef _WIN32
+    // Check whether all ranks is on the same physical machine.
+    // If true use SHM allreduce
+    auto local_size = std::getenv("TP_LOCAL_SIZE");
+    if (local_size != NULL) {
+      use_shm = std::stoi(local_size) == world_size;
+    }
+    if (use_shm) {
+      void* shared_ptr = nullptr;
+      snprintf(shm_name, sizeof(shm_name), "%s_%d", "shared_memory_tp", getuid());
+      if (rank == 0) {
+        cbuffer = (struct ccl_buffer*)malloc(world_size * sizeof(struct ccl_buffer));
+        shared_ptr = shared_create(shm_name, cbuffer, world_size * sizeof(struct ccl_buffer));
+        assert(shared_ptr != nullptr);
+        cbuffer = (struct ccl_buffer*)(shared_ptr);
+        for (int i = 0; i < world_size; i++) {
+          cbuffer[i].state = ccl_begin;
+        }
+      }
+      ccl::barrier(*pcomm).wait();
+      if (rank != 0) {
+        shared_ptr = shared_open(shm_name, world_size * sizeof(struct ccl_buffer));
+        assert(shared_ptr != nullptr);
+        cbuffer = (struct ccl_buffer*)shared_ptr;
+      }
+    }
+#endif
   }
   static void mpi_finalize() {
     int is_finalized = 0;
@@ -81,6 +126,8 @@ class parallel_class {
     }
   }
 
+  bool use_shm = false;
+  char shm_name[100];
   int world_size;
   int rank;
 
