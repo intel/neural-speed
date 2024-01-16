@@ -1,6 +1,6 @@
 Checks: >
     -*,
-    # readability-identifier-naming,
+    readability-identifier-naming,
     readability-const-return-type,
     readability-redundant-smartptr-get,
     readability-misleading-indentation,
