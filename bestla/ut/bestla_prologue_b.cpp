@@ -275,7 +275,6 @@ class UT_TransposeBlockQuantize_F4 {
     ut::buffer_error(packedW.WPtr<int8_t>(), packedW1.WPtr<int8_t>(), packedW1.mQBuf.size<int8_t>());
   }
 };
-static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;
 #endif
@@ -539,15 +538,15 @@ class UT_CompFp32 {
 
   void ut_f8() {
     CheckISA(AVX2);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3, BTLA_DTYPE::F8_E8M0);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F8_E8M0);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F32);
     CheckISA(AVX512F);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, f8>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3, BTLA_DTYPE::F8_E8M0);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E4M3, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F8_E8M0);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F32);
   }
   void ut_s4() {
     CheckISA(AVX2);
@@ -605,26 +604,27 @@ class UT_CompFp32 {
 
   void ut_f4() {
     CheckISA(AVX2);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::F32);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::BF16);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::BF16);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::BF16);
+    ut<sAVX2, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB);
 
     CheckISA(AVX512F);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, float>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
-    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, -1, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, -1, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, -1, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::F32);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::BF16);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::BF16);
+    ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::BF16);
   }
 
   template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei>
@@ -680,21 +680,24 @@ class UT_CompFp32 {
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
 
-  template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
-  void ut(int m, int n, int k, int blocksize, BTLA_DTYPE qtype) {
+  template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei>
+  void ut(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
-           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), type_str<Scale_T>);
+           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype));
     auto constexpr ISA = GemmCore_T::ISA;
-    using Launcher =
-        wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
-                                      epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
+    // using Launcher =
+    //     wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
+    //                                   epilogue::gemm::CompFp32BlockEpilogue,
+    //                                   epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Launcher = wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
+                                                 epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
-    packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
-
+    packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype);
+    if (stype == BTLA_DTYPE::DQ8_BNB) launcher.mProB.setDoubleQuantBlkSize(&packedw, stype, 32);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
@@ -708,7 +711,7 @@ class UT_CompFp32 {
     typename Launcher::Param args{gp,
                                   {matAf32.data(), k},
                                   {&packedw},
-                                  {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
+                                  // {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
     auto err = FP4_ERR;
@@ -962,19 +965,21 @@ class UT_CompInt8 {
   void ut_s4_newkblock() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>, float>(1, 11008, 4096, 32, BTLA_DTYPE::S4_CLIP);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>>(1, 11008, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
     }
 
     if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, float>(1, 11008, 4096, 32, BTLA_DTYPE::S4_CLIP);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 11008, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
     }
 
     if (_cd->AMX_INT8()) {
       request_perm_xtile_data();
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>, float>(128, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>, float>(1, 4096, 4096, 64, BTLA_DTYPE::S4_CLIP);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP,
+                                                         BTLA_DTYPE::DQ8_BNB);
     }
   }
 
@@ -1002,10 +1007,10 @@ class UT_CompInt8 {
     }
   }
 
-  template <class GemmCore_T, typename Scale_T>
-  void ut_newkblock(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, bool isAsym = false) {
+  template <class GemmCore_T>
+  void ut_newkblock(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype, bool isAsym = false) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
-           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), type_str<Scale_T>, isAsym);
+           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher = wrapper::gemm::LauncherIntKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
                                                       prologue_b::gemm::WeightKBlockNInteger,
@@ -1015,9 +1020,8 @@ class UT_CompInt8 {
     blocksize = blocksize == -1 ? k : blocksize;
     int kblks = updiv(k, blocksize);
     using WType = typename Launcher::PrologueB::StorageWeight;
-    WType packedw =
-        launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isAsym);
-
+    WType packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
+    if (stype == BTLA_DTYPE::DQ8_BNB) launcher.mProB.setDoubleQuantBlkSize(&packedw, stype, 32);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
@@ -1058,7 +1062,11 @@ class UT_CompInt8 {
       }
     }
     buffer_error(refC.data(), matC.data(), refC.size(), err);
-    buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);  // dynamic quant error
+    if (stype != BTLA_DTYPE::DQ8_BNB) {
+      buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);  // dynamic quant error
+    } else {
+      buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR * 2);  // dynamic quant error
+    }
   }
 
   template <class GemmCore_T, typename Scale_T>
@@ -1255,6 +1263,7 @@ class UT_CompInt8 {
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
 };
+static UT_CompInt8 sUT_CompInt8;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_CompInt8 sUT_CompInt8;
 #endif
