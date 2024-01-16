@@ -134,6 +134,7 @@ bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
       const int vecid = reqidx_to_vecid[idx];
       seqs->at(vecid).generated_ids = std::move(req_done_res[r]);
       seqs->at(vecid).status = seq_status::FINISHED;
+      seqs->at(vecid).end_time = model_time_us();
     }
     return true;
   }
@@ -164,6 +165,9 @@ std::vector<sequence> il_scheduler::pop_completed_requests() {
       fprintf(stderr, "%s: error: pop finished_pool %dth seq failed.\n", __func__, l);
       return std::vector<sequence>();
     }
+    fprintf(stdout, "%s: info: tokens generation time of sequence (query_id %d, request_idx: %d) is %8.2fms.\n",
+            __func__, ret_seqs[l].query_id, ret_seqs[l].request_idx,
+            (ret_seqs[l].end_time - ret_seqs[l].receive_time) / 1000.0);
   }
   return ret_seqs;
 }
@@ -199,6 +203,7 @@ int cbg_scheduler::query_free_req_idx() {
 }
 
 bool cbg_scheduler::add_request(sequence seq) {
+  seq.receive_time = model_time_us();
   if (seq.status != seq_status::UNKNOWN) {
     fprintf(stderr, "%s: error: seq status is not UNKNOWN, can not decide to add into which pool.\n", __func__);
     return false;
