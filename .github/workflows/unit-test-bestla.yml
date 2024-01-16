@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - bestla/**"
+      - bestla/**
       - .github/workflows/unit-test-bestla.yml
       - '!bestla/README.md'
   workflow_dispatch:

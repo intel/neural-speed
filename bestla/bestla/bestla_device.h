@@ -24,7 +24,7 @@
 #include <sched.h>
 #endif
 
-#define FIXED_CACHE_SIZE ((1 << 20) - (32 << 10))
+#define FIXED_CACHE_SIZE ((1 << 20) - (128 << 10))
 #define FIXED_CACHE 1
 
 namespace bestla {
