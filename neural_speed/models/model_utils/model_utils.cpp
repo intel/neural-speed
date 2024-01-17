@@ -2294,7 +2294,7 @@ void beam_search_flow::next_candidate_beams(const std::vector<int>& num_beams, c
         if (is_beam_token_worse_than_top_num_beams) continue;
         // update score with eos next token
         cur_beams[cb_off].score = next_top_k_tokens[i].score;
-        beam_hypos[request_running_indices[rb]].add(cur_beams[cb_off], n_prompt_tokens[rb]);
+        beam_hypos[request_running_indices[rb]].add(cur_beams[cb_off], n_prompt_tokens[request_running_indices[rb]]);
       } else {
         beam next_beam = cur_beams[cb_off];
         next_beam.token_ids.push_back(next_top_k_tokens[i].id);
