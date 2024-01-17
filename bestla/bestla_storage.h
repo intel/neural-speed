@@ -712,8 +712,15 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
     auto gemm_comp = bestla::gemm::CoreAttr::get_comp(mCoreId);
     auto is_cint = bestla::gemm::CompTypeHelper::is_integer(gemm_comp);
     mCorrection.resize(nk_scale, NPad, scalet, zpt, redt, IsAsym, is_cint);
+    if (scalet == BTLA_DTYPE::DQ8_BNB) initDoubleQuantBlkSize(Block, nk_scale, IsAsym, N, scalet);
     update_size();
     return mSize;
+  }
+
+  void initDoubleQuantBlkSize(int dq_blksize, int nk_scale, bool asym, int N, BTLA_DTYPE stype) {
+    mDqBlockSize = dq_blksize;
+    if (asym || dq_blksize % 8 != 0) assert(0);
+    mCorrection.enable_double_quant(utils::updiv(nk_scale * N, dq_blksize), stype);
   }
 
   void enable_shuffle() {
@@ -806,6 +813,8 @@ class StorageWeightKBlockNFloat : public StorageWeightKBlockNInteger {
     int nk_scale = utils::updiv(KPad, Block);
     StorageWeightKBlockNInteger::mCorrection.resize(nk_scale, NPad, scalet, BTLA_DTYPE::EleBitsUndef,
                                                     BTLA_DTYPE::EleBitsUndef, false, false);
+    if (scalet == BTLA_DTYPE::DQ8_BNB) initDoubleQuantBlkSize(Block, nk_scale, false, N, scalet);
+    update_size();
     mSize = StorageWeightKBlockNInteger::InfoType::getSerializedSize() +
             StorageWeightKBlockNInteger::mQBuf.getSerializedSize() +
             StorageWeightKBlockNInteger::mCorrection.getSerializedSize();

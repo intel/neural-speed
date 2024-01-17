@@ -176,7 +176,7 @@ class UT_TransposeBlockQuantize_F4 {
  public:
   UT_TransposeBlockQuantize_F4() {
     UT_START();
-    CheckISA(AVX2);
+    CheckISA(AVX512F);
     ut(4096, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
     ut(1024, 4096, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
     ut(4096, 1024, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
@@ -185,12 +185,12 @@ class UT_TransposeBlockQuantize_F4 {
     ut(48, 32, 32, BTLA_DTYPE::F4_BNB, BTLA_DTYPE::F32);
     ut(48, 32, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::F32);
     ut(48, 32, 32, BTLA_DTYPE::F4_E2M1, BTLA_DTYPE::F32);
-    ut(16, 15, 8, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB, 8);
-    ut(48, 32, 16, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB, 32);
-    ut(1024, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB, 32);
+    ut(16, 15, 8, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB);
+    ut(48, 32, 16, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB);
+    ut(1024, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::DQ8_BNB);
   }
 
-  void ut(int n, int k, int blocksize, BTLA_DTYPE F4_T, BTLA_DTYPE SCA_T, int dq_blksize = 0) {
+  void ut(int n, int k, int blocksize, BTLA_DTYPE F4_T, BTLA_DTYPE SCA_T) {
     printf("Test Case: %d %d %d\n", n, k, blocksize);
     int ldb = n;
     utils::aligned_vector<float> dequanRef(n * k);
@@ -251,10 +251,6 @@ class UT_TransposeBlockQuantize_F4 {
     PrologueB kernel;
     auto packedW = kernel.createStorage(n, k, blocksize, F4_T, SCA_T);
     auto packedW1 = kernel.createStorage(n, k, blocksize, F4_T, SCA_T);
-    if (SCA_T == BTLA_DTYPE::DQ8_BNB) {
-      kernel.setDoubleQuantBlkSize(&packedW, SCA_T, dq_blksize);
-      kernel.setDoubleQuantBlkSize(&packedW1, SCA_T, dq_blksize);
-    }
     avector<int8_t> buf(packedW.mSize), buf1(packedW1.mSize);
     packedW.assign(buf.data());
     packedW1.assign(buf1.data());
@@ -690,7 +686,6 @@ class UT_CompFp32 {
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
     packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype);
-    if (stype == BTLA_DTYPE::DQ8_BNB) launcher.mProB.setDoubleQuantBlkSize(&packedw, stype, 32);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
@@ -960,6 +955,7 @@ class UT_CompInt8 {
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>>(1, 11008, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<48, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::DQ8_BNB);
     }
 
     if (_cd->AVX512_VNNI()) {
@@ -1014,7 +1010,6 @@ class UT_CompInt8 {
     int kblks = updiv(k, blocksize);
     using WType = typename Launcher::PrologueB::StorageWeight;
     WType packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
-    if (stype == BTLA_DTYPE::DQ8_BNB) launcher.mProB.setDoubleQuantBlkSize(&packedw, stype, 32);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
