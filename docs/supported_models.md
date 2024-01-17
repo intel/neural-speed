@@ -52,7 +52,6 @@ Neural Speed supports the following models:
     <td> </td>
     <td>✅</td>
     <td> </td>
-
     <td>Latest</td>
   </tr>
   <tr>
