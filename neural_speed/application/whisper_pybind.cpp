@@ -110,25 +110,25 @@ void Model::quant_model(const std::string& model_path, const std::string& out_pa
     return;
   }
 
-  const int64_t t_main_start_us = common_time_us();
+  const int64_t t_main_start_us = ne_time_us();
 
   int64_t t_quantize_us = 0;
 
   // load the model
   {
-    const int64_t t_start_us = common_time_us();
+    const int64_t t_start_us = ne_time_us();
 
     if (!whisper_model_quantize(fname_inp, fname_out, ne_ftype(ftype))) {
       fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
       return;
     }
 
-    t_quantize_us = common_time_us() - t_start_us;
+    t_quantize_us = ne_time_us() - t_start_us;
   }
 
   // report timing
   {
-    const int64_t t_main_end_us = common_time_us();
+    const int64_t t_main_end_us = ne_time_us();
 
     printf("\n");
     printf("%s: quantize time = %8.2f ms\n", __func__, t_quantize_us / 1000.0f);
