@@ -50,8 +50,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     n_head = config["num_attention_heads"]
     ffn_hidden_size = config["intermediate_size"]
     rope_scale = 1
-        if "rope_scaling" in config and config["rope_scaling"] is not None:
-            rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
+    if "rope_scaling" in config and config["rope_scaling"] is not None:
+        rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
     # hardcoded:
     n_mult = 256
     # 1. write head and params

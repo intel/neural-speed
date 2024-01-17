@@ -53,8 +53,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     # 1. write head and params
     f.write(b"ggjt"[::-1])  # magic
     rope_scale = 1
-        if "rope_scaling" in config and config["rope_scaling"] is not None:
-            rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
+    if "rope_scaling" in config and config["rope_scaling"] is not None:
+        rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
     n_head = n_head
     n_head_kv = n_head
     values = [
