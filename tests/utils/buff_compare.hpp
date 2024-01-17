@@ -273,7 +273,7 @@ bool _handle_fp_types(buff_vals<dtype> &data, buff_vals<dtype> &other,
                     || (fabs((des - act) / des) <= 0.001))) {
             ++diff_elems_count;
             flag = false;
-            if (diff_elems_count <= 10) {
+            if (diff_elems_count <= 10000) {
                 std::cout << "\tdata_idx: " << data.idx_mapping[i]
                           << " gold_idx: " << other.idx_mapping[i]
                           << " data_val: " << act << " gold_val: " << des

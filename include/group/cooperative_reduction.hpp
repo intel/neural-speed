@@ -22,6 +22,14 @@
 #include "group/tile_shape.hpp"
 #include "subgroup/subgroup.hpp"
 
+#ifdef __SYCL_DEVICE_ONLY__
+#define CONSTANT __attribute__((opencl_constant))
+#else
+#define CONSTANT
+#endif
+
+static const CONSTANT char VEC[] = "%f %f %f %f %f %f %f %f\n";
+
 namespace gpu::xetla::group {
 
 /// @brief Workgroups to do the cooperative reduction.
@@ -143,6 +151,7 @@ public:
         local_st.reg = matAcc.reg;
         tile_store(local_st, local_st_payload);
 
+
         xetla_nbarrier_t<num_cooperative_wg, num_cooperative_wg, arch_tag>
                 nbarrier;
         uint32_t nbar_id = nbarrier_base + g.get_id();
@@ -166,6 +175,10 @@ public:
 
             tile_load(local_ld, local_ld_payload);
             mat_slice.reg = local_ld.reg;
+            sycl::ext::oneapi::experimental::printf(VEC, mat_slice.reg[0],
+                    mat_slice.reg[1], mat_slice.reg[2], mat_slice.reg[3],
+                    mat_slice.reg[4], mat_slice.reg[5], mat_slice.reg[6],
+                    mat_slice.reg[7]);
 #pragma unroll
             for (uint32_t i = 1; i < num_cooperative_wg; i++) {
                 local_ld_payload.template update_tdesc<tdesc_update_dir::y_dir>(

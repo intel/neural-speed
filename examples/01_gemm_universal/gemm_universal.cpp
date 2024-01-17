@@ -25,17 +25,17 @@ void gemm_universal_run(uint32_t iter) {
     // Please contact us for support.
 
     //GEMM_UNIVERSAL input size
-    size_t matrix_m = 4096;
-    size_t matrix_n = 4096;
-    size_t matrix_k = 4096;
+    size_t matrix_m = 4;
+    size_t matrix_n = 1024;
+    size_t matrix_k = 1024;
 
     size_t size_a = matrix_m * matrix_k;
     size_t size_b = matrix_k * matrix_n;
     size_t size_c = matrix_m * matrix_n;
 
-    using data_type_a = bf16;
-    using data_type_b = bf16;
-    using data_type_c = bf16;
+    using data_type_a = fp16;
+    using data_type_b = fp16;
+    using data_type_c = fp16;
     using data_type_acc = float;
 
     //Turn on the profiling property to facilitate subsequent profiling
@@ -51,13 +51,13 @@ void gemm_universal_run(uint32_t iter) {
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
             [](data_type_a *data, size_t idx) {
-                data[idx] = static_cast<data_type_a>(random_float());
+                data[idx] = static_cast<data_type_a>(1.f);
             },
             queue, device, context);
     auto B = alloc_device_and_init<data_type_b>(
             size_b,
             [](data_type_b *data, size_t idx) {
-                data[idx] = static_cast<data_type_b>(random_float());
+                data[idx] = static_cast<data_type_b>(1.f);
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type_c>(
@@ -69,18 +69,18 @@ void gemm_universal_run(uint32_t iter) {
 
     //Define the shape of workgroup
     //It's tunable parameters based on different input shape and hardware for better performance
-    constexpr uint32_t wg_tile_m
-            = (kslicing_type != kslicing_impl_t::local) ? 256 : 64;
+    constexpr uint32_t wg_tile_m = 4;
+    //= (kslicing_type != kslicing_impl_t::local) ? 256 : 64;
     constexpr uint32_t wg_tile_n
             = (kslicing_type != kslicing_impl_t::local) ? 256 : 128;
 
     // specify the range k_w/k_s by setting the corresponding ratio
     // splitk using global memory
-    constexpr uint32_t num_global_splitk
-            = (kslicing_type == kslicing_impl_t::global) ? 2 : 1;
+    constexpr uint32_t num_global_splitk = 1;
+    // = (kslicing_type == kslicing_impl_t::global) ? 2 : 1;
     // splitk using local memory
-    constexpr uint32_t num_local_splitk
-            = (kslicing_type == kslicing_impl_t::local) ? 2 : 1;
+    constexpr uint32_t num_local_splitk = 1;
+    //= (kslicing_type == kslicing_impl_t::local) ? 1 : 1;
 
     // Mirco-kernel configuration
     using tune_option = dict_t<
@@ -103,7 +103,7 @@ void gemm_universal_run(uint32_t iter) {
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
             data_type_acc, // accumulator data type for intermediate resutls
-            gpu_arch::Xe, // GPU arch
+            gpu_arch::Dg2, // GPU arch
             tune_option>;
 
     // allocate temp buffers for global split

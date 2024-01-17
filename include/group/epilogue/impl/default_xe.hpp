@@ -66,7 +66,7 @@ private:
 
 public:
     static constexpr msg_type msg_type_c
-            = (mem_space_c == mem_space::global ? msg_type::block_2d
+            = (mem_space_c == mem_space::global ? msg_type::unaligned_2d
                                                 : msg_type::scatter);
 
     /// @brief Default epilogue.
@@ -91,6 +91,9 @@ public:
         matC_t matC;
         matC_payload_t matC_payload(mem_desc_c);
         subgroup::elemwise_cvt(matC, matAcc);
+        // sycl::ext::oneapi::experimental::printf(VEC, matAcc.reg[0],
+        //         matAcc.reg[1], matAcc.reg[2], matAcc.reg[3], matAcc.reg[4],
+        //         matAcc.reg[5], matAcc.reg[6], matAcc.reg[7]);
         subgroup::tile_store<cache_hint::streaming, cache_hint::write_back>(
                 matC, matC_payload);
     }

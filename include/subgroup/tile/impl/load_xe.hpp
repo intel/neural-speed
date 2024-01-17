@@ -421,6 +421,12 @@ tile_load(tile_t &tile, payload_t &payload) {
     constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
     constexpr uint32_t scale_factor = payload_t::scale_factor;
 
+    // check whether need to transpose
+    static constexpr bool reg_transpose = tile_desc::reg_transpose;
+    static constexpr mem_layout mem_layout_ = payload_t::memory_layout;
+    static constexpr bool mem_transpose = payload_t::mem_transpose;
+    static constexpr bool trans = reg_transpose ^ mem_transpose;
+
 #pragma unroll
     for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
             i++) {
@@ -454,7 +460,7 @@ tile_load(tile_t &tile, payload_t &payload) {
                         payload.channel_offset + payload.base_offset
                                 + address_offset,
                         pred_y);
-                if constexpr (payload_t::simd_exec_size > 1) {
+                if constexpr (payload_t::simd_exec_size > 1 && !trans) {
                     xetla_vector<load_dtype, load_elems> reg_tmp_trans;
 #pragma unroll
                     for (uint32_t iii = 0; iii < payload_t::num_channel;

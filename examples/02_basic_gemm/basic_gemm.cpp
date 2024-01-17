@@ -44,13 +44,13 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
             [](data_type_a *data, size_t idx) {
-                data[idx] = static_cast<data_type_a>(random_float());
+                data[idx] = static_cast<data_type_a>(1.f);
             },
             queue, device, context);
     auto B = alloc_device_and_init<data_type_b>(
             size_b,
             [](data_type_b *data, size_t idx) {
-                data[idx] = static_cast<data_type_b>(random_float());
+                data[idx] = static_cast<data_type_b>(1.f);
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type_c>(
@@ -135,7 +135,7 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                         data_type_acc, // accumulator data type for intermediate resutls
                         wg_shape, // computation tile shape
                         k_stride, // elements in each iteration
-                        gpu_arch::Xe, // GPU arch
+                        arch_tag_, // GPU arch
                         gemm_tune_option>;
                 gemm_t gemm;
 
@@ -149,7 +149,7 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                         mem_space::global, // memory writing to global mem for C
                         wg_shape, // computation tile shape
                         k_stride, // elements in each iteration
-                        gpu_arch::Xe, // GPU arch
+                        arch_tag_, // GPU arch
                         epilogue_tune_option>;
 
                 // Step 3: define the shared local memory usages
@@ -233,10 +233,11 @@ int main() {
     // Detect the execution size, 8 for Arc, 16 for PVC.
     int ExecSize
             = device.get_info<ext::intel::info::device::gpu_eu_simd_width>();
-    if (ExecSize == 8) {
-        basic_gemm_run<gpu_arch::Dg2>(queue, 10);
-    } else {
-        basic_gemm_run<gpu_arch::Xe>(queue, 10);
-    }
+    //     if (ExecSize == 8) {
+    //         basic_gemm_run<gpu_arch::Dg2>(queue, 10);
+    //     } else {
+    //         basic_gemm_run<gpu_arch::Xe>(queue, 10);
+    //     }
+    basic_gemm_run<gpu_arch::Dg2>(queue, 10);
     return (0);
 }

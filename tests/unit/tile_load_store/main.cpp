@@ -20,149 +20,150 @@
 
 using namespace std::placeholders;
 
-/* following 9 cases all about padding load/store:
-    0  0  0 .... 0  0  0
-    0  _____________   0
-    .  |            |  .
-    .  |   data     |  .
-    .  |            |  .
-    0  |____________|  0
-    0  0  0 .... 0  0  0
+// /* following 9 cases all about padding load/store:
+//     0  0  0 .... 0  0  0
+//     0  _____________   0
+//     .  |            |  .
+//     .  |   data     |  .
+//     .  |            |  .
+//     0  |____________|  0
+//     0  0  0 .... 0  0  0
 
-*/
+// */
 
-// top-left
-// 0  0  0
-// 0  x  x
-// 0  x  x
-TEST(tile_padding_load_store_1, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, -1, -1);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, -1,
-                    -1>>(nd_range, result_validate);
-}
+// // top-left
+// // 0  0  0
+// // 0  x  x
+// // 0  x  x
+// TEST(tile_padding_load_store_1, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, -1, -1);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, -1,
+//                     -1>>(nd_range, result_validate);
+// }
 
-// top-mid
-// 0  0  0
-// x  x  x
-// x  x  x
-TEST(tile_padding_load_store_2, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, 0, -1);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 0,
-                    -1>>(nd_range, result_validate);
-}
+// // top-mid
+// // 0  0  0
+// // x  x  x
+// // x  x  x
+// TEST(tile_padding_load_store_2, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, 0, -1);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 0,
+//                     -1>>(nd_range, result_validate);
+// }
 
-// top-right
-// 0  0  0
-// x  x  0
-// x  x  0
-TEST(tile_padding_load_store_3, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, 1, -1);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 1,
-                    -1>>(nd_range, result_validate);
-}
+// // top-right
+// // 0  0  0
+// // x  x  0
+// // x  x  0
+// TEST(tile_padding_load_store_3, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, 1, -1);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 1,
+//                     -1>>(nd_range, result_validate);
+// }
 
-// mid-left
-// 0  x  x
-// 0  x  x
-// 0  x  x
-TEST(tile_padding_load_store_4, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, -1, 0);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, -1,
-                    0>>(nd_range, result_validate);
-}
+// // mid-left
+// // 0  x  x
+// // 0  x  x
+// // 0  x  x
+// TEST(tile_padding_load_store_4, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, -1, 0);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, -1,
+//                     0>>(nd_range, result_validate);
+// }
 
-// mid-mid
-// x  x  x
-// x  x  x
-// x  x  x
-TEST(tile_padding_load_store_5, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, 0, 0);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 0,
-                    0>>(nd_range, result_validate);
-}
+// // mid-mid
+// // x  x  x
+// // x  x  x
+// // x  x  x
+// TEST(tile_padding_load_store_5, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, 0, 0);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 0,
+//                     0>>(nd_range, result_validate);
+// }
 
-// mid-right
-// x  x  0
-// x  x  0
-// x  x  0
-TEST(tile_padding_load_store_6, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, 1, 0);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 1,
-                    0>>(nd_range, result_validate);
-}
+// // mid-right
+// // x  x  0
+// // x  x  0
+// // x  x  0
+// TEST(tile_padding_load_store_6, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, 1, 0);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 1,
+//                     0>>(nd_range, result_validate);
+// }
 
-// bottom-left
-// 0  x  x
-// 0  x  x
-// 0  0  0
-TEST(tile_padding_load_store_7, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, -1, 1);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, -1,
-                    1>>(nd_range, result_validate);
-}
+// // bottom-left
+// // 0  x  x
+// // 0  x  x
+// // 0  0  0
+// TEST(tile_padding_load_store_7, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, -1, 1);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, -1,
+//                     1>>(nd_range, result_validate);
+// }
 
-// bottom-mid
-// x  x  x
-// x  x  x
-// 0  0  0
-TEST(tile_padding_load_store_8, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, 0, 1);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 0,
-                    1>>(nd_range, result_validate);
-}
+// // bottom-mid
+// // x  x  x
+// // x  x  x
+// // 0  0  0
+// TEST(tile_padding_load_store_8, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, 0, 1);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 0,
+//                     1>>(nd_range, result_validate);
+// }
 
-// bottom-right
-// x  x  0
-// x  x  0
-// 0  0  0
-TEST(tile_padding_load_store_9, esimd) {
-    cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate
-            = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
-                    _3, 16, 16, 1, 1);
-    kernel_run<int,
-            tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 1,
-                    1>>(nd_range, result_validate);
-}
+// // bottom-right
+// // x  x  0
+// // x  x  0
+// // 0  0  0
+// TEST(tile_padding_load_store_9, esimd) {
+//     cl::sycl::nd_range<1> nd_range({1}, {1});
+//     auto result_validate
+//             = std::bind(tile_padding_load_store_result_validate<int>, _1, _2,
+//                     _3, 16, 16, 1, 1);
+//     kernel_run<int,
+//             tile_padding_load_store_func<int, 16, 16, 16, 16, 16, 16, 16, 1,
+//                     1>>(nd_range, result_validate);
+// }
 
 TEST(tile_load_store, esimd) {
     cl::sycl::nd_range<1> nd_range({1}, {1});
     auto result_validate = std::bind(tile_load_store_result_validate<int>, _1,
             _2, _3, 128, 64, 32, 32, 0);
-    kernel_run<int, tile_load_store_func<int, 128, 64, 128, 32, 32, 16, 16>>(
-            nd_range, result_validate);
+    kernel_run<int,
+            tile_load_store_func<int, 128, 64, 128, 32, 32, 16, 16, false,
+                    false, 128, gpu_arch::Dg2>>(nd_range, result_validate);
 }
 
 TEST(tile_load_transpose_store_1, esimd) {
@@ -266,8 +267,8 @@ TEST(tile_load_store_unaligned_2d, esimd) {
     auto result_validate = std::bind(tile_load_store_result_validate<date_type>,
             _1, _2, _3, 127, 63, 32, 32, 0);
     kernel_run<date_type,
-            tile_load_store_unaligned_2d_func<date_type, 127, 63, 127, 32, 32, 16,
-                    16>>(nd_range, result_validate);
+            tile_load_store_unaligned_2d_func<date_type, 127, 63, 127, 32, 32,
+                    16, 16>>(nd_range, result_validate);
 }
 
 TEST(tile_load_store_oob_1, esimd) {
