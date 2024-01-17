@@ -542,8 +542,8 @@ static void read_safe(whisper_model_loader* loader, T& dest) {  // NOLINT
   loader->read(loader->context, &dest, sizeof(T));
 }
 
-static bool kv_cache_init(const struct whisper_hparams_t& hparams, const size_t mem_bytes, struct whisper_kv_cache_t* cache,
-                          ne_type wtype, int n_ctx) {
+static bool kv_cache_init(const struct whisper_hparams_t& hparams, const size_t mem_bytes,
+                          struct whisper_kv_cache_t* cache, ne_type wtype, int n_ctx) {
   cache->buf.resize(mem_bytes);
 
   struct ne_init_params params = {
