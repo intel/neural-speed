@@ -244,6 +244,8 @@ class Dq8GetScale {
                            float* dq_scale, int src_stride, int dst_stride, bool zeropadding) {
 #if CompileAVX512F()
     if (ISA_T >= BTLA_ISA::AVX512F) {
+      return kernel::avx512f::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
+                                               src_stride, dst_stride, zeropadding);
     }
 #endif
 #if CompileAVX2()
