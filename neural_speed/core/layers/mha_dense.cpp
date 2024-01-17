@@ -151,7 +151,7 @@ inline __m512 exp_ph_0_1(const __m512 x) {
 template <BTLA_ISA ISA_T, typename T_DST>
 class scale_exp_acc_sum_fp32_t {
  public:
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     T_DST* dst;
     float* dst_sum;
     int ld_dst;  // #elements
@@ -218,7 +218,7 @@ class scale_write_back_t {
  public:
   using SType = T_SRC;
   using DType = T_DST;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     const float* scale;
     DType* dst;
     int ld_dst;
@@ -312,7 +312,7 @@ class weight_pack_batch_bf16_base_t {
   using SType = T_SRC;                                // source type (before packed)
   using StorageType = storage_packed_weight_batch_t;  // packed weight type
 
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     const SType* B;
     const int ldb;
     const StorageType* packedW;
@@ -427,7 +427,7 @@ template <class _GemmCore_T, BTLA_ISA ISA_T>
 class activation_identity_t {
  public:
   using AType = typename _GemmCore_T::AType;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     const AType* A;
     int lda;
   };
@@ -847,7 +847,7 @@ class scale_track_max_t<ISA_T, fp16, float> {
  public:
   using DType = float;
   using SType = fp16;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     DType* dst;
     DType* dst_max;
     int ld_dst;  // #elements
@@ -917,7 +917,7 @@ class scale_track_max_t<ISA_T, float, float> {
  public:
   using DType = float;
   using SType = float;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     DType* dst;
     DType* dst_max;
     int ld_dst;  // #elements
@@ -1000,7 +1000,7 @@ class scale_track_max_t<ISA_T, int32_t, float> {
  public:
   using DType = float;
   using SType = int32_t;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     DType* dst;
     DType* dst_max;
     int ld_dst;  // #elements
@@ -1050,16 +1050,16 @@ template <BTLA_ISA ISA_T>
 using ScaleTrackMaxS32Fp32 = scale_track_max_t<ISA_T, int32_t, float>;
 
 template <class _GemmCore_T, BTLA_ISA ISA_T>
-class WeightBase {
+class weight_base_t {
  public:
   using BType = typename _GemmCore_T::BType;
   using SType = BType;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     const SType* B;
     int ldb;
     bool is_padded;
   };
-  WeightBase() = default;
+  weight_base_t() = default;
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     if ((n_size % _GemmCore_T::NTILE == 0) && std::is_same<SType, BType>::value &&
@@ -1087,7 +1087,7 @@ class weight_forward_n_tile48_t {
  public:
   using BType = typename _GemmCore_T::BType;
   using SType = BType;
-  struct Param {
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     const SType* B;
     int ldb;
     bool is_padded;
@@ -1550,13 +1550,13 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
         BTLA_ISA::AVX512_FP16,                                //
         gemm::HCoreRowNAvx512fp16<64, 8>,                     //
         prologue_a::gemm::ActivationConverterFp32,            //
-        ::WeightBase,                                         //
+        ::weight_base_t,                                      //
         ::ScaleTrackMaxFp16Fp32>;                             //
     using GemmKernelFP16 = ::launcher_base_weight_t<          //
         BTLA_ISA::AVX512_FP16,                                //
         gemm::HCoreRowNAvx512fp16<64, 8>,                     //
         prologue_a::gemm::ActivationBase,                     //
-        ::WeightBase,                                         //
+        ::weight_base_t,                                      //
         epilogue::gemm::AccumulatorWriteBackFp16Fp32>;
     static mha_stable_interface_t<GemmKernelFP16TrackMax, GemmKernelFP16> kernel;
     [[maybe_unused]] const auto ret = kernel.compute(params, *pth);
@@ -1609,13 +1609,13 @@ void bestla_fusion_attn_forward<fp16, fp16, fp16, fp16>(const attn_fwd_args_t<fp
         BTLA_ISA::AVX512_FP16,                                //
         gemm::HCoreRowNAvx512fp16<64, 8>,                     //
         prologue_a::gemm::ActivationBase,                     //
-        ::WeightBase,                                         //
+        ::weight_base_t,                                      //
         ::ScaleTrackMaxFp16Fp32>;                             //
     using GemmKernelFP16 = ::launcher_base_weight_t<          //
         BTLA_ISA::AVX512_FP16,                                //
         gemm::HCoreRowNAvx512fp16<64, 8>,                     //
         prologue_a::gemm::ActivationBase,                     //
-        ::WeightBase,                                         //
+        ::weight_base_t,                                      //
         epilogue::gemm::AccumulatorWriteBackFp16>;
     static mha_stable_interface_t<GemmKernelFP16TrackMax, GemmKernelFP16> kernel;
     [[maybe_unused]] const auto ret = kernel.compute(params, *pth);

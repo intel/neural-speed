@@ -1,6 +1,15 @@
-﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
-################################################################################
+﻿### ignore binary files in llm-runtime ###
+/neural_speed/*
+!/neural_speed/*.*
+!/neural_speed/*/
+
+*.exe
+*.dll
+*.dylib
+*.pyd
+*.so
+*.so.*
+
 
 /.vs
 /out
@@ -13,3 +22,7 @@ build/
 debug/
 .eggs/
 dist/
+runtime_outs/
+__pycache__
+CMakeUserPresets.json
+*.egg-info
