@@ -214,6 +214,7 @@ class Model:
     def is_token_end(self):
         return self.model.is_token_end()
 
+
     def eos_token_id(self):
         if self.model_type == 'qwen':
             return self.tokenizer.special_tokens['<|endoftext|>']
