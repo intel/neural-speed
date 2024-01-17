@@ -45,7 +45,7 @@
             "baichuan-13b": "chinese3",
             "baichuan2-13b": "chinese1",
             "chatglm-6b": "chinese2",
-            "starcoder": "llama",
+            "starcoder-3b": "llama",
             "magicoder": "llama"
         },
         "prompts": {
