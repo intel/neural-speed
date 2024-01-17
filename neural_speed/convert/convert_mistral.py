@@ -151,6 +151,7 @@ class Params:
     ffn_hidden_size: int
     rms_norm_eps: float
     rope_theta: float
+    rope_scale: float
 
     @staticmethod
     def guessed(model: 'LazyModel') -> 'Params':
@@ -179,6 +180,10 @@ class Params:
         ffn_hidden_size = config["intermediate_size"]
         rms_norm_eps = config["rms_norm_eps"]
         rope_theta = config["rope_theta"] if "rope_theta" in config else 10000
+        rope_scale = 1
+        if "rope_scaling" in config and config["rope_scaling"] is not None:
+            rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
+
 
         return Params(
             n_vocab=n_vocab,
@@ -190,6 +195,7 @@ class Params:
             ffn_hidden_size=ffn_hidden_size,
             rms_norm_eps=rms_norm_eps,
             rope_theta=rope_theta,
+            rope_scale=rope_scale,
         )
 
     # LLaMA v2 70B params.json
@@ -244,7 +250,7 @@ class SentencePieceVocab:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
         if fname_added_tokens is not None:
-            added_tokens = json.load(open(fname_added_tokens))
+            added_tokens = json.load(open(fname_added_tokens, encoding='utf-8'))
         else:
             added_tokens = {}
         vocab_size: int = self.sentencepiece_tokenizer.vocab_size()
@@ -1057,6 +1063,7 @@ class OutputFile:
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
+        self.fout.write(struct.pack("f", params.rope_scale))
 
         self.fout.write(
             struct.pack("i", 1)

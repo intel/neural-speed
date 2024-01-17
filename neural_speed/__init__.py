@@ -73,7 +73,7 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, not_quant=False, use_cache=False, use_gptq=False, use_awq=False,
+    def init(self, model_name, use_quant=True, use_cache=False, use_gptq=False, use_awq=False,
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
@@ -99,7 +99,7 @@ class Model:
             quant_desc = "awq"
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
-        if not_quant:
+        if not use_quant:
             self.bin_file = fp32_bin
         else:
             self.bin_file = quant_bin
@@ -114,7 +114,7 @@ class Model:
             convert_model(model_name, fp32_bin, "f32")
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
 
-        if not_quant:
+        if not use_quant:
             print("FP32 model will be used.")
             return
         self.module.Model.quant_model(model_path=fp32_bin, out_path=quant_bin,
@@ -131,15 +131,23 @@ class Model:
         self.model = self.module.Model()
         if "threads" not in generate_kwargs:
             threads = os.getenv("OMP_NUM_THREADS")
+            import platform
+            sys_platform = platform.platform().lower()
             if threads is None:
-                generate_kwargs["threads"] = len(os.sched_getaffinity(0))
+                if "windows" in sys_platform:
+                    cpu_count = os.cpu_count()
+                    generate_kwargs["threads"] = int(cpu_count)
+                else:
+                    generate_kwargs["threads"] = len(os.sched_getaffinity(0))
             else:
                 generate_kwargs["threads"] = int(threads)
         self.model.init_model(model_path, **generate_kwargs)
 
+
     def quant_model(self, model_type, model_path, out_path, **quant_kwargs):
         self.__import_package(model_type)
         self.module.Model.quant_model(model_path=model_path, out_path=out_path, **quant_kwargs)
+
 
     def generate(self, input_ids, streamer=None, interactive=False, ignore_prompt=False,
                  stopping_criteria=None,  **generate_kwargs):
@@ -206,11 +214,25 @@ class Model:
     def __get_eos_id(self):
         return self.model.get_eos_id()
 
-    def __call__(self, input_ids, reinit=False, **kwargs):
-        if self.model is None:
-            self.init_from_bin(self.model_type, self.bin_file, **kwargs)
-            self.generate_round = 0
-        elif reinit:
-            self.model.reinit()
-            self.generate_round = 0
-        return self.model.evaluate(input_ids.tolist())
+
+    def __call__(self, model_input, reinit=False, **kwargs):
+        if self.model_type == 'whisper':
+            if self.model is None:
+                self.model = self.module.Model()
+                self.model.init_model(self.bin_file)
+            if os.path.isfile(model_input):
+                self.model.inference(model_input)
+            else:
+                print("Please input an audio file")
+            return
+        if isinstance(model_input, torch.Tensor):
+            if self.model is None:
+                self.init_from_bin(self.model_type, self.bin_file, **kwargs)
+                self.generate_round = 0
+            elif reinit:
+                self.model.reinit()
+                self.generate_round = 0
+            return self.model.evaluate(model_input.tolist())
+        else:
+            print("Please input torch.Tensor")
+        return

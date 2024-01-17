@@ -53,23 +53,12 @@ jobs:
 
       - name: Env build
         run: |
-          bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "cpp-graph-test" "3.8"
-
-      - name: Binary build
-        if: 0 == 1
-        run: |
-          cd ${{ github.workspace }}
-          conda activate cpp-graph-test || source activate cpp-graph-test
-          pip install build --upgrade
-          pip install -r requirements.txt
-          python setup.py sdist bdist_wheel
-          pip install dist/neuralspeed*.whl
-          pip list
+          bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "cpp-graph-test-neural-speed" "3.8"
 
       - name: BF16 Benchmark
         run: |
           cd ${{ github.workspace }}/.github/workflows/scripts/models
-          bash cpp_graph_inference.sh cpp-graph-test ${{ matrix.modelName }} ${{ env.INPUT_COMPILER_VERSION }}
+          bash cpp_graph_inference.sh cpp-graph-test-neural-speed ${{ matrix.modelName }} ${{ env.INPUT_COMPILER_VERSION }}
       
       - name: Rename summary
         run: |
