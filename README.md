@@ -10,11 +10,13 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 
 > Neural Speed is under active development so APIs are subject to change.
 
+You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) to get the performance information.
+
 ## Quick Start
 There are two methods for utilizing the Neural Speed:
-You can refer to [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) for [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code). 
+1. We provide [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
 
-Or you can use Neural Speed straight forward:
+2. Neural Speed straight forward:
 
 #### One-click Python scripts
 Run LLM with one-click python script including conversion, quantization and inference.
