@@ -655,10 +655,10 @@ class WeightKBlockNInteger {
       auto aptr = wptr->template SPtr<uint8_t>();
       auto internal_k_offset = k_offset / wptr->mBlockSize;
       auto dq_offset_idx = wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1;
-      kernel::ref::dq8_get_fp_scale(aptr + internal_k_offset * wptr->CStep() + n_offset, *dstptr,
-                                    utils::updiv(k_size, wptr->mBlockSize), n_size,
-                                    internal_k_offset * wptr->mN + n_offset, wptr->mDqBlockSize, dq_offset_idx,
-                                    wptr->DQPtr<float>(), wptr->CStep(), n_size, false);
+      kernel::wrapper::Dq8GetScale::template forward<ISA_T>(
+          aptr + internal_k_offset * wptr->CStep() + n_offset, *dstptr, utils::updiv(k_size, wptr->mBlockSize), n_size,
+          internal_k_offset * wptr->mN + n_offset, wptr->mDqBlockSize, dq_offset_idx, wptr->DQPtr<float>(),
+          wptr->CStep(), n_size, false);
     }
     return BTLA_CODE::Success;
   }
