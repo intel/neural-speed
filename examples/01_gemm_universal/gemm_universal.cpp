@@ -33,9 +33,9 @@ void gemm_universal_run(uint32_t iter) {
     size_t size_b = matrix_k * matrix_n;
     size_t size_c = matrix_m * matrix_n;
 
-    using data_type_a = bf16;
-    using data_type_b = bf16;
-    using data_type_c = bf16;
+    using data_type_a = fp16;
+    using data_type_b = fp16;
+    using data_type_c = fp16;
     using data_type_acc = float;
 
     //Turn on the profiling property to facilitate subsequent profiling
@@ -91,7 +91,11 @@ void gemm_universal_run(uint32_t iter) {
                     tune_key_value::dispatch_policy_kslicing>,
             elem_v_t<tune_key::global_kslicing_ratio, num_global_splitk>,
             elem_v_t<tune_key::local_kslicing_ratio, num_local_splitk>,
-            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>,
+            elem_t_t<tune_key::group_swizzle_policy,
+                    gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>>,
+            elem_t_t<tune_key::epilogue_policy,
+                    gpu::xetla::group::epilogue_policy_default<gpu_arch::Dg2>>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A
@@ -103,7 +107,7 @@ void gemm_universal_run(uint32_t iter) {
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
             data_type_acc, // accumulator data type for intermediate resutls
-            gpu_arch::Xe, // GPU arch
+            gpu_arch::Dg2, // GPU arch
             tune_option>;
 
     // allocate temp buffers for global split

@@ -46,7 +46,7 @@ constexpr uint32_t get_element_size_code() {
 enum class lsc_action : uint8_t { prefetch, load, store, atomic };
 
 template <lsc_action Action, cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
-constexpr std::enable_if_t<arch_tag == gpu_arch::Xe, void>
+constexpr std::enable_if_t<arch_tag <= gpu_arch::Xe, void>
 check_lsc_cache_hint() {
     if constexpr (Action == lsc_action::prefetch) {
         // https://gfxspecs.intel.com/Predator/Home/Index/53560
@@ -126,7 +126,7 @@ get_prefetch_cache_hint_code() {
 }
 
 template <cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
-constexpr std::enable_if_t<arch_tag == gpu_arch::Xe, uint32_t>
+constexpr std::enable_if_t<arch_tag <= gpu_arch::Xe, uint32_t>
 get_store_cache_hint_code() {
     check_lsc_cache_hint<lsc_action::store, L1H, L2H, arch_tag>();
     if (L1H == cache_hint::none && L2H == cache_hint::none) {
