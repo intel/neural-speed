@@ -68,7 +68,7 @@ Argument description of quantize.py ([supported MatMul combinations](#supported-
 #### Supported Matrix Multiplication Data Types Combinations
 
 Our Neural Speed supports  INT4 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 weight-only quantization and FP32 / FP16 / BF16 / INT8 computation forward matmul on the Intel platforms. Here are the all supported data types combinations for matmul operations (quantization and forward).
-> This table will be updated frequently due to active development
+> This table will be updated frequently due to active development. For details you can refer to [BesTLA](../bestla#weight-only)
 
 | Weight dtype | Compute dtype (default value) | Scale dtype (default value) | Quantization scheme (default value) |
 |---|:---:|:---:|:---:|
@@ -89,13 +89,13 @@ We provide LLM inference script to run the quantized model. Please reach [us](ma
 # please type prompt about codes when run `StarCoder`, for example, -p "def fibonnaci(".
 
 #Linux and WSL
-OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
+numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
 
 # if you want to generate fixed outputs, please set --seed arg, for example:
-OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --seed 12
+numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --seed 12
 
 # if you want to reduce repeated generated texts, please set --repeat_penalty (value > 1.0, default = 1.0), for example:
-OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --repeat_penalty 1.2
+numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see" --repeat_penalty 1.2
 
 #Windows
 #Recommend to build and run our project in WSL to get a better and stable performance
