@@ -52,7 +52,7 @@ struct sequence {
   uint32_t n_tokens;
   generation_config gen_conf;
   seq_status status = seq_status::UNKNOWN;
-  int query_id = -1;  // query_id for pybind reponse
+  uint64_t query_id;  // query_id for pybind reponse
 };
 
 // abstract class
