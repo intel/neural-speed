@@ -22,13 +22,7 @@
 #include "group/tile_shape.hpp"
 #include "subgroup/subgroup.hpp"
 
-#ifdef __SYCL_DEVICE_ONLY__
-#define CONSTANT __attribute__((opencl_constant))
-#else
-#define CONSTANT
-#endif
-
-static const CONSTANT char VEC[] = "%f %f %f %f %f %f %f %f\n";
+static const CONSTANT char VEC[] = "%s %f %f %f %f %f %f %f %f\n";
 
 namespace gpu::xetla::group {
 
@@ -150,7 +144,6 @@ public:
                 slm_store_offset_x, slm_store_offset_y);
         local_st.reg = matAcc.reg;
         tile_store(local_st, local_st_payload);
-
 
         xetla_nbarrier_t<num_cooperative_wg, num_cooperative_wg, arch_tag>
                 nbarrier;

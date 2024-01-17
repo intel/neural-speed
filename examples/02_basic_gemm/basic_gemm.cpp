@@ -23,9 +23,9 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
     // Please contact us for support.
 
     // GEMM input size
-    uint32_t matrix_m = 4096;
-    uint32_t matrix_n = 4096;
-    uint32_t matrix_k = 4096;
+    uint32_t matrix_m = 256;
+    uint32_t matrix_n = 512;
+    uint32_t matrix_k = 32;
 
     uint32_t size_a = matrix_m * matrix_k;
     uint32_t size_b = matrix_k * matrix_n;
@@ -194,7 +194,12 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                 // the results is in the matAcc rather than real output C
                 typename gemm_t::work_group_t g(item.get_local_linear_id());
                 gemm(g, matAcc, gemm_args);
-
+                // static const CONSTANT char VEC_A[]
+                //         = "after gemm %f %f %f %f %f %f %f %f\n";
+                // sycl::ext::oneapi::experimental::printf(VEC_A, matAcc.reg[0],
+                //         matAcc.reg[1], matAcc.reg[2], matAcc.reg[3],
+                //         matAcc.reg[4], matAcc.reg[5], matAcc.reg[6],
+                //         matAcc.reg[7]);
                 // Step 7: write the results from matACC to real output C
                 epilogue_t epilogue;
                 epilogue(g, matAcc, md_c);

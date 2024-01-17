@@ -342,6 +342,13 @@ public:
             pre_processing(matA_acc, matB_acc, matA, matB);
             SW_BARRIER();
             tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+            //     static const CONSTANT char VEC_XMX[]
+            //             = "matBacc %f %f %f %f %f %f %f %f\n";
+            // sycl::ext::oneapi::experimental::printf("default xmx\n");
+            //     sycl::ext::oneapi::experimental::printf(VEC, matB_acc.reg[0],
+            //             matB_acc.reg[1], matB_acc.reg[2], matB_acc.reg[3],
+            //             matB_acc.reg[4], matB_acc.reg[5], matB_acc.reg[6],
+            //             matB_acc.reg[7]);
             SW_BARRIER();
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
