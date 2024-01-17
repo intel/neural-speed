@@ -28,7 +28,7 @@ python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and
 Besides the one-click script, Neural Speed also offers the detailed script: 1) convert and quantize, and 2) inference.
 
 ##### 1. Convert and Quantize LLM
-Neural Speed assumes the compatible model format as [llama.cpp](https://github.com/ggerganov/llama.cpp) and [ggml](https://github.com/ggerganov/ggml). You can also convert the model by following the below steps:
+Neural Speed assumes the compatible model format as [GGUF](https://github.com/ggerganov/ggml/blob/master/docs/gguf.md). You can find GGUF models from HuggingFace or [llama.cpp](https://github.com/ggerganov/llama.cpp). An alternative approach involves converting the model by following the below steps:
 
 ```bash
 # convert the model directly use model id in Hugging Face. (recommended)
