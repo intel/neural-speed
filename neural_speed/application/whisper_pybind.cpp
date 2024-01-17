@@ -470,4 +470,3 @@ PYBIND11_MODULE(whisper_cpp, m)
                   py::arg("threads") = 8)
       .def("inference", &Model::inference, "Translate audio to text");
 }
-   

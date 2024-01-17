@@ -151,7 +151,7 @@ inline __m512 exp_ph_0_1(const __m512 x) {
 template <BTLA_ISA ISA_T, typename T_DST>
 class scale_exp_acc_sum_fp32_t {
  public:
-  struct param_t {
+  struct Param {
     T_DST* dst;
     float* dst_sum;
     int ld_dst;  // #elements
@@ -161,7 +161,7 @@ class scale_exp_acc_sum_fp32_t {
   };
 
   BTLA_CODE forward(const float* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                    const int N, const param_t& p, void* /* tmpcache */, size_t /* cachesize */) const {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_sum = p.dst_sum + M_offset;
@@ -218,14 +218,14 @@ class scale_write_back_t {
  public:
   using SType = T_SRC;
   using DType = T_DST;
-  struct param_t {
+  struct Param {
     const float* scale;
     DType* dst;
     int ld_dst;
   };
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                    const int N, const param_t& p, void* /* tmpcache */, size_t /* cachesize */) {
+                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto scale = p.scale + M_offset;
     // TODO(Yi): high performance implementation
@@ -312,7 +312,7 @@ class weight_pack_batch_bf16_base_t {
   using SType = T_SRC;                                // source type (before packed)
   using StorageType = storage_packed_weight_batch_t;  // packed weight type
 
-  struct param_t {
+  struct Param {
     const SType* B;
     const int ldb;
     const StorageType* packedW;
@@ -321,7 +321,7 @@ class weight_pack_batch_bf16_base_t {
   BTLA_CODE getWeight(...) = delete;
 
   BTLA_CODE getWeight(WType** dstptr, int* dststep, int /* b_size */, int /* k_size */, int /* n_size */, int b_offset,
-                      int k_offset, int n_offset, const param_t& param, void* /* tmpcache */, size_t /* cachesize */) {
+                      int k_offset, int n_offset, const Param& param, void* /* tmpcache */, size_t /* cachesize */) {
     const auto wptr = param.packedW;
     if (!wptr) return BTLA_CODE::InvalidParam;
     assert(k_offset % GemmCore_T::KTILE == 0);
@@ -334,7 +334,7 @@ class weight_pack_batch_bf16_base_t {
   }
 
   BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                      const param_t& param, void* tmpcache, size_t cachesize) {
+                      const Param& param, void* tmpcache, size_t cachesize) {
     return getWeight(dstptr, dststep, 1, k_size, n_size, 0, k_offset, n_offset, param, tmpcache, cachesize);
   }
 
@@ -346,13 +346,13 @@ class weight_pack_batch_bf16_trans_t : public weight_pack_batch_bf16_base_t<Gemm
   using Base = weight_pack_batch_bf16_base_t<GemmCore_T, ISA_T, true, T_SRC>;
 
  public:
-  using typename Base::param_t;
+  using typename Base::Param;
   using typename Base::StorageType;
   using typename Base::SType;
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const param_t& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
+  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -388,13 +388,13 @@ class weight_pack_batch_bf16_non_tr_t : public weight_pack_batch_bf16_base_t<Gem
   using Base = weight_pack_batch_bf16_base_t<GemmCore_T, ISA_T, false, T_SRC>;
 
  public:
-  using typename Base::param_t;
+  using typename Base::Param;
   using typename Base::StorageType;
   using typename Base::SType;
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const param_t& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
+  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -427,13 +427,13 @@ template <class _GemmCore_T, BTLA_ISA ISA_T>
 class activation_identity_t {
  public:
   using AType = typename _GemmCore_T::AType;
-  struct param_t {
+  struct Param {
     const AType* A;
     int lda;
   };
   activation_identity_t() = default;
 
-  BTLA_CODE getActivation(AType** dstptr, int* dststep, const param_t& _param, int m_size, int k_size, int m_offset,
+  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
                           int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
     auto aptr = const_cast<AType*>(_param.A);
     *dstptr = aptr + m_offset * _param.lda + k_offset;
@@ -1630,7 +1630,7 @@ void bestla_fusion_attn_forward<int8_t, int8_t, int8_t, int8_t>(
     const attn_fwd_args_t<int8_t, int8_t, int8_t, int8_t>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
-  if (/* params.sl_q > 4 &&  */ _cd->AMX_INT8()) {         // TODO(Yi): add vnni impl
+  if (/* params.sl_q > 4 &&  */ _cd->AMX_INT8()) {             // TODO(Yi): add vnni impl
     using GemmKernelInt32TrackMax = ::launcher_base_weight_t<  //
         BTLA_ISA::AMX_INT8,                                    //
         gemm::ICoreRowNAmxint8SS<48, 16>,                      //
@@ -1672,7 +1672,7 @@ template <>
 void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<float, bf16, bf16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
-  if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {        // TODO(Yi): add vdpbf16ps impl
+  if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {            // TODO(Yi): add vdpbf16ps impl
     using GemmKernelBF16TrackMax = ::launcher_base_weight_t<  //
         BTLA_ISA::AMX_BF16,                                   //
         gemm::HCoreRowNAmxbf16<48, 16>,                       //
