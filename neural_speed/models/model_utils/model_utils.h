@@ -74,7 +74,7 @@ MODEL_API int64_t model_time_us();
 
 // Various functions for loading a ne model model.
 // Allocate (almost) all memory needed for the model.
-// Return NULL on failure
+// Return nullptr on failure
 MODEL_API struct model_context* model_init_from_file(const char* path_model, struct model_context_params params);
 
 // Frees all allocated memory
@@ -91,7 +91,7 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
                        size_t k);
 // Apply a LoRA adapter to a loaded model
 // path_base_model is the path to a higher quality model to use as a base for
-// the layers modified by the adapter. Can be NULL to use the current loaded
+// the layers modified by the adapter. Can be nullptr to use the current loaded
 // model. The model needs to be reloaded before applying a new adapter,
 // otherwise the adapter will be applied on top of the previous one Returns 0 on
 // success
@@ -345,7 +345,7 @@ struct beam_hypotheses {
     auto comp = [](const beam& a, const beam& b) { return a.score > b.score; };
     uint32_t cur_len = b.eos() ? b.token_ids.size() - 1 : b.token_ids.size();
     float score = b.score / std::pow(cur_len + n_prompt_tokens, length_penalty);
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("add beam hypos: \n");
     b.print();
     printf("origin_score: %12.6f, new_score: %12.6f, sentence_len: %d \n", b.score, score, cur_len + n_prompt_tokens);
@@ -414,7 +414,7 @@ class beam_search_kv_cache_reorder {
   virtual ~beam_search_kv_cache_reorder() {}
 
   virtual void update(const std::vector<uint32_t>& n_past, const std::vector<uint32_t>& n_prompt_tokens,
-                      const std::vector<int> request_running_indices,
+                      const std::vector<int>& request_running_indices,
                       const std::vector<std::tuple<int, int>>& kv_reorder_indices = {},
                       const std::vector<beam>& next_beams = {});
 
@@ -455,7 +455,7 @@ class beam_search_flow {
  private:
   std::vector<beam_next_token> beam_top_k_next_tokens(model_context* ctx, const std::vector<float>& beams_score,
                                                       const std::vector<int>& num_beams,
-                                                      const std::vector<int> beam_indices, const int& sample_scale = 2,
+                                                      const std::vector<int>& beam_indices, const int& sample_scale = 2,
                                                       const int& dim = -1);
   void fill_next_beams_by_top_scores();
   std::vector<std::tuple<int, int>> update_kv_cache_reorder_indices();

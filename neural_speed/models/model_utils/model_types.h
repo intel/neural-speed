@@ -126,7 +126,8 @@ struct model_hparams {
   uint32_t word_embed_proj_dim = 0;   // for opt
   bool do_layer_norm_before = false;  // for opt
   float rms_norm_eps = 1e-6f;         // rms norm epsilon
-  float freq_base = 10000.0f;
+  float freq_base = 10000.0f;         // rope theta
+  float freq_scale = 1.0f;            // rope scale factor
 
   // ChatGLM-2
   int32_t multi_query_group_num = 0;
@@ -169,11 +170,11 @@ struct kv_seq_cell {
 };
 
 struct model_kv_cache {
-  struct ne_tensor* k = NULL;
-  struct ne_tensor* v = NULL;
-  struct ne_tensor* cossin = NULL;  // cached cos/sin value for shifting RoPE
+  struct ne_tensor* k = nullptr;
+  struct ne_tensor* v = nullptr;
+  struct ne_tensor* cossin = nullptr;  // cached cos/sin value for shifting RoPE
 
-  struct ne_context* ctx = NULL;
+  struct ne_context* ctx = nullptr;
 
   model_ctx_buffer buf;
 
@@ -199,7 +200,7 @@ struct model_struct {
   std::vector<model_layer> layers;
 
   // context
-  struct ne_context* ctx = NULL;
+  struct ne_context* ctx = nullptr;
 
   // key + value cache for the self attention
   // TODO: move to model_state
@@ -411,7 +412,7 @@ struct model_context_params {
   int beam_size;        // number of beams for beam search
   bool shift_roped_k;   // whether to store non-RoPEd K cache
 
-  // called with a progress value between 0 and 1, pass NULL to disable
+  // called with a progress value between 0 and 1, pass nullptr to disable
   model_progress_callback progress_callback;
   // context pointer passed to the progress callback
   void* progress_callback_user_data;

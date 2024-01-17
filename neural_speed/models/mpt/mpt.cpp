@@ -284,7 +284,7 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
 
   lctx.use_buf(ctx0, 0);
   // used at the end to optionally extract the embeddings
-  struct ne_tensor* embeddings = NULL;
+  struct ne_tensor* embeddings = nullptr;
 
   // norm
   {

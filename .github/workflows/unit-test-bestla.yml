@@ -1,0 +1,70 @@
+name: Bestla Unit Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - bestla/**
+      - .github/workflows/unit-test-bestla.yml
+      - '!bestla/README.md'
+  workflow_dispatch:
+    inputs:
+        compiler_version:
+          description: 'compiler_version'
+          required: false
+          type: string
+          default: '13.1.0'
+
+# If there is a new commit, the previous jobs will be canceled
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '13.1.0' }}
+  WORKING_DIR: ${{ github.workspace }}
+
+jobs:
+  unit-test:
+    runs-on: [self-hosted, linux, X64, spr]
+    steps:
+      - name: Checkout out Repo
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+          fetch-tags: true
+      
+      - name: Env build
+        run: |
+          echo "do not need conda env"
+          #bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "unit-test-bestla" "3.8"
+          #conda activate unit-test-bestla || source activate unit-test-bestla
+          #if [[ "${{ env.INPUT_COMPILER_VERSION }}" != "11.4.1" ]]; then
+          #  conda install --update-deps -c conda-forge gxx==${{ env.INPUT_COMPILER_VERSION }} gcc==${{ env.INPUT_COMPILER_VERSION }} gxx_linux-64==${{ env.INPUT_COMPILER_VERSION }} libstdcxx-ng sysroot_linux-64 -y
+          #fi
+  
+      - name: Run UT
+        run: |
+          source /opt/rh/gcc-toolset-12/enable
+          #conda activate unit-test-bestla || source activate unit-test-bestla
+          #export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
+          cd ${{ github.workspace }}/bestla && mkdir build && cd build && cmake .. -DBTLA_UT_ALL=ON && make -j
+          ./bestla_ut 2>&1 | tee unit_test_bestla.log
+
+      - name: Check Result
+        run: |
+          if [[ $(grep -c "No such file or directory" ${{ github.workspace }}/bestla/build/unit_test_bestla.log) != 0 ]]; then
+            echo "neural-speed Compile Failed"
+            exit 1
+          fi
+          if [[ $(grep -c "Case Failed" ${{ github.workspace }}/bestla/build/unit_test_bestla.log) != 0 ]]; then
+            echo "UT Failed! Please check UT log."
+            exit 1
+          fi
+
+      - name: Publish pipeline artifact
+        uses: actions/upload-artifact@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: Bestla Unit Test
+          path: ${{ github.workspace }}/bestla/build/unit_test*.*

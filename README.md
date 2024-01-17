@@ -55,6 +55,7 @@ OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts
 
 ## Supported Models
 
+
 Neural Speed supports the following models: [list](./docs/supported_models.md)
 
 ## Install

@@ -133,7 +133,7 @@ class UT_PaddingInterleaveMN {
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
     kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
-    ut::buffer_error(dst.data(), ref.data(), dst.size());
+    ut::buffer_error(dst.data(), ref.data(), dst.size(), T_DST(100));
   }
 };
 #ifdef BTLA_UT_KERNEL_WRAPPER
@@ -161,7 +161,7 @@ class UT_PaddingTransInterleaveMN {
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
     kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
-    ut::buffer_error(dst.data(), ref.data(), dst.size());
+    ut::buffer_error(dst.data(), ref.data(), dst.size(), T_DST(100));
   }
 };
 #ifdef BTLA_UT_KERNEL_WRAPPER

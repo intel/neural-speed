@@ -13,7 +13,14 @@
 //  limitations under the License.
 #pragma once
 #include <type_traits>
-#ifdef _OPENMP
+
+#if defined(_OPENMP) && defined(BTLA_USE_OPENMP)
+#define BTLA_OPENMP 1
+#else
+#define BTLA_OPENMP 0
+#endif
+
+#if BTLA_OPENMP
 #include <omp.h>
 #endif
 
@@ -59,7 +66,9 @@
 #define CompileFP16() (__GNUC__ >= 13)
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
-#else
+#endif
+
+#ifdef _MSC_VER
 #define CompileAVX512F() _MSC_VER && (_MSC_VER >= 1911)
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
 #define CompileAMX() 0
@@ -68,6 +77,17 @@
 #define CompileAMXBF16() 0
 #define CompileAMXINT8() 0
 #endif
+
+#ifdef __clang_major__
+#define CompileAVX512F() (__clang_major__ >= 4)
+#define CompileAVX2() (__clang_major__ >= 3)
+#define CompileAMX() (__clang_major__ >= 11)
+#define CompileBF16() (__clang_major__ >= 11)
+#define CompileFP16() (__clang_major__ >= 16)
+#define CompileAMXBF16() (CompileAMX())
+#define CompileAMXINT8() (CompileAMX())
+#endif
+
 #if CompileBF16() || CompileFP16()
 #include <immintrin.h>
 #endif
@@ -476,7 +496,7 @@ static inline _T* cpu_pointer_align(_T* src) {
 template <typename _T>
 static inline _T* amalloc(size_t _size, size_t _alignment = 64) {
   if (_size == 0) {
-    return NULL;
+    return nullptr;
   }
   auto psize = padto(_size * sizeof(_T), static_cast<int>(_alignment));
 #ifdef _WIN32
@@ -487,7 +507,7 @@ static inline _T* amalloc(size_t _size, size_t _alignment = 64) {
 }
 
 static inline void afree(void* ptr) {
-  if (ptr == NULL) {
+  if (ptr == nullptr) {
     return;
   }
 #ifdef _WIN32
@@ -515,7 +535,7 @@ class aligned_vector {
       auto uptr = reinterpret_cast<uint64_t>(mVec.data());
       mPtr = reinterpret_cast<_T*>((uptr + _Alignment - 1) / _Alignment * _Alignment);
     } else {
-      mPtr = NULL;
+      mPtr = nullptr;
     }
   }
   _T* data() const { return mPtr; }

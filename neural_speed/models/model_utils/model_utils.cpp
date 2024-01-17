@@ -68,21 +68,20 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
                           const ne_type wtype, const int n_ctx, const int batch_size, const int beam_size,
                           const bool shift_roped_k, model_struct* model) {
   const auto n_layer = hparams.n_layer;
-  const auto heads_kv = hparams.n_head_kv > 0 ? hparams.n_head_kv : hparams.n_head;
+  auto heads_kv = hparams.n_head_kv > 0 ? hparams.n_head_kv : hparams.n_head;
   const auto head_size = hparams.n_embd / hparams.n_head;
+#ifdef NS_TP_MODEL
+  // when use TP, cached kv will also have smaller size
+  parallel_context* p_ctx = init_parallel_context();
+  int32_t world_size = get_tp_size(p_ctx);
+  heads_kv /= world_size;
+#endif
   int32_t k_size, v_size;
   get_batch_kv_elements_from_gpt_params(heads_kv, head_size, n_ctx, wtype, &k_size, &v_size);
 
   int64_t layer_ne_k = batch_size * beam_size * k_size;
   int64_t layer_ne_v = batch_size * beam_size * v_size;
   const auto wsize = wtype == NE_TYPE_BTLA ? 1 : ne_type_size(wtype);
-#ifdef NE_TP_MODEL
-  // when use TP, cached kv will also have smaller size
-  parallel_context* p_ctx = init_parallel_context();
-  int32_t world_size = get_tp_size(p_ctx);
-  layer_ne_k /= world_size;
-  layer_ne_v /= world_size;
-#endif
 
   cache.buf.resize(n_layer * (layer_ne_k + layer_ne_v) * wsize + 2u * MB);
   cache.seq_cells.resize(batch_size * beam_size);
@@ -148,11 +147,12 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
     const auto cossin_dtype = wtype == NE_TYPE_BTLA ? NE_TYPE_F16 : wtype;
     cache.cossin = ne_new_tensor_1d(cache.ctx, cossin_dtype, head_size, NE_SIZE_CALC);
     ne_set_name(cache.cossin, "cossin(-1)");
-    float theta = -1;
+    float freq_base = hparams.freq_base;
+    float theta = -1 * hparams.freq_scale;
     float theta_scale = (model != nullptr && model->arch == MODEL_CHATGLM2)
-                            ? std::pow(10000.f, -2.0f / (head_size / 2))  // chatglm2 has their DIM_SCALE of 2
-                        : hparams.n_rot > 0 ? std::pow(10000.f, -2.0f / hparams.n_rot)
-                                            : std::pow(10000.f, -2.0f / head_size);
+                            ? std::pow(freq_base, -2.0f / (head_size / 2))  // chatglm2 has their DIM_SCALE of 2
+                        : hparams.n_rot > 0 ? std::pow(freq_base, -2.0f / hparams.n_rot)
+                                            : std::pow(freq_base, -2.0f / head_size);
     if (cossin_dtype == NE_TYPE_F16) {
       const auto data = reinterpret_cast<ne_fp16_t*>(cache.cossin->data);
       for (int i = 0; i < head_size; i += 2) {
@@ -207,7 +207,7 @@ void model_init_backend() {
 
   // needed to initialize f16 tables
   {
-    struct ne_init_params params = {0, NULL, false};
+    struct ne_init_params params = {0, nullptr, false};
     struct ne_context* ctx = ne_init(params);
     ne_free(ctx);
   }
@@ -614,7 +614,7 @@ model_token model_sample_top_k_top_p(struct model_context* ctx, const int n_logi
   {
     const double scale = 1.0 / temp;
     for (int i = 0; i < n_logits; ++i) {
-      logits_id.push_back(std::make_pair(logits[i] * scale, i));
+      logits_id.emplace_back(logits[i] * scale, i);
     }
   }
 
@@ -1042,7 +1042,7 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   work.resize(nelements * 4);  // upper bound on size
   void* new_data = work.addr;
   size_t new_size = 0;
-  float* f32_data = NULL;
+  float* f32_data = nullptr;
   model_buffer f32_conv_buf;
   if (tensor.type == NE_TYPE_F32) {
     f32_data = reinterpret_cast<float*>(tensor.data);
@@ -1076,7 +1076,7 @@ __WRITE_FILE:
   printf("\n");
 }
 
-static void model_quantize_internal(const quant_params& params, std::shared_ptr<quant_layer_base> quant_layer) {
+static void model_quantize_internal(const quant_params& params, std::shared_ptr<quant_layer_base>& quant_layer) {
   auto ftype = quant_params_to_ftype(params);
   quant_layer->set_global_config(params.nthread, quant_params_to_internal(params));
   int nthread = params.nthread;
@@ -1127,11 +1127,11 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   model_context* ctx = new model_context;
 
   if (params.seed < 0) {
-    params.seed = time(NULL);
+    params.seed = time(nullptr);
   }
 
   unsigned cur_percentage = 0;
-  if (params.progress_callback == NULL) {
+  if (params.progress_callback == nullptr) {
     params.progress_callback_user_data = &cur_percentage;
     params.progress_callback = [](float progress, void* ctx) {
       unsigned* cur_percentage_p = reinterpret_cast<unsigned*>(ctx);
@@ -1311,7 +1311,7 @@ int model_apply_lora_from_file_internal(struct model_context* ctx, const char* p
 
   // load base model
   std::unique_ptr<model_model_loader> model_loader;
-  ne_context* base_ctx = NULL;
+  ne_context* base_ctx = nullptr;
   model_buffer base_buf;
   if (path_base_model) {
     fprintf(stderr, "%s: loading base model from '%s'\n", __func__, path_base_model);
@@ -1558,17 +1558,18 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
                                                                 : lctx->model.layers[0].k_cache;  // chatglm style
   NE_ASSERT(k_cache_example->type != NE_TYPE_BTLA || bestla_reordered_attn_fp32_support(&attn_shape));
 
-  if (lctx == NULL) {
+  if (lctx == nullptr) {
     fprintf(stderr, "%s: error: failed to load model '%s'\n", __func__, params.model.c_str());
-    return NULL;
+    return nullptr;
   }
 
   if (!params.lora_adapter.empty()) {
-    int err = model_apply_lora_from_file(lctx, params.lora_adapter.c_str(),
-                                         params.lora_base.empty() ? NULL : params.lora_base.c_str(), params.n_threads);
+    int err =
+        model_apply_lora_from_file(lctx, params.lora_adapter.c_str(),
+                                   params.lora_base.empty() ? nullptr : params.lora_base.c_str(), params.n_threads);
     if (err != 0) {
       fprintf(stderr, "%s: error: failed to apply lora adapter\n", __func__);
-      return NULL;
+      return nullptr;
     }
   }
 
@@ -1601,7 +1602,7 @@ int model_get_kv_cache_token_count(const struct model_context* ctx) { return ctx
 
 void model_set_rng_seed(struct model_context* ctx, int seed) {
   if (seed < 0) {
-    seed = time(NULL);
+    seed = time(nullptr);
   }
   ctx->rng.seed(seed);
 }
@@ -2070,8 +2071,14 @@ static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model
                                           const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const auto& kv_self = ctx->model.kv_self;
   const auto& hparams = ctx->model.hparams;
-  const int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;
+  int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;
   const int head_size = hparams.n_embd / hparams.n_head;
+#ifdef NS_TP_MODEL
+  // when use TP, cached kv will also have smaller size
+  parallel_context* p_ctx = init_parallel_context();
+  int32_t world_size = get_tp_size(p_ctx);
+  heads_kv /= world_size;
+#endif
   const int n_ctx = ctx->n_ctx;
   const auto kv_n_ctx_block = ctx->kv_n_ctx_block;
   NE_ASSERT(("Invalid end position!", n_ctx >= p1));
@@ -2292,12 +2299,12 @@ void logits_processor::process(const std::vector<uint32_t>& cur_lens, const mode
 
 void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
                                           const std::vector<uint32_t>& n_prompt_tokens,
-                                          const std::vector<int> request_running_indices,
+                                          const std::vector<int>& request_running_indices,
                                           const std::vector<std::tuple<int, int>>& kv_reorder_indices,
                                           const std::vector<beam>& next_beams) {
   // beam search unsupport shift kv cache when prompt + new_tokens > nctx
   NE_ASSERT(("error: unimplement shifted kv cache update\n", !ctx->model.kv_self.has_shift));
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("start to update kv cache for next step...\n");
 #endif
   MODEL_ASSERT(request_running_indices.size() == ctx->request_running_bs);
@@ -2308,13 +2315,13 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
     const uint32_t off = ctx->beam_size * request_idx;
     const uint32_t cur_n_past = n_past[request_idx];
     const uint32_t cur_n_prompt_tokens = n_prompt_tokens[request_idx];
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("------request_idx: %d, n_past: %d, n_prompt_tokens: %d, offset: %d------ \n", request_idx, cur_n_past,
            cur_n_prompt_tokens, off);
 #endif
     // first step
     if (cur_n_past == cur_n_prompt_tokens) {
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
       printf("copy beam 1 first token to the left beams\n");
 #endif
       for (int b = 1; b < ctx->beam_size; ++b) {
@@ -2335,7 +2342,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
           p0 = 0;
           p1 = n_ctx;
         }
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
         printf("copy beam %d to beam %d in pos [%d, %d] \n", cpy_id, cur_id, p0, p1);
 #endif
         model_kv_cache_seq_cpy(ctx, cpy_id + off, cur_id + off, p0, p1);
@@ -2345,7 +2352,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
       return;
     }
   }
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
 #endif
 }
@@ -2361,7 +2368,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
 std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_context* ctx,
                                                                       const std::vector<float>& beams_score,
                                                                       const std::vector<int>& num_beams,
-                                                                      const std::vector<int> beam_indices,
+                                                                      const std::vector<int>& beam_indices,
                                                                       const int& sample_scale, const int& dim) {
   MODEL_ASSERT(dim == -1);  // raise unimplemented error
   // different requests may have different num_beams (ctx->beam_size >= num_beams[i])?
@@ -2369,7 +2376,7 @@ std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_cont
   logits_info li(ctx);
   std::vector<uint32_t> cur_lens;
   for (int i = 0; i < ctx->batch_size; ++i) {
-    cur_lens.push_back(cur_beams[i].token_ids.size());
+    cur_lens.emplace_back(cur_beams[i].token_ids.size());
   }
   lp.process(cur_lens, ctx->vocab.eos_token_id);
   const int raw_k = sample_scale * (*std::max_element(num_beams.begin(), num_beams.end()));
@@ -2465,7 +2472,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
   ctx->batch_size = batch_size;
   ctx->request_running_bs = request_running_indices.size();
   // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("========================================================================================= \n");
   printf("next_tokens for inference: \n");
   printf("request_running_bs: %d, batch_size for inference: %d\n", ctx->request_running_bs, ctx->batch_size);
@@ -2484,7 +2491,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
   MODEL_ASSERT(next_tokens.size() == batch_size * sample_scale);  // request_running_bs * beam_size * sample_scale
   // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("top_k next_tokens: \n");
   int bb = 0;
   for (int kk = 0; kk < next_tokens.size(); ++kk) {
@@ -2542,7 +2549,7 @@ void beam_search_flow::fill_next_beams_by_top_scores() {
 // if kv_cache_reorder_indices = {0:0, 1:1}, then do not need reorder (cpy)
 std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indices() {
   // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("kv cache update indices info: \n");
   printf("cur_beams:\n");
   for (int bb = 0; bb < request_running_indices.size(); ++bb) {
@@ -2606,7 +2613,7 @@ std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indi
       }
     }
     // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("batch_%d cpy_final_bs_ids: ", rb);
     for (int i = 0; i < beam_size; ++i) {
       printf("%d, ", cpy_final_bs_ids[i]);
@@ -2645,7 +2652,7 @@ void beam_search_flow::update_status() {
 
 // Return beam with highest probability.
 const beam& beam_search_flow::finalize(const int& request_idx) {
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("========================================================================================= \n");
   printf("request_idx_%d finalize:\n", request_idx);
   printf("before: \n");
@@ -2659,7 +2666,7 @@ const beam& beam_search_flow::finalize(const int& request_idx) {
       beam b = cur_beams[request_idx * beam_size + i];
       beam_hypos[request_idx].add(b, n_prompt_tokens[request_idx]);
     }
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("after (adding more beams from outside): \n");
     for (auto b : beam_hypos[request_idx].beams) {
       b.print();
@@ -2668,7 +2675,7 @@ const beam& beam_search_flow::finalize(const int& request_idx) {
 #endif
   }
   const beam& top_b = beam_hypos[request_idx].top1();
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("final beam of request_idx %d:\n", request_idx);
   top_b.print();
   printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
@@ -2706,7 +2713,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
   kv_reorder = ctx->bs_kv_reorder;
   if (kv_reorder == nullptr) {
     kv_reorder = std::make_shared<beam_search_kv_cache_reorder>(ctx);
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf(
         "WARNING: Using default kv cache update function. Ignore this warning if your K shape = [head_dim, N, n_head], "
         "V shape = [N, head_dim, n_head]\n");
@@ -2726,7 +2733,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
           beam_top_k_next_tokens(ctx, beam_scores, num_beams, beam_indices, beam_size);
       MODEL_ASSERT(next_tokens.size() == ctx->request_running_bs * beam_size);
       // DEBUG
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
       printf("========================================================================================== \n");
       printf("top_k next_tokens: \n");
       int bb = 0;
@@ -2759,7 +2766,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
     }
 
     // DEBUG: print current beams for this iteration
-#ifdef NE_BEAM_SEARCH_VERBOSE_ON
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("current beams:\n");
     for (size_t j = 0; j < cur_beams.size(); ++j) {
       printf("beams[%d]: ", j);

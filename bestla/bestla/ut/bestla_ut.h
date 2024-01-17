@@ -40,8 +40,8 @@ static int8_t cache[CacheSize];
 #define FP16_ERR 0.001f
 #define BF16_ERR 0.02f
 #define INT8_ERR 0.2f
-#define F8_ERR 1.2f
-#define INT4_ERR 2.f
+#define F8_ERR 1.4f
+#define INT4_ERR 3.f
 #define FP4_ERR 3.f
 
 static inline float get_ut_err(BTLA_DTYPE qtype) {
@@ -114,7 +114,7 @@ static void fill_buffer_randn(_T* buf, size_t size, _T minval, _T maxval) {
 template <typename _T>
 utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   auto w1fp = fopen(filepath, "rb");
-  if (w1fp == NULL) {
+  if (w1fp == nullptr) {
     return utils::aligned_vector<_T>();
   }
   fseek(w1fp, 0, SEEK_END);

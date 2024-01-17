@@ -76,17 +76,17 @@ int32_t get_num_physical_cores() {
       siblings.insert(line);
     }
   }
-  if (siblings.size() > 0) {
+  if (!siblings.empty()) {
     return static_cast<int32_t>(siblings.size());
   }
 #elif defined(__APPLE__) && defined(__MACH__)
   int32_t num_physical_cores;
   size_t len = sizeof(num_physical_cores);
-  int result = sysctlbyname("hw.perflevel0.physicalcpu", &num_physical_cores, &len, NULL, 0);
+  int result = sysctlbyname("hw.perflevel0.physicalcpu", &num_physical_cores, &len, nullptr, 0);
   if (result == 0) {
     return num_physical_cores;
   }
-  result = sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, NULL, 0);
+  result = sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, nullptr, 0);
   if (result == 0) {
     return num_physical_cores;
   }
@@ -274,8 +274,8 @@ std::map<std::string, int32_t> json_parse(const std::string& fname) {
     bool has_key = false;
     bool in_token = false;
 
-    std::string str_key = "";
-    std::string str_val = "";
+    std::string str_key;
+    std::string str_val;
 
     int n = json.size();
     for (int i = 1; i < n; ++i) {
@@ -469,7 +469,7 @@ gpt_vocab::id gpt_sample_top_k_top_p(const gpt_vocab& vocab, const float* logits
   {
     const double scale = 1.0 / temp;
     for (int i = 0; i < n_logits; ++i) {
-      logits_id.push_back(std::make_pair(logits[i] * scale, i));
+      logits_id.emplace_back(logits[i] * scale, i);
     }
   }
 
@@ -568,12 +568,12 @@ gpt_vocab::id gpt_sample_top_k_top_p_repeat(const gpt_vocab& vocab, const float*
           std::find(last_n_tokens.end() - repeat_last_n, last_n_tokens.end(), i) != last_n_tokens.end()) {
         // if score < 0 then repetition penalty has to multiplied to reduce the previous token probability
         if (plogits[i] < 0.0f) {
-          logits_id.push_back(std::make_pair(plogits[i] * scale * repeat_penalty, i));
+          logits_id.emplace_back(plogits[i] * scale * repeat_penalty, i);
         } else {
-          logits_id.push_back(std::make_pair(plogits[i] * scale / repeat_penalty, i));
+          logits_id.emplace_back(plogits[i] * scale / repeat_penalty, i);
         }
       } else {
-        logits_id.push_back(std::make_pair(plogits[i] * scale, i));
+        logits_id.emplace_back(plogits[i] * scale, i);
       }
     }
   }
@@ -766,7 +766,7 @@ void console_init(console_state& con_st) {  // NOLINT
   if (con_st.hConsole == INVALID_HANDLE_VALUE || !GetConsoleMode(con_st.hConsole, &dwMode)) {
     con_st.hConsole = GetStdHandle(STD_ERROR_HANDLE);
     if (con_st.hConsole != INVALID_HANDLE_VALUE && (!GetConsoleMode(con_st.hConsole, &dwMode))) {
-      con_st.hConsole = NULL;
+      con_st.hConsole = nullptr;
     }
   }
   if (con_st.hConsole) {
@@ -863,7 +863,7 @@ char32_t getchar32() {
 
 void pop_cursor(const console_state& con_st) {
 #if defined(_WIN32)
-  if (con_st.hConsole != NULL) {
+  if (con_st.hConsole != nullptr) {
     CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
     GetConsoleScreenBufferInfo(con_st.hConsole, &bufferInfo);
 
@@ -899,7 +899,7 @@ int put_codepoint(const console_state& con_st, const char* utf8_codepoint, size_
   }
   COORD initialPosition = bufferInfo.dwCursorPosition;
   DWORD nNumberOfChars = length;
-  WriteConsole(con_st.hConsole, utf8_codepoint, nNumberOfChars, &nNumberOfChars, NULL);
+  WriteConsole(con_st.hConsole, utf8_codepoint, nNumberOfChars, &nNumberOfChars, nullptr);
 
   CONSOLE_SCREEN_BUFFER_INFO newBufferInfo;
   GetConsoleScreenBufferInfo(con_st.hConsole, &newBufferInfo);
@@ -907,7 +907,7 @@ int put_codepoint(const console_state& con_st, const char* utf8_codepoint, size_
   // Figure out our real position if we're in the last column
   if (utf8_codepoint[0] != 0x09 && initialPosition.X == newBufferInfo.dwSize.X - 1) {
     DWORD nNumberOfChars;
-    WriteConsole(con_st.hConsole, &" \b", 2, &nNumberOfChars, NULL);
+    WriteConsole(con_st.hConsole, &" \b", 2, &nNumberOfChars, nullptr);
     GetConsoleScreenBufferInfo(con_st.hConsole, &newBufferInfo);
   }
 
@@ -1123,7 +1123,7 @@ std::string build_prompt_glm1(const std::vector<std::string>& history) {
 }
 
 static std::string regex_replace(const std::string& input, const std::regex& regex,
-                                 std::function<std::string(const std::smatch&)> format) {
+                                 const std::function<std::string(const std::smatch&)>& format) {
   std::ostringstream oss;
   int last_index = 0;
   for (auto it = std::sregex_iterator(input.begin(), input.end(), regex); it != std::sregex_iterator(); it++) {
