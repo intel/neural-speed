@@ -250,6 +250,8 @@ class Dq8GetScale {
 #endif
 #if CompileAVX2()
     if (ISA_T >= BTLA_ISA::AVX2) {
+      return kernel::avx2::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
+                                            src_stride, dst_stride, zeropadding);
     }
 #endif
     return kernel::ref::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale, src_stride,

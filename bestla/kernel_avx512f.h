@@ -1280,6 +1280,7 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
       }
     }
   }
+  if (zeropadding) assert(0);
   return BTLA_CODE::Success;
 }
 
