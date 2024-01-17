@@ -194,10 +194,10 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
           ip_add::BTLAGemmCompF32<tAVX512F, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
-                                                                       bias, broadcast_bias, workspace, pth);
+                                                                      bias, broadcast_bias, workspace, pth);
         } else if (NTile == tAVX2::NTILE && _cd->AVX2() && BlkSize % tAVX2::KTILE == 0) {
           ip_add::BTLAGemmCompF32<tAVX2, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
-                                                                    broadcast_bias, workspace, pth);
+                                                                   broadcast_bias, workspace, pth);
         }
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2 && BlkSize % tAMX_BF16::KTILE == 0) {
@@ -205,10 +205,10 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
           if (_m <= tAVX512_BF16::MTILE) {
             static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
             ip_add::BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output,
-                                                                             ldo, bias, broadcast_bias, workspace, pth);
+                                                                            ldo, bias, broadcast_bias, workspace, pth);
           } else {
             ip_add::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
-                                                                          bias, broadcast_bias, workspace, pth);
+                                                                         bias, broadcast_bias, workspace, pth);
           }
         }
       }

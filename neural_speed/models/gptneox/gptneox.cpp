@@ -188,9 +188,9 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
 
       // using mode = 2 for GPT-NeoX mode
       Qcur = ne_rope_inplace(ctx0, ne_reshape_4d(ctx0, Qcur, head_dim, n_head, N, batch_size), n_past, n_rot, 2, 0,
-                             hparams.freq_base);
+                             hparams.freq_base, hparams.freq_scale);
       Kcur = ne_rope_inplace(ctx0, ne_reshape_4d(ctx0, Kcur, head_dim, n_head, N, batch_size), n_past, n_rot, 2, 0,
-                             hparams.freq_base);
+                             hparams.freq_base, hparams.freq_scale);
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
       // store key and value to memory
       if (!run_mha_reordered) {
@@ -336,7 +336,7 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
 
   lctx.use_buf(ctx0, 0);
   // used at the end to optionally extract the embeddings
-  struct ne_tensor* embeddings = NULL;
+  struct ne_tensor* embeddings = nullptr;
   // norm
   {
     inpL = ne_norm(ctx0, inpL);

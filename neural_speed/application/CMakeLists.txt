@@ -24,7 +24,7 @@ set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(${TARGET} PUBLIC .)
 target_compile_features(${TARGET} PUBLIC cxx_std_11)
-target_link_libraries(${TARGET} PUBLIC bestla::bestla)
+target_link_libraries(${TARGET} PUBLIC bestla)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -70,7 +70,7 @@ compile_quant(quant_mistral   quant_model.cpp mistral   llama)
 compile_quant(quant_qwen   quant_model.cpp qwen   qwen)
 
 # all models running
-if (NE_PYTHON_API)
+if (NS_PYTHON_API)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
@@ -102,7 +102,7 @@ function(compile_run TARGET MAIN_CPP MAIN_PY MODEL_NAME MODEL_LIB)
     add_dependencies(${TARGET} BUILD_INFO)
   endif()
 
-  if ((NE_PYTHON_API) AND (NOT (MAIN_PY STREQUAL "") ))
+  if ((NS_PYTHON_API) AND (NOT (MAIN_PY STREQUAL "") ))
     pybind11_add_module("${MODEL_NAME}_cpp" ${MAIN_PY})
     target_link_libraries("${MODEL_NAME}_cpp" PRIVATE ne_layers ${MODEL_LIB} common)
     target_compile_definitions("${MODEL_NAME}_cpp" PUBLIC -DMODEL_NAME="${MODEL_NAME}" -DMODEL_NAME_ID=${mymap_${MODEL_NAME}})

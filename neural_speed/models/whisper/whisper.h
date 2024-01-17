@@ -182,7 +182,7 @@ typedef struct whisper_model_loader {
 
 // Various functions for loading a ggml whisper model.
 // Allocate (almost) all memory needed for the model.
-// Return NULL on failure
+// Return nullptr on failure
 MODEL_API struct whisper_context* whisper_init_from_file(const char* path_model);
 MODEL_API struct whisper_context* whisper_init_from_buffer(void* buffer, size_t buffer_size);
 MODEL_API struct whisper_context* whisper_init(struct whisper_model_loader* loader);
@@ -349,14 +349,14 @@ typedef void (*whisper_progress_callback)(struct whisper_context* ctx, struct wh
                                           void* user_data);
 
 // Encoder begin callback
-// If not NULL, called before the encoder starts
+// If not nullptr, called before the encoder starts
 // If it returns false, the computation is aborted
 typedef bool (*whisper_encoder_begin_callback)(struct whisper_context* ctx, struct whisper_state* state,
                                                void* user_data);
 
 // Logits filter callback
 // Can be used to modify the logits before sampling
-// If not NULL, called after applying temperature to logits
+// If not nullptr, called after applying temperature to logits
 typedef void (*whisper_logits_filter_callback)(struct whisper_context* ctx, struct whisper_state* state,
                                                const whisper_token_data* tokens, int n_tokens, float* logits,
                                                void* user_data);

@@ -74,7 +74,7 @@ format(const char* fmt, ...) {
   va_list ap, ap2;
   va_start(ap, fmt);
   va_copy(ap2, ap);
-  int size = vsnprintf(NULL, 0, fmt, ap);
+  int size = vsnprintf(nullptr, 0, fmt, ap);
   MODEL_ASSERT(size >= 0 && size < INT_MAX);
   std::vector<char> buf(size + 1);
   int size2 = vsnprintf(buf.data(), size + 1, fmt, ap2);
@@ -91,7 +91,7 @@ struct model_file {
 
   model_file(const char* fname, const char* mode) {
     fp = std::fopen(fname, mode);
-    if (fp == NULL) {
+    if (fp == nullptr) {
       throw std::runtime_error(format("failed to open %s: %s", fname, strerror(errno)));
     }
     seek(0, SEEK_END);
@@ -123,7 +123,7 @@ struct model_file {
       return;
     }
     errno = 0;
-    MODEL_ASSERT(ptr != NULL);
+    MODEL_ASSERT(ptr != nullptr);
     std::size_t ret = std::fread(ptr, len, 1, fp);
     if (ferror(fp)) {
       throw std::runtime_error(format("read error: %s", strerror(errno)));
@@ -169,8 +169,8 @@ struct model_file {
 static std::string model_format_win_err(DWORD err) {
   LPSTR buf;
   size_t size =
-      FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                     err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, NULL);
+      FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                     nullptr, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, nullptr);
   if (!size) {
     return "FormatMessageA failed";
   }
@@ -196,7 +196,7 @@ struct model_mmap {
 #ifdef __linux__
     flags |= MAP_POPULATE;
 #endif
-    addr = mmap(NULL, file->size, PROT_READ, flags, fd, 0);
+    addr = mmap(nullptr, file->size, PROT_READ, flags, fd, 0);
     if (addr == MAP_FAILED) {
       throw std::runtime_error(format("mmap failed: %s", strerror(errno)));
     }
@@ -218,10 +218,10 @@ struct model_mmap {
 
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file->fp));
 
-    HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    HANDLE hMapping = CreateFileMappingA(hFile, nullptr, PAGE_READONLY, 0, 0, nullptr);
     DWORD error = GetLastError();
 
-    if (hMapping == NULL) {
+    if (hMapping == nullptr) {
       throw std::runtime_error(format("CreateFileMappingA failed: %s", model_format_win_err(error).c_str()));
     }
 
@@ -229,7 +229,7 @@ struct model_mmap {
     error = GetLastError();
     CloseHandle(hMapping);
 
-    if (addr == NULL) {
+    if (addr == nullptr) {
       throw std::runtime_error(format("MapViewOfFile failed: %s", model_format_win_err(error).c_str()));
     }
 
@@ -266,7 +266,7 @@ struct model_mmap {
 // Represents some region of memory being locked using mlock or VirtualLock;
 // will automatically unlock on destruction.
 struct model_mlock {
-  void* addr = NULL;
+  void* addr = nullptr;
   size_t size = 0;
   bool failed_already = false;
 
@@ -280,7 +280,7 @@ struct model_mlock {
   }
 
   void init(void* ptr) {
-    MODEL_ASSERT(addr == NULL && size == 0);
+    MODEL_ASSERT(addr == nullptr && size == 0);
     addr = ptr;
   }
 
@@ -401,7 +401,7 @@ struct model_mlock {
 
 // Replacement for std::vector<uint8_t> that doesn't require zero-initialization.
 struct model_buffer {
-  uint8_t* addr = NULL;
+  uint8_t* addr = nullptr;
   size_t size = 0;
 
   model_buffer() = default;

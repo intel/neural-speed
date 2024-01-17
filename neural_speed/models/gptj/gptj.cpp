@@ -88,7 +88,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   const int n_rot = hparams.n_rot;
 
   bool enable_tp = false;
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
   int32_t world_size = get_tp_size(p_ctx);
   int32_t rank = get_tp_rank(p_ctx);
@@ -116,9 +116,9 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   gf.n_threads = n_threads;
 
   const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
-  const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && bestla_fusion_attn_fp16_support(NULL);
+  const bool run_mha_fp16 = !run_mha_reordered && MHA_FP16 && bestla_fusion_attn_fp16_support(nullptr);
   const bool run_mha_bf16_first =
-      !run_mha_reordered && MHA_FUSION && !MHA_FP16 && bestla_fusion_attn_fp32_fp16_fp16_fp32_support(NULL);
+      !run_mha_reordered && MHA_FUSION && !MHA_FP16 && bestla_fusion_attn_fp32_fp16_fp16_fp32_support(nullptr);
   kv_cache_info_t kv_cache_info = {0, 0};
   if (run_mha_reordered) {
     NE_ASSERT(kv_self.v->type == NE_TYPE_BTLA);  // kv type should be the same
@@ -145,13 +145,6 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
   }
-
-#ifdef NE_TP_MODEL
-  if (enable_tp) {
-    // need to broadcast the ids
-    broadcast(p_ctx, reinterpret_cast<float*>(embd->data), N * batch_size * ne_element_size(embd));
-  }
-#endif
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
 
@@ -186,9 +179,10 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_size, n_head, N, batch_size);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
     }
-    Qcur = ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base);
+    Qcur =
+        ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
     Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
-        ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base);
+        ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
     ne_set_name(Qcur, "Qcur");
     ne_set_name(Kcur, "Kcur");
     ne_set_name(Vcur, "Vcur");
@@ -292,8 +286,11 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
         struct ne_tensor* cossin_cache = nullptr;
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
         // in a single eval execution
-        if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base);
+        if (N == 1) {
+          cossin_cache = kv_self.cossin;
+        }
+        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                  hparams.freq_scale);
       }
       const auto v_size = kv_cache_info.v_bytes;
       V = ne_view_4d(ctx0, kv_self.v,                                                            // tensor
@@ -320,8 +317,11 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
         struct ne_tensor* cossin_cache = nullptr;
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
-        if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base);
+        if (N == 1) {
+          cossin_cache = kv_self.cossin;
+        }
+        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                  hparams.freq_scale);
         K = ne_permute(ctx0, K, 0, 2, 1, 3);
       }
     } else {
@@ -331,8 +331,11 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
         struct ne_tensor* cossin_cache = nullptr;
         // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N in
         // a single eval execution
-        if (N == 1) cossin_cache = kv_self.cossin;
-        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base);
+        if (N == 1) {
+          cossin_cache = kv_self.cossin;
+        }
+        K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                  hparams.freq_scale);
         K = ne_permute(ctx0, K, 0, 2, 1, 3);
       }
 
@@ -406,7 +409,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     struct ne_tensor* KQV_out = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
     ne_set_name(KQV_out, "KQV_out");
 
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     if (enable_tp) {
       KQV_out = ne_all_reduce(ctx0, KQV_out);
     }
@@ -436,7 +439,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       // NOTICE: when TP, only master node add this bias
       cur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].ffn[3], FFN_out), FFN_out);
     }
-#ifdef NE_TP_MODEL
+#ifdef NS_TP_MODEL
     // if tp model then all reduce as the weight has been split
     if (enable_tp) {
       cur = ne_all_reduce(ctx0, cur);
@@ -453,7 +456,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   lctx.use_buf(ctx0, 0);
 
   // used at the end to optionally extract the embeddings
-  struct ne_tensor* embeddings = NULL;
+  struct ne_tensor* embeddings = nullptr;
 
   // norm
   {

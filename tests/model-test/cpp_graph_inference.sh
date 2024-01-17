@@ -114,7 +114,11 @@ function ppl_eval() {
     if [[ "$ppl_mf16_test" = true ]]; then
         memory_dtype_list+=('f16')
     fi
-
+    echo "======   Prepare Env  ==============="
+    [[ $(pip list | grep intel_extension_for_transformers | wc -l) == 0 ]] && pip install intel_extension_for_transformers
+    [[ $(pip list | grep datasets | wc -l) == 0 ]] && pip install datasets
+    [[ $(pip list | grep transformers | wc -l) == 0 ]] && pip install transformers
+    pip list
     echo "=======  PPL Evaluation Start  ======="
     for memory_dtype in ${memory_dtype_list[@]}; do
         for ppl_dataset in ${ppl_dataset_list[@]}; do
@@ -122,7 +126,7 @@ function ppl_eval() {
                 local ppl_task_name="$task_name-ppl-$(basename -- "$ppl_dataset")-nctx$ppl_nctx-M$memory_dtype"
                 echo "***** PPL: $ppl_task_name *****"
                 OMP_NUM_THREADS=$(($n_cores * 1)) numactl -m 0 -C 0-$(($n_cores * 1 - 1)) \
-                    python scripts/perplexity.py --model_name "$model_path" --dataset_name "$ppl_dataset" --quantized_weight_path "$quantized_weight_path" --ctx_size $ppl_nctx --n_threads $n_cores --memory_dtype $memory_dtype 2>&1 |
+                    python $working_dir/scripts/perplexity.py --model_name "$model_path" --dataset_name "$ppl_dataset" --quantized_weight_path "$quantized_weight_path" --ctx_size $ppl_nctx --n_threads $n_cores --memory_dtype $memory_dtype 2>&1 |
                     tee "$WORKSPACE/$ppl_task_name.log"
                 mv out/ppl.png "$WORKSPACE/$ppl_task_name.png"
                 mv out/ppl_data.json "$WORKSPACE/$ppl_task_name.json"
@@ -221,26 +225,26 @@ function main() {
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"
         convert_script="${convert_script}/convert_chatglm.py"
-        infer_cmd="python ./scripts/inference.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name chatglm --tokenizer $model_path"
-        requirements_file="scripts/requirements/chatglm-6b.sh"
+        requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
     elif [[ "${model}" == "baichuan2-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
-        infer_cmd="python ./scripts/inference.py"
-        requirements_file="scripts/requirements/baichuan.sh"
+        infer_cmd="python $working_dir/scripts/inference.py"
+        requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
         extension=" --model_name baichuan --tokenizer $model_path"
     elif [[ "${model}" == "baichuan-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
-        infer_cmd="python ./scripts/inference.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name baichuan --tokenizer $model_path"
-        requirements_file="scripts/requirements/baichuan.sh"
+        requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
     elif [[ "${model}" == "mistral-7b" ]]; then
         quant_script="./build/bin/quant_mistral"
         convert_script="${convert_script}/convert_mistral.py"
         infer_cmd="./build/bin/run_mistral"
-        requirements_file="scripts/requirements/mistral.txt"
+        requirements_file="$working_dir/neural_speed/models/requirements/mistral.txt"
     elif [[ "${model}" == "qwen-7b" ]]; then
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
@@ -285,7 +289,7 @@ function main() {
     if [[ "${compiler_version}" != "12.1.0" ]]; then
         conda install --update-deps -c conda-forge gxx==${compiler_version} gcc==${compiler_version} gxx_linux-64==${compiler_version} libstdcxx-ng sysroot_linux-64 -y
     fi
-
+    export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     # setup conda env for LLM
 
     # get cpu info

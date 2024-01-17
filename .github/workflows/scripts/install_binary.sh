@@ -2,7 +2,6 @@
 source /neural-speed/.github/workflows/scripts/change_color.sh
 
 cd /neural-speed
-export CMAKE_ARGS="-DNE_DNNL_CACHE_DIR=/cache"
 $BOLD_YELLOW && echo "---------------- git submodule update --init --recursive -------------" && $RESET
 git config --global --add safe.directory "*"
 git submodule update --init --recursive
