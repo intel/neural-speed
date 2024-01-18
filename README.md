@@ -11,7 +11,7 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 > Neural Speed is under active development so APIs are subject to change.
 
 Up to 40x compared with [llama.cpp](https://github.com/ggerganov/llama.cpp).
-Some performace data have been published in NeurIPS' 2023: [Efficient LLM Inference on CPUs](https://arxiv.org/abs/2311.00502). You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) to get the performance information.
+Some performace data have been published in NeurIPS' 2023: [Efficient LLM Inference on CPUs](https://arxiv.org/abs/2311.00502). You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) to get more performance information.
 
 ## Quick Start
 There are two approaches for utilizing the Neural Speed:
