@@ -31,6 +31,14 @@ model.init(model_name, weight_dtype="int4", compute_dtype="int8", group_size=32)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample=True)
 ```
 
+To use whisper to Audio-to-text, here is the sample code
+```python
+from intel_extension_for_transformers.transformers import AutoModelForCausalLM, WeightOnlyQuantConfig
+model_name = "Local path for whisper"     # please use local path
+woq_config = WeightOnlyQuantConfig(use_ggml=True) #Currently, only Q40 is supported
+model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_config)
+model('Local audio file')
+```
 You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
 
 ### 2. Neural Speed straight forward:

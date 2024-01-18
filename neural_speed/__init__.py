@@ -62,6 +62,8 @@ class Model:
             import neural_speed.polyglot_cpp as cpp_model
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
+        elif model_type == "whisper":
+            import neural_speed.whisper_cpp as cpp_model
         else:
             raise TypeError("Unspported model type {}!".format(model_type))
         self.module = cpp_model
@@ -212,6 +214,7 @@ class Model:
     def is_token_end(self):
         return self.model.is_token_end()
 
+
     def eos_token_id(self):
         if self.model_type == 'qwen':
             return self.tokenizer.special_tokens['<|endoftext|>']
@@ -225,6 +228,7 @@ class Model:
                 raise ValueError("Please set pad_token_id when doing multi batch inference"\
                                   " with padding!")
         return self.tokenizer.pad_token_id
+
 
     def __call__(self, model_input, reinit=False, **kwargs):
         if self.model_type == 'whisper':
