@@ -154,6 +154,7 @@ model_name_map["mistral-7b"]="mistralai/Mistral-7B-v0.1"
 model_name_map["qwen-7b"]="Qwen/Qwen-7B-Chat"
 model_name_map["magicoder"]="ise-uiuc/Magicoder-S-DS-6.7B"
 model_name_map["whisper"]="openai/whisper-tiny"
+model_name_map["phi2"]="microsoft/phi-2"
 
 function main() {
     conda_env="$1"
@@ -258,6 +259,10 @@ function main() {
         convert_script="${convert_script}/convert_whisper.py"
         infer_cmd="./build/bin/run_whisper"
         precision_list+=("q4_0")
+    elif [[ "${model}" == "phi2" ]]; then
+        quant_script="./build/bin/quant_phi2"
+        convert_script="${convert_script}/convert_phi.py"
+        infer_cmd="./build/bin/run_phi2"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1
