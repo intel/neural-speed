@@ -25,7 +25,7 @@ from neural_speed import Model
 # python python_api_example_for_bin.py \
 # --model_name falcon \
 # --model_path /home/zhenzhong/model/falcon-7b \
-# -m /home/zhenzhong/model/falcon-7b/ggml-model-f32.gguf
+# -m /path/to/ggml-model-f32.gguf
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
