@@ -204,7 +204,7 @@ def unpack_awq_weight(qweight, scales, qzeros, q_config):
     bits = q_config['bits']
     order_map = [0, 4, 1, 5, 2, 6, 3, 7]
 
-    pack_num = 8
+    pack_num = 32 // bits
     weight = torch.zeros(qweight.shape[0], qweight.shape[1] * pack_num)
     zeros = torch.zeros(qzeros.shape[0], qzeros.shape[1] * pack_num)
     for col in range(qweight.shape[1]):
