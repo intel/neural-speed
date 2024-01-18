@@ -16,7 +16,7 @@ import argparse
 from intel_extension_for_transformers.llm.evaluation.lm_eval import evaluate
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate diff for a model")
+    parser = argparse.ArgumentParser(description="Evaluate accuracy for a model")
     parser.add_argument('--model_name', type=str, default="~/Llama-2-7b-chat-hf")
     parser.add_argument('--tasks', type=str, default="lambada_openai")
     parser.add_argument('--model_format', type=str, default="torch")
