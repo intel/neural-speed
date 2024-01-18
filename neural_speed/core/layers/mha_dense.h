@@ -80,6 +80,7 @@ typedef struct attn_fp32_fp16_fp16_fp32_fwd_args_t {
   int step_k_bs, step_k_head_num, step_k_sl, step_k_head_size;
   int step_v_bs, step_v_head_num, step_v_sl, step_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
+  int n_prompt;  // caller grantees that K/V for first n_prompt tokens are identical among batches
 } attn_fp32_fp16_fp16_fp32_fwd_args_t;
 
 void bestla_fusion_attn_bf16_forward(const attn_bf16_fwd_args_t* params);
@@ -165,6 +166,7 @@ typedef struct bestla_reordered_attn_fp32_fp32_fwd_args_t {
   int stride_k_bs, stride_k_head_num, stride_k_sl, stride_k_head_size;
   int stride_v_bs, stride_v_head_num, stride_v_sl, stride_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
+  int n_prompt;  // caller grantees that K/V for first n_prompt tokens are identical among batches
 } bestla_reordered_attn_fp32_fp32_fwd_args_t;
 void bestla_reordered_attn_fp32_forward(const bestla_reordered_attn_fp32_fp32_fwd_args_t* params);
 
