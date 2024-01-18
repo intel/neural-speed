@@ -64,7 +64,7 @@ struct ne_tensor* phi_ff(const model_layer& layer, const int batch_size, const i
 //   - n_threads: number of threads to use
 //
 
-static bool qwen_model_eval_internal(model_context* ctx, const model_input* inputs, const int n_input,
+static bool phi2_model_eval_internal(model_context* ctx, const model_input* inputs, const int n_input,
                                      const int n_threads) {
   const int64_t t_start_us = ne_time_us();
   model_context& lctx = *ctx;
@@ -144,6 +144,7 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
+    struct ne_tensor* cur_norm;
 
     lctx.use_buf(ctx0, 0);
 
@@ -156,7 +157,7 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
         cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
         cur = ne_add(ctx0, cur, model.layers[il].norm[1]);
       }
-
+      cur_norm = cur;
       // compute QKV
 
       struct ne_tensor* Qcur = ne_reshape_3d(ctx0,ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur),model.layers[il].attn[1]), head_dim, n_head, N);
@@ -293,7 +294,7 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 
     // this is independent of the self-attention result, so it could be done in parallel to the self-attention
     // note here we pass inpL instead of cur
-    cur = phi_ff(model.layers[il], N, batch_size, ctx0, cur);
+    cur = phi_ff(model.layers[il], N, batch_size, ctx0, cur_norm);
 
     // input for next layer
     inpL = ne_add(ctx0, cur, inpL);
@@ -377,7 +378,7 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 }
 
 int model_eval(struct model_context* ctx, const model_input* inputs, const int n_input, int n_threads) {
-  if (!qwen_model_eval_internal(ctx, inputs, n_input, n_threads)) {
+  if (!phi2_model_eval_internal(ctx, inputs, n_input, n_threads)) {
     fprintf(stderr, "%s: failed to eval\n", __func__);
     return 1;
   }

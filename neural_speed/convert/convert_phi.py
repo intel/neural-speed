@@ -135,10 +135,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         # No gradients for these
         list_vars[name].requires_grad = False
         src = name
-        if 'self_attn.q_proj' in src or 'self_attn.k_proj' in src:
-            shape = list_vars[src].shape
-            n_head = hparams["num_attention_heads"]
-            list_vars[src]=list_vars[src].reshape(n_head,2,shape[0]//n_head//2,*shape[1:]).transpose(1,2).reshape(shape)
         print(src, ' -> ', name)
         data = list_vars[src].squeeze().numpy()
         data = data.astype(np.float32)
