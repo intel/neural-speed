@@ -473,3 +473,85 @@ Available modes:
 - 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling.
 - 1: Print evaluation time. Time taken for each evaluation.
 - 2: Profile individual operator. Identify performance bottleneck within the model.
+
+### 7. GGUF
+
+Currently, we support two new features for the GGUF.
+
+1. Support loading & inference official GGUF models from HugginfaceFace.
+2. Support loading & inference official GGUF models from llama.cpp.
+
+Verified GGUF models from HF:
+
+- [TheBloke/Llama-2-7B-Chat-GGUF](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF) : q4_0 / q5_0 / q8_0
+- [TheBloke/Mistral-7B-v0.1-GGUF](https://huggingface.co/TheBloke/Mistral-7B-v0.1-GGUF) : q4_0 / q5_0 / q8_0
+- [TheBloke/CodeLlama-7B-GGUF](https://huggingface.co/TheBloke/CodeLlama-7B-GGUF) : q4_0 / q5_0 / q8_0
+- [TheBloke/CodeLlama-13B-GGUF](https://huggingface.co/TheBloke/CodeLlama-13B-GGUF): q4_0 / q5_0 / q8_0
+
+
+Verified GGUF models from Llama.cpp:
+
+- [meta-llama/Llama-2-7b-chat-hf](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf) : f32 / f16 / BTLA
+- [tiiuae/falcon-7b](https://huggingface.co/tiiuae/falcon-7b/tree/main) : f32 / f16 / BTLA
+- [tiiuae/falcon-40b](https://huggingface.co/tiiuae/falcon-40b) : f32 / f16 / BTLA
+- [mpt-7b](https://huggingface.co/mosaicml/mpt-7b) : f32 / f16 / BTLA
+- [mpt-30b](https://huggingface.co/mosaicml/mpt-30b) : f32 / f16 / BTLA
+- [bloomz-7b1](https://huggingface.co/bigscience/bloomz-7b1) : f32 / f16 / BTLA
+
+How to create the GGUF bin file in NeuralSpeed:
+```python
+# Example:
+# please provide the local model path as the arg,
+# which means you need to `git clone https://huggingface.co/meta-llama/Llama-2-7b-chat-hf` first.
+python convert-hf-to-gguf.py /model_path/Llama-2-7b-chat-hf/
+```
+
+How to load the GGUF bin file in NeuralSpeed:
+
+```python
+    prompt = "Once upon a time"
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    inputs = tokenizer(prompt, return_tensors="pt").input_ids
+    streamer = TextStreamer(tokenizer)
+
+    model = Model()
+    model.init_from_bin(args.model_name, gguf_path)
+    outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)
+
+# Please check this script for more details and input args.
+# python scripts/python_api_example_for_gguf.py --model_name falcon --model_path /home/model/falcon-7b -m /home/model/falcon-7b/ggml-model-f32.gguf
+```
+
+Note: These GGUF models from Llama.cpp can be accelerated by [NeuralSpeed BestTLA](https://github.com/intel/neural-speed/blob/c0312283f528d4a9ffebc283cd0f15a7a8eabf1a/bestla/README.md#L1).
+
+How to accelerate GGUF by BTLA:
+```python
+
+# quantization and re-run the python_api_example_for_gguf.py
+./build/bin/quant_falcon --model_file /home/model/falcon-7b/ggml-model-f32.gguf --out_file ne-falcon-q4_j.bin --weight_dtype int4 --compute_dtype int8
+```
+
+How to load the GGUF bin file in [intel-extension-for-transformers](https://github.com/intel/intel-extension-for-transformers/pull/1151):
+```python
+from transformers import AutoTokenizer, TextStreamer
+from intel_extension_for_transformers.transformers import AutoModelForCausalLM, WeightOnlyQuantConfig
+
+# Specify the GGUF repo on the Hugginface
+model_name = "TheBloke/Llama-2-7B-Chat-GGUF"
+# Download the the specific gguf model file from the above repo
+model_file = "llama-2-7b-chat.Q4_0.gguf"
+# make sure you are granted to access this model on the Huggingface.
+tokenizer_name = "meta-llama/Llama-2-7b-chat-hf"
+
+# If you are not granted, please check this combination.
+# model_name = "TheBloke/Mistral-7B-v0.1-GGUF"
+# model_file = "mistral-7b-v0.1.Q4_0.gguf" 
+# tokenizer_name = "mistralai/Mistral-7B-v0.1"
+
+prompt = "Once upon a time"
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt").input_ids
+streamer = TextStreamer(tokenizer)
+model = AutoModelForCausalLM.from_pretrained(model_name, model_file = model_file)
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
+```
