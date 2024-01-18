@@ -90,8 +90,9 @@ set(mymap_baichuan 12)
 set(mymap_polyglot 13)
 set(mymap_mistral 14)
 set(mymap_qwen 15)
-set(mymap_whisper 16)
-set(mymap_phi2 17)
+set(mymap_phi2 16)
+set(mymap_whisper 17)
+
 
 
 function(compile_run TARGET MAIN_CPP MAIN_PY MODEL_NAME MODEL_LIB)
