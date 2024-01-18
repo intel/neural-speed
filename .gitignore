@@ -22,7 +22,5 @@ build/
 debug/
 .eggs/
 dist/
-runtime_outs/
-__pycache__
-CMakeUserPresets.json
-*.egg-info
+.cache/
+.clangd

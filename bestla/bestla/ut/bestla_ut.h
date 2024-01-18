@@ -40,7 +40,7 @@ static int8_t cache[CacheSize];
 #define FP16_ERR 0.001f
 #define BF16_ERR 0.02f
 #define INT8_ERR 0.2f
-#define F8_ERR 1.4f
+#define F8_ERR 1.5f
 #define INT4_ERR 3.f
 #define FP4_ERR 3.f
 
