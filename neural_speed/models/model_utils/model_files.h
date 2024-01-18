@@ -962,8 +962,9 @@ struct gguf_loader {
       scores = (const float*)gguf_get_arr_data(ctx_gguf, score_idx);
     }
 
+    uint32_t default_n_vocab = 32000;
     const uint32_t n_vocab = gguf_get_arr_n(ctx_gguf, token_idx);
-    if (hparams.n_vocab != n_vocab) {
+    if ((hparams.n_vocab == default_n_vocab) && (hparams.n_vocab != n_vocab)) {
       hparams.n_vocab = n_vocab;
     }
 
