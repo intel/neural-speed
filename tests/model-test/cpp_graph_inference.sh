@@ -390,8 +390,8 @@ function main() {
                     export LANG=en_US.UTF-8
                     export LC_ALL=en_US.UTF-8
                     echo "=======  Inference Start  ======="
-                    if [[ "${model}" == "whisper" ]];then OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
-                        NEURAL_SPEED_VERBOSE=1 $infer_cmd -f "/tf_dataset2/models/nlp_toolkit/whisper-tiny/jfk.wav" -m ${model}-${precision}.bin
+                    if [[ "${model}" == "whisper" ]];then NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
+                         $infer_cmd -f "/tf_dataset2/models/nlp_toolkit/whisper-tiny/jfk.wav" -m ${model}-${precision}.bin
                     else
                         real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
                         [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
