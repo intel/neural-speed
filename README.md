@@ -14,7 +14,7 @@ You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-o
 
 ## Quick Start
 There are two approaches for utilizing the Neural Speed:
-1. Transformer-like API
+###1. Transformer-like API
 
 #### NeuralSpeed
 ```
@@ -34,7 +34,7 @@ outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample
 #### Intel Extension for Transformers
 You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
 
-2. Neural Speed straight forward:
+###2. Neural Speed straight forward:
 
 #### One-click Python scripts
 Run LLM with one-click python script including conversion, quantization and inference.
