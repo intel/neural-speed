@@ -1239,6 +1239,51 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
   return BTLA_CODE::Success;
 }
 
+inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
+                                  bool zeropadding) {
+  auto head_proc_num = utils::updiv(scale_offset, 16) * 16 - scale_offset;
+  auto zmm_dq_offset = _mm512_set1_ps(dq_scale[dq_offset_idx]);
+
+  auto get_fp_scale = [&](int proc_src_num, __mmask16 mask, int scale_offset, uint8_t* src, float* dst) {
+    auto dq_s_idx = scale_offset / dq_blk;
+    auto zmm_dq_scale = _mm512_set1_ps(dq_scale[dq_s_idx]);
+    __m512 fp32_dq_v;
+    for (int i = 0; i < proc_src_num; i++) fp32_dq_v[i] = dq8_bnb_LUT[src[i]];
+    auto fzmm = _mm512_mul_ps(fp32_dq_v, zmm_dq_scale);
+    fzmm = _mm512_add_ps(fzmm, zmm_dq_offset);
+    _mm512_mask_storeu_ps(dst, mask, fzmm);
+  };
+
+  for (int i = 0; i < row; i++) {
+    if (head_proc_num > col) {
+      auto mask = _cvtu32_mask16(0xffff >> (16 - col));
+      get_fp_scale(col, mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
+    } else {
+      auto head_mask = _cvtu32_mask16(0xffff >> (16 - head_proc_num));
+      auto body_mask = _cvtu32_mask16(0xffff);
+      get_fp_scale(head_proc_num, head_mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
+      auto scale_offset_iter = scale_offset + head_proc_num;
+      uint8_t* src_iter_ptr = src + head_proc_num;
+      float* dst_iter_ptr = dst + head_proc_num;
+      auto body_loop = (col - head_proc_num) / 16;
+      auto tail_proc_num = (col - head_proc_num) % 16;
+      int ii = 0;
+      for (; ii < body_loop; ii++) {
+        get_fp_scale(16, body_mask, scale_offset_iter + ii * 16, src_iter_ptr + i * src_stride + ii * 16,
+                     dst_iter_ptr + i * dst_stride + ii * 16);
+      }
+      if (tail_proc_num > 0) {
+        auto tail_mask = _cvtu32_mask16(0xffff >> (16 - tail_proc_num));
+        get_fp_scale(tail_proc_num, tail_mask, scale_offset_iter + ii * 16, src_iter_ptr + i * src_stride + ii * 16,
+                     dst_iter_ptr + i * dst_stride + ii * 16);
+      }
+    }
+  }
+  if (zeropadding) assert(0);
+  return BTLA_CODE::Success;
+}
+
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
                                           const float* src1ptr, const int src1step, float* dstptr, const int dststep,
                                           const int M, const int N) {

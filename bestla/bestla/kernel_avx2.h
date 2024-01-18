@@ -112,6 +112,52 @@ static inline void dequant_s8_N_avx2(float* dstptr, int8_t* srcptr, __m256* vsca
   }
 }
 
+inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
+                                  bool zeropadding) {
+  auto head_proc_num = utils::updiv(scale_offset, 8) * 8 - scale_offset;
+  auto ymm_dq_offset = _mm256_set1_ps(dq_scale[dq_offset_idx]);
+
+  auto get_fp_scale_ref = [&](int proc_src_num, int scale_offset, uint8_t* src, float* dst) {
+    auto dq_s_idx = scale_offset / dq_blk;
+    for (int j = 0; j < col; j++) dst[j] = dq8_bnb_LUT[src[j]] * dq_scale[dq_s_idx] + dq_scale[dq_offset_idx];
+  };
+
+  auto get_fp_scale_avx2 = [&](int scale_offset, uint8_t* src, float* dst) {
+    auto dq_s_idx = scale_offset / dq_blk;
+    auto ymm_dq_scale = _mm256_set1_ps(dq_scale[dq_s_idx]);
+    __m256 fp32_dq_v;
+    for (int i = 0; i < 8; i++) fp32_dq_v[i] = dq8_bnb_LUT[src[i]];
+    auto fymm = _mm256_mul_ps(fp32_dq_v, ymm_dq_scale);
+    fymm = _mm256_add_ps(fymm, ymm_dq_offset);
+    _mm256_storeu_ps(dst, fymm);
+  };
+
+  for (int i = 0; i < row; i++) {
+    if (head_proc_num > col) {
+      get_fp_scale_ref(col, scale_offset, src + i * src_stride, dst + i * dst_stride);
+    } else {
+      get_fp_scale_ref(head_proc_num, scale_offset, src + i * src_stride, dst + i * dst_stride);
+      auto scale_offset_iter = scale_offset + head_proc_num;
+      uint8_t* src_iter_ptr = src + head_proc_num;
+      float* dst_iter_ptr = dst + head_proc_num;
+      auto body_loop = (col - head_proc_num) / 8;
+      auto tail_proc_num = (col - head_proc_num) % 8;
+      int ii = 0;
+      for (; ii < body_loop; ii++) {
+        get_fp_scale_avx2(scale_offset_iter + ii * 8, src_iter_ptr + i * src_stride + ii * 8,
+                          dst_iter_ptr + i * dst_stride + ii * 8);
+      }
+      if (tail_proc_num > 0) {
+        get_fp_scale_ref(tail_proc_num, scale_offset_iter + ii * 8, src_iter_ptr + i * src_stride + ii * 8,
+                         dst_iter_ptr + i * dst_stride + ii * 8);
+      }
+    }
+  }
+  if (zeropadding) assert(0);
+  return BTLA_CODE::Success;
+}
+
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
                                           const float* src1ptr, const int src1step, float* dstptr, const int dststep,
                                           const int M, const int N) {
