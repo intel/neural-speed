@@ -257,7 +257,7 @@ Neural Speed supports the following models:
 </thead>
 <tbody>
   <tr>
-    <td><a href="TheBloke/Llama-2-7B-Chat-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Llama-2-7B-Chat-GGUF</td>
+    <td><a href="https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Llama-2-7B-Chat-GGUF</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -265,7 +265,7 @@ Neural Speed supports the following models:
     <td></td>
   </tr>
   <tr>
-    <td><a href="TheBloke/Mistral-7B-v0.1-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Mistral-7B-v0.1-GGUF</a>,
+    <td><a href="https://huggingface.co/TheBloke/Mistral-7B-v0.1-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Mistral-7B-v0.1-GGUF</a>,
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -299,7 +299,7 @@ Neural Speed supports the following models:
     <td>✅</td>
   </tr>
     <tr>
-    <td><a href="(https://huggingface.co/meta-llama/Llama-2-7b-chat-hf)" target="_blank" rel="noopener noreferrer">meta-llama/Llama-2-7b-chat-hf</td>
+    <td><a href="https://huggingface.co/meta-llama/Llama-2-7b-chat-hf" target="_blank" rel="noopener noreferrer">meta-llama/Llama-2-7b-chat-hf</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -308,7 +308,7 @@ Neural Speed supports the following models:
   </tr>
     </tr>
     <tr>
-    <td><a href="(https://huggingface.co/tiiuae/falcon-7b/tree/main)" target="_blank" rel="noopener noreferrer">tiiuae/falcon-7</td>
+    <td><a href="https://huggingface.co/tiiuae/falcon-7b/tree/main" target="_blank" rel="noopener noreferrer">tiiuae/falcon-7</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -317,7 +317,7 @@ Neural Speed supports the following models:
   </tr>
     </tr>
     <tr>
-    <td><a href="(https://huggingface.co/tiiuae/falcon-40b)" target="_blank" rel="noopener noreferrer">tiiuae/falcon-40b</td>
+    <td><a href="https://huggingface.co/tiiuae/falcon-40b" target="_blank" rel="noopener noreferrer">tiiuae/falcon-40b</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -326,7 +326,7 @@ Neural Speed supports the following models:
   </tr>
     </tr>
     <tr>
-    <td><a href="(https://huggingface.co/mosaicml/mpt-7b)" target="_blank" rel="noopener noreferrer">mpt-7b</td>
+    <td><a href="https://huggingface.co/mosaicml/mpt-7b" target="_blank" rel="noopener noreferrer">mpt-7b</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -335,7 +335,7 @@ Neural Speed supports the following models:
   </tr>
     </tr>
     <tr>
-    <td><a href="(https://huggingface.co/mosaicml/mpt-30b)" target="_blank" rel="noopener noreferrer">mpt-30b</td>
+    <td><a href="https://huggingface.co/mosaicml/mpt-30b" target="_blank" rel="noopener noreferrer">mpt-30b</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -345,7 +345,7 @@ Neural Speed supports the following models:
     </tr>
     </tr>
     <tr>
-    <td><a href="(https://huggingface.co/bigscience/bloomz-7b1)" target="_blank" rel="noopener noreferrer">bloomz-7b1</td>
+    <td><a href="https://huggingface.co/bigscience/bloomz-7b1" target="_blank" rel="noopener noreferrer">bloomz-7b1</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
