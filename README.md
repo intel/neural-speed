@@ -537,16 +537,11 @@ from transformers import AutoTokenizer, TextStreamer
 from intel_extension_for_transformers.transformers import AutoModelForCausalLM, WeightOnlyQuantConfig
 
 # Specify the GGUF repo on the Hugginface
-model_name = "TheBloke/Llama-2-7B-Chat-GGUF"
+model_name = "TheBloke/Mistral-7B-v0.1-GGUF"
 # Download the the specific gguf model file from the above repo
-model_file = "llama-2-7b-chat.Q4_0.gguf"
+model_file = "mistral-7b-v0.1.Q4_0.gguf"
 # make sure you are granted to access this model on the Huggingface.
-tokenizer_name = "meta-llama/Llama-2-7b-chat-hf"
-
-# If you are not granted, please check this combination.
-# model_name = "TheBloke/Mistral-7B-v0.1-GGUF"
-# model_file = "mistral-7b-v0.1.Q4_0.gguf" 
-# tokenizer_name = "mistralai/Mistral-7B-v0.1"
+tokenizer_name = "mistralai/Mistral-7B-v0.1"
 
 prompt = "Once upon a time"
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
