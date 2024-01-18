@@ -68,7 +68,7 @@ compile_quant(quant_chatglm2  quant_model.cpp chatglm2  chatglm2)
 compile_quant(quant_baichuan  quant_model.cpp baichuan  baichuan)
 compile_quant(quant_mistral   quant_model.cpp mistral   llama)
 compile_quant(quant_qwen   quant_model.cpp qwen   qwen)
-compile_quant(quant_phi   quant_model.cpp phi2   phi2)
+compile_quant(quant_phi2   quant_model.cpp phi2   phi2)
 
 # all models running
 if (NS_PYTHON_API)
