@@ -24,9 +24,8 @@ from neural_speed import Model
 # Usage:
 # python python_api_example_for_bin.py \
 # --model_name falcon \
-# --model_path /home/zhenzhong/model/falcon-7b \
-# -m /path/to/ggml-model-f32.gguf
-
+# --model_path /model_path/falcon-7b \
+# -m /model_path/falcon-7b/ggml-model-f32.gguf
 
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="main program llm running")
