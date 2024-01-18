@@ -13,3 +13,5 @@ build/
 debug/
 .eggs/
 dist/
+.cache/
+.clangd
