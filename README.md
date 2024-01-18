@@ -503,7 +503,7 @@ How to create the GGUF bin file in NeuralSpeed:
 # Example:
 # please provide the local model path as the arg,
 # which means you need to `git clone https://huggingface.co/meta-llama/Llama-2-7b-chat-hf` first.
-python convert-hf-to-gguf.py /model_path/Llama-2-7b-chat-hf/
+python neural_speed/convert/convert-hf-to-gguf.py /model_path/Llama-2-7b-chat-hf/
 ```
 
 How to load the GGUF bin file in NeuralSpeed:
