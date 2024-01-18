@@ -125,7 +125,34 @@ class WeightKBlockNInteger {
     return tmp;
   }
 
+  void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
+                        utils::aligned_vector<float>* dq_buf) {
+    if (qtype == BTLA_DTYPE::DQ8_BNB) {
+      dq_buf->resize(utils::updiv(scale_size, dq_blocksize) + 1);  // add 1 for offset.
+      kernel::ref::dq8_bnb_double_quant<false>(scale, scale_size, dq_blocksize, dq_buf->data());
+    } else {
+      assert(0);
+    }
+  }
+
+  void setDoubleQuantCorrection(utils::avector<float>* dq_buf, StorageWeight* ptr) {
+    // TODO(zhe): parallel data_cpy.
+    if (ptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+      auto packw_dqbuf_ptr = ptr->DQPtr<float>();
+      memcpy(packw_dqbuf_ptr, dq_buf->data(), dq_buf->size() * sizeof(float));
+    } else {
+      assert(0);
+    }
+  }
+
   static void enableShuffle(StorageWeight* stor) { stor->enable_shuffle(); }
+  void setDoubleQuantBlkSize(StorageWeight* stor, BTLA_DTYPE stype, int dq_blksize) {
+    stor->mDqBlockSize = dq_blksize;
+    auto nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
+    if (stor->IsAsym() || dq_blksize % 8 != 0) assert(0);
+    stor->mCorrection.enable_double_quant(utils::updiv(nk_scale * stor->mN, dq_blksize), stype);
+    stor->update_size();
+  }
 
   void packTransposeWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* stor,
                            parallel::IThreading* threading) {
@@ -273,6 +300,25 @@ class WeightKBlockNInteger {
           }
         }
       });
+    } else if (stor->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+      threading->parallel_for([&](int tidx) {
+        parallel::ThreadProblem2D thdp{tidx};
+        _para.getIndex(thdp);
+        if (thdp.valid) {
+          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
+            if (i < rawnk_scale) {
+              if (scales != nullptr) {
+                for (size_t j = 0; j < N; j++) {
+                  stor->template SPtr<uint8_t>()[j + i * stor->mNPad] = static_cast<uint8_t>(scales[i * N + j]);
+                }
+              }
+            } else {
+              if (scales != nullptr)
+                std::memset(stor->template SPtr<uint8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(uint8_t));
+            }
+          }
+        }
+      });
     } else {
       assert(0);
     }
@@ -381,6 +427,14 @@ class WeightKBlockNInteger {
 
   void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
                    const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
+    if (stor->SDtype() == BTLA_DTYPE::DQ8_BNB) assert(stor->mDqBlockSize != 0);
+    if (stor->IsDoubleQuant()) {
+      int nk_scale = utils::updiv(K, stor->mBlockSize);
+      auto ssize = static_cast<size_t>(N) * nk_scale;
+      utils::avector<float> dq_buf;
+      doubleQuantScale(const_cast<float*>(scales), ssize, stor->mDqBlockSize, stor->SDtype(), &dq_buf);
+      setDoubleQuantCorrection(&dq_buf, stor);
+    }
     setQuantCorrection(N, K, zero_points, scales, stor, threading);
     if (stor->mDType == BTLA_DTYPE::S8 || stor->mDType == BTLA_DTYPE::F8_E4M3 || stor->mDType == BTLA_DTYPE::F8_E5M2) {
       reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
@@ -596,6 +650,15 @@ class WeightKBlockNInteger {
           utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep() * 2, n_size * 4, false);
       *dststep = n_size;
     }
+    if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+      auto aptr = wptr->template SPtr<uint8_t>();
+      auto internal_k_offset = k_offset / wptr->mBlockSize;
+      auto dq_offset_idx = wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1;
+      kernel::wrapper::Dq8GetScale::template forward<ISA_T>(
+          aptr + internal_k_offset * wptr->CStep() + n_offset, *dstptr, utils::updiv(k_size, wptr->mBlockSize), n_size,
+          internal_k_offset * wptr->mN + n_offset, wptr->mDqBlockSize, dq_offset_idx, wptr->DQPtr<float>(),
+          wptr->CStep(), n_size, false);
+    }
     return BTLA_CODE::Success;
   }
 
@@ -731,6 +794,22 @@ class WeightKBlockNInteger {
         } else {
           assert(0);
         }
+      } else if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+        auto internal_n_offset = n_offset + i;
+        if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
+          kernel::wrapper::DecompressDQKBlockS4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
+                                                                                               BTLA_DTYPE::S4_CLIP>(
+              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
+                  i * KPad / 2,
+              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize,
+              wptr->template SPtr<uint8_t>(), wptr->template DQPtr<float>(), k_offset / _GemmCore_T::PACK_ROW,
+              internal_n_offset, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, wptr->mN, wptr->mDqBlockSize,
+              wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1, tmpcache, cachesize);
+        } else {
+          assert(0);
+        }
+      } else {
+        assert(0);
       }
     }
     *dststep = k_size;
@@ -896,6 +975,22 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
                                                                                                  BTLA_DTYPE::F4_BNB>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+        } else {
+          assert(0);
+        }
+      } else if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+        auto f4ptr = reinterpret_cast<utils::f4x2*>(bptr + i * KPad / 2);
+        auto fp_ptr = *dstptr + i * k_size;
+        auto internal_n_offset = n_offset + i;
+        auto internal_k_offset = k_offset / _GemmCore_T::PACK_ROW;
+        auto internal_kblock = wptr->mBlockSize / _GemmCore_T::PACK_ROW;
+        auto dq_offset_idx = wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1;
+        if (wptr->mDType == BTLA_DTYPE::F4_NF4) {
+          kernel::wrapper::DecompressDqKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
+                                                                                                   BTLA_DTYPE::F4_NF4>(
+              f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, wptr->template SPtr<uint8_t>(),
+              wptr->template DQPtr<float>(), internal_k_offset, internal_n_offset, internal_kblock, wptr->mDqBlockSize,
+              dq_offset_idx, NPad, wptr->mN, tmpcache, cachesize);
         } else {
           assert(0);
         }
