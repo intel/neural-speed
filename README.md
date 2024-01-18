@@ -13,8 +13,26 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) to get the performance information.
 
 ## Quick Start
-There are two methods for utilizing the Neural Speed:
-1. We provide [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
+There are two approaches for utilizing the Neural Speed:
+1. Transformer-like API
+
+#### NeuralSpeed
+```
+from transformers import AutoTokenizer, TextStreamer
+from neural_speed import Model
+
+prompt = "Once upon a time, a little girl"
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt").input_ids
+streamer = TextStreamer(tokenizer)
+
+model = Model()
+model.init(model_name, weight_dtype="int4", compute_dtype="int8", group_size=32)
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample=True)
+```
+
+#### Intel Extension for Transformers
+You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
 
 2. Neural Speed straight forward:
 
