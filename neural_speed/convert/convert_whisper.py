@@ -219,21 +219,25 @@ def main(args_in: Optional[List[str]] = None) -> None:
         else:
             data = data.astype(np.float32)
             ftype = 0
-             # header
-            str_ = name.encode('utf-8')
-            fout.write(struct.pack("iii", n_dims, len(str_), ftype))
-            for i in range(n_dims):
-                fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-            fout.write(str_)
 
-            # data
-            data.tofile(fout)
+        # header
+        str_ = name.encode('utf-8')
+        fout.write(struct.pack("iii", n_dims, len(str_), ftype))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(str_)
 
-        fout.close()
+        # data
+        data.tofile(fout)
 
-        print("Done. Output file: ", fname_out)
-        print("")
-    
-    if __name__ == "__main__":
-        main()
+    fout.close()
+
+    print("Done. Output file: ", fname_out)
+    print("")
+
+
+
+
+if __name__ == "__main__":
+    main()
     
