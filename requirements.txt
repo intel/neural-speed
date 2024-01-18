@@ -13,3 +13,4 @@ tiktoken
 py-cpuinfo
 gguf
 cmake
+setuptools>=61
