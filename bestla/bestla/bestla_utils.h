@@ -298,6 +298,8 @@ inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
       return "fp8_e5m2";
     case BTLA_DTYPE::F8_E3M4:
       return "fp8_e3m4";
+    case BTLA_DTYPE::F8_E8M0:
+      return "fp8_e8m0";
     case BTLA_DTYPE::S8:
       return "signed_int8";
     case BTLA_DTYPE::U8:

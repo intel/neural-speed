@@ -136,7 +136,6 @@ class WeightKBlockNInteger {
   }
 
   void setDoubleQuantCorrection(utils::avector<float>* dq_buf, StorageWeight* ptr) {
-    // TODO(zhe): parallel data_cpy.
     if (ptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
       auto packw_dqbuf_ptr = ptr->DQPtr<float>();
       memcpy(packw_dqbuf_ptr, dq_buf->data(), dq_buf->size() * sizeof(float));
