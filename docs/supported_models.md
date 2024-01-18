@@ -236,3 +236,121 @@ Neural Speed supports the following models:
   </tr>
 </tbody>
 </table>
+
+### Validated GGUF Models
+
+<table>
+<thead>
+  <tr>
+    <th rowspan="2">Model Name</th>
+    <!-- <th colspan="2">HF</th>
+    <th colspan="2">Llama.cpp</th> -->
+
+  </tr>
+  <tr>
+    <th>F32</th>
+    <th>F16</th>
+    <th>Q4_0</th>
+    <th>Q8_0</th>
+    <th>BTLA</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><a href="TheBloke/Llama-2-7B-Chat-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Llama-2-7B-Chat-GGUF</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><a href="TheBloke/Mistral-7B-v0.1-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Mistral-7B-v0.1-GGUF</a>,
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+    <tr>
+    <td><a href="https://huggingface.co/codellama/CodeLlama-7b-hf" target="_blank" rel="noopener noreferrer">TheBloke/CodeLlama-7B-GGUF</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+    </tr>
+    <tr>
+    <td><a href="https://huggingface.co/codellama/CodeLlama-13b-hf" target="_blank" rel="noopener noreferrer">TheBloke/CodeLlama-13B-GGUF</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><a href="https://huggingface.co/codellama/CodeLlama-7b-hf" target="_blank" rel="noopener noreferrer">Code-LLaMA-7B</a>,
+    <a href="https://huggingface.co/codellama/CodeLlama-13b-hf" target="_blank" rel="noopener noreferrer">Code-LLaMA-13B</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    <tr>
+    <td><a href="(https://huggingface.co/meta-llama/Llama-2-7b-chat-hf)" target="_blank" rel="noopener noreferrer">meta-llama/Llama-2-7b-chat-hf</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    </tr>
+    <tr>
+    <td><a href="(https://huggingface.co/tiiuae/falcon-7b/tree/main)" target="_blank" rel="noopener noreferrer">tiiuae/falcon-7</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    </tr>
+    <tr>
+    <td><a href="(https://huggingface.co/tiiuae/falcon-40b)" target="_blank" rel="noopener noreferrer">tiiuae/falcon-40b</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    </tr>
+    <tr>
+    <td><a href="(https://huggingface.co/mosaicml/mpt-7b)" target="_blank" rel="noopener noreferrer">mpt-7b</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    </tr>
+    <tr>
+    <td><a href="(https://huggingface.co/mosaicml/mpt-30b)" target="_blank" rel="noopener noreferrer">mpt-30b</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    </tr>
+    </tr>
+    <tr>
+    <td><a href="(https://huggingface.co/bigscience/bloomz-7b1)" target="_blank" rel="noopener noreferrer">bloomz-7b1</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+</tbody>
+</table>
