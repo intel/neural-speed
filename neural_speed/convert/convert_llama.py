@@ -1146,7 +1146,6 @@ class OutputFile:
 
 class OutputFile_GGUF:
     def __init__(self, fname_out: Path) -> None:
-        self.fout = open(fname_out, "wb")
         self.gguf_file = str(fname_out) + '.gguf'
         self.gguf_writer = gguf.GGUFWriter(self.gguf_file, "llama")
 
@@ -1223,7 +1222,6 @@ class OutputFile_GGUF:
         of = OutputFile_GGUF(fname_out)
         of.write_file_header(params)
         of.write_vocab_gguf(vocab)
-        of.fout.close()
 
     @staticmethod
     def write_all(fname_out: Path, params: Params, model: LazyModel, vocab: Vocab, file_type: NEFileType) -> None:
@@ -1246,7 +1244,6 @@ class OutputFile_GGUF:
             of.write_tensor_header_gguf(name, lazy_tensor.shape, lazy_tensor.data_type, ndarray)
 
         of.end()
-        of.fout.close()
 
 
 def pick_output_type(model: LazyModel, output_type_str: Optional[str]) -> NEFileType:
