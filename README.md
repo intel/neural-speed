@@ -5,7 +5,6 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 - Modular design to support new models
 - [Highly optimized low precision kernels](neural_speed/core/README.md)
 - Utilize AMX, VNNI, AVX512F and AVX2 instruction set
-- Support CPU (x86 platforms only) and Intel GPU (WIP)
 - Support 4bits and 8bits quantization
 
 > Neural Speed is under active development so APIs are subject to change.
@@ -102,9 +101,6 @@ python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 
 |Intel Xeon Scalable Processors | ✔ |
 |Intel Xeon CPU Max Series | ✔ |
 |Intel Core Processors | ✔ |
-|Intel Arc GPU Series | WIP |
-|Intel Data Center GPU Max Series | WIP |
-|Intel Gaudi2 | Not yet |
 
 ## Supported Models
 
