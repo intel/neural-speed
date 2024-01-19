@@ -470,9 +470,9 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
 
         // KQ_scaled = mask_past(KQ_scaled)
         if (attn_n_total == 0 || !shift_roped_k || !no_padding) {
-          std::vector<int> attn_n_padding;
+          std::vector<int> attn_n_padding(infer_groups[gi].size(), 0);
           for (int npa = 0; !n_padding.empty() && npa < infer_groups[gi].size(); ++npa) {
-            attn_n_padding.push_back(n_padding[infer_groups[gi][npa]]);
+            attn_n_padding[npa] = n_padding[infer_groups[gi][npa]];
           }
           KQ_scaled = ne_diag_mask_inf_with_padding_inplace(ctx0, KQ_scaled, attn_n_past, attn_n_padding.data());
           ne_set_name(KQ_scaled, std::string("KQ_masked_" + suffix).c_str());

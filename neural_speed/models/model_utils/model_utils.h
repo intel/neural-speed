@@ -449,7 +449,7 @@ class beam_search_flow {
     padding_side.resize(batch_size);
     n_padding.resize(batch_size);
     gen_confs.resize(batch_size);
-    next_inputs.reserve(batch_size);
+    next_inputs.reserve(batch_size * beam_size);
     kv_reorder = ctx->bs_kv_reorder;
     if (kv_reorder == nullptr) {
       kv_reorder = std::make_shared<beam_search_kv_cache_reorder>(ctx);
