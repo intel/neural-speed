@@ -59,7 +59,7 @@ class gemm_universal_t<dispatch_policy_int4_dequantize_kslicing<group_swizzle_,
     using work_group_t = typename gemm_t::work_group_t;
     static constexpr uint32_t work_group_size = work_group_t::size;
 
-    static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+    static constexpr gpu_arch arch_tag = group_swizzle_t::arch_tag;
     static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
     static_assert(
             arch_tag == epilogue_t::arch_tag, "arch_tag should be the same");
@@ -104,7 +104,7 @@ class gemm_universal_t<dispatch_policy_int4_dequantize_kslicing<group_swizzle_,
             "num_local_kslicing should be power of 2!");
 
     using kslicing_t = group::cooperative_reduce_t<reduce_op::sum, tile_shape,
-            matAcc_t, num_local_kslicing, gpu_arch::Xe>;
+            matAcc_t, num_local_kslicing, arch_tag>;
     using mat_slice_t = typename kslicing_t::mat_slice_t;
     static constexpr uint32_t ks_coop_num_x = kslicing_t::coop_num_x;
     static constexpr uint32_t ks_coop_num_y = kslicing_t::coop_num_y;
@@ -125,11 +125,12 @@ class gemm_universal_t<dispatch_policy_int4_dequantize_kslicing<group_swizzle_,
 
     using global_group_reduce_t = group::global_reduce_t<reduce_op::sum,
             tile_shape, tile_shape_cnt, mem_desc_acc_t, mem_desc_cnt_t,
-            num_global_kslicing, counter_size, gpu_arch::Xe>;
+            num_global_kslicing, counter_size, arch_tag>;
 
 public:
     /// @brief GEMM arguments.
     /// This is the interface for users to pass the application-related runtime variables.
+    template <group::quant_mode quant_mode = group::S4_FULLRANGE_NO_ZP>
     struct arguments_t {
         /// @brief Is the size of the m dimension of the matrix multiplication (m x k x n).
         uint32_t matrix_m;
@@ -206,6 +207,7 @@ public:
             , zero_pt_base(zero_pt_base_)
             , scale_ld(scale_ld_)
             , zero_pt_ld(zero_pt_ld_) {}
+
         inline arguments_t(const arguments_t &args)
             : matrix_m(args.matrix_m)
             , matrix_k(args.matrix_k)
@@ -238,8 +240,118 @@ public:
             this->matC_ld = args.matC_ld;
             this->scale_base = args.scale_base;
             this->scale_ld = args.scale_ld;
-            this->zero_pt_base = args.zero_pt_base;
+            this->zero_pt_base = args.zero_pt_base_;
             this->zero_pt_ld = args.zero_pt_ld;
+            this->acc_base = args.acc_base;
+            this->cnt_base = args.cnt_base;
+            this->epilogue_args = args.epilogue_args;
+            return *this;
+        }
+    };
+
+    template <>
+    struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
+        /// @brief Is the size of the m dimension of the matrix multiplication (m x k x n).
+        uint32_t matrix_m;
+        /// @brief Is the size of the k dimension of the matrix multiplication (m x k x n).
+        uint32_t matrix_k;
+        /// @brief Is the size of the n dimension of the matrix multiplication (m x k x n).
+        uint32_t matrix_n;
+        /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
+        uint32_t matA_ld;
+        /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
+        uint32_t matB_ld;
+        /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
+        uint32_t matC_ld;
+        /// @brief Is the base address of matrix A.
+        matA_base_t matA_base;
+        /// @brief Is the base address of matrix B.
+        matB_base_t matB_base;
+        /// @brief Is the base address of matrix C.
+        matC_base_t matC_base;
+        /// @brief Is the base address of accumulation buffer.
+        acc_base_t acc_base;
+        /// @brief Is the base address of counter buffer.
+        cnt_base_t cnt_base;
+        /// @brief Is the epilogue arguments.
+        epilogue_args_t epilogue_args;
+
+        scale_base_t scale_base;
+        uint32_t scale_ld;
+
+        /// @brief Constructs arguments with default method.
+        inline arguments_t() = default;
+
+        /// @brief Set for device copyable
+        static constexpr bool host_callable = true;
+
+        // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
+        // Please check if you need to add self-define destructor
+        // ~arguments_t(){}
+
+        /// @brief Constructs arguments with initialization list.
+        /// @param matrix_m_ Is the size of the m dimension of the matrix multiplication (m x k x n).
+        /// @param matrix_k_ Is the size of the k dimension of the matrix multiplication (m x k x n).
+        /// @param matrix_n_ Is the size of the n dimension of the matrix multiplication (m x k x n).
+        /// @param matA_base_ Is the base address of matrix A.
+        /// @param matA_ld_ Is the leading dimension (pitch) size of the matrix A in memory.
+        /// @param matB_base_ Is the base address of matrix B.
+        /// @param matB_ld_ Is the leading dimension (pitch) size of the matrix B in memory.
+        /// @param matC_base_ Is the base address of matrix C.
+        /// @param matC_ld_ Is the leading dimension (pitch) size of the matrix C in memory.
+        /// @param epilogue_args_ Is the epilogue arguments.
+        inline arguments_t(uint32_t matrix_m_, uint32_t matrix_k_,
+                uint32_t matrix_n_, matA_base_t matA_base_, uint32_t matA_ld_,
+                matB_base_t matB_base_, uint32_t matB_ld_,
+                matC_base_t matC_base_, uint32_t matC_ld_,
+                scale_base_t scale_base_, uint32_t scale_ld_,
+                acc_base_t acc_base_ = {}, cnt_base_t cnt_base_ = {},
+                epilogue_args_t epilogue_args_ = {})
+            : matrix_m(matrix_m_)
+            , matrix_k(matrix_k_)
+            , matrix_n(matrix_n_)
+            , matA_ld(matA_ld_)
+            , matB_ld(matB_ld_)
+            , matC_ld(matC_ld_)
+            , matA_base(matA_base_)
+            , matB_base(matB_base_)
+            , matC_base(matC_base_)
+            , acc_base(acc_base_)
+            , cnt_base(cnt_base_)
+            , epilogue_args(epilogue_args_)
+            , scale_base(scale_base_)
+            , scale_ld(scale_ld_) {}
+
+        inline arguments_t(const arguments_t &args)
+            : matrix_m(args.matrix_m)
+            , matrix_k(args.matrix_k)
+            , matrix_n(args.matrix_n)
+            , matA_ld(args.matA_ld)
+            , matB_ld(args.matB_ld)
+            , matC_ld(args.matC_ld)
+            , matA_base(args.matA_base)
+            , matB_base(args.matB_base)
+            , matC_base(args.matC_base)
+            , acc_base(args.acc_base)
+            , cnt_base(args.cnt_base)
+            , epilogue_args(args.epilogue_args)
+            , scale_base(args.scale_base)
+            , scale_ld(args.scale_ld) {}
+        // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
+        // Please check if you need to add self-define destructor
+        // inline ~arguments_t(){}
+        inline arguments_t &operator=(const arguments_t &args) {
+            this->matrix_m = args.matrix_m;
+            this->matrix_k = args.matrix_k;
+            this->matrix_n = args.matrix_n;
+            this->matA_base = args.matA_base;
+            this->matA_ld = args.matA_ld;
+            this->matB_base = args.matB_base;
+            this->matB_ld = args.matB_ld;
+            this->matC_base = args.matC_base;
+            this->matC_ld = args.matC_ld;
+            this->scale_base = args.scale_base;
+            this->scale_ld = args.scale_ld;
             this->acc_base = args.acc_base;
             this->cnt_base = args.cnt_base;
             this->epilogue_args = args.epilogue_args;
@@ -265,8 +377,13 @@ public:
     __XETLA_API static constexpr uint32_t get_slm_size() {
         constexpr uint32_t size = gemm_slm_size * num_local_kslicing
                 + kslicing_slm_size + epilogue_slm_size * num_local_kslicing;
-        static_assert(size <= (128 * 1024),
-                "The local memory size should be less than 128KB!");
+        if constexpr (arch_tag == gpu_arch::Dg2) {
+            static_assert(size <= (64 * 1024),
+                    "The local memory size should be less than 64KB!");
+        } else {
+            static_assert(size <= (128 * 1024),
+                    "The local memory size should be less than 128KB!");
+        }
         return size;
     }
 
@@ -300,7 +417,8 @@ public:
     /// @brief Host helper function to get the expected nd_range under the current GEMM config.
     /// @param args Is the GEMM arguments for application-related runtime variables.
     /// @return Expected nd_range.
-    static cl::sycl::nd_range<3> get_nd_range(arguments_t &args) {
+    template <group::quant_mode quant_mode>
+    static cl::sycl::nd_range<3> get_nd_range(arguments_t<quant_mode> &args) {
         cl::sycl::range<3> local_range = get_local_range();
         cl::sycl::range<3> group_range
                 = get_group_range(args.matrix_m, args.matrix_n);
@@ -329,49 +447,59 @@ public:
     /// @brief Check if the arguments can be implemented.
     /// @param args Is the GEMM arguments for application-related runtime variables.
     /// @return Check result.
-    static bool can_implement(arguments_t &args) {
+    template <group::quant_mode quant_mode>
+    static bool can_implement(arguments_t<quant_mode> &args) {
         bool implementable = true;
         if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
             if (gemm_t::msg_type_a == msg_type::block_2d) {
-                implementable &= kernel::block_2d<gpu_arch::Xe,
-                        dtype_a>::check_tensor((uint64_t)(args.matA_base.base),
-                        gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
-                        gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
-                        args.matA_ld);
+                implementable
+                        &= kernel::block_2d<arch_tag, dtype_a>::check_tensor(
+                                (uint64_t)(args.matA_base.base),
+                                gemm_t::is_col_major_a ? args.matrix_m
+                                                       : args.matrix_k,
+                                gemm_t::is_col_major_a ? args.matrix_k
+                                                       : args.matrix_m,
+                                args.matA_ld);
             } else {
-                implementable &= kernel::general_1d<gpu_arch::Xe,
+                implementable &= kernel::general_1d<arch_tag,
                         dtype_a>::check_alignment(args.matA_base.base,
                         args.matA_ld);
             }
         }
         if (gemm_t::msg_type_b != msg_type::unaligned_2d) {
             if (gemm_t::msg_type_b == msg_type::block_2d) {
-                implementable &= kernel::block_2d<gpu_arch::Xe,
-                        dtype_b>::check_tensor((uint64_t)(args.matB_base.base),
-                        args.matB_ld / pack_ratio,
-                        gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
-                        args.matB_ld / pack_ratio);
+                implementable
+                        &= kernel::block_2d<arch_tag, dtype_b>::check_tensor(
+                                (uint64_t)(args.matB_base.base),
+                                args.matB_ld / pack_ratio,
+                                gemm_t::is_col_major_b ? args.matrix_n
+                                                       : args.matrix_k,
+                                args.matB_ld / pack_ratio);
             } else {
-                implementable &= kernel::general_1d<gpu_arch::Xe,
+                implementable &= kernel::general_1d<arch_tag,
                         dtype_b>::check_alignment(args.matB_base.base,
                         args.matB_ld / pack_ratio);
             }
         }
         if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
             if (epilogue_t::msg_type_c == msg_type::block_2d) {
-                implementable &= kernel::block_2d<gpu_arch::Xe,
-                        dtype_c>::check_tensor((uint64_t)(args.matC_base.base),
-                        args.matrix_n, args.matrix_m, args.matC_ld);
+                implementable
+                        &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
+                                (uint64_t)(args.matC_base.base), args.matrix_n,
+                                args.matrix_m, args.matC_ld);
             } else {
-                implementable &= kernel::general_1d<gpu_arch::Xe,
+                implementable &= kernel::general_1d<arch_tag,
                         dtype_c>::check_alignment(args.matC_base.base,
                         args.matC_ld);
             }
         }
         // check for int4x2
         implementable &= ((args.matB_ld % pack_ratio == 0)
-                && (args.zero_pt_ld % pack_ratio == 0)
                 && (args.matrix_n % pack_ratio == 0));
+        if constexpr (gemm_t::compute_policy::quant_type
+                != group::quant_mode::S4_FULLRANGE_NO_ZP) {
+            implementable &= (args.zero_pt_ld % pack_ratio == 0);
+        }
 
         return implementable;
     }
@@ -383,8 +511,9 @@ public:
     /// @param args Is the GEMM arguments for application-related runtime variables.
     /// @param slm_base Is the slm base address.
     /// @param nbarrier_base Is the named barrier base.
+    template <group::quant_mode quant_mode>
     __XETLA_API KERNEL_FUNC void operator()(sycl::nd_item<3> &item,
-            const arguments_t &args, uint32_t slm_base = 0,
+            const arguments_t<quant_mode> &args, uint32_t slm_base = 0,
             uint32_t nbarrier_base = 0) {
         // set up workgroup level coordinates and boundaries
         work_group_t g(item.get_local_linear_id() % work_group_size);
@@ -443,7 +572,7 @@ public:
         mem_desc_a_t mem_desc_a;
         mem_desc_b_t mem_desc_b;
         mem_desc_c_t mem_desc_c;
-        //setup for matA
+        // setup for matA
 
         mem_desc_a.init(args.matA_base, {boundary_k, boundary_m, args.matA_ld},
                 {start_k, start_m});
@@ -456,14 +585,21 @@ public:
         mem_desc_scale_t mem_desc_scale(args.scale_base,
                 {args.matrix_n, scale_size_y, args.scale_ld},
                 {start_x_scale, start_y_scale});
-        mem_desc_zero_pt_t mem_desc_zero_pt(args.zero_pt_base,
-                {args.matrix_n / pack_ratio, scale_size_y,
-                        args.zero_pt_ld / pack_ratio},
-                {start_x_zero_pt, start_y_zero_pt});
 
         uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
-        gemm_args_t gemm_args(mem_desc_a, mem_desc_b, inner_loop_count,
-                mem_desc_scale, mem_desc_zero_pt);
+        gemm_args_t gemm_args;
+        if constexpr (gemm_t::compute_policy::quant_type
+                == group::quant_mode::S4_FULLRANGE_NO_ZP) {
+            gemm_args = gemm_args_t(
+                    mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
+        } else {
+            mem_desc_zero_pt_t mem_desc_zero_pt(args.zero_pt_base,
+                    {args.matrix_n / pack_ratio, scale_size_y,
+                            args.zero_pt_ld / pack_ratio},
+                    {start_x_zero_pt, start_y_zero_pt});
+            gemm_args = gemm_args_t(mem_desc_a, mem_desc_b, inner_loop_count,
+                    mem_desc_scale, mem_desc_zero_pt);
+        }
         matAcc_t matAcc;
         matAcc.init(0);
         gemm_t gemm;
@@ -523,5 +659,4 @@ public:
 };
 
 /// @} xetla_gemm
-
 } // namespace gpu::xetla::kernel

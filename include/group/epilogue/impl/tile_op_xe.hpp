@@ -32,7 +32,7 @@ namespace gpu::xetla::group {
 template <typename tile_op_t_, typename tile_shape_, typename mem_desc_c_t_,
         gpu_arch arch_tag_>
 class epilogue_t<epilogue_policy_tile_op<tile_op_t_, arch_tag_>, tile_shape_,
-        mem_desc_c_t_, std::enable_if_t<(arch_tag_ == gpu_arch::Xe)>> {
+        mem_desc_c_t_, std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
 public:
     using epilogue_policy = epilogue_policy_tile_op<tile_op_t_, arch_tag_>;
     using tile_op_t = typename epilogue_policy::tile_op_t;

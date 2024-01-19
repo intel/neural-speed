@@ -21,7 +21,7 @@
 using namespace std::placeholders;
 
 /* following 9 cases all about padding load/store:
-    0  0  0 .... 0  0  0  
+    0  0  0 .... 0  0  0
     0  _____________   0
     .  |            |  .
     .  |   data     |  .
@@ -262,11 +262,12 @@ TEST(tile_load_store_1d_boundary, esimd) {
 
 TEST(tile_load_store_unaligned_2d, esimd) {
     cl::sycl::nd_range<1> nd_range({1}, {1});
-    auto result_validate = std::bind(tile_load_store_result_validate<int>, _1,
-            _2, _3, 127, 63, 32, 32, 0);
-    kernel_run<int,
-            tile_load_store_unaligned_2d_func<int, 127, 63, 127, 32, 32, 16,
-                    16>>(nd_range, result_validate);
+    using date_type = fp16;
+    auto result_validate = std::bind(tile_load_store_result_validate<date_type>,
+            _1, _2, _3, 127, 63, 32, 32, 0);
+    kernel_run<date_type,
+            tile_load_store_unaligned_2d_func<date_type, 127, 63, 127, 32, 32,
+                    16, 16>>(nd_range, result_validate);
 }
 
 TEST(tile_load_store_oob_1, esimd) {

@@ -23,21 +23,31 @@
 
 namespace gpu::xetla::group {
 
+enum quant_mode { S4_ASYM, S4_FULLRANGE_NO_ZP };
+
+/// @brief Compute policy for unaligned shape and xmx engine.
+/// @tparam compute_attr_ Is compute-related attributes.
+/// @tparam perf_tuning_knob_ Is performance-related knobs.
+/// @tparam arch_tag_ Is the HW architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
-        typename dtype_scale_, typename dtype_zero_pt_, int dequant_s_,
-        gpu_arch arch_tag_ = gpu_arch::Xe>
+        typename dtype_scale_, typename dtype_zero_pt_, quant_mode quant_type_,
+        int dequant_s_, gpu_arch arch_tag_ = gpu_arch::Xe,
+        typename enable = void>
 struct compute_policy_int4_dequantize_xmx {};
 
+/// @brief Specialized for Xe and Dg2 architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
-        typename dtype_scale_, typename dtype_zero_pt_, int dequant_s_>
+        typename dtype_scale_, typename dtype_zero_pt_, quant_mode quant_type_,
+        int dequant_s_, gpu_arch arch_tag_>
 struct compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
-        dtype_scale_, dtype_zero_pt_, dequant_s_, gpu_arch::Xe> {
+        dtype_scale_, dtype_zero_pt_, quant_type_, dequant_s_, arch_tag_,
+        std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
     using compute_attr = compute_attr_;
     using perf_tuning_knob = perf_tuning_knob_;
     static constexpr int k_stride = perf_tuning_knob::k_stride;
     static constexpr int stages = perf_tuning_knob::stages;
     static constexpr int sync_freq = perf_tuning_knob::sync_freq;
-    static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+    static constexpr gpu_arch arch_tag = arch_tag_;
     using dtype_mma_acc = typename compute_attr::dtype_acc;
     using dtype_mma_a = typename compute_attr::dtype_a;
     using dtype_mma_b = typename compute_attr::dtype_b;
@@ -47,7 +57,8 @@ struct compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
 
     static constexpr bool is_int4_matB_policy = true;
 
-    static constexpr uint32_t block_size_x_b = 16;
+    static constexpr uint32_t block_size_x_b
+            = arch_tag == gpu_arch::Dg2 ? 8 : 16;
     static constexpr uint32_t block_bytes_y_b = 32;
     static_assert(block_bytes_x_a == block_bytes_y_b,
             "mat_a x need to match with mat_b y");
@@ -57,6 +68,7 @@ struct compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
             "dequant_s should be a multiply of 32B");
     using dtype_scale = dtype_scale_;
     using dtype_zero_pt = dtype_zero_pt_;
+    static constexpr quant_mode quant_type = quant_type_;
 };
 
 } // namespace gpu::xetla::group

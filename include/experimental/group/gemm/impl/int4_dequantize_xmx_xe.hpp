@@ -31,10 +31,10 @@ namespace gpu::xetla::group {
 template <typename compute_attr_, typename perf_tuning_knob_,
         typename tile_shape_, typename mem_desc_a_t_, typename mem_desc_b_t_,
         typename dtype_scale_, typename dtype_zero_pt_, int dequant_s_,
-        typename pre_processing_t_>
-class gemm_t<
-        compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
-                dtype_scale_, dtype_zero_pt_, dequant_s_, gpu_arch::Xe>,
+        quant_mode quant_type_, typename pre_processing_t_, gpu_arch arch_tag_>
+class gemm_t<compute_policy_int4_dequantize_xmx<compute_attr_,
+                     perf_tuning_knob_, dtype_scale_, dtype_zero_pt_,
+                     quant_type_, dequant_s_, arch_tag_>,
         tile_shape_, // tile shape of workgroup-level gemm
         mem_desc_a_t_, // memory attribute of matA
         mem_desc_b_t_, // memory attribute of matB
@@ -46,8 +46,8 @@ public:
     using tile_shape = tile_shape_;
     using pre_processing_t = pre_processing_t_;
     using compute_policy = compute_policy_int4_dequantize_xmx<compute_attr_,
-            perf_tuning_knob_, dtype_scale_, dtype_zero_pt_, dequant_s_,
-            gpu_arch::Xe>;
+            perf_tuning_knob_, dtype_scale_, dtype_zero_pt_, quant_type_,
+            dequant_s_, arch_tag_>;
     static constexpr uint32_t k_stride = compute_policy::k_stride;
 
     static constexpr uint32_t sg_tile_m = tile_shape::sg_tile_size_y;
@@ -134,11 +134,10 @@ private:
             subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>, arch_tag>;
     using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
     using matA_prefetch_payload_t = subgroup::prefetch_payload_t<mem_desc_a_t,
-            subgroup::tile_desc_t<tile_size_x_a, tile_size_y_a, 1, 1>,
-            wg_size_x, arch_tag>;
+            matA_tile_desc_t, wg_size_x, arch_tag>;
 
-    //note: plane format, row-major
-    //note: 4bit x 2, row-major
+    // note: plane format, row-major
+    // note: 4bit x 2, row-major
     using matB_tile_desc_t = subgroup::tile_desc_t<tile_size_x_b / pack_ratio,
             tile_size_y_b, block_size_x_b / pack_ratio, block_size_y_b,
             reg_layout::tiled>;
@@ -163,7 +162,7 @@ public:
             (k_stride % (dequant_s) == 0) || (dequant_s % (k_stride) == 0),
             "k_stride should match with dequant_s");
 
-    //num_block_y set to 1
+    // num_block_y set to 1
     static constexpr uint32_t block_size_y_scale
             = (k_stride + dequant_s - 1) / dequant_s;
     static constexpr uint32_t tile_size_y_scale = block_size_y_scale;
@@ -174,10 +173,10 @@ public:
     static constexpr uint32_t scale_addr_update_freq
             = (k_stride < dequant_s) ? dequant_s / k_stride : 1;
 
-    using mem_desc_scale_t
-            = mem_desc_t<dtype_scale, mem_layout::row_major, mem_space::global>;
+    using mem_desc_scale_t = mem_desc_t<dtype_scale, mem_layout::row_major,
+            mem_space::global, mem_desc_b_t::alignment>;
     using mem_desc_zero_pt_t = mem_desc_t<dtype_zero_pt, mem_layout::row_major,
-            mem_space::global>;
+            mem_space::global, mem_desc_b_t::alignment>;
 
     using matAcc_tile_desc_t = subgroup::tile_desc_t<tile_size_x_c,
             tile_size_y_c, block_size_x_b, block_size_y_a, reg_layout::tiled>;
@@ -250,6 +249,13 @@ public:
             , inner_loop_count(loop_count)
             , scale_base_desc(scale_desc)
             , zero_pt_base_desc(zero_pt_desc) {}
+
+        inline arguments_t(mem_desc_a_t matA_desc, mem_desc_b_t matB_desc,
+                uint32_t loop_count, mem_desc_scale_t scale_desc)
+            : matA_base_desc(matA_desc)
+            , matB_base_desc(matB_desc)
+            , inner_loop_count(loop_count)
+            , scale_base_desc(scale_desc) {}
         // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
         // Please check if you need to add self-define destructor
         // inline ~arguments_t(){}
@@ -366,10 +372,15 @@ public:
                     matA_prefetch_payload);
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     matB_prefetch_payload);
+            // TODO 1D prefetch need pack to U32/U64
             subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                     scale_prefetch_payload);
-            subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-                    zero_pt_prefetch_payload);
+            if constexpr (compute_policy::quant_type
+                    != quant_mode::S4_FULLRANGE_NO_ZP) {
+                // TODO 1D prefetch need pack to U32/U64
+                subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+                        zero_pt_prefetch_payload);
+            }
             scale_prefetch_addr_i++;
             matA_prefetch_payload.template update_tdesc<update_dir_a>(
                     matA_t::tile_size_x);
@@ -389,7 +400,9 @@ public:
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.arrive(); }
-                    if constexpr (wg_size_y > 1) { nbarrier_b.arrive(); }
+                    if constexpr (arch_tag >= gpu_arch::Xe) {
+                        if constexpr (wg_size_y > 1) { nbarrier_b.arrive(); }
+                    }
                 }
             }
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -398,8 +411,11 @@ public:
                     matB, matB_payload);
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     scale, scale_payload);
-            subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-                    zero_pt, zero_pt_payload);
+            if constexpr (compute_policy::quant_type
+                    != quant_mode::S4_FULLRANGE_NO_ZP) {
+                subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+                        zero_pt, zero_pt_payload);
+            }
             scale_load_addr_i++;
             SW_BARRIER();
             if constexpr (stages != 0) {
@@ -407,10 +423,15 @@ public:
                         matA_prefetch_payload);
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         matB_prefetch_payload);
+                // TODO 1D prefetch need pack to U32/U64
                 subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
                         scale_prefetch_payload);
-                subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-                        zero_pt_prefetch_payload);
+                if constexpr (compute_policy::quant_type
+                        != quant_mode::S4_FULLRANGE_NO_ZP) {
+                    // TODO 1D prefetch need pack to U32/U64
+                    subgroup::tile_prefetch<cache_hint::cached,
+                            cache_hint::cached>(zero_pt_prefetch_payload);
+                }
                 scale_prefetch_addr_i++;
             }
             SW_BARRIER();
@@ -450,7 +471,9 @@ public:
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.wait(); }
-                    if constexpr (wg_size_y > 1) { nbarrier_b.wait(); }
+                    if constexpr (arch_tag >= gpu_arch::Xe) {
+                        if constexpr (wg_size_y > 1) { nbarrier_b.wait(); }
+                    }
                 }
             }
         }
@@ -478,35 +501,12 @@ private:
                 auto scale_vec
                         = scale.reg.xetla_select<scale_t::block_size_x, 1>(
                                 scale_block_id * scale_t::block_size_x);
-                auto zero_pt_vec
-                        = zero_pt.reg
-                                  .xetla_select<zero_pt_t::block_size_x, 1>(
-                                          scale_block_id
-                                          * zero_pt_t::block_size_x)
-                                  .xetla_format<uint8_t>();
 
                 auto dst_blk
                         = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
                                 block_id * matB_acc_t::block_elems);
 
-                xetla_vector<uint8_t, block_size_x_b> zero_pt_sub;
                 //2: int8 includes 2 4bits data.
-                zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(0)
-                        = zero_pt_vec & 0x0f;
-                zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(1)
-                        = zero_pt_vec >> 4;
-
-                xetla_vector<uint8_t, block_size_x_b * block_size_y_b>
-                        zero_pt_blk;
-#pragma unroll
-                for (uint32_t row = 0; row < block_size_y_b; row++) {
-                    zero_pt_blk
-                            .xetla_select<block_size_x_b, 1>(
-                                    row * block_size_x_b)
-                            .xetla_format<int8_t>()
-                            = zero_pt_sub.xetla_format<int8_t>() + int8_t(1);
-                }
-
                 xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
                 cvt_blk.xetla_select<matB_t::block_elems, 2>(0)
                         = matB_blk & 0x0f;
@@ -514,9 +514,40 @@ private:
 
                 xetla_vector<int32_t, block_size_x_b * block_size_y_b>
                         cvt_blk_i32;
-
-                cvt_blk_i32 = (cvt_blk.xetla_format<int8_t>()
-                        - zero_pt_blk.xetla_format<int8_t>());
+                if constexpr (compute_policy::quant_type
+                        == quant_mode::S4_ASYM) {
+                    auto zero_pt_vec
+                            = zero_pt.reg
+                                      .xetla_select<zero_pt_t::block_size_x, 1>(
+                                              scale_block_id
+                                              * zero_pt_t::block_size_x)
+                                      .xetla_format<uint8_t>();
+                    xetla_vector<uint8_t, block_size_x_b> zero_pt_sub;
+                    zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(0)
+                            = zero_pt_vec & 0x0f;
+                    zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(1)
+                            = zero_pt_vec >> 4;
+                    xetla_vector<uint8_t, block_size_x_b * block_size_y_b>
+                            zero_pt_blk;
+#pragma unroll
+                    for (int row = 0; row < block_size_y_b; row++) {
+                        zero_pt_blk
+                                .xetla_select<block_size_x_b, 1>(
+                                        row * block_size_x_b)
+                                .xetla_format<int8_t>()
+                                = zero_pt_sub.xetla_format<int8_t>()
+                                + int8_t(1);
+                    }
+                    cvt_blk_i32 = (cvt_blk.xetla_format<int8_t>()
+                            - zero_pt_blk.xetla_format<int8_t>());
+                }
+                if constexpr (compute_policy::quant_type
+                        == quant_mode::S4_FULLRANGE_NO_ZP) {
+                    xetla_vector<int8_t, block_size_x_b *block_size_y_b>
+                            cvt_blk_i8
+                            = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
+                    cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
+                }
 
                 xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
                         temp_blk;
@@ -565,7 +596,6 @@ private:
         args.zero_pt_base_desc.update_coord_x(tile_offset_n / pack_ratio);
     }
 };
-
 /// @} xetla_gemm
 
 } // namespace gpu::xetla::group

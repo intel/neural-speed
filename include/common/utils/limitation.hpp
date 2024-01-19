@@ -28,12 +28,7 @@ namespace gpu::xetla {
 
 namespace core {
 template <gpu_arch arch, typename T>
-struct general_1d {};
-template <gpu_arch arch, typename T>
-class block_2d {};
-
-template <typename T>
-struct general_1d<gpu_arch::Xe, T> {
+struct general_1d {
     template <uint8_t NElts>
     static inline bool check_restriction(uint64_t offset, uint64_t p = 0) {
         static_assert(sizeof(T) == 4 || sizeof(T) == 8,
@@ -70,8 +65,8 @@ struct general_1d<gpu_arch::Xe, T> {
     }
 };
 
-template <typename T>
-class block_2d<gpu_arch::Xe, T> {
+template <gpu_arch arch_tag, typename T>
+class block_2d {
 public:
     template <bool transpose, bool vnni_transform>
     static inline bool check_load(xetla_tdescriptor tdesc) {
@@ -455,17 +450,13 @@ private:
 } // namespace core
 
 namespace subgroup {
-template <gpu_arch arch, typename dtype, typename mem_dtype>
-struct check_load {};
-template <gpu_arch arch, typename dtype, typename mem_dtype = uint32_t>
-struct check_store {};
 
-template <typename dtype, typename mem_dtype>
-struct check_load<gpu_arch::Xe, dtype, mem_dtype> {
+template <gpu_arch arch, typename dtype, typename mem_dtype>
+struct check_load {
     template <bool mem_transform, size_t block_size_x>
     struct global_2d {
         using load_store_attr = typename arch_attr_t<
-                gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+                arch>::template load_store_attr<msg_type::block_2d>;
         static constexpr int32_t max_vnni_block_width
                 = load_store_attr::max_vnni_load_width_in_elems;
         static_assert(!mem_transform || block_size_x <= max_vnni_block_width,
@@ -484,7 +475,7 @@ struct check_load<gpu_arch::Xe, dtype, mem_dtype> {
     template <bool mem_transform, size_t block_size_x>
     struct unaligned_2d {
         using load_store_attr = typename arch_attr_t<
-                gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+                arch>::template load_store_attr<msg_type::block_2d>;
         static constexpr int32_t max_vnni_block_width
                 = load_store_attr::max_vnni_load_width_in_elems;
         static_assert(!mem_transform || block_size_x <= max_vnni_block_width,
@@ -523,12 +514,12 @@ struct check_load<gpu_arch::Xe, dtype, mem_dtype> {
     };
 };
 
-template <typename dtype, typename mem_dtype>
-struct check_store<gpu_arch::Xe, dtype, mem_dtype> {
+template <gpu_arch arch, typename dtype, typename mem_dtype = uint32_t>
+struct check_store {
     template <size_t block_size_x>
     struct global_2d {
         using load_store_attr = typename arch_attr_t<
-                gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+                arch>::template load_store_attr<msg_type::block_2d>;
 
         static constexpr int32_t max_block_width
                 = load_store_attr::max_load_width_in_bytes / sizeof(dtype);
@@ -544,7 +535,7 @@ struct check_store<gpu_arch::Xe, dtype, mem_dtype> {
     template <size_t block_size_x>
     struct unaligned_2d {
         using load_store_attr = typename arch_attr_t<
-                gpu_arch::Xe>::template load_store_attr<msg_type::block_2d>;
+                arch>::template load_store_attr<msg_type::block_2d>;
 
         static constexpr int32_t max_block_width
                 = load_store_attr::max_load_width_in_bytes / sizeof(dtype);
@@ -605,11 +596,11 @@ struct check_store<gpu_arch::Xe, dtype, mem_dtype> {
 } // namespace subgroup
 
 namespace group {
-template <gpu_arch arch>
+template <gpu_arch arch = gpu_arch::Xe, class enable = void>
 struct gemm {};
 
-template <>
-struct gemm<gpu_arch::Xe> {
+template <gpu_arch arch>
+struct gemm<arch, std::enable_if_t<(arch <= gpu_arch::Xe)>> {
     struct default_fpu {
         template <typename dtype_a, typename dtype_b, typename dtype_mma_a,
                 typename dtype_mma_b, typename dtype_mma_acc>
@@ -733,12 +724,7 @@ struct gemm<gpu_arch::Xe> {
 
 namespace kernel {
 template <gpu_arch arch, typename T>
-class general_1d {};
-template <gpu_arch arch, typename T>
-class block_2d {};
-
-template <typename T>
-class general_1d<gpu_arch::Xe, T> {
+class general_1d {
 public:
     static inline bool check_alignment(T *base, uint32_t pitch) {
         auto pitch_in_bytes = pitch * element_size;
@@ -766,12 +752,12 @@ private:
     static constexpr size_t base_alignment_bytes = 4;
 };
 
-template <typename T>
-class block_2d<gpu_arch::Xe, T> {
+template <gpu_arch arch_tag, typename T>
+class block_2d {
 public:
     static inline bool check_tensor(
             uint64_t base, uint32_t width, uint32_t height, uint32_t pitch) {
-        return core::block_2d<gpu_arch::Xe, T>::check_surface(
+        return core::block_2d<arch_tag, T>::check_surface(
                 base, width * element_size, height, pitch * element_size);
     }
 

@@ -128,8 +128,13 @@ struct tile_load_store_unaligned_2d_func {
         payload_store_t payload_store(mem_desc_c);
         tile_prefetch(payload_prefetch);
         tile_load(matA, payload_load);
+        static const char vec_a[] = "after load %f %f %f %f\n";
+        // sycl::ext::oneapi::experimental::printf(vec_a, (matA.reg[0]), (matA.reg[1]), (matA.reg[2]), (matA.reg[3]));
+        // sycl::ext::oneapi::experimental::printf(vec_a, (matA.reg[16]), (matA.reg[17]), (matA.reg[18]), (matA.reg[19]));
         matC.reg = matA.reg;
         tile_store(matC, payload_store);
+        static const char vec_b[] = "%d %d %d %d\n";
+        // sycl::ext::oneapi::experimental::printf(vec_b, (matC.reg[0]), (matC.reg[1]), (matC.reg[2]), (matC.reg[3]));
     }
 };
 

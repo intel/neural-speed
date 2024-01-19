@@ -1,0 +1,11 @@
+get_filename_component(ProjectId ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+string(REPLACE " " "_" ProjectId ${ProjectId})
+set(ProjectIdDg2 ${ProjectId})
+set(ProjectIdXe ${ProjectId})
+string(PREPEND ProjectIdDg2 "gemm_dg2_")
+string(PREPEND ProjectIdXe "gemm_xe_")
+
+FILE(GLOB src_dg2 main_dg2.cpp)
+add_integration_test(${ProjectIdDg2} ${src_dg2})
+FILE(GLOB src_xe main_xe.cpp)
+add_integration_test(${ProjectIdXe} ${src_xe})

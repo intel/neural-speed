@@ -28,16 +28,16 @@ namespace gpu::xetla::subgroup {
 namespace detail {
 template <typename tile_t, typename payload_t>
 struct check_store_type {
-    static constexpr bool is_global_2d_xe
+    static constexpr bool is_global_block_2d
             = (payload_t::memory_space == mem_space::global
                     && (payload_t::message_type == msg_type::block_2d)
-                    && (payload_t::arch_tag == gpu_arch::Xe));
+                    && (payload_t::arch_tag <= gpu_arch::Xe));
 
     static constexpr bool is_global_block_1d_xe
             = ((payload_t::memory_space == mem_space::global)
                     && (tile_t::tile_size_y == 1) && (tile_t::block_size_y == 1)
                     && (payload_t::message_type == msg_type::block_1d)
-                    && (payload_t::arch_tag == gpu_arch::Xe));
+                    && (payload_t::arch_tag <= gpu_arch::Xe));
 
     static constexpr bool is_global_unaligned_2d_xe
             = (payload_t::memory_space == mem_space::global
@@ -47,12 +47,12 @@ struct check_store_type {
     static constexpr bool is_global_atomic_xe
             = ((payload_t::memory_space == mem_space::global)
                     && (payload_t::message_type == msg_type::atomic_add)
-                    && (payload_t::arch_tag == gpu_arch::Xe));
+                    && (payload_t::arch_tag <= gpu_arch::Xe));
 
     static constexpr bool is_local_scatter_xe = ((payload_t::memory_space
                                                          == mem_space::local)
             && (payload_t::message_type == msg_type::scatter)
-            && (payload_t::arch_tag == gpu_arch::Xe)
+            && (payload_t::arch_tag <= gpu_arch::Xe)
             && (payload_t::tile_desc::register_layout == reg_layout::tiled
                     || payload_t::tile_desc::register_layout
                             == reg_layout::vnni_tiled));
@@ -67,7 +67,7 @@ struct check_store_type {
     static constexpr bool is_local_block_1d_xe = ((payload_t::memory_space
                                                           == mem_space::local)
             && (payload_t::message_type == msg_type::block_1d)
-            && (payload_t::arch_tag == gpu_arch::Xe)
+            && (payload_t::arch_tag <= gpu_arch::Xe)
             && (payload_t::tile_desc::register_layout == reg_layout::tiled));
 };
 
@@ -87,7 +87,8 @@ template <cache_hint L1 = cache_hint::write_back,
         cache_hint L2 = cache_hint::write_back, typename tile_t,
         typename payload_t>
 __XETLA_API typename std::enable_if_t<
-        detail::check_store_type<tile_t, payload_t>::is_global_2d_xe>
+        detail::check_store_type<tile_t, payload_t>::is_global_block_2d
+        && payload_t::arch_tag == gpu_arch::Xe>
 tile_store(tile_t &tile, payload_t &payload) {
     using dtype = typename tile_t::dtype;
     using tile_desc = typename tile_t::tile_desc;
@@ -391,6 +392,106 @@ tile_store(tile_t &tile, payload_t &payload,
     }
 }
 
+/// @brief Is the func storing data from register file to unaligned global memory surface.
+/// store a rectangular region (X,Y)..(X+W,Y+H) into memory from registers.
+/// @tparam tile_t Is the tile_t struct contains registers
+/// These registers will be the source of store operation.
+/// @tparam payload_t Is the mem_payload_t struct describing the memory info
+/// payload indicates the destination of store operation.
+/// @tparam L1 Is the cache hint for L1 cache.
+/// @tparam L3 Is the cache hint for L3 cache.
+/// @param tile Is the tile object with type tile_t, contains the data to be stored.
+/// @param payload Is the payload object with type payload_t. Contains all the information for stores.
+/// @return No return, update in place.
+template <cache_hint L1 = cache_hint::write_back,
+        cache_hint L3 = cache_hint::write_back, typename tile_t,
+        typename payload_t>
+// typename oob_check_tag = global_atomic_oob_check_on_tag>
+__XETLA_API typename std::enable_if_t<
+        detail::check_store_type<tile_t, payload_t>::is_global_block_2d
+        && payload_t::arch_tag == gpu_arch::Dg2>
+tile_store(tile_t &tile, payload_t &payload) {
+    using dtype = typename payload_t::dtype;
+    using tile_desc = typename payload_t::tile_desc;
+    using store_dtype = typename payload_t::mem_dtype;
+
+    constexpr uint32_t num_channel = payload_t::num_channel;
+    constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
+    constexpr uint32_t scale_factor = payload_t::scale_factor;
+
+#pragma unroll
+    for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
+            i++) {
+        uint32_t offset_y = i * tile_desc::block_size_y;
+#pragma unroll
+        for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
+            uint32_t offset_x = j * tile_desc::block_size_x;
+            auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
+                    (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
+#pragma unroll
+            for (uint32_t sub_block_y = 0;
+                    sub_block_y < tile_desc::block_size_y;
+                    sub_block_y += num_channel) {
+                uint32_t address_offset = offset_x * sizeof(dtype)
+                        + (offset_y + sub_block_y) * payload.pitch_in_bytes;
+
+                xetla_vector<store_dtype, load_elems> reg_tmp;
+
+                if constexpr (payload_t::simd_exec_size > 1) {
+                    xetla_vector<store_dtype, load_elems> reg_sub_before_trans
+                            = reg_sub.xetla_select<load_elems * scale_factor,
+                                             1>(sub_block_y
+                                             * tile_desc::block_size_x)
+                                      .xetla_format<store_dtype>();
+#pragma unroll
+                    for (uint32_t iii = 0; iii < payload_t::num_channel;
+                            iii++) {
+                        reg_tmp.xetla_select<payload_t::simd_exec_size,
+                                payload_t::num_channel>(iii)
+                                = reg_sub_before_trans.xetla_select<
+                                        payload_t::simd_exec_size, 1>(
+                                        iii * payload_t::simd_exec_size);
+                    }
+                } else {
+                    reg_tmp = reg_sub.xetla_select<load_elems * scale_factor,
+                                             1>(sub_block_y
+                                             * tile_desc::block_size_x)
+                                      .xetla_format<store_dtype>();
+                }
+                if (payload.base_y + offset_y + sub_block_y + num_channel
+                                > payload.height_in_elems
+                        && payload.base_y + offset_y + sub_block_y
+                                < payload.height_in_elems) {
+
+                    xetla_vector<uint32_t, num_channel> channel_index
+                            = xetla_vector_gen<uint32_t, num_channel>(0, 1);
+
+                    xetla_mask<num_channel> pred_y = channel_index
+                            < (payload.height_in_elems % num_channel);
+
+                    xetla_store_global<store_dtype, payload_t::simd_exec_size,
+                            data_size::default_size, L1, L3, num_channel>(
+                            payload.base_ptr,
+                            (payload.base_offset + address_offset
+                                    + payload.channel_offset),
+                            reg_tmp, pred_y);
+                } else if (payload.base_y + offset_y + sub_block_y + num_channel
+                        <= payload.height_in_elems) {
+
+                    xetla_store_global<store_dtype, payload_t::simd_exec_size,
+                            data_size::default_size, L1, L3, num_channel>(
+                            payload.base_ptr,
+                            (payload.base_offset + address_offset
+                                    + payload.channel_offset),
+                            reg_tmp);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 /// @brief Is the func storing data from register file to global memory
 /// enable atomic adding data into the same buffer, but support float32, float64, uint32_t,
 /// uint64_t and int type
@@ -450,14 +551,24 @@ tile_store(tile_t &tile, payload_t &payload,
                         : 1;
                 uint64_t address_offset = offset_x * sizeof(dtype)
                         + (sub_block_y + offset_y) * payload.pitch_in_bytes;
-
-                xetla_tatomic_store_global<dtype, payload_t::num_channel, L1,
-                        L2, op_kind, payload_t::arch_tag>(
-                        payload.base_pointer + address_offset,
-                        payload.channel_offset,
-                        reg_sub.xetla_select<payload_t::store_elems, 1>(
-                                sub_block_y * block_size_x),
-                        pred_x & pred_y);
+                if constexpr (payload_t::arch_tag >= gpu_arch::Xe) {
+                    xetla_tatomic_store_global<dtype, payload_t::num_channel,
+                            L1, L2, op_kind, payload_t::arch_tag>(
+                            payload.base_pointer + address_offset,
+                            payload.channel_offset,
+                            reg_sub.xetla_select<payload_t::store_elems, 1>(
+                                    sub_block_y * block_size_x),
+                            pred_x & pred_y);
+                } else {
+                    xetla_atomic_global<op_kind, dtype, payload_t::num_channel,
+                            data_size::default_size, L1, L2>(
+                            reinterpret_cast<dtype *>(
+                                    payload.base_pointer + address_offset),
+                            payload.channel_offset,
+                            reg_sub.xetla_select<payload_t::store_elems, 1>(
+                                    sub_block_y * block_size_x),
+                            pred_x & pred_y);
+                }
             }
         }
     }
