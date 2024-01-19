@@ -18,41 +18,46 @@ pip install -r requirements.txt
 pip install .
 ```
 
-### For more installation ways like building binary by yourself, please refer to [Install Document](./docs/install.md)
-
+For more installation ways like building binary by yourself, please refer to [Install Document](./docs/install.md)
 
 ## Quick Start
-There are two approaches for utilizing the Neural Speed:
-### 1. Transformer-like API
+There are two approaches for utilizing the Neural Speed: 1. Transformer-like usage, you need to install [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) 2. llama.cpp-like usage
+
+### 1. Transformer-like usage
 
 Pytorch format HF model
-```
+```python
 from transformers import AutoTokenizer, TextStreamer
-from neural_speed import Model
+from intel_extension_for_transformers.transformers import AutoModelForCausalLM
+model_name = "Intel/neural-chat-7b-v3-1"     # Hugging Face model_id or local model
+prompt = "Once upon a time, there existed a little girl,"
 
-prompt = "Once upon a time, a little girl"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 inputs = tokenizer(prompt, return_tensors="pt").input_ids
 streamer = TextStreamer(tokenizer)
 
-model = Model()
-model.init(model_name, weight_dtype="int4", compute_dtype="int8", group_size=32)
-outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample=True)
+model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
 
 GGUF format HF model
 ```python
 from transformers import AutoTokenizer, TextStreamer
-from neural_speed import Model
+from intel_extension_for_transformers.transformers import AutoModelForCausalLM
+
+# Specify the GGUF repo on the Hugginface
+model_name = "TheBloke/Llama-2-7B-Chat-GGUF"
+# Download the the specific gguf model file from the above repo
+model_file = "llama-2-7b-chat.Q4_0.gguf"
+# make sure you are granted to access this model on the Huggingface.
+tokenizer_name = "meta-llama/Llama-2-7b-chat-hf"
 
 prompt = "Once upon a time"
-tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
 inputs = tokenizer(prompt, return_tensors="pt").input_ids
 streamer = TextStreamer(tokenizer)
-
-model = Model()
-model.init_from_bin(model_type, model_file) #  for exmaple model_type: "llama", model_file: "/PATH/ggml-model-q4_0.gguf"
-outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample=True)
+model = AutoModelForCausalLM.from_pretrained(model_name, model_file = model_file)
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
 
 You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
