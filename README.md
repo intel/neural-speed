@@ -163,6 +163,6 @@ Here is the document of Custom Stopping Criteria: [simple example with minimum g
 Enable verbose mode and control tracing information using the `NEURAL_SPEED_VERBOSE` environment variable.
 
 Available modes:
-- 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling.
+- 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling. (need to set `NS_PROFILING` to ON and recompile)
 - 1: Print evaluation time. Time taken for each evaluation.
-- 2: Profile individual operator. Identify performance bottleneck within the model.
+- 2: Profile individual operator. Identify performance bottleneck within the model. (need to set `NS_PROFILING` to ON and recompile)
