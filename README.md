@@ -99,6 +99,7 @@ Neural Speed supports the following models: [list](./docs/supported_models.md)
 
 ### Build Python package
 ```shell
+pip install -r requirements.txt
 pip install .
 ```
 
