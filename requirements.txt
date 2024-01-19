@@ -13,3 +13,4 @@ tiktoken
 py-cpuinfo
 gguf
 cmake
+auto-gptq
