@@ -11,14 +11,14 @@
 *.so.*
 
 
-/.vs
+.vs
+.vscode
 /out
-.vscode/
-.vscode/*
-bestla/build/
-bestla/build/*
+__pycache__
 neural_speed.egg-info/
-build/
+build
+runtime_outs
+out
 debug/
 .eggs/
 dist/
