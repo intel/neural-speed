@@ -7,6 +7,7 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 - Up to 40x compared with [llama.cpp](https://github.com/ggerganov/llama.cpp), performance details: [blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
 - NeurIPS' 2023: [Efficient LLM Inference on CPUs](https://arxiv.org/abs/2311.00502)
 - Support 4bits and 8bits quantization
+- Tensor Parallelism across sockets/nodes: [tensor_parallelism.md](./docs/tensor_parallelism.md)
 
 > Neural Speed is under active development so APIs are subject to change.
 
@@ -62,7 +63,7 @@ outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 
 You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
 
-### 2. Neural Speed straight forward:
+### 2. llama.cpp-like usage:
 
 #### One-click Python scripts
 Run LLM with one-click python script including conversion, quantization and inference.
@@ -124,23 +125,18 @@ Neural Speed supports the following models: [list](./docs/supported_models.md)
 ## Advanced Usage
 
 ### 1. Quantization and inferenece
-You can do quantization and inference without Transformer-API: [Advanced Usage](./docs/advanced_usage.md).
+More parameters in llama.cpp-like usage: [Advanced Usage](./docs/advanced_usage.md).
 
 ### 2. Tensor Parallelism cross nodes/sockets
 
 We support tensor parallelism strategy for distributed inference/training on multi-node and multi-socket. You can refer to [tensor_parallelism.md](./docs/tensor_parallelism.md) to enable this feature.
 
-
-### 3. Contribution
-
-You can consider adding your own models, please follow the document: [graph developer document](./developer_document.md). 
-
-### 4. Custom Stopping Criteria
+### 3. Custom Stopping Criteria
 
 You can customize the stopping criteria according to your own needs by processing the input_ids to determine if text generation needs to be stopped.
 Here is the document of Custom Stopping Criteria: [simple example with minimum generation length of 80 tokens](./docs/customized_stop.md)
 
-### 5. Verbose Mode
+### 4. Verbose Mode
 
 Enable verbose mode and control tracing information using the `NEURAL_SPEED_VERBOSE` environment variable.
 
@@ -148,3 +144,7 @@ Available modes:
 - 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling.
 - 1: Print evaluation time. Time taken for each evaluation.
 - 2: Profile individual operator. Identify performance bottleneck within the model.
+
+
+## Enable New Model
+You can consider adding your own models, please follow the document: [graph developer document](./developer_document.md).
