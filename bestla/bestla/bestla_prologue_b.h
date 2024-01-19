@@ -13,6 +13,7 @@
 //  limitations under the License.
 #pragma once
 #include <cassert>
+#include "bestla.h"
 #include "bestla_utils.h"
 #include "bestla_storage.h"
 #include "bestla_device.h"
@@ -556,8 +557,18 @@ class WeightKBlockNInteger {
     });
   }
 
+  static void compressBit3Weight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
+                                 parallel::IThreading* threading) {
+    // TODO(zhe): 1D parallel compress
+    auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
+    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + K * ldb / 4);
+    auto ret = kernel::wrapper::CompressBit3::forward<ISA_T>(B, bit2ptr, bit1ptr, K, N, ldb, ldb);
+    assert(ret == BTLA_CODE::Success);
+  }
+
   static void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr, BTLA_DTYPE qtype,
                              parallel::IThreading* threading) {
+    if (qtype == BTLA_DTYPE::S3_CLIP) return compressBit3Weight(N, K, B, ldb, dstptr, threading);
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp({tidx});
@@ -865,13 +876,13 @@ class WeightKBlockNInteger {
   static inline BTLA_CODE doCompress(const int8_t* srcptr, void* dstptr, int row, int col, int ld_src, int ld_dst,
                                      BTLA_DTYPE quant_dtype) {
     if (quant_dtype == BTLA_DTYPE::S4_CLIP || quant_dtype == BTLA_DTYPE::S4_FULLRANGE) {
-      return kernel::wrapper::CompressS8S4<_GemmCore_T::NTILE>::template forward<ISA_T>(
-          srcptr, reinterpret_cast<utils::int4x2*>(dstptr), row, col, ld_src, ld_dst);
+      return kernel::wrapper::CompressS8S4::forward<ISA_T>(srcptr, reinterpret_cast<utils::int4x2*>(dstptr), row, col,
+                                                           ld_src, ld_dst);
     } else if (quant_dtype == BTLA_DTYPE::F4_BNB || quant_dtype == BTLA_DTYPE::F4_NF4 ||
                quant_dtype == BTLA_DTYPE::F4_E2M1) {
-      return kernel::wrapper::CompressFp4<_GemmCore_T::NTILE>::template forward<ISA_T>(
-          srcptr, reinterpret_cast<utils::f4x2*>(dstptr), row, col, ld_src,
-          ld_dst);  // ld_dst here not stride
+      return kernel::wrapper::CompressFp4::forward<ISA_T>(srcptr, reinterpret_cast<utils::f4x2*>(dstptr), row, col,
+                                                          ld_src,
+                                                          ld_dst);  // ld_dst here not stride
     } else {
       assert(0);
       return BTLA_CODE::NotSupport;

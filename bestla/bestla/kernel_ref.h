@@ -152,7 +152,6 @@ static inline BTLA_CODE transpose2d(const _T* srcptr, _T* dstptr, int row, int c
   return BTLA_CODE::Success;
 }
 
-template <int NTile>
 static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstptr, int row, int col, int ld_src,
                                        int ld_dst) {
   for (int j = 0; j < row; j++) {
@@ -166,7 +165,6 @@ static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstp
   return BTLA_CODE::Success;
 }
 
-template <int NTile>
 static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, int row, int col, int ld_src,
                                     int ld_dst) {
   for (int j = 0; j < row; j++) {
@@ -175,6 +173,36 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
       tmp.x = srcptr[j * ld_src + ii + 0];
       tmp.y = srcptr[j * ld_src + ii + 1];
       dstptr[j * ld_dst / 2 + ii / 2] = tmp;
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                      int row, int col, int ld_src, int ld_dst) {
+  assert(col % 64 == 0);
+  // interleave + store 2bit.
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; i += 64) {
+      for (int k = 0; k < 16; k++) {
+        bit2ptr[i * ld_dst / 4 + i / 4 + k].a = srcptr[i * ld_src + col + 4 * k];
+        bit2ptr[i * ld_dst / 4 + i / 4 + k].b = srcptr[i * ld_src + col + 4 * k + 1];
+        bit2ptr[i * ld_dst / 4 + i / 4 + k].c = srcptr[i * ld_src + col + 4 * k + 2];
+        bit2ptr[i * ld_dst / 4 + i / 4 + k].d = srcptr[i * ld_src + col + 4 * k + 3];
+      }
+    }
+  }
+  // store 1 bit without interleave as mask.
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j += 8) {
+      bit1ptr[i * ld_dst].a = srcptr[i * ld_src + j] >> 2;
+      bit1ptr[i * ld_dst].b = srcptr[i * ld_src + j + 1] >> 2;
+      bit1ptr[i * ld_dst].c = srcptr[i * ld_src + j + 2] >> 2;
+      bit1ptr[i * ld_dst].d = srcptr[i * ld_src + j + 3] >> 2;
+      bit1ptr[i * ld_dst].e = srcptr[i * ld_src + j + 4] >> 2;
+      bit1ptr[i * ld_dst].f = srcptr[i * ld_src + j + 5] >> 2;
+      bit1ptr[i * ld_dst].g = srcptr[i * ld_src + j + 6] >> 2;
+      bit1ptr[i * ld_dst].h = srcptr[i * ld_src + j + 7] >> 2;
     }
   }
   return BTLA_CODE::Success;
