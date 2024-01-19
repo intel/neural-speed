@@ -136,7 +136,7 @@ class ModelServer {
               int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping,
               int n_keep, int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
-              const std::string& policy, const bool& print_log)
+              const std::string& policy, const bool& print_log, const std::function<void()>& init_cb)
       : response(response),
         waiting(),
         running(true),
@@ -147,6 +147,10 @@ class ModelServer {
         return_prompt(return_prompt),
         worker([=]() {
           if (!continuous_batching) fprintf(stderr, "Warning: ModelServer only supports continuous_batching.\n");
+          {
+            py::gil_scoped_acquire acquirer;
+            init_cb();
+          }
           this->InitServerParams(model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
                                  early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
@@ -911,7 +915,7 @@ PYBIND11_MODULE(qwen_cpp, m)
   py::class_<ModelServer>(m, "ModelServer", py::module_local())
       .def(py::init<const ResponseCallback&, const std::string&, bool, int, int, int, int, int, float, int, bool, int,
                     float, float, int, float, bool, int, int, bool, int, model_vocab::id, const std::string&,
-                    const bool&, const int&, const std::string&, const bool&>(),
+                    const bool&, const int&, const std::string&, const bool&, const std::function<void()>&>(),
            py::arg("response"), py::arg("model_path"), py::arg("return_prompt") = false, py::arg("max_new_tokens") = -1,
            py::arg("n_batch") = 512, py::arg("ctx_size") = 512, py::arg("seed") = -1, py::arg("threads") = 8,
            py::arg("repetition_penalty") = 1.1f, py::arg("num_beams") = 1, py::arg("do_sample") = false,
@@ -919,7 +923,8 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
            py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = false,
-           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs", py::arg("print_log") = false)
+           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs", py::arg("print_log") = false,
+           py::arg("init_cb") = std::function<void()>{[]() {}})
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))
       .def("Empty", &ModelServer::Empty, "No more queries to execute");
 }
