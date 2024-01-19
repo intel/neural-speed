@@ -786,3 +786,267 @@ static void dequantize_row_q8_0(const void* vx, float* y, int k) {
     }
   }
 }
+
+//
+// ===================== Helper functions
+//
+static inline int nearest_int(float fval) {
+  assert(fval <= 4194303.f);
+  float val = fval + 12582912.f;
+  int i;
+  memcpy(&i, &val, sizeof(int));
+  return (i & 0x007fffff) - 0x00400000;
+}
+
+static float make_qx_quants(int n, int nmax, const float* restrict x, int8_t* restrict L, int rmse_type) {
+  float max = 0;
+  float amax = 0;
+  for (int i = 0; i < n; ++i) {
+    float ax = fabsf(x[i]);
+    if (ax > amax) {
+      amax = ax;
+      max = x[i];
+    }
+  }
+  if (amax < 1e-30f) {  // all zero
+    for (int i = 0; i < n; ++i) {
+      L[i] = 0;
+    }
+    return 0.f;
+  }
+  float iscale = -nmax / max;
+  if (rmse_type == 0) {
+    for (int i = 0; i < n; ++i) {
+      int l = nearest_int(iscale * x[i]);
+      L[i] = nmax + MAX(-nmax, MIN(nmax - 1, l));
+    }
+    return 1 / iscale;
+  }
+  bool return_early = false;
+  if (rmse_type < 0) {
+    rmse_type = -rmse_type;
+    return_early = true;
+  }
+  int weight_type = rmse_type % 2;
+  float sumlx = 0;
+  float suml2 = 0;
+  for (int i = 0; i < n; ++i) {
+    int l = nearest_int(iscale * x[i]);
+    l = MAX(-nmax, MIN(nmax - 1, l));
+    L[i] = l + nmax;
+    float w = weight_type == 1 ? x[i] * x[i] : 1;
+    sumlx += w * x[i] * l;
+    suml2 += w * l * l;
+  }
+  float scale = sumlx / suml2;
+  if (return_early) return suml2 > 0 ? 0.5f * (scale + 1 / iscale) : 1 / iscale;
+  float best = scale * sumlx;
+  for (int is = -9; is <= 9; ++is) {
+    if (is == 0) {
+      continue;
+    }
+    iscale = -(nmax + 0.1f * is) / max;
+    sumlx = suml2 = 0;
+    for (int i = 0; i < n; ++i) {
+      int l = nearest_int(iscale * x[i]);
+      l = MAX(-nmax, MIN(nmax - 1, l));
+      float w = weight_type == 1 ? x[i] * x[i] : 1;
+      sumlx += w * x[i] * l;
+      suml2 += w * l * l;
+    }
+    if (suml2 > 0 && sumlx * sumlx > best * suml2) {
+      for (int i = 0; i < n; ++i) {
+        int l = nearest_int(iscale * x[i]);
+        L[i] = nmax + MAX(-nmax, MIN(nmax - 1, l));
+      }
+      scale = sumlx / suml2;
+      best = scale * sumlx;
+    }
+  }
+  return scale;
+}
+
+static void quantize_row_q6_K_reference(const float* restrict x, block_q6_K* restrict y, int k) {
+  assert(k % QK_K == 0);
+  const int nb = k / QK_K;
+
+  int8_t L[QK_K];
+  float scales[QK_K / 16];
+
+  for (int i = 0; i < nb; i++) {
+    float max_scale = 0;
+    float max_abs_scale = 0;
+
+    for (int ib = 0; ib < QK_K / 16; ++ib) {
+      const float scale = make_qx_quants(16, 32, x + 16 * ib, L + 16 * ib, 1);
+      scales[ib] = scale;
+
+      const float abs_scale = fabsf(scale);
+      if (abs_scale > max_abs_scale) {
+        max_abs_scale = abs_scale;
+        max_scale = scale;
+      }
+    }
+
+    if (!max_abs_scale) {
+      memset(&y[i], 0, sizeof(block_q6_K));
+      y[i].d = NE_FP32_TO_FP16(0.f);
+      x += QK_K;
+      continue;
+    }
+
+    float iscale = -128.f / max_scale;
+    y[i].d = NE_FP32_TO_FP16(1 / iscale);
+    for (int ib = 0; ib < QK_K / 16; ++ib) {
+      y[i].scales[ib] = MIN(127, nearest_int(iscale * scales[ib]));
+    }
+
+    for (int j = 0; j < QK_K / 16; ++j) {
+      float d = NE_FP16_TO_FP32(y[i].d) * y[i].scales[j];
+      if (!d) {
+        continue;
+      }
+      for (int ii = 0; ii < 16; ++ii) {
+        int l = nearest_int(x[16 * j + ii] / d);
+        l = MAX(-32, MIN(31, l));
+        L[16 * j + ii] = l + 32;
+      }
+    }
+
+    uint8_t* restrict ql = y[i].ql;
+    uint8_t* restrict qh = y[i].qh;
+#if QK_K == 256
+    for (int j = 0; j < QK_K; j += 128) {
+      for (int l = 0; l < 32; ++l) {
+        const uint8_t q1 = L[j + l + 0] & 0xF;
+        const uint8_t q2 = L[j + l + 32] & 0xF;
+        const uint8_t q3 = L[j + l + 64] & 0xF;
+        const uint8_t q4 = L[j + l + 96] & 0xF;
+        ql[l + 0] = q1 | (q3 << 4);
+        ql[l + 32] = q2 | (q4 << 4);
+        qh[l] =
+            (L[j + l] >> 4) | ((L[j + l + 32] >> 4) << 2) | ((L[j + l + 64] >> 4) << 4) | ((L[j + l + 96] >> 4) << 6);
+      }
+      ql += 64;
+      qh += 32;
+    }
+#else
+    for (int l = 0; l < 32; ++l) {
+      const uint8_t q1 = L[l + 0] & 0xF;
+      const uint8_t q2 = L[l + 32] & 0xF;
+      ql[l] = q1 | (q2 << 4);
+    }
+    for (int l = 0; l < 16; ++l) {
+      qh[l] = (L[l] >> 4) | ((L[l + 16] >> 4) << 2) | ((L[l + 32] >> 4) << 4) | ((L[l + 48] >> 4) << 6);
+    }
+#endif
+
+    x += QK_K;
+  }
+}
+
+static void dequantize_row_q6_K(const block_q6_K* restrict x, float* restrict y, int k) {
+  assert(k % QK_K == 0);
+  const int nb = k / QK_K;
+
+  for (int i = 0; i < nb; i++) {
+    const float d = NE_FP16_TO_FP32(x[i].d);
+
+    const uint8_t* restrict ql = x[i].ql;
+    const uint8_t* restrict qh = x[i].qh;
+    const int8_t* restrict sc = x[i].scales;
+
+#if QK_K == 256
+    for (int n = 0; n < QK_K; n += 128) {
+      for (int l = 0; l < 32; ++l) {
+        int is = l / 16;
+        const int8_t q1 = (int8_t)((ql[l + 0] & 0xF) | (((qh[l] >> 0) & 3) << 4)) - 32;
+        const int8_t q2 = (int8_t)((ql[l + 32] & 0xF) | (((qh[l] >> 2) & 3) << 4)) - 32;
+        const int8_t q3 = (int8_t)((ql[l + 0] >> 4) | (((qh[l] >> 4) & 3) << 4)) - 32;
+        const int8_t q4 = (int8_t)((ql[l + 32] >> 4) | (((qh[l] >> 6) & 3) << 4)) - 32;
+        y[l + 0] = d * sc[is + 0] * q1;
+        y[l + 32] = d * sc[is + 2] * q2;
+        y[l + 64] = d * sc[is + 4] * q3;
+        y[l + 96] = d * sc[is + 6] * q4;
+      }
+      y += 128;
+      ql += 64;
+      qh += 32;
+      sc += 8;
+    }
+#else
+    for (int l = 0; l < 16; ++l) {
+      const int8_t q1 = (int8_t)((ql[l + 0] & 0xF) | (((qh[l] >> 0) & 3) << 4)) - 32;
+      const int8_t q2 = (int8_t)((ql[l + 16] & 0xF) | (((qh[l] >> 2) & 3) << 4)) - 32;
+      const int8_t q3 = (int8_t)((ql[l + 0] >> 4) | (((qh[l] >> 4) & 3) << 4)) - 32;
+      const int8_t q4 = (int8_t)((ql[l + 16] >> 4) | (((qh[l] >> 6) & 3) << 4)) - 32;
+      y[l + 0] = d * sc[0] * q1;
+      y[l + 16] = d * sc[1] * q2;
+      y[l + 32] = d * sc[2] * q3;
+      y[l + 48] = d * sc[3] * q4;
+    }
+    y += 64;
+#endif
+  }
+}
+
+static void quantize_row_q6_K(const float* restrict x, void* restrict vy, int k) {
+  assert(k % QK_K == 0);
+  block_q6_K* restrict y = (block_q6_K*)vy;
+  quantize_row_q6_K_reference(x, y, k);
+}
+
+static void dequantize_row_q8_K(const block_q8_K* restrict x, float* restrict y, int k) {
+  assert(k % QK_K == 0);
+  const int nb = k / QK_K;
+
+  for (int i = 0; i < nb; i++) {
+    for (int j = 0; j < QK_K; ++j) {
+      *y++ = x[i].d * x[i].qs[j];
+    }
+  }
+}
+
+//===================================== Q8_K ==============================================
+
+static void quantize_row_q8_K_reference(const float* restrict x, block_q8_K* restrict y, int k) {
+  assert(k % QK_K == 0);
+  const int nb = k / QK_K;
+
+  for (int i = 0; i < nb; i++) {
+    float max = 0;
+    float amax = 0;
+    for (int j = 0; j < QK_K; ++j) {
+      float ax = fabsf(x[j]);
+      if (ax > amax) {
+        amax = ax;
+        max = x[j];
+      }
+    }
+    if (!amax) {
+      y[i].d = 0;
+      memset(y[i].qs, 0, QK_K);
+      x += QK_K;
+      continue;
+    }
+    const float iscale = -128.f / max;
+    for (int j = 0; j < QK_K; ++j) {
+      int v = nearest_int(iscale * x[j]);
+      y[i].qs[j] = MIN(127, v);
+    }
+    for (int j = 0; j < QK_K / 16; ++j) {
+      int sum = 0;
+      for (int ii = 0; ii < 16; ++ii) {
+        sum += y[i].qs[j * 16 + ii];
+      }
+      y[i].bsums[j] = sum;
+    }
+    y[i].d = 1 / iscale;
+    x += QK_K;
+  }
+}
+
+static void quantize_row_q8_K(const float* restrict x, void* restrict y, int k) {
+  block_q8_K* restrict y_tmp = (block_q8_K*)y;
+  quantize_row_q8_K_reference(x, y_tmp, k);
+}

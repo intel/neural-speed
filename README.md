@@ -16,7 +16,7 @@ You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-o
 There are two approaches for utilizing the Neural Speed:
 ### 1. Transformer-like API
 
-NeuralSpeed
+Pytorch format HF model
 ```
 from transformers import AutoTokenizer, TextStreamer
 from neural_speed import Model
@@ -31,14 +31,21 @@ model.init(model_name, weight_dtype="int4", compute_dtype="int8", group_size=32)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample=True)
 ```
 
-To use whisper to Audio-to-text, here is the sample code
+GGUF format HF model
 ```python
-from intel_extension_for_transformers.transformers import AutoModelForCausalLM, WeightOnlyQuantConfig
-model_name = "Local path for whisper"     # please use local path
-woq_config = WeightOnlyQuantConfig(use_ggml=True) #Currently, only Q40 is supported
-model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_config)
-model('Local audio file')
+from transformers import AutoTokenizer, TextStreamer
+from neural_speed import Model
+
+prompt = "Once upon a time"
+tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt").input_ids
+streamer = TextStreamer(tokenizer)
+
+model = Model()
+model.init_from_bin(model_type, model_file) #  for exmaple model_type: "llama", model_file: "/PATH/ggml-model-q4_0.gguf"
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=30, do_sample=True)
 ```
+
 You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
 
 ### 2. Neural Speed straight forward:

@@ -17,8 +17,8 @@ import json
 import numpy as np
 from pathlib import Path
 import argparse
-from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple,
-                    TypeVar, Union)
+from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
+                    Union)
 from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
 from sentencepiece import SentencePieceProcessor  # type: ignore
 import gguf
@@ -35,10 +35,7 @@ def bytes_to_unicode():
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
-    bs = list(range(ord("!"),
-                    ord("~") + 1)) + list(range(ord("¡"),
-                                                ord("¬") + 1)) + list(range(ord("®"),
-                                                                            ord("ÿ") + 1))
+    bs = list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -155,24 +152,28 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
         print(name, list_vars[name].shape, list_vars[name].dtype)
 
     print(hparams)
-    fout = open(fname_out, "wb")
 
     gguf_file = fname_out + '.gguf'
     gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm2")
 
+    arch = "chatglm2."
     gguf_writer.add_uint32('magic', 0x67676d66)
     gguf_writer.add_uint32('version', 1)
     gguf_writer.add_uint32('n_vocab', hparams["padded_vocab_size"])
-    gguf_writer.add_uint32('n_embd', hparams["hidden_size"])
-    gguf_writer.add_uint32('n_mult', 0)
-    gguf_writer.add_uint32('n_head', hparams["num_attention_heads"])
-    gguf_writer.add_uint32('n_head_kv', 0)
+    gguf_writer.add_embedding_length(hparams["hidden_size"])
 
-    gguf_writer.add_uint32('n_layer', hparams["num_layers"])
-    gguf_writer.add_uint32('n_rot', 0)
+    gguf_writer.add_uint32('n_mult', 0)
+    gguf_writer.add_head_count(hparams["num_attention_heads"])
+    gguf_writer.add_head_count_kv(0)
+    gguf_writer.add_block_count(hparams["num_layers"])
+
+    gguf_writer.add_rope_dimension_count(0)
     gguf_writer.add_uint32('ftype', ftype)
-    gguf_writer.add_uint32('max_seq_len', hparams["seq_length"])
-    gguf_writer.add_uint32('alibi_bias_max', 0)
+
+    gguf_writer.add_context_length(hparams["seq_length"])
+
+    gguf_writer.add_max_alibi_bias(0)
+
     gguf_writer.add_uint32('clip_qkv', 0)
     gguf_writer.add_uint32('par_res', 0)
 
@@ -180,13 +181,15 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     gguf_writer.add_uint32('do_layer_norm_before', 0)
 
     gguf_writer.add_uint32('multi_query_group_num', hparams["multi_query_group_num"])
-    gguf_writer.add_uint32('ffn_hidden_size', hparams["ffn_hidden_size"])
+
+    gguf_writer.add_feed_forward_length(hparams["ffn_hidden_size"])
+
     gguf_writer.add_uint32('inner_hidden_size', 0)
 
-    gguf_writer.add_int32('bos_token_id', tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1)
-    gguf_writer.add_int32('eos_token_id', tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1)
-    gguf_writer.add_int32('pad_token_id', tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1)
-    gguf_writer.add_int32('sep_token_id', tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1)
+    gguf_writer.add_bos_token_id(tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 0)
+    gguf_writer.add_eos_token_id(tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 0)
+    gguf_writer.add_pad_token_id(tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0)
+    gguf_writer.add_sep_token_id(tokenizer.sep_token_id if tokenizer.sep_token_id is not None else 0)
 
     def write_vocab_gguf(dir_model):
         print("gguf: get tokenizer metadata")

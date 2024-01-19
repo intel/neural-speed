@@ -82,6 +82,7 @@ class Model {
         .reshape({py::ssize_t(-1), static_cast<py::ssize_t>(ctx->model.hparams.n_vocab)});
   }
   bool is_token_end() { return token_eos; }
+  model_token get_eos_id() { return ctx->vocab.eos_token_id; }
   static int quant_model(const std::string& model_path, const std::string& out_path, const std::string& weight_dtype,
                          const std::string& alg, int group_size, const std::string& scale_dtype,
                          const std::string& compute_dtype, bool use_ggml, int threads);
@@ -691,5 +692,6 @@ PYBIND11_MODULE(qwen_cpp, m)
                   py::arg("group_size") = 32, py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8",
                   py::arg("threads") = 8)
       .def("print_time", &Model::print_time)
+      .def("get_eos_id", &Model::get_eos_id)
       .def("reinit", &Model::reinit);
 }
