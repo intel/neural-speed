@@ -1,16 +1,14 @@
 # Neural Speed
 
-Neural Speed is an innovation library designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization and sparsity powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor) and [llama.cpp](https://github.com/ggerganov/llama.cpp). We provide the experimental features as below:
+Neural Speed is an innovation library designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization and sparsity powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor) and [llama.cpp](https://github.com/ggerganov/llama.cpp). Highlights of this project:
 
-- Modular design to support new models
-- [Highly optimized low precision kernels](neural_speed/core/README.md)
-- Utilize AMX, VNNI, AVX512F and AVX2 instruction set
+- Support LLAMA, LLAMA2, NeuralChat series, GPT-J, GPT-NEOX, Dolly-v2, MPT, Falcon, BLOOM, OPT, ChatGLM, ChatGLM2, Baichuan, Baichuan2, Qwen, Mistral and Whisper.
+- [Highly optimized low precision kernels](neural_speed/core/README.md), utilize AMX, VNNI, AVX512F, AVX_VNNI and AVX2 instruction set
+- Up to 40x compared with [llama.cpp](https://github.com/ggerganov/llama.cpp), performance details: [blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
+- NeurIPS' 2023: [Efficient LLM Inference on CPUs](https://arxiv.org/abs/2311.00502)
 - Support 4bits and 8bits quantization
 
 > Neural Speed is under active development so APIs are subject to change.
-
-Up to 40x compared with [llama.cpp](https://github.com/ggerganov/llama.cpp).
-Some performace data have been published in NeurIPS' 2023: [Efficient LLM Inference on CPUs](https://arxiv.org/abs/2311.00502). You can refer [this blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) to get more performance information.
 
 ## Quick Start
 There are two approaches for utilizing the Neural Speed:
