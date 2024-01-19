@@ -515,6 +515,7 @@ class UT_ShuffleIndices {
     delete wptr;
   }
 };
+static UT_ShuffleIndices sUT_ShuffleIndices;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_ShuffleIndices sUT_ShuffleIndices;
 #endif

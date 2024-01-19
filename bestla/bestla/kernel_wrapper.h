@@ -259,23 +259,30 @@ class Dq8GetScale {
   }
 };
 
-template <int NTILE>
 class CompressS8S4 {
  public:
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::int4x2* dstptr, int row, int col, int ld_src,
                                   int ld_dst) {
-    return ref::compress_s8_s4<NTILE>(srcptr, dstptr, row, col, ld_src, ld_dst);
+    return ref::compress_s8_s4(srcptr, dstptr, row, col, ld_src, ld_dst);
   }
 };
 
-template <int NTILE>
 class CompressFp4 {
  public:
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::f4x2* dstptr, int row, int col, int ld_src,
                                   int ld_dst) {
-    return ref::compress_f4<NTILE>(srcptr, dstptr, row, col, ld_src, ld_dst);
+    return ref::compress_f4(srcptr, dstptr, row, col, ld_src, ld_dst);
+  }
+};
+
+class CompressBit3 {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int row,
+                                  int col, int ld_src, int ld_dst) {
+    return ref::compress_3bit(srcptr, bit2ptr, bit1ptr, row, col, ld_src, ld_dst);
   }
 };
 
