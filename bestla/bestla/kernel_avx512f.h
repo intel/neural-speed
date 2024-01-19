@@ -12,6 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
+#include "bestla.h"
 #include "bestla_utils.h"
 #include "kernel_ref.h"
 
@@ -641,6 +642,14 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
     }
   }
   return BTLA_CODE::NotSupport;
+}
+
+template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                                          _DST_T* dstptr, int interleave_n_offset, int unpack_elt,
+                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                          int NPad) {
+  return BTLA_CODE::Success;
 }
 
 template <BTLA_DTYPE _F4_T, typename _DST_T, int _PACK_ROW, typename _ST>

@@ -13,6 +13,7 @@
 //  limitations under the License.
 #pragma once
 #include <cassert>
+#include <cstdint>
 #include "bestla.h"
 #include "bestla_utils.h"
 #include "bestla_storage.h"
@@ -557,18 +558,26 @@ class WeightKBlockNInteger {
     });
   }
 
-  static void compressBit3Weight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
+  static void compressBit3Weight(const int N, const int K, const int8_t* B, int8_t* dstptr,
                                  parallel::IThreading* threading) {
     // TODO(zhe): 1D parallel compress
+    // N==NPad, K==Kpad, ldb==Kpad
+    auto ld_dst = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * utils::padto(K, 64);
+    auto col = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * K;
+    assert(N % (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE) == 0);
+    auto row = N / (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE);
+    auto pad_64_buf = utils::avector<int8_t>(row * ld_dst, 0);
+    kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD>(B, pad_64_buf.data(), row, col, col, ld_dst);
     auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
-    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + K * ldb / 4);
-    auto ret = kernel::wrapper::CompressBit3::forward<ISA_T>(B, bit2ptr, bit1ptr, K, N, ldb, ldb);
+    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + row * ld_dst / 4);
+    auto ret =
+        kernel::wrapper::CompressBit3::forward<ISA_T>(pad_64_buf.data(), bit2ptr, bit1ptr, row, col, ld_dst, ld_dst);
     assert(ret == BTLA_CODE::Success);
   }
 
   static void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr, BTLA_DTYPE qtype,
                              parallel::IThreading* threading) {
-    if (qtype == BTLA_DTYPE::S3_CLIP) return compressBit3Weight(N, K, B, ldb, dstptr, threading);
+    if (qtype == BTLA_DTYPE::S3_CLIP) return compressBit3Weight(N, K, B, dstptr, threading);
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp({tidx});
@@ -801,6 +810,19 @@ class WeightKBlockNInteger {
               *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
               wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+        } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
+          // n_offset+i : real n_offset  k_offset: real k_offset.
+          int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
+          auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
+          auto ld_dst = utils::padto(NPad, 64);
+          assert(elt_offset % 8 == 0);
+          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+          auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + wptr->mKPad * ld_dst / 4 + elt_offset / 8);
+          kernel::wrapper::DecompressKBlockS3Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
+                                                                                             BTLA_DTYPE::S3_CLIP>(
+              bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE,
+              k_size / _GemmCore_T::PACK_ROW * ColSize, sptr, zptr != nullptr ? zptr + n_offset + i : nullptr,
+              k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad);
         } else {
           assert(0);
         }
