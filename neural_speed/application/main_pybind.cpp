@@ -251,7 +251,6 @@ class ModelServer {
                         float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                         int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
                         const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num) {
-    MODEL_ASSERT(("ModelServer only supports continuous_batching", continuous_batching == true));
     init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                     num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping,
                     n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching,
