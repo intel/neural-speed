@@ -136,7 +136,7 @@ class ModelServer {
               int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping,
               int n_keep, int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
-              const std::string& policy, const int& print_log)
+              const std::string& policy, const bool& print_log)
       : response(response),
         waiting(),
         running(true),
@@ -912,7 +912,7 @@ PYBIND11_MODULE(qwen_cpp, m)
   py::class_<ModelServer>(m, "ModelServer", py::module_local())
       .def(py::init<const ResponseCallback&, const std::string&, bool, int, int, int, int, int, float, int, bool, int,
                     float, float, int, float, bool, int, int, bool, int, model_vocab::id, const std::string&,
-                    const bool&, const int&, const std::string&, const int&>(),
+                    const bool&, const int&, const std::string&, const bool&>(),
            py::arg("response"), py::arg("model_path"), py::arg("return_prompt") = false, py::arg("max_new_tokens") = -1,
            py::arg("n_batch") = 512, py::arg("ctx_size") = 512, py::arg("seed") = -1, py::arg("threads") = 8,
            py::arg("repetition_penalty") = 1.1f, py::arg("num_beams") = 1, py::arg("do_sample") = false,

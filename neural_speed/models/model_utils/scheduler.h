@@ -35,7 +35,7 @@ class il_worker {
   virtual bool prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) = 0;
   virtual bool update_seqs(std::vector<sequence>* seqs, const int& n_input) = 0;
 
-  model_context* m_ctx = NULL;
+  model_context* m_ctx = nullptr;
   int threads;
   beam_search_flow* bsf = nullptr;
   std::vector<int> request_done_ids;
@@ -47,7 +47,7 @@ class cbg_worker : public il_worker {
  public:
   explicit cbg_worker(const gpt_params& params);
   cbg_worker(const gpt_params& params, const int& n_threads);
-  ~cbg_worker();
+  ~cbg_worker() = default;
 
   bool step(std::vector<sequence>* seqs, const int& n_input) override;
   // bool greedy_search_step(sequence seqs, const int& n_input) override;
@@ -63,7 +63,7 @@ class il_scheduler {
  public:
   explicit il_scheduler(const gpt_params& params);
   il_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
-  virtual ~il_scheduler();
+  virtual ~il_scheduler() = default;
 
   // TODO (YZT) kv cache ptr as input params
   virtual bool add_request(sequence seq) = 0;
@@ -89,7 +89,7 @@ class cbg_scheduler : public il_scheduler {
  public:
   explicit cbg_scheduler(const gpt_params& params);
   cbg_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
-  ~cbg_scheduler();
+  ~cbg_scheduler() = default;
 
   bool add_request(sequence seq) override;
   bool step() override;

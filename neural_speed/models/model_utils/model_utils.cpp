@@ -2429,7 +2429,7 @@ void beam_search_flow::update_status() {
   next_done_request_ids.clear();
   for (int h = 0; h < beam_hypos.size(); ++h) {
     if (requests_done[h]) continue;
-    const bool enough_new_tokens = (cur_beams[h * beam_size].token_ids.size() > 0 &&
+    const bool enough_new_tokens = (!cur_beams[h * beam_size].token_ids.empty() &&
                                     cur_beams[h * beam_size].token_ids.size() == gen_confs[h].max_new_tokens);
     if (beam_hypos[h].is_done() || enough_new_tokens) {
       requests_done[h] = true;
@@ -2686,7 +2686,7 @@ bool beam_search_flow::step_update_beams_and_kv_cache() {
   std::vector<beam_next_token> next_tokens =
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
   if (next_tokens.size() != num_sample_k) {
-    fprintf(stderr, "%s: error: sampled next tokens size is %d which is not equal to %d.\n", __func__,
+    fprintf(stderr, "%s: error: sampled next tokens size is %ld which is not equal to %d.\n", __func__,
             next_tokens.size(), num_sample_k);
     return false;
   }

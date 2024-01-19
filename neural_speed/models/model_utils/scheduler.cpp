@@ -15,9 +15,8 @@
 #include "models/model_utils/scheduler.h"
 
 // il_worker
-il_worker::il_worker(const gpt_params& params) {
-  m_ctx = model_init_from_gpt_params(params);
-  if (m_ctx == NULL) {
+il_worker::il_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_params(params)) {
+  if (m_ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model\n", __func__);
     exit(0);
   }
@@ -28,7 +27,7 @@ il_worker::il_worker(const gpt_params& params) {
 }
 
 il_worker::~il_worker() {
-  if (m_ctx != NULL) {
+  if (m_ctx != nullptr) {
     model_free(m_ctx);
   }
   if (bsf != nullptr) {
@@ -38,7 +37,6 @@ il_worker::~il_worker() {
 
 // cbg_worker
 cbg_worker::cbg_worker(const gpt_params& params) : il_worker(params) { m_ctx->cont_batching = true; }
-cbg_worker::~cbg_worker() {}
 
 bool cbg_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) {
   for (int i = 0; i < n_input; ++i) {
@@ -86,7 +84,7 @@ bool cbg_worker::beam_search_step(std::vector<sequence>* seqs, const int& n_inpu
 bool cbg_worker::step(std::vector<sequence>* seqs, const int& n_input) {
   reqidx_to_vecid.clear();
   for (int ni = 0; ni < n_input; ++ni) {
-    reqidx_to_vecid.emplace(std::make_pair(seqs->at(ni).request_idx, ni));
+    reqidx_to_vecid.emplace(seqs->at(ni).request_idx, ni);
   }
   if (m_ctx->beam_search && bsf != nullptr) {
     if (!beam_search_step(seqs, n_input)) {
@@ -151,8 +149,6 @@ il_scheduler::il_scheduler(const gpt_params& params, const std::string& policy, 
 
 il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, "fcfs", 1) {}
 
-il_scheduler::~il_scheduler() {}
-
 std::vector<sequence> il_scheduler::pop_completed_requests() {
   std::vector<sequence> ret_seqs;
   const int length = finished_pool.size();
@@ -166,7 +162,7 @@ std::vector<sequence> il_scheduler::pop_completed_requests() {
       return std::vector<sequence>();
     }
     if (log_level == 0) {
-      fprintf(stdout, "%s: info: tokens generation time of sequence (query_id %llu, request_idx: %d) is %8.2fms.\n",
+      fprintf(stdout, "%s: info: tokens generation time of sequence (query_id %lu, request_idx: %d) is %8.2fms.\n",
               __func__, ret_seqs[l].query_id, ret_seqs[l].request_idx,
               (ret_seqs[l].end_time - ret_seqs[l].receive_time) / 1000.0);
     }
@@ -189,8 +185,6 @@ cbg_scheduler::cbg_scheduler(const gpt_params& params, const std::string& policy
       free_req_idx(max_requests, true),
       waiting_free_req_idx_seqs_num(0) {}
 
-cbg_scheduler::~cbg_scheduler() {}
-
 int cbg_scheduler::query_free_req_idx() {
   auto iter = std::find_if(free_req_idx.begin(), free_req_idx.end(), [](const bool flag) { return flag; });
   if (iter == free_req_idx.end()) {
@@ -212,7 +206,7 @@ bool cbg_scheduler::add_request(sequence seq) {
   seq.status = seq_status::WAITING;
   seq.request_idx = waiting_free_req_idx_seqs_num > 0 ? -1 : query_free_req_idx();
   if (log_level == 0) {
-    fprintf(stdout, "%s: info: added seq query_id: %llu, request_idx: %d \n", __func__, seq.query_id, seq.request_idx);
+    fprintf(stdout, "%s: info: added seq query_id: %lu, request_idx: %d \n", __func__, seq.query_id, seq.request_idx);
   }
   if (seq.request_idx == -1) waiting_free_req_idx_seqs_num++;
   return waiting_pool.add(seq);
@@ -245,7 +239,7 @@ bool cbg_scheduler::prepare_seqs() {
             }
             executed_seqs[cur_running_num + np].request_idx = fidx;
             if (log_level == 0) {
-              fprintf(stdout, "%s: info: updated seq query_id: %llu, request_idx: %d \n", __func__,
+              fprintf(stdout, "%s: info: updated seq query_id: %lu, request_idx: %d \n", __func__,
                       executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
             }
             waiting_free_req_idx_seqs_num--;
@@ -314,11 +308,15 @@ bool cbg_scheduler::update_pools() {
       finished_pool.add(executed_seqs[ns]);
       free_req_idx[executed_seqs[ns].request_idx] = true;
       if (log_level == 0) {
-        fprintf(stdout, "%s: info: seq query_id: %llu, request_idx: %d finished.\n", __func__,
+        fprintf(stdout, "%s: info: seq query_id: %lu, request_idx: %d finished.\n", __func__,
                 executed_seqs[ns].query_id, executed_seqs[ns].request_idx);
       }
     } else {
-      fprintf(stderr, "%s: error: wrong seq status, seq_idx: %d should be in DECODING OR FINISHED.\n", __func__);
+      fprintf(
+          stderr,
+          "%s: error: wrong seq status: %d of seq query_id: %lu, request_idx: %d, should be in DECODING OR FINISHED.\n",
+          __func__, static_cast<int>(executed_seqs[ns].status), executed_seqs[ns].query_id,
+          executed_seqs[ns].request_idx);
       return false;
     }
   }

@@ -107,6 +107,7 @@ class TestLLMRUNTIME(unittest.TestCase):
             pad_token=pad_token, continuous_batching=False)
         for i in range(len(itrex_generate_ids_padded)):
             self.assertListEqual(pt_generate_ids[i], itrex_generate_ids_padded[i])
+        itrex_model.model = None
         itrex_generate_ids_cont = itrex_model.generate(
             inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True,
             pad_token=pad_token, continuous_batching=True)

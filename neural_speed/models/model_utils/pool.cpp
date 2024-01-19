@@ -76,7 +76,7 @@ serve_pool::~serve_pool() {
 
 bool serve_pool::add(sequence seq) {
   std::lock_guard<std::mutex> lock(mtx);
-  return internel_pool->add(seq);
+  return internel_pool->add(std::move(seq));
 }
 
 bool serve_pool::pop(sequence* seq) {
