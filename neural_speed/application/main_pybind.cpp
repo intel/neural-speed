@@ -136,7 +136,7 @@ class ModelServer {
               int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping,
               int n_keep, int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
-              const std::string& policy)
+              const std::string& policy, const int& print_log)
       : response(response),
         waiting(),
         running(true),
@@ -151,7 +151,7 @@ class ModelServer {
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
                                  early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
                                  true, max_request_num);
-          cbg_scheduler scheduler(this->params, policy);
+          cbg_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
             {                                               // add waitting tasks queue to running queue
@@ -912,7 +912,7 @@ PYBIND11_MODULE(qwen_cpp, m)
   py::class_<ModelServer>(m, "ModelServer", py::module_local())
       .def(py::init<const ResponseCallback&, const std::string&, bool, int, int, int, int, int, float, int, bool, int,
                     float, float, int, float, bool, int, int, bool, int, model_vocab::id, const std::string&,
-                    const bool&, const int&, const std::string&>(),
+                    const bool&, const int&, const std::string&, const int&>(),
            py::arg("response"), py::arg("model_path"), py::arg("return_prompt") = false, py::arg("max_new_tokens") = -1,
            py::arg("n_batch") = 512, py::arg("ctx_size") = 512, py::arg("seed") = -1, py::arg("threads") = 8,
            py::arg("repetition_penalty") = 1.1f, py::arg("num_beams") = 1, py::arg("do_sample") = false,
@@ -920,7 +920,7 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
            py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = false,
-           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs")
+           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs", py::arg("print_log") = false)
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))
       .def("Empty", &ModelServer::Empty, "No more queries to execute");
 }

@@ -62,7 +62,7 @@ class cbg_worker : public il_worker {
 class il_scheduler {
  public:
   explicit il_scheduler(const gpt_params& params);
-  il_scheduler(const gpt_params& params, const std::string& policy);
+  il_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
   virtual ~il_scheduler();
 
   // TODO (YZT) kv cache ptr as input params
@@ -71,7 +71,6 @@ class il_scheduler {
   virtual bool done() = 0;
   inline bool has_finished_seq() { return (finished_pool.size() > 0); }
   std::vector<sequence> pop_completed_requests();
-  // void print_progress();
 
  protected:
   virtual bool prepare_seqs() = 0;
@@ -82,13 +81,14 @@ class il_scheduler {
   serve_pool waiting_pool;
   serve_pool running_pool;
   serve_pool finished_pool;
+  int log_level;  // 0: log info and error, 1 or other: log error
 };
 
 // continuous batching generation scheduler
 class cbg_scheduler : public il_scheduler {
  public:
   explicit cbg_scheduler(const gpt_params& params);
-  cbg_scheduler(const gpt_params& params, const std::string& policy);
+  cbg_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
   ~cbg_scheduler();
 
   bool add_request(sequence seq) override;
@@ -104,8 +104,6 @@ class cbg_scheduler : public il_scheduler {
   cbg_worker wr;
   std::vector<sequence> executed_seqs;
   std::vector<bool> free_req_idx;
-  // TODO (YZT) too long will hurt performance?
-  int64_t max_input_length;
   int waiting_free_req_idx_seqs_num;
   int cur_running_num = -1;
   // reserve at least one position for next prompt hidden states prefilling

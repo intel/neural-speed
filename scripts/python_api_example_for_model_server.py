@@ -33,11 +33,11 @@ def f(res, working):
         print(a)
         print("================")
 
-model_path = "/home/zhentao/ils/runtime_outs/ne_gptj_q_int4_bestla_cint8_g32.bin"
+model_path = "/home/zhentao/ils/ns/q4_j.bin"
 added_count = 0
 s = cpp.ModelServer(f, model_path, max_new_tokens=128, max_request_num=8, threads=56, num_beams=4,
                     min_new_tokens=30, early_stopping=True, continuous_batching=True,
-                    return_prompt=True)
+                    return_prompt=True, print_log=True)
 for i in range(len(prompts)):
     p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
     s.issueQuery([cpp.Query(i, p_token_ids)])

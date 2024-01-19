@@ -216,20 +216,21 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
             ne_view_4d(ctx0, Qcur, head_size, n_head, qk_sl, qk_bs, ne_element_size(Qcur) * head_size,
                        ne_element_size(Qcur) * head_size * n_head, ne_element_size(Qcur) * head_size * n_head * qk_sl,
                        off_sl * ne_element_size(Qcur));
-        ne_build_forward_expand(&gf, ne_rope_inplace(ctx0, Qcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base,
-                                        hparams.freq_scale));
+        ne_build_forward_expand(
+            &gf, ne_rope_inplace(ctx0, Qcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale));
         struct ne_tensor* Kcur_req =
             ne_view_4d(ctx0, Kcur, head_size, n_head, qk_sl, qk_bs, ne_element_size(Kcur) * head_size,
                        ne_element_size(Kcur) * head_size * n_head, ne_element_size(Kcur) * head_size * n_head * qk_sl,
                        off_sl * ne_element_size(Kcur));
-        ne_build_forward_expand(&gf, ne_rope_inplace(ctx0, Kcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base,
-                                        hparams.freq_scale));
+        ne_build_forward_expand(
+            &gf, ne_rope_inplace(ctx0, Kcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale));
         off_sl += head_size * n_head * qk_bs * qk_sl;
       }
     } else {
-      Qcur = ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base,  hparams.freq_scale);
+      Qcur = ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base,
+                             hparams.freq_scale);
       Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
-          ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base,  hparams.freq_scale);
+          ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
     }
     ne_set_name(Qcur, "Qcur");
     ne_set_name(Kcur, "Kcur");
@@ -372,7 +373,8 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
           // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
           // in a single eval execution
           if (N == 1) cossin_cache = kv_self.cossin;
-          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base, hparams.freq_scale);
+          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                    hparams.freq_scale);
         }
         const auto v_size = kv_cache_info.v_bytes;
         V = ne_view_4d(ctx0, kv_self.v,                          // tensor
@@ -404,7 +406,8 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
           // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
           // in a single eval execution
           if (N == 1) cossin_cache = kv_self.cossin;
-          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base, hparams.freq_scale);
+          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                    hparams.freq_scale);
           K = ne_permute(ctx0, K, 0, 2, 1, 3);
         }
       } else {
@@ -419,7 +422,8 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
           // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
           // in a single eval execution
           if (N == 1) cossin_cache = kv_self.cossin;
-          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base, hparams.freq_scale);
+          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                    hparams.freq_scale);
           K = ne_permute(ctx0, K, 0, 2, 1, 3);
         }
 

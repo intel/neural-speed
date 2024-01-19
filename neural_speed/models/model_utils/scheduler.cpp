@@ -28,7 +28,6 @@ il_worker::il_worker(const gpt_params& params) {
 }
 
 il_worker::~il_worker() {
-  // TODO (YZT) consider thread safe?
   if (m_ctx != NULL) {
     model_free(m_ctx);
   }
@@ -142,14 +141,15 @@ bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
 }
 
 // il_scheduler
-il_scheduler::il_scheduler(const gpt_params& params, const std::string& policy)
+il_scheduler::il_scheduler(const gpt_params& params, const std::string& policy, const int& log_level)
     : params(params),
       policy(parse_serve_policy(policy)),
       waiting_pool(pool_property::WAITING),
       running_pool(pool_property::RUNNING),
-      finished_pool(pool_property::FINISHED) {}
+      finished_pool(pool_property::FINISHED),
+      log_level(log_level) {}
 
-il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, "fcfs") {}
+il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, "fcfs", 1) {}
 
 il_scheduler::~il_scheduler() {}
 
@@ -165,9 +165,11 @@ std::vector<sequence> il_scheduler::pop_completed_requests() {
       fprintf(stderr, "%s: error: pop finished_pool %dth seq failed.\n", __func__, l);
       return std::vector<sequence>();
     }
-    fprintf(stdout, "%s: info: tokens generation time of sequence (query_id %llu, request_idx: %d) is %8.2fms.\n",
-            __func__, ret_seqs[l].query_id, ret_seqs[l].request_idx,
-            (ret_seqs[l].end_time - ret_seqs[l].receive_time) / 1000.0);
+    if (log_level == 0) {
+      fprintf(stdout, "%s: info: tokens generation time of sequence (query_id %llu, request_idx: %d) is %8.2fms.\n",
+              __func__, ret_seqs[l].query_id, ret_seqs[l].request_idx,
+              (ret_seqs[l].end_time - ret_seqs[l].receive_time) / 1000.0);
+    }
   }
   return ret_seqs;
 }
@@ -178,15 +180,13 @@ cbg_scheduler::cbg_scheduler(const gpt_params& params)
       max_requests(params.max_request_num),
       wr(params),
       free_req_idx(max_requests, true),
-      max_input_length(max_requests * params.n_ctx),
       waiting_free_req_idx_seqs_num(0) {}
 
-cbg_scheduler::cbg_scheduler(const gpt_params& params, const std::string& policy)
-    : il_scheduler(params, policy),
+cbg_scheduler::cbg_scheduler(const gpt_params& params, const std::string& policy, const int& log_level)
+    : il_scheduler(params, policy, log_level),
       max_requests(params.max_request_num),
       wr(params),
       free_req_idx(max_requests, true),
-      max_input_length(max_requests * params.n_ctx),
       waiting_free_req_idx_seqs_num(0) {}
 
 cbg_scheduler::~cbg_scheduler() {}
@@ -211,7 +211,9 @@ bool cbg_scheduler::add_request(sequence seq) {
   // add into waiting_pool by default
   seq.status = seq_status::WAITING;
   seq.request_idx = waiting_free_req_idx_seqs_num > 0 ? -1 : query_free_req_idx();
-  fprintf(stdout, "%s: info: added seq query_id: %llu, request_idx: %d \n", __func__, seq.query_id, seq.request_idx);
+  if (log_level == 0) {
+    fprintf(stdout, "%s: info: added seq query_id: %llu, request_idx: %d \n", __func__, seq.query_id, seq.request_idx);
+  }
   if (seq.request_idx == -1) waiting_free_req_idx_seqs_num++;
   return waiting_pool.add(seq);
 }
@@ -225,8 +227,10 @@ bool cbg_scheduler::prepare_seqs() {
   }
   const int n_perfill_seqs = std::min(max_requests - cur_running_num, waiting_pool.size());
   executed_seqs.resize(n_perfill_seqs + cur_running_num);
-  fprintf(stdout, "%s: info: prefilling seqs num is %d, decoding seqs num is %d.\n", __func__, n_perfill_seqs,
-          cur_running_num);
+  if (log_level == 0) {
+    fprintf(stdout, "%s: info: prefilling seqs num is %d, decoding seqs num is %d.\n", __func__, n_perfill_seqs,
+            cur_running_num);
+  }
   if (waiting_pool.size() > 0) {
     // pop prompts
     if (cur_running_num < max_requests) {
@@ -240,8 +244,10 @@ bool cbg_scheduler::prepare_seqs() {
               return false;
             }
             executed_seqs[cur_running_num + np].request_idx = fidx;
-            fprintf(stdout, "%s: info: updated seq query_id: %llu, request_idx: %d \n", __func__,
-                    executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
+            if (log_level == 0) {
+              fprintf(stdout, "%s: info: updated seq query_id: %llu, request_idx: %d \n", __func__,
+                      executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
+            }
             waiting_free_req_idx_seqs_num--;
           }
         } else {
@@ -278,13 +284,17 @@ bool cbg_scheduler::step() {
   }
   // one step
   if (!steps_decoding_for_next_prefill) {
-    fprintf(stdout, "%s: info: running_pool size < max request num, will execute one step.\n", __func__);
+    if (log_level == 0) {
+      fprintf(stdout, "%s: info: running_pool size < max request num, will execute one step.\n", __func__);
+    }
     if (!wr.step(&executed_seqs, executed_seqs.size())) {
       return false;
     }
   } else {
     // steps for next prompt prefilling
-    fprintf(stdout, "%s: info: running_pool size = max request num, will execute several steps.\n", __func__);
+    if (log_level == 0) {
+      fprintf(stdout, "%s: info: running_pool size = max request num, will execute several steps.\n", __func__);
+    }
     wr.empty_request_done_ids();
     while (wr.get_request_done_ids().empty()) {
       if (!wr.step(&executed_seqs, executed_seqs.size())) {
@@ -303,8 +313,10 @@ bool cbg_scheduler::update_pools() {
     } else if (executed_seqs[ns].status == seq_status::FINISHED) {
       finished_pool.add(executed_seqs[ns]);
       free_req_idx[executed_seqs[ns].request_idx] = true;
-      fprintf(stdout, "%s: info: seq query_id: %llu, request_idx: %d finished.\n", __func__, executed_seqs[ns].query_id,
-              executed_seqs[ns].request_idx);
+      if (log_level == 0) {
+        fprintf(stdout, "%s: info: seq query_id: %llu, request_idx: %d finished.\n", __func__,
+                executed_seqs[ns].query_id, executed_seqs[ns].request_idx);
+      }
     } else {
       fprintf(stderr, "%s: error: wrong seq status, seq_idx: %d should be in DECODING OR FINISHED.\n", __func__);
       return false;
