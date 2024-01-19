@@ -126,9 +126,10 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
   auto get_fp_scale_avx2 = [&](int scale_offset, uint8_t* src, float* dst) {
     auto dq_s_idx = scale_offset / dq_blk;
     auto ymm_dq_scale = _mm256_set1_ps(dq_scale[dq_s_idx]);
-    __m256 fp32_dq_v;
-    for (int i = 0; i < 8; i++) fp32_dq_v[i] = dq8_bnb_LUT[src[i]];
-    auto fymm = _mm256_mul_ps(fp32_dq_v, ymm_dq_scale);
+    __m256 fp32_dq_ymm;
+    float* fp32_dq_ptr=reinterpret_cast<float*>(&fp32_dq_ymm);
+    for (int i = 0; i < 8; i++) fp32_dq_ptr[i] = dq8_bnb_LUT[src[i]];
+    auto fymm = _mm256_mul_ps(fp32_dq_ymm, ymm_dq_scale);
     fymm = _mm256_add_ps(fymm, ymm_dq_offset);
     _mm256_storeu_ps(dst, fymm);
   };
