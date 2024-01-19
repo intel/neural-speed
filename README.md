@@ -10,6 +10,17 @@ Neural Speed is an innovation library designed to provide the efficient inferenc
 
 > Neural Speed is under active development so APIs are subject to change.
 
+## Installation
+
+### Build Python package (Recommended way)
+```shell
+pip install -r requirements.txt
+pip install .
+```
+
+### For more installation ways like building binary by yourself, please refer to [Install Document](./docs/install.md)
+
+
 ## Quick Start
 There are two approaches for utilizing the Neural Speed:
 ### 1. Transformer-like API
@@ -103,34 +114,6 @@ python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 
 ## Supported Models
 
 Neural Speed supports the following models: [list](./docs/supported_models.md)
-
-## Install
-
-### Build Python package
-```shell
-pip install -r requirements.txt
-pip install .
-```
-
-### Build executable only
-
-```shell
-# Linux and WSL
-git submodule update --init --recursive
-mkdir build
-cd build
-cmake .. -G Ninja
-ninja
-```
-
-```powershell
-# Windows
-# Install VisualStudio 2022 and open 'Developer PowerShell for VS 2022'
-mkdir build
-cd build
-cmake ..
-cmake --build . -j --config Release
-```
 
 
 ## Advanced Usage
