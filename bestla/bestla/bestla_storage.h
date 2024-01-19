@@ -707,8 +707,10 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
     auto bits = utils::bestla_dtype_bits(qtype);
     auto elesize = static_cast<size_t>(NPad) * KPad;
     if (qtype == BTLA_DTYPE::S3_CLIP)
-      elesize = static_cast<size_t>(utils::padto(NPad, 64)) * KPad;  // pad N-dim to 64 because 64pack interleave.
-    auto bytes = utils::updiv(elesize * bits, 8);                    // add 3bits, 5btis, 7bits size calculation here
+      elesize = static_cast<size_t>(utils::padto(KPad, 64)) *
+                NPad;  // pad K-dim to 64 because 64pack round2 interleave. round2 interleave ld_dim == PACK_ROW *
+                       // pad_to(KPad,64) * NTILE
+    auto bytes = utils::updiv(elesize * bits, 8);  // add 3bits, 5btis, 7bits size calculation here
     mQBuf.resize(bytes);
     int nk_scale = utils::updiv(KPad, Block);
     auto gemm_comp = bestla::gemm::CoreAttr::get_comp(mCoreId);
