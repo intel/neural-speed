@@ -56,7 +56,7 @@ def get_ppl(sum_nll, sum_nll2, cnt: int):
 
 def perplexity(model_name, dataset_name, **kwargs):
     import datasets
-    from intel_extension_for_transformers.transformers import (AutoModelForCausalLM, WeightOnlyQuantConfig)
+    from transformers import AutoModelForCausalLM
     from transformers import AutoTokenizer, AutoConfig
     model_name = try_resolve_dir(model_name)
     dataset_name = try_resolve_dir(dataset_name)
@@ -94,7 +94,7 @@ def perplexity(model_name, dataset_name, **kwargs):
 
     quantized_weight_path = kwargs.pop('quantized_weight_path', None)
     if quantized_weight_path:
-        from intel_extension_for_transformers.llm.runtime.graph import Model
+        from neural_speed import Model
         model = Model()
         assert pathlib.Path(quantized_weight_path).is_file(), "Quantized weight not exist!"
         model.bin_file = quantized_weight_path
@@ -102,13 +102,8 @@ def perplexity(model_name, dataset_name, **kwargs):
         model.model_type = Model.get_model_type(model.config)
         model.tokenizer = tokenizer
     else:
-        woq_kwargs = {
-            k: kwargs[k]
-            for k in kwargs
-            if k in ['use_cache', 'compute_dtype', 'weight_dtype', 'scale_dtype', 'group_size', 'use_ggml']
-        }
-        woq_config = WeightOnlyQuantConfig(**woq_kwargs)
-        model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_config, trust_remote_code=True)
+        logger.warning(f"No quantized model found, will try to download from huggingface")
+        model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
 
     model_kwargs = {k: kwargs[k] for k in kwargs if k in ['n_keep', 'shift_roped_k', 'memory_dtype']}
     model_kwargs = {**default_model_kwargs, **model_kwargs}
