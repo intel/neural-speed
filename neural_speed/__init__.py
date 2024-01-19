@@ -216,8 +216,7 @@ class Model:
     def __get_eos_id(self):
         return self.model.get_eos_id()
 
-
-    def __call__(self, model_input, reinit=False, **kwargs):
+    def __call__(self, model_input, reinit=False, logits_all=False, **kwargs):
         if self.model_type == 'whisper':
             if self.model is None:
                 self.model = self.module.Model()
@@ -234,7 +233,7 @@ class Model:
             elif reinit:
                 self.model.reinit()
                 self.generate_round = 0
-            return self.model.evaluate(model_input.tolist())
+            return self.model.evaluate(model_input.tolist(), logits_all)
         else:
             print("Please input torch.Tensor")
         return
