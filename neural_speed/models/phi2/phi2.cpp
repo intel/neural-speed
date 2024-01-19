@@ -39,11 +39,11 @@
 
 // feed-forward network
 struct ne_tensor* phi_ff(const model_layer& layer, const int batch_size, const int N, ne_context* ctx0,
-                          ne_tensor* inp) {
+                         ne_tensor* inp) {
   struct ne_tensor* cur = inp;
-  if (bestla_fusion_FFN_SiLu_f32f32_support(layer.ffn[1]->data, layer.ffn[2]->data, layer.ffn[0]->data, N, cur->ne[0],
-                                            layer.ffn[1]->ne[1], layer.ffn[2]->ne[1])&&false) {
-    cur = ne_ffn_silu(ctx0, layer.ffn[1], layer.ffn[2], layer.ffn[0], cur);
+  if (bestla_fusion_FFN_Add_GeLu_f32f32_support(layer.ffn[0]->data, layer.ffn[2]->data, N, cur->ne[0],
+                                                layer.ffn[0]->ne[1], layer.ffn[2]->ne[1])) {
+    cur = ne_ffn_add_gelu(ctx0, layer.ffn[0], layer.ffn[2], layer.ffn[1], layer.ffn[3], cur);
   } else {
     cur = ne_add(ctx0, ne_mul_mat(ctx0, layer.ffn[0], cur), layer.ffn[1]);
     // SILU activation
@@ -112,7 +112,7 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
-  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA&&false;
+  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
   if (run_mha_reordered) {
     NE_ASSERT(("kv cache should be the same dtype", kv_self.v->type == NE_TYPE_BTLA));
@@ -160,9 +160,15 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
       cur_norm = cur;
       // compute QKV
 
-      struct ne_tensor* Qcur = ne_reshape_3d(ctx0,ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur),model.layers[il].attn[1]), head_dim, n_head, N);
-      struct ne_tensor* Kcur = ne_reshape_3d(ctx0,ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur),model.layers[il].attn[3]), head_dim, n_head, N);
-      struct ne_tensor* Vcur = ne_reshape_3d(ctx0,ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur),model.layers[il].attn[5]), head_dim, n_head, N);
+      struct ne_tensor* Qcur =
+          ne_reshape_3d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
+                        head_dim, n_head, N);
+      struct ne_tensor* Kcur =
+          ne_reshape_3d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
+                        head_dim, n_head, N);
+      struct ne_tensor* Vcur =
+          ne_reshape_3d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
+                        head_dim, n_head, N);
 
       // using mode = 2 for GPT-NeoX mode
       Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
@@ -285,7 +291,7 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
         cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
       }
       // projection
-      { cur = ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[6], cur), model.layers[il].attn[7]) ; }
+      { cur = ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[6], cur), model.layers[il].attn[7]); }
     }
     lctx.use_buf(ctx0, 1);
 
@@ -392,4 +398,3 @@ int model_eval(struct model_context* ctx, const model_input* inputs, const int n
 
   return 0;
 }
-

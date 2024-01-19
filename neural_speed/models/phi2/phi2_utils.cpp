@@ -44,10 +44,12 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
   std::unique_ptr<phi2> ms(new phi2());
   ms->init(fname.c_str(), ctx, n_gpu_layers, use_mmap, use_mlock, vocab_only);
   ms->load(ctx, progress_callback, progress_callback_user_data);
+  model_context& lctx = *ctx;
+  lctx.support_bestla_kv = true;
 }
 
 void phi2::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
-               bool vocab_only_) {
+                bool vocab_only_) {
   model_context& lctx = *ctx;
   n_gpu_layer = n_gpu_layer_;
   use_mmap = use_mmap_;
@@ -145,11 +147,11 @@ void phi2::load(model_context* ctx, model_progress_callback progress_callback, v
     layer.ffn[3] = ml->get_tensor(layers_i + ".mlp.fc2.bias", {n_embd}, backend);
 
     if (backend != NE_BACKEND_CPU) {
-      vram_total +=
-          ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) + 
-          ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) + ne_nbytes(layer.attn[5]) +
-          ne_nbytes(layer.attn[6]) + ne_nbytes(layer.attn[7]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]) +
-          ne_nbytes(layer.ffn[2]) + ne_nbytes(layer.ffn[3]);
+      vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
+                    ne_nbytes(layer.attn[1]) + ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) +
+                    ne_nbytes(layer.attn[4]) + ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) +
+                    ne_nbytes(layer.attn[7]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]) +
+                    ne_nbytes(layer.ffn[2]) + ne_nbytes(layer.ffn[3]);
     }
   }
 
