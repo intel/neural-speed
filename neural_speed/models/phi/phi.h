@@ -1,16 +1,18 @@
-#ifndef PHI2_H
-#define PHI2_H
+#ifndef PHI_H
+#define PHI_H
 
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
 
 enum new_model {
   MDOEL_UNKNOWN,
-  PHI2,
+  PHI,
 };
 
-static const model_scratch phi2_mem_req(int n_layers) {
+static const model_scratch phi_mem_req(int n_layers) {
   switch (n_layers) {
+    case 24:
+      return {512ull * MB, 512ull * MB, 1026ull * MB};
     case 32:
       return {1024ull * MB, 1024ull * MB, 1026ull * MB};
     default:
@@ -18,9 +20,9 @@ static const model_scratch phi2_mem_req(int n_layers) {
   }
 }
 
-class phi2 : public IModel {
+class phi : public IModel {
  private:
-  model_archs name = MODEL_PHI2;
+  model_archs name = MODEL_PHI;
   std::unique_ptr<model_model_loader> ml;
   uint32_t n_layer, n_embd, n_ff, n_vocab;
   int n_ctx, n_gpu_layer;
@@ -33,4 +35,4 @@ class phi2 : public IModel {
   void load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) override;
 };
 
-#endif  // PHI2_H
+#endif  // PHI_H

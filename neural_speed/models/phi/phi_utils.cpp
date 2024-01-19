@@ -31,7 +31,7 @@
 #include "core/data_types.h"
 #include "core/ne.h"
 #include "core/ne_layers.h"
-#include "models/phi2/phi2.h"
+#include "models/phi/phi.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
@@ -41,14 +41,14 @@
 void model_load_internal(const std::string& fname, model_archs arch, model_context* ctx, int n_gpu_layers,
                          bool use_mmap, bool use_mlock, bool vocab_only, model_progress_callback progress_callback,
                          void* progress_callback_user_data) {
-  std::unique_ptr<phi2> ms(new phi2());
+  std::unique_ptr<phi> ms(new phi());
   ms->init(fname.c_str(), ctx, n_gpu_layers, use_mmap, use_mlock, vocab_only);
   ms->load(ctx, progress_callback, progress_callback_user_data);
   model_context& lctx = *ctx;
   lctx.support_bestla_kv = true;
 }
 
-void phi2::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
+void phi::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
                 bool vocab_only_) {
   model_context& lctx = *ctx;
   n_gpu_layer = n_gpu_layer_;
@@ -74,12 +74,12 @@ void phi2::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
   n_embd = hparams.n_embd;
-  scratch = phi2_mem_req(n_layer);
+  scratch = phi_mem_req(n_layer);
   model.scratchs = scratch;
 }
 
 #define MODEL_BACKEND_OFFLOAD NE_BACKEND_CPU
-void phi2::load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) {
+void phi::load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) {
   model_context& lctx = *ctx;
   auto& model = lctx.model;
   auto& ne_ctx = model.ctx;
@@ -109,7 +109,7 @@ void phi2::load(model_context* ctx, model_progress_callback progress_callback, v
 
   ml->ne_ctx = ne_ctx;
 
-  // PHI2 is set up so that if padding_idx is specified then offset the embedding ids by 2
+  // PHI is set up so that if padding_idx is specified then offset the embedding ids by 2
   // and adjust num_embeddings appropriately. Other models don't have this hack
   const uint32_t pos_offset = 2;
   model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -178,7 +178,7 @@ void phi2::load(model_context* ctx, model_progress_callback progress_callback, v
 }
 
 #undef MODEL_BACKEND_OFFLOAD
-class phi2_quant_layer : public quant_layer_base {
+class phi_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
@@ -194,4 +194,4 @@ class phi2_quant_layer : public quant_layer_base {
     }
   }
 };
-REGISTER_QUANT_LAYER_CLASS(phi2);
+REGISTER_QUANT_LAYER_CLASS(phi);

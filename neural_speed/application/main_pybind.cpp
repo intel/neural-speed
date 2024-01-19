@@ -660,7 +660,7 @@ PYBIND11_MODULE(qwen_cpp, m)
 
 #elif MODEL_NAME_ID == 16
 
-PYBIND11_MODULE(phi2_cpp, m)
+PYBIND11_MODULE(phi_cpp, m)
 
 #endif
 {

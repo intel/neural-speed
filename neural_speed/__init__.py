@@ -63,7 +63,7 @@ class Model:
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
         elif model_type == "phi":
-            import neural_speed.phi2_cpp as cpp_model
+            import neural_speed.phi_cpp as cpp_model
         else:
             raise TypeError("Unspported model type {}!".format(model_type))
         self.module = cpp_model
