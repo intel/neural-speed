@@ -646,9 +646,73 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
 
 template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
 static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
-                                                          _DST_T* dstptr, int interleave_n_offset, int unpack_elt,
+                                                          _DST_T* dstptr, int interleave_n_offset, int row, int col,
                                                           _ST* scales, int8_t* zero_points, int k_offset, int kblock,
                                                           int NPad) {
+  auto head_ignore_num = interleave_n_offset % 64;
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+
+  auto bit3_interleave_decompress = [&](utils::bit2x4* src1, utils::bit1x8* src2) {
+    const __m128i lowMask = _mm_set1_epi8(0x03);
+    const __m128i bit2_data = _mm_loadu_si128((const __m128i*)src1);
+    auto xmm0 = _mm_and_si128(lowMask, bit2_data);                     // uop:1 p:015
+    auto xmm1 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 2));  // uop:1 p:01
+    auto xmm2 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 4));
+    auto xmm3 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 6));
+    auto ymm1 = _mm256_set_m128i(xmm1, xmm0);  // uop:1 p5
+    auto ymm2 = _mm256_set_m128i(xmm3, xmm2);
+    auto zmm = _mm512_castps_si512(_mm512_insertf32x8(_mm512_castsi256_si512(ymm1), ymm2, 0x1));
+    // make bit1-storage as mmask64, then cvt the mask to the int8-value.
+    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src2);
+    auto bit1_mask = _cvtu64_mask64(*bit1_ptr);
+    auto zmm2 = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask, zmm_0x04);
+    zmm = _mm512_add_epi8(zmm, zmm2);
+    return zmm;
+  };
+
+  auto unpack_elt = row * col;
+  auto unpack_buf = utils::avector<int8_t>(unpack_elt, 0);
+  assert(head_ignore_num % 8 == 0);
+
+  if (head_ignore_num > unpack_elt) {
+    assert(0);
+  }
+  auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
+  auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
+  auto base_unpack_buf = unpack_buf.data() - head_ignore_num;
+  int compress_wei_ptr_offset = 0;
+  if (head_ignore_num != 0) {
+    auto unpack_mask = _cvtu64_mask64(0xffffffffffffffff << head_ignore_num);
+    auto head_zmm = bit3_interleave_decompress(base_bit2ptr, base_bit1ptr);
+    _mm512_mask_storeu_epi8(base_unpack_buf, unpack_mask, head_zmm);
+    compress_wei_ptr_offset += 64;
+  }
+  auto body_loop = (unpack_elt - (64 - head_ignore_num) % 64) / 64;
+  auto tail_proc_num = (unpack_elt - (64 - head_ignore_num) % 64) % 64;
+  for (int i = 0; i < body_loop; i++) {
+    auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
+                                          base_bit1ptr + compress_wei_ptr_offset / 8);
+    _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
+    compress_wei_ptr_offset += 64;
+  }
+  if (tail_proc_num > 0) {
+    auto unpack_mask = _cvtu64_mask64(0xffffffffffffffff >> (64 - tail_proc_num));
+    auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
+                                          base_bit1ptr + compress_wei_ptr_offset / 8);
+    _mm512_mask_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, unpack_mask, zmm);
+  }
+
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = scales + kpos * NPad;
+    for (int j = 0; j < col; j++) {
+      float tmp = static_cast<float>(unpack_buf[i * col + j]);
+      if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
+      dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
+    }
+  }
+
   return BTLA_CODE::Success;
 }
 
@@ -1270,6 +1334,7 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
       auto mask = _cvtu32_mask16(0xffff >> (16 - col));
       get_fp_scale(col, mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
     } else {
+      // TODO(zhe): consider head_proc_num==0 case.
       auto head_mask = _cvtu32_mask16(0xffff >> (16 - head_proc_num));
       auto body_mask = _cvtu32_mask16(0xffff);
       get_fp_scale(head_proc_num, head_mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
