@@ -775,9 +775,9 @@ int main(int argc, char** argv) {  // NOLINT
     model_save_session_file(ctx, path_session.c_str(), session_tokens.data(), session_tokens.size());
   }
 
-  // if (ns_log_level() == 0 || ns_log_level() == 1) {
-  model_print_timings(ctx);
-  // }
+  if (ns_log_level() == 0 || ns_log_level() == 1) {
+    model_print_timings(ctx);
+  }
   model_free(ctx);
 
   return 0;
