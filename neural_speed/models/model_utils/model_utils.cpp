@@ -2593,6 +2593,8 @@ bool beam_search_flow::step_check_and_prepare_inputs(const std::vector<model_inp
       beam_hypos[req_idx].clear();
       std::for_each(cur_beams.begin() + req_idx * beam_size, cur_beams.begin() + (req_idx + 1) * beam_size,
                     [](beam& b) { b.clear(); });
+      std::for_each(next_beams.begin() + req_idx * beam_size, next_beams.begin() + (req_idx + 1) * beam_size,
+                    [](beam& b) { b.clear(); });
       n_tokens[req_idx] = input.n_tokens;
       if (n_tokens[req_idx] > model_n_ctx(ctx)) {
         fprintf(stderr, "%s: error: request_idx %d prompt is too long (%d tokens, max %d)\n", __func__, req_idx,

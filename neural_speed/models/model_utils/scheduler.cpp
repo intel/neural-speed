@@ -17,11 +17,15 @@
 // il_worker
 il_worker::il_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_params(params)) {
   if (m_ctx == nullptr) {
-    fprintf(stderr, "%s: error: unable to load model\n", __func__);
+    fprintf(stderr, "%s: error: unable to load model.\n", __func__);
     exit(0);
   }
   if (m_ctx->beam_search && bsf == nullptr) {
     bsf = new beam_search_flow(m_ctx, m_ctx->max_request_num, params.n_threads);
+  }
+  if (!m_ctx->beam_search) {
+    fprintf(stderr, "%s: error: only supports beam search.\n", __func__);
+    exit(0);
   }
   threads = params.n_threads;
 }

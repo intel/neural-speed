@@ -922,7 +922,7 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("top_k") = 40, py::arg("top_p") = 0.95, py::arg("temperature") = 0.8, py::arg("min_new_tokens") = 0,
            py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
-           py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = false,
+           py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = true,
            py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs", py::arg("print_log") = false,
            py::arg("init_cb") = std::function<void()>{[]() {}})
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))

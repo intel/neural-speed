@@ -20,24 +20,34 @@ prompts = [
             "I want to learn how to play the piano.",
             ]
 
-model_name = "/home/zhentao/gpt-j-6b"
+model_name = "/home/zhentao/gpt-j-6b"  # "EleutherAI/gpt-j-6b" # model_name from huggingface or local model path 
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 res_collect = []
-def f(res, working):
-    ans = tokenizer.batch_decode([r.token_ids for r in res], skip_special_tokens=True,
+def f_response(res, working):
+    ret_token_ids = [r.token_ids for r in res]
+    res_collect.extend(ret_token_ids)
+    ans = tokenizer.batch_decode(ret_token_ids, skip_special_tokens=True,
                                  clean_up_tokenization_spaces=False)
     print(f"working_size: {working}, ans:", flush=True)
     for a in ans:
-        res_collect.append(a)
         print(a)
-        print("================")
+        print("=====================================")
 
-model_path = "/home/zhentao/ils/ns/q4_j.bin"
+model_path = "/home/zhentao/ils/ns/q4_j.bin" # please set your corresponding local neural_speed low-bits model file
 added_count = 0
-s = cpp.ModelServer(f, model_path, max_new_tokens=128, max_request_num=8, threads=56, num_beams=4,
-                    min_new_tokens=30, early_stopping=True, continuous_batching=True,
-                    return_prompt=True, print_log=False)
+s = cpp.ModelServer(f_response,               # reponse function (deliver generation results and current reamin working size in server)
+                    model_path,               # model_path
+                    max_new_tokens=128,       # global query max generation token length
+                    num_beams=4,              # global beam search related generation parameters
+                    min_new_tokens=30,        # global beam search related generation parameters (default: 0)
+                    early_stopping=True,      # global beam search related generation parameters (default: False)
+                    continuous_batching=True, # turn on continuous batching mechanism (default: True)
+                    return_prompt=True,       # also return prompt token ids in generation results (default: False)
+                    threads=56,               # number of threads in model evaluate process (please bind cores if need)
+                    max_request_num=8,        # maximum number of running requests (or queries, default: 8)
+                    print_log=True,           # print server running logs (default: False)
+                )
 for i in range(len(prompts)):
     p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
     s.issueQuery([cpp.Query(i, p_token_ids)])
