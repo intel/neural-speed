@@ -20,6 +20,7 @@ import re
 import argparse
 from .common import *
 from tqdm import tqdm
+import gguf
 from transformers import AutoTokenizer
 
 def permute_func(weights, n_head: int, n_head_kv: int):
@@ -46,7 +47,7 @@ def convert_fp32_tensor(src_name, dst_name, model, fout, n_head=0, n_head2=0, pe
     # data
     v.numpy().tofile(fout)
 
-def quantize_ggml_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
+def quantize_ggml_tensor(src_name, dst_name, model, fout, q_config, n_head=0, n_head_kv=0, permute_func=None):
     if ".weight" not in src_name:
         src_name = src_name + ".weight"
     v = model[src_name]
@@ -60,12 +61,15 @@ def quantize_ggml_tensor(src_name, dst_name, model, fout, q_config, n_head, n_he
 
     qv = quantize_q4_0(v)
     ftype_cur = GGML_QK4_0_TYPE
+    
+    if isinstance(fout, gguf.gguf_writer.GGUFWriter):
+        fout.add_tensor(dst_name, qv.numpy(), raw_shape=v.shape, raw_dtype=ftype_cur)
+    else:
+        # header
+        write_header(fout, shape, dst_name, ftype_cur)
 
-    # header
-    write_header(fout, shape, dst_name, ftype_cur)
-
-    # data
-    qv.numpy().tofile(fout)
+        # data
+        qv.numpy().tofile(fout)
     print(f"quantizing {dst_name} float to q4_0 tensor")
 
 def quantize_jblas_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
@@ -273,9 +277,7 @@ def convert_llama_ggml(model_path, out_path, quant_config):
 
 def convert_llama(model_path, out_path, quant_config):
     # convert gguf
-    import gguf
     gguf_writer = gguf.GGUFWriter(out_path, "llama")
-
     print(quant_config)
     # TODO(zhenweil): refact load and convert function
     convert_func = convert_fp32_tensor
@@ -375,7 +377,9 @@ def convert_llama(model_path, out_path, quant_config):
         qv = quantize_q4_0(list_vars[f"model.layers.{i}.mlp.up_proj.weight"])
         ftype_cur = GGML_QK4_0_TYPE
         # import pudb; pudb.set_trace()
-        gguf_writer.add_tensor(f"blk.{i}.ffn_up.weight", qv.numpy(), raw_shape=list_vars[f"model.layers.{i}.mlp.up_proj.weight"].shape, raw_dtype=ftype_cur)
+        # gguf_writer.add_tensor(f"blk.{i}.ffn_up.weight", qv.numpy(), raw_shape=list_vars[f"model.layers.{i}.mlp.up_proj.weight"].shape, raw_dtype=ftype_cur)
+        quantize_ggml_tensor(f"model.layers.{i}.mlp.up_proj.weight", f"blk.{i}.ffn_up.weight", list_vars,
+                             gguf_writer, quant_config)
 
         gguf_writer.add_tensor(f"blk.{i}.attn_norm.weight", list_vars[f"model.layers.{i}.input_layernorm.weight"].numpy())
         gguf_writer.add_tensor(f"blk.{i}.ffn_norm.weight", list_vars[f"model.layers.{i}.post_attention_layernorm.weight"].numpy())
