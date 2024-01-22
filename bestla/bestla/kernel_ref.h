@@ -933,6 +933,7 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       switch (S4_T) {
         case BTLA_DTYPE::S8:
         case BTLA_DTYPE::S4_CLIP:
+        case BTLA_DTYPE::S3_CLIP:
           if (zero_points == nullptr) {
             s8_calc_store_scale_and_quantv_sym(blocksize);
           } else {

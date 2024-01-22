@@ -707,7 +707,7 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
     for (int j = 0; j < col; j++) {
-      float tmp = static_cast<float>(unpack_buf[i * col + j]);
+      float tmp = static_cast<float>(unpack_buf[i * col + j] << 5);  // int3_clip => int8
       if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
       dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
     }

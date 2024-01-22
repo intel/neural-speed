@@ -1,3 +1,4 @@
+#include "bestla.h"
 #include "bestla_gemm.h"
 #include "bestla_prologue_b.h"
 #include "bestla_parallel.h"
@@ -172,6 +173,39 @@ class UT_BlockQunatize_F8 {
 static UT_BlockQunatize_F8 sUT_BlockQunatize_F8;
 #endif
 
+class UT_BlockQunatize_S3 {
+ public:
+  UT_BlockQunatize_S3() {
+    UT_START();
+    CheckISA(AVX512F);
+    ut(48, 4, 2, BTLA_DTYPE::S3_CLIP);
+  }
+  void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
+    printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
+    int ldb = n;
+    utils::aligned_vector<float> raw(n * k);
+    ut::fill_buffer_randn(raw.data(), raw.size(), -3.f, 3.f);
+
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<sAVX512F, RuntimeISA>;
+    PrologueB kernel;
+    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
+    auto ptr_ref = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
+    avector<int8_t> buffer(ptr.mSize);
+    avector<int8_t> buffer_ref(ptr_ref.mSize);
+    ptr.assign(buffer.data());
+    ptr_ref.assign(buffer_ref.data());
+    kernel.packWeight(n, k, raw.data(), ldb, &ptr, &DefaultThreading);
+    kernel.packWeight(n, k, raw.data(), ldb, &ptr_ref, &DefaultThreading);
+    avector<float> dequant(n * k, 0);
+    avector<float> dequant_ref(n * k, 0);
+    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &ptr_ref, dequant_ref.data(), n, &DefaultThreading);
+  }
+};
+#ifdef BTLA_UT_PROLOGUE_B
+static UTBUT_BlockQunatize_S3 sUT_BlockQunatize_S3;
+#endif
 class UT_TransposeBlockQuantize_F4 {
  public:
   UT_TransposeBlockQuantize_F4() {

@@ -891,6 +891,11 @@ class WeightKBlockNInteger {
     } else if (quant_dtype == BTLA_DTYPE::S4_CLIP) {
       kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S4_CLIP>(
           srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
+    } else if (quant_dtype == BTLA_DTYPE::S3_CLIP) {
+      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S3_CLIP>(
+          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
+    } else {
+      assert(0);
     }
   }
 
