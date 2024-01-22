@@ -644,11 +644,9 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
   return BTLA_CODE::NotSupport;
 }
 
-template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
-static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
-                                                          _DST_T* dstptr, int interleave_n_offset, int row, int col,
-                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
-                                                          int NPad) {
+template <BTLA_DTYPE S3_T, typename _DST_T>
+inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
+                                           int interleave_n_offset, int unpack_elt, int8_t* tmp, size_t tmpsize) {
   auto head_ignore_num = interleave_n_offset % 64;
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
@@ -673,8 +671,6 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
     return zmm;
   };
 
-  auto unpack_elt = row * col;
-  auto unpack_buf = utils::avector<int8_t>(unpack_elt, 0);
   assert(head_ignore_num % 8 == 0);
 
   if (head_ignore_num > unpack_elt) {
@@ -682,9 +678,10 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
   }
   auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
   auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
-  auto base_unpack_buf = unpack_buf.data() - head_ignore_num;
+  auto base_unpack_buf = tmp - head_ignore_num;
   int compress_wei_ptr_offset = 0;
   if (head_ignore_num != 0) {
+    assert(0);
     auto unpack_mask = _cvtu64_mask64(0xffffffffffffffff << head_ignore_num);
     auto head_zmm = bit3_interleave_decompress(base_bit2ptr, base_bit1ptr);
     _mm512_mask_storeu_epi8(base_unpack_buf, unpack_mask, head_zmm);
@@ -695,23 +692,34 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
   for (int i = 0; i < body_loop; i++) {
     auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
                                           base_bit1ptr + compress_wei_ptr_offset / 8);
-    _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
-    // int8_t* test = reinterpret_cast<int8_t*>(&zmm);
-    // for (int j = 0; j < 64; j++) std::cout << int(test[j]) << std::endl;
+    _mm512_storeu_epi8(base_unpack_buf, zmm);
+    for (int j = 0; j < 64; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
     compress_wei_ptr_offset += 64;
   }
   if (tail_proc_num > 0) {
+    assert(0);
     auto unpack_mask = _cvtu64_mask64(0xffffffffffffffff >> (64 - tail_proc_num));
     auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
                                           base_bit1ptr + compress_wei_ptr_offset / 8);
     _mm512_mask_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, unpack_mask, zmm);
   }
+  return BTLA_CODE::Success;
+}
 
+template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                                          _DST_T* dstptr, int interleave_n_offset, int row, int col,
+                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                          int NPad, void* tmp, size_t tmpsize) {
+  auto unpack_elt = row * col;
+  decompress_kblock_s3_s8fp<_S3_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                   reinterpret_cast<int8_t*>(tmp), tmpsize);
+  // TODO(zhe): simd version
   for (int i = 0; i < row; i++) {
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
     for (int j = 0; j < col; j++) {
-      float tmp = static_cast<float>(unpack_buf[i * col + j]);
+      float tmp = static_cast<float>(dstptr[i * col + j]);
       if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
       dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
     }
