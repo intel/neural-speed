@@ -155,7 +155,7 @@ def convert_quantized_tensor(src_name, dst_name, model, fout, q_config, n_head=0
                                                compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
 
-def convert_llama(model_path, out_path, quant_config):
+def convert_llama_ggml(model_path, out_path, quant_config):
     print(quant_config)
     # TODO(zhenweil): refact load and convert function
     convert_func = convert_fp32_tensor
@@ -269,4 +269,81 @@ def convert_llama(model_path, out_path, quant_config):
 
 
     f.close()
+    print(f"Success! saved as {out_path}")
+
+def convert_llama(model_path, out_path, quant_config):
+    # convert gguf
+    import gguf
+    gguf_writer = gguf.GGUFWriter(out_path, "llama")
+
+    print(quant_config)
+    # TODO(zhenweil): refact load and convert function
+    convert_func = convert_fp32_tensor
+    if not quant_config.not_quant:
+        if quant_config.use_ggml:
+            convert_func = quantize_ggml_tensor
+        else:
+            convert_func = quantize_jblas_tensor
+
+    if quant_config.use_gptq or quant_config.use_awq:
+        convert_func = convert_quantized_tensor
+        model, config, quantize_config = load_quantized_model(model_path)
+        quant_config = quantize_config
+    else:
+        model, config, quantize_config = load_hf_model(model_path)
+        config = config.to_dict()
+        model = model.state_dict()
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
+    # 1. write hparams
+    n_vocab = config["vocab_size"]
+    n_embd = config["hidden_size"]
+    n_layer = config["num_hidden_layers"]
+    n_head = config["num_attention_heads"]
+    ffn_hidden_size = config["intermediate_size"]
+    n_head_kv = n_head
+    rope_theta = config["rope_theta"] if "rope_theta" in config else 10000
+    rope_scale = 1
+    if "rope_scaling" in config and config["rope_scaling"] is not None:
+        rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
+    
+    # Customized
+    gguf_writer.add_uint32('magic', 0x67676d66)
+    gguf_writer.add_uint32('version', 1)
+    gguf_writer.add_uint32('n_vocab', n_vocab)
+    gguf_writer.add_uint32('n_mult', 256)
+    gguf_writer.add_uint32('ftype', 0)
+
+    # LLM
+    gguf_writer.add_embedding_length(n_embd)
+    gguf_writer.add_context_length(4096)
+    gguf_writer.add_block_count(n_layer)
+    gguf_writer.add_feed_forward_length(ffn_hidden_size)
+
+    # Attention
+    gguf_writer.add_head_count(n_head)
+    gguf_writer.add_head_count_kv(n_head_kv)
+    gguf_writer.add_rope_dimension_count(n_embd // n_head)
+    gguf_writer.add_layer_norm_rms_eps(config["rms_norm_eps"])
+    gguf_writer.add_rope_freq_base(rope_theta)
+    # TODO(lzw): update this
+    # gguf_writer.add_rope_freq_base(rope_scale)
+
+    # TODO:
+    # bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
+    # but bos_token_id = 1 in llama.cpp
+    # Tokenizer
+    gguf_writer.add_bos_token_id(config["bos_token_id"])
+    gguf_writer.add_eos_token_id(config["eos_token_id"])
+    gguf_writer.add_pad_token_id(0)
+    gguf_writer.add_sep_token_id(0)
+
+    print("gguf: write header")
+    gguf_writer.write_header_to_file()
+    print("gguf: write metadata")
+    # gguf_writer.write_kv_data_to_file()
+    print("gguf: write tensors")
+    # gguf_writer.write_tensors_to_file()
+
+    gguf_writer.close()
     print(f"Success! saved as {out_path}")
