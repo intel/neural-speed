@@ -652,6 +652,7 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
   auto head_ignore_num = interleave_n_offset % 64;
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  auto zmm_shift = _mm512_set1_epi32(5);
 
   auto bit3_interleave_decompress = [&](utils::bit2x4* src1, utils::bit1x8* src2) {
     const __m128i lowMask = _mm_set1_epi8(0x03);
@@ -668,6 +669,7 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
     auto bit1_mask = _cvtu64_mask64(*bit1_ptr);
     auto zmm2 = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask, zmm_0x04);
     zmm = _mm512_add_epi8(zmm, zmm2);
+    zmm = _mm512_sllv_epi32(zmm, zmm_shift);  // int3_clip => int8
     return zmm;
   };
 
@@ -694,6 +696,8 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
     auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
                                           base_bit1ptr + compress_wei_ptr_offset / 8);
     _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
+    // int8_t* test = reinterpret_cast<int8_t*>(&zmm);
+    // for (int j = 0; j < 64; j++) std::cout << int(test[j]) << std::endl;
     compress_wei_ptr_offset += 64;
   }
   if (tail_proc_num > 0) {
@@ -707,7 +711,7 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
     for (int j = 0; j < col; j++) {
-      float tmp = static_cast<float>(unpack_buf[i * col + j] << 5);  // int3_clip => int8
+      float tmp = static_cast<float>(unpack_buf[i * col + j]);
       if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
       dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
     }

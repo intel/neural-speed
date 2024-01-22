@@ -178,13 +178,20 @@ class UT_BlockQunatize_S3 {
   UT_BlockQunatize_S3() {
     UT_START();
     CheckISA(AVX512F);
-    ut(48, 4, 2, BTLA_DTYPE::S3_CLIP);
+    ut(64, 4, 4, BTLA_DTYPE::S3_CLIP);
   }
   void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
+    DefaultThreading.set_threads(1);
     printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
     int ldb = n;
-    utils::aligned_vector<float> raw(n * k);
-    ut::fill_buffer_randn(raw.data(), raw.size(), -3.f, 3.f);
+
+    int kblk_num = utils::updiv(k, blocksize);
+    utils::aligned_vector<float> scales(kblk_num * n);
+    ut::fill_buffer_randn(scales.data(), scales.size(), 0.005f, 0.01f);
+    ut::UT_vector_s8 quanW;
+    quanW.resize(k * n);
+    quanW.fill_rand(-8, 7);
+    for (int i = 0; i < k * n; i++) quanW.data()[i] = (quanW.data()[i] * 16) & 0xe0;
 
     auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<sAVX512F, RuntimeISA>;
@@ -195,16 +202,25 @@ class UT_BlockQunatize_S3 {
     avector<int8_t> buffer_ref(ptr_ref.mSize);
     ptr.assign(buffer.data());
     ptr_ref.assign(buffer_ref.data());
-    kernel.packWeight(n, k, raw.data(), ldb, &ptr, &DefaultThreading);
-    kernel.packWeight(n, k, raw.data(), ldb, &ptr_ref, &DefaultThreading);
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr, &DefaultThreading);
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr_ref, &DefaultThreading);
     avector<float> dequant(n * k, 0);
     avector<float> dequant_ref(n * k, 0);
     kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
     kernel.unpackWeight(n, k, &ptr_ref, dequant_ref.data(), n, &DefaultThreading);
+    for (int i = 0; i < k; i++) {
+      for (int j = 0; j < n; j++) {
+        if ((dequant[i * n + j] - dequant_ref[i * n + j]) != 0) {
+          std::cout << "i: " << i << " j:" << j << std::endl;
+          std::cout << dequant[i * n + j] << " vs " << dequant_ref[i * n + j] << std::endl;
+        }
+      }
+    }
   }
 };
+static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #ifdef BTLA_UT_PROLOGUE_B
-static UTBUT_BlockQunatize_S3 sUT_BlockQunatize_S3;
+static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #endif
 class UT_TransposeBlockQuantize_F4 {
  public:
@@ -549,7 +565,6 @@ class UT_ShuffleIndices {
     delete wptr;
   }
 };
-static UT_ShuffleIndices sUT_ShuffleIndices;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_ShuffleIndices sUT_ShuffleIndices;
 #endif
