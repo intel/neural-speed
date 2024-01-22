@@ -209,6 +209,7 @@ class ModelServer {
   };
 
   int issueQuery(std::vector<Query>& qs) {
+    if (!running) throw std::runtime_error("Server stopped!");
     std::lock_guard<std::mutex> lock(queue_mtx);
     std::copy(qs.cbegin(), qs.cend(), std::back_inserter(waiting));
     return waiting.size();
