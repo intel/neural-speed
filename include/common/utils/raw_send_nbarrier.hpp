@@ -102,8 +102,7 @@ struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Dg2> {
     /// note:  all subgroups participating the barrier should have the same
     /// barrier_id. Here is the bspec link
     /// https://gfxspecs.intel.com/Predator/Home/Index/54006
-    __XETLA_API void init_nbarrier(uint8_t nbarrier_id,
-            nbarrier_role role = nbarrier_role::producer_consumer) {}
+    __XETLA_API void init_nbarrier(uint8_t, nbarrier_role) {}
 
     /// @brief Generic work-group split barrier.
     ///
