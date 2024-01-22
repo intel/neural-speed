@@ -358,6 +358,7 @@ def convert_llama(model_path, out_path, quant_config):
     print("gguf: get tokenizer metadata done")
 
     list_vars = model
+    # import pudb; pudb.set_trace()
     gguf_writer.add_tensor("token_embd.weight", list_vars["model.embed_tokens.weight"].numpy())
     gguf_writer.add_tensor("output_norm.weight", list_vars["model.norm.weight"].numpy())
     gguf_writer.add_tensor("output.weight", list_vars["lm_head.weight"].numpy())
@@ -370,7 +371,11 @@ def convert_llama(model_path, out_path, quant_config):
 
         gguf_writer.add_tensor(f"blk.{i}.ffn_gate.weight", list_vars[f"model.layers.{i}.mlp.gate_proj.weight"].numpy())
         gguf_writer.add_tensor(f"blk.{i}.ffn_down.weight", list_vars[f"model.layers.{i}.mlp.down_proj.weight"].numpy())
-        gguf_writer.add_tensor(f"blk.{i}.ffn_up.weight", list_vars[f"model.layers.{i}.mlp.up_proj.weight"].numpy())
+        
+        qv = quantize_q4_0(list_vars[f"model.layers.{i}.mlp.up_proj.weight"])
+        ftype_cur = GGML_QK4_0_TYPE
+        # import pudb; pudb.set_trace()
+        gguf_writer.add_tensor(f"blk.{i}.ffn_up.weight", qv.numpy(), raw_shape=list_vars[f"model.layers.{i}.mlp.up_proj.weight"].shape, raw_dtype=ftype_cur)
 
         gguf_writer.add_tensor(f"blk.{i}.attn_norm.weight", list_vars[f"model.layers.{i}.input_layernorm.weight"].numpy())
         gguf_writer.add_tensor(f"blk.{i}.ffn_norm.weight", list_vars[f"model.layers.{i}.post_attention_layernorm.weight"].numpy())
