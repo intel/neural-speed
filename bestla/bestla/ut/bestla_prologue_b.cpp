@@ -178,10 +178,10 @@ class UT_BlockQunatize_S3 {
   UT_BlockQunatize_S3() {
     UT_START();
     CheckISA(AVX512F);
-    ut(64, 4, 4, BTLA_DTYPE::S3_CLIP);
+    ut(1024, 1024, 32, BTLA_DTYPE::S3_CLIP);
+    ut(4128, 4096, 32, BTLA_DTYPE::S3_CLIP);
   }
   void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
-    DefaultThreading.set_threads(1);
     printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
     int ldb = n;
 
