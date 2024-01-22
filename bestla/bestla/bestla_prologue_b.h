@@ -564,7 +564,7 @@ class WeightKBlockNInteger {
     // N==NPad, K==Kpad, ldb==Kpad
     auto ld_dst = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * utils::padto(K, 64);
     auto col = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * K;
-    assert(N % (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE) == 0);
+    assert(N % (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE) == 0);  // TODO(zhe): consider N pad to packrow*ntile?
     auto row = N / (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE);
     auto pad_64_buf = utils::avector<int8_t>(row * ld_dst, 0);
     kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD>(B, pad_64_buf.data(), row, col, col, ld_dst);
@@ -631,6 +631,8 @@ class WeightKBlockNInteger {
       return getQ8Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S4_CLIP || wptr->mDType == BTLA_DTYPE::S4_FULLRANGE) {
       return getQ4Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+    } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
+      return getQ3Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else {
       assert(0);
     }
@@ -889,6 +891,29 @@ class WeightKBlockNInteger {
         kernel::wrapper::DecompressKBlockS4S8::template forward<ISA_T, BTLA_DTYPE::S4_FULLRANGE>(
             bptr + i * KPad / 2, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize);
       }
+    }
+    *dststep = k_size;
+    return BTLA_CODE::Success;
+  }
+
+  static inline BTLA_CODE getQ3Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                      const Param& _param, void* tmpcache, size_t cachesize) {
+    auto wptr = _param.packedW;
+    int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
+    auto KPad = wptr->mKPad;
+    auto NPad = wptr->mNPad;
+    int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
+    auto base_offset = n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE;
+    for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
+      auto ld_dst = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * utils::padto(KPad, 64);
+      auto elt_offset = base_offset + i * utils::padto(KPad, 64);
+      auto row = NPad / (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE);
+      assert(elt_offset % 8 == 0);
+      auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+      auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
+      kernel::wrapper::DecompressKBlockS3S8Fp<int8_t>::template forward<ISA_T, BTLA_DTYPE::S3_CLIP>(
+          bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE,
+          k_size / _GemmCore_T::PACK_ROW * ColSize, reinterpret_cast<int8_t*>(tmpcache), cachesize);
     }
     *dststep = k_size;
     return BTLA_CODE::Success;
