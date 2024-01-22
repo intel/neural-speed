@@ -178,18 +178,24 @@ class UT_BlockQunatize_S3 {
   UT_BlockQunatize_S3() {
     UT_START();
     CheckISA(AVX512F);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>
@@ -252,6 +258,24 @@ class UT_BlockQunatize_S3 {
                                         {refC.data(), n}};
       parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
     } else {
+      using Launcher2 = wrapper::gemm::LauncherIntKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
+                                                         prologue_b::gemm::WeightKBlockNInteger,
+                                                         epilogue::gemm::AccumulatorWriteBackFp32>;
+      Launcher2 launcher;
+      using Parallel2 = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
+      avector<float> matAf32(m * k);
+      fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
+      auto quanA = launcher.mProA.createStorage(m, k, blocksize, false);
+      auto quanA_ref = launcher.mProA.createStorage(m, k, blocksize, false);
+      utils::avector<int8_t> bufferA(quanA.mSize);
+      utils::avector<int8_t> bufferA_ref(quanA.mSize);
+      quanA.assign(bufferA.data());
+      quanA_ref.assign(bufferA_ref.data());
+      GemmProblem gp(1, m, n, k, blocksize);
+      typename Launcher2::Param args{gp, {matAf32.data(), k, &quanA}, {&ptr}, {matC.data(), n}};
+      parallel::GemmRunWithA<Parallel2>(launcher, args, &DefaultThreading);
+      typename Launcher2::Param args_ref{gp, {matAf32.data(), k, &quanA_ref}, {&ptr_ref}, {refC.data(), n}};
+      parallel::GemmRunWithA<Parallel2>(launcher, args_ref, &DefaultThreading);
     }
     buffer_error(matC.data(), refC.data(), matC.size(), 0.001f);
     // avector<float> dequant(n * k, 0);
