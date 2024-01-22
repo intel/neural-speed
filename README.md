@@ -22,8 +22,6 @@ pip install .
 >**Note**: Please make sure GCC version is higher than GCC 10.
 
 
-For more installation ways like building binary by yourself, please refer to [Install Document](./docs/install.md)
-
 ## Quick Start
 There are two approaches for utilizing the Neural Speed: 1. Transformer-like usage, you need to install [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) 2. llama.cpp-like usage
 
