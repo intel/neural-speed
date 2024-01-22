@@ -678,7 +678,12 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   }
   auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
   auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
-  auto base_unpack_buf = tmp - head_ignore_num;
+  int8_t* base_unpack_buf;
+  if constexpr (std::is_same_v<_DST_T, int8_t>) {
+    base_unpack_buf = dstptr - head_ignore_num;
+  } else {
+    base_unpack_buf = tmp - head_ignore_num;
+  }
   int compress_wei_ptr_offset = 0;
   if (head_ignore_num != 0) {
     assert(0);
@@ -692,8 +697,12 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   for (int i = 0; i < body_loop; i++) {
     auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
                                           base_bit1ptr + compress_wei_ptr_offset / 8);
-    _mm512_storeu_epi8(base_unpack_buf, zmm);
-    for (int j = 0; j < 64; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
+    if constexpr (!std::is_same_v<_DST_T, int8_t>) {
+      _mm512_storeu_epi8(base_unpack_buf, zmm);
+      for (int j = 0; j < 64; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
+    } else {
+      _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
+    }
     compress_wei_ptr_offset += 64;
   }
   if (tail_proc_num > 0) {
