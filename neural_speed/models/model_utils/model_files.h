@@ -794,7 +794,7 @@ struct gguf_loader {
       model_load_tensor_shard shard;
       std::string name = gguf_get_tensor_name(ctx, i);
       uint32_t name_len = name.length();
-      shard.type = (enum ne_type)0;
+      shard.type = (enum ne_type)info->type;
 
       uint32_t n_dims = info->n_dims;
       shard.ne.resize(n_dims);
@@ -813,12 +813,14 @@ struct gguf_loader {
         case NE_TYPE_Q5_0:
         case NE_TYPE_Q5_1:
         case NE_TYPE_Q8_0:
+        case NE_TYPE_Q6_K:
         case NE_TYPE_BTLA:
           break;
         default: {
           throw format("unrecognized tensor type %u\n", shard.type);
         }
       }
+
       shard.file_idx = 0;
       const size_t offs = file_offset(ctx, name.c_str());
       int length = info->ne[0] * info->ne[1] * info->ne[2] * info->ne[3] * 4;
@@ -887,28 +889,41 @@ struct gguf_loader {
       printf("%s: - kv %3d: %42s %-16s = %s\n", __func__, i, name, type_name.c_str(), value.c_str());
     }
 
+    // Get model name
+    uint32_t general_architecture_idex = 0;
+    std::string arch_name = gguf_kv_to_str(ctx_gguf, general_architecture_idex);
+    llm_arch arch = llm_arch_from_string(arch_name);
+    const auto kv = LLM_KV(arch);
+
+    // Get general kv
     uint32_t magic = -1;
     uint32_t version = -1;
-    std::string arch = "unknown";
-    GGUF_GET_KEY(ctx_gguf, arch, gguf_get_val_str, GGUF_TYPE_STRING, false, "general.architecuture");
     GGUF_GET_KEY(ctx_gguf, magic, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "magic");
     GGUF_GET_KEY(ctx_gguf, version, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "version");
 
-    // get hparams kv
+    // Get hparams kv
     GGUF_GET_KEY(ctx_gguf, hparams.n_vocab, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_vocab");
-    GGUF_GET_KEY(ctx_gguf, hparams.n_embd, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_embd");
+    GGUF_GET_KEY(ctx_gguf, hparams.n_embd, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_EMBEDDING_LENGTH));
     GGUF_GET_KEY(ctx_gguf, hparams.n_mult, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_mult");
-    GGUF_GET_KEY(ctx_gguf, hparams.n_head, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_head");
-    GGUF_GET_KEY(ctx_gguf, hparams.n_head_kv, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_head_kv");
-    GGUF_GET_KEY(ctx_gguf, hparams.n_layer, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_layer");
-    GGUF_GET_KEY(ctx_gguf, hparams.n_rot, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "n_rot");
+    GGUF_GET_KEY(ctx_gguf, hparams.n_head, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_ATTENTION_HEAD_COUNT));
+    GGUF_GET_KEY(ctx_gguf, hparams.n_head_kv, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 kv(LLM_KV_ATTENTION_HEAD_COUNT_KV));
+    GGUF_GET_KEY(ctx_gguf, hparams.n_layer, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_BLOCK_COUNT));
+    GGUF_GET_KEY(ctx_gguf, hparams.n_rot, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_ROPE_DIMENSION_COUNT));
 
+    GGUF_GET_KEY(ctx_gguf, hparams.rms_norm_eps, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false,
+                 kv(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS));
+    GGUF_GET_KEY(ctx_gguf, hparams.freq_base, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_ROPE_FREQ_BASE));
+
+    // Get NeuralSpeed ftype
     uint32_t ftype = 1;
     GGUF_GET_KEY(ctx_gguf, ftype, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "ftype");
     hparams.ftype = (enum ne_ftype)ftype;
 
-    GGUF_GET_KEY(ctx_gguf, hparams.max_seq_len, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "max_seq_len");
-    GGUF_GET_KEY(ctx_gguf, hparams.alibi_bias_max, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "alibi_bias_max");
+    // Get specific model paramters
+    GGUF_GET_KEY(ctx_gguf, hparams.max_seq_len, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_CONTEXT_LENGTH));
+    GGUF_GET_KEY(ctx_gguf, hparams.alibi_bias_max, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false,
+                 kv(LLM_KV_ATTENTION_MAX_ALIBI_BIAS));
     GGUF_GET_KEY(ctx_gguf, hparams.clip_qkv, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "clip_qkv");
     GGUF_GET_KEY(ctx_gguf, hparams.par_res, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "par_res");
 
@@ -919,13 +934,19 @@ struct gguf_loader {
 
     GGUF_GET_KEY(ctx_gguf, hparams.multi_query_group_num, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
                  "multi_query_group_num");
-    GGUF_GET_KEY(ctx_gguf, hparams.ffn_hidden_size, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "ffn_hidden_size");
+    GGUF_GET_KEY(ctx_gguf, hparams.ffn_hidden_size, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 kv(LLM_KV_FEED_FORWARD_LENGTH));
     GGUF_GET_KEY(ctx_gguf, hparams.inner_hidden_size, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "inner_hidden_size");
 
-    GGUF_GET_KEY(ctx_gguf, vocab.bos_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "bos_token_id");
-    GGUF_GET_KEY(ctx_gguf, vocab.eos_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "eos_token_id");
-    GGUF_GET_KEY(ctx_gguf, vocab.pad_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "pad_token_id");
-    GGUF_GET_KEY(ctx_gguf, vocab.sep_token_id, gguf_get_val_i32, GGUF_TYPE_INT32, false, "sep_token_id");
+    // Get special vocab ids
+    GGUF_GET_KEY(ctx_gguf, vocab.bos_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.bos_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.eos_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.eos_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.pad_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.pad_token_id");
+    GGUF_GET_KEY(ctx_gguf, vocab.sep_token_id, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 "tokenizer.ggml.sep_token_id");
 
     // load vocab
     std::string tokens = "tokenizer.ggml.tokens";
@@ -941,7 +962,11 @@ struct gguf_loader {
       scores = (const float*)gguf_get_arr_data(ctx_gguf, score_idx);
     }
 
+    uint32_t default_n_vocab = 32000;
     const uint32_t n_vocab = gguf_get_arr_n(ctx_gguf, token_idx);
+    if ((hparams.n_vocab == default_n_vocab) && (hparams.n_vocab != n_vocab)) {
+      hparams.n_vocab = n_vocab;
+    }
 
     vocab.id_to_token.resize(hparams.n_vocab);
     for (uint32_t i = 0; i < n_vocab; i++) {
@@ -1290,16 +1315,19 @@ struct model_model_loader {
         if (it == tensors_map.name_to_idx.end()) {
           it = tensors_map.name_to_idx.find("model/wte");
           if (it == tensors_map.name_to_idx.end()) {
-            it = tensors_map.name_to_idx.find("model.embed_tokens.weight");  // baichuan13B
+            it = tensors_map.name_to_idx.find("token_embd.weight");  // llama-2-chat-hf
             if (it == tensors_map.name_to_idx.end()) {
-              it = tensors_map.name_to_idx.find("transformer.word_embeddings.weight");  // ChatGLM-1
+              it = tensors_map.name_to_idx.find("model.embed_tokens.weight");  // baichuan13B
               if (it == tensors_map.name_to_idx.end()) {
-                it = tensors_map.name_to_idx.find("transformer.embedding.word_embeddings.weight");  // ChatGLM-2
+                it = tensors_map.name_to_idx.find("transformer.word_embeddings.weight");  // ChatGLM-1
                 if (it == tensors_map.name_to_idx.end()) {
-                  it = tensors_map.name_to_idx.find("model.decoder.embed_tokens.weight");
-                  if (it != tensors_map.name_to_idx.end()) return 1;  // hacky solution for OPT loading
+                  it = tensors_map.name_to_idx.find("transformer.embedding.word_embeddings.weight");  // ChatGLM-2
                   if (it == tensors_map.name_to_idx.end()) {
-                    throw std::string("missing tok_embeddings.weight");
+                    it = tensors_map.name_to_idx.find("model.decoder.embed_tokens.weight");
+                    if (it != tensors_map.name_to_idx.end()) return 1;  // hacky solution for OPT loading
+                    if (it == tensors_map.name_to_idx.end()) {
+                      throw std::string("missing tok_embeddings.weight");
+                    }
                   }
                 }
               }
@@ -1324,6 +1352,15 @@ struct model_model_loader {
       }
       *(use_mmap ? mmapped_size_p : ctx_size_p) += size_needed;
     }
+  }
+
+  bool verify_tensor(const std::string& name) {
+    auto it = tensors_map.name_to_idx.find(name);
+    if (it == tensors_map.name_to_idx.end()) {
+      return false;
+    }
+
+    return true;
   }
 
   struct ne_tensor* get_tensor(const std::string& name, const std::vector<uint32_t>& ne, ne_backend backend) {

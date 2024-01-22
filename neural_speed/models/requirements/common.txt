@@ -9,4 +9,5 @@ accelerate
 peft
 datasets
 transformers_stream_generator
+gguf
 tiktoken

@@ -10,7 +10,6 @@ git submodule update --init --recursive
 $BOLD_YELLOW && echo "---------------- run python setup.py sdist bdist_wheel -------------" && $RESET
 python setup.py bdist_wheel
 
-
 $BOLD_YELLOW && echo "---------------- pip install binary -------------" && $RESET
 pip install dist/neural_speed*.whl
 pip list

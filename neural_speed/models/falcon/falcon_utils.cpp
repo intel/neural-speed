@@ -35,7 +35,7 @@
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
-#include "models/model_utils/model_utils.h"
+#include "models/model_utils/quant_utils.h"
 #include "models/model_utils/util.h"
 #include "models/models.h"
 
@@ -64,6 +64,7 @@ void FALCON::init(const char* path_model, model_context* ctx, int n_gpu_layer_, 
   auto& hparams = model.hparams;
   n_ff = 4 * hparams.n_embd;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
+  fprintf(stderr, "%s: n_ctx      = %u\n", __func__, hparams.max_seq_len);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
@@ -110,47 +111,91 @@ void FALCON::load(model_context* ctx, model_progress_callback progress_callback,
   }
 
   ml->ne_ctx = ne_ctx;
-
-  model.others[0] = ml->get_tensor("transformer.word_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-  model.others[1] = ml->get_tensor("transformer.ln_f.weight", {n_embd}, NE_BACKEND_CPU);
-  model.others[2] = ml->get_tensor("transformer.ln_f.bias", {n_embd}, NE_BACKEND_CPU);
-  model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
   const int i_gpu_start = n_layer - n_gpu_layer;
 
   model.layers.resize(n_layer);
   size_t vram_total = 0;
-  for (uint32_t i = 0; i < n_layer; ++i) {
-    const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
-    auto& layer = model.layers[i];
-    std::string layers_i = "transformer.h." + std::to_string(i);
 
-    // norm: cur = ln_1_g*cur + ln_1_b
-    if (n_head_kv == 1) {  //  7B
-      layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
-      layer.norm[1] = ml->get_tensor(layers_i + ".input_layernorm.bias", {n_embd}, backend);
-    } else if (n_head_kv == 8) {  // 40B
-      layer.norm[0] = ml->get_tensor(layers_i + ".ln_mlp.weight", {n_embd}, backend);
-      layer.norm[1] = ml->get_tensor(layers_i + ".ln_mlp.bias", {n_embd}, backend);
-      layer.norm[2] = ml->get_tensor(layers_i + ".ln_attn.weight", {n_embd}, backend);
-      layer.norm[3] = ml->get_tensor(layers_i + ".ln_attn.bias", {n_embd}, backend);
-    } else {
-      fprintf(stderr, "n_head_kv should be 1 (7B) or 8 (40B) in Falcon model, rather %d \n", n_head_kv);
+  if (ml->verify_tensor("transformer.word_embeddings.weight")) {
+    model.others[0] = ml->get_tensor("transformer.word_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("transformer.ln_f.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = ml->get_tensor("transformer.ln_f.bias", {n_embd}, NE_BACKEND_CPU);
+    model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+
+    for (uint32_t i = 0; i < n_layer; ++i) {
+      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
+      auto& layer = model.layers[i];
+      std::string layers_i = "transformer.h." + std::to_string(i);
+
+      // norm: cur = ln_1_g*cur + ln_1_b
+      if (n_head_kv == 1) {  //  7B
+        layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
+        layer.norm[1] = ml->get_tensor(layers_i + ".input_layernorm.bias", {n_embd}, backend);
+      } else if (n_head_kv == 8) {  // 40B
+        layer.norm[0] = ml->get_tensor(layers_i + ".ln_mlp.weight", {n_embd}, backend);
+        layer.norm[1] = ml->get_tensor(layers_i + ".ln_mlp.bias", {n_embd}, backend);
+        layer.norm[2] = ml->get_tensor(layers_i + ".ln_attn.weight", {n_embd}, backend);
+        layer.norm[3] = ml->get_tensor(layers_i + ".ln_attn.bias", {n_embd}, backend);
+      } else {
+        fprintf(stderr, "n_head_kv should be 1 (7B) or 8 (40B) in Falcon model, rather %d \n", n_head_kv);
+      }
+
+      // qkv GEMM
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attention.query_key_value.weight",
+                                     {n_embd, n_embd + 2 * n_head_kv * (n_embd / model.hparams.n_head)}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attention.dense.weight", {n_embd, n_embd}, backend);
+
+      // ffn GEMM
+      layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.dense_h_to_4h.weight", {n_embd, n_ff}, backend);
+      layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.dense_4h_to_h.weight", {n_ff, n_embd}, backend);
+
+      if (backend != NE_BACKEND_CPU) {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
+                      ne_nbytes(layer.attn[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
+        if (n_head_kv == 8) {
+          vram_total += ne_nbytes(layer.norm[2]) + ne_nbytes(layer.norm[3]);
+        }
+      }
     }
+  } else {
+    model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = ml->get_tensor("output_norm.bias", {n_embd}, NE_BACKEND_CPU);
+    model.others[3] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
 
-    // qkv GEMM
-    layer.attn[0] = ml->get_tensor(layers_i + ".self_attention.query_key_value.weight",
-                                   {n_embd, n_embd + 2 * n_head_kv * (n_embd / model.hparams.n_head)}, backend);
-    layer.attn[1] = ml->get_tensor(layers_i + ".self_attention.dense.weight", {n_embd, n_embd}, backend);
+    for (uint32_t i = 0; i < n_layer; ++i) {
+      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
+      auto& layer = model.layers[i];
+      std::string layers_i = "blk." + std::to_string(i);
 
-    // ffn GEMM
-    layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.dense_h_to_4h.weight", {n_embd, n_ff}, backend);
-    layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.dense_4h_to_h.weight", {n_ff, n_embd}, backend);
+      // norm: cur = ln_1_g*cur + ln_1_b
+      if (n_head_kv == 1) {  //  7B
+        layer.norm[0] = ml->get_tensor(layers_i + ".attn_norm.weight", {n_embd}, backend);
+        layer.norm[1] = ml->get_tensor(layers_i + ".attn_norm.bias", {n_embd}, backend);
+      } else if (n_head_kv == 8) {  // 40B
+        layer.norm[0] = ml->get_tensor(layers_i + ".attn_norm.weight", {n_embd}, backend);
+        layer.norm[1] = ml->get_tensor(layers_i + ".attn_norm.bias", {n_embd}, backend);
+        layer.norm[2] = ml->get_tensor(layers_i + ".attn_norm_2.weight", {n_embd}, backend);
+        layer.norm[3] = ml->get_tensor(layers_i + ".attn_norm_2.bias", {n_embd}, backend);
+      } else {
+        fprintf(stderr, "n_head_kv should be 1 (7B) or 8 (40B) in Falcon model, rather %d \n", n_head_kv);
+      }
 
-    if (backend != NE_BACKEND_CPU) {
-      vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
-                    ne_nbytes(layer.attn[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
-      if (n_head_kv == 8) {
-        vram_total += ne_nbytes(layer.norm[2]) + ne_nbytes(layer.norm[3]);
+      // qkv GEMM
+      layer.attn[0] = ml->get_tensor(layers_i + ".attn_qkv.weight",
+                                     {n_embd, n_embd + 2 * n_head_kv * (n_embd / model.hparams.n_head)}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+
+      // ffn GEMM
+      layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, n_ff}, backend);
+      layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_down.weight", {n_ff, n_embd}, backend);
+
+      if (backend != NE_BACKEND_CPU) {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
+                      ne_nbytes(layer.attn[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
+        if (n_head_kv == 8) {
+          vram_total += ne_nbytes(layer.norm[2]) + ne_nbytes(layer.norm[3]);
+        }
       }
     }
   }
@@ -182,8 +227,8 @@ void FALCON::load(model_context* ctx, model_progress_callback progress_callback,
 class falcon_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
-    bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
-    if (layername == "transformer.word_embeddings.weight") {
+    bool quantize = layername.rfind("weight") == layername.size() - 6;
+    if (layername == "transformer.word_embeddings.weight" || layername == "token_embd.weight") {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
     }

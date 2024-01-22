@@ -40,6 +40,7 @@
 #include "models/model_utils/model_types.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
+#include "models/model_utils/quant_utils.h"
 
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <signal.h>
@@ -73,7 +74,8 @@ class Model {
   // deprecated API
   std::vector<std::vector<model_token>> generate_tokens(const std::vector<std::vector<model_token>>& input_ids);
   const std::vector<float>& evaluate_(const std::vector<std::vector<model_token>>& input_ids);
-  py::array_t<float> evaluate(const std::vector<std::vector<model_token>>& input_ids) {
+  py::array_t<float> evaluate(const std::vector<std::vector<model_token>>& input_ids, bool logits_all = false) {
+    if (logits_all) ctx->logits_all = true;
     if (!check_input_and_count_padding(input_ids)) return py::array_t<float>();
     const auto& logits = evaluate_(input_ids);
     for (auto& input_id : curr_input_ids) input_id.clear();  // clear curr_input_ids after eval
@@ -81,6 +83,7 @@ class Model {
         .reshape({py::ssize_t(-1), static_cast<py::ssize_t>(ctx->model.hparams.n_vocab)});
   }
   bool is_token_end() { return token_eos; }
+  model_token get_eos_id() { return ctx->vocab.eos_token_id; }
   static int quant_model(const std::string& model_path, const std::string& out_path, const std::string& weight_dtype,
                          const std::string& alg, int group_size, const std::string& scale_dtype,
                          const std::string& compute_dtype, bool use_ggml, int threads);
@@ -676,7 +679,7 @@ PYBIND11_MODULE(phi_cpp, m)
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto")
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
-           py::arg("input_ids") = std::vector<std::vector<model_token>>{})
+           py::arg("input_ids") = std::vector<std::vector<model_token>>{}, py::arg("logits_all") = false)
       // deprecated API
       .def("generate_tokens", &Model::generate_tokens, "Generate tokens with input ids", py::arg("input_ids"))
       .def_static("quant_model", &Model::quant_model, "Quantize model", py::arg("model_path"), py::arg("out_path"),
@@ -694,5 +697,6 @@ PYBIND11_MODULE(phi_cpp, m)
                   py::arg("group_size") = 32, py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8",
                   py::arg("threads") = 8)
       .def("print_time", &Model::print_time)
+      .def("get_eos_id", &Model::get_eos_id)
       .def("reinit", &Model::reinit);
 }

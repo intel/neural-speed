@@ -64,6 +64,8 @@ class Model:
             import neural_speed.mistral_cpp as cpp_model
         elif model_type == "phi":
             import neural_speed.phi_cpp as cpp_model
+        elif model_type == "whisper":
+            import neural_speed.whisper_cpp as cpp_model
         else:
             raise TypeError("Unspported model type {}!".format(model_type))
         self.module = cpp_model
@@ -79,7 +81,6 @@ class Model:
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
         self.__import_package(model_type)
 
@@ -199,7 +200,7 @@ class Model:
             if stopping_criteria is not None:
                 if stopping_criteria(torch.tensor(ret), None):
                     break
-            elif ret[0][-1] == self.tokenizer.eos_token_id or \
+            elif ret[0][-1] == self.__get_eos_id() or \
                     (max_new_tokens != -1 and out_count > max_new_tokens):
                 break
             out_count += 1
@@ -214,21 +215,10 @@ class Model:
     def is_token_end(self):
         return self.model.is_token_end()
 
-    def eos_token_id(self):
-        if self.model_type == 'qwen':
-            return self.tokenizer.special_tokens['<|endoftext|>']
-        return self.tokenizer.eos_token_id
+    def __get_eos_id(self):
+        return self.model.get_eos_id()
 
-    def pad_token_id(self):
-        if self.tokenizer.pad_token_id == None:
-            if self.batch_size == 1:
-                return None
-            else:
-                raise ValueError("Please set pad_token_id when doing multi batch inference"\
-                                  " with padding!")
-        return self.tokenizer.pad_token_id
-
-    def __call__(self, model_input, reinit=False, **kwargs):
+    def __call__(self, model_input, reinit=False, logits_all=False, **kwargs):
         if self.model_type == 'whisper':
             if self.model is None:
                 self.model = self.module.Model()
@@ -245,7 +235,7 @@ class Model:
             elif reinit:
                 self.model.reinit()
                 self.generate_round = 0
-            return self.model.evaluate(model_input.tolist())
+            return self.model.evaluate(model_input.tolist(), logits_all)
         else:
             print("Please input torch.Tensor")
         return

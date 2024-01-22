@@ -151,6 +151,8 @@ class CompFp32BlockEpilogue {
       if (_param.zps != nullptr) {
         assert(0);
       }
+    } else {
+      assert(0);
     }
     return BTLA_CODE::NotSupport;
   }
