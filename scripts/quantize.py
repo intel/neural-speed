@@ -92,8 +92,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     )
     parser.add_argument(
         "--one_click_run",
-        action="store_true",
-        default=False,
+        type=str,
+        default="False",
+        choices=["True", "False"],
         help="one-click for quantization and inference",
     )
     args = parser.parse_args(args_in)
@@ -102,7 +103,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if is_win():
         path = Path(args.build_dir, "./Bin/Release/quant_{}.exe".format(model_name))
     else:
-        if args.one_click_run:
+        if args.one_click_run == "True":
             import neural_speed
             package_path = os.path.dirname(neural_speed.__file__)
             path = Path(package_path, "./quant_{}".format(model_name))
