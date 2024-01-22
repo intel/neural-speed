@@ -463,6 +463,7 @@ class DecompressKBlockS4Fp {
 
 template <typename _DST_T, int _PACK_ROW, typename _Z_T = int8_t>  // zero points always be int8_t, not compressed
 class DecompressKBlockS3Fp {
+ public:
   template <BTLA_ISA ISA_T, typename _SCA_T, BTLA_DTYPE S3_T>
   static inline BTLA_CODE forward(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
                                   int interleave_n_offset, int row, int col, _SCA_T* scales, int8_t* zero_points,
@@ -476,7 +477,7 @@ class DecompressKBlockS3Fp {
 #endif
     return ret;
   }
-}
+};
 
 template <typename _DST_T>  // zero points always be int8_t, not compressed
 class DecompressKBlockS4S8Fp {
