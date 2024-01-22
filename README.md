@@ -19,6 +19,9 @@ pip install -r requirements.txt
 pip install .
 ```
 
+>**Note**: Please make sure GCC version is higher than GCC 10.
+
+
 For more installation ways like building binary by yourself, please refer to [Install Document](./docs/install.md)
 
 ## Quick Start
