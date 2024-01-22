@@ -399,9 +399,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   ne_build_forward_expand(&gf, inpL);
   ne_graph_compute(ctx0, &gf);
 
-  if (ns_log_level() == 0 || ns_log_level() == 2) {
-    ne_graph_profiling(&gf);
-  }
+  // if (ns_log_level() == 0 || ns_log_level() == 2) {
+  // ne_graph_profiling(&gf);
+  // }
 
   // update kv token count
   lctx.model.kv_self.n = n_cached;
