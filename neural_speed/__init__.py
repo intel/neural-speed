@@ -62,6 +62,8 @@ class Model:
             import neural_speed.polyglot_cpp as cpp_model
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
+        elif model_type == "qwen":
+            import neural_speed.qwen_cpp as cpp_model
         elif model_type == "phi":
             import neural_speed.phi_cpp as cpp_model
         elif model_type == "whisper":
