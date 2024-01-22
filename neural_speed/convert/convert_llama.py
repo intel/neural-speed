@@ -338,12 +338,49 @@ def convert_llama(model_path, out_path, quant_config):
     gguf_writer.add_pad_token_id(0)
     gguf_writer.add_sep_token_id(0)
 
+    # vocab
+    print("gguf: get tokenizer metadata")
+
+    tokens: List[bytes] = []
+    scores: List[float] = []
+    toktypes: List[int] = []
+
+    tokenizer_path = tokenizer.vocab_file
+    vocab = load_vocab(Path(tokenizer_path))
+    for text, score in vocab.all_tokens():
+        tokens.append(text)
+        scores.append(score)
+
+    gguf_writer.add_tokenizer_model("llama")
+    gguf_writer.add_token_list(tokens)
+    gguf_writer.add_token_scores(scores)
+
+    print("gguf: get tokenizer metadata done")
+
+    list_vars = model
+    gguf_writer.add_tensor("token_embd.weight", list_vars["model.embed_tokens.weight"].numpy())
+    gguf_writer.add_tensor("output_norm.weight", list_vars["model.norm.weight"].numpy())
+    gguf_writer.add_tensor("output.weight", list_vars["lm_head.weight"].numpy())
+
+    for i in tqdm(range(n_layer), desc="Processing layers"):
+        gguf_writer.add_tensor(f"blk.{i}.attn_q.weight", list_vars[f"model.layers.{i}.self_attn.q_proj.weight"].numpy())
+        gguf_writer.add_tensor(f"blk.{i}.attn_k.weight", list_vars[f"model.layers.{i}.self_attn.k_proj.weight"].numpy())
+        gguf_writer.add_tensor(f"blk.{i}.attn_v.weight", list_vars[f"model.layers.{i}.self_attn.v_proj.weight"].numpy())
+        gguf_writer.add_tensor(f"blk.{i}.attn_output.weight", list_vars[f"model.layers.{i}.self_attn.o_proj.weight"].numpy())
+
+        gguf_writer.add_tensor(f"blk.{i}.ffn_gate.weight", list_vars[f"model.layers.{i}.mlp.gate_proj.weight"].numpy())
+        gguf_writer.add_tensor(f"blk.{i}.ffn_down.weight", list_vars[f"model.layers.{i}.mlp.down_proj.weight"].numpy())
+        gguf_writer.add_tensor(f"blk.{i}.ffn_up.weight", list_vars[f"model.layers.{i}.mlp.up_proj.weight"].numpy())
+
+        gguf_writer.add_tensor(f"blk.{i}.attn_norm.weight", list_vars[f"model.layers.{i}.input_layernorm.weight"].numpy())
+        gguf_writer.add_tensor(f"blk.{i}.ffn_norm.weight", list_vars[f"model.layers.{i}.post_attention_layernorm.weight"].numpy())
+
     print("gguf: write header")
     gguf_writer.write_header_to_file()
     print("gguf: write metadata")
-    # gguf_writer.write_kv_data_to_file()
+    gguf_writer.write_kv_data_to_file()
     print("gguf: write tensors")
-    # gguf_writer.write_tensors_to_file()
+    gguf_writer.write_tensors_to_file()
 
     gguf_writer.close()
     print(f"Success! saved as {out_path}")
