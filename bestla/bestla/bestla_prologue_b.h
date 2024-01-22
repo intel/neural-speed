@@ -812,7 +812,8 @@ class WeightKBlockNInteger {
               wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
           int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
-          auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
+          auto elt_offset =
+              n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 64);
           auto ld_dst = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * utils::padto(KPad, 64);
           auto row = NPad / (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE);
           assert(elt_offset % 8 == 0);
