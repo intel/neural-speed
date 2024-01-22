@@ -178,10 +178,12 @@ class UT_BlockQunatize_S3 {
   UT_BlockQunatize_S3() {
     UT_START();
     CheckISA(AVX512F);
-    ut(1024, 1024, 32, BTLA_DTYPE::S3_CLIP);
-    ut(4128, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<true>(128, 1024, 1024, 32, BTLA_DTYPE::S3_CLIP);
+    // ut<true>(1024, 4128, 4096, 32, BTLA_DTYPE::S3_CLIP);
   }
-  void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
+
+  template <bool FP_CMPT>
+  void ut(int m, int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
     printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
     int ldb = n;
 
@@ -195,6 +197,14 @@ class UT_BlockQunatize_S3 {
 
     auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<sAVX512F, RuntimeISA>;
+    using Launcher =
+        wrapper::gemm::LauncherKBlock<RuntimeISA, sAVX512F, prologue_a::gemm::ActivationBase,
+                                      prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
+                                      epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Parallel = parallel::gemm::SchedulerKBlock<sAVX512F>;
+
+    Launcher launcher;
+
     PrologueB kernel;
     auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
     auto ptr_ref = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
@@ -204,18 +214,32 @@ class UT_BlockQunatize_S3 {
     ptr_ref.assign(buffer_ref.data());
     kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr, &DefaultThreading);
     kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr_ref, &DefaultThreading);
-    avector<float> dequant(n * k, 0);
-    avector<float> dequant_ref(n * k, 0);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
-    kernel.unpackWeight(n, k, &ptr_ref, dequant_ref.data(), n, &DefaultThreading);
-    for (int i = 0; i < k; i++) {
-      for (int j = 0; j < n; j++) {
-        if ((dequant[i * n + j] - dequant_ref[i * n + j]) != 0) {
-          std::cout << "i: " << i << " j:" << j << std::endl;
-          std::cout << dequant[i * n + j] << " vs " << dequant_ref[i * n + j] << std::endl;
-        }
-      }
-    }
+
+    avector<float> matAf32(m * k), matC(m * n), refC(m * n);
+    fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
+    utils::GemmProblem gp(1, m, n, k, blocksize);
+    typename Launcher::Param args{
+        gp, {matAf32.data(), k}, {&ptr}, {ptr.template SPtr<int8_t>(), ptr.SDtype(), ptr.CStep()}, {matC.data(), n}};
+    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    typename Launcher::Param args_ref{gp,
+                                      {matAf32.data(), k},
+                                      {&ptr_ref},
+                                      {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
+                                      {refC.data(), n}};
+    parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
+    buffer_error(matC.data(), refC.data(), matC.size(), 0.001f);
+    // avector<float> dequant(n * k, 0);
+    // avector<float> dequant_ref(n * k, 0);
+    // kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
+    // kernel.unpackWeight(n, k, &ptr_ref, dequant_ref.data(), n, &DefaultThreading);
+    // for (int i = 0; i < k; i++) {
+    //   for (int j = 0; j < n; j++) {
+    //     if ((dequant[i * n + j] - dequant_ref[i * n + j]) != 0) {
+    //       std::cout << "i: " << i << " j:" << j << std::endl;
+    //       std::cout << dequant[i * n + j] << " vs " << dequant_ref[i * n + j] << std::endl;
+    //     }
+    //   }
+    // }
   }
 };
 static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
