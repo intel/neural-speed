@@ -18,6 +18,7 @@ import argparse
 from typing import List, Optional
 from transformers import AutoConfig
 import subprocess
+from huggingface_hub import snapshot_download
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 build_path = Path(Path(__file__).parent.absolute(), "../build/")
@@ -146,13 +147,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
         action="store_true",
         help="Use ring-buffer and thus do not re-computing after reaching ctx_size (default: False)",
     )
+    parser.add_argument(
+        "--token",
+        type=str,
+        help="Access token ID for models that require it (LLaMa2, etc..)",
+    )
 
     args = parser.parse_args(args_in)
 
     if args.model.exists():
         dir_model = args.model.as_posix()
     else:
-        dir_model = args.model
+        dir_model = snapshot_download(repo_id=str(args.model), resume_download=True, token=args.token)
 
     parent_path = Path(__file__).parent.absolute()
     config = AutoConfig.from_pretrained(dir_model)
