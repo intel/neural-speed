@@ -91,8 +91,8 @@ set(mymap_baichuan 12)
 set(mymap_polyglot 13)
 set(mymap_mistral 14)
 set(mymap_qwen 15)
-set(mymap_phi 16)
-set(mymap_whisper 17)
+set(mymap_whisper 16)
+set(mymap_phi 17)
 
 
 

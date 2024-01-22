@@ -49,7 +49,7 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
 }
 
 void phi::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
-                bool vocab_only_) {
+               bool vocab_only_) {
   model_context& lctx = *ctx;
   n_gpu_layer = n_gpu_layer_;
   use_mmap = use_mmap_;

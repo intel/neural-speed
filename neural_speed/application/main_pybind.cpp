@@ -661,7 +661,7 @@ PYBIND11_MODULE(mistral_cpp, m)
 
 PYBIND11_MODULE(qwen_cpp, m)
 
-#elif MODEL_NAME_ID == 16
+#elif MODEL_NAME_ID == 17
 
 PYBIND11_MODULE(phi_cpp, m)
 
