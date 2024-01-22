@@ -178,22 +178,23 @@ class UT_BlockQunatize_S3 {
   UT_BlockQunatize_S3() {
     UT_START();
     CheckISA(AVX512F);
-    ut<0>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<0>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<0>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<0>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<0>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<0>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<1>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<1>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    ut<1>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<1>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<1>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<1>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
   }
 
-  template <int CMPT_MODE>  // 0: fp32 1: bf16 2: int8.
+  template <class GemmCore_T, BTLA_ISA ISA>
   void ut(int m, int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
+    DefaultThreading.set_threads(64);
     printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
     int ldb = n;
 
@@ -205,8 +206,7 @@ class UT_BlockQunatize_S3 {
     quanW.fill_rand(-8, 7);
     for (int i = 0; i < k * n; i++) quanW.data()[i] = (quanW.data()[i] * 16) & 0xe0;
 
-    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<sAVX512F, RuntimeISA>;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>;
 
     PrologueB kernel;
     auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
@@ -217,16 +217,15 @@ class UT_BlockQunatize_S3 {
     ptr_ref.assign(buffer_ref.data());
     kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr, &DefaultThreading);
     kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr_ref, &DefaultThreading);
+    using Launcher =
+        wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                      prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
+                                      epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Parallel = parallel::gemm::SchedulerKBlock<sAVX512F>;
 
+    Launcher launcher;
     avector<float> matC(m * n), refC(m * n);
-    if constexpr (CMPT_MODE == 0) {
-      using Launcher =
-          wrapper::gemm::LauncherKBlock<BTLA_ISA::AVX512F, sAVX512F, prologue_a::gemm::ActivationBase,
-                                        prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
-                                        epilogue::gemm::AccumulatorWriteBackFp32>;
-      using Parallel = parallel::gemm::SchedulerKBlock<sAVX512F>;
-
-      Launcher launcher;
+    if constexpr (ISA == BTLA_ISA::AVX512F) {
       avector<float> matAf32(m * k);
       fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
       utils::GemmProblem gp(1, m, n, k, blocksize);
@@ -239,14 +238,7 @@ class UT_BlockQunatize_S3 {
                                         {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
                                         {refC.data(), n}};
       parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
-    } else if constexpr (CMPT_MODE == 1) {
-      using Launcher =
-          wrapper::gemm::LauncherKBlock<BTLA_ISA::AMX_BF16, sAMX_BF16, prologue_a::gemm::ActivationBase,
-                                        prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
-                                        epilogue::gemm::AccumulatorWriteBackFp32>;
-      using Parallel = parallel::gemm::SchedulerKBlock<sAVX512F>;
-
-      Launcher launcher;
+    } else if constexpr (ISA == BTLA_ISA::AMX_BF16) {
       avector<utils::bf16> matAbf16(m * k);
       fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
       GemmProblem gp(1, m, n, k, blocksize);
@@ -257,7 +249,7 @@ class UT_BlockQunatize_S3 {
                                         {matAbf16.data(), k},
                                         {&ptr_ref},
                                         {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
-                                        {matC.data(), n}};
+                                        {refC.data(), n}};
       parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
     } else {
     }
