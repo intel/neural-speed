@@ -41,7 +41,7 @@ streamer = TextStreamer(tokenizer)
 model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
->**Note**: For llama2/ mistral/ neural_chat/ codellama/ magicoder models, we can only support the local path to model for now.
+>**Note**: For llama2/ mistral/ neural_chat/ codellama/ magicoder/ chatglmv1/v2/ baichuan models, we can only support the local path to model for now.
 GGUF format HF model
 ```python
 from transformers import AutoTokenizer, TextStreamer
