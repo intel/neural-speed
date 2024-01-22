@@ -221,7 +221,7 @@ class UT_BlockQunatize_S3 {
         wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
                                       prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
                                       epilogue::gemm::AccumulatorWriteBackFp32>;
-    using Parallel = parallel::gemm::SchedulerKBlock<sAVX512F>;
+    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
 
     Launcher launcher;
     avector<float> matC(m * n), refC(m * n);
