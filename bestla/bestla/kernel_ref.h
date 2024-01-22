@@ -178,31 +178,53 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
   return BTLA_CODE::Success;
 }
 
+// #include <iostream>
 static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
                                       int row, int col, int ld_src, int ld_dst) {
   assert(col % 64 == 0);
   // interleave + store 2bit.
+
+  // for (int i = 0; i < row * col; i++) {
+  //   char tmp;
+  //   memcpy(&tmp, &srcptr[i], 1);
+  //   tmp &= 0xe0;
+  //   std::cout << int(*(reinterpret_cast<int8_t*>(&tmp))) << std::endl;
+  // }
+  // std::cout << "==============" << std::endl;
+
+  auto bit2_interleave = [&](int8_t* src, int8_t* dst) {
+    for (int i = 0; i < 64 / 4; i++) {
+      dst[4 * i] = src[i];
+      dst[4 * i + 1] = src[64 / 4 + i];
+      dst[4 * i + 2] = src[64 / 4 * 2 + i];
+      dst[4 * i + 3] = src[64 / 4 * 3 + i];
+    }
+  };
+
+  int8_t interleave_buf[64];
+
   for (int i = 0; i < row; i++) {
-    for (int j = 0; j < col; i += 64) {
+    for (int j = 0; j < col; j += 64) {
+      bit2_interleave(const_cast<int8_t*>(srcptr + i * ld_src + j), interleave_buf);
       for (int k = 0; k < 16; k++) {
-        bit2ptr[i * ld_dst / 4 + i / 4 + k].a = srcptr[i * ld_src + col + 4 * k];
-        bit2ptr[i * ld_dst / 4 + i / 4 + k].b = srcptr[i * ld_src + col + 4 * k + 1];
-        bit2ptr[i * ld_dst / 4 + i / 4 + k].c = srcptr[i * ld_src + col + 4 * k + 2];
-        bit2ptr[i * ld_dst / 4 + i / 4 + k].d = srcptr[i * ld_src + col + 4 * k + 3];
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].a = interleave_buf[4 * k] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].b = interleave_buf[4 * k + 1] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].c = interleave_buf[4 * k + 2] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].d = interleave_buf[4 * k + 3] >> 5;
       }
     }
   }
   // store 1 bit without interleave as mask.
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 8) {
-      bit1ptr[i * ld_dst].a = srcptr[i * ld_src + j] >> 2;
-      bit1ptr[i * ld_dst].b = srcptr[i * ld_src + j + 1] >> 2;
-      bit1ptr[i * ld_dst].c = srcptr[i * ld_src + j + 2] >> 2;
-      bit1ptr[i * ld_dst].d = srcptr[i * ld_src + j + 3] >> 2;
-      bit1ptr[i * ld_dst].e = srcptr[i * ld_src + j + 4] >> 2;
-      bit1ptr[i * ld_dst].f = srcptr[i * ld_src + j + 5] >> 2;
-      bit1ptr[i * ld_dst].g = srcptr[i * ld_src + j + 6] >> 2;
-      bit1ptr[i * ld_dst].h = srcptr[i * ld_src + j + 7] >> 2;
+      bit1ptr[i * ld_dst / 8 + j / 8].a = srcptr[i * ld_src + j] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].b = srcptr[i * ld_src + j + 1] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].c = srcptr[i * ld_src + j + 2] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].d = srcptr[i * ld_src + j + 3] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].e = srcptr[i * ld_src + j + 4] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].f = srcptr[i * ld_src + j + 5] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].g = srcptr[i * ld_src + j + 6] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].h = srcptr[i * ld_src + j + 7] >> 7;
     }
   }
   return BTLA_CODE::Success;
