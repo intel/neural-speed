@@ -49,7 +49,17 @@
 #define MODEL_SESSION_MAGIC MODEL_FILE_MAGIC_GGSN
 #define MODEL_SESSION_VERSION 1
 
-int64_t ns_log_level();
+inline int64_t ns_log_level() {
+  static int64_t log_level = -1;
+  if (log_level == -1) {
+    const char* log_level_env = getenv("NEURAL_SPEED_VERBOSE");
+    if (log_level_env != nullptr)
+      log_level = std::stoi(log_level_env);
+    else
+      log_level = -2;
+  }
+  return log_level;
+}
 
 void model_load_internal(const std::string& fname, model_archs arch, model_context* ctx, int n_gpu_layers,
                          bool use_mmap, bool use_mlock, bool vocab_only, model_progress_callback progress_callback,

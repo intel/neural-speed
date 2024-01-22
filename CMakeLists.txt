@@ -70,8 +70,10 @@ option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"               
 if(NS_BUILD_TESTS)
   add_compile_definitions(NS_BUILD_TESTS)
 endif()
-
-add_compile_definitions(NS_PERF)
+option(NS_PROFILING              "neural_speed: use Profiling"                                  OFF)
+if (NS_PROFILING)
+    add_compile_definitions(NS_PERF)
+endif()
 option(NS_BEAM_SEARCH_VERBOSE    "neural_speed: print beam search processing log"               OFF)
 if (NS_BEAM_SEARCH_VERBOSE)
     add_compile_definitions(NS_BEAM_SEARCH_VERBOSE_ON)
