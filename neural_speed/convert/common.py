@@ -35,7 +35,7 @@ GGML_QK5_1 = 32
 
 GGML_QK4_0_TYPE = 2
 GGML_QK4_1_TYPE = 3
-GGML_QJBLAS_TYPE = 13
+GGML_QJBLAS_TYPE = 19
 
 @dataclass
 class QuantConfig:

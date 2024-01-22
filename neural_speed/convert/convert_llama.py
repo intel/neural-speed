@@ -217,11 +217,15 @@ def convert_llama(model_path, out_path, quant_config):
 
     f.write(struct.pack("f", config["rms_norm_eps"]))
     f.write(struct.pack("f", config["rope_theta"] if "rope_theta" in config else 10000))
+    rope_scale = 1
+    if "rope_scaling" in config and config["rope_scaling"] is not None:
+        rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
+    f.write(struct.pack("f", rope_scale))
 
     # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
     # but bos_token_id = 1 in llama.cpp
-    f.write(struct.pack("i", 1))  
-    f.write(struct.pack("i", 2))
+    f.write(struct.pack("i", config["bos_token_id"]))  
+    f.write(struct.pack("i", config["eos_token_id"]))
 
     f.write(struct.pack("i", 0))
     f.write(struct.pack("i", 0))
