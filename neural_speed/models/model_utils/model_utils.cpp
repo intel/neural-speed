@@ -2438,6 +2438,8 @@ void beam_search_flow::update_status() {
       // batch reduction
       std::for_each(cur_beams.begin() + h * beam_size, cur_beams.begin() + (h + 1) * beam_size,
                     [&](auto& b) { b.done = true; });
+      std::for_each(next_beams.begin() + h * beam_size, next_beams.begin() + (h + 1) * beam_size,
+                    [&](auto& b) { b.done = true; });
     }
   }
   // collect request final generation result if done
