@@ -204,6 +204,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     infer_cmd.extend(["--build_dir", args.build_dir])
     if args.shift_roped_k:
         infer_cmd.extend(["--shift-roped-k"])
+    if (model_type == "baichuan" or model_type == "qwen"):
+        infer_cmd.extend(["--tokenizer", dir_model])
     print("inferce model ...")
     subprocess.run(infer_cmd)
 
