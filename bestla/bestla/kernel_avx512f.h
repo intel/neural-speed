@@ -699,8 +699,8 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   auto body_loop = (unpack_elt - (64 - head_ignore_num) % 64) / 64;
   auto tail_proc_num = (unpack_elt - (64 - head_ignore_num) % 64) % 64;
 
-  __m128i bit2_data[4];
-  __m512i bit2_data_zmm;
+  // __m128i bit2_data[4];
+  // __m512i bit2_data_zmm;
   for (int i = 0; i < body_loop; i++) {
     // if (i % 4 == 0) {
     //   bit2_data_zmm=_mm512_loadu_si512(base_bit2ptr + compress_wei_ptr_offset);
@@ -711,7 +711,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     // }
     // bit2_data = _mm512_extracti32x4_epi32(bit2_data_zmm,0x0);
     // auto zmm = bit3_interleave_decompress(bit2_data[i%4],
-    auto zmm = bit3_interleave_decompress(base_bit2ptr+compress_wei_ptr_offset/4,
+    auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
                                           base_bit1ptr + compress_wei_ptr_offset / 8);
     // __m512i zmm;
     if constexpr (!std::is_same_v<_DST_T, int8_t>) {
@@ -729,15 +729,15 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
         auto ymm2 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm2));
         auto ymm3 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm3));
         auto ymm4 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm4));
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr+compress_wei_ptr_offset), ymm1);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr+compress_wei_ptr_offset + 16), ymm2);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr+compress_wei_ptr_offset + 32), ymm3);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr+compress_wei_ptr_offset + 48), ymm4);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset), ymm1);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset + 16), ymm2);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset + 32), ymm3);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset + 48), ymm4);
       } else {
-        _mm512_storeu_ps(dstptr+compress_wei_ptr_offset, _mm512_cvtepi32_ps(zmm1));
-        _mm512_storeu_ps(dstptr+compress_wei_ptr_offset + 16, _mm512_cvtepi32_ps(zmm2));
-        _mm512_storeu_ps(dstptr+compress_wei_ptr_offset + 32, _mm512_cvtepi32_ps(zmm3));
-        _mm512_storeu_ps(dstptr+compress_wei_ptr_offset + 48, _mm512_cvtepi32_ps(zmm4));
+        _mm512_storeu_ps(dstptr + compress_wei_ptr_offset, _mm512_cvtepi32_ps(zmm1));
+        _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 16, _mm512_cvtepi32_ps(zmm2));
+        _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 32, _mm512_cvtepi32_ps(zmm3));
+        _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 48, _mm512_cvtepi32_ps(zmm4));
       }
       // for (int j = 0; j < 64; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
     } else {
