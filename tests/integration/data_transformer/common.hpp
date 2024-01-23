@@ -38,8 +38,8 @@ int data_transformer_result_validate(data_type_in *in_device,
     data_type_acc cpu_max = (data_type_acc)0;
     data_type_out res = data_type_out(0);
     data_type_out ref = data_type_out(0);
-    for (int i = 0; i < mat_m; i++) {
-        for (int j = 0; j < mat_n; j++) {
+    for (uint32_t i = 0; i < mat_m; i++) {
+        for (uint32_t j = 0; j < mat_n; j++) {
             int idx = i * mat_n + j;
 
             cpu_max = (cpu_max > abs(in[idx])) ? cpu_max

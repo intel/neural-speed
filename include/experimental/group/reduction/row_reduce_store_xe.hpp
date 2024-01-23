@@ -129,8 +129,10 @@ struct group_row_reduce_store_t<dtype_acc, dtype_out, row_size, wg_size_x, 1,
             (row_size * sizeof(dtype_out) > 64) ? msg_type::block_1d
                                                 : msg_type::block_2d,
             gpu_arch::Xe>;
-    inline void init(uint32_t sg_idx_ = 0, uint32_t sg_idy_ = 0,
-            uint32_t slm_base = 0, uint32_t nbarrier_base = 0) {}
+    inline void init([[maybe_unused]] uint32_t sg_idx_ = 0,
+            [[maybe_unused]] uint32_t sg_idy_ = 0,
+            [[maybe_unused]] uint32_t slm_base = 0,
+            [[maybe_unused]] uint32_t nbarrier_base = 0) {}
 
     inline KERNEL_FUNC void operator()(dtype_out *ptr, uint32_t st_width,
             uint32_t st_height, uint32_t st_pitch, int start_n_base,

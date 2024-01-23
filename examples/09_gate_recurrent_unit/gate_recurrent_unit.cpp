@@ -218,7 +218,6 @@ void gru_run(uint32_t iter) {
     // Please contact us for support.
 
     using data_type = typename gru_config::dtype_in;
-    using data_type_act = typename gru_config::dtype_acc;
 
     size_t S = gru_config::layer_size;
     size_t L = gru_config::sequence_length;
@@ -231,13 +230,10 @@ void gru_run(uint32_t iter) {
     size_t wg_tile_n = gru_config::wg_tile_n;
     size_t sg_tile_m = gru_config::sg_tile_m;
     size_t sg_tile_n = gru_config::sg_tile_n;
-    size_t sg_tile_k = gru_config::sg_tile_k;
     // input and output size
     size_t layer_input_size = L * N * F;
-    size_t hidden_input_size = S * (L + 1) * N * H;
     size_t input_weight_size = F * H + (S - 1) * H * H;
     size_t hidden_weight_size = S * H * H;
-    size_t gate_size = S * L * N * H;
 
     //***********dpcpp runtime setup && buffer allocation start ************//
     // Turn on the enable_profiling property to facilitate subsequent profiling
@@ -317,20 +313,32 @@ void gru_run(uint32_t iter) {
     h_weights.push_back(hn_weights);
 
     auto hidden_outputs = alloc_device_and_init<data_type>(
-            L * N * H, [](data_type *data, size_t idx) {}, queue, device,
-            context);
+            L * N * H,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(0);
+            },
+            queue, device, context);
 
     auto layer_outputs = alloc_device_and_init<data_type>(
-            S * N * H, [](data_type *data, size_t idx) {}, queue, device,
-            context);
+            S * N * H,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(0);
+            },
+            queue, device, context);
 
     auto ping_pong_buffer = alloc_device_and_init<data_type>(
-            2 * L * N * H, [](data_type *data, size_t idx) {}, queue, device,
-            context);
+            2 * L * N * H,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(0);
+            },
+            queue, device, context);
 
     auto ping_pong_cell = alloc_device_and_init<data_type>(
-            2 * N * H, [](data_type *data, size_t idx) {}, queue, device,
-            context);
+            2 * N * H,
+            [](data_type *data, size_t idx) {
+                data[idx] = static_cast<data_type>(0);
+            },
+            queue, device, context);
 
     //***********dpcpp runtime setup && buffer allocation start ************//
 

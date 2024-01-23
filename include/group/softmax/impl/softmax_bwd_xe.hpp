@@ -58,7 +58,7 @@ public:
         dtype_acc sqrt_dk_inv;
         inline arguments_t() = default;
         inline arguments_t(base_t base_, shape_t shape_, dtype_acc sqrt_dk_inv_)
-            : base(base_), shape(shape_), sqrt_dk_inv(sqrt_dk_inv_) {}
+            : shape(shape_), base(base_), sqrt_dk_inv(sqrt_dk_inv_) {}
     };
     struct get_barrier_count {
         static constexpr uint32_t count = (wg_size_x > 1) ? wg_size_y : 0;
@@ -81,10 +81,6 @@ public:
         static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
         static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
         static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
-        static constexpr int32_t num_block_x = matAcc_t::num_block_x;
-        static constexpr int32_t num_block_y = matAcc_t::num_block_y;
-        static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
-        static constexpr uint32_t block_elems = matAcc_t::block_elems;
         static_assert((sg_tile_m == tile_size_y) && (sg_tile_n == tile_size_x),
                 "tile size should match");
         using mat_in_tile_desc_t = subgroup::tile_desc_t<tile_size_x,

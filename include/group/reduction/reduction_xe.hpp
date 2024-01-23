@@ -92,17 +92,19 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::Xe> {
 template <typename T, uint32_t SZ, uint32_t N, reduce_op Op, bool is_all_reduce>
 struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::Xe> {
     inline group_reduce_t() = default;
-    inline group_reduce_t(
-            uint32_t sg_id_, uint32_t nbarrier_id, uint32_t slm_base_) {}
-    inline void init(uint32_t sg_id_ = 0, uint32_t nbarrier_id = 0,
-            uint32_t slm_base_ = 0) {}
-    inline void set_slm_base(uint32_t slm_base_ = 0) {}
+    inline group_reduce_t([[maybe_unused]] uint32_t sg_id_,
+            [[maybe_unused]] uint32_t nbarrier_id,
+            [[maybe_unused]] uint32_t slm_base_) {}
+    inline void init([[maybe_unused]] uint32_t sg_id_ = 0,
+            [[maybe_unused]] uint32_t nbarrier_id = 0,
+            [[maybe_unused]] uint32_t slm_base_ = 0) {}
+    inline void set_slm_base([[maybe_unused]] uint32_t slm_base_ = 0) {}
     inline KERNEL_FUNC xetla_vector<T, N> operator()(
             xetla_vector<T, N * SZ> buffer) {
         auto buffer_2d = buffer.xetla_format<T, N, SZ>();
         xetla_vector<T, N> ret;
 #pragma unroll
-        for (int i = 0; i < N; i++) {
+        for (uint32_t i = 0; i < N; i++) {
             ret[i] = xetla_reduce<T, T, SZ, Op>(buffer_2d.row(i));
         }
         return ret;

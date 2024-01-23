@@ -86,7 +86,7 @@ inline auto getTypeName<gpu::xetla::tf32>() {
     return "tf32";
 }
 
-enum class test_result { complete = 0, skip = 1, fail = 2 };
+enum class test_result : uint8_t { complete = 0, skip = 1, fail = 2 };
 
 template <typename result_type>
 inline result_type generate_real_random(
@@ -170,8 +170,6 @@ int gemm_result_validate(data_type_a *A_device, data_type_b *B_device,
         uint32_t n, sycl::queue &queue,
         mem_layout mem_layout_a_ = mem_layout::row_major,
         mem_layout mem_layout_b_ = mem_layout::row_major) {
-    bool is_col_major_a = mem_layout_a_ == mem_layout::col_major;
-    bool is_col_major_b = mem_layout_b_ == mem_layout::col_major;
     // define slice of each matrices
     size_t size_a_slice = m * k;
     size_t size_b_slice = k * n;

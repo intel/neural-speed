@@ -23,8 +23,8 @@ using namespace gpu::xetla;
 template <typename dtype, uint32_t tile_size_x, uint32_t tile_size_y,
         uint32_t block_size_x, uint32_t block_size_y>
 struct conversion_func {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            dtype *a, [[maybe_unused]] dtype *b, dtype *c) {
         using linear_desc = subgroup::tile_desc_t<tile_size_x, tile_size_y,
                 tile_size_x, tile_size_y, reg_layout::linear>;
         using tiled_desc = subgroup::tile_desc_t<tile_size_x, tile_size_y,
@@ -53,7 +53,7 @@ struct conversion_func {
                 = linear_data_tile.reg.xetla_format<native_type_t<dtype>,
                         tile_size_y, tile_size_x>();
 #pragma unroll
-        for (int i = 0; i < tile_size_y; ++i) {
+        for (uint32_t i = 0; i < tile_size_y; ++i) {
             linear_data_tile_2d.xetla_select<1, 1, tile_size_x, 1>(i, 0)
                     += mask;
         }

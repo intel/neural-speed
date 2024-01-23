@@ -33,8 +33,6 @@ int gemm_relu_bias_result_validate(data_type_a *A_device, data_type_b *B_device,
     auto C = alloc_host_and_copy<data_type_c>(C_device, m * n, queue);
     auto D = alloc_host_and_copy<data_type_d>(D_device, n, queue);
 
-    bool is_col_major_a = mem_layout_a_ == mem_layout::col_major;
-    bool is_col_major_b = mem_layout_b_ == mem_layout::col_major;
     buff_cmp::buff_vals<data_type_c> data(C, m, n, n);
     std::vector<data_type_acc> gold_C(m * n, 0);
     get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
@@ -144,10 +142,10 @@ void gemm_relu_bias_run(uint32_t iter) {
 
     // Mirco-kernel configuration
     using tune_option = dict_t<
-            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                    tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-            elem_t_t<tune_key::EPILOGUE_POLICY, epilogue_policy>,
-            elem_t_t<tune_key::WG_TILE_SHAPE, shape<wg_tile_n, wg_tile_m>>>;
+            elem_v_t<tune_key::param_optimizer_type,
+                    tune_key_value::param_optimizer_decision_tree>,
+            elem_t_t<tune_key::epilogue_policy, epilogue_policy>,
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
     using default_config_t = gpu::xetla::kernel::default_gemm_config_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A

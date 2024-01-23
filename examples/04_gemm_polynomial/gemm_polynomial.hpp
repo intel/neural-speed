@@ -31,9 +31,10 @@ struct polynomial_op_t {
         inline arguments_t(coeff_t coeff_) : coeff(coeff_) {}
     };
     template <typename matAcc_t, typename coord_t>
-    __XETLA_API KERNEL_FUNC void operator()(matAcc_t &matAcc, coord_t coord,
-            arguments_t args, uint32_t slm_base = 0,
-            uint32_t nbarrier_base = 0) {
+    __XETLA_API KERNEL_FUNC void operator()(matAcc_t &matAcc,
+            [[maybe_unused]] coord_t coord, arguments_t args,
+            [[maybe_unused]] uint32_t slm_base = 0,
+            [[maybe_unused]] uint32_t nbarrier_base = 0) {
         using dtype_acc = typename matAcc_t::dtype;
         // total flag register
         constexpr uint32_t elems = 8 * 16;

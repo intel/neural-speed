@@ -194,37 +194,36 @@ public:
             : matrix_m(matrix_m_)
             , matrix_k(matrix_k_)
             , matrix_n(matrix_n_)
-            , matA_base(matA_base_)
             , matA_ld(matA_ld_)
-            , matB_base(matB_base_)
             , matB_ld(matB_ld_)
-            , matC_base(matC_base_)
             , matC_ld(matC_ld_)
-            , scale_base(scale_base_)
-            , scale_ld(scale_ld_)
-            , zero_pt_base(zero_pt_base_)
-            , zero_pt_ld(zero_pt_ld_)
+            , matA_base(matA_base_)
+            , matB_base(matB_base_)
+            , matC_base(matC_base_)
             , acc_base(acc_base_)
             , cnt_base(cnt_base_)
-            , epilogue_args(epilogue_args_) {}
-
+            , epilogue_args(epilogue_args_)
+            , scale_base(scale_base_)
+            , zero_pt_base(zero_pt_base_)
+            , scale_ld(scale_ld_)
+            , zero_pt_ld(zero_pt_ld_) {}
         inline arguments_t(const arguments_t &args)
             : matrix_m(args.matrix_m)
             , matrix_k(args.matrix_k)
             , matrix_n(args.matrix_n)
-            , matA_base(args.matA_base)
             , matA_ld(args.matA_ld)
-            , matB_base(args.matB_base)
             , matB_ld(args.matB_ld)
-            , matC_base(args.matC_base)
             , matC_ld(args.matC_ld)
-            , scale_base(args.scale_base)
-            , scale_ld(args.scale_ld)
-            , zero_pt_base(args.zero_pt_base)
-            , zero_pt_ld(args.zero_pt_ld)
+            , matA_base(args.matA_base)
+            , matB_base(args.matB_base)
+            , matC_base(args.matC_base)
             , acc_base(args.acc_base)
             , cnt_base(args.cnt_base)
-            , epilogue_args(args.epilogue_args) {}
+            , epilogue_args(args.epilogue_args)
+            , scale_base(args.scale_base)
+            , zero_pt_base(args.zero_pt_base)
+            , scale_ld(args.scale_ld)
+            , zero_pt_ld(args.zero_pt_ld) {}
         // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
         // Please check if you need to add self-define destructor
         // inline ~arguments_t(){}
@@ -240,7 +239,7 @@ public:
             this->matC_ld = args.matC_ld;
             this->scale_base = args.scale_base;
             this->scale_ld = args.scale_ld;
-            this->zero_pt_base = args.zero_pt_base_;
+            this->zero_pt_base = args.zero_pt_base;
             this->zero_pt_ld = args.zero_pt_ld;
             this->acc_base = args.acc_base;
             this->cnt_base = args.cnt_base;
@@ -310,33 +309,33 @@ public:
             : matrix_m(matrix_m_)
             , matrix_k(matrix_k_)
             , matrix_n(matrix_n_)
-            , matA_base(matA_base_)
             , matA_ld(matA_ld_)
-            , matB_base(matB_base_)
             , matB_ld(matB_ld_)
-            , matC_base(matC_base_)
             , matC_ld(matC_ld_)
-            , scale_base(scale_base_)
-            , scale_ld(scale_ld_)
+            , matA_base(matA_base_)
+            , matB_base(matB_base_)
+            , matC_base(matC_base_)
             , acc_base(acc_base_)
             , cnt_base(cnt_base_)
-            , epilogue_args(epilogue_args_) {}
+            , epilogue_args(epilogue_args_)
+            , scale_base(scale_base_)
+            , scale_ld(scale_ld_) {}
 
         inline arguments_t(const arguments_t &args)
             : matrix_m(args.matrix_m)
             , matrix_k(args.matrix_k)
             , matrix_n(args.matrix_n)
-            , matA_base(args.matA_base)
             , matA_ld(args.matA_ld)
-            , matB_base(args.matB_base)
             , matB_ld(args.matB_ld)
-            , matC_base(args.matC_base)
             , matC_ld(args.matC_ld)
-            , scale_base(args.scale_base)
-            , scale_ld(args.scale_ld)
+            , matA_base(args.matA_base)
+            , matB_base(args.matB_base)
+            , matC_base(args.matC_base)
             , acc_base(args.acc_base)
             , cnt_base(args.cnt_base)
-            , epilogue_args(args.epilogue_args) {}
+            , epilogue_args(args.epilogue_args)
+            , scale_base(args.scale_base)
+            , scale_ld(args.scale_ld) {}
         // Be aware of the risks: Rule of three (copy constructor, copy assignment, destructor)
         // Please check if you need to add self-define destructor
         // inline ~arguments_t(){}

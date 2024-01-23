@@ -17,8 +17,8 @@
 
 #include "kernel_func.hpp"
 
-int block_load_store_result_validate(int *A, int *B, int *C, unsigned Sizex,
-        unsigned Blockx, unsigned Blocky) {
+int block_load_store_result_validate(int *A, [[maybe_unused]] int *B, int *C,
+        unsigned Sizex, unsigned Blockx, unsigned Blocky) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Blocky; ++i) {
         for (unsigned j = 0; j < Blockx; ++j) {

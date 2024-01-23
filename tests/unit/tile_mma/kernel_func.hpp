@@ -25,8 +25,8 @@ using namespace gpu::xetla::subgroup;
 template <typename dtypeA, typename dtypeB, typename dtypeC, typename dtypeAcc,
         uint32_t m, uint32_t n, uint32_t k>
 struct tile_mma_func {
-    static KERNEL_FUNC inline void run(
-            sycl::nd_item<1> *item, dtypeA *a, dtypeB *b, dtypeC *c) {
+    static KERNEL_FUNC inline void run([[maybe_unused]] sycl::nd_item<1> *item,
+            dtypeA *a, dtypeB *b, dtypeC *c) {
 
         int width_a = k;
         int height_a = m;
@@ -75,9 +75,6 @@ struct tile_mma_func {
         matA_payload.init(a, width_a, height_a, pitch_a, start_x_a, start_y_a);
         matB_payload.init(b, width_b, height_b, pitch_b, start_x_b, start_y_b);
         matAcc.init(0);
-
-        constexpr tdesc_update_dir matA_update_dir = tdesc_update_dir::x_dir;
-        constexpr tdesc_update_dir matB_update_dir = tdesc_update_dir::y_dir;
 
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                 matA, matA_payload);

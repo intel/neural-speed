@@ -23,7 +23,7 @@ using namespace gpu::xetla;
 template <typename dtype, int SIMD, int BLOCK_SIZE,
         gpu_arch arch_tag = gpu_arch::Xe>
 KERNEL_FUNC inline void vector_add_func(
-        sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
+        [[maybe_unused]] sycl::nd_item<1> *item, dtype *a, dtype *b, dtype *c) {
 
     xetla_tdescriptor a_src_tdesc;
     xetla_tdescriptor b_src_tdesc;

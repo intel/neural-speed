@@ -18,7 +18,8 @@
 
 #include "xetla.hpp"
 
-int named_barrier_result_validate(int *A, int *B, int *C, unsigned Size) {
+int named_barrier_result_validate(
+        int *A, [[maybe_unused]] int *B, int *C, unsigned Size) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Size; ++i) {
         if (A[i] != C[i] * 2) {
@@ -38,11 +39,11 @@ int named_barrier_result_validate(int *A, int *B, int *C, unsigned Size) {
     return err_cnt;
 }
 
-int named_barrier_split_validate(
-        int *A, int *B, int *C, unsigned Size, unsigned times) {
+int named_barrier_split_validate(int *A, [[maybe_unused]] int *B, int *C,
+        unsigned Size, unsigned times) {
     int err_cnt = 0;
     for (unsigned i = 0; i < Size; ++i) {
-        if (C[i] != A[i] * times) {
+        if (C[i] != A[i] * (int)times) {
             if (++err_cnt < 16) {
                 std::cout << "failed at index " << i << ", " << C[i]
                           << " != " << A[i] * times << "\n";

@@ -228,7 +228,7 @@ struct layer_norm_fwd_t<dtype_x_, dtype_y_, dtype_weight_, dtype_acc_,
                 + wg_size_x * wg_size_y * 2 * sizeof(dtype_acc);
         uint32_t itr_count = 0;
 
-        for (int row = start_m; row < args->matrix_m;
+        for (uint32_t row = start_m; row < args->matrix_m;
                 row += wg_num_m * wg_tile_m) {
             if constexpr (n_chunks > 1) {
                 fused_op.init(
@@ -243,7 +243,7 @@ struct layer_norm_fwd_t<dtype_x_, dtype_y_, dtype_weight_, dtype_acc_,
                         args->matrix_m, args->mat_ld, start_n, row);
             }
 #pragma unroll
-            for (int i = 0; i < n_chunks; i++) {
+            for (uint32_t i = 0; i < n_chunks; i++) {
                 subgroup::tile_load(x_in, x_in_payload);
                 x_in_payload.update_tdesc(chunk_size);
                 input = xetla_cvt<dtype_acc, dtype_x>(x_in.reg);
@@ -261,7 +261,7 @@ struct layer_norm_fwd_t<dtype_x_, dtype_y_, dtype_weight_, dtype_acc_,
                         args->matrix_m, args->mat_ld, start_n, row);
             }
 #pragma unroll
-            for (int i = 0; i < n_chunks; i++) {
+            for (uint32_t i = 0; i < n_chunks; i++) {
                 if constexpr (n_chunks > 1) {
                     subgroup::tile_load(x_in, x_in_payload);
                     x_in_payload.update_tdesc(chunk_size);
@@ -315,7 +315,6 @@ struct layer_norm_fwd_t<dtype_x_, dtype_y_, dtype_weight_, dtype_acc_,
                 }
             }
             // to generate mixed instruction
-            constexpr uint32_t SIMD = 64 / sizeof(dtype_acc);
             if constexpr (chunk_size > 1) {
                 gamma_in_payload.init(args->gamma_ptr, args->matrix_n, 1,
                         args->mat_ld, start_n, 0);
@@ -331,10 +330,8 @@ struct layer_norm_fwd_t<dtype_x_, dtype_y_, dtype_weight_, dtype_acc_,
                 x_in_payload.init(args->x_in_ptr, args->matrix_n,
                         args->matrix_m, args->mat_ld, start_n, row);
             }
-            xetla_vector<dtype_acc, chunk_size> beta;
-            xetla_vector<dtype_acc, chunk_size> gamma;
 #pragma unroll
-            for (int i = 0; i < n_chunks; i++) {
+            for (uint32_t i = 0; i < n_chunks; i++) {
                 if constexpr (n_chunks > 1) {
                     subgroup::tile_load(gamma_in, gamma_in_payload);
                     gamma_in_payload.update_tdesc(chunk_size);

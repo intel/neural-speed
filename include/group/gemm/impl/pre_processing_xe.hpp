@@ -39,14 +39,17 @@ public:
 
     inline pre_processing_default_t() = default;
 
-    inline pre_processing_default_t(work_group_t &g, arguments_t &args) {}
+    inline pre_processing_default_t([[maybe_unused]] work_group_t &g,
+            [[maybe_unused]] arguments_t &args) {}
 
-    inline void init(work_group_t &g, arguments_t &args) {}
+    inline void init([[maybe_unused]] work_group_t &g,
+            [[maybe_unused]] arguments_t &args) {}
 
     template <typename matA_acc_t, typename matB_acc_t, typename matA_t,
             typename matB_t>
-    inline KERNEL_FUNC void operator()(matA_acc_t &matA_acc,
-            matB_acc_t &matB_acc, matA_t &matA, matB_t &matB) {}
+    inline KERNEL_FUNC void operator()([[maybe_unused]] matA_acc_t &matA_acc,
+            [[maybe_unused]] matB_acc_t &matB_acc,
+            [[maybe_unused]] matA_t &matA, [[maybe_unused]] matB_t &matB) {}
 };
 
 /// @brief gemm pre_processing functor with applying relu op to matA. Specialized for Xe architecture.
@@ -61,15 +64,17 @@ public:
 
     inline pre_processing_matA_neg_filter_t() = default;
 
-    inline pre_processing_matA_neg_filter_t(
-            work_group_t &g, arguments_t &args) {}
+    inline pre_processing_matA_neg_filter_t([[maybe_unused]] work_group_t &g,
+            [[maybe_unused]] arguments_t &args) {}
 
-    inline void init(work_group_t &g, arguments_t &args) {}
+    inline void init([[maybe_unused]] work_group_t &g,
+            [[maybe_unused]] arguments_t &args) {}
 
     template <typename matA_acc_t, typename matB_acc_t, typename matA_t,
             typename matB_t>
-    inline KERNEL_FUNC void operator()(matA_acc_t &matA_acc,
-            matB_acc_t &matB_acc, matA_t &matA, matB_t &matB) {
+    inline KERNEL_FUNC void operator()([[maybe_unused]] matA_acc_t &matA_acc,
+            [[maybe_unused]] matB_acc_t &matB_acc,
+            [[maybe_unused]] matA_t &matA, [[maybe_unused]] matB_t &matB) {
 
         using data_t = typename matA_acc_t::dtype;
         if constexpr (sizeof(data_t) == 2) {

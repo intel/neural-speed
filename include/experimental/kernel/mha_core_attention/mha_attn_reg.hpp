@@ -713,7 +713,6 @@ struct xetla_mha_attn_reg_fwd_t {
                 { //softmax
                     xetla_vector<float, 16 * 1> matElem_reg_max_local;
                     xetla_vector<float, 16 * 1> matElem_reg_max_global;
-                    xetla_vector<uint8_t, 16 * 4> matElem_reg_attn_mk;
 
                     xetla_vector<uint32_t, 16> address_fmax
                             = xetla_vector_gen<uint32_t, 16>(0, 1);

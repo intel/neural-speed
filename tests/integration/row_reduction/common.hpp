@@ -32,7 +32,6 @@ int reduction_result_validate(data_type_in *device_in,
         data_type_x *device_x_out, data_type_d *device_d_out,
         uint8_t *device_mask_in, int m, int n, float scale,
         reduction_fused_kind fused_op, sycl::queue &queue) {
-    int err_cnt = 0;
     bool is_bias_gelu_bwd = fused_op == reduction_fused_kind::bias_gelu_w_bwd;
     bool is_bias_dropout_bwd
             = fused_op == reduction_fused_kind::bias_dropout_bwd;

@@ -28,8 +28,9 @@ using namespace gpu::xetla;
 class TestBase {
 public:
     static std::string name(size_t mat_m, size_t mat_n, size_t mat_k,
-            size_t wg_m, size_t wg_n, size_t sg_m, size_t sg_n, size_t sg_k,
-            mem_layout layout_a, mem_layout layout_b) {
+            size_t wg_m, size_t wg_n, size_t sg_m, size_t sg_n,
+            [[maybe_unused]] size_t sg_k, mem_layout layout_a,
+            mem_layout layout_b) {
         std::string mem_layout_a_str
                 = layout_a == mem_layout::col_major ? "col_major" : "row_major";
         std::string mem_layout_b_str
@@ -216,9 +217,9 @@ public:
         {
             bool is_col_major_a = Test::layout_a == mem_layout::col_major;
             bool is_col_major_b = Test::layout_b == mem_layout::col_major;
-            for (int i = 0; i < Test::mat_m; i++) {
-                for (int j = 0; j < Test::mat_n; j++) {
-                    for (int k = 0; k < Test::mat_k; k++) {
+            for (uint32_t i = 0; i < Test::mat_m; i++) {
+                for (uint32_t j = 0; j < Test::mat_n; j++) {
+                    for (uint32_t k = 0; k < Test::mat_k; k++) {
                         dtype_acc a_temp = is_col_major_a
                                 ? A[i + k * Test::mat_m]
                                 : A[i * Test::mat_k + k];

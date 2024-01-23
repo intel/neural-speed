@@ -25,8 +25,9 @@
 class TestBase {
 public:
     static std::string name(size_t mat_m, size_t mat_n, size_t mat_k,
-            size_t wg_m, size_t wg_n, size_t sg_m, size_t sg_n, size_t sg_k,
-            mem_layout layout_a, mem_layout layout_b) {
+            size_t wg_m, size_t wg_n, size_t sg_m, size_t sg_n,
+            [[maybe_unused]] size_t sg_k, mem_layout layout_a,
+            mem_layout layout_b) {
         std::string mem_layout_a_str
                 = layout_a == mem_layout::col_major ? "col_major" : "row_major";
         std::string mem_layout_b_str

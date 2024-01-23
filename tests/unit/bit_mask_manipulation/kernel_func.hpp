@@ -22,7 +22,7 @@ using namespace gpu::xetla;
 
 template <typename T, int SIMD, typename T_op>
 static inline void run_bit_shift_op_common(
-        sycl::nd_item<1> *item, T *a, T *b, T *c, T_op op) {
+        sycl::nd_item<1> *item, T *a, [[maybe_unused]] T *b, T *c, T_op op) {
     uint64_t offset = sizeof(T) * SIMD * item->get_group(0);
     xetla_vector<uint32_t, SIMD> offsets = xetla_vector_gen<T, SIMD>(0, 1);
     offsets *= sizeof(T);

@@ -29,9 +29,6 @@ int gemm_softmax_result_validate(data_type_a *A_device, data_type_b *B_device,
         uint32_t batch_num, sycl::queue &queue,
         mem_layout mem_layout_a_ = mem_layout::row_major,
         mem_layout mem_layout_b_ = mem_layout::row_major) {
-    uint32_t err_cnt = 0;
-    bool is_col_major_a = mem_layout_a_ == mem_layout::col_major;
-    bool is_col_major_b = mem_layout_b_ == mem_layout::col_major;
     uint32_t size_a = m * k;
     uint32_t size_b = k * n;
     uint32_t size_c = m * n;
@@ -137,8 +134,6 @@ void gemm_softmax_run(uint32_t iter) {
     constexpr uint32_t sg_tile_m = 32;
     constexpr uint32_t sg_tile_n = 64;
 
-    // buffer size of softmax row data
-    constexpr uint32_t softmax_size = 512;
     // default set Thread num = 32 to maximize EU utilization
     constexpr uint32_t thread_num = 32;
     //"Row data need to be in a same work group!"
@@ -189,13 +184,13 @@ void gemm_softmax_run(uint32_t iter) {
 
                     // Mirco-kernel configuration
                     using tune_option = dict_t<
-                            elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
+                            elem_v_t<tune_key::param_optimizer_type,
                                     tune_key_value::
-                                            PARAM_OPTIMZER_DECISION_TREE>,
-                            elem_t_t<tune_key::SG_TILE_SHAPE, sg_shape>,
-                            elem_v_t<tune_key::PREFETCH_DISTANCE,
+                                            param_optimizer_decision_tree>,
+                            elem_t_t<tune_key::sg_tile_shape, sg_shape>,
+                            elem_v_t<tune_key::prefetch_distance,
                                     prefetch_distance>,
-                            elem_v_t<tune_key::PERIODIC_SYNC_INTERVAL,
+                            elem_v_t<tune_key::periodic_sync_interval,
                                     periodic_sync_interval>>;
                     using gemm_op_t = xetla::group::default_gemm_selector_t<
                             data_type_a, // input datatype for A

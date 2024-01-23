@@ -150,8 +150,6 @@ struct gru_layer {
         // declare two accumulators to stroe the results of two GEMMs
         // and its activation
         matAcc_t matAcc_0, matAcc_1;
-        matC_t matC;
-        matC_payload_t matC_payload;
         gemm_arguments gemm_args;
         mat_hidden_t mat_hidden;
         mat_hidden_payload_t mat_hidden_payload;
@@ -321,7 +319,6 @@ struct kernel_xcoder_gru_fusion {
                 fused_op_sg_m, fused_op_sg_n, fused_op_sg_k>;
 
         fused_config_t<input_T> args;
-        int layer_input_size = batch_size * input_size;
         int hidden_io_size = batch_size * hidden_size;
         int input_weight_size = input_size * hidden_size;
         int hidden_weight_size = hidden_size * hidden_size;
@@ -353,7 +350,8 @@ struct kernel_xcoder_gru_fusion {
         args.input_size = hidden_size;
         args.batch_size = batch_size;
         args.hidden_size = hidden_size;
-        for (uint32_t layer_id = 1; layer_id < layer_size; ++layer_id) {
+        uint32_t current_layer_size = layer_size;
+        for (uint32_t layer_id = 1; layer_id < current_layer_size; ++layer_id) {
             args.layer_output = layer_out_ptr + layer_id * hidden_io_size;
             args.hx_ptr = (h0_ptr + layer_id * hidden_io_size);
             args.W_ir_ptr = (W_ir_ptr + (layer_id - 1) * hidden_weight_size
@@ -365,7 +363,7 @@ struct kernel_xcoder_gru_fusion {
             args.W_in_ptr = (W_in_ptr + (layer_id - 1) * hidden_weight_size
                     + input_weight_size);
             args.W_hn_ptr = (W_hn_ptr + layer_id * hidden_weight_size);
-            args.cell_out_ptr = layer_id == layer_size - 1
+            args.cell_out_ptr = layer_id == current_layer_size - 1
                     ? hidden_out_ptr
                     : (ping_pong_buffer + ping * one_layer_size);
             args.layer_ptr = ((ping_pong_buffer + pong * one_layer_size));

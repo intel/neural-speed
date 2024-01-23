@@ -29,15 +29,15 @@ template <typename dtype_a, typename dtype_b, typename dtype_c,
         uint32_t global_kslicing, uint32_t local_kslicing, mma_engine engine>
 struct default_config_kernel_gemm_test_func {
     using tune_option
-            = dict_t<elem_v_t<tune_key::PARAM_OPTIMZER_TYPE,
-                             tune_key_value::PARAM_OPTIMZER_DECISION_TREE>,
-                    elem_v_t<tune_key::DISPATCH_POLICY,
-                            tune_key_value::DISPATCH_POLICY_KSLICING>,
-                    elem_v_t<tune_key::GLOBAL_KSLICING_RATIO, global_kslicing>,
-                    elem_v_t<tune_key::LOCAL_KSLICING_RATIO, local_kslicing>,
-                    elem_v_t<tune_key::MMA_ENGINE, engine>,
-                    elem_t_t<tune_key::WG_TILE_SHAPE, shape<wg_n, wg_m>>,
-                    elem_t_t<tune_key::SG_TILE_SHAPE, shape<sg_n, sg_m>>>;
+            = dict_t<elem_v_t<tune_key::param_optimizer_type,
+                             tune_key_value::param_optimizer_decision_tree>,
+                    elem_v_t<tune_key::dispatch_policy,
+                            tune_key_value::dispatch_policy_kslicing>,
+                    elem_v_t<tune_key::global_kslicing_ratio, global_kslicing>,
+                    elem_v_t<tune_key::local_kslicing_ratio, local_kslicing>,
+                    elem_v_t<tune_key::mma_engine, engine>,
+                    elem_t_t<tune_key::wg_tile_shape, shape<wg_n, wg_m>>,
+                    elem_t_t<tune_key::sg_tile_shape, shape<sg_n, sg_m>>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             dtype_a, // input datatype for A
             layout_a, // memory layout for A

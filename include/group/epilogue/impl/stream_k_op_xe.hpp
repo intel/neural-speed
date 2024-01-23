@@ -102,13 +102,10 @@ struct epilogue_stream_k_t {
         static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
         static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
         static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
-        static constexpr uint32_t tile_elems = matAcc_t::tile_elems;
-        static constexpr uint32_t block_elems = matAcc_t::block_elems;
 
         using matD_tile_desc_t = subgroup::tile_desc_t<tile_size_x, tile_size_y,
                 block_size_x, block_size_y, reg_layout::tiled>;
 
-        using matD_t = subgroup::tile_t<dtype_d, matD_tile_desc_t>;
         using matD_atomic_payload_t = subgroup::mem_payload_t<mem_desc_d_t,
                 matD_tile_desc_t, msg_type_d_atomic, arch_tag>;
 

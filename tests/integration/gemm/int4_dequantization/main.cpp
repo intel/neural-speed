@@ -151,7 +151,7 @@ public:
 };
 
 template <class Test>
-void dequantize_gemm_run(int iter) {
+void dequantize_gemm_run(uint32_t iter) {
     using namespace gpu;
     //Accept incoming parameters
     constexpr size_t matrix_m = Test::mat_m;
@@ -186,11 +186,6 @@ void dequantize_gemm_run(int iter) {
     constexpr size_t size_zero_pt = size_zero_pt_m * size_zero_pt_n;
 
     constexpr size_t size_c = matrix_m * matrix_n;
-    uint32_t lda = matrix_k;
-    uint32_t ldb = matrix_n;
-    uint32_t ldc = matrix_n;
-    uint32_t ld_scale = size_scale_n;
-    uint32_t ld_zero_pt = size_zero_pt_n;
 
     //Turn on the enable_profiling property to facilitate subsequent profiling
     sycl::property_list properties {sycl::property::queue::enable_profiling()};
@@ -324,7 +319,7 @@ void dequantize_gemm_run(int iter) {
     size_t ops = 2 * matrix_m * matrix_n * matrix_k;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
     try {
-        for (int i = 0; i < iter; i++) {
+        for (uint32_t i = 0; i < iter; i++) {
             prof.cpu_start();
             auto e_esimd = queue.submit([&](handler &cgh) {
                 cgh.parallel_for<Test>(
@@ -348,13 +343,13 @@ void dequantize_gemm_run(int iter) {
     prof.print_profiling_result(profiling_selector::GPU);
 
     std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
-    for (int i = 0; i < matrix_k / dequant_s; i++) {
-        for (int j = 0; j < matrix_n / 2; j++) {
+    for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
+        for (uint32_t j = 0; j < matrix_n / 2; j++) {
             int start_in = i * dequant_s * matrix_n / 2 + j;
             int start_zero_pt = i * size_zero_pt_n + j;
             int start_out = i * dequant_s * matrix_n + j * 2;
             int start_scale = i * size_scale_n + j * 2;
-            for (int ii = 0; ii < dequant_s; ii++) {
+            for (uint32_t ii = 0; ii < dequant_s; ii++) {
                 uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
                 uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
                 int8_t data_0 = int8_t(data_in & 0x0f);
