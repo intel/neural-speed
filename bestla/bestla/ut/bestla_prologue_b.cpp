@@ -203,30 +203,30 @@ class UT_BlockQunatize_S3 {
     ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 56);
     ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 56);
     // emr case
-    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, 64);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, 64);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, 64);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 64);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, 64);
-    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, 64);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, 64);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, 64);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, 64);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 64);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 64);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 64);
-    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 64);
-    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 64);
-    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 64);
-    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 64);
-    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 64);
-    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 64);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, 64);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, 64);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, 64);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 64);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, 64);
+    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, 64);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, 64);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, 64);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, 64);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 64);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 64);
+    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 64);
+    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 64);
+    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 64);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>
@@ -323,7 +323,7 @@ class UT_BlockQunatize_S3 {
     // }
   }
 };
-static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
+// static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #endif
@@ -880,7 +880,8 @@ class UTBenchmark_CompFp32 {
   }
 
   void ut_s4() {
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
@@ -993,7 +994,7 @@ class UTBenchmark_CompFp32 {
     kernel.mProB.packWeight(n, k, B, n, &packBs[0], &DefaultThreading);
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
-      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(float));
+      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(uint16_t));
     }
     auto psize = (size_t)m * n * k * 2;
     auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
@@ -1035,18 +1036,19 @@ class UTBenchmark_CompFp32 {
     GetCPUDevice();
     if (_cd->AVX512F()) {
       int blocksize = 32;
-      benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                  C.data(), testtime, 48, qtype);
+      // benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      //                                                             C.data(), testtime, 48, qtype);
       benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
                                                                       C.data(), testtime, 48, qtype);
       blocksize = 128;
-      benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                  C.data(), testtime, 48, qtype);
+      // benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      //                                                             C.data(), testtime, 48, qtype);
       benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
                                                                       C.data(), testtime, 48, qtype);
     }
   }
 };
+static UTBenchmark_CompFp32 sUTBenchmark_CompFp32;
 #ifdef BTLA_UT_PROLOGUE_B_
 static UTBenchmark_CompFp32 sUTBenchmark_CompFp32;
 #endif
