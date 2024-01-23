@@ -122,6 +122,7 @@ class WeightKBlockNInteger {
                                      bool is_asym) {
     int KPad = utils::padto(k, _GemmCore_T::KTILE);
     int NPad = utils::padto(n, _GemmCore_T::NTILE);
+    if (qtype == BTLA_DTYPE::S3_CLIP) NPad = utils::padto(n, _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW);
     StorageWeight tmp(_GemmCore_T::ID);
     tmp.resize(NPad, KPad, blocksize <= 0 ? KPad : blocksize, n, k, qtype, scat, redt, is_asym);
     return tmp;
@@ -903,11 +904,11 @@ class WeightKBlockNInteger {
     auto KPad = wptr->mKPad;
     auto NPad = wptr->mNPad;
     int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
+    auto row = NPad / (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE);
+    auto ld_dst = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * utils::padto(KPad, 64);
     auto base_offset = n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE;
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
-      auto ld_dst = _GemmCore_T::PACK_ROW * _GemmCore_T::NTILE * utils::padto(KPad, 64);
       auto elt_offset = base_offset + i * utils::padto(KPad, 64);
-      auto row = NPad / (_GemmCore_T::PACK_ROW * _GemmCore_T::NTILE);
       assert(elt_offset % 8 == 0);
       auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
       auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
