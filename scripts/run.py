@@ -18,7 +18,6 @@ import argparse
 from typing import List, Optional
 from transformers import AutoConfig
 import subprocess
-import requests
 from huggingface_hub import snapshot_download
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
@@ -180,7 +179,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_cmd.extend(["--outfile", Path(work_path, "ne_{}_f32.bin".format(model_type))])
     convert_cmd.extend(["--outtype", "f32"])
     convert_cmd.append(dir_model)
-    print("convert model ...")
+    print("Convert model ...")
     subprocess.run(convert_cmd)
 
     # 2. quantize
@@ -199,7 +198,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         quant_cmd.extend(["--use_ggml"])
     quant_cmd.extend(["--build_dir", args.build_dir])
     quant_cmd.extend(["--one_click_run", "True"])
-    print("quantize model ...")
+    print("Quantize model ...")
     subprocess.run(quant_cmd)
 
     # 3. inference
@@ -221,7 +220,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--shift-roped-k"])
     if (model_type == "baichuan" or model_type == "qwen"):
         infer_cmd.extend(["--tokenizer", dir_model])
-    print("inferce model ...")
+    print("Inference model ...")
     subprocess.run(infer_cmd)
 
 
