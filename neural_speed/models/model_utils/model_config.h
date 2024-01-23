@@ -102,6 +102,8 @@ struct gpt_params {
   uint32_t min_new_tokens = 0;     // min new tokens for beam search generation
   float length_penalty = 1.0f;     // exponential penalty to the length in beam search generation
   bool do_early_stopping = false;  // early stopping in beam search generation
+
+  int model_scratch_enlarge_scale = 1;  // model memory scratch enlarge scale
 };
 
 bool gpt_params_parse(int argc, char** argv, gpt_params& params);

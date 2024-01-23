@@ -26,11 +26,11 @@ enum gptj_model {
   GPTJ_65B,
 };
 
-static const model_scratch gptj_mem_req(int n_layers) {
+static const model_scratch gptj_mem_req(int n_layers, int enlarge_scale = 1) {
   switch (n_layers) {
     case 28:
       // should be enough for batch=8 * beam=4
-      return {3072ull * MB, 2048ull * MB, 3072ull * MB};
+      return {3072ull * enlarge_scale * MB, 2048ull * enlarge_scale * MB, 3072ull * enlarge_scale * MB};
     default:
       MODEL_ASSERT(false);
   }

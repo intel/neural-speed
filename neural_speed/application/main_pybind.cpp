@@ -82,7 +82,8 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
                      float temperature = 0.8, int min_new_tokens = 0, float length_penalty = 1.0f,
                      bool early_stopping = false, int n_keep = 0, int n_discard = -1, bool shift_roped_k = false,
                      int batch_size = 1, model_vocab::id pad_token = -1, const std::string& memory_dtype = "auto",
-                     const bool& continuous_batching = false, const int& max_request_num = MODEL_MAX_REQUEST_NUM) {
+                     const bool& continuous_batching = false, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
+                     const int& model_scratch_enlarge_scale = 1) {
   MODEL_ASSERT(params != nullptr);
 #ifdef MODEL_NAME
   params->model_name = MODEL_NAME;
@@ -121,6 +122,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   params->min_new_tokens = min_new_tokens;
   params->length_penalty = length_penalty;
   params->do_early_stopping = early_stopping;
+  params->model_scratch_enlarge_scale = model_scratch_enlarge_scale;
 
   printf(
       "beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d, "
@@ -136,7 +138,8 @@ class ModelServer {
               int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping,
               int n_keep, int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
-              const std::string& policy, const bool& print_log, const std::function<void()>& init_cb)
+              const int& model_scratch_enlarge_scale, const std::string& policy, const bool& print_log,
+              const std::function<void()>& init_cb)
       : response(response),
         waiting(),
         running(true),
@@ -154,7 +157,7 @@ class ModelServer {
           this->InitServerParams(model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
                                  early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
-                                 true, max_request_num);
+                                 true, max_request_num, model_scratch_enlarge_scale);
           cbg_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
@@ -255,11 +258,12 @@ class ModelServer {
                         int threads, float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p,
                         float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                         int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
-                        const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num) {
+                        const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
+                        const int& model_scratch_enlarge_scale) {
     init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                     num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping,
                     n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching,
-                    max_request_num);
+                    max_request_num, model_scratch_enlarge_scale);
   }
 
   ~ModelServer() {
@@ -916,7 +920,8 @@ PYBIND11_MODULE(qwen_cpp, m)
   py::class_<ModelServer>(m, "ModelServer", py::module_local())
       .def(py::init<const ResponseCallback&, const std::string&, bool, int, int, int, int, int, float, int, bool, int,
                     float, float, int, float, bool, int, int, bool, int, model_vocab::id, const std::string&,
-                    const bool&, const int&, const std::string&, const bool&, const std::function<void()>&>(),
+                    const bool&, const int&, const int&, const std::string&, const bool&,
+                    const std::function<void()>&>(),
            py::arg("response"), py::arg("model_path"), py::arg("return_prompt") = false, py::arg("max_new_tokens") = -1,
            py::arg("n_batch") = 512, py::arg("ctx_size") = 512, py::arg("seed") = -1, py::arg("threads") = 8,
            py::arg("repetition_penalty") = 1.1f, py::arg("num_beams") = 1, py::arg("do_sample") = false,
@@ -924,7 +929,8 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
            py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = true,
-           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("policy") = "fcfs", py::arg("print_log") = false,
+           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("model_scratch_enlarge_scale") = 1,
+           py::arg("policy") = "fcfs", py::arg("print_log") = false,
            py::arg("init_cb") = std::function<void()>{[]() {}})
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))
       .def("Empty", &ModelServer::Empty, "No more queries to execute");

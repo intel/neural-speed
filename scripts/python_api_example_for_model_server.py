@@ -36,17 +36,18 @@ def f_response(res, working):
 
 model_path = "/home/zhentao/ils/ns/q4_j.bin" # please set your corresponding local neural_speed low-bits model file
 added_count = 0
-s = cpp.ModelServer(f_response,               # reponse function (deliver generation results and current reamin working size in server)
-                    model_path,               # model_path
-                    max_new_tokens=128,       # global query max generation token length
-                    num_beams=4,              # global beam search related generation parameters
-                    min_new_tokens=30,        # global beam search related generation parameters (default: 0)
-                    early_stopping=True,      # global beam search related generation parameters (default: False)
-                    continuous_batching=True, # turn on continuous batching mechanism (default: True)
-                    return_prompt=True,       # also return prompt token ids in generation results (default: False)
-                    threads=56,               # number of threads in model evaluate process (please bind cores if need)
-                    max_request_num=8,        # maximum number of running requests (or queries, default: 8)
-                    print_log=True,           # print server running logs (default: False)
+s = cpp.ModelServer(f_response,                      # reponse function (deliver generation results and current reamin working size in server)
+                    model_path,                      # model_path
+                    max_new_tokens=128,              # global query max generation token length
+                    num_beams=4,                     # global beam search related generation parameters
+                    min_new_tokens=30,               # global beam search related generation parameters (default: 0)
+                    early_stopping=True,             # global beam search related generation parameters (default: False)
+                    continuous_batching=True,        # turn on continuous batching mechanism (default: True)
+                    return_prompt=True,              # also return prompt token ids in generation results (default: False)
+                    threads=56,                      # number of threads in model evaluate process (please bind cores if need)
+                    max_request_num=8,               # maximum number of running requests (or queries, default: 8)
+                    print_log=True,                  # print server running logs (default: False)
+                    model_scratch_enlarge_scale = 1, # model memory scratch enlarge scale (default: 1)
                 )
 for i in range(len(prompts)):
     p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
