@@ -188,7 +188,7 @@ struct model_context_params model_context_default_params() {
       /*cont_batching                =*/false,
       /*.max_request_num             =*/1,
       /*.gen_conf                    =*/generation_config(),
-      /*model_scratch_enlarge_scale  =*/1,
+      /*model_scratch_enlarge_scale  =*/1.0f,
       /*.progress_callback           =*/nullptr,
       /*.progress_callback_user_data =*/nullptr,
   };
