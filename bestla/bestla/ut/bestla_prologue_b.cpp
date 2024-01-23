@@ -178,30 +178,36 @@ class UT_BlockQunatize_S3 {
   UT_BlockQunatize_S3() {
     UT_START();
     CheckISA(AVX512F);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, BTLA_DTYPE::S3_CLIP);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, BTLA_DTYPE::S3_CLIP);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, 56);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, 56);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, 56);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 56);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, 56);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 56);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>
-  void ut(int m, int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
-    DefaultThreading.set_threads(64);
-    printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
+  void ut(int m, int n, int k, int blocksize, int enable_thr) {
+    DefaultThreading.set_threads(enable_thr);
+    printf("%s:%d %d %d %d\n", __FUNCTION__, m, n, k, blocksize);
     int ldb = n;
 
     int kblk_num = utils::updiv(k, blocksize);
@@ -215,7 +221,7 @@ class UT_BlockQunatize_S3 {
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>;
 
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
+    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
     auto ptr_ref = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
     avector<int8_t> buffer(ptr.mSize);
     avector<int8_t> buffer_ref(ptr_ref.mSize);
