@@ -270,6 +270,7 @@ bool cbg_scheduler::prepare_seqs() {
 }
 
 bool cbg_scheduler::step() {
+  int64_t s_t0 = model_time_us();
   if (done()) {
     fprintf(stderr,
             "%s: warning: scheduler has no more requests, please add extra requests or just stop "
@@ -301,7 +302,11 @@ bool cbg_scheduler::step() {
     }
     steps_decoding_for_next_prefill = false;
   }
-  return update_pools();
+  bool success = update_pools();
+  if (log_level == 0) {
+    fprintf(stdout, "%s: info: scheduler step time usage is %8.2fms \n", __func__, (model_time_us() - s_t0) / 1000.0f);
+  }
+  return success;
 }
 
 bool cbg_scheduler::update_pools() {
