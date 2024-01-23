@@ -190,12 +190,12 @@ class UT_BlockQunatize_S3 {
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, BTLA_DTYPE::S3_CLIP);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, BTLA_DTYPE::S3_CLIP);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
     ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, BTLA_DTYPE::S3_CLIP);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>
