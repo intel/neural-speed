@@ -968,9 +968,14 @@ class UTBenchmark_CompFp32 {
                      int threads, BTLA_DTYPE qtype) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerKBlock<Core_T>;
+    // using Launcher =
+    //     wrapper::gemm::LauncherKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
+    //                                   epilogue::gemm::CompFp32BlockEpilogue,
+    //                                   epilogue::gemm::AccumulatorWriteBackFp32>;
     using Launcher =
-        wrapper::gemm::LauncherKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
-                                      epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherIntKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationF32KBlockQuantize,
+                                         prologue_b::gemm::WeightKBlockNInteger,
+                                         epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -987,6 +992,9 @@ class UTBenchmark_CompFp32 {
     }
     std::vector<WType> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
+    auto quanA = kernel.mProA.createStorage(m, k, blocksize, false);
+    utils::avector<int8_t> bufferA(quanA.mSize);
+    quanA.assign(bufferA.data());
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
@@ -1004,11 +1012,12 @@ class UTBenchmark_CompFp32 {
       for (size_t i = 0; i < batch; i++) {
         GemmProblem gp(1, m, n, k, blocksize);
         typename Launcher::Param args{gp,
-                                      {A + i * m * k, k},
+                                      {A + i * m * k, k, &quanA},
                                       {&packBs[i]},
-                                      {packBs[i].template SPtr<int8_t>(), packBs[i].SDtype(), packBs[i].CStep()},
+                                      // {packBs[i].template SPtr<int8_t>(), packBs[i].SDtype(), packBs[i].CStep()},
                                       {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        // parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRunWithA<Parallel>(kernel, args, &DefaultThreading);
       }
       if (log.stop()) {
         double t = log.avg_val / batch;
@@ -1035,16 +1044,17 @@ class UTBenchmark_CompFp32 {
     float testtime = 500.f;
     GetCPUDevice();
     if (_cd->AVX512F()) {
-      int blocksize = 32;
+      // int blocksize = 32;
       // benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
       //                                                             C.data(), testtime, 48, qtype);
-      benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                      C.data(), testtime, 48, qtype);
-      blocksize = 128;
+      // benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      //                                                                 C.data(), testtime, 48, qtype);
+      int blocksize = 128;
       // benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
       //                                                             C.data(), testtime, 48, qtype);
-      benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                      C.data(), testtime, 48, qtype);
+      // benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      benchmark_mem<gemm::ICoreRowNAmxint8KBlock<48, 16>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(),
+                                                                             B.data(), C.data(), testtime, 48, qtype);
     }
   }
 };
