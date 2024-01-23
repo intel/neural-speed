@@ -87,7 +87,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     fout.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
     fout.write(struct.pack("i", 1))
-    #import pdb;pdb.set_trace()
     fout.write(struct.pack("i", hparams["vocab_size"]))
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
