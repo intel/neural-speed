@@ -33,7 +33,7 @@ GGML_QK5_1 = 32
 
 GGML_QK4_0_TYPE = 2
 GGML_QK4_1_TYPE = 3
-GGML_QJBLAS_TYPE = 13
+GGML_QJBLAS_TYPE = 19
 
 def quantize_q4_0(tensor: torch.Tensor) -> torch.CharTensor:
     # equivalent to ggml_quantize_q4_0 in ggml.c
