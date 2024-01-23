@@ -35,7 +35,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     woq_configs = {
-        "fp32": {"use_cache":True, "use_quant":False},
+            "fp32": {"use_cache":True, "use_quant":False},
         # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":True},
         "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True},
         # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8", "use_cache":True},

@@ -171,11 +171,13 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
                         head_dim, n_head, N, 1);
 
       // using mode = 2 for GPT-NeoX mode
-      struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur,0, 2, 1, 3), 32, n_head, N, 1, Qcur->nb[1], Qcur->nb[2], Qcur->nb[3], 0);
+      struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), 32, n_head, N, 1, Qcur->nb[1],
+                                               Qcur->nb[2], Qcur->nb[3], 0);
       Qcur_Part = ne_rope_inplace(ctx0, Qcur_Part, n_past, 32, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_build_forward_expand(&gf, Qcur_Part);
       ne_set_name(Qcur, "Qcur");
-      struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), 32, n_head, N, 1, Kcur->nb[1], Kcur->nb[2], Kcur->nb[3], 0);
+      struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), 32, n_head, N, 1, Kcur->nb[1],
+                                               Kcur->nb[2], Kcur->nb[3], 0);
       Kcur_Part = ne_rope_inplace(ctx0, Kcur_Part, n_past, 32, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_build_forward_expand(&gf, Kcur_Part);
       ne_set_name(Kcur, "kcur");
@@ -190,9 +192,11 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
           std::vector<ne_tensor*> v_bs(batch_size);
           for (int i = 0; i < batch_size; ++i) {
             // batch K
-            Kcur_bs[i] = ne_permute(ctx0, ne_view_4d(ctx0, Kcur, head_dim, n_head, N, 1, ne_element_size(Kcur) * head_dim,
+            Kcur_bs[i] = ne_permute(ctx0,
+                                    ne_view_4d(ctx0, Kcur, head_dim, n_head, N, 1, ne_element_size(Kcur) * head_dim,
                                                ne_element_size(Kcur) * n_embd, ne_element_size(Kcur) * n_embd * N,
-                                               i * ne_element_size(Kcur) * n_embd * N), 0, 2, 1, 3);
+                                               i * ne_element_size(Kcur) * n_embd * N),
+                                    0, 2, 1, 3);
             Kcur_temp = Kcur_bs[i];
             ne_set_name(Kcur_bs[i], "kcur_bs");
             k_bs[i] = ne_view_4d(
@@ -221,7 +225,8 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
         struct ne_tensor* Q = ne_permute(ctx0, ne_reshape_4d(ctx0, Qcur, head_dim, n_head, N, batch_size), 0, 2, 1, 3);
         ne_set_name(Q, "Q");
         // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
-        struct ne_tensor* K = ne_view_4d(ctx0, kv_self.k, head_dim, n_past + N, n_head, batch_size, ne_element_size(kv_self.k) * head_dim,
+        struct ne_tensor* K =
+            ne_view_4d(ctx0, kv_self.k, head_dim, n_past + N, n_head, batch_size, ne_element_size(kv_self.k) * head_dim,
                        ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd * n_ctx,
                        il * n_ctx * ne_element_size(kv_self.k) * n_embd * kv_n_ctx_block);
         ne_set_name(K, "K");
@@ -308,7 +313,7 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
 
     // input for next layer
     inpL = ne_add(ctx0, cur, inpL);
-    ne_set_name(inpL,"inpL");
+    ne_set_name(inpL, "inpL");
   }
 
   lctx.use_buf(ctx0, 0);
