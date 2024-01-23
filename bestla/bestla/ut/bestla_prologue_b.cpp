@@ -202,6 +202,31 @@ class UT_BlockQunatize_S3 {
     ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 56);
     ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 56);
     ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 56);
+    // emr case
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, 64);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, 64);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, 64);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 64);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, 64);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, 64);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, 64);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, 64);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, 64);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 64);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 64);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 64);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 64);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 64);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 64);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 64);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 64);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 64);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 64);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 64);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 64);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 64);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 64);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 64);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>
