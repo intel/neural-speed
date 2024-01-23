@@ -250,6 +250,135 @@ class DequanS8FP {
     }
   }
 };
+class DecompresssS3 {
+ public:
+  class MicroKernelAVX512F : protected xbyak::JitAvx512f {
+   public:
+    struct params {
+      void *bit2ptr, *bit1ptr, *dstptr;
+      int unpack_elt;
+      int8_t ox3, ox4;
+      int ox5;
+    };
+    typedef long long (*func_t)(params*);
+    static int constexpr VBytes = 64;
+    MicroKernelAVX512F() {
+      generate();
+      this->ready();
+      mKernel = this->getCode<func_t>();
+    }
+
+    void generate() {
+      inLocalLabel();  // use local label for multiple instance
+      {
+        Xbyak::util::StackFrame st(this, 1, 13);
+        parambase = st.p[0];
+        reg_bit1ptr = st.t[0];
+        reg_bit2ptr = st.t[1];
+        reg_loop = st.t[2];
+        reg_iter = st.t[3];
+        reg_dst = st.t[4];
+        reg_tmp = st.t[5];
+        reg_ret = rax;
+        xor_(reg_loop, reg_loop);
+        mov(reg_loop.cvt32(), ptr[parambase + OFFSET(unpack_elt)]);
+        xor_(reg_iter, reg_iter);
+        Xbyak::Ymm LowMask = ymm1;
+        Xbyak::Zmm zmm_0x04 = zmm31;
+        Xbyak::Zmm zmm_shift = zmm30;
+        vpbroadcastb(LowMask, ptr[parambase + OFFSET(ox3)]);
+        vpbroadcastb(zmm_0x04, ptr[parambase + OFFSET(ox4)]);
+        vpbroadcastd(zmm_shift, ptr[parambase + OFFSET(ox5)]);
+        mov(reg_bit1ptr, ptr[parambase + OFFSET(bit1ptr)]);
+        mov(reg_bit2ptr, ptr[parambase + OFFSET(bit2ptr)]);
+        mov(reg_dst, ptr[parambase + OFFSET(dstptr)]);
+        L("loop_label");
+        imul(reg_tmp, reg_iter, 32);
+        kmovq(bit1_mask1, ptr[reg_bit1ptr + reg_tmp]);
+        kmovq(bit1_mask2, ptr[reg_bit1ptr + reg_tmp + 8]);
+        kmovq(bit1_mask3, ptr[reg_bit1ptr + reg_tmp + 16]);
+        kmovq(bit1_mask4, ptr[reg_bit1ptr + reg_tmp + 24]);
+        Xbyak::Zmm bit2_data_zmm = zmm0;
+        imul(reg_tmp, reg_iter, 64);
+        vmovups(bit2_data_zmm, ptr[reg_bit2ptr + reg_tmp]);
+        vextractf32x8(ymm2, bit2_data_zmm, 0x0);
+        vextractf32x8(ymm3, bit2_data_zmm, 0x1);
+
+        vpand(ymm4, LowMask, ymm2);
+        vpsrlw(ymm2, bit2_data_zmm, 2);
+        vpand(ymm5, LowMask, ymm2);
+        vpsrlw(ymm2, bit2_data_zmm, 2);
+        vpand(ymm6, LowMask, ymm2);
+        vpsrlw(ymm2, bit2_data_zmm, 2);
+        vpand(ymm7, LowMask, ymm2);
+        vinsertf32x8(zmm4, zmm4, ymm5, 1);
+        vinsertf32x8(zmm6, zmm6, ymm7, 1);
+
+        vpand(ymm8, LowMask, ymm3);
+        vpsrlw(ymm3, bit2_data_zmm, 2);
+        vpand(ymm9, LowMask, ymm3);
+        vpsrlw(ymm3, bit2_data_zmm, 2);
+        vpand(ymm10, LowMask, ymm3);
+        vpsrlw(ymm3, bit2_data_zmm, 2);
+        vpand(ymm11, LowMask, ymm3);
+        vinsertf32x8(zmm8, zmm8, ymm9, 1);
+        vinsertf32x8(zmm10, zmm10, ymm11, 1);
+
+        vxorps(zmm12, zmm12);
+        vxorps(zmm13, zmm13);
+        vxorps(zmm14, zmm14);
+        vxorps(zmm15, zmm15);
+        vmovdqu8(zmm12 | bit1_mask1, zmm_0x04);
+        vmovdqu8(zmm13 | bit1_mask2, zmm_0x04);
+        vmovdqu8(zmm14 | bit1_mask3, zmm_0x04);
+        vmovdqu8(zmm15 | bit1_mask4, zmm_0x04);
+
+        vpaddb(zmm4, zmm4, zmm12);
+        vpaddb(zmm6, zmm6, zmm13);
+        vpaddb(zmm8, zmm8, zmm14);
+        vpaddb(zmm10, zmm10, zmm15);
+
+        vpsllvd(zmm4, zmm4, zmm_shift);
+        vpsllvd(zmm6, zmm6, zmm_shift);
+        vpsllvd(zmm8, zmm10, zmm_shift);
+        vpsllvd(zmm10, zmm10, zmm_shift);
+
+        imul(reg_tmp, reg_iter, 256);
+        vmovups(ptr[reg_dst + reg_tmp], zmm4);
+        vmovups(ptr[reg_dst + reg_tmp + 64], zmm6);
+        vmovups(ptr[reg_dst + reg_tmp + 128], zmm8);
+        vmovups(ptr[reg_dst + reg_tmp + 192], zmm10);
+
+        add(reg_iter, 1);
+        cmp(reg_iter, reg_loop);
+        jb("loop_label");
+        mov(reg_ret, 0);
+      }
+      outLocalLabel();  // end of local label
+    }
+
+    func_t mKernel = nullptr;
+
+   private:
+    Xbyak::Reg64 parambase;
+    Xbyak::Reg64 reg_bit1ptr;
+    Xbyak::Reg64 reg_bit2ptr;
+    Xbyak::Reg64 reg_loop;
+    Xbyak::Reg64 reg_iter;
+    Xbyak::Reg64 reg_dst;
+    Xbyak::Reg64 reg_tmp;
+    Xbyak::Reg64 reg_ret;
+    Xbyak::Opmask bit1_mask1 = Xbyak::Opmask(1);
+    Xbyak::Opmask bit1_mask2 = Xbyak::Opmask(2);
+    Xbyak::Opmask bit1_mask3 = Xbyak::Opmask(3);
+    Xbyak::Opmask bit1_mask4 = Xbyak::Opmask(4);
+  };
+  static void forward_avx512f(void* bit2ptr, void* bit1ptr, void* dstptr, int unpack_elt) {
+    static MicroKernelAVX512F ker;
+    auto param = MicroKernelAVX512F::params{bit2ptr, bit1ptr, dstptr, unpack_elt / 256, 0x03, 0x4, 5};
+    ker.mKernel(&param);
+  }
+};
 
 class DequanKBlockS8Fp {
  public:
