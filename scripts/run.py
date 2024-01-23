@@ -18,6 +18,7 @@ import argparse
 from typing import List, Optional
 from transformers import AutoConfig
 import subprocess
+import requests
 from huggingface_hub import snapshot_download
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
@@ -158,7 +159,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if args.model.exists():
         dir_model = args.model.as_posix()
     else:
-        dir_model = snapshot_download(repo_id=str(args.model), resume_download=True, token=args.token)
+        try:
+            dir_model = snapshot_download(repo_id=str(args.model), resume_download=True, token=args.token)
+        # Handles Missing token ID for gated models
+        except Exception as e:
+            if e.response.status_code == 401:
+                print("You are required to input an acccess token ID for {}, please add it in option --token or download model weights locally".format(args.model))
+            sys.exit(f"{e}")
 
     parent_path = Path(__file__).parent.absolute()
     config = AutoConfig.from_pretrained(dir_model)
@@ -172,7 +179,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_cmd = ["python", path]
     convert_cmd.extend(["--outfile", Path(work_path, "ne_{}_f32.bin".format(model_type))])
     convert_cmd.extend(["--outtype", "f32"])
-    convert_cmd.append(args.model)
+    convert_cmd.append(dir_model)
     print("convert model ...")
     subprocess.run(convert_cmd)
 
