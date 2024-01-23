@@ -306,7 +306,7 @@ class Model {
                   float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p, float temperature,
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype,
-                  const bool& continuous_batching, const int& max_request_num);
+                  const bool& continuous_batching, const int& max_request_num, const int& model_scratch_enlarge_scale);
   void reinit();
   std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
   // deprecated API
@@ -399,10 +399,12 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                        int threads, float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p,
                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
-                       const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num) {
+                       const std::string& memory_dtype, const bool& continuous_batching, const int& max_request_num,
+                       const int& model_scratch_enlarge_scale) {
   init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty, num_beams,
                   do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping, n_keep,
-                  n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching, max_request_num);
+                  n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching, max_request_num,
+                  model_scratch_enlarge_scale);
 
   n_past = 0;
   n_total = 0;
@@ -888,7 +890,8 @@ PYBIND11_MODULE(qwen_cpp, m)
            py::arg("min_new_tokens") = 0, py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false,
            py::arg("n_keep") = 0, py::arg("n_discard") = -1, py::arg("shift_roped_k") = false,
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto",
-           py::arg("continuous_batching") = false, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM)
+           py::arg("continuous_batching") = false, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM,
+           py::arg("model_scratch_enlarge_scale") = 1)
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
            py::arg("input_ids") = std::vector<std::vector<model_token>>{}, py::arg("logits_all") = false)
