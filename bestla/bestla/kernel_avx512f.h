@@ -675,29 +675,28 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     return zmm;
   };
 
-  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t *dst) {
-const __m256i lowMask = _mm256_set1_epi8(0x03);
-  const __m256i bit2_data = _mm256_loadu_si256((const __m256i *)src1);
-  auto ymm0 = _mm256_and_si256(lowMask, bit2_data); // uop:1 p:015
-  auto ymm1 =
-      _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2)); // uop:1 p:01
-  auto ymm2 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 4));
-  auto ymm3 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 6));
-  auto zmm1 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm0), ymm1, 0x1); // lat3, tp1 uop1 p:5
-  auto zmm2 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm2), ymm3, 0x1);
+  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+    const __m256i lowMask = _mm256_set1_epi8(0x03);
+    const __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src1);
+    auto ymm0 = _mm256_and_si256(lowMask, bit2_data);                        // uop:1 p:015
+    auto ymm1 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2));  // uop:1 p:01
+    auto ymm2 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 4));
+    auto ymm3 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 6));
+    auto zmm1 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm0), ymm1, 0x1);  // lat3, tp1 uop1 p:5
+    auto zmm2 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm2), ymm3, 0x1);
 
-  unsigned long long *bit1_ptr = reinterpret_cast<unsigned long long *>(src2);
-  auto bit1_mask1 = _cvtu64_mask64(*bit1_ptr);
-  auto bit1_mask2 = _cvtu64_mask64(*(bit1_ptr + 1));
-  auto zmm1_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask1, zmm_0x04);
-  auto zmm2_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask2, zmm_0x04);
-  zmm1 = _mm512_add_epi8(zmm1, zmm1_);
-  zmm2 = _mm512_add_epi8(zmm2, zmm2_);
-  zmm1 = _mm512_sllv_epi32(zmm1, zmm_shift); // int3_clip => int8
-  zmm2 = _mm512_sllv_epi32(zmm2, zmm_shift); // int3_clip => int8
+    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src2);
+    auto bit1_mask1 = _cvtu64_mask64(*bit1_ptr);
+    auto bit1_mask2 = _cvtu64_mask64(*(bit1_ptr + 1));
+    auto zmm1_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask1, zmm_0x04);
+    auto zmm2_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask2, zmm_0x04);
+    zmm1 = _mm512_add_epi8(zmm1, zmm1_);
+    zmm2 = _mm512_add_epi8(zmm2, zmm2_);
+    zmm1 = _mm512_sllv_epi32(zmm1, zmm_shift);  // int3_clip => int8
+    zmm2 = _mm512_sllv_epi32(zmm2, zmm_shift);  // int3_clip => int8
 
-  _mm512_storeu_epi8((__m512i *)dst, zmm1);
-  _mm512_storeu_epi8((__m512i *)(dst + 64), zmm2);
+    _mm512_storeu_epi8((__m512i*)dst, zmm1);
+    _mm512_storeu_epi8((__m512i*)(dst + 64), zmm2);
   };
 
   assert(head_ignore_num % 8 == 0);
@@ -725,10 +724,12 @@ const __m256i lowMask = _mm256_set1_epi8(0x03);
   auto tail_proc_num = (unpack_elt - (64 - head_ignore_num) % 64) % 64;
 
   // for (int i = 0; i < body_loop; i++) {
-  for (int i = 0; i < body_loop/2; i++) {
+  for (int i = 0; i < body_loop / 2; i++) {
     if constexpr (!std::is_same_v<_DST_T, int8_t>) {
-bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,base_bit1ptr + compress_wei_ptr_offset / 8,reinterpret_cast<int8_t*>(base_unpack_buf));
-for (int j = 0; j < 128; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
+      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,
+                                         base_bit1ptr + compress_wei_ptr_offset / 8,
+                                         reinterpret_cast<int8_t*>(base_unpack_buf));
+      for (int j = 0; j < 128; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
       // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
       //                                     base_bit1ptr + compress_wei_ptr_offset / 8);
       // _mm512_storeu_epi8(base_unpack_buf, zmm);
@@ -756,9 +757,11 @@ for (int j = 0; j < 128; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_of
       //   _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 48, _mm512_cvtepi32_ps(zmm4));
       // }
     } else {
-            // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
-                                          // base_bit1ptr + compress_wei_ptr_offset / 8);
-bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,base_bit1ptr + compress_wei_ptr_offset / 8,reinterpret_cast<int8_t*>(base_unpack_buf)+compress_wei_ptr_offset);
+      // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
+      // base_bit1ptr + compress_wei_ptr_offset / 8);
+      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,
+                                         base_bit1ptr + compress_wei_ptr_offset / 8,
+                                         reinterpret_cast<int8_t*>(base_unpack_buf) + compress_wei_ptr_offset);
       // _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
     }
     // compress_wei_ptr_offset += 64;
