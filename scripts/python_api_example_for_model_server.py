@@ -20,7 +20,7 @@ prompts = [
             "I want to learn how to play the piano.",
             ]
 
-model_name = "/home/zhentao/gpt-j-6b"  # "EleutherAI/gpt-j-6b" # model_name from huggingface or local model path 
+model_name = "EleutherAI/gpt-j-6b"  # model_name from huggingface or local model path
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 res_collect = []
@@ -34,7 +34,7 @@ def f_response(res, working):
         print(a)
         print("=====================================")
 
-model_path = "/home/zhentao/ils/ns/q4_j.bin" # please set your corresponding local neural_speed low-bits model file
+model_path = "gptj-q4.bin"  # please set your corresponding local neural_speed low-bits model file
 added_count = 0
 s = cpp.ModelServer(f_response,                      # reponse function (deliver generation results and current reamin working size in server)
                     model_path,                      # model_path
