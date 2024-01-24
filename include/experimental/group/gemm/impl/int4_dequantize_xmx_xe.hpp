@@ -31,10 +31,10 @@ namespace gpu::xetla::group {
 template <typename compute_attr_, typename perf_tuning_knob_,
         typename tile_shape_, typename mem_desc_a_t_, typename mem_desc_b_t_,
         typename dtype_scale_, typename dtype_zero_pt_, int dequant_s_,
-        quant_mode quant_type_, typename pre_processing_t_, gpu_arch arch_tag_>
-class gemm_t<compute_policy_int4_dequantize_xmx<compute_attr_,
+        quant_mode quant_type_, typename pre_processing_t_, mma_engine mma_, gpu_arch arch_tag_>
+class gemm_t<compute_policy_int4_dequantize<compute_attr_,
                      perf_tuning_knob_, dtype_scale_, dtype_zero_pt_,
-                     quant_type_, dequant_s_, arch_tag_>,
+                     quant_type_, dequant_s_, mma_, arch_tag_>,
         tile_shape_, // tile shape of workgroup-level gemm
         mem_desc_a_t_, // memory attribute of matA
         mem_desc_b_t_, // memory attribute of matB
@@ -45,9 +45,9 @@ public:
     using mem_desc_b_t = mem_desc_b_t_;
     using tile_shape = tile_shape_;
     using pre_processing_t = pre_processing_t_;
-    using compute_policy = compute_policy_int4_dequantize_xmx<compute_attr_,
+    using compute_policy = compute_policy_int4_dequantize<compute_attr_,
             perf_tuning_knob_, dtype_scale_, dtype_zero_pt_, quant_type_,
-            dequant_s_, arch_tag_>;
+            dequant_s_, mma_, arch_tag_>;
     static constexpr uint32_t k_stride = compute_policy::k_stride;
 
     static constexpr uint32_t sg_tile_m = tile_shape::sg_tile_size_y;

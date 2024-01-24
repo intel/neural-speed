@@ -26,7 +26,7 @@ using namespace gpu::xetla;
 
 template <class Test, typename validate_func, typename KERNEL,
         int SLMSIZE = 128 * 1024, int BARNUM = 32>
-void gemm_exec(const std::string &compile_str, size_t batch = 1) {
+void gemm_exec(size_t batch = 1) {
     test_result result = test_result::complete;
 
     using gemm_op_t = typename KERNEL::gemm_op_t;
@@ -70,6 +70,7 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
             },
             queue, device, context);
 
+    std::cout << "Init A/B/C" << std::endl;
     size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
     size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
     auto Acc = alloc_device_and_init<data_type_acc>(
@@ -84,14 +85,14 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
                 data[idx] = static_cast<uint32_t>(0);
             },
             queue, device, context);
-
+    std::cout << "Init Acc/Cnt" << std::endl;
     try {
-        std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
-        auto inputBundle
-                = get_kernel_bundle<bundle_state::input>(context, kernelId);
-        setenv("SYCL_PROGRAM_COMPILE_OPTIONS", compile_str.c_str(), 1);
-        kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
-        unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
+        // std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
+        // auto inputBundle
+        //         = get_kernel_bundle<bundle_state::input>(context, kernelId);
+        // setenv("SYCL_PROGRAM_COMPILE_OPTIONS", compile_str.c_str(), 1);
+        // kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
+        // unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
 
         using namespace gpu::xetla::group;
         using namespace gpu::xetla::kernel;
@@ -125,9 +126,9 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
                 result = test_result::skip;
                 break;
             }
-
+            std::cout << "Before submit" << std::endl;
             auto e_esimd = queue.submit([&](handler &cgh) {
-                cgh.use_kernel_bundle(exeBundle);
+                // cgh.use_kernel_bundle(exeBundle);
                 cgh.parallel_for<Test>(
                         nd_range, [=](nd_item<3> item) KERNEL_MAIN {
                             gpu::xetla::xetla_local_init<SLMSIZE>();
