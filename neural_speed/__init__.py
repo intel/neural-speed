@@ -60,6 +60,8 @@ class Model:
             import neural_speed.baichuan_cpp as cpp_model
         elif model_type == "polyglot":
             import neural_speed.polyglot_cpp as cpp_model
+        elif model_type == "qwen":
+            import neural_speed.qwen_cpp as cpp_model
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
         elif model_type == "qwen":
@@ -79,7 +81,7 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, use_quant=True, use_cache=False, use_gptq=False, use_awq=False,
+    def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False,
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
@@ -109,14 +111,17 @@ class Model:
             self.bin_file = fp32_bin
         else:
             self.bin_file = quant_bin
-        if use_cache and os.path.exists(self.bin_file):
+        
+        if os.path.exists(self.bin_file):
+            print("{} existed, will use cache file. Otherwise please remove the file".
+                  format(self.bin_file))
             return
 
         if use_gptq or use_awq:
             convert_model(model_name, quant_bin, "f32")
             return
         
-        if not use_cache or not os.path.exists(fp32_bin):
+        if not os.path.exists(fp32_bin):
             convert_model(model_name, fp32_bin, "f32")
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
 
@@ -129,8 +134,7 @@ class Model:
         assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
-        if not use_cache:
-            os.remove(fp32_bin)
+        os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)

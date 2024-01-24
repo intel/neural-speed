@@ -304,7 +304,8 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
       fprintf(stderr, "\n%s: Warning: prompt is too long (%d tokens, max %d), will be truncated\n", __func__,
               input_id_cb.size(), n_ctx - 4);
       curr_input_ids[bs].resize(n_ctx - 4);
-      std::copy(input_id_cb.end() - n_ctx - 4, input_id_cb.end(), curr_input_ids[bs].begin());
+      std::copy(input_id_cb.end() - n_ctx - 8, input_id_cb.end(), curr_input_ids[bs].begin() + 4);
+      std::copy(input_id_cb.begin(), input_id_cb.begin() + 4, curr_input_ids[bs].begin());
     } else {  // good input_id_cb and empty curr_input_ids[bs]
       curr_input_ids[bs] = input_id_cb;
     }
@@ -418,7 +419,9 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
       fprintf(stderr, "\n%s: Warning: prompt is too long (%d tokens, max %d), will be truncated\n", __func__,
               input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - 4);
       curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - 4);
-      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - 4, input_ids[STATIC_INPUT_HEAD_IDX].end(),
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - 8, input_ids[STATIC_INPUT_HEAD_IDX].end(),
+                curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + 4);
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].begin(), input_ids[STATIC_INPUT_HEAD_IDX].begin() + 4,
                 curr_input_ids[STATIC_INPUT_HEAD_IDX].begin());
     } else {
       curr_input_ids[STATIC_INPUT_HEAD_IDX] = input_ids[STATIC_INPUT_HEAD_IDX];
@@ -675,7 +678,7 @@ PYBIND11_MODULE(whisper_cpp, m)
   py::class_<Model>(m, "Model", py::module_local())
       .def(py::init())
       .def("init_model", &Model::init_model, "initial model with model path and parameters", py::arg("model_path"),
-           py::arg("max_new_tokens") = -1, py::arg("n_batch") = 512, py::arg("ctx_size") = 512, py::arg("seed") = -1,
+           py::arg("max_new_tokens") = -1, py::arg("n_batch") = 512, py::arg("ctx_size") = 1024, py::arg("seed") = -1,
            py::arg("threads") = 8, py::arg("repetition_penalty") = 1.1f, py::arg("num_beams") = 1,
            py::arg("do_sample") = false, py::arg("top_k") = 40, py::arg("top_p") = 0.95, py::arg("temperature") = 0.8,
            py::arg("min_new_tokens") = 0, py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false,

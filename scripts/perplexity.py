@@ -105,7 +105,7 @@ def perplexity(model_name, dataset_name, **kwargs):
         init_kwargs = {
             k: kwargs[k]
             for k in kwargs
-            if k in ['use_cache', 'compute_dtype', 'weight_dtype', 'scale_dtype', 'group_size', 'use_ggml']
+            if k in ['compute_dtype', 'weight_dtype', 'scale_dtype', 'group_size', 'use_ggml']
         }
         model.init(model_name, **init_kwargs)
 
@@ -186,7 +186,6 @@ def add_quant_args(parser: argparse.ArgumentParser):
                        type=str,
                        help="path to quantized weight; other quant args will be ignored if specified",
                        default="")
-    group.add_argument('--use_cache', action="store_true", help="Use local quantized model if file exists")
     group.add_argument(
         "--weight_dtype",
         choices=["int4", "int8"],
