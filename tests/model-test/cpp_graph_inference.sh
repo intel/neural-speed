@@ -260,9 +260,9 @@ function main() {
         infer_cmd="./build/bin/run_whisper"
         precision_list+=("q4_0")
     elif [[ "${model}" == "phi2" ]]; then
-        quant_script="./build/bin/quant_phi2"
+        quant_script="./build/bin/quant_phi"
         convert_script="${convert_script}/convert_phi.py"
-        infer_cmd="./build/bin/run_phi2"
+        infer_cmd="./build/bin/run_phi"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1
