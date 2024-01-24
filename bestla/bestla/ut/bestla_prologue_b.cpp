@@ -323,7 +323,7 @@ class UT_BlockQunatize_S3 {
     // }
   }
 };
-static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
+// static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #endif

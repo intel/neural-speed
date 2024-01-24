@@ -294,14 +294,14 @@ class DecompresssS3 {
         mov(reg_dst, ptr[parambase + OFFSET(dstptr)]);
         L("loop_label");
         imul(reg_tmp, reg_iter, 96);
-        Xbyak::Zmm bit2_data_zmm = zmm0;
-
-        vmovups(ymm2, ptr[reg_bit2ptr + reg_tmp]);
-        kmovq(bit1_mask1, ptr[reg_bit2ptr + reg_tmp + 32]);
-        kmovq(bit1_mask2, ptr[reg_bit2ptr + reg_tmp + 40]);
-        vmovups(ymm3, ptr[reg_bit2ptr + reg_tmp + 48]);
+        kmovq(bit1_mask1, ptr[reg_bit2ptr + reg_tmp + 64]);
+        kmovq(bit1_mask2, ptr[reg_bit2ptr + reg_tmp + 72]);
         kmovq(bit1_mask3, ptr[reg_bit2ptr + reg_tmp + 80]);
         kmovq(bit1_mask4, ptr[reg_bit2ptr + reg_tmp + 88]);
+        Xbyak::Zmm bit2_data_zmm = zmm0;
+        vmovups(bit2_data_zmm, ptr[reg_bit2ptr + reg_tmp]);
+        vextractf32x8(ymm2, bit2_data_zmm, 0x0);
+        vextractf32x8(ymm3, bit2_data_zmm, 0x1);
 
         vpand(ymm4, LowMask, ymm2);
         vpsrlw(ymm2, ymm2, 2);

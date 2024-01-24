@@ -231,11 +231,11 @@ static inline BTLA_CODE compress_3bit(const int8_t* srcptr, void* dst, int row, 
   }
 
   for (int i = 0; i < row; i++) {
-    for (int j = 0; j < col; j += 128) {
+    for (int j = 0; j < col; j += 256) {
       bit2x4* bit2 = reinterpret_cast<bit2x4*>(dst + i * ld_dst / 8 * 3 + j / 8 * 3);
-      bit1x8* bit1 = reinterpret_cast<bit1x8*>(dst + i * ld_dst / 8 * 3 + j / 8 * 3 + 32);
-      for (int k = 0; k < 32; k++) bit2[k] = bit2_data_[i * ld_dst / 4 + j / 4 + k];
-      for (int k = 0; k < 16; k++) bit1[k] = bit1_data_[i * ld_dst / 8 + j / 8 + k];
+      bit1x8* bit1 = reinterpret_cast<bit1x8*>(dst + i * ld_dst / 8 * 3 + j / 8 * 3 + 64);
+      for (int k = 0; k < 64; k++) bit2[k] = bit2_data_[i * ld_dst / 4 + j / 4 + k];
+      for (int k = 0; k < 32; k++) bit1[k] = bit1_data_[i * ld_dst / 8 + j / 8 + k];
     }
   }
   return BTLA_CODE::Success;
