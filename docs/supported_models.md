@@ -172,6 +172,18 @@ Neural Speed supports the following models:
     <td> </td>
     <td>Latest</td>
   </tr>
+  <tr>
+    <td><a href="https://huggingface.co/microsoft/phi-2" target="_blank" rel="noopener noreferrer">phi-2</a>,
+    <a href="https://huggingface.co/microsoft/phi-1_5" target="_blank" rel="noopener noreferrer">phi-1_5</a>
+    <a href="https://huggingface.co/microsoft/phi-1" target="_blank" rel="noopener noreferrer">phi-1</a></td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td>Latest</td>
+  </tr>
     <tr>
     <td><a href="https://huggingface.co/openai/whisper-tiny" target="_blank" rel="noopener noreferrer">Whisper-tiny</a>,
     <a href="https://huggingface.co/openai/whisper-base" target="_blank" rel="noopener noreferrer">Whisper-base</a>
