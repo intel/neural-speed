@@ -14,8 +14,8 @@
 
 #include "models/model_utils/scheduler.h"
 
-// il_worker
-il_worker::il_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_params(params)) {
+// Iter_level_worker
+Iter_level_worker::Iter_level_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_params(params)) {
   if (m_ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model.\n", __func__);
     exit(0);
@@ -30,7 +30,7 @@ il_worker::il_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_param
   threads = params.n_threads;
 }
 
-il_worker::~il_worker() {
+Iter_level_worker::~Iter_level_worker() {
   if (m_ctx != nullptr) {
     model_free(m_ctx);
   }
@@ -39,10 +39,12 @@ il_worker::~il_worker() {
   }
 }
 
-// cbg_worker
-cbg_worker::cbg_worker(const gpt_params& params) : il_worker(params) { m_ctx->cont_batching = true; }
+// Cont_batch_gen_worker
+Cont_batch_gen_worker::Cont_batch_gen_worker(const gpt_params& params) : Iter_level_worker(params) {
+  m_ctx->cont_batching = true;
+}
 
-bool cbg_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) {
+bool Cont_batch_gen_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) {
   for (int i = 0; i < n_input; ++i) {
     if ((seqs->at(i)).status != seq_status::PREFILL && (seqs->at(i)).status != seq_status::DECODING) {
       fprintf(stderr, "%s: error: request %d status is unright (%d).\n", __func__, seqs->at(i).request_idx,
@@ -73,7 +75,7 @@ bool cbg_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input,
   return true;
 }
 
-bool cbg_worker::beam_search_step(std::vector<sequence>* seqs, const int& n_input) {
+bool Cont_batch_gen_worker::beam_search_step(std::vector<sequence>* seqs, const int& n_input) {
   std::vector<model_input> step_inputs(n_input);
   if (!prepare_inputs(seqs, n_input, step_inputs.data())) {
     return false;
@@ -85,7 +87,7 @@ bool cbg_worker::beam_search_step(std::vector<sequence>* seqs, const int& n_inpu
   return true;
 }
 
-bool cbg_worker::step(std::vector<sequence>* seqs, const int& n_input) {
+bool Cont_batch_gen_worker::step(std::vector<sequence>* seqs, const int& n_input) {
   reqidx_to_vecid.clear();
   for (int ni = 0; ni < n_input; ++ni) {
     reqidx_to_vecid.emplace(seqs->at(ni).request_idx, ni);
@@ -99,7 +101,7 @@ bool cbg_worker::step(std::vector<sequence>* seqs, const int& n_input) {
   return update_seqs(seqs, n_input);
 }
 
-bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
+bool Cont_batch_gen_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
   empty_request_done_ids();
   for (int ni = 0; ni < n_input; ++ni) {
     if (seqs->at(ni).status == seq_status::PREFILL) {
@@ -142,8 +144,8 @@ bool cbg_worker::update_seqs(std::vector<sequence>* seqs, const int& n_input) {
   return false;  // TODO (YZT) greedy search and top_p-top_k sampling
 }
 
-// il_scheduler
-il_scheduler::il_scheduler(const gpt_params& params, const std::string& policy, const int& log_level)
+// Iter_level_scheduler
+Iter_level_scheduler::Iter_level_scheduler(const gpt_params& params, const std::string& policy, const int& log_level)
     : params(params),
       policy(parse_serve_policy(policy)),
       waiting_pool(pool_property::WAITING),
@@ -151,9 +153,9 @@ il_scheduler::il_scheduler(const gpt_params& params, const std::string& policy, 
       finished_pool(pool_property::FINISHED),
       log_level(log_level) {}
 
-il_scheduler::il_scheduler(const gpt_params& params) : il_scheduler(params, "fcfs", 1) {}
+Iter_level_scheduler::Iter_level_scheduler(const gpt_params& params) : Iter_level_scheduler(params, "fcfs", 1) {}
 
-std::vector<sequence> il_scheduler::pop_completed_requests() {
+std::vector<sequence> Iter_level_scheduler::pop_completed_requests() {
   std::vector<sequence> ret_seqs;
   const int length = finished_pool.size();
   if (length == 0) {
@@ -174,22 +176,23 @@ std::vector<sequence> il_scheduler::pop_completed_requests() {
   return ret_seqs;
 }
 
-// cbg_scheduler
-cbg_scheduler::cbg_scheduler(const gpt_params& params)
-    : il_scheduler(params),
+// Cont_batch_gen_scheduler
+Cont_batch_gen_scheduler::Cont_batch_gen_scheduler(const gpt_params& params)
+    : Iter_level_scheduler(params),
       max_requests(params.max_request_num),
       wr(params),
       free_req_idx(max_requests, true),
       waiting_free_req_idx_seqs_num(0) {}
 
-cbg_scheduler::cbg_scheduler(const gpt_params& params, const std::string& policy, const int& log_level)
-    : il_scheduler(params, policy, log_level),
+Cont_batch_gen_scheduler::Cont_batch_gen_scheduler(const gpt_params& params, const std::string& policy,
+                                                   const int& log_level)
+    : Iter_level_scheduler(params, policy, log_level),
       max_requests(params.max_request_num),
       wr(params),
       free_req_idx(max_requests, true),
       waiting_free_req_idx_seqs_num(0) {}
 
-int cbg_scheduler::query_free_req_idx() {
+int Cont_batch_gen_scheduler::query_free_req_idx() {
   auto iter = std::find_if(free_req_idx.begin(), free_req_idx.end(), [](const bool flag) { return flag; });
   if (iter == free_req_idx.end()) {
     return -1;
@@ -200,7 +203,7 @@ int cbg_scheduler::query_free_req_idx() {
   }
 }
 
-bool cbg_scheduler::add_request(sequence seq) {
+bool Cont_batch_gen_scheduler::add_request(sequence seq) {
   seq.receive_time = model_time_us();
   if (seq.status != seq_status::UNKNOWN) {
     fprintf(stderr, "%s: error: seq status is not UNKNOWN, can not decide to add into which pool.\n", __func__);
@@ -216,7 +219,7 @@ bool cbg_scheduler::add_request(sequence seq) {
   return waiting_pool.add(seq);
 }
 
-bool cbg_scheduler::prepare_seqs() {
+bool Cont_batch_gen_scheduler::prepare_seqs() {
   executed_seqs.clear();
   cur_running_num = running_pool.size();
   if (cur_running_num > max_requests) {
@@ -269,7 +272,7 @@ bool cbg_scheduler::prepare_seqs() {
   return true;
 }
 
-bool cbg_scheduler::step() {
+bool Cont_batch_gen_scheduler::step() {
   int64_t s_t0 = model_time_us();
   if (done()) {
     fprintf(stderr,
@@ -309,7 +312,7 @@ bool cbg_scheduler::step() {
   return success;
 }
 
-bool cbg_scheduler::update_pools() {
+bool Cont_batch_gen_scheduler::update_pools() {
   for (int ns = 0; ns < executed_seqs.size(); ++ns) {
     if (executed_seqs[ns].status == seq_status::DECODING) {
       running_pool.add(executed_seqs[ns]);
@@ -332,7 +335,7 @@ bool cbg_scheduler::update_pools() {
   return true;
 }
 
-bool cbg_scheduler::done() {
+bool Cont_batch_gen_scheduler::done() {
   if (waiting_pool.empty() && running_pool.empty()) {
     return true;
   } else {

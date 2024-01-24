@@ -19,10 +19,10 @@
 #include "models/model_utils/model_utils.h"
 
 // iteration-level worker
-class il_worker {
+class Iter_level_worker {
  public:
-  explicit il_worker(const gpt_params& params);
-  virtual ~il_worker();
+  explicit Iter_level_worker(const gpt_params& params);
+  virtual ~Iter_level_worker();
   virtual bool step(std::vector<sequence>* seqs, const int& n_input) = 0;
   // virtual bool greedy_search_step(sequence seqs, const int& n_input) = 0;
   virtual bool beam_search_step(std::vector<sequence>* seqs, const int& n_input) = 0;
@@ -43,11 +43,11 @@ class il_worker {
 };
 
 // continuous batching generation worker
-class cbg_worker : public il_worker {
+class Cont_batch_gen_worker : public Iter_level_worker {
  public:
-  explicit cbg_worker(const gpt_params& params);
-  cbg_worker(const gpt_params& params, const int& n_threads);
-  ~cbg_worker() = default;
+  explicit Cont_batch_gen_worker(const gpt_params& params);
+  Cont_batch_gen_worker(const gpt_params& params, const int& n_threads);
+  ~Cont_batch_gen_worker() = default;
 
   bool step(std::vector<sequence>* seqs, const int& n_input) override;
   // bool greedy_search_step(sequence seqs, const int& n_input) override;
@@ -59,11 +59,11 @@ class cbg_worker : public il_worker {
 };
 
 // iteration-level scheduler
-class il_scheduler {
+class Iter_level_scheduler {
  public:
-  explicit il_scheduler(const gpt_params& params);
-  il_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
-  virtual ~il_scheduler() = default;
+  explicit Iter_level_scheduler(const gpt_params& params);
+  Iter_level_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
+  virtual ~Iter_level_scheduler() = default;
 
   // TODO (YZT) kv cache ptr as input params
   virtual bool add_request(sequence seq) = 0;
@@ -85,11 +85,11 @@ class il_scheduler {
 };
 
 // continuous batching generation scheduler
-class cbg_scheduler : public il_scheduler {
+class Cont_batch_gen_scheduler : public Iter_level_scheduler {
  public:
-  explicit cbg_scheduler(const gpt_params& params);
-  cbg_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
-  ~cbg_scheduler() = default;
+  explicit Cont_batch_gen_scheduler(const gpt_params& params);
+  Cont_batch_gen_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
+  ~Cont_batch_gen_scheduler() = default;
 
   bool add_request(sequence seq) override;
   bool step() override;
@@ -101,7 +101,7 @@ class cbg_scheduler : public il_scheduler {
   int query_free_req_idx();
 
   const int max_requests;
-  cbg_worker wr;
+  Cont_batch_gen_worker wr;
   std::vector<sequence> executed_seqs;
   std::vector<bool> free_req_idx;
   int waiting_free_req_idx_seqs_num;

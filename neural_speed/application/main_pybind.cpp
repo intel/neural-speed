@@ -158,7 +158,7 @@ class ModelServer {
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
                                  early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
                                  true, max_request_num, model_scratch_enlarge_scale);
-          cbg_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
+          Cont_batch_gen_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
             {                                               // add waitting tasks queue to running queue
@@ -279,15 +279,26 @@ class ModelServer {
   }
 
  private:
+  // response function from outside for collecting generation results and checking server working status
   const ResponseCallback response;
+  // waiting pool for new queries added into server
   std::vector<Query> waiting;
+  // lock for waiting pool
   std::mutex queue_mtx;
+  // status for telling server if it still need to continue running or not
+  // true: checking waiting pool and performing one step (or waiting new query)
+  // false: stop server
   bool running;
   gpt_params params;
+  // server policy (only FCFS (first come, first serve) now)
   std::string policy;
+  // if server scheduler has no queries to run or not
   bool scheduler_empty;
+  // current number of queries the server need to deal with
   uint64_t working_size;
+  // add prompt token ids before generated tokens in results if set it true
   bool return_prompt;
+  // server working thread
   std::thread worker;
 };
 
