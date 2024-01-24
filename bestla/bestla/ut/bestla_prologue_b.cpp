@@ -190,12 +190,12 @@ class UT_BlockQunatize_S3 {
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 56);
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1024, 4096, 16384, 128, 8);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(48, 4096, 16384, 128, 8);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1024, 4096, 4096, 128, 8);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(48, 4096, 4096, 128, 8);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1024, 16384, 4096, 128, 8);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(48, 16384, 4096, 128, 8);
     // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 56);
     // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 56);
     // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 56);
@@ -215,12 +215,12 @@ class UT_BlockQunatize_S3 {
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 64);
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 64);
     // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 64);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 64);
+    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 64);
     // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 64);
     // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 64);
     // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 64);
@@ -881,8 +881,10 @@ class UTBenchmark_CompFp32 {
 
   void ut_s4() {
     // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(32, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(32, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(48, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(48, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
     //  benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
@@ -1054,7 +1056,7 @@ class UTBenchmark_CompFp32 {
       //                                                             C.data(), testtime, 48, qtype);
       // benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
       benchmark_mem<gemm::ICoreRowNAmxint8KBlock<48, 16>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(),
-                                                                             B.data(), C.data(), testtime, 48, qtype);
+                                                                             B.data(), C.data(), testtime, 8, qtype);
     }
   }
 };
