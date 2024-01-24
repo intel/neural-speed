@@ -173,6 +173,7 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("")
 
 def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
+    n_rot = int(hparams["partial_rotary_factor"]*hparams["hidden_size"]/hparams["num_attention_heads"])
     model.eval()
     for p in model.parameters():
         p.requires_grad = False
@@ -194,7 +195,7 @@ def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["num_attention_heads"]))
     fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
-    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", n_rot))
     fout.write(struct.pack("i", ftype))
     fout.write(struct.pack("i", hparams["max_position_embeddings"]))
     fout.write(struct.pack("f", 0.0))
