@@ -171,14 +171,14 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
                         head_dim, n_head, N, 1);
 
       // using mode = 2 for GPT-NeoX mode
-      struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), 32, n_head, N, 1, Qcur->nb[1],
+      struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), n_rot, n_head, N, 1, Qcur->nb[1],
                                                Qcur->nb[2], Qcur->nb[3], 0);
-      Qcur_Part = ne_rope_inplace(ctx0, Qcur_Part, n_past, 32, 2, 0, hparams.freq_base, hparams.freq_scale);
+      Qcur_Part = ne_rope_inplace(ctx0, Qcur_Part, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_build_forward_expand(&gf, Qcur_Part);
       ne_set_name(Qcur, "Qcur");
-      struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), 32, n_head, N, 1, Kcur->nb[1],
+      struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), n_rot, n_head, N, 1, Kcur->nb[1],
                                                Kcur->nb[2], Kcur->nb[3], 0);
-      Kcur_Part = ne_rope_inplace(ctx0, Kcur_Part, n_past, 32, 2, 0, hparams.freq_base, hparams.freq_scale);
+      Kcur_Part = ne_rope_inplace(ctx0, Kcur_Part, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_build_forward_expand(&gf, Kcur_Part);
       ne_set_name(Kcur, "kcur");
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));

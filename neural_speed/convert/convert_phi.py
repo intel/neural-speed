@@ -27,7 +27,7 @@ import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
+import gguf
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
@@ -50,28 +50,129 @@ def bytes_to_unicode():
             n += 1
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
+        
+def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
+    print("phi.gguf converting: ")
+    list_vars = model.state_dict()
+    n_rot = int(hparams["partial_rotary_factor"]*hparams["hidden_size"]/hparams["num_attention_heads"])
+    for name in list_vars.keys():
+        print(name, list_vars[name].shape, list_vars[name].dtype)
 
+    print(hparams)
 
-def main(args_in: Optional[List[str]] = None) -> None:
-    parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
-    parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
-    parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("model", type=Path, help="directory containing model file")
-    args = parser.parse_args(args_in)
+    gguf_file = fname_out + '.gguf'
+    gguf_writer = gguf.GGUFWriter(gguf_file, "phi")
 
-    dir_model = args.model.as_posix()
-    fname_out = args.outfile.as_posix()
+    gguf_writer.add_uint32('magic', 0x67676d66)
+    gguf_writer.add_uint32('version', 1)
+    gguf_writer.add_uint32('n_vocab', hparams["vocab_size"])
+    gguf_writer.add_embedding_length(hparams["hidden_size"])
+    gguf_writer.add_uint32('n_mult', 0)
+    gguf_writer.add_head_count(hparams["num_attention_heads"])
+    gguf_writer.add_head_count_kv(hparams["num_key_value_heads"])
 
-    # possible data types
-    #   ftype == 0 -> float32
-    #   ftype == 1 -> float16
-    ftype = 0
-    if args.outtype == "f16":
-        ftype = 1
+    gguf_writer.add_block_count(hparams["num_hidden_layers"])
+    gguf_writer.add_rope_dimension_count(n_rot)
+    gguf_writer.add_uint32('ftype', ftype)
+    gguf_writer.add_context_length(hparams["max_position_embeddings"])
+    gguf_writer.add_max_alibi_bias(0)
+    gguf_writer.add_uint32('clip_qkv', 0)
+    gguf_writer.add_uint32('par_res', 0)
 
-    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-    print("Loading model: ", dir_model)
-    model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
+    gguf_writer.add_uint32('word_embed_proj_dim', 0)
+    gguf_writer.add_uint32('do_layer_norm_before', 0)
+
+    gguf_writer.add_uint32('multi_query_group_num', 0)
+    gguf_writer.add_feed_forward_length(hparams["intermediate_size"])
+    gguf_writer.add_uint32('inner_hidden_size', 0)
+
+    gguf_writer.add_int32('bos_token_id', tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1)
+    gguf_writer.add_int32('eos_token_id', tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1)
+    gguf_writer.add_int32('pad_token_id', tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1)
+    gguf_writer.add_int32('sep_token_id', tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1)
+
+    def write_vocab_gguf(dir_model, hparams, gguf_writer):
+        tokens: list[bytearray] = []
+        toktypes: list[int] = []
+
+        from transformers import AutoTokenizer  # type: ignore[attr-defined]
+        tokenizer = AutoTokenizer.from_pretrained(dir_model)
+        vocab_size = hparams.get("vocab_size", len(tokenizer.vocab))
+        assert max(tokenizer.vocab.values()) < vocab_size
+
+        reverse_vocab = {id_: encoded_tok for encoded_tok, id_ in tokenizer.vocab.items()}
+        added_vocab = tokenizer.get_added_vocab()
+
+        for i in range(vocab_size):
+            if i not in reverse_vocab:
+                pad_token = f"[PAD{i}]".encode('utf-8')
+                tokens.append(bytearray(pad_token))
+                toktypes.append(gguf.TokenType.USER_DEFINED)
+            elif reverse_vocab[i] in added_vocab:
+                tokens.append(reverse_vocab[i])
+                if tokenizer.added_tokens_decoder[i].special:
+                    toktypes.append(gguf.TokenType.CONTROL)
+                else:
+                    toktypes.append(gguf.TokenType.USER_DEFINED)
+            else:
+                tokens.append(reverse_vocab[i])
+                toktypes.append(gguf.TokenType.NORMAL)
+
+        gguf_writer.add_tokenizer_model("gpt2")
+        gguf_writer.add_token_list(tokens)
+        gguf_writer.add_token_types(toktypes)
+
+        special_vocab = gguf.SpecialVocab(dir_model, load_merges=True)
+        special_vocab.add_to_gguf(gguf_writer)
+
+    write_vocab_gguf(dir_model, hparams, gguf_writer)
+
+    # tensor info
+    print("gguf: get tensor metadata")
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+
+        print("Processing variable: " + name + " with shape: ", data.shape)
+        if 'inv_freq' in name:
+            continue
+
+        n_dims = len(data.shape)
+
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
+        if ftype != 0:
+            if name[-7:] == ".weight" and n_dims == 2:
+                print("  Converting to float16")
+                data = data.astype(np.float16)
+                ftype_cur = 1
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+        else:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+
+        # print(f"[{i+1:{padi}d}/{len(model)}]
+        # Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4}")
+
+        gguf_writer.add_tensor(name, data)
+
+    print("gguf: write header")
+    gguf_writer.write_header_to_file()
+    print("gguf: write metadata")
+    gguf_writer.write_kv_data_to_file()
+    print("gguf: write tensors")
+    gguf_writer.write_tensors_to_file()
+
+    gguf_writer.close()
+
+    print("Done. Output file: " + fname_out)
+    print("")
+
+def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     model.eval()
     for p in model.parameters():
         p.requires_grad = False
@@ -166,6 +267,38 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     print("Done. Output file: " + fname_out)
     print("")
+    
+def main(args_in: Optional[List[str]] = None) -> None:
+    parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
+    parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
+    parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("model", type=Path, help="directory containing model file")
+    parser.add_argument("--format",
+                        type=str,
+                        default="NE",
+                        choices=["NE", "GGUF"],
+                        help="convert to the GGUF or NE format")
+    args = parser.parse_args(args_in)
+
+    dir_model = args.model.as_posix()
+    fname_out = args.outfile.as_posix()
+
+    # possible data types
+    #   ftype == 0 -> float32
+    #   ftype == 1 -> float16
+    ftype = 0
+    if args.outtype == "f16":
+        ftype = 1
+
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
+    print("Loading model: ", dir_model)
+    model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
+    hparams = model.config.to_dict()
+    if args.format == "GGUF":
+        phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    else:
+        phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    
 
 
 if __name__ == '__main__':
