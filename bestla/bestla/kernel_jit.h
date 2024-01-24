@@ -307,9 +307,9 @@ class DecompresssS3 {
         vpand(ymm4, LowMask, ymm2);
         vpsrlw(ymm2, bit2_data_zmm, 2);
         vpand(ymm5, LowMask, ymm2);
-        vpsrlw(ymm2, bit2_data_zmm, 2);
+        vpsrlw(ymm2, bit2_data_zmm, 4);
         vpand(ymm6, LowMask, ymm2);
-        vpsrlw(ymm2, bit2_data_zmm, 2);
+        vpsrlw(ymm2, bit2_data_zmm, 6);
         vpand(ymm7, LowMask, ymm2);
         vinsertf32x8(zmm4, zmm4, ymm5, 1);
         vinsertf32x8(zmm6, zmm6, ymm7, 1);
@@ -317,9 +317,9 @@ class DecompresssS3 {
         vpand(ymm8, LowMask, ymm3);
         vpsrlw(ymm3, bit2_data_zmm, 2);
         vpand(ymm9, LowMask, ymm3);
-        vpsrlw(ymm3, bit2_data_zmm, 2);
+        vpsrlw(ymm3, bit2_data_zmm, 4);
         vpand(ymm10, LowMask, ymm3);
-        vpsrlw(ymm3, bit2_data_zmm, 2);
+        vpsrlw(ymm3, bit2_data_zmm, 6);
         vpand(ymm11, LowMask, ymm3);
         vinsertf32x8(zmm8, zmm8, ymm9, 1);
         vinsertf32x8(zmm10, zmm10, ymm11, 1);
