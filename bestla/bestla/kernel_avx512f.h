@@ -652,32 +652,9 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
   auto zmm_shift = _mm512_set1_epi32(5);
 
-  // auto bit3_interleave_decompress = [&](__m128i bit2_data, utils::bit1x8* src2) {
-  auto bit3_interleave_decompress = [&](utils::bit2x4* src1, utils::bit1x8* src2) {
-    const __m128i lowMask = _mm_set1_epi8(0x03);
-    const __m128i bit2_data = _mm_loadu_si128((const __m128i*)src1);
-    // __m128i bit2_data;
-    auto xmm0 = _mm_and_si128(lowMask, bit2_data);                     // uop:1 p:015
-    auto xmm1 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 2));  // uop:1 p:01
-    auto xmm2 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 4));
-    auto xmm3 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 6));
-    auto ymm1 = _mm256_set_m128i(xmm1, xmm0);  // uop:1 p5
-    auto ymm2 = _mm256_set_m128i(xmm3, xmm2);
-    auto zmm = _mm512_inserti32x8(_mm512_castsi256_si512(ymm1), ymm2, 0x1);
-    // make bit1-storage as mmask64, then cvt the mask to the int8-value.
-    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src2);
-    auto bit1_mask = _cvtu64_mask64(*bit1_ptr);
-    // __mmask64 bit1_mask;
-    // __m512i zmm;
-    auto zmm2 = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask, zmm_0x04);
-    zmm = _mm512_add_epi8(zmm, zmm2);
-    zmm = _mm512_sllv_epi32(zmm, zmm_shift);  // int3_clip => int8
-    return zmm;
-  };
-
-  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+  auto bit3_interleave_decompress_pack128 = [&](void* src, int8_t* dst) {
     const __m256i lowMask = _mm256_set1_epi8(0x03);
-    const __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src1);
+    const __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src);
     auto ymm0 = _mm256_and_si256(lowMask, bit2_data);                        // uop:1 p:015
     auto ymm1 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2));  // uop:1 p:01
     auto ymm2 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 4));
@@ -685,7 +662,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     auto zmm1 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm0), ymm1, 0x1);  // lat3, tp1 uop1 p:5
     auto zmm2 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm2), ymm3, 0x1);
 
-    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src2);
+    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src + 32);
     auto bit1_mask1 = _cvtu64_mask64(*bit1_ptr);
     auto bit1_mask2 = _cvtu64_mask64(*(bit1_ptr + 1));
     auto zmm1_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask1, zmm_0x04);
@@ -726,8 +703,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   // for (int i = 0; i < body_loop; i++) {
   for (int i = 0; i < body_loop / 2; i++) {
     if constexpr (!std::is_same_v<_DST_T, int8_t>) {
-      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,
-                                         base_bit1ptr + compress_wei_ptr_offset / 8,
+      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 8 * 3,
                                          reinterpret_cast<int8_t*>(base_unpack_buf));
       for (int j = 0; j < 128; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
       // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
@@ -759,8 +735,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     } else {
       // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
       // base_bit1ptr + compress_wei_ptr_offset / 8);
-      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,
-                                         base_bit1ptr + compress_wei_ptr_offset / 8,
+      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 8 * 3,
                                          reinterpret_cast<int8_t*>(base_unpack_buf) + compress_wei_ptr_offset);
       // _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
     }

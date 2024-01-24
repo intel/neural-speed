@@ -280,9 +280,8 @@ class CompressFp4 {
 class CompressBit3 {
  public:
   template <BTLA_ISA ISA_T>
-  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int row,
-                                  int col, int ld_src, int ld_dst) {
-    return ref::compress_3bit(srcptr, bit2ptr, bit1ptr, row, col, ld_src, ld_dst);
+  static inline BTLA_CODE forward(const int8_t* srcptr, void* dst, int row, int col, int ld_src, int ld_dst) {
+    return ref::compress_3bit(srcptr, dst, row, col, ld_src, ld_dst);
   }
 };
 

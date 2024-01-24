@@ -323,7 +323,7 @@ class UT_BlockQunatize_S3 {
     // }
   }
 };
-// static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
+static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #endif
@@ -881,10 +881,8 @@ class UTBenchmark_CompFp32 {
 
   void ut_s4() {
     // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(48, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(48, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
     //  benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);

@@ -568,10 +568,9 @@ class WeightKBlockNInteger {
     auto row = N / _GemmCore_T::NTILE;
     auto pad_64_buf = utils::avector<int8_t>(row * ld_dst, 0);
     kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD>(B, pad_64_buf.data(), row, col, col, ld_dst);
-    auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
-    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + row * ld_dst / 4);
-    auto ret =
-        kernel::wrapper::CompressBit3::forward<ISA_T>(pad_64_buf.data(), bit2ptr, bit1ptr, row, col, ld_dst, ld_dst);
+    // auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
+    // auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + row * ld_dst / 4);
+    auto ret = kernel::wrapper::CompressBit3::forward<ISA_T>(pad_64_buf.data(), dstptr, row, col, ld_dst, ld_dst);
     assert(ret == BTLA_CODE::Success);
   }
 
@@ -752,7 +751,7 @@ class WeightKBlockNInteger {
           auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
           auto row = NPad / _GemmCore_T::NTILE;
           assert(elt_offset % 8 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 8 * 3);
           auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
           kernel::wrapper::DecompressKBlockS3S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S3_CLIP>(
               bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE,
@@ -833,7 +832,7 @@ class WeightKBlockNInteger {
           auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
           auto row = NPad / _GemmCore_T::NTILE;
           assert(elt_offset % 8 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 8 * 3);
           auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
           kernel::wrapper::DecompressKBlockS3Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
                                                                                              BTLA_DTYPE::S3_CLIP>(
@@ -909,7 +908,7 @@ class WeightKBlockNInteger {
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
       auto elt_offset = base_offset + i * utils::padto(KPad, 64);
       assert(elt_offset % 8 == 0);
-      auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+      auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 8 * 3);
       auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
       kernel::wrapper::DecompressKBlockS3S8Fp<int8_t>::template forward<ISA_T, BTLA_DTYPE::S3_CLIP>(
           bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE,
