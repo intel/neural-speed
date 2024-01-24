@@ -71,7 +71,8 @@ struct Query {
     return std::to_string(id) + ": " + repr_ids;
   }
 };
-
+// Response happens to be the same structure as Query, while the tokens IDs is for prompt in a Query but is for
+// generated tokens in a Response.
 using Response = Query;
 using ResponseCallback = std::function<void(std::vector<Response>, int)>;
 }  // namespace
