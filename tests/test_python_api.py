@@ -53,7 +53,7 @@ class TestLLMRUNTIME(unittest.TestCase):
         print(tokenizer.decode(pt_generate_ids))
 
         # check output ids
-        woq_config_fp32 = {"use_quant":False, "compute_dtype":"fp32", "weight_dtype":"fp32", "use_cache":True, "use_ggml":False, "group_size":128}
+        woq_config_fp32 = {"use_quant":False, "compute_dtype":"fp32", "weight_dtype":"fp32", "use_ggml":False, "group_size":128}
         itrex_model = Model()
 
         itrex_model.init(model_name, use_quant=False)
@@ -65,10 +65,10 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # check diff of logits
         woq_configs = {
-            "fp32": {"use_cache":True, "use_quant":False},
-            # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":True},
-            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True},
-            # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8", "use_cache":True},
+            "fp32": {"use_quant":False},
+            # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_ggml":True},
+            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4"},
+            # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8"},
         }
         for config_type in woq_configs:
             itrex_model = Model()
