@@ -280,6 +280,9 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   bestla::parallel::StdThreading threading(nthread);
 #endif
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
+  if (params.bits == quant_bits::q3) {
+    quant_type = BTLA_DTYPE::S3_CLIP;
+  }
   if (params.bits == quant_bits::q8) {
     quant_type = BTLA_DTYPE::S8;
   }
