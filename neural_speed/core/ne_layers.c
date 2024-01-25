@@ -6365,13 +6365,13 @@ static void ne_compute_forward_mul_mat_f32(const struct ne_compute_params* param
   const size_t nb02 = src0->nb[2];
   const size_t nb03 = src0->nb[3];
 
-  const int nb10 = src1->nb[0];
+  const size_t nb10 = src1->nb[0];
 
-  const int nb11 = src1->nb[1];
+  const size_t nb11 = src1->nb[1];
   UNUSED(nb11);
-  const int nb12 = src1->nb[2];
+  const size_t nb12 = src1->nb[2];
   UNUSED(nb12);
-  const int nb13 = src1->nb[3];
+  const size_t nb13 = src1->nb[3];
   UNUSED(nb13);
 
   const size_t nb0 = dst->nb[0];
@@ -6841,20 +6841,20 @@ static void ne_compute_forward_mul_mat_bias_q_f32_bestla(const struct ne_compute
   const int64_t ne2 = dst->ne[2];
   const int64_t ne3 = dst->ne[3];
 
-  const int nb00 = src0->nb[0];
-  const int nb01 = src0->nb[1];
-  const int nb02 = src0->nb[2];
-  const int nb03 = src0->nb[3];
+  const size_t nb00 = src0->nb[0];
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
 
-  const int nb10 = src1->nb[0];
-  const int nb11 = src1->nb[1];
-  const int nb12 = src1->nb[2];
-  const int nb13 = src1->nb[3];
+  const size_t nb10 = src1->nb[0];
+  const size_t nb11 = src1->nb[1];
+  const size_t nb12 = src1->nb[2];
+  const size_t nb13 = src1->nb[3];
 
-  const int nb0 = dst->nb[0];
-  const int nb1 = dst->nb[1];
-  const int nb2 = dst->nb[2];
-  const int nb3 = dst->nb[3];
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
 
   const int ith = params->ith;
   const int nth = params->nth;
@@ -8703,25 +8703,25 @@ static void ne_compute_forward_flash_attn_f32_f16_f16(const struct ne_compute_pa
   // const int64_t ne2  = dst->ne[2];
   // const int64_t ne3  = dst->ne[3];
 
-  const int nbk0 = k->nb[0];
-  const int nbk1 = k->nb[1];
-  const int nbk2 = k->nb[2];
-  const int nbk3 = k->nb[3];
+  const size_t nbk0 = k->nb[0];
+  const size_t nbk1 = k->nb[1];
+  const size_t nbk2 = k->nb[2];
+  const size_t nbk3 = k->nb[3];
 
-  const int nbq0 = q->nb[0];
-  const int nbq1 = q->nb[1];
-  const int nbq2 = q->nb[2];
-  const int nbq3 = q->nb[3];
+  const size_t nbq0 = q->nb[0];
+  const size_t nbq1 = q->nb[1];
+  const size_t nbq2 = q->nb[2];
+  const size_t nbq3 = q->nb[3];
 
-  const int nbv0 = v->nb[0];
-  const int nbv1 = v->nb[1];
-  const int nbv2 = v->nb[2];
-  const int nbv3 = v->nb[3];
+  const size_t nbv0 = v->nb[0];
+  const size_t nbv1 = v->nb[1];
+  const size_t nbv2 = v->nb[2];
+  const size_t nbv3 = v->nb[3];
 
-  const int nb0 = dst->nb[0];
-  const int nb1 = dst->nb[1];
-  const int nb2 = dst->nb[2];
-  const int nb3 = dst->nb[3];
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
 
   const int64_t headsize = neq0;
   const int64_t headnum = neq2;

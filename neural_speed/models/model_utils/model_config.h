@@ -86,16 +86,24 @@ struct gpt_params {
   bool multiline_input = false;    // reverse the usage of `\`
   bool warmup = true;
 
-  bool instruct = false;        // instruction mode (used for Alpaca models)
-  bool penalize_nl = true;      // consider newlines as a repeatable token
-  bool perplexity = false;      // compute perplexity over the prompt
-  bool use_mmap = false;        // use mmap for faster loads
-  bool use_mlock = false;       // use mlock to keep model in memory
-  bool mem_test = false;        // compute maximum memory usage
-  bool verbose_prompt = false;  // print prompt tokens before generation
-  int batch_size = 1;           // number batch of prompt
-  bool beam_search = false;     // use beam_search or not
-  int beam_size = 1;            // only valid if use beam search
+  bool instruct = false;                        // instruction mode (used for Alpaca models)
+  bool penalize_nl = true;                      // consider newlines as a repeatable token
+  bool perplexity = false;                      // compute perplexity over the prompt
+  bool use_mmap = false;                        // use mmap for faster loads
+  bool use_mlock = false;                       // use mlock to keep model in memory
+  bool mem_test = false;                        // compute maximum memory usage
+  bool verbose_prompt = false;                  // print prompt tokens before generation
+  int batch_size = 1;                           // number batch of prompt
+  bool beam_search = false;                     // use beam_search or not
+  int beam_size = 1;                            // only valid if use beam search
+  int cont_batching = false;                    // whether to use continuous batching (concat multi sequences)
+  int max_request_num = MODEL_MAX_REQUEST_NUM;  // maximum num of bearable requests in current env
+
+  uint32_t min_new_tokens = 0;     // min new tokens for beam search generation
+  float length_penalty = 1.0f;     // exponential penalty to the length in beam search generation
+  bool do_early_stopping = false;  // early stopping in beam search generation
+
+  float model_scratch_enlarge_scale = 1.0f;  // model memory scratch enlarge scale
 };
 
 bool gpt_params_parse(int argc, char** argv, gpt_params& params);

@@ -37,18 +37,8 @@
 #include "core/data_types.h"
 #include "layers/layers.h"
 
-#define NE_FILE_MAGIC 0x67676d6c  // "ne"
-#define NE_FILE_VERSION 1
-
 #define NE_QNT_VERSION 2            // bump this on quantization format changes
 #define NE_QNT_VERSION_FACTOR 1000  // do not change this
-
-#define NE_MAX_DIMS 4
-#define NE_MAX_NODES 8192
-#define NE_MAX_PARAMS 256
-#define NE_MAX_CONTEXTS 64
-#define NE_MAX_OPT 4
-#define NE_DEFAULT_N_THREADS 4
 
 #define NE_UNUSED(x) (void)(x)
 #define NE_TENSOR_LOCALS_1(type, prefix, pointer, array) \

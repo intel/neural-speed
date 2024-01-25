@@ -21,6 +21,7 @@ from neural_speed.convert import convert_model
 from transformers import AutoConfig, AutoTokenizer
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
+max_request_num_default = 8
 
 
 class Model:
@@ -30,6 +31,7 @@ class Model:
         self.model_type = None
         self.bin_file = None
         self.generate_round = 0
+        self.max_request_num = -1
 
     def __import_package(self, model_type):
         if self.module:
@@ -139,6 +141,9 @@ class Model:
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)
         self.model = self.module.Model()
+        if self.max_request_num == -1:
+            self.max_request_num = max(generate_kwargs.get("max_request_num", 
+                            max_request_num_default), generate_kwargs.get("batch_size", 1))
         if "threads" not in generate_kwargs:
             threads = os.getenv("OMP_NUM_THREADS")
             import platform
@@ -162,9 +167,18 @@ class Model:
     def generate(self, input_ids, streamer=None, interactive=False, ignore_prompt=False,
                  stopping_criteria=None,  **generate_kwargs):
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
-        if self.model is None:
-            self.init_from_bin(self.model_type, self.bin_file, batch_size=input_ids.shape[0],
-                               **generate_kwargs)
+        input_bs = input_ids.shape[0]
+        max_request_num = generate_kwargs.pop("max_request_num", max_request_num_default)
+        reinit_from_bin = False
+        if max_request_num > self.max_request_num or input_bs > self.max_request_num:
+            reinit_from_bin = True
+            if self.max_request_num > 0:
+                print("Will start to reinit model from bin due to different max request num.")
+            self.max_request_num = max(input_bs, max_request_num) 
+
+        if self.model is None or reinit_from_bin:
+            self.init_from_bin(self.model_type, self.bin_file, batch_size=input_bs,
+                               max_request_num = self.max_request_num, **generate_kwargs)
             self.generate_round = 0
         elif not interactive:
             self.model.reinit()
@@ -191,7 +205,12 @@ class Model:
         if interactive:
             self.model.reset_token_end()
         out_count = 0
-        input_list = input_ids.tolist()
+        input_list = None
+        pad_token_id = generate_kwargs.get("pad_token", None)
+        if generate_kwargs.get("continuous_batching", False):
+            input_list = self._cont_batching_input(input_ids, pad_token_id)
+        else:
+            input_list = input_ids.tolist()
         while True:
             response = self.model.generate(input_ids=input_list)
             input_list = []  # next-token stage will use previous output
@@ -245,3 +264,17 @@ class Model:
         else:
             print("Please input torch.Tensor")
         return
+
+    def _cont_batching_input(self, input_ids, pad_token_id=None):
+        assert isinstance(input_ids, torch.Tensor), "Input must be torch.Tensor."
+        input_list = input_ids.tolist()
+        pti = pad_token_id
+        if pti == None:
+            pti = self.tokenizer.pad_token_id
+        assert pti != None, "Please supply pad token id."
+        for il in range(len(input_list)):
+            count = input_list[il].count(pti)
+            # padding left
+            del input_list[il][0: count]
+            assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
+        return input_list
