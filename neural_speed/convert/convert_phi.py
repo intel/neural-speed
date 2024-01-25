@@ -67,7 +67,6 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     gguf_writer.add_uint32('version', 1)
     gguf_writer.add_uint32('n_vocab', hparams["vocab_size"])
     gguf_writer.add_embedding_length(hparams["hidden_size"])
-    gguf_writer.add_uint32('n_mult', 0)
     gguf_writer.add_head_count(hparams["num_attention_heads"])
     gguf_writer.add_head_count_kv(hparams["num_key_value_heads"])
 
@@ -75,16 +74,7 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     gguf_writer.add_rope_dimension_count(n_rot)
     gguf_writer.add_uint32('ftype', ftype)
     gguf_writer.add_context_length(hparams["max_position_embeddings"])
-    gguf_writer.add_max_alibi_bias(0)
-    gguf_writer.add_uint32('clip_qkv', 0)
-    gguf_writer.add_uint32('par_res', 0)
-
-    gguf_writer.add_uint32('word_embed_proj_dim', 0)
-    gguf_writer.add_uint32('do_layer_norm_before', 0)
-
-    gguf_writer.add_uint32('multi_query_group_num', 0)
     gguf_writer.add_feed_forward_length(hparams["intermediate_size"])
-    gguf_writer.add_uint32('inner_hidden_size', 0)
 
     gguf_writer.add_bos_token_id(tokenizer.bos_token_id)
     gguf_writer.add_eos_token_id(tokenizer.eos_token_id)
