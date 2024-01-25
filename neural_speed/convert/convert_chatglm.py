@@ -19,7 +19,7 @@ from pathlib import Path
 import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from sentencepiece import SentencePieceProcessor  # type: ignore
 import gguf
 
@@ -368,7 +368,9 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
-    vocab = load_vocab_for_glm2(Path(dir_model))
+    tokenizer_path = Path(tokenizer.vocab_file).parent
+    vocab = load_vocab_for_glm2(Path(tokenizer_path))
+
     counter = 0
     for text, score in vocab.all_tokens():
         fout.write(struct.pack("i", len(text)))
@@ -464,7 +466,8 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
-    vocab = load_vocab_for_glm1(Path(dir_model))
+    tokenizer_path = Path(tokenizer.vocab_file).parent
+    vocab = load_vocab_for_glm1(Path(tokenizer_path))
     counter = 0
     for text, score in vocab.all_tokens():
         fout.write(struct.pack("i", len(text)))
@@ -534,9 +537,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     dir_model = args.model.as_posix()
     fname_out = args.outfile.as_posix()
 
-    with open(dir_model + '/config.json', "r", encoding="utf-8") as f:
-        hparams = json.load(f)
-
     # possible data types
     #   ftype == 0 -> float32
     #   ftype == 1 -> float16
@@ -544,8 +544,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if args.outtype == "f16":
         ftype = 1
 
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
+
+    hparams = config.to_dict()
 
     if hasattr(model.config, "multi_query_attention"):
         if args.format == "GGUF":
