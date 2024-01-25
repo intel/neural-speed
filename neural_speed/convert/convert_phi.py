@@ -86,10 +86,10 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     gguf_writer.add_feed_forward_length(hparams["intermediate_size"])
     gguf_writer.add_uint32('inner_hidden_size', 0)
 
-    gguf_writer.add_int32('bos_token_id', tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1)
-    gguf_writer.add_int32('eos_token_id', tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1)
-    gguf_writer.add_int32('pad_token_id', tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1)
-    gguf_writer.add_int32('sep_token_id', tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1)
+    gguf_writer.add_bos_token_id(tokenizer.bos_token_id)
+    gguf_writer.add_eos_token_id(tokenizer.eos_token_id)
+    gguf_writer.add_pad_token_id(tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0)
+    gguf_writer.add_sep_token_id(tokenizer.sep_token_id if tokenizer.sep_token_id is not None else 0)
 
     def write_vocab_gguf(dir_model, hparams, gguf_writer):
         tokens: list[bytearray] = []
@@ -210,7 +210,6 @@ def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
-
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
