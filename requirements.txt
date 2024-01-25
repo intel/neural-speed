@@ -13,5 +13,4 @@ tiktoken
 py-cpuinfo
 gguf
 cmake
-auto-gptq
 setuptools>=61
