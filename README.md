@@ -41,7 +41,6 @@ streamer = TextStreamer(tokenizer)
 model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
->**Note**: For llama2/ mistral/ neural_chat/ codellama/ magicoder/ chatglmv1/v2/ baichuan models, we can only support the local path to model for now.
 GGUF format HF model
 ```python
 from transformers import AutoTokenizer, TextStreamer
@@ -62,7 +61,9 @@ model = AutoModelForCausalLM.from_pretrained(model_name, model_file = model_file
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
 
-You can also use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers), but you need to install Intel Extension for Transformers.
+Please refer [this link](./docs/supported_models.md) to check supported models.
+
+If you want to use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(Intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers). Please refer to [ITREX Installation Page](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md).
 
 ### 2. llama.cpp-like usage:
 
