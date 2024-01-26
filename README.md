@@ -27,23 +27,22 @@ There are two approaches for utilizing the Neural Speed: 1. Transformer-like usa
 
 ### 1. Transformer-like usage
 
-Pytorch format HF model
+PyTorch model from Hugging Face
 ```python
-from transformers import AutoTokenizer, TextStreamer
+from transformers import AutoTokenizer
 from intel_extension_for_transformers.transformers import AutoModelForCausalLM
 model_name = "Intel/neural-chat-7b-v3-1"     # Hugging Face model_id or local model
 prompt = "Once upon a time, there existed a little girl,"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 inputs = tokenizer(prompt, return_tensors="pt").input_ids
-streamer = TextStreamer(tokenizer)
 
 model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
-outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
+outputs = model.generate(inputs)
 ```
-GGUF format HF model
+GGUF model from Hugging Face
 ```python
-from transformers import AutoTokenizer, TextStreamer
+from transformers import AutoTokenizer
 from intel_extension_for_transformers.transformers import AutoModelForCausalLM
 
 # Specify the GGUF repo on the Hugginface
@@ -56,16 +55,13 @@ tokenizer_name = "meta-llama/Llama-2-7b-chat-hf"
 prompt = "Once upon a time"
 tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
 inputs = tokenizer(prompt, return_tensors="pt").input_ids
-streamer = TextStreamer(tokenizer)
 model = AutoModelForCausalLM.from_pretrained(model_name, model_file = model_file)
-outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
+outputs = model.generate(inputs)
 ```
 
-Please refer [this link](./docs/supported_models.md) to check supported models.
+Please refer [this link](./docs/supported_models.md) to check the supported models and more [sample code](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code).
 
-If you want to use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(Intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers). Please refer to [ITREX Installation Page](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md).
-
-### 2. llama.cpp-like usage:
+### 2. llama.cpp-like usage
 
 #### One-click Python scripts
 Run LLM with one-click python script including conversion, quantization and inference.
