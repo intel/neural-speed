@@ -715,54 +715,20 @@ class WeightKBlockNInteger {
     auto KPad = wptr->mKPad;
     int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
-      if (wptr->SDtype() == BTLA_DTYPE::F32) {
-        auto sptr = wptr->template SPtr<float>() + n_offset + i;
-        if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
-          kernel::wrapper::DecompressKBlockS4S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S4_CLIP>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S4_FULLRANGE) {
-          kernel::wrapper::DecompressKBlockS4S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S4_FULLRANGE>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S8) {
-          kernel::wrapper::DecompressKBlockS8S8Fp<T>::template forward<ISA_T>(
-              wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        }
-      } else if (wptr->SDtype() == BTLA_DTYPE::BF16) {
-        auto sptr = wptr->template SPtr<utils::bf16>() + n_offset + i;
-        if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
-          kernel::wrapper::DecompressKBlockS4S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S4_CLIP>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S4_FULLRANGE) {
-          kernel::wrapper::DecompressKBlockS4S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S4_FULLRANGE>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S8) {
-          kernel::wrapper::DecompressKBlockS8S8Fp<T>::template forward<ISA_T>(
-              wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
-          int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
-          auto elt_offset =
-              n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 64);
-          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
-          auto row = NPad / _GemmCore_T::NTILE;
-          assert(elt_offset % 8 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
-          auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
-          kernel::wrapper::DecompressKBlockS3S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S3_CLIP>(
-              bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE,
-              k_size / _GemmCore_T::PACK_ROW * ColSize, tmpcache, cachesize);
-        } else {
-          assert(0);
-        }
+      if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
+        kernel::wrapper::DecompressKBlockS4S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S4_CLIP>(
+            wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
+                i * KPad / 2,
+            *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
+      } else if (wptr->mDType == BTLA_DTYPE::S4_FULLRANGE) {
+        kernel::wrapper::DecompressKBlockS4S8Fp<T>::template forward<ISA_T, BTLA_DTYPE::S4_FULLRANGE>(
+            wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
+                i * KPad / 2,
+            *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
+      } else if (wptr->mDType == BTLA_DTYPE::S8) {
+        kernel::wrapper::DecompressKBlockS8S8Fp<T>::template forward<ISA_T>(
+            wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
+            *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
       }
     }
     *dststep = k_size;
