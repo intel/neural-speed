@@ -1065,6 +1065,10 @@ class OutputFile:
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
+        self.fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+        self.fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+        self.fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+
         self.fout.write(
             struct.pack("i", 1)
         )

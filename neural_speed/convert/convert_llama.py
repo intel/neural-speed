@@ -1093,6 +1093,10 @@ class OutputFile:
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
+        self.fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+        self.fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+        self.fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+
         # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
         self.fout.write(struct.pack("i", params.bos_token_id))
