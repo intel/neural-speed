@@ -50,9 +50,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     gguf_path = args.model.as_posix()
 
-    prompt = "Once upon a time"
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
-    inputs = tokenizer(prompt, return_tensors="pt").input_ids
+    inputs = tokenizer(args.prompt, return_tensors="pt").input_ids
     streamer = TextStreamer(tokenizer)
 
     model = Model()

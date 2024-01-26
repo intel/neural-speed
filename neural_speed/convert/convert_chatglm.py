@@ -279,7 +279,8 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
             if "pad_token_id" in hparams and hparams["pad_token_id"] != None:
                 gguf_writer.add_pad_token_id(hparams["pad_token_id"])
 
-    write_vocab_gguf(dir_model)
+    tokenizer_path = Path(tokenizer.vocab_file).parent
+    write_vocab_gguf(str(tokenizer_path))
 
     # tensor info
     print("gguf: get tensor metadata")
