@@ -246,8 +246,8 @@ class UT_BlockQunatize_S3 {
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>;
 
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
-    auto ptr_ref = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16, BTLA_DTYPE::F32, false);
+    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
+    auto ptr_ref = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
     avector<int8_t> buffer(ptr.mSize);
     avector<int8_t> buffer_ref(ptr_ref.mSize);
     ptr.assign(buffer.data());
