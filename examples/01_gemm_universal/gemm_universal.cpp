@@ -51,13 +51,13 @@ void gemm_universal_run(uint32_t iter) {
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
             [](data_type_a *data, size_t idx) {
-                data[idx] = static_cast<data_type_a>(1.f);
+                data[idx] = static_cast<data_type_a>(random_float());
             },
             queue, device, context);
     auto B = alloc_device_and_init<data_type_b>(
             size_b,
             [](data_type_b *data, size_t idx) {
-                data[idx] = static_cast<data_type_b>(1.f);
+                data[idx] = static_cast<data_type_b>(random_float());
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type_c>(
@@ -76,11 +76,11 @@ void gemm_universal_run(uint32_t iter) {
 
     // specify the range k_w/k_s by setting the corresponding ratio
     // splitk using global memory
-    constexpr uint32_t num_global_splitk = 1;
-    // = (kslicing_type == kslicing_impl_t::global) ? 2 : 1;
+    constexpr uint32_t num_global_splitk
+            = (kslicing_type == kslicing_impl_t::global) ? 2 : 1;
     // splitk using local memory
-    constexpr uint32_t num_local_splitk = 1;
-    //= (kslicing_type == kslicing_impl_t::local) ? 1 : 1;
+    constexpr uint32_t num_local_splitk
+            = (kslicing_type == kslicing_impl_t::local) ? 2 : 1;
 
     // Mirco-kernel configuration
     using tune_option = dict_t<
@@ -91,11 +91,11 @@ void gemm_universal_run(uint32_t iter) {
                     tune_key_value::dispatch_policy_kslicing>,
             elem_v_t<tune_key::global_kslicing_ratio, num_global_splitk>,
             elem_v_t<tune_key::local_kslicing_ratio, num_local_splitk>,
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>,
             elem_t_t<tune_key::group_swizzle_policy,
                     gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>>,
             elem_t_t<tune_key::epilogue_policy,
-                    gpu::xetla::group::epilogue_policy_default<gpu_arch::Dg2>>,
-            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
+                    gpu::xetla::group::epilogue_policy_default<gpu_arch::Dg2>>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A
