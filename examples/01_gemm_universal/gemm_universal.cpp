@@ -91,6 +91,10 @@ void gemm_universal_run(uint32_t iter) {
                     tune_key_value::dispatch_policy_kslicing>,
             elem_v_t<tune_key::global_kslicing_ratio, num_global_splitk>,
             elem_v_t<tune_key::local_kslicing_ratio, num_local_splitk>,
+            elem_t_t<tune_key::group_swizzle_policy,
+                    gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>>,
+            elem_t_t<tune_key::epilogue_policy,
+                    gpu::xetla::group::epilogue_policy_default<gpu_arch::Dg2>>,
             elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             data_type_a, // input datatype for A

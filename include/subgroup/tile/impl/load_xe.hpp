@@ -423,7 +423,6 @@ tile_load(tile_t &tile, payload_t &payload) {
 
     // check whether need to transpose
     static constexpr bool reg_transpose = tile_desc::reg_transpose;
-    static constexpr mem_layout mem_layout_ = payload_t::memory_layout;
     static constexpr bool mem_transpose = payload_t::mem_transpose;
     static constexpr bool trans = reg_transpose ^ mem_transpose;
 
