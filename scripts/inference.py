@@ -133,9 +133,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if is_win():
         path = Path(args.build_dir, "./Bin/Release/run_{}.exe".format(model_name))
     else:
-        import neural_speed
-        package_path = os.path.dirname(neural_speed.__file__)
-        path = Path(package_path, "./run_{}".format(model_name))
+        if args.one_click_run == "True":
+            import neural_speed
+            package_path = os.path.dirname(neural_speed.__file__)
+            path = Path(package_path, "./run_{}".format(model_name))
+        else:
+            path = Path(args.build_dir, "./bin/run_{}".format(model_name))
 
     if not path.exists():
         print("Please build graph first or select the correct model name.")
