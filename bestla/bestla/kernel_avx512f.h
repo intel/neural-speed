@@ -14,6 +14,7 @@
 #pragma once
 #include "bestla.h"
 #include "bestla_utils.h"
+#include "kernel_jit.h"
 #include "kernel_ref.h"
 
 #include <array>
@@ -647,33 +648,10 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
 template <BTLA_DTYPE S3_T, typename _DST_T>
 inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
                                            int interleave_n_offset, int unpack_elt, int8_t* tmp, size_t tmpsize) {
-  auto head_ignore_num = interleave_n_offset % 64;
+  auto head_ignore_num = interleave_n_offset % 128;
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
   auto zmm_shift = _mm512_set1_epi32(5);
-
-  // auto bit3_interleave_decompress = [&](__m128i bit2_data, utils::bit1x8* src2) {
-  auto bit3_interleave_decompress = [&](utils::bit2x4* src1, utils::bit1x8* src2) {
-    const __m128i lowMask = _mm_set1_epi8(0x03);
-    const __m128i bit2_data = _mm_loadu_si128((const __m128i*)src1);
-    // __m128i bit2_data;
-    auto xmm0 = _mm_and_si128(lowMask, bit2_data);                     // uop:1 p:015
-    auto xmm1 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 2));  // uop:1 p:01
-    auto xmm2 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 4));
-    auto xmm3 = _mm_and_si128(lowMask, _mm_srli_epi16(bit2_data, 6));
-    auto ymm1 = _mm256_set_m128i(xmm1, xmm0);  // uop:1 p5
-    auto ymm2 = _mm256_set_m128i(xmm3, xmm2);
-    auto zmm = _mm512_inserti32x8(_mm512_castsi256_si512(ymm1), ymm2, 0x1);
-    // make bit1-storage as mmask64, then cvt the mask to the int8-value.
-    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src2);
-    auto bit1_mask = _cvtu64_mask64(*bit1_ptr);
-    // __mmask64 bit1_mask;
-    // __m512i zmm;
-    auto zmm2 = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask, zmm_0x04);
-    zmm = _mm512_add_epi8(zmm, zmm2);
-    zmm = _mm512_sllv_epi32(zmm, zmm_shift);  // int3_clip => int8
-    return zmm;
-  };
 
   auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
     const __m256i lowMask = _mm256_set1_epi8(0x03);
@@ -701,78 +679,31 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
 
   assert(head_ignore_num % 8 == 0);
 
-  if (head_ignore_num > unpack_elt) {
-    assert(0);
-  }
   auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
   auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
-  int8_t* base_unpack_buf;
-  if constexpr (std::is_same_v<_DST_T, int8_t>) {
-    base_unpack_buf = dstptr - head_ignore_num;
-  } else {
-    base_unpack_buf = tmp - head_ignore_num;
-  }
   int compress_wei_ptr_offset = 0;
+  int8_t* s8_ptr = reinterpret_cast<int8_t*>(tmp);
+  auto head_write_num = 128 - head_ignore_num;
   if (head_ignore_num != 0) {
-    assert(0);
-    // auto unpack_mask = _cvtu64_mask64(0xffffffffffffffff << head_ignore_num);
-    // auto head_zmm = bit3_interleave_decompress(base_bit2ptr, base_bit1ptr);
-    // _mm512_mask_storeu_epi8(base_unpack_buf, unpack_mask, head_zmm);
-    // compress_wei_ptr_offset += 64;
+    printf("head process\n");
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    for (int i = 0; i < head_write_num; i++) dstptr[i] = s8_ptr[head_ignore_num + i];
+    compress_wei_ptr_offset += head_write_num;
   }
-  auto body_loop = (unpack_elt - (64 - head_ignore_num) % 64) / 64;
-  auto tail_proc_num = (unpack_elt - (64 - head_ignore_num) % 64) % 64;
 
-  // for (int i = 0; i < body_loop; i++) {
-  for (int i = 0; i < body_loop / 2; i++) {
-    if constexpr (!std::is_same_v<_DST_T, int8_t>) {
-      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,
-                                         base_bit1ptr + compress_wei_ptr_offset / 8,
-                                         reinterpret_cast<int8_t*>(base_unpack_buf));
-      for (int j = 0; j < 128; j += 16) convert_s8_fp_v16(dstptr + compress_wei_ptr_offset + j, tmp + j);
-      // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
-      //                                     base_bit1ptr + compress_wei_ptr_offset / 8);
-      // _mm512_storeu_epi8(base_unpack_buf, zmm);
-      // auto xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(base_unpack_buf));
-      // auto xmm2 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(base_unpack_buf + 16));
-      // auto xmm3 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(base_unpack_buf + 32));
-      // auto xmm4 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(base_unpack_buf + 48));
-      // auto zmm1 = _mm512_cvtepi8_epi32(xmm1);
-      // auto zmm2 = _mm512_cvtepi8_epi32(xmm2);
-      // auto zmm3 = _mm512_cvtepi8_epi32(xmm3);
-      // auto zmm4 = _mm512_cvtepi8_epi32(xmm4);
-      // if constexpr (std::is_same_v<_DST_T, utils::bf16>) {
-      //   auto ymm1 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm1));
-      //   auto ymm2 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm2));
-      //   auto ymm3 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm3));
-      //   auto ymm4 = zmm_cvt_fp32_bf16(_mm512_cvtepi32_ps(zmm4));
-      //   _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset), ymm1);
-      //   _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset + 16), ymm2);
-      //   _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset + 32), ymm3);
-      //   _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr + compress_wei_ptr_offset + 48), ymm4);
-      // } else {
-      //   _mm512_storeu_ps(dstptr + compress_wei_ptr_offset, _mm512_cvtepi32_ps(zmm1));
-      //   _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 16, _mm512_cvtepi32_ps(zmm2));
-      //   _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 32, _mm512_cvtepi32_ps(zmm3));
-      //   _mm512_storeu_ps(dstptr + compress_wei_ptr_offset + 48, _mm512_cvtepi32_ps(zmm4));
-      // }
-    } else {
-      // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
-      // base_bit1ptr + compress_wei_ptr_offset / 8);
-      bit3_interleave_decompress_pack128(base_bit2ptr + compress_wei_ptr_offset / 4,
-                                         base_bit1ptr + compress_wei_ptr_offset / 8,
-                                         reinterpret_cast<int8_t*>(base_unpack_buf) + compress_wei_ptr_offset);
-      // _mm512_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, zmm);
-    }
-    // compress_wei_ptr_offset += 64;
-    compress_wei_ptr_offset += 128;
-  }
+  auto body_loop = (unpack_elt - head_write_num % 128) / 128;
+  auto tail_proc_num = (unpack_elt - head_write_num % 128) % 128;
+
+  bestla::kernel::jit::DecompresssS3::forward_avx512f(bit2ptr + compress_wei_ptr_offset / 4,
+                                                      bit1ptr + compress_wei_ptr_offset / 8,
+                                                      dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
+  compress_wei_ptr_offset += body_loop * 128;
   if (tail_proc_num > 0) {
-    assert(0);
-    // auto unpack_mask = _cvtu64_mask64(0xffffffffffffffff >> (64 - tail_proc_num));
-    // auto zmm = bit3_interleave_decompress(base_bit2ptr + compress_wei_ptr_offset / 4,
-    //                                       base_bit1ptr + compress_wei_ptr_offset / 8);
-    // _mm512_mask_storeu_epi8(base_unpack_buf + compress_wei_ptr_offset, unpack_mask, zmm);
+    printf("tail process\n");
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
+                                       tmp);
+    for (int i = 0; i < tail_proc_num; i++) dstptr[compress_wei_ptr_offset + i] = s8_ptr[i];
   }
   return BTLA_CODE::Success;
 }
