@@ -228,19 +228,27 @@ def unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config):
     return weight, scales, zeros
 
 def unpack_gptq_weight_3bits(qweight, scales, qzeros, q_config):
-    print("unpack_gptq_weight_3bits...", end='')
+    print("unpack_gptq_weight_3bits...   ", end='')
+
     group_size = q_config['group_size']
     bits = q_config['bits']
-    wf = torch.tensor([[ 0,  4,  8, 12, 16, 20, 24, 28]], dtype=torch.int32)
+
+    wf = torch.tensor([[0, 3, 6, 9, 12, 15, 18, 21, 24, 27]], dtype=torch.int32)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
                                       wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
 
     zeros = zeros + 1
-    zeros = zeros.reshape(scales.shape)
+    zeros = zeros.reshape(zeros.shape[0], -1)
+    zeros = zeros[:,:scales.shape[1]]
 
     weight = torch.bitwise_right_shift(torch.unsqueeze(qweight, 1).expand(-1, 32 // bits, -1),
                                        wf.unsqueeze(-1)).to(torch.int16 if bits == 8 else torch.int8)
+
+    weight = weight.reshape(-1, weight.shape[-1])
+    input_feature = group_size * scales.shape[0]
+    weight = weight[:input_feature,:]
+
     torch.bitwise_and(weight,(2 ** bits) - 1, out=weight)
 
     return weight, scales, zeros
