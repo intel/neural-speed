@@ -181,16 +181,7 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
 // #include <iostream>
 static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
                                       int row, int col, int ld_src, int ld_dst) {
-  assert(col % 64 == 0);
-  // interleave + store 2bit.
-
-  // for (int i = 0; i < row * col; i++) {
-  //   char tmp;
-  //   memcpy(&tmp, &srcptr[i], 1);
-  //   tmp &= 0xe0;
-  //   std::cout << int(*(reinterpret_cast<int8_t*>(&tmp))) << std::endl;
-  // }
-  // std::cout << "==============" << std::endl;
+  assert(col % 128 == 0);
 
   auto bit2_interleave = [&](int8_t* src, int8_t* dst) {
     for (int i = 0; i < 128 / 4; i++) {
@@ -201,24 +192,12 @@ static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x
     }
   };
 
-  // auto bit2_interleave = [&](int8_t* src, int8_t* dst) {
-  //   for (int i = 0; i < 64 / 4; i++) {
-  //     dst[4 * i] = src[i];
-  //     dst[4 * i + 1] = src[64 / 4 + i];
-  //     dst[4 * i + 2] = src[64 / 4 * 2 + i];
-  //     dst[4 * i + 3] = src[64 / 4 * 3 + i];
-  //   }
-  // };
-
-
   int8_t interleave_buf[128];
 
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 128) {
-    // for (int j = 0; j < col; j += 64) {
       bit2_interleave(const_cast<int8_t*>(srcptr + i * ld_src + j), interleave_buf);
       for (int k = 0; k < 32; k++) {
-      // for (int k = 0; k < 16; k++) {
         bit2ptr[i * ld_dst / 4 + j / 4 + k].a = interleave_buf[4 * k] >> 5;
         bit2ptr[i * ld_dst / 4 + j / 4 + k].b = interleave_buf[4 * k + 1] >> 5;
         bit2ptr[i * ld_dst / 4 + j / 4 + k].c = interleave_buf[4 * k + 2] >> 5;
