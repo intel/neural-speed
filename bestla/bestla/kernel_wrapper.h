@@ -511,13 +511,14 @@ class DecompressKBlockS3S8Fp {
                                   int interleave_n_offset, int unpack_elt, void* tmp, size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
 #if CompileAVX512F()
-    if constexpr (utils::isa_base<ISA_T>::avx512f && !std::is_same_v<_DST_T, int8_t>) {
-      ret = avx512f::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
-                                                             reinterpret_cast<int8_t*>(tmp), tmpsize);
-    } else {
-      jit::DecompresssS3::forward_avx512f(bit2ptr, bit1ptr, dstptr, unpack_elt);
-      ret = BTLA_CODE::Success;
-    }
+    // if constexpr (utils::isa_base<ISA_T>::avx512f && !std::is_same_v<_DST_T, int8_t>) {
+    //   ret = avx512f::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset,
+    //   unpack_elt,
+    //                                                          reinterpret_cast<int8_t*>(tmp), tmpsize);
+    // } else {
+    jit::DecompresssS3::forward_avx512f(bit2ptr, bit1ptr, dstptr, tmp, unpack_elt);
+    ret = BTLA_CODE::Success;
+    // }
 #endif
     assert(ret == BTLA_CODE::Success);
     return ret;
