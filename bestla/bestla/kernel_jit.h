@@ -252,10 +252,11 @@ class DequanS8FP {
 };
 class DecompresssS3 {
  public:
+  template <typename _DST_T>
   class MicroKernelAVX512F : protected xbyak::JitAvx512f {
    public:
     struct params {
-      void *bit2ptr, *bit1ptr, *dstptr;
+      void *bit2ptr, *bit1ptr, *dstptr, *tmpbuf;
       int unpack_elt;
       int8_t ox3, ox4;
       int ox5;
@@ -279,6 +280,7 @@ class DecompresssS3 {
         reg_iter = st.t[3];
         reg_dst = st.t[4];
         reg_tmp = st.t[5];
+        reg_cache = st.t[6];
         reg_ret = rax;
         xor_(reg_loop, reg_loop);
         mov(reg_loop.cvt32(), ptr[parambase + OFFSET(unpack_elt)]);
@@ -292,6 +294,7 @@ class DecompresssS3 {
         mov(reg_bit1ptr, ptr[parambase + OFFSET(bit1ptr)]);
         mov(reg_bit2ptr, ptr[parambase + OFFSET(bit2ptr)]);
         mov(reg_dst, ptr[parambase + OFFSET(dstptr)]);
+        if constexpr (!std::is_same_v<_DST_T, int8_t>) mov(reg_cache, ptr[parambase + OFFSET(tmpbuf)]);
         L("loop_label");
         imul(reg_tmp, reg_iter, 16);
         kmovq(bit1_mask1, ptr[reg_bit1ptr + reg_tmp]);
@@ -321,9 +324,25 @@ class DecompresssS3 {
         vpsllvd(zmm4, zmm4, zmm_shift);
         vpsllvd(zmm6, zmm6, zmm_shift);
 
-        imul(reg_tmp, reg_iter, 128);
-        vmovups(ptr[reg_dst + reg_tmp], zmm4);
-        vmovups(ptr[reg_dst + reg_tmp + 64], zmm6);
+        if constexpr (std::is_same_v<_DST_T, int8_t>) {
+          imul(reg_tmp, reg_iter, 128);
+          vmovups(ptr[reg_dst + reg_tmp], zmm4);
+          vmovups(ptr[reg_dst + reg_tmp + 64], zmm6);
+        } else if constexpr (std::is_same_v<_DST_T, float> || std::is_same_v<_DST_T, utils::bf16>) {
+          vmovups(ptr[reg_cache], zmm4);
+          vmovups(ptr[reg_cache + 64], zmm6);
+          for (int i = 0; i < 8; i++) vpmovsxbd(Xbyak::Zmm(16 + i), ptr[reg_cache + 16 * i]);
+          for (int i = 0; i < 8; i++) vcvtdq2ps(Xbyak::Zmm(16 + i), Xbyak::Zmm(16 + i));
+          imul(reg_tmp, reg_iter, 128 * sizeof(_DST_T));
+          if constexpr (std::is_same_v<_DST_T, float>) {
+            for (int i = 0; i < 8; i++) vmovups(ptr[reg_dst + reg_tmp + i * 64], Xbyak::Zmm(16 + i));
+          } else {
+            for (int i = 0; i < 8; i++) vcvtneps2bf16(Xbyak::Ymm(16 + i), Xbyak::Zmm(16 + i));
+            for (int i = 0; i < 8; i++) vmovups(ptr[reg_dst + reg_tmp + i * 32], Xbyak::Ymm(16 + i));
+          }
+        } else {
+          assert(0);
+        }
 
         add(reg_iter, 1);
         cmp(reg_iter, reg_loop);
@@ -343,15 +362,17 @@ class DecompresssS3 {
     Xbyak::Reg64 reg_iter;
     Xbyak::Reg64 reg_dst;
     Xbyak::Reg64 reg_tmp;
+    Xbyak::Reg64 reg_cache;
     Xbyak::Reg64 reg_ret;
     Xbyak::Opmask bit1_mask1 = Xbyak::Opmask(1);
     Xbyak::Opmask bit1_mask2 = Xbyak::Opmask(2);
     Xbyak::Opmask bit1_mask3 = Xbyak::Opmask(3);
     Xbyak::Opmask bit1_mask4 = Xbyak::Opmask(4);
   };
-  static void forward_avx512f(void* bit2ptr, void* bit1ptr, void* dstptr, int unpack_elt) {
-    static MicroKernelAVX512F ker;
-    auto param = MicroKernelAVX512F::params{bit2ptr, bit1ptr, dstptr, unpack_elt / 128, 0x03, 0x4, 5};
+  template <typename _DST_T>
+  static void forward_avx512f(void* bit2ptr, void* bit1ptr, _DST_T* dstptr, void* tmpbuf, int unpack_elt) {
+    static MicroKernelAVX512F<_DST_T> ker;
+    typename MicroKernelAVX512F<_DST_T>::params param{bit2ptr, bit1ptr, dstptr, tmpbuf, unpack_elt / 128, 0x03, 0x4, 5};
     ker.mKernel(&param);
   }
 };
