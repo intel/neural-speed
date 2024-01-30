@@ -197,23 +197,48 @@ def unpack_weight(qweight, scales, qzeros, q_config):
         raise ValueError(f"Unsupported q_config without quant_method: {q_config}")
     quant_method = q_config["quant_method"]
     if quant_method == "gptq":
-        return unpack_gptq_weight(qweight, scales, qzeros, q_config)
+        qbits = q_config["bits"]
+        if qbits == 4:
+            return unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config)
+        elif qbits == 3:
+            return unpack_gptq_weight_3bits(qweight, scales, qzeros, q_config)
+
+        return ValueError(f"Unsupported q_config[bits]: {qbits}")
+
     if quant_method == "awq":
         return unpack_awq_weight(qweight, scales, qzeros, q_config)
     raise ValueError(f"Unsupported quant_method: {quant_method}")
 
 
-def unpack_gptq_weight(qweight, scales, qzeros, q_config):
+def unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config):
     group_size = q_config['group_size']
     bits = q_config['bits']
     wf = torch.tensor([[ 0,  4,  8, 12, 16, 20, 24, 28]], dtype=torch.int32)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
                                       wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
-        
+
     zeros = zeros + 1
     zeros = zeros.reshape(scales.shape)
-        
+
+    weight = torch.bitwise_right_shift(torch.unsqueeze(qweight, 1).expand(-1, 32 // bits, -1),
+                                       wf.unsqueeze(-1)).to(torch.int16 if bits == 8 else torch.int8)
+    torch.bitwise_and(weight,(2 ** bits) - 1, out=weight)
+
+    return weight, scales, zeros
+
+def unpack_gptq_weight_3bits(qweight, scales, qzeros, q_config):
+    print("unpack_gptq_weight_3bits...", end='')
+    group_size = q_config['group_size']
+    bits = q_config['bits']
+    wf = torch.tensor([[ 0,  4,  8, 12, 16, 20, 24, 28]], dtype=torch.int32)
+    zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
+                                      wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
+    torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
+
+    zeros = zeros + 1
+    zeros = zeros.reshape(scales.shape)
+
     weight = torch.bitwise_right_shift(torch.unsqueeze(qweight, 1).expand(-1, 32 // bits, -1),
                                        wf.unsqueeze(-1)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(weight,(2 ** bits) - 1, out=weight)
