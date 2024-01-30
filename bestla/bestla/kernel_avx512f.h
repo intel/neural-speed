@@ -685,7 +685,6 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   int8_t* s8_ptr = reinterpret_cast<int8_t*>(tmp);
   auto head_write_num = 128 - head_ignore_num;
   if (head_ignore_num != 0) {
-    printf("head process\n");
     bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
     for (int i = 0; i < head_write_num; i++) dstptr[i] = s8_ptr[head_ignore_num + i];
     compress_wei_ptr_offset += head_write_num;
@@ -699,7 +698,6 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
                                                       dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
   compress_wei_ptr_offset += body_loop * 128;
   if (tail_proc_num > 0) {
-    printf("tail process\n");
     bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
     bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
                                        tmp);
