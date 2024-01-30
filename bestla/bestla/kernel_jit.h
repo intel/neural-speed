@@ -293,16 +293,12 @@ class DecompresssS3 {
         mov(reg_bit2ptr, ptr[parambase + OFFSET(bit2ptr)]);
         mov(reg_dst, ptr[parambase + OFFSET(dstptr)]);
         L("loop_label");
-        imul(reg_tmp, reg_iter, 32);
+        imul(reg_tmp, reg_iter, 16);
         kmovq(bit1_mask1, ptr[reg_bit1ptr + reg_tmp]);
         kmovq(bit1_mask2, ptr[reg_bit1ptr + reg_tmp + 8]);
-        kmovq(bit1_mask3, ptr[reg_bit1ptr + reg_tmp + 16]);
-        kmovq(bit1_mask4, ptr[reg_bit1ptr + reg_tmp + 24]);
         Xbyak::Zmm bit2_data_zmm = zmm0;
-        imul(reg_tmp, reg_iter, 64);
-        vmovups(bit2_data_zmm, ptr[reg_bit2ptr + reg_tmp]);
-        vextractf32x8(ymm2, bit2_data_zmm, 0x0);
-        vextractf32x8(ymm3, bit2_data_zmm, 0x1);
+        imul(reg_tmp, reg_iter, 32);
+        vmovups(ymm2, ptr[reg_bit2ptr + reg_tmp]);
 
         vpand(ymm4, LowMask, ymm2);
         vpsrlw(ymm2, ymm2, 2);
@@ -314,40 +310,20 @@ class DecompresssS3 {
         vinsertf32x8(zmm4, zmm4, ymm5, 1);
         vinsertf32x8(zmm6, zmm6, ymm7, 1);
 
-        vpand(ymm8, LowMask, ymm3);
-        vpsrlw(ymm3, ymm3, 2);
-        vpand(ymm9, LowMask, ymm3);
-        vpsrlw(ymm3, ymm3, 2);
-        vpand(ymm10, LowMask, ymm3);
-        vpsrlw(ymm3, ymm3, 2);
-        vpand(ymm11, LowMask, ymm3);
-        vinsertf32x8(zmm8, zmm8, ymm9, 1);
-        vinsertf32x8(zmm10, zmm10, ymm11, 1);
-
         vxorps(zmm12, zmm12);
         vxorps(zmm13, zmm13);
-        vxorps(zmm14, zmm14);
-        vxorps(zmm15, zmm15);
         vmovdqu8(zmm12 | bit1_mask1, zmm_0x04);
         vmovdqu8(zmm13 | bit1_mask2, zmm_0x04);
-        vmovdqu8(zmm14 | bit1_mask3, zmm_0x04);
-        vmovdqu8(zmm15 | bit1_mask4, zmm_0x04);
 
         vpaddb(zmm4, zmm4, zmm12);
         vpaddb(zmm6, zmm6, zmm13);
-        vpaddb(zmm8, zmm8, zmm14);
-        vpaddb(zmm10, zmm10, zmm15);
 
         vpsllvd(zmm4, zmm4, zmm_shift);
         vpsllvd(zmm6, zmm6, zmm_shift);
-        vpsllvd(zmm8, zmm8, zmm_shift);
-        vpsllvd(zmm10, zmm10, zmm_shift);
 
-        imul(reg_tmp, reg_iter, 256);
+        imul(reg_tmp, reg_iter, 128);
         vmovups(ptr[reg_dst + reg_tmp], zmm4);
         vmovups(ptr[reg_dst + reg_tmp + 64], zmm6);
-        vmovups(ptr[reg_dst + reg_tmp + 128], zmm8);
-        vmovups(ptr[reg_dst + reg_tmp + 192], zmm10);
 
         add(reg_iter, 1);
         cmp(reg_iter, reg_loop);
@@ -375,7 +351,7 @@ class DecompresssS3 {
   };
   static void forward_avx512f(void* bit2ptr, void* bit1ptr, void* dstptr, int unpack_elt) {
     static MicroKernelAVX512F ker;
-    auto param = MicroKernelAVX512F::params{bit2ptr, bit1ptr, dstptr, unpack_elt / 256, 0x03, 0x4, 5};
+    auto param = MicroKernelAVX512F::params{bit2ptr, bit1ptr, dstptr, unpack_elt / 128, 0x03, 0x4, 5};
     ker.mKernel(&param);
   }
 };
