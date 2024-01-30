@@ -42,12 +42,6 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config):
     int_weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
     int_weight = int_weight.view(-1,int_weight.shape[-1])
 
-    # permute_func for llama-like model
-    if permute_func:
-        int_weight = permute_func(int_weight.t(), n_head, n_head_kv).t().contiguous()
-        gptq_scales = permute_func(gptq_scales.t(), n_head, n_head_kv).t().contiguous()
-        gptq_zeros = permute_func(gptq_zeros.t(), n_head, n_head_kv).t().contiguous()
-
     # shuffle weight in GPTQ when act order is on
     if 'desc_act'in q_config and q_config['desc_act']:
         g_idx = model[f"{src_name}.g_idx"]
