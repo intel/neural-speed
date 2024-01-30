@@ -23,9 +23,9 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
     // Please contact us for support.
 
     // GEMM input size
-    uint32_t matrix_m = 256;
-    uint32_t matrix_n = 512;
-    uint32_t matrix_k = 32;
+    uint32_t matrix_m = 4096;
+    uint32_t matrix_n = 4096;
+    uint32_t matrix_k = 4096;
 
     uint32_t size_a = matrix_m * matrix_k;
     uint32_t size_b = matrix_k * matrix_n;
@@ -44,13 +44,13 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
             [](data_type_a *data, size_t idx) {
-                data[idx] = static_cast<data_type_a>(1.f);
+                data[idx] = static_cast<data_type_a>(random_float());
             },
             queue, device, context);
     auto B = alloc_device_and_init<data_type_b>(
             size_b,
             [](data_type_b *data, size_t idx) {
-                data[idx] = static_cast<data_type_b>(1.f);
+                data[idx] = static_cast<data_type_b>(random_float());
             },
             queue, device, context);
     auto C = alloc_device_and_init<data_type_c>(
@@ -194,12 +194,6 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                 // the results is in the matAcc rather than real output C
                 typename gemm_t::work_group_t g(item.get_local_linear_id());
                 gemm(g, matAcc, gemm_args);
-                // static const CONSTANT char VEC_A[]
-                //         = "after gemm %f %f %f %f %f %f %f %f\n";
-                // sycl::ext::oneapi::experimental::printf(VEC_A, matAcc.reg[0],
-                //         matAcc.reg[1], matAcc.reg[2], matAcc.reg[3],
-                //         matAcc.reg[4], matAcc.reg[5], matAcc.reg[6],
-                //         matAcc.reg[7]);
                 // Step 7: write the results from matACC to real output C
                 epilogue_t epilogue;
                 epilogue(g, matAcc, md_c);
@@ -238,11 +232,10 @@ int main() {
     // Detect the execution size, 8 for Arc, 16 for PVC.
     int ExecSize
             = device.get_info<ext::intel::info::device::gpu_eu_simd_width>();
-    //     if (ExecSize == 8) {
-    //         basic_gemm_run<gpu_arch::Dg2>(queue, 10);
-    //     } else {
-    //         basic_gemm_run<gpu_arch::Xe>(queue, 10);
-    //     }
-    basic_gemm_run<gpu_arch::Dg2>(queue, 10);
+    if (ExecSize == 8) {
+        basic_gemm_run<gpu_arch::Dg2>(queue, 10);
+    } else {
+        basic_gemm_run<gpu_arch::Xe>(queue, 10);
+    }
     return (0);
 }

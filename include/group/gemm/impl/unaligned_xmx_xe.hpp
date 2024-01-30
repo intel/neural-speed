@@ -181,7 +181,7 @@ public:
 
 private:
     using tile_mma = subgroup::tile_mma_t<matAcc_t, matAcc_t, matB_acc_t,
-            matA_acc_t, mma_engine::fpu, arch_tag>;
+            matA_acc_t, mma_engine::xmx, arch_tag>;
     // static constexpr bool enable_periodic_sync = (sync_freq != 0);
     static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
     static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;

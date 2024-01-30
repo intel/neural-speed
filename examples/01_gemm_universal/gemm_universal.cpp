@@ -25,9 +25,9 @@ void gemm_universal_run(uint32_t iter) {
     // Please contact us for support.
 
     //GEMM_UNIVERSAL input size
-    size_t matrix_m = 4;
-    size_t matrix_n = 1024;
-    size_t matrix_k = 1024;
+    size_t matrix_m = 4096;
+    size_t matrix_n = 4096;
+    size_t matrix_k = 4096;
 
     size_t size_a = matrix_m * matrix_k;
     size_t size_b = matrix_k * matrix_n;
@@ -69,8 +69,8 @@ void gemm_universal_run(uint32_t iter) {
 
     //Define the shape of workgroup
     //It's tunable parameters based on different input shape and hardware for better performance
-    constexpr uint32_t wg_tile_m = 4;
-    //= (kslicing_type != kslicing_impl_t::local) ? 256 : 64;
+    constexpr uint32_t wg_tile_m
+            = (kslicing_type != kslicing_impl_t::local) ? 256 : 64;
     constexpr uint32_t wg_tile_n
             = (kslicing_type != kslicing_impl_t::local) ? 256 : 128;
 

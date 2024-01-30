@@ -28,12 +28,11 @@ template <typename T>
 class fp16_gemm_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(fp16_gemm_test);
 TYPED_TEST_P(fp16_gemm_test, esimd) {
-    gemm_exec<TypeParam, result_validate<TypeParam>, fp16_gemm_func<TypeParam>,
-            64 * 1024>(esimd_compile_string);
+    gemm_exec<TypeParam, result_validate<TypeParam>, fp16_gemm_func<TypeParam>(
+        esimd_compile_string);
 }
 REGISTER_TYPED_TEST_SUITE_P(fp16_gemm_test, esimd);
-using tests = ::testing::Types<Test>;
-// using tests = ::testing::Types<Test0, Test1, Test2, Test3, Test4, Test5, Test6,
-//         Test7, Test8, Test9, Test10, Test11, Test12, Test13, Test14, Test15,
-//         Test16, Test17, Test18, Test19>;
+using tests = ::testing::Types<Test0, Test1, Test2, Test3, Test4, Test5, Test6,
+        Test7, Test8, Test9, Test10, Test11, Test12, Test13, Test14, Test15,
+        Test16, Test17, Test18, Test19>;
 INSTANTIATE_TYPED_TEST_SUITE_P(fp16_gemm_test_suite, fp16_gemm_test, tests);

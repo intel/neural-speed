@@ -56,7 +56,6 @@ class gemm_universal_t<dispatch_policy_default<group_swizzle_>, gemm_t_,
     using work_group_t = typename gemm_t::work_group_t;
 
     static constexpr gpu_arch arch_tag = group_swizzle_t::arch_tag;
-    static_assert(gemm_t::arch_tag == gpu_arch::Dg2);
     static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
     static_assert(
             arch_tag == epilogue_t::arch_tag, "arch_tag should be the same");

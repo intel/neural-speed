@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 20)
 
 project(XeTLA)
-include_directories("/home/hengyume/miniconda3/include")
-link_directories("/home/hengyume/miniconda3/lib")
 include(CTest)
 enable_testing()
 
