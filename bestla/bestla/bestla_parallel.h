@@ -486,7 +486,6 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
     mKBlock = config.problem.dims[4];
     BaseScheduler::update(config);
     auto blks = utils::updiv(this->mBlock[2], mKBlock);
-    this->mBlock[2] = utils::padto(this->mBlock[2], 128);  // TODO(zhe): remove it ,only for vnni 3bit linear
     this->mL2Use += static_cast<size_t>(blks) * (this->mBlock[1] + this->mStep[0]) *
                     (sizeof(float) + sizeof(int8_t) + sizeof(float));  // scale+zp+reduce
     assert(this->mL2Use <= this->mL2Size - ReservedSize);

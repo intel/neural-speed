@@ -122,7 +122,6 @@ class WeightKBlockNInteger {
                                      bool is_asym) {
     int KPad = utils::padto(k, _GemmCore_T::KTILE);
     int NPad = utils::padto(n, _GemmCore_T::NTILE);
-    // if (qtype == BTLA_DTYPE::S3_CLIP) NPad = utils::padto(n, _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW);
     StorageWeight tmp(_GemmCore_T::ID);
     tmp.resize(NPad, KPad, blocksize <= 0 ? KPad : blocksize, n, k, qtype, scat, redt, is_asym);
     return tmp;
@@ -190,15 +189,12 @@ class WeightKBlockNInteger {
 
   void unpackWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
                     parallel::IThreading* threading) {
-    // parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
-    parallel::Scheduler2D _para({threading->num_threads(), K, N, 32,
-                                 _GemmCore_T::NTILE});  // TODO(zhe): remove it, only for 3bit vnni woq linear
+    parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       _para.getIndex(thdp);
       if (thdp.valid) {
-        // auto rowpad = utils::padto(thdp.size[0], _GemmCore_T::KTILE);
-        auto rowpad = utils::padto(thdp.size[0], 32);  // as above
+        auto rowpad = utils::padto(thdp.size[0], _GemmCore_T::KTILE);
         auto colpad = utils::padto(thdp.size[1], _GemmCore_T::NTILE);
         auto dequant = utils::amalloc<float>((size_t)rowpad * colpad);
         auto dstptr = dequant;
@@ -732,8 +728,8 @@ class WeightKBlockNInteger {
       } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
         int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
         auto elt_offset =
-            n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 64);
-        auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
+            n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
+        auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
         auto row = NPad / _GemmCore_T::NTILE;
         assert(elt_offset % 8 == 0);
         auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
@@ -785,8 +781,8 @@ class WeightKBlockNInteger {
         } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
           int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
           auto elt_offset =
-              n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 64);
-          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
+              n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
+          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
           auto row = NPad / _GemmCore_T::NTILE;
           assert(elt_offset % 8 == 0);
           auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
@@ -826,8 +822,8 @@ class WeightKBlockNInteger {
         } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
           int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
           auto elt_offset =
-              n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 64);
-          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
+              n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
+          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
           auto row = NPad / _GemmCore_T::NTILE;
           assert(elt_offset % 8 == 0);
           auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
@@ -901,10 +897,10 @@ class WeightKBlockNInteger {
     auto NPad = wptr->mNPad;
     int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
     auto row = NPad / _GemmCore_T::NTILE;
-    auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 64);
-    auto base_offset = n_offset * utils::padto(KPad, 64) + k_offset * _GemmCore_T::NTILE;
+    auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
+    auto base_offset = n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE;
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
-      auto elt_offset = base_offset + i * utils::padto(KPad, 64);
+      auto elt_offset = base_offset + i * utils::padto(KPad, 128);
       assert(elt_offset % 8 == 0);
       auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
       auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
