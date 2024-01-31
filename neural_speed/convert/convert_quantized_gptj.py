@@ -39,14 +39,15 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     scales = model[f"{src_name}.scales"]
     qweight = model[f"{src_name}.qweight"]
 
-    int_weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
-    int_weight = int_weight.view(-1,int_weight.shape[-1])
+    int_weight, gptq_scales, gptq_zeros = unpack_weight(
+        qweight, scales, qzeros, q_config)
+    int_weight = int_weight.view(-1, int_weight.shape[-1])
 
     # shuffle weight in GPTQ when act order is on
-    if 'desc_act'in q_config and q_config['desc_act']:
+    if 'desc_act' in q_config and q_config['desc_act']:
         g_idx = model[f"{src_name}.g_idx"]
         int_weight2 = int_weight.clone()
-        group_size=q_config['group_size']
+        group_size = q_config['group_size']
         group_dict = {}
         for i in range(len(g_idx)):
             group_idx = g_idx[i].item()
@@ -84,7 +85,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
         gptq_zeros = np.empty(0, dtype=np.int8)
     else:
         gptq_zeros = np.ascontiguousarray(gptq_zeros.numpy())
-    if 'desc_act'in q_config and q_config['desc_act']:
+    if 'desc_act' in q_config and q_config['desc_act']:
         g_idx = np.ascontiguousarray(g_idx.numpy())
     else:
         g_idx = np.empty(0, dtype=np.int32)
@@ -111,13 +112,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     model, config, quantize_config = load_quantized_model(model_path)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path, trust_remote_code=True)
     fout = open(out_path, "wb")
 
     # 1. write hparams
     hparams = config
     n_layer = hparams["n_layer"]
-    fout.write(b"ggjt"[::-1])  #0x67676d6c)) # magic: ggml in hex
+    fout.write(b"ggjt"[::-1])  # 0x67676d6c)) # magic: ggml in hex
     values = [
         1,  # file version
         hparams["vocab_size"],
@@ -140,7 +142,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
+    fout.write(struct.pack("f", hparams.get(
+        "rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
