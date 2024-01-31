@@ -1426,6 +1426,61 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
   }
   return BTLA_CODE::Success;
 }
+
+template <typename T>
+static inline BTLA_CODE layernorm(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                  T* dstptr, T* mean_out, T* mean_square_out, bool simplified) {
+  T mean = 0;
+  T mean_square = 0;
+
+  for (int h = 0; h < norm_size; h++) {
+    mean += srcptr[h];
+    mean_square += srcptr[h] * srcptr[h];
+  }
+
+  mean = mean / norm_size;
+  if (simplified) {
+    mean_square = std::sqrt(mean_square / norm_size + epsilon);
+  } else {
+    mean_square = std::sqrt(mean_square / norm_size - mean * mean + epsilon);
+  }
+  float inv_mean_square = 1.f / mean_square;
+  if (simplified) {
+    if (scaleptr) {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = srcptr[h] * inv_mean_square * scaleptr[h];
+      }
+    } else {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = srcptr[h] * inv_mean_square;
+      }
+    }
+  } else {
+    if (scaleptr) {
+      if (biasptr == nullptr) {
+        for (int h = 0; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h];
+        }
+      } else {
+        for (int h = 0; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h] + biasptr[h];
+        }
+      }
+    } else {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_mean_square;
+      }
+    }
+  }
+
+  if (mean_out) {
+    *mean_out = mean;
+  }
+  if (mean_square_out) {
+    *mean_square_out = mean_square;
+  }
+  return BTLA_CODE::Success;
+}
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla

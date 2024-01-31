@@ -6052,6 +6052,11 @@ static void ne_compute_forward_norm_f32(const struct ne_compute_params* params, 
 
   const float eps = 1e-5f;  // TODO: make this a parameter
 
+  if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
+    bestla_layernormalization(ne03 * ne02 * ne01, ne00, false, eps, (const float*)src0->data, (float*)dst->data);
+    return;
+  }
+
   // TODO: optimize
   for (int64_t i03 = 0; i03 < ne03; i03++) {
     for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -6124,6 +6129,10 @@ static void ne_compute_forward_rms_norm_f32(const struct ne_compute_params* para
   float eps;
   memcpy(&eps, dst->op_params, sizeof(float));
 
+  if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
+    bestla_layernormalization(ne03 * ne02 * ne01, ne00, true, eps, (const float*)src0->data, (float*)dst->data);
+    return;
+  }
   // TODO: optimize
   for (int64_t i03 = 0; i03 < ne03; i03++) {
     for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -10467,7 +10476,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_NEG:
         case NE_OP_STEP:
         case NE_OP_MUL:
-        case NE_OP_RMS_NORM:
         case NE_OP_RELU: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
@@ -10475,10 +10483,21 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
             node->n_tasks = 1;
           }
         } break;
+        case NE_OP_NORM:
+        case NE_OP_RMS_NORM: {
+          if (ne_is_contiguous(node->src0)) {
+            node->n_tasks = 1;
+          } else {
+            if (node->src0->ne[1] > 4) {
+              node->n_tasks = n_threads;
+            } else {
+              node->n_tasks = 1;
+            }
+          }
+        } break;
         case NE_OP_GELU:
         case NE_OP_SILU:
         case NE_OP_SILU_BACK:
-        case NE_OP_NORM:
         case NE_OP_RMS_NORM_BACK: {
           node->n_tasks = n_threads;
         } break;
