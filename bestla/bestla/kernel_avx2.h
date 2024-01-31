@@ -1015,6 +1015,85 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
   return BTLA_CODE::Success;
 }
 
+template <bool simplified>
+static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, const float* biasptr, float epsilon,
+                                  int norm_size, float* dstptr, float* mean_out, float* mean_square_out) {
+  int constexpr VLen = 8;
+  int norm_size8 = utils::padto_le(norm_size, VLen);
+  int h = 0;
+  __m256 vmean = _mm256_setzero_ps(), vmeansq = _mm256_setzero_ps();
+  for (; h < norm_size8; h += VLen) {
+    auto tmp = _mm256_loadu_ps(srcptr + h);
+    vmean = _mm256_add_ps(vmean, tmp);
+    tmp = _mm256_mul_ps(tmp, tmp);
+    vmeansq = _mm256_add_ps(vmeansq, tmp);
+  }
+  float mean = avx2_reduce_ps<AVX2_REDUCE_TYPE::ADD>(vmean);
+  float mean_square = avx2_reduce_ps<AVX2_REDUCE_TYPE::ADD>(vmeansq);
+  for (; h < norm_size; h++) {
+    mean += srcptr[h];
+    mean_square += srcptr[h] * srcptr[h];
+  }
+  mean = mean / norm_size;
+  if constexpr (simplified) {
+    mean_square = std::sqrt(mean_square / norm_size + epsilon);
+  } else {
+    mean_square = std::sqrt(mean_square / norm_size - mean * mean + epsilon);
+  }
+  auto vm = _mm256_set1_ps(mean);
+  float inv_meansq = 1.f / mean_square;
+  auto vms = _mm256_set1_ps(inv_meansq);
+  h = 0;
+  if constexpr (simplified) {
+    for (; h < norm_size8; h += VLen) {
+      auto inp = _mm256_loadu_ps(srcptr + h);
+      auto scale = _mm256_loadu_ps(scaleptr + h);
+      inp = _mm256_mul_ps(inp, scale);
+      inp = _mm256_mul_ps(inp, vms);
+      _mm256_storeu_ps(dstptr + h, inp);
+    }
+    for (; h < norm_size; h++) {
+      dstptr[h] = srcptr[h] * inv_meansq * scaleptr[h];
+    }
+  } else {
+    if (biasptr == nullptr) {
+      for (; h < norm_size8; h += VLen) {
+        auto inp = _mm256_loadu_ps(srcptr + h);
+        auto scale = _mm256_loadu_ps(scaleptr + h);
+        inp = _mm256_sub_ps(inp, vm);
+        inp = _mm256_mul_ps(inp, scale);
+        inp = _mm256_mul_ps(inp, vms);
+        _mm256_storeu_ps(dstptr + h, inp);
+      }
+      for (; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h];
+      }
+    } else {
+      for (; h < norm_size8; h += VLen) {
+        auto inp = _mm256_loadu_ps(srcptr + h);
+        auto scale = _mm256_loadu_ps(scaleptr + h);
+        inp = _mm256_sub_ps(inp, vm);
+        inp = _mm256_mul_ps(inp, vms);
+        inp = _mm256_mul_ps(inp, scale);
+        auto bias = _mm256_loadu_ps(biasptr + h);
+        inp = _mm256_add_ps(inp, bias);
+        _mm256_storeu_ps(dstptr + h, inp);
+      }
+      for (; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h] + biasptr[h];
+      }
+    }
+  }
+
+  if (mean_out) {
+    *mean_out = mean;
+  }
+  if (mean_square_out) {
+    *mean_square_out = mean_square;
+  }
+  return BTLA_CODE::Success;
+}
+
 #ifdef __GNUC__
 #pragma GCC pop_options
 #else
