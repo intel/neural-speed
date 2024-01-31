@@ -10882,6 +10882,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 }
 
 void ne_graph_profiling(const struct ne_cgraph* cgraph) {
+#ifdef NS_PERF
   int64_t perf_total_per_op_us[NE_OP_COUNT] = {0};
 
   NE_PRINT("=== GRAPH Profiling ===\n");
@@ -10904,6 +10905,10 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
   NE_PRINT("========================================\n");
+
+#else
+  NE_PRINT("\n[Warning] To collect profiling data, please recompile with NS_PROFILING=ON.\n");
+#endif
 }
 
 void ne_graph_reset(struct ne_cgraph* cgraph) {

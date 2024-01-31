@@ -93,6 +93,7 @@ class CMakeBuild(build_ext):
         extdir = ext_fullpath.parent.resolve()
 
         output_dir = f"{extdir}{os.sep}"
+        NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}",
             f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY={output_dir}",
@@ -104,6 +105,7 @@ class CMakeBuild(build_ext):
             f"-DNS_WITH_AVX2={'ON' if NS_WITH_AVX2 else 'OFF'}",
             f"-DNS_WITH_TESTS=OFF",
             f"-DNS_PYTHON_API=ON",
+            f"-DNS_PROFILING={NS_PROFILING_ENV}",
         ]
         if sys.platform == "linux":  # relative_rpath
             cmake_args.append('-DCMAKE_BUILD_RPATH=$ORIGIN/')
