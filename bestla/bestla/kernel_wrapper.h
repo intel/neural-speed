@@ -851,6 +851,21 @@ class LayerNormalization {
       return ref::layernorm<T, false>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
     }
   }
+  template <typename T>
+  static inline BTLA_CODE forward_auto(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                       T* dstptr, T* mean, T* mean_square, bool simplified) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                           simplified);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                        simplified);
+    }
+    return forward<BTLA_ISA::NoSIMD, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                        simplified);
+  }
 };
 }  // namespace wrapper
 }  // namespace kernel

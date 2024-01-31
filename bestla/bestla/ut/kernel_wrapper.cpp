@@ -227,7 +227,7 @@ class UT_LayerNormalization {
     buffer_error(ref.data(), dst.data(), ref.size(), 0.01f);
   }
 };
-#ifdef BTLA_UT_DEBUG
+#ifdef BTLA_UT_KERNEL_WRAPPER
 UT_LayerNormalization sUT_LayerNormalization;
 #endif
 }  // namespace ut
