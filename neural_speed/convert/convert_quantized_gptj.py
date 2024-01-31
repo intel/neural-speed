@@ -165,11 +165,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     # 3. write tensors
     list_vars = model
 
-    convert_fp32_tensor("transformer.wte.weight", "transformer.wte.weight", list_vars, fout)
-    convert_fp32_tensor("transformer.ln_f.weight", "transformer.ln_f.weight", list_vars, fout)
-    convert_fp32_tensor("transformer.ln_f.bias", "transformer.ln_f.bias", list_vars, fout)
-    convert_fp32_tensor("lm_head.bias", "lm_head.bias", list_vars, fout)
-    convert_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
+    convert_to_fp32_tensor("transformer.wte.weight", "transformer.wte.weight", list_vars, fout)
+    convert_to_fp32_tensor("transformer.ln_f.weight", "transformer.ln_f.weight", list_vars, fout)
+    convert_to_fp32_tensor("transformer.ln_f.bias", "transformer.ln_f.bias", list_vars, fout)
+    convert_to_fp32_tensor("lm_head.bias", "lm_head.bias", list_vars, fout)
+    convert_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
 
     for i in tqdm(range(n_layer), desc="Processing layers"):
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.q_proj.weight",
@@ -186,14 +186,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_out.weight",
                     f"transformer.h.{i}.mlp.fc_out.weight", list_vars, fout, quantize_config)
 
-        convert_fp32_tensor(f"transformer.h.{i}.mlp.fc_in.bias",
+        convert_to_fp32_tensor(f"transformer.h.{i}.mlp.fc_in.bias",
                         f"transformer.h.{i}.mlp.fc_in.bias", list_vars, fout)
-        convert_fp32_tensor(f"transformer.h.{i}.mlp.fc_out.bias",
+        convert_to_fp32_tensor(f"transformer.h.{i}.mlp.fc_out.bias",
                         f"transformer.h.{i}.mlp.fc_out.bias", list_vars, fout)
 
-        convert_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
+        convert_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
                         f"transformer.h.{i}.ln_1.weight", list_vars, fout)
-        convert_fp32_tensor(f"transformer.h.{i}.ln_1.bias",
+        convert_to_fp32_tensor(f"transformer.h.{i}.ln_1.bias",
                         f"transformer.h.{i}.ln_1.bias", list_vars, fout)
 
 

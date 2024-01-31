@@ -217,7 +217,7 @@ def unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config):
 
     assert bits == 4
     # Int32 can store 8 * 4bits data. This is the offset for each data.
-    wf = torch.tensor(list(range(0, 32, bits)), dtype=torch.int32).unsqueeze(0)
+    wf = torch.tensor(list(range(0, s32_bits, bits)), dtype=torch.int32).unsqueeze(0)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
                                       wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
@@ -315,7 +315,7 @@ def load_quantized_model(model_path):
     return model, config, config["quantization_config"]
 
 
-def convert_fp32_tensor(src_name, dst_name, model, fout):
+def convert_to_fp32_tensor(src_name, dst_name, model, fout):
     v = model[src_name]
     shape = v.shape
     # print("Processing non-Q4 variable: " + src_name +
