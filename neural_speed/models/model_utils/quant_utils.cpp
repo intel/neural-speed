@@ -238,6 +238,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   if (params.bits == quant_bits::q8) {
     quant_type = BTLA_DTYPE::S8;
   }
+  if (params.bits == quant_bits::q3) quant_type = BTLA_DTYPE::S3_CLIP;
   auto dtype_type = static_cast<BTLA_DTYPE>(
       bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
   if (dtype_type == BTLA_DTYPE::TypeFloat) {

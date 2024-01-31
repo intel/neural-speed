@@ -173,60 +173,15 @@ class UT_BlockQunatize_F8 {
 static UT_BlockQunatize_F8 sUT_BlockQunatize_F8;
 #endif
 
-class UT_BlockQunatize_S3 {
+class UT_S3_WOQ {
  public:
-  UT_BlockQunatize_S3() {
+  UT_S3_WOQ() {
     UT_START();
     CheckISA(AVX512F);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, 56);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, 56);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, 56);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 56);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, 56);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, 56);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, 56);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, 56);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, 56);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 56);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1024, 4096, 16384, 128, 8);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(48, 4096, 16384, 128, 8);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1024, 4096, 4096, 128, 8);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(48, 4096, 4096, 128, 8);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1024, 16384, 4096, 128, 8);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(48, 16384, 4096, 128, 8);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 56);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 56);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 56);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 56);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 56);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 56);
-    // emr case
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 16384, 32, 64);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 16384, 32, 64);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 4096, 4096, 32, 64);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 64);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(128, 16384, 4096, 32, 64);
-    // ut<sAVX512F, BTLA_ISA::AVX512F>(1, 16384, 4096, 32, 64);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 16384, 32, 64);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 16384, 32, 64);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 4096, 4096, 32, 64);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 64);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(128, 16384, 4096, 32, 64);
-    // ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 16384, 4096, 32, 64);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 16384, 128, 64);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 16384, 128, 64);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 4096, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(128, 16384, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 16384, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 16384, 128, 64);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 16384, 128, 64);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 4096, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(128, 16384, 4096, 128, 64);
-    // ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 16384, 4096, 128, 64);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 56);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>
@@ -309,23 +264,10 @@ class UT_BlockQunatize_S3 {
       parallel::GemmRunWithA<Parallel2>(launcher, args_ref, &DefaultThreading);
     }
     buffer_error(matC.data(), refC.data(), matC.size(), 0.001f);
-    // avector<float> dequant(n * k, 0);
-    // avector<float> dequant_ref(n * k, 0);
-    // kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
-    // kernel.unpackWeight(n, k, &ptr_ref, dequant_ref.data(), n, &DefaultThreading);
-    // for (int i = 0; i < k; i++) {
-    //   for (int j = 0; j < n; j++) {
-    //     if ((dequant[i * n + j] - dequant_ref[i * n + j]) != 0) {
-    //       std::cout << "i: " << i << " j:" << j << std::endl;
-    //       std::cout << dequant[i * n + j] << " vs " << dequant_ref[i * n + j] << std::endl;
-    //     }
-    //   }
-    // }
   }
 };
-// static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_BlockQunatize_S3 sUT_BlockQunatize_S3;
+static UT_S3_WOQ sUT_S3_WOQ;
 #endif
 class UT_TransposeBlockQuantize_F4 {
  public:
@@ -1060,7 +1002,6 @@ class UTBenchmark_CompFp32 {
     }
   }
 };
-static UTBenchmark_CompFp32 sUTBenchmark_CompFp32;
 #ifdef BTLA_UT_PROLOGUE_B_
 static UTBenchmark_CompFp32 sUTBenchmark_CompFp32;
 #endif
