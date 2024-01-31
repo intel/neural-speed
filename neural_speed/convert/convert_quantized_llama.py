@@ -27,7 +27,74 @@ def permute_func(weights, n_head: int, n_head_kv: int):
     return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
-def main(args_in: Optional[List[str]] = None) -> None:
+def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
+    # unpack weight and repack into jblas format
+    import neural_speed.llama_cpp as cpp_model
+    if ".weight" in src_name:
+        src_name = src_name.replace(".weight", "")
+    qzeros = model[f"{src_name}.qzeros"]
+    zeros = qzeros_to_zeros(qzeros)
+    scales = model[f"{src_name}.scales"]
+    qweight = model[f"{src_name}.qweight"]
+
+    int_weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
+    int_weight = int_weight.view(-1,int_weight.shape[-1])
+
+    # permute_func for llama-like model
+    if permute_func:
+        int_weight = permute_func(int_weight.t(), n_head, n_head_kv).t().contiguous()
+        gptq_scales = permute_func(gptq_scales.t(), n_head, n_head_kv).t().contiguous()
+        gptq_zeros = permute_func(gptq_zeros.t(), n_head, n_head_kv).t().contiguous()
+
+    # shuffle weight in GPTQ when act order is on
+    if 'desc_act'in q_config and q_config['desc_act']:
+        g_idx = model[f"{src_name}.g_idx"]
+        int_weight2 = int_weight.clone()
+        group_size=q_config['group_size']
+        group_dict = {}
+        for i in range(len(g_idx)):
+            group_idx = g_idx[i].item()
+            if group_idx not in group_dict:
+                target_idx = group_idx * group_size
+                group_dict[group_idx] = 0
+            else:
+                group_dict[group_idx] = group_dict[group_idx] + 1
+                target_idx = group_idx * group_size + group_dict[group_idx]
+            int_weight2[target_idx] = int_weight[i]
+        int_weight = int_weight2
+
+    shape = int_weight.shape
+    write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
+
+    weight_dtype = "int8"
+    if q_config['bits'] == 4:
+        int_weight = (int_weight - 8) * 16
+        gptq_scales = gptq_scales / 16
+        gptq_zeros = (gptq_zeros - 8) * 16
+        weight_dtype == "int4"
+
+    dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
+    int_weight = np.ascontiguousarray(int_weight.numpy())
+    gptq_scales = np.ascontiguousarray((gptq_scales.float()).numpy())
+    if q_config['sym']:
+        gptq_zeros = np.empty(0, dtype=np.int8)
+    else:
+        gptq_zeros = np.ascontiguousarray(gptq_zeros.numpy())
+    if 'desc_act'in q_config and q_config['desc_act']:
+        g_idx = np.ascontiguousarray(g_idx.numpy())
+    else:
+        g_idx = np.empty(0, dtype=np.int32)
+
+    # pack int weight in bestla format
+    byte_size = cpp_model.Model.np_bestla_qpack(int_weight, gptq_scales, gptq_zeros, g_idx, dst,
+                                               weight_dtype=weight_dtype,
+                                               group_size=q_config['group_size'],
+                                               alg="sym" if q_config['sym'] else "asym",
+                                               compute_dtype="int8")
+    dst.flatten()[:byte_size].tofile(fout)
+    print(f"converting {dst_name} qauntized tensor to bestla q4 block")
+
+def main(args_in: Optional[List[str]] = None) -> None:    
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
@@ -102,9 +169,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 3. write tensors
     list_vars = model
-    convert_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
-    convert_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
-    convert_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
+    convert_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
+    convert_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
+    convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
 
     for i in range(n_layer):
         convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
@@ -124,9 +191,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         convert_q4_bestla_tensor(f"model.layers.{i}.mlp.up_proj",
                     f"layers.{i}.feed_forward.w3.weight", list_vars, f, quantize_config, n_head)
 
-        convert_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",
+        convert_to_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",
                         f"layers.{i}.attention_norm.weight", list_vars, f)
-        convert_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight",
+        convert_to_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight",
                         f"layers.{i}.ffn_norm.weight", list_vars, f)
 
 
