@@ -832,24 +832,12 @@ class LayerNormalization {
   static inline BTLA_CODE forward(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
                                   T* dstptr, T* mean, T* mean_square, bool simplified) {
     if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<T, float>) {
-      if (simplified) {
-        return avx512f::layernorm<true>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
-      } else {
-        return avx512f::layernorm<false>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
-      }
+      return avx512f::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
     }
     if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<T, float>) {
-      if (simplified) {
-        return avx2::layernorm<true>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
-      } else {
-        return avx2::layernorm<false>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
-      }
+      return avx2::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
     }
-    if (simplified) {
-      return ref::layernorm<T, true>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
-    } else {
-      return ref::layernorm<T, false>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square);
-    }
+    return ref::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
   }
   template <typename T>
   static inline BTLA_CODE forward_auto(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,

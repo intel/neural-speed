@@ -1015,9 +1015,9 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
   return BTLA_CODE::Success;
 }
 
-template <bool simplified>
 static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, const float* biasptr, float epsilon,
-                                  int norm_size, float* dstptr, float* mean_out, float* mean_square_out) {
+                                  int norm_size, float* dstptr, float* mean_out, float* mean_square_out,
+                                  bool simplified) {
   int constexpr VLen = 8;
   int norm_size8 = utils::padto_le(norm_size, VLen);
   int h = 0;
@@ -1035,7 +1035,7 @@ static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, co
     mean_square += srcptr[h] * srcptr[h];
   }
   mean = mean / norm_size;
-  if constexpr (simplified) {
+  if (simplified) {
     mean_square = std::sqrt(mean_square / norm_size + epsilon);
   } else {
     mean_square = std::sqrt(mean_square / norm_size - mean * mean + epsilon);
@@ -1044,7 +1044,7 @@ static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, co
   float inv_meansq = 1.f / mean_square;
   auto vms = _mm256_set1_ps(inv_meansq);
   h = 0;
-  if constexpr (simplified) {
+  if (simplified) {
     if (scaleptr) {
       for (; h < norm_size8; h += VLen) {
         auto inp = _mm256_loadu_ps(srcptr + h);
