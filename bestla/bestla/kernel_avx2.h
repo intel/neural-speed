@@ -1045,42 +1045,66 @@ static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, co
   auto vms = _mm256_set1_ps(inv_meansq);
   h = 0;
   if constexpr (simplified) {
-    for (; h < norm_size8; h += VLen) {
-      auto inp = _mm256_loadu_ps(srcptr + h);
-      auto scale = _mm256_loadu_ps(scaleptr + h);
-      inp = _mm256_mul_ps(inp, scale);
-      inp = _mm256_mul_ps(inp, vms);
-      _mm256_storeu_ps(dstptr + h, inp);
-    }
-    for (; h < norm_size; h++) {
-      dstptr[h] = srcptr[h] * inv_meansq * scaleptr[h];
-    }
-  } else {
-    if (biasptr == nullptr) {
+    if (scaleptr) {
       for (; h < norm_size8; h += VLen) {
         auto inp = _mm256_loadu_ps(srcptr + h);
         auto scale = _mm256_loadu_ps(scaleptr + h);
-        inp = _mm256_sub_ps(inp, vm);
         inp = _mm256_mul_ps(inp, scale);
         inp = _mm256_mul_ps(inp, vms);
         _mm256_storeu_ps(dstptr + h, inp);
       }
       for (; h < norm_size; h++) {
-        dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h];
+        dstptr[h] = srcptr[h] * inv_meansq * scaleptr[h];
       }
     } else {
       for (; h < norm_size8; h += VLen) {
         auto inp = _mm256_loadu_ps(srcptr + h);
-        auto scale = _mm256_loadu_ps(scaleptr + h);
-        inp = _mm256_sub_ps(inp, vm);
         inp = _mm256_mul_ps(inp, vms);
-        inp = _mm256_mul_ps(inp, scale);
-        auto bias = _mm256_loadu_ps(biasptr + h);
-        inp = _mm256_add_ps(inp, bias);
         _mm256_storeu_ps(dstptr + h, inp);
       }
       for (; h < norm_size; h++) {
-        dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h] + biasptr[h];
+        dstptr[h] = srcptr[h] * inv_meansq;
+      }
+    }
+
+  } else {
+    if (scaleptr) {
+      if (biasptr == nullptr) {
+        for (; h < norm_size8; h += VLen) {
+          auto inp = _mm256_loadu_ps(srcptr + h);
+          auto scale = _mm256_loadu_ps(scaleptr + h);
+          inp = _mm256_sub_ps(inp, vm);
+          inp = _mm256_mul_ps(inp, scale);
+          inp = _mm256_mul_ps(inp, vms);
+          _mm256_storeu_ps(dstptr + h, inp);
+        }
+        for (; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h];
+        }
+      } else {
+        for (; h < norm_size8; h += VLen) {
+          auto inp = _mm256_loadu_ps(srcptr + h);
+          auto scale = _mm256_loadu_ps(scaleptr + h);
+          inp = _mm256_sub_ps(inp, vm);
+          inp = _mm256_mul_ps(inp, vms);
+          inp = _mm256_mul_ps(inp, scale);
+          auto bias = _mm256_loadu_ps(biasptr + h);
+          inp = _mm256_add_ps(inp, bias);
+          _mm256_storeu_ps(dstptr + h, inp);
+        }
+        for (; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h] + biasptr[h];
+        }
+      }
+    } else {
+      for (; h < norm_size8; h += VLen) {
+        auto inp = _mm256_loadu_ps(srcptr + h);
+        inp = _mm256_sub_ps(inp, vm);
+        inp = _mm256_mul_ps(inp, vms);
+        _mm256_storeu_ps(dstptr + h, inp);
+      }
+      for (; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_meansq;
       }
     }
   }

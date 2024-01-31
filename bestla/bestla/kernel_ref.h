@@ -1446,21 +1446,33 @@ static inline BTLA_CODE layernorm(const T* srcptr, const T* scaleptr, const T* b
   }
   float inv_mean_square = 1.f / mean_square;
   if constexpr (simplified) {
-    for (int h = 0; h < norm_size; h++) {
-      dstptr[h] = srcptr[h] * inv_mean_square * scaleptr[h];
-    }
-  } else {
-    if (biasptr == nullptr) {
+    if (scaleptr) {
       for (int h = 0; h < norm_size; h++) {
-        dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h];
+        dstptr[h] = srcptr[h] * inv_mean_square * scaleptr[h];
       }
     } else {
       for (int h = 0; h < norm_size; h++) {
-        dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h] + biasptr[h];
+        dstptr[h] = srcptr[h] * inv_mean_square;
+      }
+    }
+  } else {
+    if (scaleptr) {
+      if (biasptr == nullptr) {
+        for (int h = 0; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h];
+        }
+      } else {
+        for (int h = 0; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h] + biasptr[h];
+        }
+      }
+    } else {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_mean_square;
       }
     }
   }
-  
+
   if (mean_out) {
     *mean_out = mean;
   }
