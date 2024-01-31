@@ -10425,7 +10425,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           }
         } break;
         case NE_OP_RMS_NORM: {
-          if (ne_is_contiguous(node->src0)&&ne_is_contiguous(node->data)) {
+          if (ne_is_contiguous(node->src0)) {
             node->n_tasks = 1;
           } else {
             if (node->src0->ne[1] > 4) {

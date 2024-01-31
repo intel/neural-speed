@@ -691,7 +691,8 @@ bool BTLALayerNorm(size_t norm_count, size_t norm_size, bool isrms, float epsilo
   auto inorm_count = static_cast<int>(norm_count);
   auto inorm_size = static_cast<int>(norm_size);
   auto pth = reinterpret_cast<parallel::IThreading*>(ThreadPool);
-  parallel::Scheduler2D sch({pth->num_threads(), inorm_count, inorm_size, 1, inorm_size});
+  int threads = inorm_count <= 4 ? 1 : pth->num_threads();
+  parallel::Scheduler2D sch({threads, inorm_count, inorm_size, 1, inorm_size});
   pth->parallel_for([&](int tidx) {
     parallel::ThreadProblem2D tp{tidx};
     sch.getIndex(tp);
