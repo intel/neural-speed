@@ -29,8 +29,8 @@ def permute_func(weights, n_head: int, n_head_kv: int):
     return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
-def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config):
-    # unpack weight and repack into jblas format
+def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
+    # unpack weight and repack into 3bits / 4bits BestLA format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
         src_name = src_name.replace(".weight", "")
@@ -62,6 +62,9 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config):
     shape = int_weight.shape
     write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
 
+    # INC stores sig-int4 value as u4(range 0~15, they add a offset),
+    # BesTLA requires s4_clip((-8,7)*16), so we sub the offset and then mul 16.
+    # Int3 is the same as int4, but offset=4, mul scale==32.
     if q_config['bits'] == 4:
         int_weight = (int_weight - 8) * 16
         gptq_scales = gptq_scales / 16
@@ -82,7 +85,7 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config):
     else:
         g_idx = np.empty(0, dtype=np.int32)
 
-    # pack int weight in bestla format
+    # repack int weight in BesTLA format
     byte_size = cpp_model.Model.np_bestla_qpack(int_weight, gptq_scales, gptq_zeros, g_idx, dst,
                                                weight_dtype="int4" if q_config['bits'] == 4 else "int8",
                                                group_size=q_config['group_size'],
@@ -169,18 +172,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
 
     for i in tqdm(range(n_layer), desc="Processing layers"):
-        convert_q4_bestla_tensor(f"transformer.h.{i}.attn.q_proj.weight",
+        convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.q_proj.weight",
                     f"transformer.h.{i}.attn.q_proj.weight", list_vars, fout, quantize_config)
-        convert_q4_bestla_tensor(f"transformer.h.{i}.attn.k_proj.weight",
+        convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.k_proj.weight",
                     f"transformer.h.{i}.attn.k_proj.weight", list_vars, fout, quantize_config)
-        convert_q4_bestla_tensor(f"transformer.h.{i}.attn.v_proj.weight",
+        convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.v_proj.weight",
                     f"transformer.h.{i}.attn.v_proj.weight", list_vars, fout, quantize_config)
         
-        convert_q4_bestla_tensor(f"transformer.h.{i}.attn.out_proj.weight",
+        convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.out_proj.weight",
                     f"transformer.h.{i}.attn.out_proj.weight", list_vars, fout, quantize_config)
-        convert_q4_bestla_tensor(f"transformer.h.{i}.mlp.fc_in.weight",
+        convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_in.weight",
                     f"transformer.h.{i}.mlp.fc_in.weight", list_vars, fout, quantize_config)
-        convert_q4_bestla_tensor(f"transformer.h.{i}.mlp.fc_out.weight",
+        convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_out.weight",
                     f"transformer.h.{i}.mlp.fc_out.weight", list_vars, fout, quantize_config)
 
         convert_fp32_tensor(f"transformer.h.{i}.mlp.fc_in.bias",
