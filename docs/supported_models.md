@@ -293,6 +293,15 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td></td>
   </tr>
+  <tr>
+    <td><a href="https://huggingface.co/TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF" target="_blank" rel="noopener noreferrer">Solar-10.7B-GGUF</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+    </tr>
     <tr>
     <td><a href="https://huggingface.co/codellama/CodeLlama-7b-hf" target="_blank" rel="noopener noreferrer">TheBloke/CodeLlama-7B-GGUF</a></td>
     <td>✅</td>
@@ -327,15 +336,6 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
   </tr>
-    <tr>
-    <td><a href="https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0" target="_blank" rel="noopener noreferrer">Solar-10.7B</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-  </tr>
-    </tr>
     <tr>
     <td><a href="https://huggingface.co/tiiuae/falcon-7b/tree/main" target="_blank" rel="noopener noreferrer">tiiuae/falcon-7</td>
     <td>✅</td>
