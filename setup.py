@@ -33,6 +33,7 @@ def check_env_flag(name: str, default: bool = False) -> bool:
 
 NS_WITH_AVX2 = check_env_flag("NS_WITH_AVX2", 'avx512f' not in cpu_flags)
 """ Whether to limit the max ISA used to AVX2; otherwise AVX512 will be used; set to ON/OFF """
+NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -93,7 +94,6 @@ class CMakeBuild(build_ext):
         extdir = ext_fullpath.parent.resolve()
 
         output_dir = f"{extdir}{os.sep}"
-        NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}",
             f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY={output_dir}",
