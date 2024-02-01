@@ -394,6 +394,7 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     # num_itr = g_idx.shape[0]//x.shape[-1]
     if 'desc_act' in q_config and q_config['desc_act']:
         g_idx = model[f"{src_name}.g_idx"]
+        weight = weight.reshape(-1, weight.shape[-1])
         weight = (gptq_scales[g_idx.long()] * (weight - gptq_zeros[g_idx.long()]))
     else:
         infeatures = weight.shape[0]

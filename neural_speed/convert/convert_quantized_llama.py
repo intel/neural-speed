@@ -23,7 +23,7 @@ from common import *
 
 def permute_func(weights, n_head: int, n_head_kv: int):
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
@@ -39,12 +39,6 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
 
     int_weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
     int_weight = int_weight.view(-1,int_weight.shape[-1])
-
-    # permute_func for llama-like model
-    if permute_func:
-        int_weight = permute_func(int_weight.t(), n_head, n_head_kv).t().contiguous()
-        gptq_scales = permute_func(gptq_scales.t(), n_head, n_head_kv).t().contiguous()
-        gptq_zeros = permute_func(gptq_zeros.t(), n_head, n_head_kv).t().contiguous()
 
     # shuffle weight in GPTQ when act order is on
     if 'desc_act'in q_config and q_config['desc_act']:
@@ -62,6 +56,12 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
                 target_idx = group_idx * group_size + group_dict[group_idx]
             int_weight2[target_idx] = int_weight[i]
         int_weight = int_weight2
+
+    # permute_func for llama-like model
+    if permute_func:
+        int_weight = permute_func(int_weight.t(), n_head, n_head_kv).t().contiguous()
+        gptq_scales = permute_func(gptq_scales.t(), n_head, n_head_kv).t().contiguous()
+        gptq_zeros = permute_func(gptq_zeros.t(), n_head, n_head_kv).t().contiguous()
 
     shape = int_weight.shape
     write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
@@ -123,7 +123,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if "rope_scaling" in config and config["rope_scaling"] is not None:
         rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
     n_head = n_head
-    n_head_kv = n_head
+    n_head_kv = config["num_key_value_heads"] if "num_key_value_heads" in config else n_head
     values = [
         1,  # file version
         n_vocab,
