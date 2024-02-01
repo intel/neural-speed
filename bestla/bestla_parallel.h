@@ -30,10 +30,10 @@ struct Config2D {
 };
 struct ThreadProblem2D {
   int tid;
-  int tidx[2];
-  int loc[2];
-  int size[2];
-  bool valid;
+  int tidx[2] = {0, 0};
+  int loc[2] = {0, 0};
+  int size[2] = {0, 0};
+  bool valid{false};
   void print() {
     printf("Thread %d indice:(%d,%d)\n", tid, tidx[0], tidx[1]);
     printf("Thread location:(%d,%d)\n", loc[0], loc[1]);
