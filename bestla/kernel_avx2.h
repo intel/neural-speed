@@ -112,6 +112,53 @@ static inline void dequant_s8_N_avx2(float* dstptr, int8_t* srcptr, __m256* vsca
   }
 }
 
+inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
+                                  bool zeropadding) {
+  auto head_proc_num = utils::updiv(scale_offset, 8) * 8 - scale_offset;
+  auto ymm_dq_offset = _mm256_set1_ps(dq_scale[dq_offset_idx]);
+
+  auto get_fp_scale_ref = [&](int proc_src_num, int scale_offset, uint8_t* src, float* dst) {
+    auto dq_s_idx = scale_offset / dq_blk;
+    for (int j = 0; j < col; j++) dst[j] = dq8_bnb_LUT[src[j]] * dq_scale[dq_s_idx] + dq_scale[dq_offset_idx];
+  };
+
+  auto get_fp_scale_avx2 = [&](int scale_offset, uint8_t* src, float* dst) {
+    auto dq_s_idx = scale_offset / dq_blk;
+    auto ymm_dq_scale = _mm256_set1_ps(dq_scale[dq_s_idx]);
+    float tmp[8];
+    for (int i = 0; i < 8; i++) tmp[i] = dq8_bnb_LUT[src[i]];
+    __m256 fp32_dq_ymm = _mm256_loadu_ps(tmp);
+    auto fymm = _mm256_mul_ps(fp32_dq_ymm, ymm_dq_scale);
+    fymm = _mm256_add_ps(fymm, ymm_dq_offset);
+    _mm256_storeu_ps(dst, fymm);
+  };
+
+  for (int i = 0; i < row; i++) {
+    if (head_proc_num > col) {
+      get_fp_scale_ref(col, scale_offset, src + i * src_stride, dst + i * dst_stride);
+    } else {
+      get_fp_scale_ref(head_proc_num, scale_offset, src + i * src_stride, dst + i * dst_stride);
+      auto scale_offset_iter = scale_offset + head_proc_num;
+      uint8_t* src_iter_ptr = src + head_proc_num;
+      float* dst_iter_ptr = dst + head_proc_num;
+      auto body_loop = (col - head_proc_num) / 8;
+      auto tail_proc_num = (col - head_proc_num) % 8;
+      int ii = 0;
+      for (; ii < body_loop; ii++) {
+        get_fp_scale_avx2(scale_offset_iter + ii * 8, src_iter_ptr + i * src_stride + ii * 8,
+                          dst_iter_ptr + i * dst_stride + ii * 8);
+      }
+      if (tail_proc_num > 0) {
+        get_fp_scale_ref(tail_proc_num, scale_offset_iter + ii * 8, src_iter_ptr + i * src_stride + ii * 8,
+                         dst_iter_ptr + i * dst_stride + ii * 8);
+      }
+    }
+  }
+  if (zeropadding) assert(0);
+  return BTLA_CODE::Success;
+}
+
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
                                           const float* src1ptr, const int src1step, float* dstptr, const int dststep,
                                           const int M, const int N) {
@@ -964,6 +1011,109 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
     if (zeropadding && npadding) {
       std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
     }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, const float* biasptr, float epsilon,
+                                  int norm_size, float* dstptr, float* mean_out, float* mean_square_out,
+                                  bool simplified) {
+  int constexpr VLen = 8;
+  int norm_size8 = utils::padto_le(norm_size, VLen);
+  int h = 0;
+  __m256 vmean = _mm256_setzero_ps(), vmeansq = _mm256_setzero_ps();
+  for (; h < norm_size8; h += VLen) {
+    auto tmp = _mm256_loadu_ps(srcptr + h);
+    vmean = _mm256_add_ps(vmean, tmp);
+    tmp = _mm256_mul_ps(tmp, tmp);
+    vmeansq = _mm256_add_ps(vmeansq, tmp);
+  }
+  float mean = avx2_reduce_ps<AVX2_REDUCE_TYPE::ADD>(vmean);
+  float mean_square = avx2_reduce_ps<AVX2_REDUCE_TYPE::ADD>(vmeansq);
+  for (; h < norm_size; h++) {
+    mean += srcptr[h];
+    mean_square += srcptr[h] * srcptr[h];
+  }
+  mean = mean / norm_size;
+  if (simplified) {
+    mean_square = std::sqrt(mean_square / norm_size + epsilon);
+  } else {
+    mean_square = std::sqrt(mean_square / norm_size - mean * mean + epsilon);
+  }
+  auto vm = _mm256_set1_ps(mean);
+  float inv_meansq = 1.f / mean_square;
+  auto vms = _mm256_set1_ps(inv_meansq);
+  h = 0;
+  if (simplified) {
+    if (scaleptr) {
+      for (; h < norm_size8; h += VLen) {
+        auto inp = _mm256_loadu_ps(srcptr + h);
+        auto scale = _mm256_loadu_ps(scaleptr + h);
+        inp = _mm256_mul_ps(inp, scale);
+        inp = _mm256_mul_ps(inp, vms);
+        _mm256_storeu_ps(dstptr + h, inp);
+      }
+      for (; h < norm_size; h++) {
+        dstptr[h] = srcptr[h] * inv_meansq * scaleptr[h];
+      }
+    } else {
+      for (; h < norm_size8; h += VLen) {
+        auto inp = _mm256_loadu_ps(srcptr + h);
+        inp = _mm256_mul_ps(inp, vms);
+        _mm256_storeu_ps(dstptr + h, inp);
+      }
+      for (; h < norm_size; h++) {
+        dstptr[h] = srcptr[h] * inv_meansq;
+      }
+    }
+
+  } else {
+    if (scaleptr) {
+      if (biasptr == nullptr) {
+        for (; h < norm_size8; h += VLen) {
+          auto inp = _mm256_loadu_ps(srcptr + h);
+          auto scale = _mm256_loadu_ps(scaleptr + h);
+          inp = _mm256_sub_ps(inp, vm);
+          inp = _mm256_mul_ps(inp, scale);
+          inp = _mm256_mul_ps(inp, vms);
+          _mm256_storeu_ps(dstptr + h, inp);
+        }
+        for (; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h];
+        }
+      } else {
+        for (; h < norm_size8; h += VLen) {
+          auto inp = _mm256_loadu_ps(srcptr + h);
+          auto scale = _mm256_loadu_ps(scaleptr + h);
+          inp = _mm256_sub_ps(inp, vm);
+          inp = _mm256_mul_ps(inp, vms);
+          inp = _mm256_mul_ps(inp, scale);
+          auto bias = _mm256_loadu_ps(biasptr + h);
+          inp = _mm256_add_ps(inp, bias);
+          _mm256_storeu_ps(dstptr + h, inp);
+        }
+        for (; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h] + biasptr[h];
+        }
+      }
+    } else {
+      for (; h < norm_size8; h += VLen) {
+        auto inp = _mm256_loadu_ps(srcptr + h);
+        inp = _mm256_sub_ps(inp, vm);
+        inp = _mm256_mul_ps(inp, vms);
+        _mm256_storeu_ps(dstptr + h, inp);
+      }
+      for (; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_meansq;
+      }
+    }
+  }
+
+  if (mean_out) {
+    *mean_out = mean;
+  }
+  if (mean_square_out) {
+    *mean_square_out = mean_square;
   }
   return BTLA_CODE::Success;
 }
