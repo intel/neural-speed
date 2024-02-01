@@ -222,6 +222,43 @@ class Memcpy2DBf16CvtFp32 {
   }
 };
 
+template <typename _DST_T, int _PACK_ROW>
+class DecompressDQKBlockS4Fp {
+ public:
+  template <BTLA_ISA ISA_T, BTLA_DTYPE S4_T>
+  static inline BTLA_CODE forward(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
+                                  uint8_t* scales, float* dq_scale, int k_offset, int n_offset, int kblock, int NPad,
+                                  int N, int dq_blk, int dq_offset_idx, void* tmp, size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+    ret = ref::decompress_dq_kblock_s4_fp<S4_T, _DST_T, _PACK_ROW>(
+        srcptr, dstptr, row, col, ld_src, ld_dst, scales, dq_scale, k_offset, n_offset, kblock, dq_blk, dq_offset_idx,
+        NPad, N, reinterpret_cast<int8_t*>(tmp), tmpsize);
+    return ret;
+  }
+};
+
+class Dq8GetScale {
+ public:
+  template <BTLA_ISA ISA_T>
+  static BTLA_CODE forward(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk, int dq_offset_idx,
+                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding) {
+#if CompileAVX512F()
+    if (ISA_T >= BTLA_ISA::AVX512F) {
+      return kernel::avx512f::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
+                                               src_stride, dst_stride, zeropadding);
+    }
+#endif
+#if CompileAVX2()
+    if (ISA_T >= BTLA_ISA::AVX2) {
+      return kernel::avx2::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
+                                            src_stride, dst_stride, zeropadding);
+    }
+#endif
+    return kernel::ref::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale, src_stride,
+                                         dst_stride, zeropadding);
+  }
+};
+
 template <int NTILE>
 class CompressS8S4 {
  public:
@@ -465,6 +502,19 @@ class DecompressKBlockF4Fp {
     return ref::decompress_kblock_f4_fp<F4_T, _DST_T, _PACK_ROW, SCA_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                                         scales, k_offset, kblock, NPad,
                                                                         reinterpret_cast<int8_t*>(tmp), tmpsize);
+  }
+};
+
+template <typename _DST_T, int _PACK_ROW>
+class DecompressDqKBlockF4Fp {
+ public:
+  template <BTLA_ISA ISA_T, BTLA_DTYPE F4_T, typename SCA_T>
+  static inline BTLA_CODE forward(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
+                                  SCA_T* scales, float* dq_scale, int k_offset, int n_offset, int kblock, int dq_blk,
+                                  int dq_offset_idx, int NPad, int N, void* tmp, size_t tmpsize) {
+    return ref::decompress_dq_kblock_f4_fp<F4_T, _PACK_ROW>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, dq_scale,
+                                                            k_offset, n_offset, kblock, dq_blk, dq_offset_idx, NPad, N,
+                                                            tmp, tmpsize);
   }
 };
 
@@ -776,6 +826,35 @@ class RemoveZeroPointBias {
   }
 };
 
+class LayerNormalization {
+ public:
+  template <BTLA_ISA ISA_T, typename T>
+  static inline BTLA_CODE forward(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                  T* dstptr, T* mean, T* mean_square, bool simplified) {
+    if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<T, float>) {
+      return avx512f::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
+    }
+    if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<T, float>) {
+      return avx2::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
+    }
+    return ref::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
+  }
+  template <typename T>
+  static inline BTLA_CODE forward_auto(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                       T* dstptr, T* mean, T* mean_square, bool simplified) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                           simplified);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                        simplified);
+    }
+    return forward<BTLA_ISA::NoSIMD, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                        simplified);
+  }
+};
 }  // namespace wrapper
 }  // namespace kernel
 }  // namespace bestla

@@ -373,6 +373,34 @@ inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, 
   return BTLA_CODE::Success;
 }
 
+template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW>
+inline BTLA_CODE decompress_dq_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
+                                            int ld_dst, uint8_t* scales, float* dq_scale, int k_offset, int n_offset,
+                                            int kblock, int dq_blk, int dq_offset_idx, int NPad, int N, void* tmp,
+                                            size_t tmpsize) {
+  auto sptr_base = scales + n_offset;
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = sptr_base + kpos * NPad;
+    for (int j = 0; j < col; j += 2) {
+      auto tmp = srcptr[i * ld_src / 2 + j / 2];
+      float scale0, scale1, dst0, dst1;
+      int s0_idx, s1_idx;
+      s0_idx = j / _PACK_ROW;
+      s1_idx = (j + 1) / _PACK_ROW;
+      auto dq_s0_idx = (n_offset + kpos * N + s0_idx) / dq_blk;
+      auto dq_s1_idx = (n_offset + kpos * N + s1_idx) / dq_blk;
+      scale0 = dq8_bnb_LUT[sptr[s0_idx]] * dq_scale[dq_s0_idx] + dq_scale[dq_offset_idx];
+      scale1 = dq8_bnb_LUT[sptr[s1_idx]] * dq_scale[dq_s1_idx] + dq_scale[dq_offset_idx];
+      dst0 = static_cast<float>(get_s8<S4_T>(tmp.x)) * scale0;
+      dst1 = static_cast<float>(get_s8<S4_T>(tmp.y)) * scale1;
+      dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(dst0);
+      dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
 template <BTLA_DTYPE S4_T, typename _DST_T>
 inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
                                            int ld_dst, int8_t* tmp, size_t tmpsize) {
@@ -661,6 +689,34 @@ inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, in
       scale1 = static_cast<float>(sptr[s1_idx]);
       dst0 = f4_dequantize<F4_T>(tmp.x, scale0);
       dst1 = f4_dequantize<F4_T>(tmp.y, scale1);
+      dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(dst0);
+      dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <BTLA_DTYPE F4_T, int _PACK_ROW, typename _DST_T, typename SCA_T>
+inline BTLA_CODE decompress_dq_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
+                                            int ld_dst, SCA_T* scales, float* dq_scale, int k_offset, int n_offset,
+                                            int kblock, int dq_blk, int dq_offset_idx, int NPad, int N, void* tmp,
+                                            size_t tmpsize) {
+  auto sptr_base = scales + n_offset;
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = sptr_base + kpos * NPad;
+    for (int j = 0; j < col; j += 2) {
+      auto tmp = srcptr[i * ld_src / 2 + j / 2];
+      float scale0, scale1, dst0, dst1;
+      int s0_idx, s1_idx;
+      s0_idx = j / _PACK_ROW;
+      s1_idx = (j + 1) / _PACK_ROW;
+      auto dq_s0_idx = (n_offset + kpos * N + s0_idx) / dq_blk;
+      auto dq_s1_idx = (n_offset + kpos * N + s1_idx) / dq_blk;
+      scale0 = dq8_bnb_LUT[sptr[s0_idx]] * dq_scale[dq_s0_idx] + dq_scale[dq_offset_idx];
+      scale1 = dq8_bnb_LUT[sptr[s1_idx]] * dq_scale[dq_s1_idx] + dq_scale[dq_offset_idx];
+      dst0 = ref::f4_dequantize<F4_T>(tmp.x, scale0);
+      dst1 = ref::f4_dequantize<F4_T>(tmp.y, scale1);
       dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(dst0);
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
     }
@@ -1103,6 +1159,70 @@ inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* srcptr, 
   return BTLA_CODE::Success;
 }
 
+inline uint8_t get_dq8_bnb(float v) {
+  int left = 0;
+  int right = 255;
+  while (left <= right) {
+    int mid = left + (right - left) / 2;
+    if (dq8_bnb_LUT[mid] == v) {
+      return mid;
+    } else if (dq8_bnb_LUT[mid] < v) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  if (right < 0) {
+    return 0;
+  } else if (left >= 256) {
+    return 255;
+  } else {
+    return (v - dq8_bnb_LUT[right] < dq8_bnb_LUT[left] - v) ? right : left;
+  }
+}
+template <bool QDQ_SCALE>
+inline BTLA_CODE dq8_bnb_double_quant(float* scale, size_t scale_size, int dq_blocksize, float* dq_buf) {
+  float offset = 0.f;
+  for (int i = 0; i < scale_size; i++) offset += scale[i];
+  offset /= scale_size;
+  dq_buf[utils::updiv(scale_size, dq_blocksize)] = offset;  // store zp.
+  int align_blk_size = scale_size / dq_blocksize * dq_blocksize;
+  int i = 0;
+  auto calc_scale = [&](int blksize) {
+    float absmax = std::numeric_limits<float>::min();
+    for (int j = 0; j < blksize; j++) {
+      scale[i + j] -= offset;
+      absmax = std::max(absmax, std::abs(scale[i + j]));
+    }
+    for (int j = 0; j < blksize; j++) {
+      scale[i + j] /= absmax;
+      scale[i + j] = get_dq8_bnb(scale[i + j]);
+      if constexpr (QDQ_SCALE) {
+        scale[i + j] = dq8_bnb_LUT[static_cast<int>(scale[i + j])];
+        scale[i + j] *= absmax;
+        scale[i + j] += offset;
+      }
+    }
+    return absmax;
+  };
+  for (; i < align_blk_size; i += dq_blocksize) dq_buf[i / dq_blocksize] = calc_scale(dq_blocksize);
+  if (i < scale_size) dq_buf[i / dq_blocksize + 1] = calc_scale(scale_size - i);
+  return BTLA_CODE::Success;
+}
+
+inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
+                                  bool zeropadding) {
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j++) {
+      auto dq_s_idx = (scale_offset + j) / dq_blk;
+      dst[i * dst_stride + j] = dq8_bnb_LUT[src[i * src_stride + j]] * dq_scale[dq_s_idx] + dq_scale[dq_offset_idx];
+    }
+  }
+  if (zeropadding) assert(0);
+  return BTLA_CODE::Success;
+}
+
 static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr, const int srcstep, const float beta,
                                           const float* src1ptr, const int src1step, float* dstptr, const int dststep,
                                           const int M, const int N) {
@@ -1303,6 +1423,61 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
       accptr[i * ldacc + j] -= zpaf * reduceb[j];
       accptr[i * ldacc + j] -= zpaf * zpbf * k;
     }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename T>
+static inline BTLA_CODE layernorm(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                  T* dstptr, T* mean_out, T* mean_square_out, bool simplified) {
+  T mean = 0;
+  T mean_square = 0;
+
+  for (int h = 0; h < norm_size; h++) {
+    mean += srcptr[h];
+    mean_square += srcptr[h] * srcptr[h];
+  }
+
+  mean = mean / norm_size;
+  if (simplified) {
+    mean_square = std::sqrt(mean_square / norm_size + epsilon);
+  } else {
+    mean_square = std::sqrt(mean_square / norm_size - mean * mean + epsilon);
+  }
+  float inv_mean_square = 1.f / mean_square;
+  if (simplified) {
+    if (scaleptr) {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = srcptr[h] * inv_mean_square * scaleptr[h];
+      }
+    } else {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = srcptr[h] * inv_mean_square;
+      }
+    }
+  } else {
+    if (scaleptr) {
+      if (biasptr == nullptr) {
+        for (int h = 0; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h];
+        }
+      } else {
+        for (int h = 0; h < norm_size; h++) {
+          dstptr[h] = (srcptr[h] - mean) * inv_mean_square * scaleptr[h] + biasptr[h];
+        }
+      }
+    } else {
+      for (int h = 0; h < norm_size; h++) {
+        dstptr[h] = (srcptr[h] - mean) * inv_mean_square;
+      }
+    }
+  }
+
+  if (mean_out) {
+    *mean_out = mean;
+  }
+  if (mean_square_out) {
+    *mean_square_out = mean_square;
   }
   return BTLA_CODE::Success;
 }
