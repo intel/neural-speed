@@ -33,9 +33,11 @@ def permute_func(weights, n_head: int, n_head_kv: int):
 def convert_fp32_rtn_q4_bestla_tensor(src_name, dst_name, model, fout, blocksize, compute_type, quant_type, scale_type):
     torch.ops.load_library("libqbits.so")
     raw_wei = model[src_name]
+    raw_wei = raw_wei.to(torch.float32)
+    write_header(fout, raw_wei.shape, dst_name, GGML_QJBLAS_TYPE)
     compress_wei = torch.ops.bestlaop.woq_quantize(
-        raw_wei, False, blocksize, compute_type, quant_type, scale_type, False)
-    compress_wei.tofile(fout)
+        raw_wei, True, blocksize, compute_type, quant_type, scale_type, False)
+    compress_wei.numpy().tofile(fout)
     print(
         f"converting {dst_name} fp32 tensor to bestla rtn {quant_type} block")
 
@@ -193,7 +195,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_fp32_tensor("transformer.ln_f.bias",
                         "transformer.ln_f.bias", list_vars, fout)
     convert_fp32_tensor("lm_head.bias", "lm_head.bias", list_vars, fout)
-    convert_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
+    # convert_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
+    convert_fp32_rtn_q4_bestla_tensor(
+        "lm_head.weight", "lm_head.weight", list_vars, fout, 128, "int8", "int4_clip", "fp32")
 
     for i in tqdm(range(n_layer), desc="Processing layers"):
         convert_q4_bestla_tensor(f"transformer.h.{i}.attn.q_proj.weight",
