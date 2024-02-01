@@ -294,12 +294,12 @@ Neural Speed supports the following models:
     <td></td>
   </tr>
   <tr>
-    <td><a href="https://huggingface.co/TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF" target="_blank" rel="noopener noreferrer">Solar-10.7B-GGUF</td>
+    <td><a href="https://huggingface.co/TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
-    <td>✅</td>
+    <td></td>
   </tr>
     </tr>
     <tr>
@@ -330,6 +330,14 @@ Neural Speed supports the following models:
   </tr>
     <tr>
     <td><a href="https://huggingface.co/meta-llama/Llama-2-7b-chat-hf" target="_blank" rel="noopener noreferrer">meta-llama/Llama-2-7b-chat-hf</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
+   <tr>
+    <td><a href="https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0" target="_blank" rel="noopener noreferrer">upstage/SOLAR-10.7B-Instruct-v1.0</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
