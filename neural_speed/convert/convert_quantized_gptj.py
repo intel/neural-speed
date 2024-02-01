@@ -30,6 +30,16 @@ def permute_func(weights, n_head: int, n_head_kv: int):
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
 
+def convert_fp32_rtn_q4_bestla_tensor(src_name, dst_name, model, fout, blocksize, compute_type, quant_type, scale_type):
+    torch.ops.load_library("libqbits.so")
+    raw_wei = model[src_name]
+    compress_wei = torch.ops.bestlaop.woq_quantize(
+        raw_wei, False, blocksize, compute_type, quant_type, scale_type, False)
+    compress_wei.tofile(fout)
+    print(
+        f"converting {dst_name} fp32 tensor to bestla rtn {quant_type} block")
+
+
 def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config):
     # unpack weight and repack into jblas format
     import neural_speed.llama_cpp as cpp_model
