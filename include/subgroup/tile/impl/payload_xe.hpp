@@ -822,7 +822,7 @@ private:
             : block_size_x * sizeof(dtype);
 
     using this_payload_t = mem_payload_t<mem_desc_t, tile_desc,
-            msg_type::unaligned_2d, arch_tag_>;
+            msg_type::block_2d, arch_tag_>;
 
 public:
     static constexpr bool mem_transpose
@@ -842,18 +842,20 @@ public:
     static constexpr uint32_t block_bytes
             = block_size_x * block_size_y * sizeof(dtype);
 
-    using mem_dtype = typename std::conditional<
-            (block_per_row_bytes % sizeof(uint64_t) == 0), uint64_t,
-            typename std::conditional<(block_per_row_bytes % sizeof(uint32_t)
-                                              == 0),
-                    uint32_t, dtype>::type>::type;
+    using mem_dtype = uint32_t;
+    //     using mem_dtype = typename std::conditional<
+    //             (block_per_row_bytes % sizeof(uint64_t) == 0), uint64_t,
+    //             typename std::conditional<(block_per_row_bytes % sizeof(uint32_t)
+    //                                               == 0),
+    //                     uint32_t, dtype>::type>::type;
     static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
     // for pvc, we can use simd16 or simd32
     static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
     static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
     static constexpr uint32_t num_channel = block_size_y;
 
-    static constexpr uint32_t simd_exec_size = block_size_x / scale_factor;
+    static constexpr uint32_t simd_exec_size
+            = block_size_x >= scale_factor ? block_size_x / scale_factor : 1;
 
     xetla_vector<uint32_t, num_channel> channel_offset;
     xetla_vector<uint32_t, num_channel> step_x;

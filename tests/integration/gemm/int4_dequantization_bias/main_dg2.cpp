@@ -322,7 +322,7 @@ void dequantize_gemm_run(int iter) {
     using data_type_zero_pt = int4x2;
     using data_type_scale = fp16;
     using data_type_acc_in = fp16;
-    using data_type_acc = float;
+    using data_type_acc = fp16;
     using data_type_bias = fp16;
 
     constexpr size_t size_a = matrix_m * matrix_k;
