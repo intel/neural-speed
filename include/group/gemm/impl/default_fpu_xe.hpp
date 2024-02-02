@@ -37,7 +37,7 @@ class gemm_t<
         mem_desc_a_t_, // memory attribute of matA
         mem_desc_b_t_, // memory attribute of matB
         pre_processing_t_, // pre_processing functor
-        std::enable_if_t<(arch_tag_ == gpu_arch::Xe)>> {
+        std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
 public:
     using mem_desc_a_t = mem_desc_a_t_;
     using mem_desc_b_t = mem_desc_b_t_;
@@ -69,7 +69,7 @@ private:
     using dtype_mma_b = typename compute_policy::dtype_mma_b;
 
     using check_dtype
-            = group::gemm<gpu_arch::Xe>::default_fpu::check_dtype_default<
+            = group::gemm<arch_tag_>::default_fpu::template check_dtype_default<
                     dtype_a, dtype_b, dtype_mma_a, dtype_mma_b, dtype_mma_acc>;
 
     /******** set memory attribute **********/
@@ -85,9 +85,9 @@ private:
             ? tdesc_update_dir::x_dir
             : tdesc_update_dir::y_dir;
 
-    using check_memory
-            = group::gemm<gpu_arch::Xe>::default_fpu::check_memory_default<
-                    mem_layout_a, mem_layout_b, mem_space_a, mem_space_b>;
+    using check_memory = group::gemm<
+            arch_tag_>::default_fpu::template check_memory_default<mem_layout_a,
+            mem_layout_b, mem_space_a, mem_space_b>;
 
     static constexpr uint32_t stages = compute_policy::stages;
     static constexpr uint32_t sync_freq = compute_policy::sync_freq;
@@ -117,10 +117,11 @@ private:
             ? tile_size_y_b
             : compute_policy::block_size_y_b;
 
-    using check_tile_size = group::gemm<
-            gpu_arch::Xe>::default_fpu::check_tile_size_default<dtype_mma_acc,
-            tile_size_x_a, tile_size_y_a, block_size_x_a, block_size_y_a,
-            tile_size_x_b, tile_size_y_b, block_size_x_b, block_size_y_b>;
+    using check_tile_size = group::gemm<arch_tag_>::default_fpu::
+            template check_tile_size_default<dtype_mma_acc, tile_size_x_a,
+                    tile_size_y_a, block_size_x_a, block_size_y_a,
+                    tile_size_x_b, tile_size_y_b, block_size_x_b,
+                    block_size_y_b>;
 
     /******** set tile  **********/
     // transpose in reg for src suppression

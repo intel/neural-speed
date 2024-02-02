@@ -124,8 +124,10 @@ private:
     /******** set tile  **********/
     static constexpr bool is_vnni_tiled_a
             = (sizeof(dtype_a) < sizeof(uint32_t)) && is_col_major_a;
-    static constexpr reg_layout reg_layout_a
-            = is_vnni_tiled_a ? reg_layout::vnni_tiled : reg_layout::tiled;
+//     static constexpr reg_layout reg_layout_a
+//             = is_vnni_tiled_a ? reg_layout::vnni_tiled : reg_layout::tiled;
+    static constexpr reg_layout reg_layout_a = reg_layout::transpose_tiled;
+
     using matA_tile_desc_t = subgroup::tile_desc_t<tile_size_x_a, tile_size_y_a,
             block_size_x_a, block_size_y_a, reg_layout_a>;
     using matA_t = subgroup::tile_t<dtype_a, matA_tile_desc_t>;
@@ -208,7 +210,7 @@ private:
                     zero_pt_tile_desc_t, 1, arch_tag>;
 
     using tile_mma = subgroup::tile_mma_t<matAcc_t, matAcc_t, matB_acc_t,
-            matA_acc_t, mma_engine::xmx, arch_tag>;
+            matA_acc_t, mma_engine::fpu, arch_tag>;
     static constexpr bool enable_periodic_sync = (sync_freq != 0);
     static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
     static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
