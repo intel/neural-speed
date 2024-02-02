@@ -77,6 +77,6 @@ else() # Windows
     # their original names.
     add_compile_definitions(_CRT_NONSTDC_NO_WARNINGS)
 endif()
-
+add_compile_options(-ftemplate-backtrace-limit=0)
 add_subdirectory(tests)
 add_subdirectory(examples)
