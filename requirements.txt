@@ -2,6 +2,7 @@
 torch==2.1.0+cpu
 transformers
 numpy
+matplotlib
 sentencepiece
 protobuf<3.20
 einops
