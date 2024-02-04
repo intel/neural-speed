@@ -9690,12 +9690,12 @@ static void ne_compute_backward(struct ne_context* ctx, struct ne_tensor* tensor
     } break;
     case NE_OP_SQRT: {
       if (src0->grad) {
-        src0->grad = ne_add_impl(
-            ctx, src0->grad,
-            ne_mul(ctx,
-                   tensor->grad,  // this was not caught by test_grad because in test_grad tensor->grad is 1
-                   ne_div(ctx, ne_repeat(ctx, ne_new_f32(ctx, 0.5f), tensor), tensor)),
-            inplace);
+          src0->grad =
+            ne_add_impl(ctx, src0->grad,
+                        ne_mul(ctx,
+                               tensor->grad,  // this was not caught by test_grad because in test_grad tensor->grad is 1
+                               ne_div(ctx, ne_repeat(ctx, ne_new_f32(ctx, 0.5f), tensor), tensor)),
+                        inplace);
       }
     } break;
     case NE_OP_LOG: {

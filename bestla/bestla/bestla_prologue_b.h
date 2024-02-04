@@ -438,10 +438,10 @@ class WeightKBlockNInteger {
     if (stor->mDType == BTLA_DTYPE::S8 || stor->mDType == BTLA_DTYPE::F8_E4M3 || stor->mDType == BTLA_DTYPE::F8_E5M2) {
       reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
     } else {
-      auto reorder = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
-      reorderWeight(N, K, B, ldb, reorder, threading);
-      compressWeight(stor->mNPad, stor->mKPad, reorder, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
-      utils::afree(reorder);
+      auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
+      reorderWeight(N, K, B, ldb, reordered, threading);
+      compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
+      utils::afree(reordered);
     }
     reduceWeight(stor, threading);
   }
@@ -494,9 +494,9 @@ class WeightKBlockNInteger {
         });
       };
       transposeunpackfunc_u4s4();
-      auto reorder = s8ptr + static_cast<size_t>(K) * N;
-      reorderWeight(N, K, s8ptr, N, reorder, threading);
-      compressWeight(stor->mNPad, stor->mKPad, reorder, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
+      auto reordered = s8ptr + static_cast<size_t>(K) * N;
+      reorderWeight(N, K, s8ptr, N, reordered, threading);
+      compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
     }
     utils::afree(tmp);
   }
