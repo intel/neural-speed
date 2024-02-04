@@ -601,6 +601,7 @@ class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }
   void parallel_for(const thread_func& func) override {
+    if (mThreadNum > 1) {
 #pragma omp parallel
       {
         int tidx = omp_get_thread_num();
@@ -665,10 +666,11 @@ class StdThreading : public IThreading {
     // printf("create %d\n", mThreadNum);
     thdset.resize(mThreadNum - 1);
     stop = false;
-
+    bestla::device::CpuDevice::core_bond(0);
     for (size_t i = 0; i < mThreadNum - 1; i++) {
       thdset[i] = std::thread(
           [&](int tidx) {
+            bestla::device::CpuDevice::core_bond(tidx+1);
             while (true) {
               if (stop.load() == true) break;
               if (func_[tidx] != nullptr) {
