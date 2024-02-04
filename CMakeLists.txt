@@ -40,8 +40,8 @@ option(NS_ALL_WARNINGS           "neural_speed: enable all compiler warnings"   
 option(NS_ALL_WARNINGS_3RD_PARTY "neural_speed: enable all compiler warnings in 3rd party libs" OFF)
 option(NS_GPROF                  "neural_speed: enable gprof"                                   OFF)
 
-# tensor parallism
-option(NS_TP                     "neural_speed: enable tensor parallism"                        OFF)
+# tensor parallelism
+option(NS_TP                     "neural_speed: enable tensor parallelism"                        OFF)
 if (NS_TP)
   add_compile_definitions(NS_TP_MODEL)
 endif()

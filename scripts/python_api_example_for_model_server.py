@@ -36,7 +36,7 @@ def f_response(res, working):
 
 model_path = "gptj-q4.bin"  # please set your corresponding local neural_speed low-bits model file
 added_count = 0
-s = cpp.ModelServer(f_response,                      # reponse function (deliver generation results and current reamin working size in server)
+s = cpp.ModelServer(f_response,                      # response function (deliver generation results and current remain working size in server)
                     model_path,                      # model_path
                     max_new_tokens=128,              # global query max generation token length
                     num_beams=4,                     # global beam search related generation parameters

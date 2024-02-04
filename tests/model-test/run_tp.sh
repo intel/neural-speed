@@ -105,7 +105,7 @@ function main {
     make -j
     cd ..
 
-    ## prepare example requiement
+    ## prepare example requirement
     pip install -r requirements.txt
 
     # launch benchmark

@@ -3330,7 +3330,7 @@ static drwav_result drwav_wfopen(FILE** ppFile, const wchar_t* pFilePath, const 
   annoying because fopen() is locale specific. The only real way I can think of
   to do this is with wcsrtombs(). Note that wcstombs() is apparently not
   thread-safe because it uses a static global mbstate_t object for maintaining
-  state. I've checked this with -std=c89 and it works, but if somebody get's a
+  state. I've checked this with -std=c89 and it works, but if somebody gets a
   compiler error I'll look into improving compatibility.
   */
   {

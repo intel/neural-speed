@@ -69,7 +69,7 @@ function(add_ut_flag UT_OPTION)
 endfunction()
 
 if(UT_BUILD)
-	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everthing even run parts of UTs
+	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everything even run parts of UTs
 	file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
   include_directories(${PROJECT_NAME})
 	add_executable(${PROJECT_NAME}_ut ${srcs} ${headers} ${ut_headers})
