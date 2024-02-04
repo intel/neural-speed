@@ -196,7 +196,7 @@ def unpack_weight(qweight, scales, qzeros, q_config):
     if "quant_method" not in q_config:
         raise ValueError(f"Unsupported q_config without quant_method: {q_config}")
     quant_method = q_config["quant_method"]
-    if quant_method == "gptq":
+    if quant_method == "gptq" or quant_method == "autoround":
         qbits = q_config["bits"]
         if qbits == 4:
             return unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config)
