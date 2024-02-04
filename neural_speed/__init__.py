@@ -83,7 +83,7 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False,
+    def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False, use_autoround=False,
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
@@ -108,6 +108,8 @@ class Model:
             quant_desc = "gptq"
         if use_awq:
             quant_desc = "awq"
+        if use_awq:
+            quant_desc = "autoround"
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
@@ -120,8 +122,8 @@ class Model:
                   format(self.bin_file))
             return
 
-        if use_gptq or use_awq:
-            convert_model(model_name, quant_bin, "f32")
+        if use_gptq or use_awq or use_autoround:
+            convert_model(model_name, quant_bin, use_quantized_model=True)
             return
 
         if not os.path.exists(fp32_bin):
