@@ -109,7 +109,7 @@ class HuggingFaceAutoLM(BaseLM):
         peft: str = None,
         load_in_8bit: Optional[bool] = False,
         load_in_4bit: Optional[bool] = False,
-        trust_remote_code: Optional[bool] = False,
+        trust_remote_code: Optional[bool] = True,
         gptq_use_triton: Optional[bool] = False,
         inject_fused_attention: Optional[bool] = True,
         bnb_4bit_quant_type: Optional[str] = None,
@@ -229,7 +229,7 @@ class HuggingFaceAutoLM(BaseLM):
         self._max_length = max_length
         self._config = self.AUTO_CONFIG_CLASS.from_pretrained(
             pretrained,
-            trust_remote_code=trust_remote_code,
+            trust_remote_code=True,
             revision=revision + ("/" + subfolder if subfolder is not None else ""),
         )
 
@@ -621,9 +621,32 @@ class AutoCausalLM(HuggingFaceAutoLM):
         super().__init__(*args, pretrained=pretrained, model_format=model_format, **kwargs)
 
         if self.model_format == "runtime":
-            from neural_speed import Model
-            self.runtime_model = Model()
-            self.runtime_model.init(pretrained, weight_dtype="int4", compute_dtype="int8")
+            # from neural_speed import Model
+            # self.runtime_model = Model()
+            # self.runtime_model.init(pretrained, weight_dtype="int4", compute_dtype="int8")
+            import intel_extension_for_pytorch as ipex
+            from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
+            from transformers import AutoTokenizer
+            from intel_extension_for_transformers.transformers import WeightOnlyQuantConfig
+            import torch
+
+            device = "xpu"
+            model_name = pretrained
+            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            prompt = "Once upon a time, a little girl"
+            inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+
+            # woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=32)
+            # qmodel = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_quantization_config, device_map="xpu", trust_remote_code=True, use_llm_runtime=False, torch_dtype=torch.float16)
+            # import pdb; pdb.set_trace()
+            # qmodel.save_pretrained("llama_int4_saved_dir")
+            self.runtime_model = AutoModelForCausalLM.from_pretrained("llama_int4_saved_dir", trust_remote_code=True)
+
+            # optimize the model with ipex, it will improve performance.
+            self.runtime_model = ipex.optimize_transformers(self.runtime_model, inplace=True, dtype=torch.float16, woq=True, device="xpu")
+
+            # output = qmodel.generate(inputs, max_new_tokens=100, do_sample=True)
+            # print(tokenizer.batch_decode(output, skip_special_tokens=True))
 
         if self.model_format == "onnx":
             if not os.path.exists(os.path.join(pretrained, "decoder_model.onnx")) and \
@@ -755,8 +778,8 @@ class AutoCausalLM(HuggingFaceAutoLM):
             bos = torch.tensor([64790, 64792]).repeat(input_bs, 1)
             inputs = torch.cat((bos, inputs), 1)
         if self.model_format == "runtime":
-            out = self.runtime_model(inputs, reinit=True, logits_all=True)
-            output = {"logits": torch.tensor(out).unsqueeze(0)}
+            output = self.runtime_model(inputs.to("xpu"))#, reinit=True, logits_all=True)
+            # output = {"logits": torch.tensor(out).unsqueeze(0)}
         elif self.model_format != "onnx":
             output = self.model(inputs)
         else:
