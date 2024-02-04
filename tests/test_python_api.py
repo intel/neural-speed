@@ -47,7 +47,7 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         inputs = tokenizer(prompt, return_tensors="pt")
-        
+
         pt_logits = torch.load("/tf_dataset2/inc-ut/nlptoolkit_ut_model/llama2_pt_logits.pth")[:,-1]
         pt_generate_ids = torch.load("/tf_dataset2/inc-ut/nlptoolkit_ut_model/llama2_pt_generate_ids.pth")[0].tolist()
         print(tokenizer.decode(pt_generate_ids))
@@ -117,4 +117,4 @@ class TestLLMRUNTIME(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-    
+

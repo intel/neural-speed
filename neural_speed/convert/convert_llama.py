@@ -285,7 +285,7 @@ class SentencePieceVocab:
     def sentencepiece_tokens(self) -> Iterable[Tuple[bytes, float]]:
         tokenizer = self.sentencepiece_tokenizer
         for i in range(self.params_vocab_size):
-            text: bytes           
+            text: bytes
             if i < tokenizer.vocab_size():
                 if tokenizer.is_unknown(i):
                     text = " \u2047 ".encode("utf-8")

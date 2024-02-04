@@ -26,7 +26,7 @@ jobs:
         job_name: ["copyright"]
       fail-fast: false
     steps:
-          
+
       - name: Checkout out Repo
         uses: actions/checkout@v3
 
@@ -40,7 +40,7 @@ jobs:
           git --no-pager diff --name-only remotes/origin/${{ github.base_ref }} ${{ github.workspace }}/neural_speed> ${{ env.CODE_SCAN_LOG_PATH }}/diff.log
           files=$(cat ${{ env.CODE_SCAN_LOG_PATH }}/diff.log | awk '!a[$0]++')
           $LIGHT_PURPLE && echo " ----------------- checking ... --------------------------" && $RESET
-          if [[ -f ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log ]]; then 
+          if [[ -f ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log ]]; then
             rm -f ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log
           fi
           for file in ${files}
@@ -57,7 +57,7 @@ jobs:
                   $LIGHT_PURPLE && echo "Skipping ${file}"  && $RESET
               fi
           done
-          if [[ -f ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log ]]; then 
+          if [[ -f ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log ]]; then
             $BOLD_YELLOW && echo " -----------------  Current log file output start --------------------------"
             cat ${{ env.CODE_SCAN_LOG_PATH }}/copyright_issue_summary.log
             $BOLD_YELLOW && echo " -----------------  Current log file output end --------------------------" && $RESET

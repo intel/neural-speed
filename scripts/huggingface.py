@@ -351,7 +351,7 @@ class HuggingFaceAutoLM(BaseLM):
                             load_in_8bit=load_in_8bit,
                             trust_remote_code=trust_remote_code,
                             torch_dtype=torch_dtype
-                        )   
+                        )
             else:
                 if load_in_4bit:
                     assert (
@@ -468,7 +468,7 @@ class HuggingFaceAutoLM(BaseLM):
         elif self.model_format == "runtime":
             return True
         elif self.AUTO_MODEL_CLASS is transformers.AutoModelForCausalLM:
-            return False 
+            return False
         elif self.AUTO_MODEL_CLASS is transformers.AutoModel:
             return False
         elif self.AUTO_MODEL_CLASS is transformers.AutoModelForSeq2SeqLM:

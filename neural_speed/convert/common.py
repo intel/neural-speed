@@ -401,7 +401,7 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
         g_idx = torch.tensor([i // q_config["group_size"] for i in range(infeatures)], dtype=torch.int32)
         scale_zeros = gptq_zeros * gptq_scales
         weight = (gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()])
-    
+
     weight = weight.t()
     weight = weight.float()
     if permute_func:

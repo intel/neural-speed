@@ -1,13 +1,13 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
+accelerate
+datasets
+einops
+gguf
+numpy
+peft
+protobuf<3.20
+sentencepiece
+tiktoken
 torch==2.1.0+cpu
 transformers
-numpy
-sentencepiece
-protobuf<3.20
-einops
-accelerate
-peft
-datasets
 transformers_stream_generator
-gguf
-tiktoken

@@ -99,7 +99,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     print(f"converting {dst_name} qauntized tensor to bestla q4 block")
 
 
-def main(args_in: Optional[List[str]] = None) -> None:    
+def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
@@ -143,7 +143,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
-    
+
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
@@ -183,7 +183,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     f"transformer.h.{i}.attn.k_proj.weight", list_vars, fout, quantize_config)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.v_proj.weight",
                     f"transformer.h.{i}.attn.v_proj.weight", list_vars, fout, quantize_config)
-        
+
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.out_proj.weight",
                     f"transformer.h.{i}.attn.out_proj.weight", list_vars, fout, quantize_config)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_in.weight",
