@@ -1286,7 +1286,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.gen_conf.do_early_stopping = params.do_early_stopping;
   lparams.model_scratch_enlarge_scale = params.model_scratch_enlarge_scale;
 
-  NE_ASSERT(("Start size cannot be greater than the maximun context size!", lparams.n_keep < lparams.n_ctx));
+  NE_ASSERT(("Start size cannot be greater than the maximum context size!", lparams.n_keep < lparams.n_ctx));
 
   model_context* lctx = model_init_from_file(params.model.c_str(), lparams);
 
@@ -1698,7 +1698,7 @@ int model_tokenize(struct model_context* ctx, const char* text, model_token* tok
 }
 
 std::vector<model_token> model_tokenize(struct model_context* ctx, const std::string& text, bool add_bos) {
-  // initialize to prompt numer of chars, since n_tokens <= n_prompt_chars
+  // initialize to prompt number of chars, since n_tokens <= n_prompt_chars
   std::vector<model_token> res(text.size() + static_cast<int>(add_bos));
   const int n = model_tokenize(ctx, text.c_str(), res.data(), res.size(), add_bos);
   assert(n >= 0);
@@ -2053,7 +2053,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
                                           const std::vector<int>& request_running_indices,
                                           const std::vector<std::tuple<int, int>>& kv_reorder_indices,
                                           const std::vector<beam>& next_beams) {
-  // beam search unsupport shift kv cache when prompt + new_tokens > nctx
+  // beam search unsupported shift kv cache when prompt + new_tokens > nctx
   NE_ASSERT(("error: unimplement shifted kv cache update\n", !ctx->model.kv_self.has_shift));
 #ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("start to update kv cache for next step...\n");

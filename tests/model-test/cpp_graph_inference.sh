@@ -30,7 +30,7 @@ beam_list=(1)
 extra_precision_list=("q4_j_i8_g128" "q4_j_i8_g32" "q4_0") # precisions to be tested for most of supported models
 
 ppl_dataset_list=("/tf_dataset2/datasets/nlp_toolkit/wikitext-2-raw-v1-data-test")
-ppl_nctx_list=() # no ppl test by defalut
+ppl_nctx_list=() # no ppl test by default
 # ppl_nctx_list=(256 1024 2048)
 drop_caches=false
 ppl_fp32_test=false
@@ -309,7 +309,7 @@ function main() {
     ninja
     cd ..
 
-    ## prepare example requiement
+    ## prepare example requirement
     if [[ $requirements_file == *'.txt' ]]; then
         pip install -r "$requirements_file"
     elif [[ $requirements_file == *'.sh' ]]; then

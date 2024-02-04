@@ -292,7 +292,7 @@ class SchedulerBase : public Scheduler2D {
 
 template <class _GemmCore_T>
 class SchedulerKBlock : public Scheduler2D {
-  // Block[2]: block size of K must be mutiplier of mKBlock
+  // Block[2]: block size of K must be multiplier of mKBlock
   //           or factor of mKBlock
  public:
   using ThreadProblem = ThreadProblemBase;
@@ -474,7 +474,7 @@ class SchedulerKBlock : public Scheduler2D {
 
 template <class _GemmCore_T>
 class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
-  // Block[2]: block size of K must be mutiplier of mKBlock
+  // Block[2]: block size of K must be multiplier of mKBlock
   //           or factor of mKBlock
  public:
   using ThreadProblem = ThreadProblemBase;

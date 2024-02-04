@@ -73,7 +73,7 @@ class Model:
         elif model_type == "whisper":
             import neural_speed.whisper_cpp as cpp_model
         else:
-            raise TypeError("Unspported model type {}!".format(model_type))
+            raise TypeError("Unsupported model type {}!".format(model_type))
         self.module = cpp_model
 
     @staticmethod
@@ -193,7 +193,7 @@ class Model:
             beam_search = True
         if not beam_search:
             # TODO support multi batch
-            assert input_ids.shape[0] == 1, "Unsupport multi-batch input ids."
+            assert input_ids.shape[0] == 1, "Unsupported multi-batch input ids."
 
         if streamer:
             assert input_ids.shape[0] == 1, "Streamer only supports batch size 1."

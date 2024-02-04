@@ -43,7 +43,7 @@
 #define WHISPER_HOP_LENGTH 160
 #define WHISPER_CHUNK_SIZE 30
 
-// command-line parameters; equivelent of `struct gpt_params` in
+// command-line parameters; equivalent of `struct gpt_params` in
 // models/model_utils/model_config.h
 struct whisper_params {
   std::string model_name;
@@ -362,7 +362,7 @@ typedef void (*whisper_logits_filter_callback)(struct whisper_context* ctx, stru
                                                void* user_data);
 
 // Parameters for the whisper_full() function
-// If you chnage the order or add new parameters, make sure to update the
+// If you change the order or add new parameters, make sure to update the
 // default values in whisper.cpp: whisper_full_default_params()
 struct whisper_full_params {
   enum whisper_sampling_strategy strategy;
