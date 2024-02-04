@@ -28,7 +28,7 @@ Version 0.12 includes breaking changes to custom chunk handling.
 
 Changes to Chunk Callback
 -------------------------
-dr_wav supports the ability to fire a callback when a chunk is encounted (except
+dr_wav supports the ability to fire a callback when a chunk is encountered (except
 for WAVE and FMT chunks). The callback has been updated to include both the
 container (RIFF or Wave64) and the FMT chunk which contains information about
 the format of the data in the wave file.

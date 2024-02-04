@@ -2376,7 +2376,7 @@ std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indi
     }
     // we arrange beams by inference batch indice rather score for memcpy time reduction
     // so there will be 2 circumstances (ignore no memcpy : 0,1,2,3 --> 0,1,2,3)
-    // 1. cpoy former beams into latter beams, like: 0,1,2,3 --> 0,0,0,1
+    // 1. copy former beams into latter beams, like: 0,1,2,3 --> 0,0,0,1
     // 2. copy latter beams into former beams, like: 0,1,2,3 -- > 1,2,2,3
     // kv cache memcpy happens in itself which would cause memory dislocation if follows wrong order
     // so we give the contrary order to beams vector indice, which is:
