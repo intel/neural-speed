@@ -112,4 +112,3 @@ mpirun -n 1 taskset -c 0-47 sh run.sh : -n 1 taskset -c 48-95 sh run.sh
 
 ```
 **NOTICE**: tensor parallelsim strategy will split the model to specific node/socket, each device already use part of the original weights differently. So we should not use shared-memory of weights to avoid cross numa weight movement. Use option `--no-mmap` to disable shared weights between processes.
-

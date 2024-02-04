@@ -42,7 +42,7 @@ def bytes_to_unicode():
     The reversible bpe codes work on unicode strings.
     This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
     When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
+    This is a significant percentage of your normal, say, 32K bpe vocab.
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
@@ -401,7 +401,7 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
         g_idx = torch.tensor([i // q_config["group_size"] for i in range(infeatures)], dtype=torch.int32)
         scale_zeros = gptq_zeros * gptq_scales
         weight = (gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()])
-    
+
     weight = weight.t()
     weight = weight.float()
     if permute_func:

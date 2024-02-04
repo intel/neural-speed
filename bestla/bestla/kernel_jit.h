@@ -738,7 +738,7 @@ class JitMemcpy2DAvx512f : protected xbyak::JitAvx512f {
         push(reg_iter);
         push(reg_size);
         int vbytes = VBytes;
-        // consider a case that input==bf16 but apply postop, betore sotre will be fp32_to_bf16 but need to normal gen
+        // consider a case that input==bf16 but apply postop, betore store will be fp32_to_bf16 but need to normal gen
         // mask.
         if (dt_cvt_cfg.input_dt == BTLA_DTYPE::F32) {
           shr(reg_iter, 1);

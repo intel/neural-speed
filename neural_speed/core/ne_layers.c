@@ -4735,7 +4735,7 @@ static void ne_compute_forward_acc_f32(const struct ne_compute_params* params, c
   NE_ASSERT(ne_nelements(opt0) == 5);
 
   // view src0 and dst with these strides and data offset inbytes during acc
-  // nb0 is implicitely element_size because src0 and dst are contiguous
+  // nb0 is implicitly element_size because src0 and dst are contiguous
   size_t nb1 = ((int32_t*)opt0->data)[0];
   size_t nb2 = ((int32_t*)opt0->data)[1];
   size_t nb3 = ((int32_t*)opt0->data)[2];
@@ -7061,7 +7061,7 @@ static void ne_compute_forward_set_f32(const struct ne_compute_params* params, c
   NE_ASSERT(ne_nelements(opt0) == 5);
 
   // view src0 and dst with these strides and data offset inbytes during set
-  // nb0 is implicitely element_size because src0 and dst are contiguous
+  // nb0 is implicitly element_size because src0 and dst are contiguous
   size_t nb1 = ((int32_t*)opt0->data)[0];
   size_t nb2 = ((int32_t*)opt0->data)[1];
   size_t nb3 = ((int32_t*)opt0->data)[2];
@@ -7707,7 +7707,7 @@ static void ne_compute_forward_alibi_f32(const struct ne_compute_params* params,
   assert(nb0 == sizeof(float));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
 #ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
@@ -7777,7 +7777,7 @@ static void ne_compute_forward_alibi_f16(const struct ne_compute_params* params,
   assert(nb0 == sizeof(ne_fp16_t));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
 #ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
@@ -9690,12 +9690,12 @@ static void ne_compute_backward(struct ne_context* ctx, struct ne_tensor* tensor
     } break;
     case NE_OP_SQRT: {
       if (src0->grad) {
-        src0->grad = ne_add_impl(
-            ctx, src0->grad,
-            ne_mul(ctx,
-                   tensor->grad,  // this was not catched by test_grad because in test_grad tensor->grad is 1
-                   ne_div(ctx, ne_repeat(ctx, ne_new_f32(ctx, 0.5f), tensor), tensor)),
-            inplace);
+        src0->grad =
+            ne_add_impl(ctx, src0->grad,
+                        ne_mul(ctx,
+                               tensor->grad,  // this was not caught by test_grad because in test_grad tensor->grad is 1
+                               ne_div(ctx, ne_repeat(ctx, ne_new_f32(ctx, 0.5f), tensor), tensor)),
+                        inplace);
       }
     } break;
     case NE_OP_LOG: {

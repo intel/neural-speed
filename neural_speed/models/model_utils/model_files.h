@@ -920,7 +920,7 @@ struct gguf_loader {
     GGUF_GET_KEY(ctx_gguf, ftype, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "ftype");
     hparams.ftype = (enum ne_ftype)ftype;
 
-    // Get specific model paramters
+    // Get specific model parameters
     GGUF_GET_KEY(ctx_gguf, hparams.max_seq_len, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_CONTEXT_LENGTH));
     GGUF_GET_KEY(ctx_gguf, hparams.alibi_bias_max, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false,
                  kv(LLM_KV_ATTENTION_MAX_ALIBI_BIAS));
@@ -1575,7 +1575,7 @@ struct model_model_loader {
         tmp_buf.resize(lt.size * lt.world_size);
         file.read_raw(tmp_buf.addr, lt.size * lt.world_size);
         size_t offset = 0;
-        // different data type may have differnet per_row_size
+        // different data type may have different per_row_size
         size_t per_row_size = lt.size / num_rows;
         if (lt.split_type == TP_1D_QKV_COLUMN) {
           for (size_t i = 0; i < num_rows; ++i) {

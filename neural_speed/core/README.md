@@ -73,4 +73,3 @@ Ice Lake<br>Cascade Lake<br>Cooper Lake<br>Tiger Lake<br>Rocket Lake | any int4<
 Skylake |  any 4bits<br>group size=-1<br>compute type=fp32 | AVX512F
 Alder Lake (12th Gen)<br>Raptor Lake (13th and 14th Gen)|any 4bits<br>group size=-1<br>compute type=int8 | AVX_VNNI
 Older architecture (before 12th Gen)|  any 4bits<br>group size=-1<br>compute type=fp32 | AVX2
-

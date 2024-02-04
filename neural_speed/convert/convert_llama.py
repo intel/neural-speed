@@ -285,7 +285,7 @@ class SentencePieceVocab:
     def sentencepiece_tokens(self) -> Iterable[Tuple[bytes, float]]:
         tokenizer = self.sentencepiece_tokenizer
         for i in range(self.params_vocab_size):
-            text: bytes           
+            text: bytes
             if i < tokenizer.vocab_size():
                 if tokenizer.is_unknown(i):
                     text = " \u2047 ".encode("utf-8")
@@ -705,7 +705,7 @@ def merge_multifile_models(models_plus: List[ModelPlus]) -> ModelPlus:
 
     if any("model.embed_tokens.weight" in mp.model for mp in models_plus):
         # Transformers models put different tensors in different files, but
-        # don't split indivdual tensors between files.
+        # don't split individual tensors between files.
         model: LazyModel = {}
         for mp in models_plus:
             model.update(mp.model)

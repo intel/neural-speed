@@ -162,7 +162,7 @@ class ModelServer {
           Cont_batch_gen_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
-            {                                               // add waitting tasks queue to running queue
+            {                                               // add waiting tasks queue to running queue
               std::lock_guard<std::mutex> lock(queue_mtx);  // need lock as issueQuery may also access waiting
 
               // TODO(Yi): should have some limitations
@@ -488,7 +488,7 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
       if (iter == input_ids[bs].end()) fprintf(stderr, "\nERROR: there are all pad tokens in batch %d!\n", bs);
       padding_count.push_back(std::distance(input_ids[bs].begin(), iter));
     }
-    // shoule be same in static batching inference
+    // should be same in static batching inference
     n_prompt_tokens = input_ids[STATIC_INPUT_HEAD_IDX].size();
     return true;
   }
@@ -519,7 +519,7 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
   std::vector<model_input> inputs;
   for (int bs = 0; bs < ctx->batch_size; ++bs) {
     const auto& input_id_cb = input_ids.empty() ? empty_id : input_ids[bs];
-    if (input_id_cb.empty()) {  // use internel input id
+    if (input_id_cb.empty()) {  // use internal input id
       if (curr_input_ids[bs].empty()) {
         fprintf(stderr, "%s: error: no input\n", __func__);
         return empty_ret;
