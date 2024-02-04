@@ -50,12 +50,6 @@
 #include "ne.h"
 #include "ne_bestla.h"
 
-// if C99 - static_assert is noop
-// ref: https://stackoverflow.com/a/53923785/4039976
-#ifndef static_assert
-#define static_assert(cond, msg) struct global_scope_noop_trick
-#endif
-
 #if defined(_WIN32)
 
 #include <windows.h>
@@ -3274,9 +3268,16 @@ struct ne_tensor* ne_conv_1d_ph(struct ne_context* ctx, struct ne_tensor* a, str
 }
 
 // ne_flash_attn
-
 struct ne_tensor* ne_flash_attn(struct ne_context* ctx, struct ne_tensor* q, struct ne_tensor* k, struct ne_tensor* v,
                                 float scale, ne_attn_flags_t flags) {
+  const ne_attn_op_params_t attn_op_param = {
+      .flags = flags,
+      .scale = scale,
+  };
+  return ne_flash_attn_with_params(ctx, q, k, v, &attn_op_param);
+};
+struct ne_tensor* ne_flash_attn_with_params(struct ne_context* ctx, struct ne_tensor* q, struct ne_tensor* k,
+                                            struct ne_tensor* v, const ne_attn_op_params_t* op_params) {
   NE_ASSERT(ne_can_mul_mat(k, q));
   int batch = q->ne[3];
   int headnum = q->ne[2];
@@ -3303,8 +3304,7 @@ struct ne_tensor* ne_flash_attn(struct ne_context* ctx, struct ne_tensor* q, str
   result->src1 = k;
   result->opt[0] = v;
   result->opt[1] = tmp_t;
-  *(float*)result->padding = scale;
-  *(ne_attn_flags_t*)&result->padding[sizeof(scale)] = flags;
+  memcpy(result->op_params, op_params, sizeof(ne_attn_op_params_t));
   return result;
 }
 
@@ -6052,11 +6052,6 @@ static void ne_compute_forward_norm_f32(const struct ne_compute_params* params, 
 
   const float eps = 1e-5f;  // TODO: make this a parameter
 
-  if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
-    bestla_layernormalization(ne03 * ne02 * ne01, ne00, false, eps, (const float*)src0->data, (float*)dst->data);
-    return;
-  }
-
   // TODO: optimize
   for (int64_t i03 = 0; i03 < ne03; i03++) {
     for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -6129,10 +6124,6 @@ static void ne_compute_forward_rms_norm_f32(const struct ne_compute_params* para
   float eps;
   memcpy(&eps, dst->op_params, sizeof(float));
 
-  if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
-    bestla_layernormalization(ne03 * ne02 * ne01, ne00, true, eps, (const float*)src0->data, (float*)dst->data);
-    return;
-  }
   // TODO: optimize
   for (int64_t i03 = 0; i03 < ne03; i03++) {
     for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -8753,8 +8744,7 @@ static void ne_compute_forward_flash_attn_f32_f16_f16(const struct ne_compute_pa
   int step_v_head_size = v->nb[1] / veles;
   int step_v_head_num = v->nb[2] / veles;
   int step_v_bs = k->nb[3] / veles;
-  float scale = *(float*)dst->padding;
-  ne_attn_flags_t flags = *(bool*)&dst->padding[sizeof(scale)];
+  const ne_attn_op_params_t* op_params = (ne_attn_op_params_t*)dst->op_params;
   attn_fp32_fp16_fp16_fp32_fwd_args_t args = {
       .Q = (float*)q->data,
       .K = (ne_fp16_t*)k->data,
@@ -8765,8 +8755,8 @@ static void ne_compute_forward_flash_attn_f32_f16_f16(const struct ne_compute_pa
       .V_sc = 1.f,
       .dst_sc = 1.f,
       .tmp = tmp->data,
-      .QK_scale = scale,
-      .attn_flags = flags,
+      .QK_scale = op_params->scale,
+      .attn_flags = op_params->flags,
       .batch_size = batch,
       .head_num = headnum,
       .heads_kv = heads_kv,
@@ -8791,6 +8781,7 @@ static void ne_compute_forward_flash_attn_f32_f16_f16(const struct ne_compute_pa
       .step_dst_bs = seq_cur * embedsize,
       .step_dst_head_num = headsize,
       .step_dst_sl = embedsize,
+      .n_prompt = op_params->n_prompt,
   };
   bestla_fusion_attn_fp32_fp16_fp16_fp32_forward(&args);
 }
@@ -8810,8 +8801,9 @@ static void ne_compute_forward_flash_attn_reordered(const struct ne_compute_para
   const int64_t dst_ele_size = ne_element_size(dst);
   // const int64_t seq_past = seq_all - seq_cur;
 
-  float scale = *(float*)dst->padding;
-  ne_attn_flags_t flags = *(ne_attn_flags_t*)&dst->padding[sizeof(scale)];
+  const ne_attn_op_params_t* op_params = (ne_attn_op_params_t*)dst->op_params;
+  float scale = op_params->scale;
+  ne_attn_flags_t flags = op_params->flags;
 
   NE_ASSERT(k->type == NE_TYPE_BTLA && v->type == NE_TYPE_BTLA);
   ATTN_FWD_LAYOUT K_layout = *(ATTN_FWD_LAYOUT*)(&k->nb[0]);
@@ -8857,6 +8849,7 @@ static void ne_compute_forward_flash_attn_reordered(const struct ne_compute_para
       .step_dst_bs = dst->nb[3] / dst_ele_size,
       .step_dst_head_num = dst->nb[1] / dst_ele_size,
       .step_dst_sl = dst->nb[2] / dst_ele_size,
+      .n_prompt = op_params->n_prompt,
   };
   bestla_reordered_attn_fp32_forward(&args);
 }
@@ -10476,6 +10469,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_NEG:
         case NE_OP_STEP:
         case NE_OP_MUL:
+        case NE_OP_RMS_NORM:
         case NE_OP_RELU: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
@@ -10483,21 +10477,10 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
             node->n_tasks = 1;
           }
         } break;
-        case NE_OP_NORM:
-        case NE_OP_RMS_NORM: {
-          if (ne_is_contiguous(node->src0)) {
-            node->n_tasks = 1;
-          } else {
-            if (node->src0->ne[1] > 4) {
-              node->n_tasks = n_threads;
-            } else {
-              node->n_tasks = 1;
-            }
-          }
-        } break;
         case NE_OP_GELU:
         case NE_OP_SILU:
         case NE_OP_SILU_BACK:
+        case NE_OP_NORM:
         case NE_OP_RMS_NORM_BACK: {
           node->n_tasks = n_threads;
         } break;
@@ -10901,7 +10884,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 }
 
 void ne_graph_profiling(const struct ne_cgraph* cgraph) {
-#ifdef NS_PERF
   int64_t perf_total_per_op_us[NE_OP_COUNT] = {0};
 
   NE_PRINT("=== GRAPH Profiling ===\n");
@@ -10924,10 +10906,6 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
   NE_PRINT("========================================\n");
-
-#else
-  NE_PRINT("\n[Warning] To collect profiling data, please recompile with NS_PROFILING=ON.\n");
-#endif
 }
 
 void ne_graph_reset(struct ne_cgraph* cgraph) {

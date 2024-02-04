@@ -80,6 +80,7 @@ struct attn_fwd_args_t {
   int step_k_bs, step_k_head_num, step_k_sl, step_k_head_size;
   int step_v_bs, step_v_head_num, step_v_sl, step_v_head_size;
   int step_dst_bs, step_dst_head_num, step_dst_sl;
+  int n_prompt;  // caller grantees that K/V for first n_prompt tokens are identical among batches
 };
 
 struct mha_problem_t {
@@ -657,7 +658,7 @@ class mha_interface_t {
     const auto num_heads = p.batch_size * p.head_num;  // Total number of heads
     device::CpuBase cb;                                // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
 
-    const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
+    const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0 && p.sl_q > 1;
     const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
     assert(!is_causal || p.sl_q <= p.sl_kv);
     assert(("alibi not supported!", !is_alibi));
@@ -1338,7 +1339,7 @@ class mha_stable_interface_t {
     assert((p.V_layout != ATTN_FWD_LAYOUT_PLAIN || p.step_k_sl == 1));
     const auto num_heads = p.batch_size * p.head_num;  // Total number of heads
     device::CpuBase cb;                                // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
-    const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
+    const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0 && p.sl_q > 1;
     const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
     assert(!is_causal || p.sl_q <= p.sl_kv);
     assert(("head_num must be a multiple of heads_kv!", p.head_num % p.heads_kv == 0));
@@ -1499,6 +1500,284 @@ class mha_stable_interface_t {
                   // /* .workspace = */ nullptr,
               },
               tpPV);
+        }
+      }
+    });
+    return BTLA_CODE::Success;
+  }
+
+  BTLA_CODE compute_beams(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& p, const parallel::IThreading& th) {
+    assert((std::is_same<Q_T, int8_t>::value || p.Q_sc == 1));
+    assert((std::is_same<K_T, int8_t>::value || p.K_sc == 1));
+    assert((std::is_same<V_T, int8_t>::value || p.V_sc == 1));
+    assert((std::is_same<DST_T, int8_t>::value || p.dst_sc == 1));
+
+    assert((p.Q_layout == ATTN_FWD_LAYOUT_PLAIN && p.dst_layout == ATTN_FWD_LAYOUT_PLAIN));
+    assert((p.K_layout == ATTN_FWD_LAYOUT_PLAIN ||
+            (std::is_same<K_T, int8_t>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4) ||
+            (std::is_same<K_T, bf16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2)));
+    assert((p.V_layout == ATTN_FWD_LAYOUT_PLAIN ||
+            (std::is_same<V_T, int8_t>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4) ||
+            (std::is_same<V_T, bf16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2)));
+
+    assert((!std::is_same<PrologueK, ::weight_forward_n_tile48_t<typename L_Max::GemmCore, L_Max::RT_ISA>>::value) ||
+           p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ||
+           p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);  // WeightForward can only be used with preprocessed layout
+    assert(
+        (!std::is_same<PrologueV, ::weight_forward_n_tile48_t<typename L_Scale::GemmCore, L_Scale::RT_ISA>>::value) ||
+        p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ||
+        p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);  // WeightForward can only be used with preprocessed layout
+
+    assert((p.K_layout != ATTN_FWD_LAYOUT_PLAIN || p.step_v_head_size == 1));
+    assert((p.V_layout != ATTN_FWD_LAYOUT_PLAIN || p.step_k_sl == 1));
+    assert(p.sl_q == 1 && p.batch_size > 1);  // beam search next-token cases
+    device::CpuBase cb;                       // Note: DO NOT use cb.mNumThreads; use th.num_threads() instead
+    const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0 && p.sl_q > 1;
+    const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
+    assert(!is_causal || p.sl_q <= p.sl_kv);
+    assert(("head_num must be a multiple of heads_kv!", p.head_num % p.heads_kv == 0));
+    assert(("Not Implemented", !is_alibi));
+    assert(("Not Implemented", !is_causal));
+    const auto group_heads = p.head_num / p.heads_kv;
+    const auto sl_diff = p.sl_kv - p.sl_q;
+
+    // TP will need the real rank oder of k
+    int32_t k_offset = 0;
+    int32_t log_head_num = p.head_num;
+#ifdef NS_TP_MODEL
+    NE_ASSERT(("Not implemented", false))
+#endif
+
+    // alibi slope
+    const int n_heads_log2_floor = 1 << static_cast<int>(floor(log2(log_head_num)));
+    const float m0 = powf(2.0f, -(8.f) / n_heads_log2_floor);
+    const float m1 = powf(2.0f, -(8.f / 2.0f) / n_heads_log2_floor);
+
+    const auto m_tiles = updiv(p.batch_size, M_TILE);
+    assert(p.batch_size <= M_TILE && m_tiles == 1);
+    const auto num_tasks = p.head_num;
+
+    using Scheduler2D = bestla::parallel::Scheduler2D;
+    const Scheduler2D parl({th.num_threads(), {num_tasks, 1}, {1, 1}});  // main parallel scheduler
+
+    th.parallel_for([&](int tid) {
+      const int tmp_s_size = M_TILE * padto(padto(p.sl_kv, GemmQK::NTILE), GemmPV::KTILE);
+      const int tmp_p_size = tmp_s_size;
+      const int tmp_bytes = tmp_s_size * sizeof(float);  // S & exp
+      const auto tmp_s = reinterpret_cast<float*>(p.tmp + tid * tmp_bytes);
+      using PType = typename GemmPV::AType;
+      const auto tmp_p = reinterpret_cast<PType*>(tmp_s);  // overwrite tmp_s row-wisely
+
+      // calculate mm + softmax + mm
+      {
+        typename parallel::ThreadProblem2D thdp{tid};
+        parl.getIndex(thdp);
+        const auto [task_start, _assert0] = thdp.loc;
+        auto [task_size, _assert_max1] = thdp.size;
+        assert(task_size == 0 || _assert0 == 0);
+        assert(task_size == 0 || _assert_max1 == 1 || _assert_max1 == 0);
+        if (_assert_max1 == 0 || !thdp.valid) task_size = 0;
+
+        for (int task_id = task_start; task_id < task_start + task_size; ++task_id) {
+          const int ihn = task_id;
+          const int ihkv = ihn / group_heads;
+
+          const auto alibi_ihn_m = 0.f;  // Alibi not implemented
+
+          float s_max[M_TILE]{};  // maximum for each row of the S matrix
+          std::fill_n(s_max, M_TILE, -INFINITY);
+
+          // ptr to Q / dst matrix of the current head
+          const auto head_q_bs0 = p.Q + ihn * p.step_q_head_num;
+          // const auto head_k = p.K + ibs * p.step_k_bs + ihkv * p.step_k_head_num;
+          // const auto head_v = p.V + ibs * p.step_v_bs + ihkv * p.step_v_head_num;
+          const auto head_k_bs0 = p.K + ihkv * p.step_k_head_num;  // bs here is beam
+          const auto head_v_bs0 = p.V + ihkv * p.step_v_head_num;  // bs here is beam
+          // const auto head_dst = p.dst + ibs * p.step_dst_bs + ihn * p.step_dst_head_num;
+          const auto head_dst_bs0 = p.dst + ihn * p.step_dst_head_num;
+
+          assert(!is_causal);
+          const auto unmasked_size = p.sl_kv;
+
+          const auto unmasked_size_pad_qk = std::min(p.sl_kv, padto(unmasked_size, GemmQK::NTILE));
+          const auto unmasked_size_pad_pv = std::min(p.sl_kv, padto(unmasked_size, GemmPV::KTILE));
+          const int ld_tmp_s = padto(padto(unmasked_size_pad_pv, GemmQK::NTILE), GemmPV::KTILE);
+          static_assert(sizeof(float) >= sizeof(PType), "PType exceeded float size!");
+          const int ld_tmp_p = ld_tmp_s * sizeof(float) / sizeof(PType);
+          const auto qk_prok_ldb = p.step_k_sl == 1                                 ? p.step_k_head_size
+                                   : p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ? p.step_k_sl
+                                   : p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? p.step_k_sl
+                                                                                    : (assert(0), 0);
+
+          const auto n_prompt_le_n = padto_le(p.n_prompt, GemmQK::NTILE);
+          typename parallel::gemm::ThreadProblemBase tpQKBatch{
+              /* ThreadProblem2D */ {tid, {}, {0, 0}, {p.batch_size, n_prompt_le_n}, true},
+              /* .block = */ {M_TILE, GemmQK::NTILE, p.head_size},
+              /* .stacksize = */ cb.mL2Cache,
+              /* .tmpcachesize = */ cb.mL2Cache,
+          };
+          l_qk.run(  // QxK => S ==exp==> P
+              QKArgs{
+                  utils::GemmProblem{
+                      /* .batch */ 1,
+                      /* .M = */ p.batch_size,
+                      /* .N = */ n_prompt_le_n,
+                      /* .K = */ p.head_size,
+                  },
+                  /* .paramA = */
+                  QKProQArgs{
+                      head_q_bs0,
+                      p.step_q_bs,
+                  },
+                  /* .paramB = */
+                  QKProKArgs{
+                      /* .B = */ head_k_bs0,
+                      /* .ldb = */ qk_prok_ldb,
+                      /* .is_padded = */ true,
+                  },  // K should be pre-transposed
+                  /* .paramC = */
+                  QKEpiArgs{
+                      /* .dst = */ tmp_s,
+                      /* .dst_sum = */ s_max,
+                      /* .ld_dst = */ ld_tmp_s,
+                      /* .scale = */ p.QK_scale * p.Q_sc * p.K_sc,
+                      /* .causal_offset = */ -1,
+                      /* .alibi_slope = */ alibi_ihn_m,
+                  },
+                  // /* .workspace = */ nullptr,
+              },
+              tpQKBatch);
+          for (int ibs = 0; ibs < p.batch_size; ++ibs) {
+            typename parallel::gemm::ThreadProblemBase tpQKBeam{
+                /* ThreadProblem2D */ {tid, {}, {ibs, n_prompt_le_n}, {1, p.sl_kv - n_prompt_le_n}, true},
+                /* .block = */ {M_TILE, GemmQK::NTILE, p.head_size},
+                /* .stacksize = */ cb.mL2Cache,
+                /* .tmpcachesize = */ cb.mL2Cache,
+            };
+            l_qk.run(  // QxK => S ==exp==> P
+                QKArgs{
+                    utils::GemmProblem{
+                        /* .batch */ 1,
+                        /* .M = */ 1,
+                        /* .N = */ p.sl_kv,
+                        /* .K = */ p.head_size,
+                    },
+                    /* .paramA = */
+                    QKProQArgs{
+                        head_q_bs0,
+                        p.step_q_bs,
+                    },
+                    /* .paramB = */
+                    QKProKArgs{
+                        /* .B = */ head_k_bs0 + ibs * p.step_k_bs,
+                        /* .ldb = */ qk_prok_ldb,
+                        /* .is_padded = */ true,
+                    },  // K should be pre-transposed
+                    /* .paramC = */
+                    QKEpiArgs{
+                        /* .dst = */ tmp_s,
+                        /* .dst_sum = */ s_max,
+                        /* .ld_dst = */ ld_tmp_s,
+                        /* .scale = */ p.QK_scale * p.Q_sc * p.K_sc,
+                        /* .causal_offset = */ is_causal ? sl_diff : -1,
+                        /* .alibi_slope = */ alibi_ihn_m,
+                    },
+                    // /* .workspace = */ nullptr,
+                },
+                tpQKBeam);
+          }
+
+          // softmax (with pre-computed row_max)
+          assert(!is_causal);
+          const auto unmasked_size_start = p.sl_kv;
+          float expsum[M_TILE]{};  // maximum for each row of the S matrix
+          const auto softmax_npad_size = padto(unmasked_size_pad_pv, GemmPV::KTILE);
+          inplace_precompute_max_softmax_t<float, PType>::forward(          //
+              p.batch_size, unmasked_size_start, softmax_npad_size,         // m / n
+              is_causal, tmp_s, tmp_p, s_max, expsum, ld_tmp_s, ld_tmp_p);  //
+
+          const auto pv_scale = expsum;
+          for (int i = 0; i < M_TILE; ++i) pv_scale[i] = p.V_sc / UINT8_MAX / expsum[i] / p.dst_sc;
+
+          const auto pv_prov_ldb = p.step_v_head_size == 1                          ? p.step_v_sl
+                                   : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ? p.step_v_head_size
+                                   : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? p.step_v_head_size
+                                                                                    : (assert(0), 0);
+
+          const auto n_prompt_le_k = padto_le(p.n_prompt, GemmPV::KTILE);
+          typename parallel::gemm::ThreadProblemBase tpPVBatch{
+              /* ThreadProblem2D */ {tid, {}, {0, 0}, {p.batch_size, p.head_size}, true},
+              /* .block = */ {M_TILE, GemmPV::NTILE, n_prompt_le_k},
+              /* .stacksize = */ cb.mL2Cache,
+              /* .tmpcachesize = */ cb.mL2Cache,
+          };
+          l_pv.run(  // PxV => O
+              PVArgs{
+                  utils::GemmProblem{
+                      /* .batch */ 1,
+                      /* .M = */ p.batch_size,
+                      /* .N = */ p.head_size,
+                      /* .K = */ n_prompt_le_k,
+                  },
+                  /* .paramA = */ PVProPArgs{tmp_p, ld_tmp_p},
+                  /* .paramB = */
+                  PVProVArgs{
+                      /* .B = */ head_v_bs0,
+                      /* .ldb = */ pv_prov_ldb,
+                      /* .is_padded = */ true,
+                  },
+                  /* .paramC = */
+                  PVEpiArgs{
+                      /* .C = */ head_dst_bs0,
+                      /* .D = */ head_dst_bs0,
+                      /* .ldc = */ p.step_dst_bs,
+                      /* .ldd = */ p.step_dst_bs,
+                      /* .alpha = */ 1.f,
+                      /* .beta = */ 0,
+                  },
+                  // /* .workspace = */ nullptr,
+              },
+              tpPVBatch);
+          for (int ibs = 0; ibs < p.batch_size; ++ibs) {
+            if constexpr (std::is_same_v<PVEpiArgs,
+                                         typename epilogue::gemm::AlphaBetaProcessFp32<L_Scale::RT_ISA>::Param>) {
+              typename parallel::gemm::ThreadProblemBase tpPVBeam{
+                  /* ThreadProblem2D */ {tid, {}, {ibs, 0}, {1, p.head_size}, true},
+                  /* .block = */ {M_TILE, GemmPV::NTILE, unmasked_size_pad_pv - n_prompt_le_k},
+                  /* .stacksize = */ cb.mL2Cache,
+                  /* .tmpcachesize = */ cb.mL2Cache,
+              };
+              l_pv.run(  // PxV => O
+                  PVArgs{
+                      utils::GemmProblem{
+                          /* .batch */ 1,
+                          /* .M = */ p.batch_size,
+                          /* .N = */ p.head_size,
+                          /* .K = */ unmasked_size_pad_pv - n_prompt_le_k,
+                      },
+                      /* .paramA = */ PVProPArgs{tmp_p + n_prompt_le_k, ld_tmp_p},
+                      /* .paramB = */
+                      PVProVArgs{
+                          /* .B = */ head_v_bs0 + ibs * p.step_v_bs + n_prompt_le_k * GemmPV::NTILE,
+                          /* .ldb = */ pv_prov_ldb,
+                          /* .is_padded = */ true,
+                      },
+                      /* .paramC = */
+                      PVEpiArgs{
+                          /* .C = */ head_dst_bs0,
+                          /* .D = */ head_dst_bs0,
+                          /* .ldc = */ p.step_dst_bs,
+                          /* .ldd = */ p.step_dst_bs,
+                          /* .alpha = */ 1.f,
+                          /* .beta = */ 1.f,
+                      },
+                      // /* .workspace = */ nullptr,
+                  },
+                  tpPVBeam);
+            } else {
+              assert(("Not implemented", false));
+            }
+          }
         }
       }
     });
@@ -1679,15 +1958,27 @@ void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<
         prologue_a::gemm::ActivationConverterFp32,            //
         ::weight_forward_n_tile48_t,                          //
         ::ScaleTrackMaxFp32Fp32>;                             //
-    using GemmKernelBF16 = ::launcher_base_weight_t<          //
-        BTLA_ISA::AMX_BF16,                                   //
-        gemm::HCoreRowNAmxbf16<48, 16>,                       //
-        ::activation_identity_t,                              // pretty sure we have enough paddings for P-matrix
-        ::weight_forward_n_tile48_t,                          //
-        epilogue::gemm::AccumulatorWriteBackFp32>;            //
-    static mha_stable_interface_t<GemmKernelBF16TrackMax, GemmKernelBF16> mha;
-    [[maybe_unused]] const auto ret = mha.compute(params, *pth);
-    assert(ret == BTLA_CODE::Success);
+    if (params.n_prompt > 0 && params.batch_size > 1) {       // beam search optimization
+      using GemmKernelBF16 = ::launcher_base_weight_t<        //
+          BTLA_ISA::AMX_BF16,                                 //
+          gemm::HCoreRowNAmxbf16<48, 16>,                     //
+          ::activation_identity_t,                            // pretty sure we have enough paddings for P-matrix
+          ::weight_forward_n_tile48_t,                        //
+          epilogue::gemm::AlphaBetaProcessFp32>;              //
+      static mha_stable_interface_t<GemmKernelBF16TrackMax, GemmKernelBF16> mha;
+      [[maybe_unused]] const auto ret = mha.compute_beams(params, *pth);
+      assert(ret == BTLA_CODE::Success);
+    } else {
+      using GemmKernelBF16 = ::launcher_base_weight_t<  //
+          BTLA_ISA::AMX_BF16,                           //
+          gemm::HCoreRowNAmxbf16<48, 16>,               //
+          ::activation_identity_t,                      // pretty sure we have enough paddings for P-matrix
+          ::weight_forward_n_tile48_t,                  //
+          epilogue::gemm::AccumulatorWriteBackFp32>;    //
+      static mha_stable_interface_t<GemmKernelBF16TrackMax, GemmKernelBF16> mha;
+      [[maybe_unused]] const auto ret = mha.compute(params, *pth);
+      assert(ret == BTLA_CODE::Success);
+    }
   } else {
     assert(0);
   }
@@ -1695,7 +1986,7 @@ void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<
 
 template <typename Q_T, typename K_T, typename V_T, typename DST_T>
 void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& p) {
-  const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
+  const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0 && p.sl_q > 1;
   const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
   assert(!is_causal || p.sl_q <= p.sl_kv);
   assert(("head_num must be a multiple of heads_kv!", p.head_num % p.heads_kv == 0));
@@ -1937,6 +2228,7 @@ void bestla_reordered_attn_fp32_forward(const bestla_reordered_attn_fp32_fp32_fw
       /* .step_dst_bs = */ params->step_dst_bs,
       /* .step_dst_head_num = */ params->step_dst_head_num,
       /* .step_dst_sl = */ params->step_dst_sl,
+      /* .n_prompt = */ params->n_prompt,
   };
   return bestla_fusion_attn_forward<float, bf16, bf16, float>(bestla_params);
 }

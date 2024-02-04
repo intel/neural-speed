@@ -12,7 +12,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
+#include "bestla.h"
 #include "bestla_utils.h"
+#include "kernel_jit.h"
 #include "kernel_ref.h"
 
 #include <array>
@@ -643,6 +645,89 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
   return BTLA_CODE::NotSupport;
 }
 
+template <BTLA_DTYPE S3_T, typename _DST_T>
+inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
+                                           int interleave_n_offset, int unpack_elt, int8_t* tmp, size_t tmpsize) {
+  auto head_ignore_num = interleave_n_offset % 128;
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  auto zmm_shift = _mm512_set1_epi32(5);
+
+  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+    const __m256i lowMask = _mm256_set1_epi8(0x03);
+    const __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src1);
+    auto ymm0 = _mm256_and_si256(lowMask, bit2_data);                        // uop:1 p:015
+    auto ymm1 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2));  // uop:1 p:01
+    auto ymm2 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 4));
+    auto ymm3 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 6));
+    auto zmm1 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm0), ymm1, 0x1);  // lat3, tp1 uop1 p:5
+    auto zmm2 = _mm512_inserti32x8(_mm512_castsi256_si512(ymm2), ymm3, 0x1);
+
+    unsigned long long* bit1_ptr = reinterpret_cast<unsigned long long*>(src2);
+    auto bit1_mask1 = _cvtu64_mask64(*bit1_ptr);
+    auto bit1_mask2 = _cvtu64_mask64(*(bit1_ptr + 1));
+    auto zmm1_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask1, zmm_0x04);
+    auto zmm2_ = _mm512_mask_mov_epi8(zmm_0x00, bit1_mask2, zmm_0x04);
+    zmm1 = _mm512_add_epi8(zmm1, zmm1_);
+    zmm2 = _mm512_add_epi8(zmm2, zmm2_);
+    zmm1 = _mm512_sllv_epi32(zmm1, zmm_shift);  // int3_clip => int8
+    zmm2 = _mm512_sllv_epi32(zmm2, zmm_shift);  // int3_clip => int8
+
+    _mm512_storeu_epi8((__m512i*)dst, zmm1);
+    _mm512_storeu_epi8((__m512i*)(dst + 64), zmm2);
+  };
+
+  assert(head_ignore_num % 8 == 0);
+
+  auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
+  auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
+  int compress_wei_ptr_offset = 0;
+  int8_t* s8_ptr = reinterpret_cast<int8_t*>(tmp);
+  auto head_write_num = 128 - head_ignore_num;
+  if (head_ignore_num != 0) {
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    for (int i = 0; i < head_write_num; i++) dstptr[i] = s8_ptr[head_ignore_num + i];
+    compress_wei_ptr_offset += head_write_num;
+  }
+
+  auto body_loop = (unpack_elt - head_write_num % 128) / 128;
+  auto tail_proc_num = (unpack_elt - head_write_num % 128) % 128;
+
+  bestla::kernel::jit::DecompresssS3::forward_avx512f(bit2ptr + compress_wei_ptr_offset / 4,
+                                                      bit1ptr + compress_wei_ptr_offset / 8,
+                                                      dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
+  compress_wei_ptr_offset += body_loop * 128;
+  if (tail_proc_num > 0) {
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
+                                       tmp);
+    for (int i = 0; i < tail_proc_num; i++) dstptr[compress_wei_ptr_offset + i] = s8_ptr[i];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                                          _DST_T* dstptr, int interleave_n_offset, int row, int col,
+                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                          int NPad, void* tmp, size_t tmpsize) {
+  auto unpack_elt = row * col;
+  decompress_kblock_s3_s8fp<_S3_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                   reinterpret_cast<int8_t*>(tmp), tmpsize);
+  // TODO(zhe): simd version
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = scales + kpos * NPad;
+    for (int j = 0; j < col; j++) {
+      float tmp = static_cast<float>(dstptr[i * col + j]);
+      if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
+      dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
+    }
+  }
+
+  return BTLA_CODE::Success;
+}
+
 template <BTLA_DTYPE _F4_T, typename _DST_T, int _PACK_ROW, typename _ST>
 static inline BTLA_CODE decompress_kblock_f4_fp(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
                                                 int ld_dst, _ST* scales, int k_offset, int kblock, int NPad,
@@ -1261,6 +1346,7 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
       auto mask = _cvtu32_mask16(0xffff >> (16 - col));
       get_fp_scale(col, mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
     } else {
+      // TODO(zhe): consider head_proc_num==0 case.
       auto head_mask = _cvtu32_mask16(0xffff >> (16 - head_proc_num));
       auto body_mask = _cvtu32_mask16(0xffff);
       get_fp_scale(head_proc_num, head_mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
@@ -2195,108 +2281,6 @@ struct padding_trans_interleave_cvt<utils::fp16, utils::bf16, 2> {
 };
 #endif
 
-static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, const float* biasptr, float epsilon,
-                                  int norm_size, float* dstptr, float* mean_out, float* mean_square_out,
-                                  bool simplified) {
-  int constexpr VLen = 16;
-  int norm_size16 = utils::padto_le(norm_size, VLen);
-  int h = 0;
-  __m512 vmean = _mm512_setzero_ps(), vmeansq = _mm512_setzero_ps();
-  for (; h < norm_size16; h += VLen) {
-    auto tmp = _mm512_loadu_ps(srcptr + h);
-    vmean = _mm512_add_ps(vmean, tmp);
-    tmp = _mm512_mul_ps(tmp, tmp);
-    vmeansq = _mm512_add_ps(vmeansq, tmp);
-  }
-  float mean = _mm512_reduce_add_ps(vmean);
-  float mean_square = _mm512_reduce_add_ps(vmeansq);
-  for (; h < norm_size; h++) {
-    mean += srcptr[h];
-    mean_square += srcptr[h] * srcptr[h];
-  }
-  mean = mean / norm_size;
-  if (simplified) {
-    mean_square = std::sqrt(mean_square / norm_size + epsilon);
-  } else {
-    mean_square = std::sqrt(mean_square / norm_size - mean * mean + epsilon);
-  }
-  auto vm = _mm512_set1_ps(mean);
-  float inv_meansq = 1.f / mean_square;
-  auto vms = _mm512_set1_ps(inv_meansq);
-  h = 0;
-  if (simplified) {
-    if (scaleptr) {
-      for (; h < norm_size16; h += VLen) {
-        auto inp = _mm512_loadu_ps(srcptr + h);
-        auto scale = _mm512_loadu_ps(scaleptr + h);
-        inp = _mm512_mul_ps(inp, vms);
-        inp = _mm512_mul_ps(inp, scale);
-        _mm512_storeu_ps(dstptr + h, inp);
-      }
-      for (; h < norm_size; h++) {
-        dstptr[h] = srcptr[h] * inv_meansq * scaleptr[h];
-      }
-    } else {
-      for (; h < norm_size16; h += VLen) {
-        auto inp = _mm512_loadu_ps(srcptr + h);
-        inp = _mm512_mul_ps(inp, vms);
-        _mm512_storeu_ps(dstptr + h, inp);
-      }
-      for (; h < norm_size; h++) {
-        dstptr[h] = srcptr[h] * inv_meansq;
-      }
-    }
-
-  } else {
-    if (scaleptr) {
-      if (biasptr == nullptr) {
-        for (; h < norm_size16; h += VLen) {
-          auto inp = _mm512_loadu_ps(srcptr + h);
-          auto scale = _mm512_loadu_ps(scaleptr + h);
-          inp = _mm512_sub_ps(inp, vm);
-          inp = _mm512_mul_ps(inp, vms);
-          inp = _mm512_mul_ps(inp, scale);
-          _mm512_storeu_ps(dstptr + h, inp);
-        }
-        for (; h < norm_size; h++) {
-          dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h];
-        }
-      } else {
-        for (; h < norm_size16; h += VLen) {
-          auto inp = _mm512_loadu_ps(srcptr + h);
-          auto scale = _mm512_loadu_ps(scaleptr + h);
-          inp = _mm512_sub_ps(inp, vm);
-          inp = _mm512_mul_ps(inp, vms);
-          inp = _mm512_mul_ps(inp, scale);
-          auto bias = _mm512_loadu_ps(biasptr + h);
-          inp = _mm512_add_ps(inp, bias);
-          _mm512_storeu_ps(dstptr + h, inp);
-        }
-        for (; h < norm_size; h++) {
-          dstptr[h] = (srcptr[h] - mean) * inv_meansq * scaleptr[h] + biasptr[h];
-        }
-      }
-    } else {
-      for (; h < norm_size16; h += VLen) {
-        auto inp = _mm512_loadu_ps(srcptr + h);
-        inp = _mm512_sub_ps(inp, vm);
-        inp = _mm512_mul_ps(inp, vms);
-        _mm512_storeu_ps(dstptr + h, inp);
-      }
-      for (; h < norm_size; h++) {
-        dstptr[h] = (srcptr[h] - mean) * inv_meansq;
-      }
-    }
-  }
-
-  if (mean_out) {
-    *mean_out = mean;
-  }
-  if (mean_square_out) {
-    *mean_square_out = mean_square;
-  }
-  return BTLA_CODE::Success;
-}
 #ifdef __GNUC__
 #pragma GCC pop_options
 #else

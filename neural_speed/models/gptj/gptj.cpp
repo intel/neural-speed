@@ -208,10 +208,11 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     if (lctx.cont_batching) {
       size_t off_sl = 0;
       // per_request rope
-      for (int gi = 0; gi < infer_groups.size(); ++gi) {
-        const int qk_bs = infer_groups[gi].size();
-        const int qk_sl = n_tokens[infer_groups[gi].front()];
-        const int qk_n_past = n_pasts[infer_groups[gi].front()];
+
+      for (const auto& curr_group : infer_groups) {
+        const int qk_bs = curr_group.size();
+        const int qk_sl = n_tokens[curr_group.front()];
+        const int qk_n_past = n_pasts[curr_group.front()];
         struct ne_tensor* Qcur_req =
             ne_view_4d(ctx0, Qcur, head_size, n_head, qk_sl, qk_bs, ne_element_size(Qcur) * head_size,
                        ne_element_size(Qcur) * head_size * n_head, ne_element_size(Qcur) * head_size * n_head * qk_sl,
@@ -313,11 +314,11 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       const auto k_size = kv_cache_info.k_bytes;
       const auto v_size = kv_cache_info.v_bytes;
       size_t off_sl = 0;
-      for (int gi = 0; gi < infer_groups.size(); ++gi) {
-        const int update_bs = infer_groups[gi].size();
-        const int update_sl = n_tokens[infer_groups[gi].front()];
-        const int update_block_id = block_ids[infer_groups[gi].front()];
-        const int update_n_past = n_pasts[infer_groups[gi].front()];
+      for (const auto& curr_group : infer_groups) {
+        const int update_bs = curr_group.size();
+        const int update_sl = n_tokens[curr_group.front()];
+        const int update_block_id = block_ids[curr_group.front()];
+        const int update_n_past = n_pasts[curr_group.front()];
         struct ne_tensor* k_cache_g = ne_view_4d(ctx0, kv_self.k,                      // tensor
                                                  head_size, n_ctx, n_head, update_bs,  // ne
                                                  0, 0, k_size,                         // nb (bestla managed)
@@ -345,20 +346,19 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     struct ne_tensor* KQV_merged_contiguous =
         ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC);
     size_t off_sl = 0;
-    for (int gi = 0; gi < infer_groups.size(); ++gi) {
-      const int attn_bs = infer_groups[gi].size();
-      const int attn_sl = n_tokens[infer_groups[gi].front()];
-      const int attn_block_id = block_ids[infer_groups[gi].front()];
-      const int attn_n_past = n_pasts[infer_groups[gi].front()];
-      const int attn_n_total = n_totals[infer_groups[gi].front()];
+    for (const auto& curr_group : infer_groups) {
+      const int attn_bs = curr_group.size();
+      const int attn_sl = n_tokens[curr_group.front()];
+      const int attn_block_id = block_ids[curr_group.front()];
+      const int attn_n_past = n_pasts[curr_group.front()];
+      const int attn_n_total = n_totals[curr_group.front()];
       struct ne_tensor* Q =
           ne_permute(ctx0,
                      ne_view_4d(ctx0, Qcur, head_size, n_head, attn_sl, attn_bs, ne_element_size(Qcur) * head_size,
                                 ne_element_size(Qcur) * head_size * n_head,
                                 ne_element_size(Qcur) * head_size * n_head * attn_sl, off_sl * ne_element_size(Qcur)),
                      0, 2, 1, 3);
-      std::string suffix = std::to_string(gi);
-      ne_set_name(Q, std::string("Q_" + suffix).c_str());
+      ne_set_name(Q, "Q");
       struct ne_tensor *K, *V;
       const int n_cached_gi = shift_roped_k ? n_cached : attn_n_past + attn_sl;
       if (run_mha_reordered) {
@@ -412,7 +412,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
         }
       } else {
         std::vector<int> attn_block_ids;
-        for (const auto& bsi : infer_groups[gi]) {
+        for (const auto& bsi : curr_group) {
           attn_block_ids.push_back(block_ids[bsi]);
         }
         K = model_kv_cache_seq_concat(&gf, &lctx, ctx0, head_size, n_cached_gi, n_head, attn_bs, attn_block_ids, il);
@@ -431,20 +431,27 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
         V = model_kv_cache_seq_concat(&gf, &lctx, ctx0, n_cached_gi, head_size, n_head, attn_bs, attn_block_ids, il,
                                       false);
       }
-      ne_set_name(K, std::string("K_" + suffix).c_str());
-      ne_set_name(V, std::string("V_" + suffix).c_str());
+      ne_set_name(K, "K");
+      ne_set_name(V, "V");
 
       struct ne_tensor* KQV_merged_gi;
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
       ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
+#ifndef NDEBUG
+      for (const auto bi : curr_group) {
+        NE_ASSERT(inputs[bi].n_prompt_tokens == inputs[curr_group[0]].n_prompt_tokens);
+      }
+#endif
+      const int n_prompt = curr_group.size() == 1 ? 0 : inputs[curr_group[0]].n_prompt_tokens;
       if (attn_n_total == 0 || !shift_roped_k)
         attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
-      if (run_mha_reordered) {                 // reordered kv-cache bf16 mha must be used if run_mha_reordered
-        struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
+      const auto attn_op_param = ne_attn_op_params_t{attn_flags, attn_scale, n_prompt};
+      if (run_mha_reordered) {  // reordered kv-cache bf16 mha must be used if run_mha_reordered
+        struct ne_tensor* KQV_Out = ne_flash_attn_with_params(ctx0, Q, K, V, &attn_op_param);
         KQV_merged_gi = ne_view_2d(ctx0, KQV_Out, head_size * n_head, attn_sl * attn_bs,
                                    head_size * n_head * ne_element_size(KQV_Out), 0);
       } else if (run_mha_fp16) {  // non-reordered kv-cache fp16 mha
-        struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
+        struct ne_tensor* KQV_Out = ne_flash_attn_with_params(ctx0, Q, K, V, &attn_op_param);
         KQV_merged_gi = ne_view_2d(ctx0, KQV_Out, head_size * n_head, attn_sl * attn_bs,
                                    head_size * n_head * ne_element_size(KQV_Out), 0);
       } else if (attn_n_total == 0 && run_mha_bf16_first) {
@@ -462,37 +469,37 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       } else {
         // K * Q
         struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
-        ne_set_name(KQ, std::string("KQ_" + suffix).c_str());
+        ne_set_name(KQ, "KQ");
 
         // KQ_scaled = KQ / sqrt(n_embd/n_head)
         struct ne_tensor* KQ_scale = ne_new_f32(ctx0, attn_scale);
-        ne_set_name(KQ_scale, std::string("1/sqrt(n_embd/n_head)_" + suffix).c_str());
+        ne_set_name(KQ_scale, "1/sqrt(n_embd/n_head)");
 
         // KQ_scaled shape [n_cached, N, n_head, 1]
         struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, KQ, KQ_scale);
-        ne_set_name(KQ_scaled, std::string("KQ_scaled_" + suffix).c_str());
+        ne_set_name(KQ_scaled, "KQ_scaled");
 
         // KQ_scaled = mask_past(KQ_scaled)
         if (attn_n_total == 0 || !shift_roped_k || !no_padding) {
-          std::vector<int> attn_n_padding(infer_groups[gi].size(), 0);
-          for (int npa = 0; !n_padding.empty() && npa < infer_groups[gi].size(); ++npa) {
-            attn_n_padding[npa] = n_padding[infer_groups[gi][npa]];
+          std::vector<int> attn_n_padding(curr_group.size(), 0);
+          for (int npa = 0; !n_padding.empty() && npa < curr_group.size(); ++npa) {
+            attn_n_padding[npa] = n_padding[curr_group[npa]];
           }
           KQ_scaled = ne_diag_mask_inf_with_padding_inplace(ctx0, KQ_scaled, attn_n_past, attn_n_padding.data());
-          ne_set_name(KQ_scaled, std::string("KQ_masked_" + suffix).c_str());
+          ne_set_name(KQ_scaled, "KQ_masked");
         }
 
         // KQ = soft_max(KQ_masked)
         struct ne_tensor* KQ_soft_max = ne_soft_max_inplace(ctx0, KQ_scaled);
-        ne_set_name(KQ_soft_max, std::string("KQ_soft_max_" + suffix).c_str());
+        ne_set_name(KQ_soft_max, "KQ_soft_max");
 
         struct ne_tensor* KQV = ne_mul_mat(ctx0, V, KQ_soft_max);
-        ne_set_name(KQV, std::string("KQV_" + suffix).c_str());
+        ne_set_name(KQV, "KQV");
 
         // KQV_merged = KQV.permute(0, 2, 1, 3)
         KQV_merged_gi = ne_permute(ctx0, KQV, 0, 2, 1, 3);
       }
-      ne_set_name(KQV_merged_gi, std::string("KQV_merged_" + suffix).c_str());
+      ne_set_name(KQV_merged_gi, "KQV_merged");
       ne_build_forward_expand(&gf, ne_cpy(ctx0, KQV_merged_gi,
                                           ne_view_2d(ctx0, KQV_merged_contiguous, head_size * n_head, attn_sl * attn_bs,
                                                      head_size * n_head * ne_element_size(KQV_merged_contiguous),

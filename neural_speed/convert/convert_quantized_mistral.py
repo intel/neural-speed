@@ -105,9 +105,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 3. write tensors
     list_vars = model
-    convert_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
-    convert_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
-    convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
+    convert_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
+    convert_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
+    convert_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
 
     for i in range(n_layer):
         convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
@@ -127,9 +127,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         convert_q4_bestla_tensor(f"model.layers.{i}.mlp.up_proj",
                     f"layers.{i}.feed_forward.w3.weight", list_vars, f, quantize_config, n_head)
 
-        convert_to_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",
+        convert_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",
                         f"layers.{i}.attention_norm.weight", list_vars, f)
-        convert_to_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight",
+        convert_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight",
                         f"layers.{i}.ffn_norm.weight", list_vars, f)
 
 

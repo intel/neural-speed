@@ -213,11 +213,7 @@ def unpack_weight(qweight, scales, qzeros, q_config):
 def unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config):
     group_size = q_config['group_size']
     bits = q_config['bits']
-    s32_bits = 32
-
-    assert bits == 4
-    # Int32 can store 8 * 4bits data. This is the offset for each data.
-    wf = torch.tensor(list(range(0, s32_bits, bits)), dtype=torch.int32).unsqueeze(0)
+    wf = torch.tensor([[ 0,  4,  8, 12, 16, 20, 24, 28]], dtype=torch.int32)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
                                       wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
@@ -233,13 +229,11 @@ def unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config):
 
 def unpack_gptq_weight_3bits(qweight, scales, qzeros, q_config):
     print("unpack_gptq_weight_3bits...   ", end='')
+
     group_size = q_config['group_size']
     bits = q_config['bits']
-    s32_bits = 32
 
-    assert bits == 3
-    # Int32 can only store 10 * 3bits data. This is the offset for each data.
-    wf = torch.tensor([[ i for i in range(0, s32_bits - bits, bits)]], dtype=torch.int32)
+    wf = torch.tensor([[0, 3, 6, 9, 12, 15, 18, 21, 24, 27]], dtype=torch.int32)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
                                       wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
@@ -315,7 +309,7 @@ def load_quantized_model(model_path):
     return model, config, config["quantization_config"]
 
 
-def convert_to_fp32_tensor(src_name, dst_name, model, fout):
+def convert_fp32_tensor(src_name, dst_name, model, fout):
     v = model[src_name]
     shape = v.shape
     # print("Processing non-Q4 variable: " + src_name +
@@ -390,11 +384,11 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     qweight = model[f"{src_name}.qweight"]
 
     weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
+    # import pdb; pdb.set_trace()
     # weight = weight.reshape(weight.shape[0], weight.shape[1] * weight.shape[2])
     # num_itr = g_idx.shape[0]//x.shape[-1]
     if 'desc_act' in q_config and q_config['desc_act']:
         g_idx = model[f"{src_name}.g_idx"]
-        weight = weight.reshape(-1, weight.shape[-1])
         weight = (gptq_scales[g_idx.long()] * (weight - gptq_zeros[g_idx.long()]))
     else:
         infeatures = weight.shape[0]
