@@ -4,6 +4,8 @@
 #include "bestla_gemm.h"
 #include "bestla_ut.h"
 #include "bestla_prologue_a.h"
+
+#ifdef BTLA_UT_PARALLEL
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -206,3 +208,4 @@ static UT_SchedulerGemmKBlockNew sUT_SchedulerGemmKBlockNew;
 #endif
 }  // namespace ut
 }  // namespace bestla
+#endif

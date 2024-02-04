@@ -626,17 +626,16 @@ class StdThreading : public IThreading {
   explicit StdThreading(int nthreads) : IThreading(nthreads) { create_threads(); }
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
-      func_ = &func;
+      running.store(mThreadNum - 1);
       for (size_t i = 0; i < mThreadNum - 1; i++) {
-        locks[i] = true;
+        func_[i] = &func;
       }
       func(0);
       while (true) {
-        bool is_lock = false;
-        for (size_t i = 0; !is_lock && i < mThreadNum - 1; i++) {
-          is_lock |= locks[i];
-        }
-        if (!is_lock) break;
+        if (running.load() == 0)
+          break;
+        else
+          _mm_pause();
       }
     } else {
       func(0);
@@ -644,9 +643,11 @@ class StdThreading : public IThreading {
   }
 
   void set_threads(int nthreads) override {
-    stop_threads();
-    mThreadNum = nthreads;
-    create_threads();
+    if (nthreads != mThreadNum) {
+      stop_threads();
+      mThreadNum = nthreads;
+      create_threads();
+    }
   }
 
   inline void sync() const override { assert(0); }
@@ -655,24 +656,25 @@ class StdThreading : public IThreading {
 
  private:
   void stop_threads() {
-    for (int i = 0; i < mThreadNum - 1; i++) stop[i] = true;
+    stop = true;
     for (int i = 0; i < mThreadNum - 1; i++) thdset[i].join();
+    thdset.clear();
+    // printf("stop %d\n", mThreadNum);
   }
   void create_threads() {
-    thdset.clear();
+    // printf("create %d\n", mThreadNum);
     thdset.resize(mThreadNum - 1);
-    locks.resize(mThreadNum - 1);
-    stop.resize(mThreadNum - 1);
+    stop = false;
 
     for (size_t i = 0; i < mThreadNum - 1; i++) {
-      stop[i] = false;
-      locks[i] = false;
       thdset[i] = std::thread(
           [&](int tidx) {
-            while (!stop[tidx]) {
-              if (locks[tidx]) {
-                (*func_)(tidx + 1);
-                locks[tidx] = false;
+            while (true) {
+              if (stop.load() == true) break;
+              if (func_[tidx] != nullptr) {
+                (*func_[tidx])(tidx + 1);
+                func_[tidx] = nullptr;
+                running.fetch_sub(1);
               } else {
                 _mm_pause();
               }
@@ -683,8 +685,9 @@ class StdThreading : public IThreading {
   }
 
   std::vector<std::thread> thdset;
-  std::vector<bool> locks, stop;
-  const thread_func* func_ = nullptr;
+  std::atomic_bool stop;
+  std::atomic_int running;
+  const thread_func* func_[100];
 };
 
 class SingleThread : public StdThreading {

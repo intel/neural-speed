@@ -5,6 +5,7 @@
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
 
+#ifdef BTLA_UT_PROLOGUE_B
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -1889,3 +1890,4 @@ static UT_CompFp16 sUT_CompFp16;
 #endif
 }  // namespace ut
 }  // namespace bestla
+#endif

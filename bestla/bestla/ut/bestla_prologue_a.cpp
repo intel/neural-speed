@@ -2,6 +2,7 @@
 #include "bestla_ut.h"
 #include "kernel_avx512f.h"
 
+#ifdef BTLA_UT_PROLOGUE_A
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -292,3 +293,4 @@ static UT_ShuffleActivationKblock sUT_ShuffleActivationKblock;
 #endif
 }  // namespace ut
 }  // namespace bestla
+#endif

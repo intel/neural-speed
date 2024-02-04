@@ -7,11 +7,11 @@ class UT_Fp32Fp32 {
  public:
   UT_Fp32Fp32() {
     UT_START();
-#ifdef JBLAS_UT_BENCHMARK
+#ifdef BTLA_UT_BENCHMARK
     benchmark_all(1, 4096, 4096, 32);
     benchmark_all(1024, 4096, 4096, 32);
     benchmark_all(2048, 4096, 4096, 32);
-#endif  // JBLAS_UT_BENCHMARK
+#endif  // BTLA_UT_BENCHMARK
 
     CheckISA(AVX2);
     ut<sAVX2>(1, 1, 1);
@@ -116,7 +116,7 @@ class UT_Fp32Fp32 {
     }
   }
 };
-#ifdef JBLAS_UT_WRAPPER
+#ifdef BTLA_UT_WRAPPER
 static UT_Fp32Fp32 sUT_Fp32Fp32;
 #endif
 
@@ -125,7 +125,7 @@ class UT_U8S8S32 {
   UT_U8S8S32() {
     UT_START();
     GetCPUDevice();
-#ifdef JBLAS_UT_BENCHMARK
+#ifdef BTLA_UT_BENCHMARK
     benchmark_all(1024, 4096, 4096, 32);
     benchmark_all(2048, 4096, 4096, 32);
 #endif
@@ -269,7 +269,7 @@ class UT_U8S8S32 {
     }
   }
 };
-#ifdef JBLAS_UT_WRAPPER
+#ifdef BTLA_UT_WRAPPER
 static UT_U8S8S32 sUT_U8S8S32;
 #endif
 
@@ -278,7 +278,7 @@ class UT_S8S8S32 {
   UT_S8S8S32() {
     UT_START();
     GetCPUDevice();
-#ifdef JBLAS_UT_BENCHMARK
+#ifdef BTLA_UT_BENCHMARK
     benchmark_all(1024, 4096, 4096, 32);
     benchmark_all(2048, 4096, 4096, 32);
 #endif
@@ -393,7 +393,7 @@ class UT_S8S8S32 {
     }
   }
 };
-#ifdef JBLAS_UT_WRAPPER
+#ifdef BTLA_UT_WRAPPER
 static UT_S8S8S32 sUT_S8S8S32;
 #endif
 
@@ -403,7 +403,7 @@ class UT_Bf16Bf16Fp32 {
     UT_START();
     CheckISA(AMX_BF16);
     request_perm_xtile_data();
-#ifdef JBLAS_UT_BENCHMARK
+#ifdef BTLA_UT_BENCHMARK
     benchmark_all(1024, 4096, 4096, 32);
     benchmark_all(2048, 4096, 4096, 32);
 #endif
@@ -499,7 +499,7 @@ class UT_Bf16Bf16Fp32 {
     }
   }
 };
-#ifdef JBLAS_UT_WRAPPER
+#ifdef BTLA_UT_WRAPPER
 static UT_Bf16Bf16Fp32 sUT_Bf16Bf16Fp32;
 #endif
 
@@ -508,7 +508,7 @@ class UT_Fp16Fp16Fp16 {
   UT_Fp16Fp16Fp16() {
     UT_START();
     CheckISA(AVX512_FP16);
-#ifdef JBLAS_UT_BENCHMARK
+#ifdef BTLA_UT_BENCHMARK
     benchmark_all(1024, 4096, 4096, 32);
     benchmark_all(2048, 4096, 4096, 32);
 #endif
@@ -602,7 +602,7 @@ class UT_Fp16Fp16Fp16 {
     }
   }
 };
-#ifdef JBLAS_UT_WRAPPER
+#ifdef BTLA_UT_WRAPPER
 static UT_Fp16Fp16Fp16 sUT_Fp16Fp16Fp16;
 #endif
 }  // namespace ut

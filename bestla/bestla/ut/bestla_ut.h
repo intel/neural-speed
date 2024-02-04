@@ -1,3 +1,5 @@
+#pragma once
+
 #include <random>
 #include <stdexcept>
 #include "bestla_utils.h"
@@ -25,9 +27,9 @@ using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;
 using sAVX2 = gemm::SCoreRowNAvx2<24, 4>;
 #ifdef _OPENMP
-static parallel::OMPThreading DefaultThreading(4);
+extern parallel::OMPThreading DefaultThreading;
 #else
-static parallel::StdThreading DefaultThreading(4);
+extern parallel::StdThreading DefaultThreading;
 #endif  // _OPNEMP
 
 constexpr size_t CacheSize = size_t(100) << 10;
