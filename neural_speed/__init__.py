@@ -88,6 +88,7 @@ class Model:
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
+        self.model_type = model_type
         self.__import_package(model_type)
 
         # check cache and quantization
