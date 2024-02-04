@@ -42,7 +42,7 @@ repos:
     hooks:
       - id: codespell
         args:
-          [--ignore-words=.github/workflows/scripts/formatScan/nlp_dict.txt]
+          [-w, --ignore-words=.github/workflows/scripts/formatScan/nlp_dict.txt]
         exclude: |
           (?x)^(
               .+.po|.+.ts|.+.js|.+.map|.+.js.map|.+.css.map|
