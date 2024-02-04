@@ -426,4 +426,3 @@ We can improve the performance by fusion the FFN process.
 - [FFN-Fusion example](https://github.com/intel/intel-extension-for-transformers/pull/160)
 # 4. A complete example
 - [Enable baichuan](https://github.com/intel/intel-extension-for-transformers/pull/376)
-

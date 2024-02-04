@@ -59,7 +59,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/.github/workflows/scripts/models
           bash cpp_graph_inference.sh cpp-graph-test-neural-speed ${{ matrix.modelName }} ${{ env.INPUT_COMPILER_VERSION }}
-      
+
       - name: Rename summary
         run: |
           cd ${{ github.workspace }}
@@ -93,7 +93,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           path: ${{ env.OUT_SCRIPT_PATH }}/generated/log
-      
+
       - name: Merge CPP Graph Summary Log
         run: |
           cd ${{ env.OUT_SCRIPT_PATH }}/generated/log/cpp_graph

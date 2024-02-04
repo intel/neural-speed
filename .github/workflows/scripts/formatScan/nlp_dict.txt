@@ -12,12 +12,14 @@ haa
 inout
 mata
 matc
+mone
 nd
 ore
 ot
 parm
 ques
 rouge
+ser
 sie
 te
 tye

@@ -143,4 +143,3 @@ Available modes:
 
 ## Enable New Model
 You can consider adding your own models, please follow the document: [graph developer document](./developer_document.md).
-

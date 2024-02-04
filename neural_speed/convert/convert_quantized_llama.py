@@ -94,7 +94,7 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
     dst.flatten()[:byte_size].tofile(fout)
     print(f"converting {dst_name} qauntized tensor to bestla q4 block")
 
-def main(args_in: Optional[List[str]] = None) -> None:    
+def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
@@ -153,7 +153,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
     # but bos_token_id = 1 in llama.cpp
-    f.write(struct.pack("i", 1))  
+    f.write(struct.pack("i", 1))
     f.write(struct.pack("i", 2))
 
     f.write(struct.pack("i", 0))
