@@ -139,6 +139,7 @@ if (NS_BTLA_UT)
 endif()
 include(FindOpenMP)
 
+set(BTLA_USE_OPENMP ON)
 add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)
