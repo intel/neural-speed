@@ -1,3 +1,4 @@
+aadd
 alse
 ans
 bu
@@ -6,10 +7,12 @@ daa
 datas
 dota
 dout
+endianess
 fo
 followings
 haa
 inout
+iterm
 mata
 matc
 mone
@@ -22,6 +25,7 @@ rouge
 ser
 sie
 te
+tne
 tye
 ue
 wya
