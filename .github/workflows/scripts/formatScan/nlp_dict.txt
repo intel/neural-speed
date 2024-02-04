@@ -25,3 +25,7 @@ ue
 wya
 ser
 mone
+iterm
+tne
+aadd
+endianess

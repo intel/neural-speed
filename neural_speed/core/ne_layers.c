@@ -7707,7 +7707,7 @@ static void ne_compute_forward_alibi_f32(const struct ne_compute_params* params,
   assert(nb0 == sizeof(float));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
 #ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
@@ -7777,7 +7777,7 @@ static void ne_compute_forward_alibi_f16(const struct ne_compute_params* params,
   assert(nb0 == sizeof(ne_fp16_t));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
 #ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();

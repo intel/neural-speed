@@ -1345,7 +1345,7 @@ class mha_stable_interface_t {
     const auto group_heads = p.head_num / p.heads_kv;
     const auto sl_diff = p.sl_kv - p.sl_q;
 
-    // TP will need the real rank oder of k
+    // TP will need the real rank order of k
     int32_t k_offset = 0;
     int32_t log_head_num = p.head_num;
 #ifdef NS_TP_MODEL
@@ -1731,7 +1731,7 @@ void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>&
   const auto ROWPACK = p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 4
                        : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 2
                                                                         : 0;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
   int32_t log_head_num = p.head_num;
 #ifdef NS_TP_MODEL
