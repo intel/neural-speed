@@ -354,7 +354,7 @@ def convert_q4_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2
     # gptq_scale = torch.cat([gptq_scale,gptq_scale,gptq_scale,gptq_scale], dim=1).view(-1,1)
     pack_tensor = torch.cat((gptq_scale.half().view(torch.int8), tensor), dim=-1)
     pack_tensor.numpy().tofile(fout)
-    print(f"converting {dst_name} qauntized tensor to ggml q4 block")
+    print(f"converting {dst_name} quantized tensor to ggml q4 block")
 
 def convert_q4_1_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2=0, permute_func=None):
     qzeros = model[f"{src_name}.qzeros"]
@@ -381,7 +381,7 @@ def convert_q4_1_tensor(src_name, dst_name, model, fout, q_config, n_head, n_hea
     gptq_zeros = -gptq_scale*gptq_zeros
     pack_tensor = torch.cat((gptq_scale.half().view(torch.int8), gptq_zeros.half().view(torch.int8), tensor), dim=-1)
     pack_tensor.numpy().tofile(fout)
-    print(f"converting {dst_name} qauntized tensor to ggml q4 1 block")
+    print(f"converting {dst_name} quantized tensor to ggml q4 1 block")
 
 
 def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
@@ -411,4 +411,4 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     write_header(fout, shape, dst_name, 0)
     weight.numpy().tofile(fout)
 
-    print(f"converting {dst_name} qauntized tensor to fp32 tensor")
+    print(f"converting {dst_name} quantized tensor to fp32 tensor")
