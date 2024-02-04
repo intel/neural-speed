@@ -600,14 +600,10 @@ class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }
   void parallel_for(const thread_func& func) const override {
-    if (mThreadNum > 1) {
 #pragma omp parallel
-      {
-        int tidx = omp_get_thread_num();
-        func(tidx);
-      }
-    } else {
-      func(0);
+    {
+      int tidx = omp_get_thread_num();
+      func(tidx);
     }
   }
   virtual void set_threads(int nthreads) override {

@@ -18,10 +18,13 @@ import argparse
 from typing import List, Optional
 import subprocess
 from transformers import AutoTokenizer
-import neural_speed
 
 model_maps = {"gpt_neox": "gptneox", "llama2": "llama", "gpt_bigcode": "starcoder"}
 build_path = Path(Path(__file__).parent.absolute(), "../build/")
+
+
+def is_win():
+    return sys.platform.startswith('win')
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
@@ -127,8 +130,19 @@ def main(args_in: Optional[List[str]] = None) -> None:
     args = parser.parse_args(args_in)
     print(args)
     model_name = model_maps.get(args.model_name, args.model_name)
-    package_path = os.path.dirname(neural_speed.__file__)
-    path = Path(package_path, "./run_{}".format(model_name))
+    if is_win():
+        path = Path(args.build_dir, "./Bin/Release/run_{}.exe".format(model_name))
+    else:
+        if args.one_click_run == "True":
+            import neural_speed
+            package_path = os.path.dirname(neural_speed.__file__)
+            path = Path(package_path, "./run_{}".format(model_name))
+        else:
+            path = Path(args.build_dir, "./bin/run_{}".format(model_name))
+
+    if not path.exists():
+        print("Please build graph first or select the correct model name.")
+        sys.exit(1)
 
     cmd = [path]
     cmd.extend(["--model", args.model])

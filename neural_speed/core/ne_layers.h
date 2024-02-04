@@ -37,6 +37,12 @@
 #include "core/data_types.h"
 #include "layers/layers.h"
 
+// if C99 - static_assert is noop
+// ref: https://stackoverflow.com/a/53923785/4039976
+#if !defined(static_assert) && (!defined(__cplusplus) || __cplusplus < 201103L)
+#define static_assert(cond, msg) struct global_scope_noop_trick
+#endif
+
 #define NE_QNT_VERSION 2            // bump this on quantization format changes
 #define NE_QNT_VERSION_FACTOR 1000  // do not change this
 
@@ -68,6 +74,13 @@ typedef enum NE_ATTN_FLAG {
   NE_ATTN_FLAG_IS_ALIBI8 = 1 << 2,
 } NE_ATTN_FLAG;
 typedef uint32_t ne_attn_flags_t;
+
+typedef struct ne_attn_op_params_t {
+  ne_attn_flags_t flags;
+  float scale;
+  int n_prompt;
+} ne_attn_op_params_t;
+static_assert(sizeof(ne_attn_op_params_t) <= NE_MAX_OP_PARAMS, "ATTN OP PARAM too large!");
 
 // convert FP16 <-> FP32
 NE_API float ne_fp16_to_fp32(ne_fp16_t x);
@@ -440,6 +453,8 @@ NE_API struct ne_tensor* ne_conv_1d_ph(struct ne_context* ctx, struct ne_tensor*
 
 NE_API struct ne_tensor* ne_flash_attn(struct ne_context* ctx, struct ne_tensor* q, struct ne_tensor* k,
                                        struct ne_tensor* v, float scale, ne_attn_flags_t flags);
+NE_API struct ne_tensor* ne_flash_attn_with_params(struct ne_context* ctx, struct ne_tensor* q, struct ne_tensor* k,
+                                                   struct ne_tensor* v, const ne_attn_op_params_t* op_params);
 // set no_zeroing to true to prevent zeroing unaligned seq
 NE_API struct ne_tensor* ne_flash_attn_update_k(struct ne_context* ctx, struct ne_tensor* cache, struct ne_tensor* cur,
                                                 int n_past, bool no_zeroing);

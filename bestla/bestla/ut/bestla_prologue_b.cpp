@@ -1,3 +1,4 @@
+#include "bestla.h"
 #include "bestla_gemm.h"
 #include "bestla_prologue_b.h"
 #include "bestla_parallel.h"
@@ -172,6 +173,102 @@ class UT_BlockQunatize_F8 {
 static UT_BlockQunatize_F8 sUT_BlockQunatize_F8;
 #endif
 
+class UT_S3_WOQ {
+ public:
+  UT_S3_WOQ() {
+    UT_START();
+    CheckISA(AVX512F);
+    ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 56);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 56);
+    ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 56);
+  }
+
+  template <class GemmCore_T, BTLA_ISA ISA>
+  void ut(int m, int n, int k, int blocksize, int enable_thr) {
+    DefaultThreading.set_threads(enable_thr);
+    printf("%s:%d %d %d %d\n", __FUNCTION__, m, n, k, blocksize);
+    int ldb = n;
+
+    int kblk_num = utils::updiv(k, blocksize);
+    utils::aligned_vector<float> scales(kblk_num * n);
+    ut::fill_buffer_randn(scales.data(), scales.size(), 0.005f, 0.01f);
+    ut::UT_vector_s8 quanW;
+    quanW.resize(k * n);
+    quanW.fill_rand(-8, 7);
+    for (int i = 0; i < k * n; i++) quanW.data()[i] = (quanW.data()[i] * 16) & 0xe0;
+
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>;
+
+    PrologueB kernel;
+    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
+    auto ptr_ref = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
+    avector<int8_t> buffer(ptr.mSize);
+    avector<int8_t> buffer_ref(ptr_ref.mSize);
+    ptr.assign(buffer.data());
+    ptr_ref.assign(buffer_ref.data());
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr, &DefaultThreading);
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr_ref, &DefaultThreading);
+    using Launcher =
+        wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+                                      prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
+                                      epilogue::gemm::AccumulatorWriteBackFp32>;
+    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
+
+    Launcher launcher;
+    avector<float> matC(m * n), refC(m * n);
+    if constexpr (ISA == BTLA_ISA::AVX512F) {
+      avector<float> matAf32(m * k);
+      fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
+      utils::GemmProblem gp(1, m, n, k, blocksize);
+      typename Launcher::Param args{
+          gp, {matAf32.data(), k}, {&ptr}, {ptr.template SPtr<int8_t>(), ptr.SDtype(), ptr.CStep()}, {matC.data(), n}};
+      parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+      typename Launcher::Param args_ref{gp,
+                                        {matAf32.data(), k},
+                                        {&ptr_ref},
+                                        {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
+                                        {refC.data(), n}};
+      parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
+    } else if constexpr (ISA == BTLA_ISA::AMX_BF16) {
+      avector<utils::bf16> matAbf16(m * k);
+      fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
+      GemmProblem gp(1, m, n, k, blocksize);
+      typename Launcher::Param args{
+          gp, {matAbf16.data(), k}, {&ptr}, {ptr.template SPtr<int8_t>(), ptr.SDtype(), ptr.CStep()}, {matC.data(), n}};
+      parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+      typename Launcher::Param args_ref{gp,
+                                        {matAbf16.data(), k},
+                                        {&ptr_ref},
+                                        {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
+                                        {refC.data(), n}};
+      parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
+    } else {
+      using Launcher2 = wrapper::gemm::LauncherIntKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
+                                                         prologue_b::gemm::WeightKBlockNInteger,
+                                                         epilogue::gemm::AccumulatorWriteBackFp32>;
+      Launcher2 launcher;
+      using Parallel2 = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
+      avector<float> matAf32(m * k);
+      fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
+      auto quanA = launcher.mProA.createStorage(m, k, blocksize, false);
+      auto quanA_ref = launcher.mProA.createStorage(m, k, blocksize, false);
+      utils::avector<int8_t> bufferA(quanA.mSize);
+      utils::avector<int8_t> bufferA_ref(quanA.mSize);
+      quanA.assign(bufferA.data());
+      quanA_ref.assign(bufferA_ref.data());
+      GemmProblem gp(1, m, n, k, blocksize);
+      typename Launcher2::Param args{gp, {matAf32.data(), k, &quanA}, {&ptr}, {matC.data(), n}};
+      parallel::GemmRunWithA<Parallel2>(launcher, args, &DefaultThreading);
+      typename Launcher2::Param args_ref{gp, {matAf32.data(), k, &quanA_ref}, {&ptr_ref}, {refC.data(), n}};
+      parallel::GemmRunWithA<Parallel2>(launcher, args_ref, &DefaultThreading);
+    }
+    buffer_error(matC.data(), refC.data(), matC.size(), 0.001f);
+  }
+};
+#ifdef BTLA_UT_PROLOGUE_B
+static UT_S3_WOQ sUT_S3_WOQ;
+#endif
 class UT_TransposeBlockQuantize_F4 {
  public:
   UT_TransposeBlockQuantize_F4() {
@@ -725,8 +822,11 @@ class UTBenchmark_CompFp32 {
   }
 
   void ut_s4() {
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(32, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(32, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2048, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     // benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(4096, 4096, 11008, 128, BTLA_DTYPE::S4_CLIP);
     //  benchmark_all<prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
@@ -812,9 +912,14 @@ class UTBenchmark_CompFp32 {
                      int threads, BTLA_DTYPE qtype) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerKBlock<Core_T>;
+    // using Launcher =
+    //     wrapper::gemm::LauncherKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
+    //                                   epilogue::gemm::CompFp32BlockEpilogue,
+    //                                   epilogue::gemm::AccumulatorWriteBackFp32>;
     using Launcher =
-        wrapper::gemm::LauncherKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
-                                      epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherIntKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationF32KBlockQuantize,
+                                         prologue_b::gemm::WeightKBlockNInteger,
+                                         epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
     DefaultThreading.set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
@@ -831,6 +936,9 @@ class UTBenchmark_CompFp32 {
     }
     std::vector<WType> packBs(batch, 0);
     std::vector<int8_t> bufB(tmpB.mSize * batch);
+    auto quanA = kernel.mProA.createStorage(m, k, blocksize, false);
+    utils::avector<int8_t> bufferA(quanA.mSize);
+    quanA.assign(bufferA.data());
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
@@ -838,7 +946,7 @@ class UTBenchmark_CompFp32 {
     kernel.mProB.packWeight(n, k, B, n, &packBs[0], &DefaultThreading);
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
-      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(float));
+      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(uint16_t));
     }
     auto psize = (size_t)m * n * k * 2;
     auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
@@ -848,11 +956,12 @@ class UTBenchmark_CompFp32 {
       for (size_t i = 0; i < batch; i++) {
         GemmProblem gp(1, m, n, k, blocksize);
         typename Launcher::Param args{gp,
-                                      {A + i * m * k, k},
+                                      {A + i * m * k, k, &quanA},
                                       {&packBs[i]},
-                                      {packBs[i].template SPtr<int8_t>(), packBs[i].SDtype(), packBs[i].CStep()},
+                                      // {packBs[i].template SPtr<int8_t>(), packBs[i].SDtype(), packBs[i].CStep()},
                                       {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        // parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRunWithA<Parallel>(kernel, args, &DefaultThreading);
       }
       if (log.stop()) {
         double t = log.avg_val / batch;
@@ -879,16 +988,17 @@ class UTBenchmark_CompFp32 {
     float testtime = 500.f;
     GetCPUDevice();
     if (_cd->AVX512F()) {
-      int blocksize = 32;
-      benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                  C.data(), testtime, 48, qtype);
-      benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                      C.data(), testtime, 48, qtype);
-      blocksize = 128;
-      benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                  C.data(), testtime, 48, qtype);
-      benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
-                                                                      C.data(), testtime, 48, qtype);
+      // int blocksize = 32;
+      // benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      //                                                             C.data(), testtime, 48, qtype);
+      // benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      //                                                                 C.data(), testtime, 48, qtype);
+      int blocksize = 128;
+      // benchmark<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      //                                                             C.data(), testtime, 48, qtype);
+      // benchmark_mem<gemm::SCoreRowNAvx512f<48, 8>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(), B.data(),
+      benchmark_mem<gemm::ICoreRowNAmxint8KBlock<48, 16>, LOG, Wei, Scale_T>(m, n, k, blocksize, batch, A.data(),
+                                                                             B.data(), C.data(), testtime, 56, qtype);
     }
   }
 };

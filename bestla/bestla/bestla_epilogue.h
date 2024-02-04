@@ -93,6 +93,7 @@ struct ParamAlphaBetaProcess {
 template <BTLA_ISA ISA_T>
 class AlphaBetaProcessFp32 {
  public:
+  using DType = float;
   using Param = ParamAlphaBetaProcess<float>;
 
   BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,

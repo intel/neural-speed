@@ -19,7 +19,7 @@
 #include <vector>
 #include <algorithm>
 
-#include "bestla/jit_blas_utils.h"
+#include "bestla/bestla_utils.h"
 
 #ifndef NS_TESTS
 static_assert(false, "Only include this header file for testing!");
