@@ -17,13 +17,10 @@ from pathlib import Path
 import argparse
 from typing import List, Optional
 import subprocess
+import neural_speed
 
 model_maps = {"gpt_neox": "gptneox", "llama2": "llama", "gpt_bigcode": "starcoder"}
 build_path = Path(Path(__file__).parent.absolute(), "../build/")
-
-
-def is_win():
-    return sys.platform.startswith('win')
 
 
 def str2bool(v):
@@ -90,17 +87,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
         action="store_true",
         help="enable ggml for quantization and inference",
     )
+    parser.add_argument(
+        "--one_click_run",
+        type=str,
+        default="False",
+        choices=["True", "False"],
+        help="one-click for quantization and inference",
+    )
     args = parser.parse_args(args_in)
 
     model_name = model_maps.get(args.model_name, args.model_name)
-    if is_win():
-        path = Path(args.build_dir, "./Bin/Release/quant_{}.exe".format(model_name))
-    else:
-        path = Path(args.build_dir, "./bin/quant_{}".format(model_name))
-    if not path.exists():
-        print(path)
-        print("Please build graph first or select the correct model name.")
-        sys.exit(1)
+    package_path = os.path.dirname(neural_speed.__file__)
+    path = Path(package_path, "./quant_{}".format(model_name))
 
     cmd = [path]
     cmd.extend(["--model_file", args.model_file])

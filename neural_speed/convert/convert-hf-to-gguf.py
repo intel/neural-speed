@@ -96,8 +96,6 @@ class Model:
         self.gguf_writer.add_parallel_residual(self.hparams.get("use_parallel_residual", True))
 
     def write_tensors(self):
-        import pdb
-        pdb.set_trace()
         block_count = self.hparams.get("n_layers", self.hparams.get("num_hidden_layers", self.hparams.get("n_layer")))
         tensor_map = gguf.get_tensor_name_map(self.model_arch, block_count)
         for name, data_torch in self.get_tensors():
@@ -126,7 +124,7 @@ class Model:
             if self.ftype == 0 and data_dtype == np.float16:
                 data = data.astype(np.float32)
 
-            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
             if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                 data = data.astype(np.float32)
 
@@ -371,9 +369,9 @@ class BloomModel(Model):
             data = data_torch.squeeze().numpy()
 
             # Map bloom-style qkv_linear to gpt-style qkv_linear
-            # bloom: 
+            # bloom:
             # github.com/huggingface/transformers/blob/main/src/transformers/models/bloom/modeling_bloom.py#L238-L252
-            # gpt-2: 
+            # gpt-2:
             # github.com/huggingface/transformers/blob/main/src/transformers/models/gpt2/modeling_gpt2.py#L312
             if re.match(r"h\.\d+\.self_attention\.query_key_value\.weight", name):
                 qkv_weights = data.reshape((n_head, 3, n_embed // n_head, n_embed))
@@ -411,7 +409,7 @@ class BloomModel(Model):
             if self.ftype == 0 and data_dtype == np.float16:
                 data = data.astype(np.float32)
 
-            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
             if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                 data = data.astype(np.float32)
 
@@ -473,7 +471,7 @@ class MPTModel(Model):
             if self.ftype == 0 and data_dtype == np.float16:
                 data = data.astype(np.float32)
 
-            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
             if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                 data = data.astype(np.float32)
 
@@ -574,7 +572,7 @@ class BaichuanModel(Model):
             if self.ftype == 0 and data_dtype == np.float16:
                 data = data.astype(np.float32)
 
-            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
             if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                 data = data.astype(np.float32)
 
@@ -687,7 +685,7 @@ class FalconModel(Model):
             if self.ftype == 0 and data_dtype == np.float16:
                 data = data.astype(np.float32)
 
-            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
             if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                 data = data.astype(np.float32)
 
@@ -786,7 +784,7 @@ class RefactModel(Model):
             if self.ftype == 0 and data_dtype == np.float16:
                 data = data.astype(np.float32)
 
-            # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
             if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                 data = data.astype(np.float32)
 

@@ -63,6 +63,9 @@ void bestla_fusion_FFN_Add_GeLu_f32f32_forward(float* activation, void* w1ptr, v
 void bestla_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld);
 // packweight to dstptr, copy weight attributes from srcptr
 void bestla_packweight_copyattr(const float* f32ptr, void* dstpr, int n, int k, int ld, void* srcptr);
+
+void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float epsilon, const float* FpIn,
+                               float* FpOut);
 #ifdef __cplusplus
 }
 #endif

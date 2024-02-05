@@ -685,7 +685,7 @@ def merge_multifile_models(models_plus: List[ModelPlus]) -> ModelPlus:
 
     if any("model.embed_tokens.weight" in mp.model for mp in models_plus):
         # Transformers models put different tensors in different files, but
-        # don't split indivdual tensors between files.
+        # don't split individual tensors between files.
         model: LazyModel = {}
         for mp in models_plus:
             model.update(mp.model)
@@ -1067,8 +1067,8 @@ class OutputFile:
 
         self.fout.write(
             struct.pack("i", 1)
-        )  
-        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json 
+        )
+        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
         self.fout.write(struct.pack("i", 2))
 

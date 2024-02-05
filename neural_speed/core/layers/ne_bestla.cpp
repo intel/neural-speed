@@ -77,3 +77,8 @@ void bestla_packweight_copyattr(const float* f32ptr, void* dstptr, int n, int k,
   }
   safe_delete(wtmp);
 }
+
+void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float epsilon, const float* FpIn,
+                               float* FpOut) {
+  BTLALayerNorm(norm_count, norm_size, isrms, epsilon, FpIn, FpOut, ne_threading::get());
+}

@@ -292,7 +292,7 @@ class SchedulerBase : public Scheduler2D {
 
 template <class _GemmCore_T>
 class SchedulerKBlock : public Scheduler2D {
-  // Block[2]: block size of K must be mutiplier of mKBlock
+  // Block[2]: block size of K must be multiplier of mKBlock
   //           or factor of mKBlock
  public:
   using ThreadProblem = ThreadProblemBase;
@@ -474,7 +474,7 @@ class SchedulerKBlock : public Scheduler2D {
 
 template <class _GemmCore_T>
 class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
-  // Block[2]: block size of K must be mutiplier of mKBlock
+  // Block[2]: block size of K must be multiplier of mKBlock
   //           or factor of mKBlock
  public:
   using ThreadProblem = ThreadProblemBase;
@@ -600,10 +600,14 @@ class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }
   void parallel_for(const thread_func& func) const override {
+    if (mThreadNum > 1) {
 #pragma omp parallel
-    {
-      int tidx = omp_get_thread_num();
-      func(tidx);
+      {
+        int tidx = omp_get_thread_num();
+        func(tidx);
+      }
+    } else {
+      func(0);
     }
   }
   virtual void set_threads(int nthreads) override {

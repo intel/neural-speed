@@ -65,7 +65,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         "--scale_dtype",
         type=str,
         choices=["fp32", "bf16", "fp8"],
-        help="Data type of scales: fp32/bf16 (dafault fp32)",
+        help="Data type of scales: fp32/bf16 (default fp32)",
         default="fp32",
     )
     parser.add_argument(
@@ -185,6 +185,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if args.use_ggml:
         quant_cmd.extend(["--use_ggml"])
     quant_cmd.extend(["--build_dir", args.build_dir])
+    quant_cmd.extend(["--one_click_run", "True"])
     print("quantize model ...")
     subprocess.run(quant_cmd)
 
@@ -202,8 +203,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     infer_cmd.extend(["--repeat_penalty", str(args.repeat_penalty)])
     infer_cmd.extend(["--keep", str(args.keep)])
     infer_cmd.extend(["--build_dir", args.build_dir])
+    infer_cmd.extend(["--one_click_run", "True"])
     if args.shift_roped_k:
         infer_cmd.extend(["--shift-roped-k"])
+    if (model_type == "baichuan" or model_type == "qwen"):
+        infer_cmd.extend(["--tokenizer", dir_model])
     print("inferce model ...")
     subprocess.run(infer_cmd)
 

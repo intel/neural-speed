@@ -685,3 +685,41 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
   }
   return false;
 }
+
+bool BTLALayerNorm(size_t norm_count, size_t norm_size, bool isrms, float epsilon, const float* FpIn, float* FpOut,
+                   void* ThreadPool) {
+  auto inorm_count = static_cast<int>(norm_count);
+  auto inorm_size = static_cast<int>(norm_size);
+  auto pth = reinterpret_cast<parallel::IThreading*>(ThreadPool);
+  int threads = inorm_count <= 4 ? 1 : pth->num_threads();
+  parallel::Scheduler2D sch({threads, inorm_count, inorm_size, 1, inorm_size});
+  if (threads == 1) {
+    parallel::SingleThread st;
+    st.parallel_for([&](int tidx) {
+      parallel::ThreadProblem2D tp{tidx};
+      sch.getIndex(tp);
+      if (tp.valid) {
+        for (size_t i = 0; i < tp.size[0]; i++) {
+          auto srcptr = FpIn + (tp.loc[0] + i) * inorm_size;
+          auto dstptr = FpOut + (tp.loc[0] + i) * inorm_size;
+          auto ret = kernel::wrapper::LayerNormalization::forward_auto<float>(
+              srcptr, nullptr, nullptr, epsilon, inorm_size, dstptr, nullptr, nullptr, isrms);
+        }
+      }
+    });
+  } else {
+    pth->parallel_for([&](int tidx) {
+      parallel::ThreadProblem2D tp{tidx};
+      sch.getIndex(tp);
+      if (tp.valid) {
+        for (size_t i = 0; i < tp.size[0]; i++) {
+          auto srcptr = FpIn + (tp.loc[0] + i) * inorm_size;
+          auto dstptr = FpOut + (tp.loc[0] + i) * inorm_size;
+          auto ret = kernel::wrapper::LayerNormalization::forward_auto<float>(
+              srcptr, nullptr, nullptr, epsilon, inorm_size, dstptr, nullptr, nullptr, isrms);
+        }
+      }
+    });
+  }
+  return true;
+}

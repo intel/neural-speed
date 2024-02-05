@@ -33,7 +33,29 @@ GGML_QK5_1 = 32
 
 GGML_QK4_0_TYPE = 2
 GGML_QK4_1_TYPE = 3
-GGML_QJBLAS_TYPE = 13
+GGML_QJBLAS_TYPE = 19
+
+# ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
+def bytes_to_unicode():
+    """
+    Returns list of utf-8 byte and a corresponding list of unicode strings.
+    The reversible bpe codes work on unicode strings.
+    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
+    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
+    This is a significant percentage of your normal, say, 32K bpe vocab.
+    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
+    And avoids mapping to whitespace/control characters the bpe code barfs on.
+    """
+    bs = list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
+    cs = bs[:]
+    n = 0
+    for b in range(2**8):
+        if b not in bs:
+            bs.append(b)
+            cs.append(2**8 + n)
+            n += 1
+    cs = [chr(n) for n in cs]
+    return dict(zip(bs, cs))
 
 def quantize_q4_0(tensor: torch.Tensor) -> torch.CharTensor:
     # equivalent to ggml_quantize_q4_0 in ggml.c
@@ -174,26 +196,65 @@ def unpack_weight(qweight, scales, qzeros, q_config):
     if "quant_method" not in q_config:
         raise ValueError(f"Unsupported q_config without quant_method: {q_config}")
     quant_method = q_config["quant_method"]
-    if quant_method == "gptq":
-        return unpack_gptq_weight(qweight, scales, qzeros, q_config)
+    if quant_method == "gptq" or quant_method == "autoround":
+        qbits = q_config["bits"]
+        if qbits == 4:
+            return unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config)
+        elif qbits == 3:
+            return unpack_gptq_weight_3bits(qweight, scales, qzeros, q_config)
+
+        return ValueError(f"Unsupported q_config[bits]: {qbits}")
+
     if quant_method == "awq":
         return unpack_awq_weight(qweight, scales, qzeros, q_config)
     raise ValueError(f"Unsupported quant_method: {quant_method}")
 
 
-def unpack_gptq_weight(qweight, scales, qzeros, q_config):
+def unpack_gptq_weight_4bits(qweight, scales, qzeros, q_config):
     group_size = q_config['group_size']
     bits = q_config['bits']
-    wf = torch.tensor([[ 0,  4,  8, 12, 16, 20, 24, 28]], dtype=torch.int32)
+    s32_bits = 32
+
+    assert bits == 4
+    # Int32 can store 8 * 4bits data. This is the offset for each data.
+    wf = torch.tensor(list(range(0, s32_bits, bits)), dtype=torch.int32).unsqueeze(0)
     zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
                                       wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
     torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
-        
+
     zeros = zeros + 1
     zeros = zeros.reshape(scales.shape)
-        
+
     weight = torch.bitwise_right_shift(torch.unsqueeze(qweight, 1).expand(-1, 32 // bits, -1),
                                        wf.unsqueeze(-1)).to(torch.int16 if bits == 8 else torch.int8)
+    torch.bitwise_and(weight,(2 ** bits) - 1, out=weight)
+
+    return weight, scales, zeros
+
+def unpack_gptq_weight_3bits(qweight, scales, qzeros, q_config):
+    print("unpack_gptq_weight_3bits...   ", end='')
+    group_size = q_config['group_size']
+    bits = q_config['bits']
+    s32_bits = 32
+
+    assert bits == 3
+    # Int32 can only store 10 * 3bits data. This is the offset for each data.
+    wf = torch.tensor([[ i for i in range(0, s32_bits - bits, bits)]], dtype=torch.int32)
+    zeros = torch.bitwise_right_shift(torch.unsqueeze(qzeros, 2).expand(-1, -1, 32 // bits),
+                                      wf.unsqueeze(0)).to(torch.int16 if bits == 8 else torch.int8)
+    torch.bitwise_and(zeros, (2 ** bits) - 1, out=zeros)
+
+    zeros = zeros + 1
+    zeros = zeros.reshape(zeros.shape[0], -1)
+    zeros = zeros[:,:scales.shape[1]]
+
+    weight = torch.bitwise_right_shift(torch.unsqueeze(qweight, 1).expand(-1, 32 // bits, -1),
+                                       wf.unsqueeze(-1)).to(torch.int16 if bits == 8 else torch.int8)
+
+    weight = weight.reshape(-1, weight.shape[-1])
+    input_feature = group_size * scales.shape[0]
+    weight = weight[:input_feature,:]
+
     torch.bitwise_and(weight,(2 ** bits) - 1, out=weight)
 
     return weight, scales, zeros
@@ -254,7 +315,7 @@ def load_quantized_model(model_path):
     return model, config, config["quantization_config"]
 
 
-def convert_fp32_tensor(src_name, dst_name, model, fout):
+def convert_to_fp32_tensor(src_name, dst_name, model, fout):
     v = model[src_name]
     shape = v.shape
     # print("Processing non-Q4 variable: " + src_name +
@@ -293,7 +354,7 @@ def convert_q4_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2
     # gptq_scale = torch.cat([gptq_scale,gptq_scale,gptq_scale,gptq_scale], dim=1).view(-1,1)
     pack_tensor = torch.cat((gptq_scale.half().view(torch.int8), tensor), dim=-1)
     pack_tensor.numpy().tofile(fout)
-    print(f"converting {dst_name} qauntized tensor to ggml q4 block")
+    print(f"converting {dst_name} quantized tensor to ggml q4 block")
 
 def convert_q4_1_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2=0, permute_func=None):
     qzeros = model[f"{src_name}.qzeros"]
@@ -320,7 +381,7 @@ def convert_q4_1_tensor(src_name, dst_name, model, fout, q_config, n_head, n_hea
     gptq_zeros = -gptq_scale*gptq_zeros
     pack_tensor = torch.cat((gptq_scale.half().view(torch.int8), gptq_zeros.half().view(torch.int8), tensor), dim=-1)
     pack_tensor.numpy().tofile(fout)
-    print(f"converting {dst_name} qauntized tensor to ggml q4 1 block")
+    print(f"converting {dst_name} quantized tensor to ggml q4 1 block")
 
 
 def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
@@ -329,18 +390,18 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     qweight = model[f"{src_name}.qweight"]
 
     weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
-    # import pdb; pdb.set_trace()
     # weight = weight.reshape(weight.shape[0], weight.shape[1] * weight.shape[2])
     # num_itr = g_idx.shape[0]//x.shape[-1]
     if 'desc_act' in q_config and q_config['desc_act']:
         g_idx = model[f"{src_name}.g_idx"]
+        weight = weight.reshape(-1, weight.shape[-1])
         weight = (gptq_scales[g_idx.long()] * (weight - gptq_zeros[g_idx.long()]))
     else:
         infeatures = weight.shape[0]
         g_idx = torch.tensor([i // q_config["group_size"] for i in range(infeatures)], dtype=torch.int32)
         scale_zeros = gptq_zeros * gptq_scales
         weight = (gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()])
-    
+
     weight = weight.t()
     weight = weight.float()
     if permute_func:
@@ -350,67 +411,4 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     write_header(fout, shape, dst_name, 0)
     weight.numpy().tofile(fout)
 
-    print(f"converting {dst_name} qauntized tensor to fp32 tensor")
-
-
-def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
-    # unpack weight and repack into jblas format
-    import neural_speed.llama_cpp as cpp_model
-    qzeros = model[f"{src_name}.qzeros"]
-    zeros = qzeros_to_zeros(qzeros)
-    scales = model[f"{src_name}.scales"]
-    qweight = model[f"{src_name}.qweight"]
-
-    int_weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
-    int_weight = int_weight.view(-1,int_weight.shape[-1])
-
-    # permute_func for llama-like model
-    if permute_func:
-        int_weight = permute_func(int_weight.t(), n_head, n_head_kv).t().contiguous()
-        gptq_scales = permute_func(gptq_scales.t(), n_head, n_head_kv).t().contiguous()
-        gptq_zeros = permute_func(gptq_zeros.t(), n_head, n_head_kv).t().contiguous()
-
-    # shuffle weight in GPTQ when act order is on
-    if 'desc_act'in q_config and q_config['desc_act']:
-        g_idx = model[f"{src_name}.g_idx"]
-        int_weight2 = int_weight.clone()
-        group_size=q_config['group_size']
-        group_dict = {}
-        for i in range(len(g_idx)):
-            group_idx = g_idx[i].item()
-            if group_idx not in group_dict:
-                target_idx = group_idx * group_size
-                group_dict[group_idx] = 0
-            else:
-                group_dict[group_idx] = group_dict[group_idx] + 1
-                target_idx = group_idx * group_size + group_dict[group_idx]
-            int_weight2[target_idx] = int_weight[i]
-        int_weight = int_weight2
-
-    shape = int_weight.shape
-    write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
-
-    if q_config['bits'] == 4:
-        int_weight = (int_weight - 8) * 16
-        gptq_scales = gptq_scales / 16
-        gptq_zeros = (gptq_zeros - 8) * 16
-    dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
-    int_weight = np.ascontiguousarray(int_weight.numpy())
-    gptq_scales = np.ascontiguousarray((gptq_scales.float()).numpy())
-    if q_config['sym']:
-        gptq_zeros = np.empty(0, dtype=np.int8)
-    else:
-        gptq_zeros = np.ascontiguousarray(gptq_zeros.numpy())
-    if 'desc_act'in q_config and q_config['desc_act']:
-        g_idx = np.ascontiguousarray(g_idx.numpy())
-    else:
-        g_idx = np.empty(0, dtype=np.int32)
-
-    # pack int weight in bestla format
-    byte_size = cpp_model.Model.np_bestla_qpack(int_weight, gptq_scales, gptq_zeros, g_idx, dst,
-                                               weight_dtype="int4" if q_config['bits'] == 4 else "int8",
-                                               group_size=q_config['group_size'],
-                                               alg="sym" if q_config['sym'] else "asym",
-                                               compute_dtype="int8")
-    dst.flatten()[:byte_size].tofile(fout)
-    print(f"converting {dst_name} qauntized tensor to bestla q4 block")
+    print(f"converting {dst_name} quantized tensor to fp32 tensor")

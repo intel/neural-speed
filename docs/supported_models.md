@@ -44,6 +44,15 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>Latest</td>
   </tr>
+    <td><a href="https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0" target="_blank" rel="noopener noreferrer">Solar-10.7B</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>Latest</td>
+  </tr>
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
     <td>✅</td>
@@ -172,6 +181,18 @@ Neural Speed supports the following models:
     <td> </td>
     <td>Latest</td>
   </tr>
+  <tr>
+    <td><a href="https://huggingface.co/microsoft/phi-2" target="_blank" rel="noopener noreferrer">phi-2</a>,
+    <a href="https://huggingface.co/microsoft/phi-1_5" target="_blank" rel="noopener noreferrer">phi-1_5</a>
+    <a href="https://huggingface.co/microsoft/phi-1" target="_blank" rel="noopener noreferrer">phi-1</a></td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td>Latest</td>
+  </tr>
     <tr>
     <td><a href="https://huggingface.co/openai/whisper-tiny" target="_blank" rel="noopener noreferrer">Whisper-tiny</a>,
     <a href="https://huggingface.co/openai/whisper-base" target="_blank" rel="noopener noreferrer">Whisper-base</a>
@@ -272,6 +293,15 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td></td>
   </tr>
+  <tr>
+    <td><a href="https://huggingface.co/TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+    </tr>
     <tr>
     <td><a href="https://huggingface.co/codellama/CodeLlama-7b-hf" target="_blank" rel="noopener noreferrer">TheBloke/CodeLlama-7B-GGUF</a></td>
     <td>✅</td>
@@ -306,7 +336,14 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
   </tr>
-    </tr>
+   <tr>
+    <td><a href="https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0" target="_blank" rel="noopener noreferrer">upstage/SOLAR-10.7B-Instruct-v1.0</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
     <tr>
     <td><a href="https://huggingface.co/tiiuae/falcon-7b/tree/main" target="_blank" rel="noopener noreferrer">tiiuae/falcon-7</td>
     <td>✅</td>

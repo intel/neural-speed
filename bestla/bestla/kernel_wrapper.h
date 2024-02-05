@@ -826,6 +826,35 @@ class RemoveZeroPointBias {
   }
 };
 
+class LayerNormalization {
+ public:
+  template <BTLA_ISA ISA_T, typename T>
+  static inline BTLA_CODE forward(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                  T* dstptr, T* mean, T* mean_square, bool simplified) {
+    if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<T, float>) {
+      return avx512f::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
+    }
+    if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<T, float>) {
+      return avx2::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
+    }
+    return ref::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
+  }
+  template <typename T>
+  static inline BTLA_CODE forward_auto(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
+                                       T* dstptr, T* mean, T* mean_square, bool simplified) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                           simplified);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                        simplified);
+    }
+    return forward<BTLA_ISA::NoSIMD, T>(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square,
+                                        simplified);
+  }
+};
 }  // namespace wrapper
 }  // namespace kernel
 }  // namespace bestla

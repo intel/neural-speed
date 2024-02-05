@@ -30,7 +30,7 @@ def bytes_to_unicode():
     The reversible bpe codes work on unicode strings.
     This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
     When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
+    This is a significant percentage of your normal, say, 32K bpe vocab.
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
@@ -165,7 +165,8 @@ def baichuan13B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
-    vocab = load_vocab_for_baichuan(Path(dir_model))
+    tokenizer_path = Path(tokenizer.vocab_file).parent
+    vocab = load_vocab_for_baichuan(Path(tokenizer_path))
     counter = 0
     for text, score in vocab.all_tokens():
         fout.write(struct.pack("i", len(text)))
@@ -230,9 +231,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     dir_model = args.model.as_posix()
     fname_out = args.outfile.as_posix()
 
-    with open(dir_model + '/config.json', "r", encoding="utf-8") as f:
-        hparams = json.load(f)
-
     # possible data types
     #   ftype == 0 -> float32
     #   ftype == 1 -> float16
@@ -243,6 +241,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
+
+    hparams = config.to_dict()
 
     baichuan13B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
 

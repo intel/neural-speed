@@ -9,7 +9,7 @@ Argument description of run.py ([supported MatMul combinations](#supported-matri
 | --weight_dtype              | Data type of quantized weight: int4/int8/fp8(=fp8_e4m3)/fp8_e5m2/fp4(=fp4e2m1)/nf4 (default int4)                                                       |
 | --alg                       | Quantization algorithm: sym/asym (default sym)                                                                |
 | --group_size                | Group size: Int, 32/128/-1 (per channel) (default: 32)                                                                                 |
-| --scale_dtype               | Data type of scales: fp32/bf16/fp8 (dafault fp32)                                                                 |
+| --scale_dtype               | Data type of scales: fp32/bf16/fp8 (default fp32)                                                                 |
 | --compute_dtype             | Data type of Gemm computation: int8/bf16/fp16/fp32 (default: fp32)                                                 |
 | --use_ggml                  | Enable ggml for quantization and inference                                                                    |
 | -p / --prompt               | Prompt to start generation with: String (default: empty)                                                      |
@@ -44,7 +44,7 @@ python scripts/load_peft_and_merge.py --model_name_or_path meta-llama/Llama-2-7b
 # optimized INT4 model with group size 128 (recommended)
 python scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --compute_dtype int8
 
-# Alternativly you could run ggml q4_0 format like following
+# Alternatively you could run ggml q4_0 format like following
 python scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_0.bin --weight_dtype int4 --use_ggml
 # optimized INT4 model with group size 32
 python scripts/quantize.py --model_name llama2 --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 32 --compute_dtype int8
@@ -82,9 +82,8 @@ Our Neural Speed supports  INT4 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 wei
 
 ### 2. Inference
 
-We provide LLM inference script to run the quantized model. Please reach [us](mailto:itrex.maintainers@intel.com) if you want to run using C++ API directly.
 ```bash
-# recommed to use numactl to bind cores in Intel cpus for better performance
+# recommend to use numactl to bind cores in Intel cpus for better performance
 # if you use different core numbers, please also  change -t arg value
 # please type prompt about codes when run `StarCoder`, for example, -p "def fibonnaci(".
 
