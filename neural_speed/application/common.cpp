@@ -730,7 +730,16 @@ ne_ftype quant_params_to_ftype(const quant_params& params) {
       return NE_FTYPE_MOSTLY_Q8_0;
     }
   } else {
-    return NE_FTYPE_MOSTLY_Q_BTLA;
+    if (params.weight_dtype == "int4")
+      return NE_FTYPE_MOSTLY_Q4_J;
+    else if (params.weight_dtype == "int8")
+      return NE_FTYPE_MOSTLY_Q8_J;
+    else if (params.weight_dtype == "fp8" || params.weight_dtype == "fp8_e5m2")
+      return NE_FTYPE_MOSTLY_F8;
+    else if (params.weight_dtype == "fp4")
+      return NE_FTYPE_MOSTLY_F4;
+    else if (params.weight_dtype == "nf4")
+      return NE_FTYPE_MOSTLY_NF4;
   }
   return NE_FTYPE_UNKNOWN;
 }

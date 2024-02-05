@@ -31,6 +31,7 @@
 #include "core/data_types.h"
 #include "core/ne.h"
 #include "core/ne_layers.h"
+#include "core/ne_bestla.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
 
@@ -86,6 +87,13 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
+  if (hparams.ftype == NE_FTYPE_MOSTLY_NF4 && bestla_is_hybrid() && gf.n_threads > bestla_get_Pcore_number()) {
+    printf(
+        "WARNING: NF4 is poor at Ecore, only use P-core to inference. Not use the thread number according to settings. "
+        "New thread number is: %d\n.",
+        bestla_get_Pcore_number());
+    gf.n_threads = bestla_get_Pcore_number();
+  }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
   ne_set_name(embd, "embd");

@@ -128,6 +128,13 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
+  if (hparams.ftype == NE_FTYPE_MOSTLY_NF4 && bestla_is_hybrid() && gf.n_threads > bestla_get_Pcore_number()) {
+    printf(
+        "WARNING: NF4 is poor at Ecore, only use P-core to inference. Not use the thread number according to settings. "
+        "New thread number is: %d\n.",
+        bestla_get_Pcore_number());
+    gf.n_threads = bestla_get_Pcore_number();
+  }
 
   const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};

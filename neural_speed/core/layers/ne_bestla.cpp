@@ -16,6 +16,21 @@
 using namespace bestla;     // NOLINT
 using namespace ne_bestla;  // NOLINT
 
+bool bestla_is_hybrid() {
+  GetCPUDevice();
+  return _cd->isHybrid();
+}
+
+int bestla_get_Pcore_number() {
+  GetCPUDevice();
+  return _cd->getPcoreNum();
+}
+
+int bestla_get_Ecore_number() {
+  GetCPUDevice();
+  return _cd->getEcoreNum();
+}
+
 void bestla_init() {
   GetCPUDevice();
   if (_cd->AMX_BF16() || _cd->AMX_INT8()) {

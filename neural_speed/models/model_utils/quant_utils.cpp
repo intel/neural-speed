@@ -288,6 +288,8 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   }
   if (params.bits == quant_bits::nf4) {
     quant_type = BTLA_DTYPE::F4_NF4;
+    if (bestla_is_hybrid())
+      printf("Warning: Not recommend NF4 in client CPU. Please use Int4 to get better performance.\n");
   }
   if (params.bits == quant_bits::fp8_e4m3) {
     quant_type = BTLA_DTYPE::F8_E4M3;
@@ -476,7 +478,11 @@ bool model_quantize_special(std::ifstream& finp, std::ofstream& fout, const ne_f
     case NE_FTYPE_MOSTLY_Q4_0:
       qtype = NE_TYPE_Q4_0;
       break;
-    case NE_FTYPE_MOSTLY_Q_BTLA:
+    case NE_FTYPE_MOSTLY_Q4_J:
+    case NE_FTYPE_MOSTLY_Q8_J:
+    case NE_FTYPE_MOSTLY_F8:
+    case NE_FTYPE_MOSTLY_NF4:
+    case NE_FTYPE_MOSTLY_F4:
       qtype = NE_TYPE_BTLA;
       break;
     case NE_FTYPE_MOSTLY_F16: {

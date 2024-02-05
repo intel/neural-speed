@@ -22,6 +22,12 @@ void bestla_timer(bool _init);
 
 int bestla_set_threads(int _nth);
 
+bool bestla_is_hybrid();
+
+int bestla_get_Pcore_number();
+
+int bestla_get_Ecore_number();
+
 void* bestla_get_thread_handle();
 
 void bestla_init();
