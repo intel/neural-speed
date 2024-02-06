@@ -139,7 +139,7 @@ if (NS_BTLA_UT)
 endif()
 include(FindOpenMP)
 
-set(BTLA_USE_OPENMP ON)
+set(BTLA_USE_OPENMP ON CACHE BOOL "BesTLA use OpenMP" FORCE)
 add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)
