@@ -3037,7 +3037,7 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 
   ne_scratch_load(ctx);
 
-  /* what the diffrence of setting parameters in b->data and in op_parameters */
+  /* what the difference of setting parameters in b->data and in op_parameters */
   /* float and int are in different data ?? */
   float params[] = {freq_base, freq_scale, (float)yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow};
   ne_set_op_params(result, &params, sizeof(params));
