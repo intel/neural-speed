@@ -21,14 +21,12 @@ bool bestla_is_hybrid() {
   return _cd->isHybrid();
 }
 
-int bestla_get_Pcore_number() {
+int bestla_get_best_thread_number(bool is_support_Ecore) {
   GetCPUDevice();
-  return _cd->getPcoreNum();
-}
-
-int bestla_get_Ecore_number() {
-  GetCPUDevice();
-  return _cd->getEcoreNum();
+  if (_cd->isHybrid())
+    return is_support_Ecore ? _cd->getThreads() : _cd->getPcoreNum();
+  else
+    return _cd->getThreads();
 }
 
 void bestla_init() {

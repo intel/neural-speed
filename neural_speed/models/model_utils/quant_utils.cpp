@@ -285,6 +285,8 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   }
   if (params.bits == quant_bits::fp4_e2m1) {
     quant_type = BTLA_DTYPE::F4_E2M1;
+    if (bestla_is_hybrid())
+      printf("Warning: Not recommend FP4 in client CPU. Please use Int4 to get better performance.\n");
   }
   if (params.bits == quant_bits::nf4) {
     quant_type = BTLA_DTYPE::F4_NF4;
