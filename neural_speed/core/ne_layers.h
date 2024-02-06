@@ -405,20 +405,6 @@ NE_API struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne
                                                int mode, int prompt_size, int n_keep, struct ne_tensor* cossin,
                                                float freq_base, float freq_scale);
 
-// in-place, returns view(a)
-NE_API struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
-                                                int mode, int prompt_size, float freq_base, float freq_scale,
-                                                int yarn_orig_ctx, float ext_factor, float attn_factor, float beta_fast,
-                                                float beta_slow);
-
-// shift all tokens by a give p (n_shift)
-// Optionally give a 1d tensor of precomputed interleaved cos/sin value of n_shift*scale^k for k \in [0, n_dims)
-NE_API struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift,
-                                                      int n_dims, int mode, int prompt_size, int n_keep,
-                                                      struct ne_tensor* cossin, float freq_base, float freq_scale,
-                                                      int yarn_orig_ctx, float ext_factor, float attn_factor,
-                                                      float beta_fast, float beta_slow);
-
 // rotary position embedding backward, i.e compute dx from dy
 // a - dy
 NE_API struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode);
