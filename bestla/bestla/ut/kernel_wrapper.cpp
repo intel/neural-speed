@@ -201,14 +201,16 @@ class UT_LayerNormalization {
  public:
   UT_LayerNormalization() {
     UT_START();
-    ut<float, BTLA_ISA::AVX512F>(4096, false, true, true);
-    ut<float, BTLA_ISA::AVX512F>(4096, false, false, false);
-    ut<float, BTLA_ISA::AVX512F>(111, false, true, true);
-    ut<float, BTLA_ISA::AVX512F>(111, true, true, true);
+    CheckISA(AVX2);
     ut<float, BTLA_ISA::AVX2>(4096, false, true, true);
     ut<float, BTLA_ISA::AVX2>(4096, false, false, false);
     ut<float, BTLA_ISA::AVX2>(111, false, true, true);
     ut<float, BTLA_ISA::AVX2>(111, true, true, true);
+    CheckISA(AVX512F);
+    ut<float, BTLA_ISA::AVX512F>(4096, false, true, true);
+    ut<float, BTLA_ISA::AVX512F>(4096, false, false, false);
+    ut<float, BTLA_ISA::AVX512F>(111, false, true, true);
+    ut<float, BTLA_ISA::AVX512F>(111, true, true, true);
   }
   template <typename T, BTLA_ISA ISA>
   void ut(int norm_size, bool simplified, bool hasscale, bool hasbias) {
