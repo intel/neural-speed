@@ -85,14 +85,34 @@ struct attn_fwd_args_t {
 struct mha_problem_t {
   int batch_size, head_num, heads_kv, head_size, sl_q, sl_kv;
 };
-
-inline __m512 poly_scale_2nd_ps(const __m512 z, const __m512 f, const __m512 c0, const __m512 c1, const __m512 c2) {
+template <typename X_T, typename Z_T = X_T>
+inline X_T poly_scale_2nd_ps(const Z_T z, const X_T f, const X_T c0, const X_T c1, const X_T c2);
+template <>
+inline __m512 poly_scale_2nd_ps<__m512, __m512>(const __m512 z, const __m512 f, const __m512 c0, const __m512 c1,
+                                                const __m512 c2) {
   const auto y = _mm512_fmadd_ps(_mm512_fmadd_ps(f, c0, c1), f, c2);  // auto y = (f * c0 + c1) * f + c2;
   const auto exp = _mm512_scalef_ps(y, z);
   return exp;
 }
+template <>
+inline __m256 poly_scale_2nd_ps<__m256, __m256i>(const __m256i z, const __m256 f, const __m256 c0, const __m256 c1,
+                                                 const __m256 c2) {
+  const auto y = _mm256_fmadd_ps(_mm256_fmadd_ps(f, c0, c1), f, c2);  // auto y = (f * c0 + c1) * f + c2;
+  static const auto mask_exp = _mm256_set1_epi32(0x7f800000);
+  static const auto mask_not_exp = _mm256_set1_epi32(~0x7f800000);
 
-inline __m512 exp_ps_0_1(const __m512 x) {
+  const auto y_exp = _mm256_and_si256(_mm256_castps_si256(y), mask_exp);
+  const auto y_not_exp = _mm256_and_si256(_mm256_castps_si256(y), mask_not_exp);
+
+  const auto y_exp_scaled = _mm256_add_epi32(y_exp, _mm256_slli_epi32(z, 23));
+  return _mm256_castsi256_ps(_mm256_or_epi32(y_not_exp, _mm256_and_si256(y_exp_scaled, mask_exp)));
+}
+
+template <typename X_T>
+inline X_T exp_ps_0_1(const X_T x);
+
+template <>
+inline __m512 exp_ps_0_1<__m512>(const __m512 x) {
   static const auto c0 = _mm512_set1_ps(0.240226507f);
   static const auto c1 = _mm512_set1_ps(0.452920674f);
   static const auto c2 = _mm512_set1_ps(0.713483036f);
@@ -105,6 +125,21 @@ inline __m512 exp_ps_0_1(const __m512 x) {
   const auto f = _mm512_sub_ps(x1, z);  // auto f = x1 - z;
 
   return poly_scale_2nd_ps(z, f, c0, c1, c2);
+}
+template <>
+inline __m256 exp_ps_0_1<__m256>(const __m256 x) {
+  static const auto c0 = _mm256_set1_ps(0.240226507f);
+  static const auto c1 = _mm256_set1_ps(0.452920674f);
+  static const auto c2 = _mm256_set1_ps(0.713483036f);
+  static const float v_log2e = std::log2(std::exp(1.f));
+  static const auto log2e = _mm256_set1_ps(v_log2e);
+  static const auto half = _mm256_set1_ps(.5f);
+
+  const auto x1 = _mm256_fmadd_ps(x, log2e, half);  // auto x1 = x * log2e + _mm256_set1_ps(.5f);
+  const auto z = _mm256_floor_ps(x1);
+  const auto f = _mm256_sub_ps(x1, z);  // auto f = x1 - z;
+
+  return poly_scale_2nd_ps(_mm256_cvtps_epi32(z), f, c0, c1, c2);
 }
 
 inline float mha_exp_ref(float x) {
@@ -143,6 +178,80 @@ inline __m512 exp_ph_0_1(const __m512 x) {
 
   return exp_2nd_ph(z, f, c0, c1, c2);
 }
+#endif
+
+alignas(32) static const uint32_t mask8[9][8]{
+    {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+    {0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+    {0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+    {0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+    {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+    {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000},
+    {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000},
+    {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000},
+    {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff},
+};
+
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
+#endif
+// Interleave 8 xmm vectors of words inplace
+static inline std::array<__m128i, 8> tr_x8_word(std::array<__m128i, 8>& src) {  // NOLINT [runtime/references]
+  std::array<__m128i, 8> dst;
+
+  for (int i = 0; i < 8; i += 2) {
+    dst[i + 0] = _mm_unpacklo_epi16(src[i + 0], src[i + 1]);
+    dst[i + 1] = _mm_unpackhi_epi16(src[i + 0], src[i + 1]);
+  }
+  for (int i = 0; i < 8; i += 4) {
+    src[i + 0] = _mm_unpacklo_epi32(dst[i + 0], dst[i + 2]);
+    src[i + 1] = _mm_unpackhi_epi32(dst[i + 0], dst[i + 2]);
+    src[i + 2] = _mm_unpacklo_epi32(dst[i + 1], dst[i + 3]);
+    src[i + 3] = _mm_unpackhi_epi32(dst[i + 1], dst[i + 3]);
+  }
+  dst[0] = _mm_unpacklo_epi64(src[0], src[4]);
+  dst[1] = _mm_unpackhi_epi64(src[0], src[4]);
+  dst[2] = _mm_unpacklo_epi64(src[1], src[5]);
+  dst[3] = _mm_unpackhi_epi64(src[1], src[5]);
+  dst[4] = _mm_unpacklo_epi64(src[2], src[6]);
+  dst[5] = _mm_unpackhi_epi64(src[2], src[6]);
+  dst[6] = _mm_unpacklo_epi64(src[3], src[7]);
+  dst[7] = _mm_unpackhi_epi64(src[3], src[7]);
+  return dst;
+}
+
+template <int tail>
+static inline std::array<__m128i, 8> load_fp32_fp16_tr_x8_word(const float* a, size_t lda) {
+  static_assert(tail > 0 && tail <= 8, "Unexpected tail value.");
+  std::array<__m128i, 8> dst;
+  for (int i = 0; i < tail; ++i) {
+    dst[i] = _mm256_cvtps_ph(_mm256_loadu_ps(a + i * lda), _MM_FROUND_TO_NEAREST_INT);
+  }
+  for (int i = tail; i < 8; ++i) dst[i] = _mm_setzero_si128();
+  return tr_x8_word(dst);
+}
+static constexpr decltype(load_fp32_fp16_tr_x8_word<1>)* load_fp32_fp16_tr_x8_word_tbl[9]{
+    load_fp32_fp16_tr_x8_word<1>, load_fp32_fp16_tr_x8_word<1>, load_fp32_fp16_tr_x8_word<2>,
+    load_fp32_fp16_tr_x8_word<3>, load_fp32_fp16_tr_x8_word<4>, load_fp32_fp16_tr_x8_word<5>,
+    load_fp32_fp16_tr_x8_word<6>, load_fp32_fp16_tr_x8_word<7>, load_fp32_fp16_tr_x8_word<8>};
+
+template <int tail>
+static inline std::array<__m128i, 8> load_maskz_fp32_fp16_tr_x8_word(const float* a, size_t lda, __m256i mask) {
+  static_assert(tail > 0 && tail <= 8, "Unexpected tail value.");
+  std::array<__m128i, 8> dst;
+  for (int i = 0; i < tail; ++i) {
+    dst[i] = _mm256_cvtps_ph(_mm256_maskload_ps(a + i * lda, mask), _MM_FROUND_TO_NEAREST_INT);
+  }
+  for (int i = tail; i < 8; ++i) dst[i] = _mm_setzero_si128();
+  return tr_x8_word(dst);
+}
+static constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_x8_word_tbl[9]{
+    load_maskz_fp32_fp16_tr_x8_word<1>, load_maskz_fp32_fp16_tr_x8_word<1>, load_maskz_fp32_fp16_tr_x8_word<2>,
+    load_maskz_fp32_fp16_tr_x8_word<3>, load_maskz_fp32_fp16_tr_x8_word<4>, load_maskz_fp32_fp16_tr_x8_word<5>,
+    load_maskz_fp32_fp16_tr_x8_word<6>, load_maskz_fp32_fp16_tr_x8_word<7>, load_maskz_fp32_fp16_tr_x8_word<8>};
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
 #endif
 
 /**
@@ -943,58 +1052,98 @@ class scale_track_max_t<ISA_T, float, float> {
                      const int N, const Param& p) const {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
-#if CompileAVX512F()
 #if MHA_2ND_EXP
-    const auto v_scale = _mm512_set1_ps(p.scale);
-    const auto v_seq15 = _mm512_loadu_ps(seq15);
-    const auto alibi_slope = _mm512_set1_ps(p.alibi_slope);
-    const auto alibi_base = _mm512_mul_ps(alibi_slope, _mm512_add_ps(v_seq15, _mm512_set1_ps(N_offset)));
-    const auto alibi_step = _mm512_set1_ps(p.alibi_slope * 16);
+#if CompileAVX512F()
+    if constexpr (ISA_T >= BTLA_ISA::AVX512F) {
+      const auto v_scale = _mm512_set1_ps(p.scale);
+      const auto v_seq15 = _mm512_loadu_ps(seq15);
+      const auto alibi_slope = _mm512_set1_ps(p.alibi_slope);
+      const auto alibi_base = _mm512_mul_ps(alibi_slope, _mm512_add_ps(v_seq15, _mm512_set1_ps(N_offset)));
+      const auto alibi_step = _mm512_set1_ps(p.alibi_slope * 16);
 
-    for (int i = 0; i < M; ++i) {
-      auto alibi_curr = alibi_base;
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
+      for (int i = 0; i < M; ++i) {
+        auto alibi_curr = alibi_base;
+        const auto N_unmasked =
+            std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
 
-      const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
-      int j = 0;
-      auto v_max = _mm512_set1_ps(-INFINITY);
-      for (; j < N_unmasked - 15; j += 16) {
-        const auto xs = _mm512_fmadd_ps(v_scale, _mm512_loadu_ps(src + i * src_step + j), alibi_curr);
-        v_max = _mm512_max_ps(v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI) alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+        const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
+        int j = 0;
+        auto v_max = _mm512_set1_ps(-INFINITY);
+        for (; j < N_unmasked - 15; j += 16) {
+          const auto xs = _mm512_fmadd_ps(v_scale, _mm512_loadu_ps(src + i * src_step + j), alibi_curr);
+          v_max = _mm512_max_ps(v_max, xs);
+          _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
+          if constexpr (HAS_ALIBI) alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+        }
+        if (j < N_unmasked) {
+          const auto xs = _mm512_fmadd_ps(v_scale, _mm512_maskz_loadu_ps(v_mask, src + i * src_step + j), alibi_curr);
+          v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
+          _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
+          if constexpr (HAS_ALIBI) alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+          j += 16;
+        }
+        dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
+
+        // if (j < utils::padto(N, 64))
+        //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
       }
-      if (j < N_unmasked) {
-        const auto xs = _mm512_fmadd_ps(v_scale, _mm512_maskz_loadu_ps(v_mask, src + i * src_step + j), alibi_curr);
-        v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI) alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
-        j += 16;
-      }
-      dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
-
-      // if (j < utils::padto(N, 64))
-      //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
+      return BTLA_CODE::Success;
     }
-#else
+#endif
+#if CompileAVX2()
+    if constexpr (ISA_T >= BTLA_ISA::AVX2) {
+      const auto v_scale = _mm256_set1_ps(p.scale);
+      const auto v_seq7 = _mm256_loadu_ps(seq15);
+      const auto alibi_slope = _mm256_set1_ps(p.alibi_slope);
+      const auto alibi_base = _mm256_mul_ps(alibi_slope, _mm256_add_ps(v_seq7, _mm256_set1_ps(N_offset)));
+      const auto alibi_step = _mm256_set1_ps(p.alibi_slope * 8);
+      const auto infinity_neg = _mm256_set1_ps(-INFINITY);
+      for (int i = 0; i < M; ++i) {
+        auto alibi_curr = alibi_base;
+        const auto N_unmasked =
+            std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
+
+        const auto v_mask = _mm256_load_si256(reinterpret_cast<const __m256i*>(mask8[N_unmasked % 8]));
+        int j = 0;
+        auto v_max = infinity_neg;
+        for (; j < N_unmasked - 7; j += 8) {
+          const auto xs = _mm256_fmadd_ps(v_scale, _mm256_loadu_ps(src + i * src_step + j), alibi_curr);
+          v_max = _mm256_max_ps(v_max, xs);
+          _mm256_storeu_ps(dst + i * p.ld_dst + j, xs);
+          if constexpr (HAS_ALIBI) alibi_curr = _mm256_add_ps(alibi_curr, alibi_step);
+        }
+        if (j < N_unmasked) {
+          const auto xs = _mm256_fmadd_ps(v_scale, _mm256_maskload_ps(src + i * src_step + j, v_mask), alibi_curr);
+          const auto masked_xs = _mm256_blendv_ps(infinity_neg, xs, _mm256_castsi256_ps(v_mask));
+          v_max = _mm256_max_ps(v_max, masked_xs);
+          _mm256_storeu_ps(dst + i * p.ld_dst + j, xs);
+          if constexpr (HAS_ALIBI) alibi_curr = _mm256_add_ps(alibi_curr, alibi_step);
+          j += 8;
+        }
+        alignas(32) float dst_tmp[8];
+        _mm256_store_ps(dst_tmp, v_max);
+        for (int ii = 0; ii < 8; ++ii) dst_max[i] = std::max(dst_max[i], dst_tmp[ii]);
+        // if (j < bestla::utils::padto(N, 64))
+        //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (bestla::utils::padto(N, 64) - j));
+      }
+      return BTLA_CODE::Success;
+    }
+#endif
+#endif
+
+    // reference
     for (int i = 0; i < M; ++i) {
       const auto N_unmasked =
           std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
       for (int j = 0; j < N_unmasked; ++j) {
         const auto val_ = src[i * src_step + j] * p.scale;
-        dst[i * p.ld_dst + j] = static_cast<T_DST>();
+        dst[i * p.ld_dst + j] = static_cast<DType>(val_);
         dst_max[i] = std::max(dst_max[i], val_);
       }
       if (N_unmasked < utils::padto(N, 64))
         memset(dst + i * p.ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
     }
-#endif
-
     return BTLA_CODE::Success;
-#else
-    return BTLA_CODE::NotSupport;
-#endif
   }
 };
 template <BTLA_ISA ISA_T>
@@ -1147,7 +1296,58 @@ class weight_cvt_bf16_ntile48_t {
   }
 };
 #endif
-template <class SRC_T, class DST_T>
+
+#if CompileAVX2()
+template <class _GemmCore_T, BTLA_ISA ISA_T>
+class WeightCvtF16NTile24 {  // convert fp16 weight to fp32 using F16C
+ public:
+  using BType = typename _GemmCore_T::BType;
+  using SType = fp16;
+  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
+    const SType* B;
+    int ldb;
+    bool is_padded;
+  };
+  WeightCvtF16NTile24() {}
+  BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
+                      int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+    assert(p.is_padded);
+    const auto src = const_cast<SType*>(p.B) + k_offset * 24 + n_offset * p.ldb;
+    const auto dst = *dst_ptr;
+    *dst_step = _GemmCore_T::NTILE;
+    if constexpr (std::is_same_v<BType, float> && std::is_same_v<SType, utils::fp16>) {
+      assert(n_size <= _GemmCore_T::NTILE);
+      assert(n_size <= 24);
+      assert(n_offset % 24 == 0);
+      if (n_size == 24) {
+        constexpr auto n_size = 24;
+        for (int i = 0; i < k_size; ++i) {
+          for (int j = 0; j < n_size; j += 8) {
+            const auto cur_src = src + i * 24 + j;
+            const auto cur_dst = dst + i * 24 + j;
+            const auto src = _mm256_cvtph_ps(_mm_loadu_si128(reinterpret_cast<const __m128i*>(cur_src)));
+            _mm256_store_ps(cur_dst, src);
+          }
+        }
+      } else {
+        for (int i = 0; i < k_size; ++i) {
+          for (int j = 0; j < n_size; j += 8) {
+            const auto cur_src = src + i * 24 + j;
+            const auto cur_dst = dst + i * 24 + j;
+            const auto src = _mm256_cvtph_ps(_mm_loadu_si128(reinterpret_cast<const __m128i*>(cur_src)));
+            _mm256_store_ps(cur_dst, src);
+          }
+        }
+      }
+
+    } else {
+      assert(0);
+    }
+    return BTLA_CODE::Success;
+  }
+};
+#endif
+template <class SRC_T, class DST_T, BTLA_ISA ISA_T>
 struct inplace_precompute_max_softmax_t {
   // nsize is the staring n-size when causal mask enabled
   // src and dst cam be on the same address if sizeof(SRC_T) >= sizeof(DST_T) and ld is correctly set
@@ -1158,8 +1358,8 @@ struct inplace_precompute_max_softmax_t {
   }
 };
 #if CompileFP16()
-template <>
-struct inplace_precompute_max_softmax_t<float, fp16> {
+template <BTLA_ISA ISA_T>
+struct inplace_precompute_max_softmax_t<float, fp16, ISA_T> {
   static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, fp16* dst, const float* s_max,
                       float* expsum, int ld_src, int ld_dst) {
     for (int ii = 0; ii < m_size; ++ii) {
@@ -1208,8 +1408,8 @@ struct inplace_precompute_max_softmax_t<float, fp16> {
 #endif
 
 #if CompileBF16()
-template <>
-struct inplace_precompute_max_softmax_t<float, bf16> {
+template <BTLA_ISA ISA_T>
+struct inplace_precompute_max_softmax_t<float, bf16, ISA_T> {
   static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, bf16* dst, const float* s_max,
                       float* expsum, int ld_src, int ld_dst) {
     for (int ii = 0; ii < m_size; ++ii) {
@@ -1267,8 +1467,8 @@ struct inplace_precompute_max_softmax_t<float, bf16> {
 #endif
 
 #if CompileAVX512F()
-template <>
-struct inplace_precompute_max_softmax_t<float, float> {
+template <BTLA_ISA ISA_T>
+struct inplace_precompute_max_softmax_t<std::enable_if_t<ISA_T >= BTLA_ISA::AVX512F, float>, float, ISA_T> {
   static void forward(  // NOLINT [build/include_what_you_use]
       int m_size, int n_size, int n_pad_size, bool is_causal, float* src, float* dst, const float* s_max, float* expsum,
       int ld_src, int ld_dst) {
@@ -1315,8 +1515,62 @@ struct inplace_precompute_max_softmax_t<float, float> {
 };
 #endif
 
-template <>
-struct inplace_precompute_max_softmax_t<float, uint8_t> {
+#if CompileAVX2()
+template <BTLA_ISA ISA_T>
+struct inplace_precompute_max_softmax_t<std::enable_if_t<(ISA_T < BTLA_ISA::AVX512F && ISA_T >= BTLA_ISA::AVX2), float>,
+                                        float, ISA_T> {
+  static void forward(  // NOLINT [build/include_what_you_use]
+      int m_size, int n_size, int n_pad_size, bool is_causal, float* src, float* dst, const float* s_max, float* expsum,
+      int ld_src, int ld_dst) {
+    for (int ii = 0; ii < m_size; ++ii) {
+      const auto i_src = src + ii * ld_src;
+      const auto i_dst = dst + ii * ld_dst;
+      const auto curr_n_size = n_size + (is_causal ? ii : 0);
+      const auto v_mask = _mm256_load_si256(reinterpret_cast<const __m256i*>(mask8[curr_n_size % 8]));
+      {  // subtract max
+        const auto row_max = _mm256_set1_ps(s_max[ii]);
+        for (int jj = 0; jj < curr_n_size; jj += 8) {  // should be fine to do extra work on idx >= curr_n_size
+          _mm256_storeu_ps(i_src + jj, _mm256_sub_ps(_mm256_loadu_ps(i_src + jj), row_max));
+        }
+      }
+      auto v_sum = _mm256_setzero_ps();
+      {  // exp & sum
+        int jj = 0;
+        for (; jj < padto_le(curr_n_size, 8); jj += 8) {
+          const auto v_exp = exp_ps_0_1(_mm256_loadu_ps(i_src + jj));
+          v_sum = _mm256_add_ps(v_sum, v_exp);
+          _mm256_storeu_ps(i_src + jj, v_exp);
+        }
+        if (jj < curr_n_size) {
+          const auto v_exp = exp_ps_0_1(_mm256_loadu_ps(i_src + jj));  // should be fine to load some extra
+          v_sum = _mm256_add_ps(v_sum, _mm256_and_ps(v_exp, _mm256_castsi256_ps(v_mask)));
+          _mm256_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
+        }
+
+        alignas(32) float sum_tmp[8];
+        _mm256_store_ps(sum_tmp, v_sum);
+        expsum[ii] = 0.f;
+        for (int iii = 0; iii < 8; ++iii) expsum[ii] += sum_tmp[iii];
+        v_sum = _mm256_set1_ps(expsum[ii]);
+      }
+      {  // scale & store
+        int jj = 0;
+        for (; jj < padto_le(curr_n_size, 8); jj += 8) {
+          _mm256_store_ps(i_dst + jj, _mm256_div_ps(_mm256_loadu_ps(i_src + jj), v_sum));
+        }
+        if (jj < curr_n_size) {
+          const auto quotient = _mm256_div_ps(_mm256_loadu_ps(i_src + jj), v_sum);
+          _mm256_store_ps(i_dst + jj, _mm256_and_ps(quotient, _mm256_castsi256_ps(v_mask)));
+          jj += 8;
+        }
+        if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(float) * (n_pad_size - jj));
+      }
+    }
+  }
+};
+#endif
+template <BTLA_ISA ISA_T>
+struct inplace_precompute_max_softmax_t<float, uint8_t, ISA_T> {
   static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, uint8_t* dst, float* s_max,
                       float* expsum, int ld_src, int ld_dst) {
     for (int ii = 0; ii < m_size; ++ii) {
@@ -1404,6 +1658,8 @@ class mha_stable_interface_t {
   using V_T = typename PrologueV::SType;
   using DST_T = typename L_Scale::Epilogue::DType;
 
+  static constexpr auto RT_ISA = std::max(L_Max::RT_ISA, L_Scale::RT_ISA);
+
   static_assert(GemmQK::MTILE == GemmPV::MTILE, "2 GEMM should have the same M_TILE.");
   static constexpr auto M_TILE = GemmQK::MTILE;
 
@@ -1416,10 +1672,12 @@ class mha_stable_interface_t {
     assert((p.Q_layout == ATTN_FWD_LAYOUT_PLAIN && p.dst_layout == ATTN_FWD_LAYOUT_PLAIN));
     assert((p.K_layout == ATTN_FWD_LAYOUT_PLAIN ||
             (std::is_same<K_T, int8_t>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4) ||
-            (std::is_same<K_T, bf16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2)));
+            (std::is_same<K_T, bf16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2) ||
+            (std::is_same<K_T, fp16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1)));
     assert((p.V_layout == ATTN_FWD_LAYOUT_PLAIN ||
             (std::is_same<V_T, int8_t>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4) ||
-            (std::is_same<V_T, bf16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2)));
+            (std::is_same<V_T, bf16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2) ||
+            (std::is_same<V_T, fp16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1)));
 
     assert((!std::is_same<PrologueK, ::weight_forward_n_tile48_t<typename L_Max::GemmCore, L_Max::RT_ISA>>::value) ||
            p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ||
@@ -1517,6 +1775,7 @@ class mha_stable_interface_t {
           const auto qk_prok_ldb = p.step_k_sl == 1                                 ? p.step_k_head_size
                                    : p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ? p.step_k_sl
                                    : p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? p.step_k_sl
+                                   : p.K_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? p.step_k_sl
                                                                                     : (assert(0), 0);
 
           typename parallel::gemm::ThreadProblemBase tpQK{
@@ -1561,7 +1820,7 @@ class mha_stable_interface_t {
           const auto unmasked_size_start = is_causal ? std::min(sl_diff + i_m + 1, p.sl_kv) : p.sl_kv;
           float expsum[M_TILE]{};  // maximum for each row of the S matrix
           const auto softmax_npad_size = padto(unmasked_size_pad_pv, GemmPV::KTILE);
-          inplace_precompute_max_softmax_t<float, PType>::forward(          //
+          inplace_precompute_max_softmax_t<float, PType, RT_ISA>::forward(  //
               m_size, unmasked_size_start, softmax_npad_size,               // m / n
               is_causal, tmp_s, tmp_p, s_max, expsum, ld_tmp_s, ld_tmp_p);  //
 
@@ -1571,6 +1830,7 @@ class mha_stable_interface_t {
           const auto pv_prov_ldb = p.step_v_head_size == 1                          ? p.step_v_sl
                                    : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ? p.step_v_head_size
                                    : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? p.step_v_head_size
+                                   : p.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? p.step_v_head_size
                                                                                     : (assert(0), 0);
 
           typename parallel::gemm::ThreadProblemBase tpPV{
@@ -1696,6 +1956,24 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
       [[maybe_unused]] const auto ret = kernel.compute(params, *pth);
       assert(ret == BTLA_CODE::Success);
     }
+  } else if (_cd->AVX2() &&  //
+             params.K_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 &&
+             params.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1) {
+    using GemmKernelTrackMax = ::launcher_base_weight_t<  //
+        BTLA_ISA::AVX2,                                   //
+        gemm::SCoreRowNAvx2<24, 4>,                       //
+        prologue_a::gemm::ActivationBase,                 //
+        ::WeightCvtF16NTile24,                            //
+        ::ScaleTrackMaxFp32Fp32>;                         //
+    using GemmKernelId = ::launcher_base_weight_t<        //
+        BTLA_ISA::AVX2,                                   //
+        gemm::SCoreRowNAvx2<24, 4>,                       //
+        ::activation_identity_t,                          // pretty sure we have enough paddings for P-matrix
+        ::WeightCvtF16NTile24,                            //
+        epilogue::gemm::AccumulatorWriteBackFp32>;        //
+    static mha_stable_interface_t<GemmKernelTrackMax, GemmKernelId> mha;
+    [[maybe_unused]] const auto ret = mha.compute(params, *pth);
+    assert(ret == BTLA_CODE::Success);
   } else {
     assert(false);  // no suitbale launcher
   }
@@ -1773,7 +2051,7 @@ template <>
 void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<float, bf16, bf16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
-  if ((params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) {
+  if (_cd->AVX512F() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) {
     using GemmKernelBF16TrackMax = ::launcher_base_weight_t<  //
         BTLA_ISA::AMX_BF16,                                   //
         gemm::SCoreRowNAvx512f<48, 8>,                        //
@@ -1839,16 +2117,20 @@ void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>&
   assert(p.dst_layout == ATTN_FWD_LAYOUT_PLAIN);
   assert((p.K_layout == ATTN_FWD_LAYOUT_PLAIN ||
           (std::is_same<K_T, int8_t>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4) ||
-          (std::is_same<K_T, bf16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2)));
+          (std::is_same<K_T, bf16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2) ||
+          (std::is_same<K_T, fp16>::value && p.K_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1)));
   assert((p.V_layout == ATTN_FWD_LAYOUT_PLAIN ||
           (std::is_same<V_T, int8_t>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4) ||
-          (std::is_same<V_T, bf16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2)));
+          (std::is_same<V_T, bf16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2) ||
+          (std::is_same<V_T, fp16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1)));
 
   const auto NTILE = p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 48
                      : p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 48
+                     : p.K_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 24
                                                                       : 0;
   const auto ROWPACK = p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 4
                        : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 2
+                       : p.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 1
                                                                         : 0;
   // TP will need the real rank order of k
   int32_t k_offset = 0;
@@ -1991,39 +2273,62 @@ size_t bestla_fusion_attn_workspace_size(const attn_shape_t* params) {
 }
 
 bool bestla_reordered_attn_fp32_support(const attn_shape_t* params) {
-#if CompileBF16()
   GetCPUDevice();
+#if CompileBF16()
   // TODO(Yi): check K V's layout
   return _cd->AMX_BF16();
 #endif
-  return false;
+  return _cd->AVX512F() || _cd->AVX2();  // use avx2 and f16c on avx2 platforms
 }
 // kv cache sizes in bytes per layer per batch per beam for;
 void bestla_reordered_attn_fp32_batch_kv_info(const kv_shape_t* params, kv_cache_info_t* out) {
+  GetCPUDevice();
   // use bf16 for kv-cache
   const auto p = *params;
-  out->k_layout = ATTN_FWD_LAYOUT_NTILE48_ROWPACK2;
-  out->v_layout = ATTN_FWD_LAYOUT_NTILE48_ROWPACK2;
+  int n_tile = 0, row_pad = 0, elt_size = 0;
+  if (_cd->AVX512F()) {
+    out->k_layout = ATTN_FWD_LAYOUT_NTILE48_ROWPACK2;
+    out->v_layout = ATTN_FWD_LAYOUT_NTILE48_ROWPACK2;
+    n_tile = 48;
+    row_pad = 32;
+    elt_size = sizeof(bf16);
+  } else if (_cd->AVX2()) {
+    out->k_layout = ATTN_FWD_LAYOUT_NTILE24_ROWPACK1;
+    out->v_layout = ATTN_FWD_LAYOUT_NTILE24_ROWPACK1;
+    n_tile = 24;
+    row_pad = 1;
+    elt_size = sizeof(fp16);
+  } else {
+    assert(false);
+  }
 
-  out->stride_k_head_size = sizeof(bf16) * 48;
-  out->stride_k_sl = sizeof(bf16) * padto(static_cast<int>(p.head_size), 32);
-  out->stride_k_head_num = out->stride_k_sl * padto(static_cast<int>(p.sl_kv_max), 48);
+  out->stride_k_head_size = elt_size * n_tile;
+  out->stride_k_sl = elt_size * padto(static_cast<int>(p.head_size), row_pad);
+  out->stride_k_head_num = out->stride_k_sl * padto(static_cast<int>(p.sl_kv_max), n_tile);
   out->k_bytes = out->stride_k_head_num * static_cast<size_t>(p.heads_kv);
 
-  out->stride_v_sl = sizeof(bf16) * 48;
-  out->stride_v_head_size = sizeof(bf16) * padto(static_cast<int>(p.sl_kv_max), 32);
-  out->stride_v_head_num = out->stride_v_head_size * padto(static_cast<int>(p.head_size), 48);
+  out->stride_v_sl = elt_size * n_tile;
+  out->stride_v_head_size = elt_size * padto(static_cast<int>(p.sl_kv_max), row_pad);
+  out->stride_v_head_num = out->stride_v_head_size * padto(static_cast<int>(p.head_size), n_tile);
   out->v_bytes = out->stride_v_head_num * static_cast<size_t>(p.heads_kv);
 }
+template <ATTN_FWD_LAYOUT KV_LAYOUT>
+void bestla_reordered_attn_fp32_forward_(const bestla_reordered_attn_fp32_fp32_fwd_args_t* params) {
+  using kv_t = std::conditional_t<  //
+      KV_LAYOUT == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2, bf16,
+      std::conditional_t<  //
+          KV_LAYOUT == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4, int8_t,
+          std::conditional_t<  //
+              KV_LAYOUT == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1, fp16, void>>>;
+  const auto n_tile = KV_LAYOUT == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2   ? 48
+                      : KV_LAYOUT == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ? 48
+                      : KV_LAYOUT == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 24
+                                                                      : 1;
 
-void bestla_reordered_attn_fp32_forward(const bestla_reordered_attn_fp32_fp32_fwd_args_t* params) {
-  assert(params->K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);
-  assert(params->V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);
-
-  const attn_fwd_args_t<float, bf16, bf16, float> bestla_params = {
+  const attn_fwd_args_t<float, kv_t, kv_t, float> bestla_params = {
       /* .Q = */ params->Q,
-      /* .K = */ reinterpret_cast<bf16*>(params->K),
-      /* .V = */ reinterpret_cast<bf16*>(params->V),
+      /* .K = */ reinterpret_cast<kv_t*>(params->K),
+      /* .V = */ reinterpret_cast<kv_t*>(params->V),
       /* .dst = */ params->dst,
       /* .Q_sc = */ params->Q_sc,
       /* .K_sc = */ params->K_sc,
@@ -2045,23 +2350,38 @@ void bestla_reordered_attn_fp32_forward(const bestla_reordered_attn_fp32_fp32_fw
       /* .step_q_bs = */ params->step_q_bs,
       /* .step_q_head_num = */ params->step_q_head_num,
       /* .step_q_sl = */ params->step_q_sl,
-      /* .step_k_bs = */ static_cast<int>(params->stride_k_bs / sizeof(bf16)),
-      /* .step_k_head_num = */ static_cast<int>(params->stride_k_head_num / sizeof(bf16)),
-      /* .step_k_sl = */ static_cast<int>(params->stride_k_sl / sizeof(bf16)),
-      /* .step_k_head_size = */ 48,
-      /* .step_v_bs = */ static_cast<int>(params->stride_v_bs / sizeof(bf16)),
-      /* .step_v_head_num = */ static_cast<int>(params->stride_v_head_num / sizeof(bf16)),
-      /* .step_v_sl = */ 48,
-      /* .step_v_head_size = */ static_cast<int>(params->stride_v_head_size / sizeof(bf16)),
+      /* .step_k_bs = */ static_cast<int>(params->stride_k_bs / sizeof(kv_t)),
+      /* .step_k_head_num = */ static_cast<int>(params->stride_k_head_num / sizeof(kv_t)),
+      /* .step_k_sl = */ static_cast<int>(params->stride_k_sl / sizeof(kv_t)),
+      /* .step_k_head_size = */ n_tile,
+      /* .step_v_bs = */ static_cast<int>(params->stride_v_bs / sizeof(kv_t)),
+      /* .step_v_head_num = */ static_cast<int>(params->stride_v_head_num / sizeof(kv_t)),
+      /* .step_v_sl = */ n_tile,
+      /* .step_v_head_size = */ static_cast<int>(params->stride_v_head_size / sizeof(kv_t)),
       /* .step_dst_bs = */ params->step_dst_bs,
       /* .step_dst_head_num = */ params->step_dst_head_num,
       /* .step_dst_sl = */ params->step_dst_sl,
   };
-  return bestla_fusion_attn_forward<float, bf16, bf16, float>(bestla_params);
+  return bestla_fusion_attn_forward<float, kv_t, kv_t, float>(bestla_params);
+}
+
+void bestla_reordered_attn_fp32_forward(const bestla_reordered_attn_fp32_fp32_fwd_args_t* params) {
+  assert(params->K_layout == params->V_layout);
+  switch (params->K_layout) {
+    case ATTN_FWD_LAYOUT_NTILE48_ROWPACK2:
+      return bestla_reordered_attn_fp32_forward_<ATTN_FWD_LAYOUT_NTILE48_ROWPACK2>(params);
+    case ATTN_FWD_LAYOUT_NTILE24_ROWPACK1:
+      return bestla_reordered_attn_fp32_forward_<ATTN_FWD_LAYOUT_NTILE24_ROWPACK1>(params);
+    // case ATTN_FWD_LAYOUT_NTILE48_ROWPACK4:
+    //   return bestla_reordered_attn_fp32_forward_<ATTN_FWD_LAYOUT_NTILE48_ROWPACK4>(params);
+    default:
+      assert(false);
+      break;
+  }
 }
 
 template <bool zero_padding>
-void bestla_reordered_attn_fp32_update_k_(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
+void bestla_reordered_attn_fp32_update_k_48x2(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
   const auto p = *params;
   NE_ASSERT(p.step_head_size == 1);
   const auto pad_headsize = padto(p.head_size, 32);
@@ -2101,13 +2421,88 @@ void bestla_reordered_attn_fp32_update_k_(const bestla_fusion_attn_fp32_update_k
     }
   }
 }
+
+template <bool zero_padding>
+void bestla_reordered_attn_fp32_update_k_24x1(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
+  const auto p = *params;
+  NE_ASSERT(p.step_head_size == 1);
+  const auto pad_headsize = padto(p.head_size, 1);
+  const auto pad_seq_max = padto(p.seq_max, 24);
+  const auto cache_step_head_num = pad_headsize * pad_seq_max;
+  const auto cache_step_bs = p.heads_kv * cache_step_head_num;
+
+  const int n_para = p.batch_size * p.heads_kv;
+#pragma omp parallel
+  for (int i_para = 0; i_para < n_para; ++i_para) {
+    const int ibs = i_para / p.heads_kv;
+    const int ihn = i_para % p.heads_kv;
+
+    const auto dst = reinterpret_cast<fp16*>(p.cache) + ibs * cache_step_bs + ihn * cache_step_head_num;
+    const auto src = p.src + ibs * p.step_bs + ihn * p.step_head_num;
+
+    if (p.seq_off == 0 && p.head_size % 8 == 0 && zero_padding) {
+      int i = 0;
+      for (; i < padto_le(p.seq_size, 8); i += 8) {  // QK_GEMM should not require 0-padding on seq_kv (i.e. N-dim)
+        for (int j = 0; j < pad_headsize; j += 8) {  // K-dim padding for QK_GEMM
+          const auto i_dst = p.seq_off + i;
+          const auto ii = i_dst % 24;
+          const auto i_blk = i_dst - ii;
+          const auto mm_dst = load_fp32_fp16_tr_x8_word<8>(src + i * p.step_seq + j, p.step_seq);
+          for (int jj = 0; jj < 8; ++jj)
+            _mm_store_si128(reinterpret_cast<__m128i*>(dst + i_blk * pad_headsize + ii + (j + jj) * 24), mm_dst[jj]);
+        }
+      }
+      if (i < p.seq_size) {
+        for (int j = 0; j < pad_headsize; j += 8) {  // K-dim padding for QK_GEMM
+          const auto i_dst = p.seq_off + i;
+          const auto ii = i_dst % 24;
+          const auto i_blk = i_dst - ii;
+          const auto mm_dst = load_fp32_fp16_tr_x8_word_tbl[p.seq_size - i](src + i * p.step_seq + j, p.step_seq);
+          for (int jj = 0; jj < 8; ++jj)
+            _mm_store_si128(reinterpret_cast<__m128i*>(dst + i_blk * pad_headsize + ii + (j + jj) * 24), mm_dst[jj]);
+        }
+      }
+    } else {
+      for (int i = 0; i < p.seq_size; ++i) {      // QK_GEMM should not require 0-padding on seq_kv (i.e. N-dim)
+        for (int j = 0; j < pad_headsize; ++j) {  // K-dim padding for QK_GEMM
+          const auto i_dst = p.seq_off + i;
+          const auto ii = i_dst % 24;
+          const auto i_blk = i_dst - ii;
+          if constexpr (zero_padding) {
+            dst[i_blk * pad_headsize + ii + j * 24] = utils::bit_cast<fp16, int16_t>(
+                j < p.head_size ? NE_FP32_TO_FP16(src[i * p.step_seq + j]) : NE_FP32_TO_FP16(0.f));
+          } else {
+            if (j < p.head_size)
+              dst[i_blk * pad_headsize + ii + j * 24] =
+                  utils::bit_cast<fp16, int16_t>(NE_FP32_TO_FP16(src[i * p.step_seq + j]));
+          }
+        }
+      }
+    }
+  }
+}
+
+template <bool zero_padding>
+void bestla_reordered_attn_fp32_update_k_(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
+  GetCPUDevice();
+  if (_cd->AVX512F()) {
+    // ATTN_FWD_LAYOUT_NTILE48_ROWPACK2
+    return bestla_reordered_attn_fp32_update_k_48x2<zero_padding>(params);
+  } else if (_cd->AVX2()) {
+    // ATTN_FWD_LAYOUT_NTILE24_ROWPACK1
+    return bestla_reordered_attn_fp32_update_k_24x1<zero_padding>(params);
+  } else {
+    assert(false);
+  }
+}
+
 void bestla_reordered_attn_fp32_update_k(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
   return params->no_zeroing ? bestla_reordered_attn_fp32_update_k_<false>(params)
                             : bestla_reordered_attn_fp32_update_k_<true>(params);
 }
 
 template <bool zero_padding>
-void bestla_reordered_attn_fp32_update_v_(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
+void bestla_reordered_attn_fp32_update_v_48x2(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
   const auto p = *params;
   NE_ASSERT(p.step_head_size == 1);
   const auto pad_headsize = padto(p.head_size, 48);
@@ -2146,6 +2541,63 @@ void bestla_reordered_attn_fp32_update_v_(const bestla_fusion_attn_fp32_update_k
     }
   }
 }
+template <bool zero_padding>
+void bestla_reordered_attn_fp32_update_v_24x1(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
+  const auto p = *params;
+  NE_ASSERT(p.step_head_size == 1);
+  const auto pad_headsize = padto(p.head_size, 24);
+  const auto pad_seq_max = padto(p.seq_max, 1);
+  const auto step_cache_head_num = pad_headsize * pad_seq_max;
+  const auto step_cache_bs = p.heads_kv * step_cache_head_num;
+
+  const int n_para = p.batch_size * p.heads_kv;
+#pragma omp parallel
+  for (int i_para = 0; i_para < n_para; ++i_para) {
+    const int ibs = i_para / p.heads_kv;
+    const int ihn = i_para % p.heads_kv;
+    const auto dst = reinterpret_cast<fp16*>(p.cache) + ibs * step_cache_bs + ihn * step_cache_head_num;
+    const auto src = p.src + ibs * p.step_bs + ihn * p.step_head_num;
+    if (p.seq_off == 0 && p.head_size % 8 == 0) {
+      for (int i = 0; i < p.seq_size; ++i) {        // K-dim padding for PV_GEMM
+        for (int j = 0; j < p.head_size; j += 8) {  // PV_GEMM shouldn't require 0-padding on head_size (i.e. N-dim)
+          const auto jj = j % 24;
+          const auto j_blk = j - jj;
+          const auto dst_m128 = _mm256_cvtps_ph(_mm256_load_ps(src + i * p.step_seq + j), _MM_FROUND_TO_NEAREST_INT);
+          _mm_store_si128(reinterpret_cast<__m128i*>(dst + i * 24 + j_blk * pad_seq_max + jj), dst_m128);
+        }
+      }
+    } else {
+      for (int i = 0; i < p.seq_size; ++i) {     // K-dim padding for PV_GEMM
+        for (int j = 0; j < p.head_size; ++j) {  // PV_GEMM shouldn't require 0-padding on head_size (i.e. N-dim)
+          const auto i_dst = p.seq_off + i;
+          const auto jj = j % 24;
+          const auto j_blk = j - jj;
+          if constexpr (zero_padding) {
+            dst[i_dst * 24 + j_blk * pad_seq_max + jj] = utils::bit_cast<fp16, int16_t>(
+                i < p.seq_size ? NE_FP32_TO_FP16(src[i * p.step_seq + j]) : NE_FP32_TO_FP16(0));
+          } else {
+            if (i < p.seq_size)
+              dst[i_dst * 24 + j_blk * pad_seq_max + jj] =
+                  utils::bit_cast<fp16, int16_t>(NE_FP32_TO_FP16(src[i * p.step_seq + j]));
+          }
+        }
+      }
+    }
+  }
+}
+template <bool zero_padding>
+void bestla_reordered_attn_fp32_update_v_(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
+  GetCPUDevice();
+  if (_cd->AVX512F()) {
+    // ATTN_FWD_LAYOUT_NTILE48_ROWPACK2
+    return bestla_reordered_attn_fp32_update_v_48x2<zero_padding>(params);
+  } else if (_cd->AVX2()) {
+    // ATTN_FWD_LAYOUT_NTILE24_ROWPACK1
+    return bestla_reordered_attn_fp32_update_v_24x1<zero_padding>(params);
+  } else {
+    assert(false);
+  }
+}
 void bestla_reordered_attn_fp32_update_v(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
   return params->no_zeroing ? bestla_reordered_attn_fp32_update_v_<false>(params)
                             : bestla_reordered_attn_fp32_update_v_<true>(params);
@@ -2169,6 +2621,8 @@ void bestla_reordered_attn_fp32_shift_rope_k(char* cache, const ne_fp16_t* cossi
 
 template <bool zero_padding>
 void bestla_fusion_attn_fp32_batch_cpy_k_(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params) {
+  GetCPUDevice();
+  assert(_cd->AVX512F());  // TODO(Yi): add avx2 implementation
   static constexpr auto N_TILE = 48;
   static constexpr auto K_TILE = 32;
   static constexpr auto K_PACK = 2;
@@ -2207,8 +2661,11 @@ void bestla_fusion_attn_fp32_batch_cpy_k(const bestla_fusion_attn_fp32_batch_cpy
                             : bestla_fusion_attn_fp32_batch_cpy_k_<true>(params);
 }
 
+// TODO
 template <bool zero_padding>
 void bestla_fusion_attn_fp32_batch_cpy_v_(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params) {
+  GetCPUDevice();
+  assert(_cd->AVX512F());  // TODO(Yi): add avx2 implementation
   static constexpr auto N_TILE = 48;
   static constexpr auto K_TILE = 32;
   static constexpr auto K_PACK = 2;
@@ -2250,14 +2707,8 @@ void bestla_fusion_attn_fp32_batch_cpy_v(const bestla_fusion_attn_fp32_batch_cpy
 #endif
 
 #ifdef NS_TESTS
-#define CheckISA(ISA)                         \
-  {                                           \
-    GetCPUDevice();                           \
-    if (!_cd->ISA()) {                        \
-      printf("Wrong Device ISA: " #ISA "\n"); \
-      return;                                 \
-    }                                         \
-  }
+#define CheckISA(ISA) \
+  (bestla::device::CpuDevice::getInstance()->ISA() || (printf("Wrong Device ISA: " #ISA "\n"), false))
 
 namespace {
 bool ret_ok = true;
@@ -2266,35 +2717,36 @@ class TestMhaDese {
  public:
   TestMhaDese() {
     printf("Test suit: %s\n", __FUNCTION__);
-    CheckISA(AMX_BF16);
     GetCPUDevice();
     ne_threading::get()->set_threads(std::min(_cd->getThreads(), omp_get_max_threads()));
     utils::request_perm_xtile_data();
 
 #if CompileFP16()
-    ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 80, 128, 77}, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 63, 63}, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_case<float, fp16, fp16, float>({3, 4, 4, 256, 1, 384}, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL);
+    if (CheckISA(AMX_BF16)) {
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE);
+      ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE);
+      ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 80, 128, 77}, NE_ATTN_FLAG_NONE);
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 63, 63}, NE_ATTN_FLAG_NONE);
+      ret_ok &= test_case<float, fp16, fp16, float>({3, 4, 4, 256, 1, 384}, NE_ATTN_FLAG_NONE);
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL);
 
-    ret_ok &= test_case<fp16, fp16, fp16, fp16>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<fp16, fp16, fp16, fp16>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<fp16, fp16, fp16, fp16>({2, 5, 5, 80, 128, 77}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<fp16, fp16, fp16, fp16>({1, 1, 1, 256, 63, 63}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<fp16, fp16, fp16, fp16>({3, 4, 4, 256, 1, 384}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<fp16, fp16, fp16, fp16>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL, true);
+      ret_ok &= test_case<fp16, fp16, fp16, fp16>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<fp16, fp16, fp16, fp16>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<fp16, fp16, fp16, fp16>({2, 5, 5, 80, 128, 77}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<fp16, fp16, fp16, fp16>({1, 1, 1, 256, 63, 63}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<fp16, fp16, fp16, fp16>({3, 4, 4, 256, 1, 384}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<fp16, fp16, fp16, fp16>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL, true);
 
-    ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 80, 128, 77}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 256, 63, 63}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<float, fp16, fp16, float>({3, 4, 4, 256, 1, 384}, NE_ATTN_FLAG_NONE, true);
-    ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL, true);
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 80, 128, 77}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 256, 63, 63}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<float, fp16, fp16, float>({3, 4, 4, 256, 1, 384}, NE_ATTN_FLAG_NONE, true);
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL, true);
+    }
 #endif
 
-    {
+    if (CheckISA(AMX_BF16)) {
       const auto BA48b4a = ATTN_FWD_LAYOUT_NTILE48_ROWPACK4;
       ret_ok &= test_case<int8_t, int8_t, int8_t, int8_t>({1, 1, 1, 32, 128, 64}, NE_ATTN_FLAG_NONE, false, BA48b4a);
       ret_ok &= test_case<int8_t, int8_t, int8_t, int8_t>({2, 5, 5, 32, 64, 128}, NE_ATTN_FLAG_NONE, false, BA48b4a);
@@ -2305,7 +2757,7 @@ class TestMhaDese {
           test_case<int8_t, int8_t, int8_t, int8_t>({1, 1, 1, 64, 64, 64}, NE_ATTN_FLAG_IS_CAUSAL, false, BA48b4a);
     }
 
-    {
+    if (CheckISA(AMX_BF16)) {
       const auto BA48b2a = ATTN_FWD_LAYOUT_NTILE48_ROWPACK2;
       int flags = NE_ATTN_FLAG_NONE;
       ret_ok &= test_case<float, bf16, bf16, float>({1, 1, 1, 32, 128, 64}, flags, false, BA48b2a, 1e-3f);
@@ -2318,7 +2770,7 @@ class TestMhaDese {
       ret_ok &= test_case<float, bf16, bf16, float>({1, 1, 1, 64, 64, 64}, flags, false, BA48b2a, 1e-3f);
     }
 
-    {  // PREFER_FP32
+    if (CheckISA(AVX512F)) {  // PREFER_FP32
       const auto BA48b2a = ATTN_FWD_LAYOUT_NTILE48_ROWPACK2;
       int flags = NE_ATTN_FLAG_PREFER_FP32;
       ret_ok &= test_case<float, bf16, bf16, float>({1, 1, 1, 32, 128, 64}, flags, false, BA48b2a, 1e-3f);
@@ -2330,17 +2782,33 @@ class TestMhaDese {
       flags |= NE_ATTN_FLAG_IS_CAUSAL;
       ret_ok &= test_case<float, bf16, bf16, float>({1, 1, 1, 64, 64, 64}, flags, false, BA48b2a, 1e-3f);
     }
+    if (CheckISA(AVX2)) {  // avx2
+      const auto Ba24b = ATTN_FWD_LAYOUT_NTILE24_ROWPACK1;
+      int flags = NE_ATTN_FLAG_PREFER_FP32;
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 32, 128, 64}, flags, false, Ba24b, 1e-3f);
+      ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 32, 64, 128}, flags, false, Ba24b, 1e-3f);
+      ret_ok &= test_case<float, fp16, fp16, float>({2, 5, 5, 80, 128, 77}, flags, false, Ba24b, 1e-3f);
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 256, 63, 63}, flags, false, Ba24b, 1e-3f);
+      ret_ok &= test_case<float, fp16, fp16, float>({3, 4, 4, 256, 1, 384}, flags, false, Ba24b, 1e-3f);
 
-    ret_ok &= test_reorder_pipe<float, float, float, float>({1, 1, 1, 32, 128, 64}, 64, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({2, 5, 5, 32, 64, 128}, 256, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({2, 5, 5, 80, 128, 77}, 256, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({2, 5, 1, 80, 128, 77}, 256, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({1, 1, 1, 256, 63, 63}, 256, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({3, 4, 4, 256, 1, 384}, 384, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({3, 4, 2, 256, 1, 384}, 384, NE_ATTN_FLAG_NONE);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({1, 1, 1, 64, 64, 64}, 128, NE_ATTN_FLAG_IS_CAUSAL);
-    ret_ok &= test_reorder_pipe<float, float, float, float>({1, 8, 8, 64, 64, 64}, 128,
-                                                            NE_ATTN_FLAG_IS_CAUSAL | NE_ATTN_FLAG_IS_ALIBI8);
+      flags |= NE_ATTN_FLAG_IS_CAUSAL;
+      ret_ok &= test_case<float, fp16, fp16, float>({1, 1, 1, 64, 64, 64}, flags, false, Ba24b, 1e-3f);
+    }
+
+    {  // amxbf16 => avx2 fallback
+      int flags = NE_ATTN_FLAG_NONE;
+      ret_ok &= test_reorder_pipe<float, float, float, float>({1, 1, 1, 32, 128, 64}, 64, flags);
+      ret_ok &= test_reorder_pipe<float, float, float, float>({2, 5, 5, 32, 64, 128}, 256, flags);
+      ret_ok &= test_reorder_pipe<float, float, float, float>({2, 5, 5, 80, 128, 77}, 256, flags);
+      ret_ok &= test_reorder_pipe<float, float, float, float>({2, 5, 1, 80, 128, 77}, 256, flags);
+      ret_ok &= test_reorder_pipe<float, float, float, float>({1, 1, 1, 256, 63, 63}, 256, flags);
+      ret_ok &= test_reorder_pipe<float, float, float, float>({3, 4, 4, 256, 1, 384}, 384, flags);
+      ret_ok &= test_reorder_pipe<float, float, float, float>({3, 4, 2, 256, 1, 384}, 384, flags);
+      flags |= NE_ATTN_FLAG_IS_CAUSAL;
+      ret_ok &= test_reorder_pipe<float, float, float, float>({1, 1, 1, 64, 64, 64}, 128, flags);
+      flags |= NE_ATTN_FLAG_IS_ALIBI8;
+      ret_ok &= test_reorder_pipe<float, float, float, float>({1, 8, 8, 64, 64, 64}, 128, flags);
+    }
     printf("Test suit done: %s\n", __FUNCTION__);
   }
 
@@ -2380,11 +2848,13 @@ class TestMhaDese {
 
     const auto NTILE = kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 48
                        : kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 48
+                       : kv_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 24
                                                                        : 0;
     const auto ROWPACK = kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 4
                          : kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 2
+                         : kv_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 1
                                                                          : 0;
-    const auto ROWPAD = ROWPACK * 16;
+    const auto ROWPAD = ROWPACK > 1 ? ROWPACK * 16 : 1;
     const auto k_rows_pad = kv_layout != ATTN_FWD_LAYOUT_PLAIN ? padto(head_size, ROWPAD) : head_size;
     const auto k_cols_pad = kv_layout != ATTN_FWD_LAYOUT_PLAIN ? padto(sl_kv, NTILE) : sl_kv;
     const auto v_rows_pad = kv_layout != ATTN_FWD_LAYOUT_PLAIN ? padto(sl_kv, ROWPAD) : sl_kv;
@@ -2405,7 +2875,8 @@ class TestMhaDese {
     init_vector(&src_v, init_min_val<V_T>, init_max_val<V_T>, dist(rng));
 
     // pad0 for padded layouts
-    if (kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 || kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2) {
+    if (kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 || kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ||
+        kv_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1) {
 #pragma omp parallel for collapse(2)
       for (int ibs = 0; ibs < batch_size; ++ibs) {
         for (int ihn = 0; ihn < heads_kv; ++ihn) {
@@ -2526,11 +2997,13 @@ class TestMhaDese {
     const auto kv_layout = kv_cache_info.k_layout;
     const auto NTILE = kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 48
                        : kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 48
+                       : kv_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 24
                                                                        : 0;
     const auto ROWPACK = kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 4
                          : kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 2
+                         : kv_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 ? 1
                                                                          : 0;
-    const auto ROWPAD = ROWPACK * 16;
+    const auto ROWPAD = ROWPACK > 1 ? ROWPACK * 16 : 1;
     const auto k_rows_pad = kv_layout != ATTN_FWD_LAYOUT_PLAIN ? padto(head_size, ROWPAD) : head_size;
     const auto k_cols_pad = kv_layout != ATTN_FWD_LAYOUT_PLAIN ? padto(sl_kv, NTILE) : sl_kv;
     const auto v_rows_pad = kv_layout != ATTN_FWD_LAYOUT_PLAIN ? padto(sl_kv, ROWPAD) : sl_kv;
@@ -2606,7 +3079,7 @@ class TestMhaDese {
     bestla_fusion_attn_forward_ref(ref_args);
 
     if (std::is_same<std::tuple<Q_T, K_T, V_T, DST_T>, std::tuple<float, float, float, float>>::value) {
-      assert(kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);
+      assert(kv_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 || kv_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1);
       // for testing, first reorder sl_kv - 1 and than concat the last 1 line
       const auto seq_size_first = sl_kv - 1;
       const auto seq_size_next = 1;
@@ -2671,8 +3144,8 @@ class TestMhaDese {
           /* .sl_q = */ sl_q,
           /* .sl_kv = */ sl_kv,
           /* .Q_layout = */ ATTN_FWD_LAYOUT_PLAIN,
-          /* .K_layout = */ ATTN_FWD_LAYOUT_NTILE48_ROWPACK2,
-          /* .V_layout = */ ATTN_FWD_LAYOUT_NTILE48_ROWPACK2,
+          /* .K_layout = */ kv_layout,
+          /* .V_layout = */ kv_layout,
           /* .dst_layout = */ ATTN_FWD_LAYOUT_PLAIN,
           /* .step_q_bs = */ sl_q * head_num * head_size,
           /* .step_q_head_num = */ head_size,

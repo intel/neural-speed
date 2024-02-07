@@ -36,11 +36,14 @@ typedef enum ATTN_FWD_LAYOUT {
   // plain layout
   ATTN_FWD_LAYOUT_PLAIN,
 
-  // step of sl/hs only works on indices which is a multiple of 64/4 on corresponding dimensions
+  // step of sl/hs only works on indices which is a multiple of 48/4 on corresponding dimensions
   ATTN_FWD_LAYOUT_NTILE48_ROWPACK4,
 
-  // step of sl/hs only works on indices which is a multiple of 32/4 on corresponding dimensions
+  // step of sl/hs only works on indices which is a multiple of 48/2 on corresponding dimensions
   ATTN_FWD_LAYOUT_NTILE48_ROWPACK2,
+
+  // step of sl/hs only works on indices which is a multiple of 24/1 on corresponding dimensions
+  ATTN_FWD_LAYOUT_NTILE24_ROWPACK1,
 } ATTN_FWD_LAYOUT;
 
 typedef struct kv_cache_info_t {
