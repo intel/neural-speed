@@ -85,6 +85,8 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   int n_head = hparams.n_head;
   int head_size = n_embd / n_head;
   int n_head_kv = hparams.n_head_kv;
+  int n_expert = hparams.n_experts;
+  int n_expert_used = hparams.n_experts_used;
 
   bool enable_tp = false;
 #ifdef NS_TP_MODEL
@@ -347,17 +349,62 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         // cur = cur*ffn_norm(broadcasted)
         cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
       }
-
-      if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
-                                                model.layers[il].ffn[2]->data, N, cur->ne[0],
-                                                model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
-        cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
+      if (n_expert == 0) {
+        if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
+                                                  model.layers[il].ffn[2]->data, N, cur->ne[0],
+                                                  model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
+          cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
+        } else {
+          struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);
+          cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
+          cur = ne_silu(ctx0, cur);
+          cur = ne_mul(ctx0, cur, tmp);
+          cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
+        }
       } else {
-        struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);
-        cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
-        cur = ne_silu(ctx0, cur);
-        cur = ne_mul(ctx0, cur, tmp);
-        cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
+        ne_tensor* logits = ne_mul_mat(ctx0, model.layers[il].ffn_gate_inp, cur);  // [n_tokens, num_experts]
+        ne_tensor* probs = ne_soft_max_inplace(ctx0, logits);
+        ne_tensor* selected_experts = ne_top_k(ctx0, probs, n_expert_used);
+        ne_build_forward_expand(&gf, selected_experts);
+        ne_tensor* weights = ne_get_rows(ctx0, ne_reshape_3d(ctx0, probs, 1, n_expert, N), selected_experts);
+        weights = ne_reshape_2d(ctx0, weights, n_expert_used, N);
+        ne_tensor* weights_sum = ne_sum_rows(ctx0, weights);
+        weights_sum = ne_repeat(ctx0, weights_sum, weights);
+        weights = ne_div(ctx0, weights, weights_sum);
+        ne_tensor* moe_out = nullptr;
+        for (int i = 0; i < n_expert_used; ++i) {
+          ne_tensor* cur_expert;
+
+          ne_tensor* cur_up = ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
+          ne_set_name(cur_up, "ffn_moe_up");
+
+          ne_tensor* cur_gate = ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur);
+          ne_set_name(cur_gate, "ffn_moe_gate");
+
+          cur_gate = ne_silu(ctx0, cur_gate);
+          ne_set_name(cur_gate, "ffn_moe_silu");
+
+          cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
+          ne_set_name(cur_expert, "ffn_moe_gate_par");
+
+          cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
+                                     cur_expert);  // [n_tokens, n_embd]
+          ne_set_name(cur_expert, "ffn_moe_down");
+
+          cur_expert =
+              ne_mul(ctx0, cur_expert,
+                     ne_repeat(ctx0, ne_view_2d(ctx0, weights, 1, N, weights->nb[1], i * weights->nb[0]), cur_expert));
+          ne_set_name(cur_expert, "ffn_moe_weighted");
+
+          if (i == 0) {
+            moe_out = cur_expert;
+          } else {
+            moe_out = ne_add(ctx0, moe_out, cur_expert);
+            ne_set_name(moe_out, "ffn_moe_out");
+          }
+        }
+
+        cur = moe_out;
       }
 #ifdef NS_TP_MODEL
       // ffn2 and ffn0 use split row, ffn1 use split column

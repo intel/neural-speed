@@ -79,6 +79,8 @@ void Llama::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_layer = hparams.n_layer;
   n_head_kv = hparams.n_head_kv;
   n_head = hparams.n_head;
+  n_expert = hparams.n_experts;
+  n_expert_used = hparams.n_experts_used;
   scratch = llama_mem_req(n_layer);
   model.scratchs = scratch;
 }
@@ -140,9 +142,23 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
 
       // ffn GEMM
-      layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, n_ff}, backend);
-      layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_down.weight", {n_ff, n_embd}, backend);
-      layer.ffn[2] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, n_ff}, backend);
+      if (ml->verify_tensor(layers_i + ".ffn_gate.weight")) {
+        layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, n_ff}, backend);
+        layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_down.weight", {n_ff, n_embd}, backend);
+        layer.ffn[2] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, n_ff}, backend);
+      } else {
+        NE_ASSERT(n_expert > 0);
+        NE_ASSERT(n_expert_used > 0);
+        layer.ffn_gate_inp = ml->get_tensor(layers_i + ".ffn_gate_inp.weight", {n_embd, n_expert}, backend);
+        for (uint32_t x = 0; x < n_expert; ++x) {
+          layer.ffn_gate_exp[x] =
+              ml->get_tensor(layers_i + ".ffn_gate." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
+          layer.ffn_down_exp[x] =
+              ml->get_tensor(layers_i + ".ffn_down." + std::to_string(x) + ".weight", {n_ff, n_embd}, backend);
+          layer.ffn_up_exp[x] =
+              ml->get_tensor(layers_i + ".ffn_up." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
+        }
+      }
 
       if (backend != NE_BACKEND_CPU) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
@@ -176,6 +192,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
 
       // ffn GEMM
+
       layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, backend);
       layer.ffn[1] = ml->get_tensor(layers_i + ".feed_forward.w2.weight", {n_ff, n_embd}, backend);
       layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, backend);

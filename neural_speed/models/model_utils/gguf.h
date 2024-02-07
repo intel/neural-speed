@@ -423,6 +423,8 @@ enum llm_kv {
   LLM_KV_ATTENTION_CLAMP_KQV,
   LLM_KV_ATTENTION_LAYERNORM_EPS,
   LLM_KV_ATTENTION_LAYERNORM_RMS_EPS,
+  LLM_KV_NUM_EXPERTS,
+  LLM_KV_NUM_EXPERTS_USED,
 
   LLM_KV_ROPE_DIMENSION_COUNT,
   LLM_KV_ROPE_FREQ_BASE,
@@ -466,6 +468,8 @@ static std::map<llm_kv, std::string> LLM_KV_NAMES = {
     {LLM_KV_FEED_FORWARD_LENGTH, "%s.feed_forward_length"},
     {LLM_KV_USE_PARALLEL_RESIDUAL, "%s.use_parallel_residual"},
     {LLM_KV_TENSOR_DATA_LAYOUT, "%s.tensor_data_layout"},
+    {LLM_KV_NUM_EXPERTS, "%s.expert_count"},
+    {LLM_KV_NUM_EXPERTS_USED, "%s.expert_used_count"},
 
     {LLM_KV_ATTENTION_HEAD_COUNT, "%s.attention.head_count"},
     {LLM_KV_ATTENTION_HEAD_COUNT_KV, "%s.attention.head_count_kv"},

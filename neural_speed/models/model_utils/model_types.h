@@ -45,6 +45,7 @@
 #define MODEL_MAX_ATTN 8
 #define MODEL_MAX_FFN 6
 #define MODEL_MAX_OTHERS 7
+#define MODEL_MAX_EXPERTS 8
 
 #define MODEL_USE_SCRATCH
 #define MODEL_MAX_SCRATCH_BUFFERS 16
@@ -139,6 +140,8 @@ struct model_hparams {
 
   // ChatGLM-1
   int32_t inner_hidden_size = 0;
+  uint32_t n_experts = 0;
+  uint32_t n_experts_used = 0;
 
   bool operator!=(const model_hparams& other) const {
     return static_cast<bool>(memcmp(this, &other, sizeof(model_hparams)));
@@ -154,6 +157,14 @@ struct model_layer {
 
   // ff
   struct ne_tensor* ffn[MODEL_MAX_FFN];
+
+  struct ne_tensor* ffn_gate_inp;
+
+  struct ne_tensor* ffn_gate_exp[MODEL_MAX_EXPERTS];
+
+  struct ne_tensor* ffn_down_exp[MODEL_MAX_EXPERTS];
+
+  struct ne_tensor* ffn_up_exp[MODEL_MAX_EXPERTS];
 
   struct ne_tensor* k_cache;
   struct ne_tensor* v_cache;

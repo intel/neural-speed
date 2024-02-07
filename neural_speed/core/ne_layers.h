@@ -253,9 +253,14 @@ NE_API struct ne_tensor* ne_rms_norm_back(struct ne_context* ctx, struct ne_tens
 // result is m columns, p rows
 NE_API struct ne_tensor* ne_mul_mat(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b);
 
+NE_API struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor* const as[], int n_as,
+                                       struct ne_tensor* ids, int id, struct ne_tensor* b);
+
 NE_API struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor* w, struct ne_tensor* b,
                                               struct ne_tensor* a);
+NE_API struct ne_tensor* ne_argsort(struct ne_context* ctx, struct ne_tensor* a);
 
+NE_API struct ne_tensor* ne_top_k(struct ne_context* ctx, struct ne_tensor* a, int k);
 // merged Q K V  ne_mul_mat
 NE_API struct ne_tensor* ne_mul_qkv(struct ne_context* ctx, struct ne_tensor* qw, struct ne_tensor* kw,
                                     struct ne_tensor* vw, struct ne_tensor* src);
