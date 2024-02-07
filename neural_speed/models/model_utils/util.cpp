@@ -12,6 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #include "util.h"
+#include "core/ne_bestla.h"
+#include "core/ne_layers.h"
 
 int32_t get_num_physical_cores() {
 #ifdef __linux__
@@ -46,4 +48,22 @@ int32_t get_num_physical_cores() {
 #endif
   unsigned int n_threads = std::thread::hardware_concurrency();
   return n_threads > 0 ? (n_threads <= 4 ? n_threads : n_threads / 2) : 4;
+}
+
+int get_best_thread(const ne_ftype ftype, const int n_threads, const int N) {
+  int res;
+  if (N >= 32 && ne_cpu_has_blas()) {
+    res = 1;
+  } else {
+    if ((ftype == NE_FTYPE_MOSTLY_NF4 || ftype == NE_FTYPE_MOSTLY_F4) && bestla_is_hybrid())
+      res = bestla_get_Pcore_number();
+    else
+      res = bestla_get_thread_number();
+  }
+  if (res < n_threads) {
+    printf("WARNING: Thread number exceed the limit. Actual thread number is: %d\n now.", res);
+  } else {
+    res = n_threads;
+  }
+  return res;
 }

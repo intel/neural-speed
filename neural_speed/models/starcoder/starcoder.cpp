@@ -90,13 +90,7 @@ static bool starcoder_model_eval_internal(model_context* ctx, const model_input*
   // for big prompts, if BLAS is enabled, it is better to use only one thread
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
-  gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
-  const int best_thread_num =
-      bestla_get_best_thread_number(hparams.ftype == NE_FTYPE_MOSTLY_NF4 || hparams.ftype == NE_FTYPE_MOSTLY_F4);
-  if (gf.n_threads > best_thread_num) {
-    printf("WARNING: Thread number exceed the limit. Actual thread number is: %d\n now.", best_thread_num);
-    gf.n_threads = best_thread_num;
-  }
+  gf.n_threads = get_best_thread(hparams.ftype, n_threads, N);
 
   const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};

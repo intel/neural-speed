@@ -41,8 +41,6 @@
 // CLI argument parsing
 //
 
-int32_t get_num_physical_cores();
-
 struct common_params {
   int32_t n_threads = get_num_physical_cores();
 

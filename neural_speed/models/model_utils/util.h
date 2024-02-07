@@ -31,6 +31,7 @@
 #include <unordered_set>
 #include <vector>
 #include "bestla/bestla_utils.h"  // borrow aligned_malloc
+#include "core/data_types.h"
 
 #ifdef __has_include
 #if __has_include(<unistd.h>)
@@ -424,5 +425,7 @@ struct model_buffer {
 typedef model_buffer model_ctx_buffer;
 
 int32_t get_num_physical_cores();
+
+int get_best_thread(const ne_ftype ftype, const int n_threads, const int N);
 
 #endif

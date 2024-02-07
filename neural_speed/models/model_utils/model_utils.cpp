@@ -1766,6 +1766,7 @@ const char* model_print_system_info(void) {
   s = "";
   s += "AVX = " + std::to_string(ne_cpu_has_avx()) + " | ";
   s += "AVX2 = " + std::to_string(ne_cpu_has_avx2()) + " | ";
+  s += "AVX_VNNI = " + std::to_string(ne_cpu_has_avx_vnni()) + " | ";
   s += "AVX512 = " + std::to_string(ne_cpu_has_avx512()) + " | ";
   s += "AVX512_VBMI = " + std::to_string(ne_cpu_has_avx512_vbmi()) + " | ";
   s += "AVX512_VNNI = " + std::to_string(ne_cpu_has_avx512_vnni()) + " | ";

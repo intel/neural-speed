@@ -87,13 +87,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
   // for big profalcon, if BLAS is enabled, it is better to use only one thread
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
-  gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
-  const int best_thread_num =
-      bestla_get_best_thread_number(hparams.ftype == NE_FTYPE_MOSTLY_NF4 || hparams.ftype == NE_FTYPE_MOSTLY_F4);
-  if (gf.n_threads > best_thread_num) {
-    printf("WARNING: Thread number exceed the limit. Actual thread number is: %d\n now.", best_thread_num);
-    gf.n_threads = best_thread_num;
-  }
+  gf.n_threads = get_best_thread(hparams.ftype, n_threads, N);
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
   ne_set_name(embd, "embd");

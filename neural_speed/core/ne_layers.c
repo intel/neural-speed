@@ -11960,6 +11960,14 @@ int ne_cpu_has_avx2(void) {
 #endif
 }
 
+int ne_cpu_has_avx_vnni(void) {
+#if defined(__AVXVNNI__)
+  return 1;
+#else
+  return 0;
+#endif
+}
+
 int ne_cpu_has_avx512(void) {
 #if defined(__AVX512F__)
   return 1;

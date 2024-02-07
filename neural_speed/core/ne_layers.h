@@ -596,6 +596,7 @@ NE_API size_t ne_quantize_chunk(enum ne_type type, const float* src, void* dst, 
 
 NE_API int ne_cpu_has_avx(void);
 NE_API int ne_cpu_has_avx2(void);
+NE_API int ne_cpu_has_avx_vnni(void);
 NE_API int ne_cpu_has_avx512(void);
 NE_API int ne_cpu_has_avx512_vbmi(void);
 NE_API int ne_cpu_has_avx512_vnni(void);

@@ -24,7 +24,9 @@ int bestla_set_threads(int _nth);
 
 bool bestla_is_hybrid();
 
-int bestla_get_best_thread_number(bool is_support_Ecore);
+int bestla_get_Pcore_number();
+
+int bestla_get_thread_number();
 
 void* bestla_get_thread_handle();
 
