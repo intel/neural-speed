@@ -57,6 +57,9 @@ bool gptj_model_eval_ids(model_context* ctx, model_token* tokens, size_t n_eval,
   return true;
 }
 
+static const char* memory_dtype =
+    (getenv("NE_MEM_DTYPE") != nullptr && strlen(getenv("NE_MEM_DTYPE")) > 0) ? getenv("NE_MEM_DTYPE") : "auto";
+
 extern "C" {
 void* init_gptj(int seed, int n_predict, int n_batch, int top_k, float top_p, float temp, float repeat_penalty,
                 bool perplexity, int n_ctx, const char* model_file, bool beam_search = false, int beam_size = 4,
@@ -79,7 +82,17 @@ void* init_gptj(int seed, int n_predict, int n_batch, int top_k, float top_p, fl
   params.batch_size = batch_size;
   params.beam_search = beam_search;
   params.beam_size = beam_size;
-  if (batch_size > 1) params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi): NO MHA IN MULTI-BATCH
+  if (batch_size > 1)  // TODO(Yi): NO MHA IN MULTI-BATCH
+    params.memory_type = KV_MEM_TYPE_F16;
+  else if (strcmp(memory_dtype, "f32") == 0)
+    params.memory_type = KV_MEM_TYPE_F32;
+  else if (strcmp(memory_dtype, "f16") == 0)
+    params.memory_type = KV_MEM_TYPE_F16;
+  else if (strcmp(memory_dtype, "auto") == 0)
+    params.memory_type = KV_MEM_TYPE_AUTO;
+  else
+    fprintf(stderr, "Unexpected memory dtype!");
+
   // params.use_mmap = false;
   // params.use_mlock= true;
   model_init_backend();
@@ -238,6 +251,7 @@ char* eval_gptj_char(void* ctx, const char* prom, int n_predict, int top_k, floa
 
   char* res_c_str = new char[res.size() + 1];
   std::strncpy(res_c_str, res.c_str(), res.size());
+  res_c_str[res.size()] = '\0';
   return res_c_str;
 }
 
