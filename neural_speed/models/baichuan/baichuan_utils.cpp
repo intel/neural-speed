@@ -145,8 +145,8 @@ void BAICHUAN::load(model_context* ctx, model_progress_callback progress_callbac
     layer.ffn[2] =
         ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, uint32_t(model.hparams.inner_hidden_size)}, backend);
 
-    layer.v_cache == nullptr;
-    layer.k_cache == nullptr;
+    layer.v_cache = nullptr;
+    layer.k_cache = nullptr;
   }
 
   // print memory requirements

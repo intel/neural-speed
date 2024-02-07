@@ -54,17 +54,17 @@ option(NS_SANITIZE_UNDEFINED     "neural_speed: enable undefined sanitizer"     
 # instruction set specific
 option(NS_AVX                    "neural_speed: enable AVX"                                     ON)
 option(NS_AVX2                   "neural_speed: enable AVX2"                                    ON)
+option(NS_F16C                   "neural_speed: enable F16C"                                    ON)
 option(NS_AVX512                 "neural_speed: enable AVX512"                                  OFF)
 option(NS_AVX512_VBMI            "neural_speed: enable AVX512-VBMI"                             OFF)
 option(NS_AVX512_VNNI            "neural_speed: enable AVX512-VNNI"                             OFF)
 option(NS_FMA                    "neural_speed: enable FMA"                                     ON)
 option(NS_AMX                    "neural_speed: enable AMX"                                     OFF)
-option(NS_F16C                   "neural_speed: enable F16C"                                    ON)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
 option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
 option(NS_BUILD_EXAMPLES         "neural_speed: build examples"                    ${NS_STANDALONE})
-option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)                               
+option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)
 
 
 if(NS_BUILD_TESTS)
@@ -96,9 +96,28 @@ endif()
 
 if (MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX)
+    add_compile_options(/wd4244 /wd4267)  # possible loss of data
+    add_compile_options(/wd4305)  # truncation from 'double' to 'float'
+    add_compile_options(/wd4018)  # '>': signed/unsigned mismatch
+    add_compile_options(/wd4334)  # '<<': result of 32-bit shift implicitly converted to 64 bits
     if (BUILD_SHARED_LIBS)
         set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     endif()
+
+    # 'std::codecvt_utf8<wchar_t,1114111,(std::codecvt_mode)0>': warning STL4017: std::wbuffer_convert,
+    # std::wstring_convert, and the <codecvt> header (containing std::codecvt_mode, std::codecvt_utf8,
+    # std::codecvt_utf16, and std::codecvt_utf8_utf16) are deprecated in C++17. (The std::codecvt class template is NOT
+    # deprecated.) The C++ Standard doesn't provide equivalent non-deprecated functionality; consider using
+    # MultiByteToWideChar() and WideCharToMultiByte() from <Windows.h> instead. You can define
+    # _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING or _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS to suppress this
+    # warning.
+    add_compile_definitions(_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
+
+    # Microsoft renamed some POSIX and Microsoft-specific library functions in the CRT to conform with C99 and C++03
+    # constraints on reserved and global implementation-defined names. If you need to use the existing function names
+    # for portability reasons, you can turn off these warnings. The functions are still available in the library under
+    # their original names.
+    add_compile_definitions(_CRT_NONSTDC_NO_WARNINGS)
 endif()
 
 if (NS_LTO)

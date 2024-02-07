@@ -99,7 +99,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
   const auto wtype_alloc = wtype == NE_TYPE_BTLA ? NE_TYPE_I8 : wtype;
 
   if (model) {  // non-null param of model for kv-cache as components of model->layers[il]
-    for (int il = 0; il < hparams.n_layer; ++il) {
+    for (int il = 0; il < n_layer; ++il) {
       auto& k_cache = model->layers[il].k_cache;
       auto& v_cache = model->layers[il].v_cache;
       if (wtype == NE_TYPE_F16) {  // chatglm does not support fp32 kv-cache in original impl of chatglm_util.cpp
@@ -2693,7 +2693,7 @@ bool beam_search_flow::step_update_beams_and_kv_cache() {
   std::vector<beam_next_token> next_tokens =
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
   if (next_tokens.size() != num_sample_k) {
-    fprintf(stderr, "%s: error: sampled next tokens size is %ld which is not equal to %d.\n", __func__,
+    fprintf(stderr, "%s: error: sampled next tokens size is %zu which is not equal to %d.\n", __func__,
             next_tokens.size(), num_sample_k);
     return false;
   }

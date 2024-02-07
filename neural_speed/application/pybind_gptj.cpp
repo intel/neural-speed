@@ -268,7 +268,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto gptj_in_all_bs =
-      init_gptj(1234, 32, 32, 40, 1.0, 0.8, 1.02, false, 2048, argv[1], true, 4, 1, 56, 30, 1.0, true);
+      init_gptj(1234, 32, 32, 40, 1.f, 0.8f, 1.02f, false, 2048, argv[1], true, 4, 1, 56, 30, 1.0, true);
   std::vector<void*> ctxs = {gptj_in_all_bs};
   for (auto gptj_in_all : ctxs) {
     auto res = eval_gptj_char(
@@ -355,7 +355,7 @@ int main(int argc, char* argv[]) {
         "out-of-place-and-still-not-obvious 'Call Waiter' button. But in hindsight, I should have gone with a simple "
         "HUD from the start, especially one that indicated each team's colors and general state of the game without "
         "the need for zooming in and out. Development Development went fast.",
-        128, 40, 1.0, 0.8, 2048);
+        128, 40, 1.0f, 0.8f, 2048);
     std::cout << res << std::endl;
     exit_gptj(gptj_in_all);
     delete[] res;
