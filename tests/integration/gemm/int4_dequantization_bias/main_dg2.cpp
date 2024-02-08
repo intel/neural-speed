@@ -19,7 +19,7 @@
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
-constexpr int ITER = 100;
+constexpr int ITER = 1000;
 
 class test1 {
 public:
@@ -244,8 +244,8 @@ public:
     static constexpr size_t sg_k = 16;
     static constexpr size_t dequant_s = 64;
     static constexpr size_t num_buffer = 64;
-    static constexpr size_t local_kslicing = 4;
-    static constexpr size_t global_kslicing = 1;
+    static constexpr size_t local_kslicing = 8;
+    static constexpr size_t global_kslicing = 2;
     static constexpr mem_layout layout_a = mem_layout::row_major;
     static constexpr mem_layout layout_b = mem_layout::row_major;
     using data_type_a = fp16;
@@ -585,7 +585,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<qkv6>;
+using tests = ::testing::Types<qkv9, qkv6>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7, qkv8,
 //         qkv9, qkv10>;
 
