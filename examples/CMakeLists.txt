@@ -11,4 +11,6 @@ add_subdirectory(07_multi_layer_perceptron)
 add_subdirectory(08_scaled_dot_product_attention)
 add_subdirectory(09_gate_recurrent_unit)
 add_subdirectory(10_gemm_large_n)
+if(UNIX)  # pvc not available on win?
 add_subdirectory(11_stream_k_gemm)
+endif()

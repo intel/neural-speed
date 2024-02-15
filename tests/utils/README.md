@@ -3,13 +3,13 @@
 - Analyze execution time only  
   *profiling_helper prof;*  
 - Analyze performance data such as gflops  
-  *long work_amount = 2 * matrix_m * matrix_n * matrix_k;*  
+  *int64_t work_amount = 2 * matrix_m * matrix_n * matrix_k;*  
   *profiling_helper prof(work_amount, "gflops");*  
 - Multiple kernels need to be analyzed  
-  *profiling_helper(string kernel_name, long work_amount, string work_name, int kernel_nums = 1)*  
+  *profiling_helper(string kernel_name, int64_t work_amount, string work_name, int kernel_nums = 1)*  
   Subsequent prof.cpu_end(), add_gpu_event need to pass in the corresponding kernel_id as a parameter  
 - Multiple kernels need to be analyzed and corresponding to different work_amount and work_name 
-  *profiling_helper(vector<string> kernel_name, vector<long> work_amount, vector<string> work_name, int kernel_nums = 1)*  
+  *profiling_helper(vector<string> kernel_name, vector<int64_t> work_amount, vector<string> work_name, int kernel_nums = 1)*  
   Items without work_amount and work_name can be written with 0 and "" respectively  
   
 2.Record CPU time  

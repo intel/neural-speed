@@ -13,8 +13,11 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+
+#include <chrono>
+#include <thread>
 
 void gemm_large_n_run(uint32_t iter) {
     // Tips, the example demonstrates programming kernel with XeTLA, it works as expected with current configurations.
@@ -122,7 +125,7 @@ void gemm_large_n_run(uint32_t iter) {
     }
 
     uint32_t warmup = 10;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k;
     profiling_helper prof("gemm_large_n", ops, "gflops");
     for (uint32_t i = 0; i < iter + warmup; i++) {
         if (i >= warmup) { prof.cpu_start(); }
@@ -142,7 +145,8 @@ void gemm_large_n_run(uint32_t iter) {
             prof.add_gpu_event(gpu_event);
         }
         // sleep 1 second after finishing each gpu event
-        sleep(1);
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1000ms);
     }
 
     prof.print_profiling_result(profiling_selector::GPU);

@@ -84,10 +84,10 @@ void softmax_bwd_run() {
     cl::sycl::range<3> local_range {1, subgroup_range_m, subgroup_range_n};
     cl::sycl::nd_range<3> nd_range(group_range * local_range, local_range);
 
-    long transferred_bytes = sizeof(data_type_in) * size_in
+    int64_t transferred_bytes = sizeof(data_type_in) * size_in
             + sizeof(data_type_out) * size_out
             + sizeof(data_type_coff_in) * size_in;
-    std::vector<long> work_amount = {transferred_bytes};
+    std::vector<int64_t> work_amount = {transferred_bytes};
     std::vector<std::string> kernel_name = {"softmax_bwd"};
     std::vector<std::string> work_name = {"GB/s"};
 
@@ -95,14 +95,13 @@ void softmax_bwd_run() {
         std::vector<sycl::kernel_id> kernelId = {get_kernel_id<Test>()};
         auto inputBundle = get_kernel_bundle<sycl::bundle_state::input>(
                 context, kernelId);
-        setenv("SYCL_PROGRAM_COMPILE_OPTIONS",
-                " -vc-codegen -doubleGRF  -Xfinalizer ' "
-                "-printregusage -enableBCR  "
-                "-DPASTokenReduction '",
-                1);
+
+        static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF  -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
+        putenv(env_set_str.c_str());
         sycl::kernel_bundle<sycl::bundle_state::executable> exeBundle
                 = build(inputBundle);
-        unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
+        static const std::string env_del_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
+        putenv(env_del_str.c_str());
         try {
 
             auto e_softmax_bwd = queue.submit([&](sycl::handler &cgh) {

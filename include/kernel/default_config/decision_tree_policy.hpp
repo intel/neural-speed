@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "kernel/default_config/common.hpp"
+#include <kernel/default_config/common.hpp>
 
 namespace gpu::xetla {
 namespace decision_tree_rule {

@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 
 int add_update_carry_result_validate(
         uint32_t *A, uint32_t *B, uint32_t *C, unsigned Size) {

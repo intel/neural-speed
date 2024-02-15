@@ -56,7 +56,7 @@ class profiling_helper {
     vector<vector<double>> cpu_time_vec;
 
     //Some information for measuring performance
-    vector<long> work_amount;
+    vector<int64_t> work_amount;
     vector<string> work_name;
     vector<string> kernel_name;
 
@@ -222,7 +222,7 @@ class profiling_helper {
     }
 
 public:
-    profiling_helper(string kernel_name, long work_amount,
+    profiling_helper(string kernel_name, int64_t work_amount,
             string work_name = "gflops", int kernel_nums = 1) {
         for (int i = 0; i < kernel_nums; i++) {
             this->kernel_name.push_back(kernel_name);
@@ -233,7 +233,7 @@ public:
         set_time_vecs();
     }
 
-    profiling_helper(vector<string> kernel_name, vector<long> work_amount,
+    profiling_helper(vector<string> kernel_name, vector<int64_t> work_amount,
             vector<string> work_name, int kernel_nums = 1) {
         this->kernel_name = kernel_name;
         this->work_name = work_name;

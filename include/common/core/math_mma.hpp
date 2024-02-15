@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/core/common.hpp"
+#include <common/core/common.hpp>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"

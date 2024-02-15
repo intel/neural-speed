@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "subgroup/subgroup.hpp"
+#include <subgroup/subgroup.hpp>
 #include "xetla.hpp"
 
 using namespace gpu::xetla;

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/core/core.hpp"
+#include <common/core/core.hpp>
 
 namespace gpu::xetla {
 namespace detail {

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
+#include <common/utils/common.hpp>
 
 __XETLA_API constexpr uint32_t div_round_up(uint32_t n, uint32_t d) {
     return (n + d - 1) / d;

@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 
 #include "batch_gemm.hpp"
 

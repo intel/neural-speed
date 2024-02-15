@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "experimental/kernel/data_transformer/api.hpp"
-#include "experimental/kernel/data_transformer/common.hpp"
-#include "experimental/kernel/data_transformer/config.hpp"
-#include "group/reduction/reduction_xe.hpp"
+#include <experimental/kernel/data_transformer/api.hpp>
+#include <experimental/kernel/data_transformer/common.hpp>
+#include <experimental/kernel/data_transformer/config.hpp>
+#include <group/reduction/reduction_xe.hpp>
 
 namespace gpu::xetla::kernel {
 

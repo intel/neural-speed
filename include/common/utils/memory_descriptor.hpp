@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
-#include "common/utils/raw_send_load_store.hpp"
+#include <common/utils/common.hpp>
+#include <common/utils/raw_send_load_store.hpp>
 
 namespace gpu::xetla {
 

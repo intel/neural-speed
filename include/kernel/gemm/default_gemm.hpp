@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "kernel/default_config/common.hpp"
-#include "kernel/gemm/common.hpp"
-#include "kernel/gemm/dispatch_policy.hpp"
-#include "kernel/gemm/gemm_preset.hpp"
+#include <kernel/default_config/common.hpp>
+#include <kernel/gemm/common.hpp>
+#include <kernel/gemm/dispatch_policy.hpp>
+#include <kernel/gemm/gemm_preset.hpp>
 
 namespace gpu::xetla {
 namespace kernel {

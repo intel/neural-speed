@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
 
 enum class kslicing_impl_t : uint8_t { none = 0, global = 1, local = 2 };
@@ -146,7 +146,7 @@ void gemm_universal_run(uint32_t iter) {
     }
 
     uint32_t warmup = 10;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k;
     profiling_helper prof("gemm_universal", ops, "gflops");
     for (uint32_t i = 0; i < iter + warmup; i++) {
         if (i >= warmup) { prof.cpu_start(); }

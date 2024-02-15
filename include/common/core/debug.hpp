@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "common/core/common.hpp"
+#include <common/core/common.hpp>
 #include <CL/sycl.hpp>
 #include <ext/intel/esimd.hpp>
 

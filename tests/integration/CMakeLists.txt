@@ -16,6 +16,7 @@ function(add_integration_test target "host_cpp")
     # make test
     add_test(NAME ${TARGET} COMMAND ${TARGET})
     set_tests_properties(${TARGET} PROPERTIES LABELS "integration" TIMEOUT ${INTEGRATION_TIMEOUT})
+    # target_link_libraries(${TARGET} PUBLIC MKL::MKL_SYCL)
 endfunction()
 
 # add_subdirectory(vector_add)

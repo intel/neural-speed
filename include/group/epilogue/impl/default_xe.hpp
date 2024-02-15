@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "group/epilogue/api.hpp"
-#include "group/epilogue/common.hpp"
-#include "group/epilogue/epilogue_policy.hpp"
+#include <group/epilogue/api.hpp>
+#include <group/epilogue/common.hpp>
+#include <group/epilogue/epilogue_policy.hpp>
 
 namespace gpu::xetla::group {
 

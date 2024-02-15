@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "common/core/base_ops.hpp"
-#include "common/core/base_types.hpp"
-#include "common/core/common.hpp"
-#include "common/utils/limitation.hpp"
+#include <common/core/base_ops.hpp>
+#include <common/core/base_types.hpp>
+#include <common/core/common.hpp>
+#include <common/utils/limitation.hpp>
 
 namespace gpu::xetla {
 

@@ -16,7 +16,7 @@
 
 #include "common.hpp"
 #include "kernel_func.hpp"
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 #include <gtest/gtest.h>
 
 template <typename Test>

@@ -19,11 +19,11 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/row_reduction_fused_op_xe.hpp"
-#include "experimental/group/reduction/row_reduce_store_xe.hpp"
-#include "experimental/kernel/reduction/api.hpp"
-#include "experimental/kernel/reduction/common.hpp"
-#include "experimental/kernel/reduction/config.hpp"
+#include <experimental/group/fused_op/row_reduction_fused_op_xe.hpp>
+#include <experimental/group/reduction/row_reduce_store_xe.hpp>
+#include <experimental/kernel/reduction/api.hpp>
+#include <experimental/kernel/reduction/common.hpp>
+#include <experimental/kernel/reduction/config.hpp>
 
 namespace gpu::xetla::kernel {
 
