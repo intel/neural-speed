@@ -97,7 +97,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
                                             alg="sym" if q_config['sym'] else "asym",
                                             compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
-    print(f"converting {dst_name} quantized tensor to bestla q4 block")
+    print(f"converting {dst_name} quantized tensor to bestla q{q_config['bits']} block")
 
 
 def main(args_in: Optional[List[str]] = None) -> None:

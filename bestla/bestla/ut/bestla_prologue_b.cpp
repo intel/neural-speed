@@ -1,4 +1,3 @@
-#include "bestla.h"
 #include "bestla_gemm.h"
 #include "bestla_prologue_b.h"
 #include "bestla_parallel.h"
@@ -886,7 +885,7 @@ class UTBenchmark_CompFp32 {
     kernel.mProB.packWeight(n, k, B, n, &packBs[0], &DefaultThreading);
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
-      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(float));
+      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
     auto psize = (size_t)m * n * k * 2;
     auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
@@ -946,7 +945,7 @@ class UTBenchmark_CompFp32 {
     kernel.mProB.packWeight(n, k, B, n, &packBs[0], &DefaultThreading);
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
-      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(uint16_t));
+      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
     auto psize = (size_t)m * n * k * 2;
     auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);

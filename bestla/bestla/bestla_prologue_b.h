@@ -13,8 +13,6 @@
 //  limitations under the License.
 #pragma once
 #include <cassert>
-#include <cstdint>
-#include "bestla.h"
 #include "bestla_utils.h"
 #include "bestla_storage.h"
 #include "bestla_device.h"
@@ -561,7 +559,6 @@ class WeightKBlockNInteger {
   static void compressBit3Weight(const int N, const int K, const int8_t* B, int8_t* dstptr,
                                  parallel::IThreading* threading) {
     // TODO(zhe): 1D parallel compress
-    // N==NPad, K==Kpad, ldb==Kpad
     auto ld_dst = _GemmCore_T::NTILE * utils::padto(K, 64);
     auto col = _GemmCore_T::NTILE * K;
     auto row = N / _GemmCore_T::NTILE;

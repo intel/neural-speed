@@ -178,7 +178,6 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
   return BTLA_CODE::Success;
 }
 
-// #include <iostream>
 static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
                                       int row, int col, int ld_src, int ld_dst) {
   assert(col % 128 == 0);
