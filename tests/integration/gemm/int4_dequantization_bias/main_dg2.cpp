@@ -350,7 +350,7 @@ void dequantize_gemm_run(int iter) {
     using tile_shape = xetla::group::tile_shape_t<wg_tile_n, wg_tile_m,
             sg_tile_n, sg_tile_m>;
     static constexpr uint32_t periodic_sync_interval = 0;
-    static constexpr uint32_t prefetch_distance = 0;
+    static constexpr uint32_t prefetch_distance = 1;
 
     using mem_desc_a_t = xetla::mem_desc_t<data_type_a, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
