@@ -512,7 +512,7 @@ class BloomModel(Model):
                 data_torch = data_torch.to(torch.float32)
 
             data = data_torch.squeeze().numpy()
-            
+
             # Map bloom-style qkv_linear to gpt-style qkv_linear
             # bloom:
             # github.com/huggingface/transformers/blob/main/src/transformers/models/bloom/modeling_bloom.py#L238-L252
