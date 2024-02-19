@@ -1647,7 +1647,7 @@ in chat mode so that the conversation can end normally.")
                 qkv = rearrange(qkv.T, " o (g n i) ->o g n i", g=num_groups, n=q_per_kv + 2, i=head_dim)
                 q, k, v = qkv[..., :q_per_kv, :], qkv[..., q_per_kv:q_per_kv + 1, :], qkv[...,
                                                                                           q_per_kv + 1:q_per_kv + 2, :]
-                # The model weights of q and k equire additional reshape.
+                # The model weights of q and k require additional reshape.
                 q = self._hf_permute_qk(rearrange(q, " o g n i ->  o (g n i)").T, num_heads, num_heads)
                 k = self._hf_permute_qk(rearrange(k, " o g n i ->  o (g n i)").T, num_heads, num_kv_heads)
                 v = rearrange(v, " o g n i ->  o (g n i)").T
