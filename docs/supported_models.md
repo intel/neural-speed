@@ -344,6 +344,14 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
   </tr>
+  <tr>
+    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B-Chat</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+  </tr>
     <tr>
     <td><a href="https://huggingface.co/tiiuae/falcon-7b/tree/main" target="_blank" rel="noopener noreferrer">tiiuae/falcon-7</td>
     <td>✅</td>
