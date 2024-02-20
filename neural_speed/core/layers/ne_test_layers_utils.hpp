@@ -75,7 +75,7 @@ inline typename std::enable_if<!s_is_u8s8<T>::value, float>::type get_err(const 
 }
 template <typename T>
 inline typename std::enable_if<s_is_u8s8<T>::value, float>::type get_err(const T& a, const T& b) {
-  // for quantized value, error ratio was calcualted with its data range
+  // for quantized value, error ratio was calculated with its data range
   return fabs(static_cast<float>(a) - static_cast<float>(b)) / UINT8_MAX;
 }
 

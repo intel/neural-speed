@@ -14,7 +14,7 @@ cd build
 cmake .. -G Ninja -DNS_USE_CLANG_TIDY=CHECK -DBTLA_USE_OPENMP=OFF
 ninja 2>&1 | tee ${log_path}
 
-if [[ ! -f ${log_path} ]] || [[ $(grep -c "warning:" ${log_path}) != 0 ]]; then
+if [[ ! -f ${log_path} ]] || [[ $(grep -c "warning:" ${log_path}) != 0 ]] || [[ $(grep -c "error" ${log_path}) != 0 ]]; then
     exit 1
 fi
 $BOLD_PURPLE && echo "Congratulations, check passed!" && $LIGHT_PURPLE && echo "You can click on the artifact button to see the log details." && $RESET

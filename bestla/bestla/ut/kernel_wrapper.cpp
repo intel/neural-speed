@@ -196,5 +196,41 @@ class UT_RevertPaddingInterleaveMN {
 #ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_RevertPaddingInterleaveMN sUT_RevertPaddingInterleaveMN;
 #endif
+
+class UT_LayerNormalization {
+ public:
+  UT_LayerNormalization() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<float, BTLA_ISA::AVX2>(4096, false, true, true);
+    ut<float, BTLA_ISA::AVX2>(4096, false, false, false);
+    ut<float, BTLA_ISA::AVX2>(111, false, true, true);
+    ut<float, BTLA_ISA::AVX2>(111, true, true, true);
+    CheckISA(AVX512F);
+    ut<float, BTLA_ISA::AVX512F>(4096, false, true, true);
+    ut<float, BTLA_ISA::AVX512F>(4096, false, false, false);
+    ut<float, BTLA_ISA::AVX512F>(111, false, true, true);
+    ut<float, BTLA_ISA::AVX512F>(111, true, true, true);
+  }
+  template <typename T, BTLA_ISA ISA>
+  void ut(int norm_size, bool simplified, bool hasscale, bool hasbias) {
+    printf("%s %d\n", __FUNCTION__, norm_size);
+    aligned_vector<T> src(norm_size), dst(norm_size), bias(norm_size), scale(norm_size), ref(norm_size);
+    fill_buffer_randn(src.data(), src.size(), -0.5f, 0.5f);
+    fill_buffer_randn(bias.data(), bias.size(), -0.5f, 0.5f);
+    fill_buffer_randn(scale.data(), scale.size(), 0.1f, 1.f);
+    T mean = 0.f, mean_square = 0.f;
+    kernel::wrapper::LayerNormalization::forward<BTLA_ISA::NoSIMD>(src.data(), hasscale ? scale.data() : nullptr,
+                                                                   hasbias ? bias.data() : nullptr, 0.00001f, norm_size,
+                                                                   ref.data(), &mean, &mean_square, simplified);
+    kernel::wrapper::LayerNormalization::forward<ISA>(src.data(), hasscale ? scale.data() : nullptr,
+                                                      hasbias ? bias.data() : nullptr, 0.00001f, norm_size, dst.data(),
+                                                      &mean, &mean_square, simplified);
+    buffer_error(ref.data(), dst.data(), ref.size(), 0.01f);
+  }
+};
+#ifdef BTLA_UT_KERNEL_WRAPPER
+UT_LayerNormalization sUT_LayerNormalization;
+#endif
 }  // namespace ut
 }  // namespace bestla

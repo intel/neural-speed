@@ -51,7 +51,7 @@ if __name__ == "__main__":
     p99 = calculate_percentile(predictions, 99)
     latency_mean = calculate_mean(predictions[1:])
     total_latency = np.sum(predictions)
-     
+
     print("P90: {:.2f} ms".format(p90))
     print("P99: {:.2f} ms".format(p99))
     print("average_latency: {:.2f} ms".format(latency_mean))

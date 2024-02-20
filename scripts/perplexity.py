@@ -105,7 +105,7 @@ def perplexity(model_name, dataset_name, **kwargs):
         init_kwargs = {
             k: kwargs[k]
             for k in kwargs
-            if k in ['use_cache', 'compute_dtype', 'weight_dtype', 'scale_dtype', 'group_size', 'use_ggml']
+            if k in ['compute_dtype', 'weight_dtype', 'scale_dtype', 'group_size', 'use_ggml']
         }
         model.init(model_name, **init_kwargs)
 
@@ -113,7 +113,7 @@ def perplexity(model_name, dataset_name, **kwargs):
     model_kwargs = {**default_model_kwargs, **model_kwargs}
 
     ppl_hist = [{} for _ in range(n_sampels)]  # ppl_hist[i_sample][end_pos] = ppl
-    sum_nll = [0. for _ in range(n_sampels)]  # sum of negative log likelyhood
+    sum_nll = [0. for _ in range(n_sampels)]  # sum of negative log likelihood
     sum_nll2 = [0. for _ in range(n_sampels)]  # sum of nll square
 
     pbar = tqdm(range(n_pred_per_sample * n_sampels))
@@ -186,7 +186,6 @@ def add_quant_args(parser: argparse.ArgumentParser):
                        type=str,
                        help="path to quantized weight; other quant args will be ignored if specified",
                        default="")
-    group.add_argument('--use_cache', action="store_true", help="Use local quantized model if file exists")
     group.add_argument(
         "--weight_dtype",
         choices=["int4", "int8"],

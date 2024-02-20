@@ -4,7 +4,7 @@ project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
-option(BTLA_USE_OPENMP "Enable OpenMP thread pool" ON)
+option(BTLA_USE_OPENMP "Enable OpenMP thread pool" OFF)
 
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
 option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
@@ -69,12 +69,13 @@ function(add_ut_flag UT_OPTION)
 endfunction()
 
 if(UT_BUILD)
-	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everthing even run parts of UTs
+	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everything even run parts of UTs
 	file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
   include_directories(${PROJECT_NAME})
 	add_executable(${PROJECT_NAME}_ut ${srcs} ${headers} ${ut_headers})
   if(BTLA_UT_OPENMP)
     include(FindOpenMP)
+    target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
     target_link_libraries(${PROJECT_NAME}_ut PRIVATE OpenMP::OpenMP_CXX)
   endif()
 	if(NOT WIN32)
