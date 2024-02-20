@@ -90,10 +90,10 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
         auto inputBundle
                 = get_kernel_bundle<bundle_state::input>(context, kernelId);
         static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS="+compile_str;
-        putenv(env_set_str.c_str());
+        putenv(const_cast<char*>(env_set_str.c_str()));
         kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
         static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-        putenv(env_unset_str.c_str());
+        putenv(const_cast<char*>(env_unset_str.c_str()));
 
         using namespace gpu::xetla::group;
         using namespace gpu::xetla::kernel;

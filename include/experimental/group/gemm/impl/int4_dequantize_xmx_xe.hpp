@@ -530,7 +530,7 @@ private:
                     xetla_vector<uint8_t, block_size_x_b * block_size_y_b>
                             zero_pt_blk;
 #pragma unroll
-                    for (int row = 0; row < block_size_y_b; row++) {
+                    for (uint32_t row = 0; row < block_size_y_b; row++) {
                         zero_pt_blk
                                 .xetla_select<block_size_x_b, 1>(
                                         row * block_size_x_b)
