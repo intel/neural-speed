@@ -152,7 +152,7 @@ tile_prefetch(payload_t &payload) {
             = payload_t::arch_tag == gpu_arch::Xe ? 64 : 32;
     if constexpr (prefetch_len >= reg_in_bytes) {
 #pragma unroll
-        for (int j = 0; j < prefetch_len / reg_in_bytes; j++) {
+        for (uint32_t j = 0; j < prefetch_len / reg_in_bytes; j++) {
             uint32_t offset_x = j * reg_in_bytes * payload_t::scale_factor;
             uint32_t address_offset = offset_x * sizeof(dtype);
             xetla_prefetch_global<prefetch_dtype, reg_in_bytes,

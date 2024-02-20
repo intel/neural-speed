@@ -83,10 +83,10 @@ void softmax_fwd_run() {
         auto inputBundle
                 = get_kernel_bundle<bundle_state::input>(context, kernelId);
         static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
-        putenv(env_set_str.c_str());
+        putenv(const_cast<char*>(env_set_str.c_str()));
         kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
         static const std::string env_del_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-        putenv(env_del_str.c_str());
+        putenv(const_cast<char*>(env_del_str.c_str()));
         try {
 
             auto e_softmax_fwd = queue.submit([&](handler &cgh) {

@@ -301,7 +301,7 @@ void stream_k_gemm_run(uint32_t iter) {
 
 
     static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF -vc-disable-indvars-opt -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
-    putenv(env_set_str.c_str());
+    putenv(const_cast<char*>(env_set_str.c_str()));
     //Define and initialize the data required for the calculation
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
@@ -434,7 +434,7 @@ void stream_k_gemm_run(uint32_t iter) {
     }
 
     static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-    putenv(env_unset_str.c_str());
+    putenv(const_cast<char*>(env_unset_str.c_str()));
 
     ASSERT_EQ(0,
             gemm_result_validate(A, B, C, Bias, matrix_m, matrix_k, matrix_n,

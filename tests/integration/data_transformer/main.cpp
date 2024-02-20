@@ -86,10 +86,10 @@ static void data_transformer_run() {
     auto inputBundle
             = get_kernel_bundle<bundle_state::input>(context, kernelId);
     static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
-    putenv(env_set_str.c_str());
+    putenv(const_cast<char*>(env_set_str.c_str()));
     kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
     static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-    putenv(env_unset_str.c_str());
+    putenv(const_cast<char*>(env_unset_str.c_str()));
 
     try {
         auto e_esimd = queue.submit([&](handler &cgh) {
