@@ -20,6 +20,7 @@ import logging
 import math
 import os
 import pathlib
+import psutil
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
@@ -64,7 +65,7 @@ def perplexity(model_name, dataset_name, **kwargs):
 
     ctx_size = kwargs.get("ctx_size", 256)
     prompt_size = kwargs.get("prompt_size", ctx_size // 4)  # use one quarter as prompt
-    n_threads = kwargs.get("n_threads", len(os.sched_getaffinity(0)))  # Note: linux only
+    n_threads = kwargs.get("n_threads", psutil.cpu_count(logical=False) or 1)
     n_pred_per_sample = kwargs.get("n_pred_per_sample", ctx_size * 2)
     n_sampels = kwargs.get("n_sampels", 2)
     data_text_concat = kwargs.get("data_text_concat", "wikitext-2-raw-v1" in dataset_name)  # concat samples with `\n\n`

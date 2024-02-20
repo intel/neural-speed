@@ -4,6 +4,7 @@ cmake
 datasets
 einops
 gguf
+matplotlib
 numpy
 peft
 protobuf<3.20
