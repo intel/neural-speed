@@ -24,7 +24,7 @@ from common import *
 
 def permute_func(weights, n_head: int, n_head_kv: int):
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head_kv, 2, weights.shape[0] // n_head_kv // 2, *weights.shape[1:])
                 .swapaxes(1, 2)
                 .reshape(weights.shape))
@@ -70,7 +70,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         n_embd // n_head,  # rot (obsolete)
         0, #file_type.value, # TODO
     ]
-    # import pdb; pdb.set_trace()
+
     f.write(struct.pack("i" * len(values), *values))
     f.write(struct.pack("i", 0))
     f.write(struct.pack("f", 0))
