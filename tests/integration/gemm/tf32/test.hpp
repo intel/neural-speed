@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../tests/utils/utils.hpp"
+#include <../tests/utils/utils.hpp>
 #include <gtest/gtest.h>
 
 class TF32_test_mat_m_9158_mat_k_4926_mat_n_466_wg_m_16_wg_n_64_sg_m_8_sg_n_16_sg_k_16_global_kslicing_1_local_kslicing_4_layout_a_row_major_layout_b_row_major_data_type_a_tf32_data_type_b_tf32_data_type_c_tf32 {

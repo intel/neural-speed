@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include <algorithm>
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
 
 using namespace cl::sycl;
@@ -183,7 +183,7 @@ void gemm_relu_bias_run(uint32_t iter) {
     }
 
     constexpr uint32_t warmup = 10;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k
             + matrix_m * matrix_n;
     profiling_helper prof("gemm_relu_bias_run", ops, "gflops");
     for (uint32_t i = 0; i < iter + warmup; i++) {

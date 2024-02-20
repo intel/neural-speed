@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string>
 #include "buff_compare.hpp"
-#include "common/common.hpp"
+#include <common/common.hpp>
 #include "gemm_gen.hpp"
 #include <CL/sycl.hpp>
 

@@ -15,7 +15,7 @@
 *******************************************************************************/
 #include <algorithm>
 #include "multi_layer_perceptron.hpp"
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 
 using namespace cl::sycl;
 using namespace gpu::xetla;
@@ -256,8 +256,8 @@ void mlp_run(uint32_t iter) {
         FAIL();
     }
     uint32_t warmup = 10;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k
-            + 2 * static_cast<long>(matrix_m) * matrix_n * matrix_l;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k
+            + 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_l;
     profiling_helper prof("mlp", ops, "gflops");
     for (uint32_t i = 0; i < iter + warmup; i++) {
         if (i >= warmup) { prof.cpu_start(); }

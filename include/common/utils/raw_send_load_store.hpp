@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "common/utils/common.hpp"
-#include "common/utils/limitation.hpp"
-#include "common/utils/tensor_descriptor.hpp"
+#include <common/utils/common.hpp>
+#include <common/utils/limitation.hpp>
+#include <common/utils/tensor_descriptor.hpp>
 
 namespace gpu::xetla {
 

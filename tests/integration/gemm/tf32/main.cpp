@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "../tests/utils/utils.hpp"
+#include <../tests/utils/utils.hpp>
 #include "kernel_func.hpp"
 #include "test.hpp"
 #include <gtest/gtest.h>

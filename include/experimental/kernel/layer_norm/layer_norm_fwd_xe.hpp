@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/layer_norm_fused_op_fwd_xe.hpp"
-#include "experimental/kernel/layer_norm/api.hpp"
-#include "experimental/kernel/layer_norm/common.hpp"
-#include "experimental/kernel/layer_norm/config.hpp"
+#include <experimental/group/fused_op/layer_norm_fused_op_fwd_xe.hpp>
+#include <experimental/kernel/layer_norm/api.hpp>
+#include <experimental/kernel/layer_norm/common.hpp>
+#include <experimental/kernel/layer_norm/config.hpp>
 
 namespace gpu::xetla::kernel {
 

@@ -15,9 +15,9 @@
 *******************************************************************************/
 #pragma once
 
-#include "utils/buff_compare.hpp"
+#include <utils/buff_compare.hpp>
 #include "xetla.hpp"
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 using namespace cl::sycl;
 using namespace gpu;

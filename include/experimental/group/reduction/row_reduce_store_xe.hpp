@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/group/reduction/reduction_api.hpp"
+#include <experimental/group/reduction/reduction_api.hpp>
 
 namespace gpu::xetla::group {
 

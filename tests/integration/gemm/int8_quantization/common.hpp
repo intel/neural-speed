@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "utils/common.hpp"
+#include <utils/common.hpp>
 #include "xetla.hpp"
 #include <gtest/gtest.h>
 
@@ -257,7 +257,7 @@ int gemm_result_validate(data_type_a *A_device, data_type_b *B_device,
             if (abs(result_quant - C[i * n + j]) > 1) {
                 if (++err_cnt < 100) {
                     std::cout << "failed at (" << i << ", " << j << "), "
-                              << " golden: " << uint(result_quant)
+                              << " golden: " << uint32_t(result_quant)
                               << " != GPU: " << float(C[i * n + j]) << "\n";
                 }
             }

@@ -17,8 +17,8 @@
 #pragma once
 
 #include "kernel_func.hpp"
-#include "utils/buff_compare.hpp"
-#include "utils/common.hpp"
+#include <utils/buff_compare.hpp>
+#include <utils/common.hpp>
 #include "xetla.hpp"
 #include <gtest/gtest.h>
 

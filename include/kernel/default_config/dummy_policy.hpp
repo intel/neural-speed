@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "kernel/default_config/common.hpp"
+#include <kernel/default_config/common.hpp>
 
 namespace gpu::xetla {
 template <param_optimizer_tag tag_, typename dict_t_, typename... candidates_t>

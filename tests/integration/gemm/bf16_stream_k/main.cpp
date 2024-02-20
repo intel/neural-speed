@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 #include "xetla.hpp"
 
 using namespace gpu::xetla;
@@ -299,11 +299,9 @@ void stream_k_gemm_run(uint32_t iter) {
             gemm_config::k_stride, wg_tile_n, sg_tile_m, sg_tile_n,
             avail_xecores);
 
-    setenv("SYCL_PROGRAM_COMPILE_OPTIONS",
-            " -vc-codegen -doubleGRF -vc-disable-indvars-opt "
-            " -Xfinalizer '-printregusage -enableBCR -DPASTokenReduction '",
-            1);
 
+    static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF -vc-disable-indvars-opt -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
+    putenv(env_set_str.c_str());
     //Define and initialize the data required for the calculation
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
@@ -350,7 +348,7 @@ void stream_k_gemm_run(uint32_t iter) {
 
     using epilogue_args_t = typename epilogue_t::arguments_t;
     uint32_t warmup = 0;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k;
     profiling_helper prof("stream_k_universal_gemm", ops, "gflops");
 
     if constexpr (postop_enable) {
@@ -435,7 +433,8 @@ void stream_k_gemm_run(uint32_t iter) {
         }
     }
 
-    unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
+    static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
+    putenv(env_unset_str.c_str());
 
     ASSERT_EQ(0,
             gemm_result_validate(A, B, C, Bias, matrix_m, matrix_k, matrix_n,

@@ -16,7 +16,7 @@
 
 #include "kernel_func.hpp"
 #include "scatter_common.hpp"
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 
 using namespace std::placeholders;
 

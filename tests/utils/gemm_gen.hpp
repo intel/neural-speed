@@ -17,7 +17,7 @@
 #pragma once
 
 #include <mkl.h>
-#include "common/core/core.hpp"
+#include <common/core/core.hpp>
 #include <type_traits>
 
 using namespace gpu::xetla;

@@ -17,14 +17,21 @@
 #include <cstring>
 #include <limits>
 #include <random>
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
+#include <type_traits>
 
 using namespace buff_cmp;
 
 template <typename dtype1>
 bool validate_buff_cmp_same(std::string name) {
     std::default_random_engine gen;
-    std::uniform_int_distribution<dtype1> dist1(
+    using dist_dtype1 =   // No 8-bit dist in the standard. https://stackoverflow.com/q/31460733
+        std::conditional_t<std::is_same_v<dtype1, int8_t>, int16_t, 
+        std::conditional_t<std::is_same_v<dtype1, uint8_t>, uint16_t,
+        dtype1
+    >>;
+
+    std::uniform_int_distribution<dist_dtype1> dist1(
             std::numeric_limits<dtype1>::min(),
             std::numeric_limits<dtype1>::max());
     dtype1 data[10000], other[10000];
@@ -40,10 +47,15 @@ bool validate_buff_cmp_same(std::string name) {
 template <typename dtype1>
 bool validate_buff_cmp_diff(std::string name) {
     std::default_random_engine gen;
-    std::uniform_int_distribution<dtype1> dist1(
+    using dist_dtype1 =  // No 8-bit dist in the standard. https://stackoverflow.com/q/31460733
+        std::conditional_t<std::is_same_v<dtype1, int8_t>, int16_t, 
+        std::conditional_t<std::is_same_v<dtype1, uint8_t>, uint16_t,
+        dtype1
+    >>;
+    std::uniform_int_distribution<dist_dtype1> dist1(
             std::numeric_limits<dtype1>::min(),
             std::numeric_limits<dtype1>::max() / 2);
-    std::uniform_int_distribution<dtype1> dist2(
+    std::uniform_int_distribution<dist_dtype1> dist2(
             0, std::numeric_limits<dtype1>::max() / 2);
     dtype1 data[10000], other[10000];
     for (int i = 0; i < 10000; ++i) {

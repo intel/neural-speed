@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "experimental/kernel/gemm/common.hpp"
-#include "experimental/kernel/gemm/dispatch_policy.hpp"
+#include <experimental/kernel/gemm/common.hpp>
+#include <experimental/kernel/gemm/dispatch_policy.hpp>
 
 namespace gpu::xetla::kernel {
 

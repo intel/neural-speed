@@ -16,8 +16,8 @@
 #pragma once
 
 #include "kernel_func.hpp"
-#include "utils/buff_compare.hpp"
-#include "gtest/gtest.h"
+#include <utils/buff_compare.hpp>
+#include <gtest/gtest.h>
 
 using namespace cl::sycl;
 

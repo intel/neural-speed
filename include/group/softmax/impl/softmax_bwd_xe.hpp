@@ -19,10 +19,10 @@
 
 #pragma once
 
-#include "group/reduction/reduction.hpp"
-#include "group/softmax/api.hpp"
-#include "group/softmax/common.hpp"
-#include "group/softmax/softmax_policy.hpp"
+#include <group/reduction/reduction.hpp>
+#include <group/softmax/api.hpp>
+#include <group/softmax/common.hpp>
+#include <group/softmax/softmax_policy.hpp>
 
 namespace gpu::xetla::group {
 

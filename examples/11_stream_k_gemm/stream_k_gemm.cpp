@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
 
 void stream_k_gemm_run(uint32_t iter) {
@@ -154,7 +154,7 @@ void stream_k_gemm_run(uint32_t iter) {
     }
 
     uint32_t warmup = 5;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k;
     profiling_helper prof("stream_k_universalgemm", ops, "gflops");
     for (uint32_t i = 0; i < iter + warmup; i++) {
         if (i >= warmup) { prof.cpu_start(); }
@@ -393,7 +393,7 @@ void stream_k_gemm_relu_biasadd_run(uint32_t iter) {
     }
 
     uint32_t warmup = 5;
-    long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k;
     profiling_helper prof(
             "stream_k_universal_gemm_relu_biasadd", ops, "gflops");
     for (uint32_t i = 0; i < iter + warmup; i++) {

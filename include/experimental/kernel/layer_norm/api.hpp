@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "experimental/kernel/layer_norm/common.hpp"
-#include "experimental/kernel/layer_norm/config.hpp"
+#include <experimental/kernel/layer_norm/common.hpp>
+#include <experimental/kernel/layer_norm/config.hpp>
 
 namespace gpu::xetla::kernel {
 

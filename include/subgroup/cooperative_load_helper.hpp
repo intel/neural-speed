@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "subgroup/tile/tile.hpp"
+#include <subgroup/tile/tile.hpp>
 
 namespace gpu::xetla::subgroup {
 

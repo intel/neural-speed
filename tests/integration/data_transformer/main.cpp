@@ -16,7 +16,7 @@
 
 #include "common.hpp"
 #include "kernel_func.hpp"
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 #include <gtest/gtest.h>
 
 using namespace gpu::xetla;
@@ -85,13 +85,11 @@ static void data_transformer_run() {
     std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
     auto inputBundle
             = get_kernel_bundle<bundle_state::input>(context, kernelId);
-    setenv("SYCL_PROGRAM_COMPILE_OPTIONS",
-            " -vc-codegen -Xfinalizer ' "
-            "-printregusage -enableBCR  "
-            "-DPASTokenReduction '",
-            1);
+    static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
+    putenv(env_set_str.c_str());
     kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
-    unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
+    static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
+    putenv(env_unset_str.c_str());
 
     try {
         auto e_esimd = queue.submit([&](handler &cgh) {

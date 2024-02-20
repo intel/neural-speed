@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "subgroup/tile/api.hpp"
-#include "subgroup/tile/common.hpp"
+#include <subgroup/tile/api.hpp>
+#include <subgroup/tile/common.hpp>
 
 namespace gpu::xetla::subgroup {
 

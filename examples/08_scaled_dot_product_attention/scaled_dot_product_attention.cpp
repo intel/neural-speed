@@ -15,7 +15,7 @@
  *******************************************************************************/
 
 #include "softmax.hpp"
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 
 using namespace gpu::xetla;
 using namespace cl::sycl;
@@ -232,7 +232,7 @@ void sdp_fwd_run(uint32_t iter) {
     cl::sycl::nd_range<3> nd_range(group_range * local_range, local_range);
 
     constexpr uint32_t warmup = 10;
-    long ops = long(4 * batch_num * head_num * sequence_len) * sequence_len
+    int64_t ops = int64_t(4 * batch_num * head_num * sequence_len) * sequence_len
             * head_size;
     profiling_helper prof("sdp", ops, "gflops");
     try {

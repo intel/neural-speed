@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #pragma once
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 
 enum class bit_shift_op : uint8_t {
     shl_vector = 0,

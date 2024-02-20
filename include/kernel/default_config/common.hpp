@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "common/common.hpp"
-#include "group/group.hpp"
-#include "subgroup/subgroup.hpp"
+#include <common/common.hpp>
+#include <group/group.hpp>
+#include <subgroup/subgroup.hpp>
 
 namespace gpu::xetla {
 
@@ -152,5 +152,5 @@ struct param_adaptor_base {
 
 } // namespace gpu::xetla
 
-#include "kernel/default_config/decision_tree_policy.hpp"
-#include "kernel/default_config/dummy_policy.hpp"
+#include <kernel/default_config/decision_tree_policy.hpp>
+#include <kernel/default_config/dummy_policy.hpp>

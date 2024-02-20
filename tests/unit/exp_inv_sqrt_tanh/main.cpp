@@ -17,7 +17,7 @@
 #include <cmath>
 #include "common.hpp"
 #include "kernel_func.hpp"
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 using namespace std::placeholders;
 
 TEST(test_exp_fp32, esimd) {

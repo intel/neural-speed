@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "experimental/group/fused_op/row_reduction_fused_op_api.hpp"
+#include <experimental/group/fused_op/row_reduction_fused_op_api.hpp>
 
 namespace gpu::xetla::group {
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  *******************************************************************************/
 
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
 
 using namespace gpu::xetla;
@@ -156,8 +156,8 @@ void gemm_softmax_run(uint32_t iter) {
     cl::sycl::nd_range<3> nd_range(group_range * local_range, local_range);
 
     uint32_t warmup = 10;
-    long ops
-            = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k * batch_num;
+    int64_t ops
+            = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k * batch_num;
     profiling_helper prof("gemm_softmax", ops, "gflops");
     try {
         for (uint32_t i = 0; i < iter + warmup; i++) {

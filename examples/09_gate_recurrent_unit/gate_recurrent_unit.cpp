@@ -14,7 +14,7 @@
  * limitations under the License.
  *******************************************************************************/
 #include "kernel_func.hpp"
-#include "tests/utils/utils.hpp"
+#include <tests/utils/utils.hpp>
 
 using namespace cl::sycl;
 using namespace gpu::xetla;
@@ -354,7 +354,7 @@ void gru_run(uint32_t iter) {
               << ", group_size_y: " << (wg_tile_m + sg_tile_m - 1) / sg_tile_m
               << std::endl;
     uint32_t warmup = 10;
-    long ops = 3 * L * (2 * N * F * H + 2 * N * H * H)
+    int64_t ops = 3 * L * (2 * N * F * H + 2 * N * H * H)
             + (S - 1) * 12 * L * N * H * H;
     profiling_helper prof("gru", ops, "gflops");
     // esimd kernel prepratation and execution

@@ -16,7 +16,7 @@
 
 #include "common.hpp"
 #include "kernel_func.hpp"
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 #include <gtest/gtest.h>
 
 std::string esimd_compile_string

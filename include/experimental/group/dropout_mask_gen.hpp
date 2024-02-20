@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "common/common.hpp"
-#include "subgroup/tile/tile.hpp"
+#include <common/common.hpp>
+#include <subgroup/tile/tile.hpp>
 
 namespace gpu::xetla::group {
 
