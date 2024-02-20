@@ -11,8 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import os
-import sys
 from pathlib import Path
 import argparse
 from typing import List, Optional
@@ -65,7 +63,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         "--scale_dtype",
         type=str,
         choices=["fp32", "bf16", "fp8"],
-        help="Data type of scales: fp32/bf16 (dafault fp32)",
+        help="Data type of scales: fp32/bf16 (default fp32)",
         default="fp32",
     )
     parser.add_argument(
@@ -87,6 +85,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         type=str,
         help="Prompt to start generation with: String (default: empty)",
         default="Once upon a time, there existed a ",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="Path to a text file containing the prompt (for large prompts)",
+        default=None,
     )
     parser.add_argument(
         "-n",
@@ -195,6 +200,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     infer_cmd.extend(["--model_name", model_type])
     infer_cmd.extend(["-m", Path(work_path, "ne_{}_{}.bin".format(model_type, args.weight_dtype, args.group_size))])
     infer_cmd.extend(["--prompt", args.prompt])
+    infer_cmd.extend(["--file", args.file])
     infer_cmd.extend(["--n_predict", str(args.n_predict)])
     infer_cmd.extend(["--threads", str(args.threads)])
     infer_cmd.extend(["--batch_size_truncate", str(args.batch_size_truncate)])
@@ -214,3 +220,4 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
+

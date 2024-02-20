@@ -12,19 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import os
-import sys
 from pathlib import Path
 import argparse
 from typing import List, Optional
 import subprocess
 from transformers import AutoTokenizer
+import neural_speed
 
 model_maps = {"gpt_neox": "gptneox", "llama2": "llama", "gpt_bigcode": "starcoder"}
 build_path = Path(Path(__file__).parent.absolute(), "../build/")
-
-
-def is_win():
-    return sys.platform.startswith('win')
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
@@ -38,6 +34,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         type=str,
         help="Prompt to start generation with: String (default: empty)",
         default="",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="Path to a text file containing the prompt (for large prompts)",
+        default=None,
     )
     parser.add_argument(
         "--tokenizer",
@@ -129,24 +132,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     args = parser.parse_args(args_in)
     print(args)
-    model_name = model_maps.get(args.model_name, args.model_name)
-    if is_win():
-        path = Path(args.build_dir, "./Bin/Release/run_{}.exe".format(model_name))
+    if args.file:
+        with open(args.file, 'r') as f:
+            prompt_text = f.read()
     else:
-        if args.one_click_run == "True":
-            import neural_speed
-            package_path = os.path.dirname(neural_speed.__file__)
-            path = Path(package_path, "./run_{}".format(model_name))
-        else:
-            path = Path(args.build_dir, "./bin/run_{}".format(model_name))
-
-    if not path.exists():
-        print("Please build graph first or select the correct model name.")
-        sys.exit(1)
+        prompt_text = args.prompt
+    model_name = model_maps.get(args.model_name, args.model_name)
+    package_path = os.path.dirname(neural_speed.__file__)
+    path = Path(package_path, "./run_{}".format(model_name))
 
     cmd = [path]
     cmd.extend(["--model", args.model])
-    cmd.extend(["--prompt", args.prompt])
+    cmd.extend(["--prompt", prompt_text])
     cmd.extend(["--n-predict", str(args.n_predict)])
     cmd.extend(["--threads", str(args.threads)])
     cmd.extend(["--batch-size-truncate", str(args.batch_size_truncate)])
@@ -167,7 +164,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     if (args.model_name == "chatglm"):
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, trust_remote_code=True)
-        token_ids_list = tokenizer.encode(args.prompt)
+        token_ids_list = tokenizer.encode(prompt_text)
         token_ids_list = map(str, token_ids_list)
         token_ids_str = ', '.join(token_ids_list)
         cmd.extend(["--ids", token_ids_str])
@@ -207,14 +204,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 else:
                     ids.append(ASSISTANT_TOKEN_ID)
 
-                content_ids = tokenizer.encode(args.prompt)
+                content_ids = tokenizer.encode(prompt_text)
                 ids.extend(content_ids)
 
             ids.append(ASSISTANT_TOKEN_ID)
             truncate(ids, max_length)
             return ids
 
-        history = [args.prompt]
+        history = [prompt_text]
         token_ids_list = encode_history(history)
         token_ids_list = map(str, token_ids_list)
         token_ids_str = ', '.join(token_ids_list)
@@ -226,3 +223,4 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
+
