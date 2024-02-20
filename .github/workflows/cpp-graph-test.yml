@@ -8,6 +8,9 @@ on:
        - '.github/workflows/scripts/models/cpp_graph_inference.sh'
        - 'neural_speed/**'
        - 'bestla/**'
+       - 'CMakeLists.txt'
+       - 'setup.py'
+       - '!**/*.md'
   workflow_dispatch:
     inputs:
       compiler_version:
