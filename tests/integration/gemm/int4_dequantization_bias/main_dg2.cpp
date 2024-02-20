@@ -19,7 +19,7 @@
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
-constexpr int ITER = 100;
+constexpr int ITER = 1000;
 
 class test1 {
 public:
@@ -513,9 +513,11 @@ void dequantize_gemm_run(int iter) {
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
+    int constexpr warm = 100;
     try {
-        for (int i = 0; i < iter; i++) {
-            prof.cpu_start();
+        for (int i = 0; i < iter + warm; i++) {
+          if (i >= warm)
+				prof.cpu_start();
             auto e_esimd = queue.submit([&](handler &cgh) {
                 cgh.parallel_for(
                         nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
@@ -525,9 +527,11 @@ void dequantize_gemm_run(int iter) {
                             gemm_op(item, gemm_arg);
                         });
             });
+          if (i >= warm) {
             e_esimd.wait();
             prof.cpu_end();
             prof.add_gpu_event(e_esimd);
+          }
         }
     } catch (cl::sycl::exception const &e) {
         std::cout << "SYCL exception caught: " << e.what() << '\n';
