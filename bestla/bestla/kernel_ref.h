@@ -152,7 +152,6 @@ static inline BTLA_CODE transpose2d(const _T* srcptr, _T* dstptr, int row, int c
   return BTLA_CODE::Success;
 }
 
-template <int NTile>
 static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstptr, int row, int col, int ld_src,
                                        int ld_dst) {
   for (int j = 0; j < row; j++) {
@@ -166,7 +165,6 @@ static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstp
   return BTLA_CODE::Success;
 }
 
-template <int NTile>
 static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, int row, int col, int ld_src,
                                     int ld_dst) {
   for (int j = 0; j < row; j++) {
@@ -175,6 +173,48 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
       tmp.x = srcptr[j * ld_src + ii + 0];
       tmp.y = srcptr[j * ld_src + ii + 1];
       dstptr[j * ld_dst / 2 + ii / 2] = tmp;
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                      int row, int col, int ld_src, int ld_dst) {
+  assert(col % 128 == 0);
+
+  auto bit2_interleave = [&](int8_t* src, int8_t* dst) {
+    for (int i = 0; i < 128 / 4; i++) {
+      dst[4 * i] = src[i];
+      dst[4 * i + 1] = src[128 / 4 + i];
+      dst[4 * i + 2] = src[128 / 4 * 2 + i];
+      dst[4 * i + 3] = src[128 / 4 * 3 + i];
+    }
+  };
+
+  int8_t interleave_buf[128];
+
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j += 128) {
+      bit2_interleave(const_cast<int8_t*>(srcptr + i * ld_src + j), interleave_buf);
+      for (int k = 0; k < 32; k++) {
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].a = interleave_buf[4 * k] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].b = interleave_buf[4 * k + 1] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].c = interleave_buf[4 * k + 2] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].d = interleave_buf[4 * k + 3] >> 5;
+      }
+    }
+  }
+  // store 1 bit without interleave as mask.
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j += 8) {
+      bit1ptr[i * ld_dst / 8 + j / 8].a = srcptr[i * ld_src + j] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].b = srcptr[i * ld_src + j + 1] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].c = srcptr[i * ld_src + j + 2] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].d = srcptr[i * ld_src + j + 3] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].e = srcptr[i * ld_src + j + 4] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].f = srcptr[i * ld_src + j + 5] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].g = srcptr[i * ld_src + j + 6] >> 7;
+      bit1ptr[i * ld_dst / 8 + j / 8].h = srcptr[i * ld_src + j + 7] >> 7;
     }
   }
   return BTLA_CODE::Success;
@@ -905,6 +945,7 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       switch (S4_T) {
         case BTLA_DTYPE::S8:
         case BTLA_DTYPE::S4_CLIP:
+        case BTLA_DTYPE::S3_CLIP:
           if (zero_points == nullptr) {
             s8_calc_store_scale_and_quantv_sym(blocksize);
           } else {

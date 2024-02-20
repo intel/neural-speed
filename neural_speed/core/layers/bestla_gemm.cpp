@@ -264,6 +264,7 @@ size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantTyp
                          ne_comp_type CompType, int* shuffle_indice) {
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
+    case BTLA_DTYPE::S3_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
     case BTLA_DTYPE::S8:
       return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNInteger>(N, K, BlkSize, QuantType, ScaleDtype,
@@ -364,6 +365,7 @@ bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K
                         void* ThreadPool) {
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
+    case BTLA_DTYPE::S3_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
     case BTLA_DTYPE::S8:
       return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(
@@ -566,6 +568,7 @@ size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantTyp
                          ne_comp_type CompType, int* shuffle_indice) {
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
+    case BTLA_DTYPE::S3_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
     case BTLA_DTYPE::S8:
       return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNInteger>(N, K, BlkSize, QuantType, ScaleDtype,
@@ -589,6 +592,7 @@ bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K
                         void* ThreadPool) {
   switch (QuantType) {
     case BTLA_DTYPE::S4_CLIP:
+    case BTLA_DTYPE::S3_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
     case BTLA_DTYPE::S8:
       return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(
@@ -611,6 +615,7 @@ bool BTLAGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, co
                    ne_comp_type CompType, int* shuffle_indice, void* ThreadPool) {
   // only for integer quant
   switch (QuantType) {
+    case BTLA_DTYPE::S3_CLIP:
     case BTLA_DTYPE::S4_CLIP:
     case BTLA_DTYPE::S4_FULLRANGE:
     case BTLA_DTYPE::S8:
