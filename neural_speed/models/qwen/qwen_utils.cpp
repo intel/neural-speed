@@ -52,14 +52,12 @@ void QWEN::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
-  n_ff = hparams.n_mult / 2;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
-  fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
   fprintf(stderr, "%s: n_layer    = %u\n", __func__, hparams.n_layer);
   fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
-  fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
+  fprintf(stderr, "%s: n_ff       = %u\n", __func__, hparams.ffn_hidden_size / 2);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
@@ -98,32 +96,59 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
   }
 
   ml->ne_ctx = ne_ctx;
-
-  model.others[0] = ml->get_tensor("transformer.wte.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-  model.others[1] = ml->get_tensor("transformer.ln_f.weight", {n_embd}, NE_BACKEND_CPU);
-  model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
   const int i_gpu_start = n_layer - n_gpu_layer;
 
   model.layers.resize(n_layer);
   size_t vram_total = 0;
-  for (uint32_t i = 0; i < n_layer; ++i) {
-    const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
-    auto& layer = model.layers[i];
-    std::string layers_i = "transformer.h." + std::to_string(i);
 
-    // norm: cur = ln_1_g*cur
-    layer.norm[0] = ml->get_tensor(layers_i + ".ln_1.weight", {n_embd}, backend);
-    layer.norm[1] = ml->get_tensor(layers_i + ".ln_2.weight", {n_embd}, backend);
+  if (ml->verify_tensor("token_embd.weight")) {
+    model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
 
-    // qkv GEMM
-    layer.attn[0] = ml->get_tensor(layers_i + ".attn.c_attn.weight", {n_embd, 3 * n_embd}, backend);
-    layer.attn[1] = ml->get_tensor(layers_i + ".attn.c_attn.bias", {3 * n_embd}, backend);
-    layer.attn[2] = ml->get_tensor(layers_i + ".attn.c_proj.weight", {n_embd, n_embd}, backend);
+    for (uint32_t i = 0; i < n_layer; ++i) {
+      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
+      auto& layer = model.layers[i];
+      std::string layers_i = "blk." + std::to_string(i);
 
-    // ffn GEMM
-    layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.w1.weight", {n_embd, n_ff}, backend);
-    layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.w2.weight", {n_embd, n_ff}, backend);
-    layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.c_proj.weight", {n_ff, n_embd}, backend);
+      // norm: cur = ln_1_g*cur
+      layer.norm[0] = ml->get_tensor(layers_i + ".attn_norm.weight", {n_embd}, backend);
+      layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
+
+      // qkv GEMM
+      layer.attn[0] = ml->get_tensor(layers_i + ".attn_qkv.weight", {n_embd, 3 * n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".attn_qkv.bias", {3 * n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+
+      // ffn GEMM
+      layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, n_ff}, backend);
+      layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, n_ff}, backend);
+      layer.ffn[2] = ml->get_tensor(layers_i + ".ffn_down.weight", {n_ff, n_embd}, backend);
+    }
+  } else {
+    model.others[0] = ml->get_tensor("transformer.wte.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("transformer.ln_f.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+
+    for (uint32_t i = 0; i < n_layer; ++i) {
+      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
+      auto& layer = model.layers[i];
+      std::string layers_i = "transformer.h." + std::to_string(i);
+
+      // norm: cur = ln_1_g*cur
+      layer.norm[0] = ml->get_tensor(layers_i + ".ln_1.weight", {n_embd}, backend);
+      layer.norm[1] = ml->get_tensor(layers_i + ".ln_2.weight", {n_embd}, backend);
+
+      // qkv GEMM
+      layer.attn[0] = ml->get_tensor(layers_i + ".attn.c_attn.weight", {n_embd, 3 * n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".attn.c_attn.bias", {3 * n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".attn.c_proj.weight", {n_embd, n_embd}, backend);
+
+      // ffn GEMM
+      layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.w1.weight", {n_embd, n_ff}, backend);
+      layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.w2.weight", {n_embd, n_ff}, backend);
+      layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.c_proj.weight", {n_ff, n_embd}, backend);
+    }
   }
 
   // print memory requirements
