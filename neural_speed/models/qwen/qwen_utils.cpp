@@ -52,6 +52,7 @@ void QWEN::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
+  n_ff = hparams.ffn_hidden_size / 2;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
