@@ -27,7 +27,7 @@ class UT_OMPThreading {
     kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col,
                                                                              row);
     parallel::Scheduler2D _para({threads, row, col, 1, 1});
-    DefaultThreading.parallel_for([&](int tidx) {
+    UT_Threading::get()->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       _para.getIndex(thdp);
       if (thdp.valid) {
@@ -61,7 +61,7 @@ class UT_StdThreading {
     kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col,
                                                                              row);
     parallel::Scheduler2D _para({threads, row, col, 1, 1});
-    DefaultThreading.parallel_for([&](int tidx) {
+    UT_Threading::get()->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       _para.getIndex(thdp);
       if (thdp.valid) {

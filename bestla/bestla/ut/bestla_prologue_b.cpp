@@ -69,11 +69,11 @@ class UT_BlockQunatize_INT8 {
     auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
-    kernel.packWeight(n, k, dequanRef.data(), ldb, &ptr, &DefaultThreading);
+    kernel.packWeight(n, k, dequanRef.data(), ldb, &ptr, UT_Threading::get());
     avector<float> dequant(n * k);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
     avector<int8_t> ws8(n * k);
-    kernel.unpackWeight(n, k, &ptr, ws8.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &ptr, ws8.data(), n, UT_Threading::get());
     ut::buffer_error(quanW.data(), ws8.data(), ws8.size(), (int8_t)1);
     ut::buffer_error(dequanRef.data(), dequant.data(), dequanRef.size(), 0.01f);
   }
@@ -119,13 +119,13 @@ class UT_BlockQunatize_INT8 {
     auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
-    kernel.packTransposeWeight(n, k, dequanT.data(), k, &ptr, &DefaultThreading);
+    kernel.packTransposeWeight(n, k, dequanT.data(), k, &ptr, UT_Threading::get());
     avector<float> dequant(n * k), tardequanT(k * n);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
-    kernel.unpackTransposeWeight(n, k, &ptr, tardequanT.data(), k, &DefaultThreading);
+    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
+    kernel.unpackTransposeWeight(n, k, &ptr, tardequanT.data(), k, UT_Threading::get());
     ut::buffer_error(dequanT.data(), tardequanT.data(), tardequanT.size(), 0.01f);
     avector<int8_t> ws8(n * k);
-    kernel.unpackWeight(n, k, &ptr, ws8.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &ptr, ws8.data(), n, UT_Threading::get());
     ut::buffer_error(quanW.data(), ws8.data(), ws8.size(), (int8_t)1);
     ut::buffer_error(dequanRef.data(), dequant.data(), dequanRef.size(), 0.01f);
   }
@@ -160,12 +160,12 @@ class UT_BlockQunatize_F8 {
     avector<int8_t> ref_buffer(ptr.mSize);
     ptr.assign(buffer.data());
     ref_ptr.assign(ref_buffer.data());
-    kernel.packWeight(n, k, raw.data(), ldb, &ptr, &DefaultThreading);
-    ref_ker.packWeight(n, k, raw.data(), ldb, &ref_ptr, &DefaultThreading);
+    kernel.packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
+    ref_ker.packWeight(n, k, raw.data(), ldb, &ref_ptr, UT_Threading::get());
     avector<float> dequant(n * k, 0);
     avector<float> ref_dequant(n * k, 0);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, &DefaultThreading);
-    ref_ker.unpackWeight(n, k, &ref_ptr, ref_dequant.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
+    ref_ker.unpackWeight(n, k, &ref_ptr, ref_dequant.data(), n, UT_Threading::get());
     ut::buffer_error(ref_dequant.data(), dequant.data(), dequant.size(), 0.01f);
   }
 };
@@ -351,10 +351,10 @@ class UT_TransposeBlockQuantize_F4 {
     avector<int8_t> buf(packedW.mSize), buf1(packedW1.mSize);
     packedW.assign(buf.data());
     packedW1.assign(buf1.data());
-    kernel.packTransposeWeight(n, k, dequanRef.data(), k, &packedW, &DefaultThreading);
-    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &packedW1, &DefaultThreading);
+    kernel.packTransposeWeight(n, k, dequanRef.data(), k, &packedW, UT_Threading::get());
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &packedW1, UT_Threading::get());
     avector<float> dequant(n * k);
-    kernel.unpackTransposeWeight(n, k, &packedW1, dequant.data(), k, &DefaultThreading);
+    kernel.unpackTransposeWeight(n, k, &packedW1, dequant.data(), k, UT_Threading::get());
     if (SCA_T != BTLA_DTYPE::DQ8_BNB) {
       ut::buffer_error(packedW.SPtr<float>(), packedW1.SPtr<float>(), packedW1.CSize());
       ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size());
@@ -417,11 +417,11 @@ class UT_BlockQuantize_INT4 {
     auto packedW = kernel.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(packedW.mSize);
     packedW.assign(buffer.data());
-    kernel.packWeight(n, k, dequant.data(), ldb, &packedW, &DefaultThreading);
+    kernel.packWeight(n, k, dequant.data(), ldb, &packedW, UT_Threading::get());
     avector<float> unpackf32(dequant.size());
     avector<float> unpack512f32(dequant.size());
-    kernel.unpackWeight(n, k, &packedW, unpackf32.data(), n, &DefaultThreading);
-    kernel512.unpackWeight(n, k, &packedW, unpack512f32.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &packedW, unpackf32.data(), n, UT_Threading::get());
+    kernel512.unpackWeight(n, k, &packedW, unpack512f32.data(), n, UT_Threading::get());
     ut::buffer_error(unpackf32.data(), unpack512f32.data(), unpackf32.size(), 0.01f);
   }
   void ut_512vnni(int n, int k, int blocksize, BTLA_DTYPE qtype, bool asym = false) {
@@ -459,9 +459,9 @@ class UT_BlockQuantize_INT4 {
     auto packedW = kernel.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(packedW.mSize);
     packedW.assign(buffer.data());
-    kernel.packWeight(n, k, dequant.data(), ldb, &packedW, &DefaultThreading);
+    kernel.packWeight(n, k, dequant.data(), ldb, &packedW, UT_Threading::get());
     avector<float> unpackf32(dequant.size());
-    kernel.unpackWeight(n, k, &packedW, unpackf32.data(), n, &DefaultThreading);
+    kernel.unpackWeight(n, k, &packedW, unpackf32.data(), n, UT_Threading::get());
     int lsb = 16;
     float err_thres = lsb * 0.01f;  // lsb*max_scale
     ut::buffer_error(dequant.data(), unpackf32.data(), dequant.size(), err_thres);
@@ -549,7 +549,7 @@ class UT_ShuffleIndices {
     }
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());
-    ProWei.setShuffleIndices(groupindices.data(), &packedW, &DefaultThreading);
+    ProWei.setShuffleIndices(groupindices.data(), &packedW, UT_Threading::get());
     buffer_error(reflut.data(), packedW.ShfIndice(), reflut.size());
 
     storage::gemm::StorageWeightKBlockNInteger tmp(GemmCore::ID);
@@ -585,7 +585,7 @@ class UT_ShuffleIndices {
       rordA.assign(bufA.data());
       typename Launcher::Param args{
           gp, {aarray.data(), k, nullptr, wptr_->ShfIndice(), &rordA}, {wptr_}, {output.data(), n}};
-      parallel::GemmRunWithA<parallel::gemm::SchedulerBase<GemmCore>>(kernel, args, &DefaultThreading);
+      parallel::GemmRunWithA<parallel::gemm::SchedulerBase<GemmCore>>(kernel, args, UT_Threading::get());
 
     } else {
       using Launcher =
@@ -603,7 +603,7 @@ class UT_ShuffleIndices {
           redA.template RPtr<float>(),    redA.lda};
       typename Launcher::Param args{
           gp, {aarray.data(), k, &redA, wptr_->ShfIndice(), &rordA}, {wptr_}, blkargs, {output.data(), n}};
-      parallel::GemmRunWithA<parallel::gemm::SchedulerKBlock<GemmCore>>(kernel, args, &DefaultThreading);
+      parallel::GemmRunWithA<parallel::gemm::SchedulerKBlock<GemmCore>>(kernel, args, UT_Threading::get());
     }
 
     ut::buffer_error(output.data(), oarray.data(), output.size());
@@ -741,9 +741,9 @@ class UT_CompFp32 {
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
     fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     utils::GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp,
@@ -751,7 +751,7 @@ class UT_CompFp32 {
                                   {&packedw},
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = INT8_ERR;
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
@@ -788,9 +788,9 @@ class UT_CompFp32 {
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
     fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp,
@@ -798,7 +798,7 @@ class UT_CompFp32 {
                                   {&packedw},
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = FP4_ERR;
 
     if (qtype == BTLA_DTYPE::F8_E5M2 || qtype == BTLA_DTYPE::F8_E4M3) err = F8_ERR;
@@ -864,7 +864,7 @@ class UTBenchmark_CompFp32 {
     using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
@@ -883,7 +883,7 @@ class UTBenchmark_CompFp32 {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
     }
-    kernel.mProB.packWeight(n, k, B, n, &packBs[0], &DefaultThreading);
+    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
@@ -896,7 +896,7 @@ class UTBenchmark_CompFp32 {
         log.start();
         GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {&packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           double band = double(memsize) / log.avg_val / 1e6;
@@ -921,7 +921,7 @@ class UTBenchmark_CompFp32 {
                                          prologue_b::gemm::WeightKBlockNInteger,
                                          epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
@@ -943,7 +943,7 @@ class UTBenchmark_CompFp32 {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
     }
-    kernel.mProB.packWeight(n, k, B, n, &packBs[0], &DefaultThreading);
+    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
@@ -960,8 +960,8 @@ class UTBenchmark_CompFp32 {
                                       {&packBs[i]},
                                       // {packBs[i].template SPtr<int8_t>(), packBs[i].SDtype(), packBs[i].CStep()},
                                       {C + i * m * n, n}};
-        // parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
-        parallel::GemmRunWithA<Parallel>(kernel, args, &DefaultThreading);
+        // parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRunWithA<Parallel>(kernel, args, UT_Threading::get());
       }
       if (log.stop()) {
         double t = log.avg_val / batch;
@@ -1139,16 +1139,16 @@ class UT_CompInt8 {
         reduceAf32[i * kblks + j / blocksize] += matAf32[i * k + j];
       }
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     auto quanA = launcher.mProA.createStorage(m, k, blocksize, isAsym);
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &quanA}, {&packedw}, {matC.data(), n}};
-    parallel::GemmRunWithA<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
     auto err = INT8_ERR;
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
@@ -1204,9 +1204,9 @@ class UT_CompInt8 {
         reduceAf32[i * kblks + j / blocksize] += matAf32[i * k + j];
       }
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{
@@ -1217,7 +1217,7 @@ class UT_CompInt8 {
          packedw.template RPtr<void>(), packedw.RDtype(), isAsym ? packedw.template ZPtr<int8_t>() : nullptr,
          isAsym ? reduceAf32.data() : nullptr, blocksize},
         {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = INT8_ERR;
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
@@ -1272,9 +1272,9 @@ class UT_CompInt8 {
         reduceAf32[i * kblks + j / blocksize] += matAf32[i * k + j];
       }
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{
@@ -1285,7 +1285,7 @@ class UT_CompInt8 {
          quanA.CStep(), quanA.template ZPtr<uint8_t>(), packedw.template RPtr<void>(), packedw.RDtype(),
          packedw.template ZPtr<int8_t>(), quanA.template RPtr<float>(), blocksize},
         {matC.data(), n}};
-    parallel::GemmRunWithA<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
     auto err = INT8_ERR;
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
@@ -1334,9 +1334,9 @@ class UT_CompInt8 {
         reduceAf32[i * kblks + j / blocksize] += matAf32[i * k + j];
       }
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{
@@ -1346,7 +1346,7 @@ class UT_CompInt8 {
         {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep(), scaleAf32.data(), kblks, nullptr, nullptr,
          bestla_dtype<float>, packedw.template ZPtr<int8_t>(), reduceAf32.data(), blocksize},
         {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = INT8_ERR;
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
@@ -1446,9 +1446,9 @@ class UT_CompBf16 {
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBf32[i] = matBbf16[i];
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBbf16[i] = static_cast<utils::bf16>(matBf32[i]);
     }
@@ -1459,7 +1459,7 @@ class UT_CompBf16 {
                                   {&packedw},
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.05f);
@@ -1520,7 +1520,7 @@ class UTBenchmark_CompBf16 {
     using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationConverterFp32, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
@@ -1537,7 +1537,7 @@ class UTBenchmark_CompBf16 {
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, B + i * n * k, n, &packBs[i], &DefaultThreading);
+      kernel.mProB.packWeight(n, k, B + i * n * k, n, &packBs[i], UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
@@ -1547,7 +1547,7 @@ class UTBenchmark_CompBf16 {
         log.start();
         GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {&packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           double band = double(memsize) / log.avg_val / 1e6;
@@ -1657,7 +1657,7 @@ class UT_ORT_NBits {
         }
       }
       rA.assign(tmpA.data());
-      launcher.mProA.reduce({matAf32.data(), k, &rA}, m, k, blocksize, &DefaultThreading);  // for reduce UT
+      launcher.mProA.reduce({matAf32.data(), k, &rA}, m, k, blocksize, UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear
     }
@@ -1675,11 +1675,11 @@ class UT_ORT_NBits {
       }
     }
     launcher.mProB.packNbitsWeightQ4(n, k, isasym, (uint8_t*)matBs4.data(), k, scalesB.data(), (uint8_t*)zpBs4.data(),
-                                     &packedw, &DefaultThreading);
-    launcher.mProB.reduceWeight(&packedw, &DefaultThreading);
+                                     &packedw, UT_Threading::get());
+    launcher.mProB.reduceWeight(&packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     avector<float> revB(matBf32.size());
-    launcher.mProB.unpackWeight(n, k, &packedw, revB.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, revB.data(), n, UT_Threading::get());
     buffer_error(matBf32.data(), revB.data(), revB.size(), FP32_ERR);
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), revB.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
@@ -1691,9 +1691,9 @@ class UT_ORT_NBits {
          isasym ? packedw.template ZPtr<int8_t>() : nullptr, rA.template RPtr<float>(), rA.lda},
         {matC.data(), n}};
     if (isasym) {
-      parallel::GemmRunWithA<Parallel>(launcher, args, &DefaultThreading);
+      parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
     } else {
-      parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+      parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     }
     auto err = INT4_ERR;
     buffer_error(refC.data(), matC.data(), refC.size(), err);
@@ -1738,7 +1738,7 @@ class UT_ORT_NBits {
         }
       }
       rA.assign(tmpA.data());
-      launcher.mProA.reduce({matAf32.data(), k, &rA}, m, k, blocksize, &DefaultThreading);  // for reduce UT
+      launcher.mProA.reduce({matAf32.data(), k, &rA}, m, k, blocksize, UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear
     }
@@ -1748,7 +1748,7 @@ class UT_ORT_NBits {
       }
     }
 
-    launcher.mProB.packQWeight(n, k, qdata.data(), n, sdata.data(), zdata.data(), &packedw, &DefaultThreading);
+    launcher.mProB.packQWeight(n, k, qdata.data(), n, sdata.data(), zdata.data(), &packedw, UT_Threading::get());
 
     auto bfile = readFile2Buffer<int8_t>("bestla_w3.weight.bin");
     WType packedfile(0);
@@ -1758,7 +1758,7 @@ class UT_ORT_NBits {
     buffer_error(packedw.ZPtr<int8_t>(), packedfile.ZPtr<int8_t>(), packedw.CSize());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     avector<float> revB(matBf32.size());
-    launcher.mProB.unpackWeight(n, k, &packedw, revB.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, revB.data(), n, UT_Threading::get());
     buffer_error(matBf32.data(), revB.data(), revB.size(), FP32_ERR);
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), revB.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
@@ -1770,9 +1770,9 @@ class UT_ORT_NBits {
          isasym ? packedw.template ZPtr<int8_t>() : nullptr, rA.template RPtr<float>(), rA.lda},
         {matC.data(), n}};
     if (isasym) {
-      parallel::GemmRunWithA<Parallel>(launcher, args, &DefaultThreading);
+      parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
     } else {
-      parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+      parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     }
     auto err = INT4_ERR;
     buffer_error(refC.data(), matC.data(), refC.size(), err);
@@ -1856,9 +1856,9 @@ class UT_CompFp16 {
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBf32[i] = matBbf16[i];
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, &DefaultThreading);
+    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBbf16[i] = static_cast<utils::bf16>(matBf32[i]);
     }

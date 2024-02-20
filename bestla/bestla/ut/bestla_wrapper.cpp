@@ -47,10 +47,10 @@ class UT_Fp32Fp32 {
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
-    launcher.mProB.packWeight(n, k, {matB.data(), n, &packw}, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, {matB.data(), n, &packw}, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matA.data(), k}, {matB.data(), n, &packw}, {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     ut::buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 
@@ -65,7 +65,7 @@ class UT_Fp32Fp32 {
         wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
                                     epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
@@ -74,7 +74,7 @@ class UT_Fp32Fp32 {
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, &DefaultThreading);
+      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -83,7 +83,7 @@ class UT_Fp32Fp32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("%s %s Flops:%.3f PerCoreFlops:%.3f\n ", corestr, log.get_log_str(), flops, flops / threads);
@@ -190,14 +190,14 @@ class UT_U8S8S32 {
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
-    launcher.mProB.packWeight(n, k, {matBs8.data(), n, &packw}, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, {matBs8.data(), n, &packw}, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{
         gp,
         {matAu8.data(), k},
         {matBs8.data(), n, &packw},
         {matC.data(), n, 1, scaleAf32.data(), scaleBf32.data(), zpAu8.data(), reduceB.data()}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     ut::buffer_error(refC.data(), matC.data(), refC.size(), 0.001f);
   }
 
@@ -212,7 +212,7 @@ class UT_U8S8S32 {
         wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
                                     epilogue::gemm::AccumulatorWriteBackInt32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
@@ -221,7 +221,7 @@ class UT_U8S8S32 {
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, &DefaultThreading);
+      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -230,7 +230,7 @@ class UT_U8S8S32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -324,11 +324,11 @@ class UT_S8S8S32 {
     auto packw = launcher.mProB.createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
-    launcher.mProB.packWeight(n, k, {matBs8.data(), n, &packw}, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, {matBs8.data(), n, &packw}, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{
         gp, {matAu8.data(), k}, {matBs8.data(), n, &packw}, {matC.data(), n, 1, scaleAf32.data(), scaleBf32.data()}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     ut::buffer_error(refC.data(), matC.data(), refC.size(), 0.001f);
   }
 
@@ -343,7 +343,7 @@ class UT_S8S8S32 {
         wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
                                     epilogue::gemm::AccumulatorWriteBackInt32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
@@ -352,7 +352,7 @@ class UT_S8S8S32 {
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, &DefaultThreading);
+      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -361,7 +361,7 @@ class UT_S8S8S32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -430,11 +430,11 @@ class UT_Bf16Bf16Fp32 {
     fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
     fill_buffer_randn(matBbf16.data(), matBbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
     avector<float> matC(m * n), refC(m * n);
-    launcher.mProB.packWeight(n, k, {matBbf16.data(), n, &packw}, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     buffer_error(refC.data(), matC.data(), refC.size(), 0.05f);
   }
 
@@ -449,7 +449,7 @@ class UT_Bf16Bf16Fp32 {
         wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
                                     epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
@@ -458,7 +458,7 @@ class UT_Bf16Bf16Fp32 {
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, &DefaultThreading);
+      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -467,7 +467,7 @@ class UT_Bf16Bf16Fp32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
@@ -534,11 +534,11 @@ class UT_Fp16Fp16Fp16 {
     avector<utils::fp16> matAbf16(m * k), matBbf16(k * n), matC(m * n), refC(m * n);
     fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
     fill_buffer_randn(matBbf16.data(), matBbf16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
-    launcher.mProB.packWeight(n, k, {matBbf16.data(), n, &packw}, &DefaultThreading);
+    launcher.mProB.packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
     gemmref_fp16fp16fp16(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
     GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     buffer_error(refC.data(), matC.data(), refC.size(), utils::fp16(0.0002f * k));
   }
 
@@ -553,7 +553,7 @@ class UT_Fp16Fp16Fp16 {
         wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
                                     epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher kernel;
-    DefaultThreading.set_threads(threads);
+    UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     auto tmpB = kernel.mProB.createStorage(n, k);
@@ -562,7 +562,7 @@ class UT_Fp16Fp16Fp16 {
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, &DefaultThreading);
+      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -571,7 +571,7 @@ class UT_Fp16Fp16Fp16 {
         log.start();
         GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, &DefaultThreading);
+        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
           printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,

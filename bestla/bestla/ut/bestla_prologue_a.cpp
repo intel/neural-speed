@@ -131,7 +131,7 @@ class UT_ActivationU8KBlockQuantize {
     auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
-    actA.quantize({raw.data(), lda, &quanAct}, m, k, &DefaultThreading);
+    actA.quantize({raw.data(), lda, &quanAct}, m, k, UT_Threading::get());
 
     ut::buffer_error(q.data(), quanAct.template APtr<uint8_t>(), q.size(), uint8_t(1));
     ut::buffer_error(zp.data(), quanAct.template ZPtr<uint8_t>(), zp.size(), uint8_t(1));
@@ -186,7 +186,7 @@ class UT_ActivationS8KBlockQuantize {
     auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
-    actA.quantize({raw.data(), k, &quanAct}, m, k, &DefaultThreading);
+    actA.quantize({raw.data(), k, &quanAct}, m, k, UT_Threading::get());
     ut::buffer_error(q.data(), quanAct.template APtr<int8_t>(), q.size(), int8_t(1));
     if (hasreduce) {
       avector<float> redref(reduce.size(), 0.f), redqref(reduce.size(), 0.f);
@@ -235,7 +235,7 @@ class UT_ShuffleActivationKblock {
     auto reordA = kernel.createReorderStorage(m, k, 32);
     avector<int8_t> bufA(reordA.mSize);
     reordA.assign(bufA.data());
-    kernel.preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32, &DefaultThreading);
+    kernel.preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32, UT_Threading::get());
 
     kernel.getActivation(&dstptr, &dststride, {src.data(), k, nullptr, indices.data(), &reordA}, m, kpad, 0, 0, cache,
                          CacheSize);
@@ -272,7 +272,7 @@ class UT_ShuffleActivationKblock {
     avector<int8_t> bufA(quanAct.mSize + reordAct.mSize);
     quanAct.assign(bufA.data());
     reordAct.assign(bufA.data() + quanAct.mSize);
-    actA.quantize({raw_cp.data(), k, &quanAct, indices.data(), &reordAct}, m, k, &DefaultThreading);
+    actA.quantize({raw_cp.data(), k, &quanAct, indices.data(), &reordAct}, m, k, UT_Threading::get());
     ut::buffer_error(quanAct.template APtr<int8_t>(), q.data(), q.size(), int8_t(1));
     if (hasreduce) {
       avector<float> redref(reduce.size(), 0.f), redqref(reduce.size(), 0.f);

@@ -26,11 +26,20 @@ using sAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;
 using sAVX2 = gemm::SCoreRowNAvx2<24, 4>;
-#ifdef _OPENMP
-extern parallel::OMPThreading DefaultThreading;
+
+class UT_Threading {
+ public:
+  static bestla::parallel::IThreading* get() {
+#if BTLA_UT_OPENMP
+    static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
-extern parallel::StdThreading DefaultThreading;
+    static bestla::parallel::StdThreading DefaultThreading(4);
 #endif  // _OPNEMP
+    return &DefaultThreading;
+  }
+
+  static void set_threads(int n_thread) { get()->set_threads(n_thread); }
+};
 
 constexpr size_t CacheSize = size_t(100) << 10;
 static int8_t cache[CacheSize];
@@ -129,11 +138,11 @@ utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   return buf;
 }
 
-#define UT_START()                                       \
-  {                                                      \
-    GetCPUDevice();                                      \
-    ut::DefaultThreading.set_threads(_cd->getThreads()); \
-    printf("Test Class: %s\n", __FUNCTION__);            \
+#define UT_START()                                    \
+  {                                                   \
+    GetCPUDevice();                                   \
+    ut::UT_Threading::set_threads(_cd->getThreads()); \
+    printf("Test Class: %s\n", __FUNCTION__);         \
   }
 template <typename _T>
 static double buffer_error(_T* ref, _T* tar, size_t size, _T thres = _T(0)) {

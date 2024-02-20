@@ -599,7 +599,10 @@ class IThreading {
 #if BTLA_OPENMP
 class OMPThreading : public IThreading {
  public:
-  explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }
+  explicit OMPThreading(int nthreads) : IThreading(nthreads) {
+    printf("Using OMP\n");
+    omp_set_num_threads(nthreads);
+  }
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
 #pragma omp parallel
@@ -624,7 +627,10 @@ class OMPThreading : public IThreading {
 
 class StdThreading : public IThreading {
  public:
-  explicit StdThreading(int nthreads) : IThreading(nthreads) { create_threads(); }
+  explicit StdThreading(int nthreads) : IThreading(nthreads) {
+    printf("Using Std\n");
+    create_threads();
+  }
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
       running.store(mThreadNum - 1);
