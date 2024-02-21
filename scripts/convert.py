@@ -44,7 +44,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             dir_model = snapshot_download(repo_id=str(args.model), resume_download=True, token=args.token)
         except Exception as e:
             if e.response.status_code == 401:
-                print("You are required to input an acccess token ID for {}, please add it in option --token or download model weights locally".format(args.model))
+                print("You are required to input an access token ID for {}, please add it in option --token or download model weights locally".format(args.model))
             sys.exit(f"{e}")
 
     convert_model(dir_model, args.outfile, args.outtype, use_quantized_model=args.use_quantized_model)

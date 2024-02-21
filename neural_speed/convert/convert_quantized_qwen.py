@@ -98,7 +98,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
                                             compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
     print(f"converting {dst_name} quantized tensor to bestla q4 block")
-    
+
 
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
@@ -124,18 +124,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
         if "zero_point" in quantize_config:
             quantize_config["sym"] = not quantize_config["zero_point"]
         return model, config, config["quantization_config"]
-    
+
     model, hparams, quantize_config = load_GPTQ_qwen(model_path)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     f = open(out_path, "wb")
-    
+
     # possible data types
     #   ftype == 0 -> float32
     #   ftype == 1 -> float16
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
-        
+
     # 1. write hparams
     ne_file_magic = 0x67676d66
     f.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
@@ -179,8 +179,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
             f.write(struct.pack("i", len(text)))
             f.write(text)
             f.write(struct.pack("f", -10000))
-    
-    
+
+
     # 3. write tensors
     list_vars = model
 
@@ -193,7 +193,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     f"blk.h.{i}.attn_norm.weight", list_vars, f)
         convert_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
                     f"blk.h.{i}.ffn_norm.weight", list_vars, f)
-        
+
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_attn.weight",
                     f"blk.h.{i}.attn_qkv.weight", list_vars, f, quantize_config)
@@ -201,8 +201,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         f"blk.h.{i}.attn_qkv.bias", list_vars, f)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_proj.weight",
                     f"blk.h.{i}.attn_output.weight", list_vars, f, quantize_config)
-        
-        
+
+
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w1.weight",
                     f"blk.h.{i}.ffn_up.weight", list_vars, f, quantize_config)
