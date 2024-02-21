@@ -186,7 +186,7 @@ class UT_S3_WOQ {
 
   template <class GemmCore_T, BTLA_ISA ISA>
   void ut(int m, int n, int k, int blocksize, int enable_thr) {
-    DefaultThreading.set_threads(enable_thr);
+    UT_Threading::set_threads(enable_thr);
     printf("%s:%d %d %d %d\n", __FUNCTION__, m, n, k, blocksize);
     int ldb = n;
 
@@ -207,8 +207,8 @@ class UT_S3_WOQ {
     avector<int8_t> buffer_ref(ptr_ref.mSize);
     ptr.assign(buffer.data());
     ptr_ref.assign(buffer_ref.data());
-    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr, &DefaultThreading);
-    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr_ref, &DefaultThreading);
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr, UT_Threading::get());
+    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &ptr_ref, UT_Threading::get());
     using Launcher =
         wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
                                       prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
@@ -223,26 +223,26 @@ class UT_S3_WOQ {
       utils::GemmProblem gp(1, m, n, k, blocksize);
       typename Launcher::Param args{
           gp, {matAf32.data(), k}, {&ptr}, {ptr.template SPtr<int8_t>(), ptr.SDtype(), ptr.CStep()}, {matC.data(), n}};
-      parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+      parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
       typename Launcher::Param args_ref{gp,
                                         {matAf32.data(), k},
                                         {&ptr_ref},
                                         {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
                                         {refC.data(), n}};
-      parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
+      parallel::GemmRun<Parallel>(launcher, args_ref, UT_Threading::get());
     } else if constexpr (ISA == BTLA_ISA::AMX_BF16) {
       avector<utils::bf16> matAbf16(m * k);
       fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
       GemmProblem gp(1, m, n, k, blocksize);
       typename Launcher::Param args{
           gp, {matAbf16.data(), k}, {&ptr}, {ptr.template SPtr<int8_t>(), ptr.SDtype(), ptr.CStep()}, {matC.data(), n}};
-      parallel::GemmRun<Parallel>(launcher, args, &DefaultThreading);
+      parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
       typename Launcher::Param args_ref{gp,
                                         {matAbf16.data(), k},
                                         {&ptr_ref},
                                         {ptr_ref.template SPtr<int8_t>(), ptr_ref.SDtype(), ptr_ref.CStep()},
                                         {refC.data(), n}};
-      parallel::GemmRun<Parallel>(launcher, args_ref, &DefaultThreading);
+      parallel::GemmRun<Parallel>(launcher, args_ref, UT_Threading::get());
     } else {
       using Launcher2 = wrapper::gemm::LauncherIntKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
                                                          prologue_b::gemm::WeightKBlockNInteger,
@@ -259,9 +259,9 @@ class UT_S3_WOQ {
       quanA_ref.assign(bufferA_ref.data());
       GemmProblem gp(1, m, n, k, blocksize);
       typename Launcher2::Param args{gp, {matAf32.data(), k, &quanA}, {&ptr}, {matC.data(), n}};
-      parallel::GemmRunWithA<Parallel2>(launcher, args, &DefaultThreading);
+      parallel::GemmRunWithA<Parallel2>(launcher, args, UT_Threading::get());
       typename Launcher2::Param args_ref{gp, {matAf32.data(), k, &quanA_ref}, {&ptr_ref}, {refC.data(), n}};
-      parallel::GemmRunWithA<Parallel2>(launcher, args_ref, &DefaultThreading);
+      parallel::GemmRunWithA<Parallel2>(launcher, args_ref, UT_Threading::get());
     }
     buffer_error(matC.data(), refC.data(), matC.size(), 0.001f);
   }

@@ -589,7 +589,7 @@ class IThreading {
  public:
   explicit IThreading(int nthreads) : mThreadNum(nthreads) {}
   virtual void parallel_for(const thread_func& func) = 0;
-  virtual inline void sync() const = 0;
+  virtual inline void sync(int idx=0) = 0;
   virtual int num_threads() const { return mThreadNum; };
   virtual void set_threads(int nthreads) = 0;
 
@@ -618,7 +618,7 @@ class OMPThreading : public IThreading {
     mThreadNum = nthreads;
     omp_set_num_threads(nthreads);
   }
-  virtual inline void sync() const override {
+  virtual inline void sync(int idx=0) override {
 #pragma omp barrier
     (void)(0);  // make msvc happy with c++20
   }
@@ -633,7 +633,8 @@ class StdThreading : public IThreading {
   }
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
-      running.store(mThreadNum - 1);
+      running.store(mThreadNum-1);
+      for(int i=0;i<10;i++) flag[i].store(mThreadNum);
       for (size_t i = 0; i < mThreadNum - 1; i++) {
         func_[i] = &func;
       }
@@ -657,7 +658,15 @@ class StdThreading : public IThreading {
     }
   }
 
-  inline void sync() const override { assert(0); }
+  inline void sync(int idx=0) override {
+    flag[idx].fetch_sub(1);
+    while (true) {
+        if (flag[idx].load() == 0)
+          break;
+        else
+          _mm_pause();
+      } 
+    }
 
   ~StdThreading() { stop_threads(); }
 
@@ -695,6 +704,7 @@ class StdThreading : public IThreading {
   std::vector<std::thread> thdset;
   std::atomic_bool stop;
   std::atomic_int running;
+  std::atomic_int flag[10];
   const thread_func* func_[100];
 };
 
@@ -704,7 +714,7 @@ class SingleThread : public StdThreading {
 
   void set_threads(int nthreads) override { (void)(nthreads); }
 
-  inline void sync() const override {}
+  inline void sync(int idx) override {}
 };
 
 template <class Parallel_T, class Launch_T>
