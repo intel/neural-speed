@@ -23,8 +23,6 @@ file(GLOB HEADERS
     ${PROJECT_SOURCE_DIR}/include/*.hpp
 )
 
-# add_subdirectory(../../bestla bestla_out)
-
 add_library(bestla_dispatcher STATIC ${HEADERS} ${SOURCES})
 if(WIN32)
 # MSVC does not allow sth like -fconcepts
