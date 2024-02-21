@@ -132,7 +132,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
     hparams = model.config.to_dict()
     list_vars = model.state_dict()
-    
+
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     f = open(out_path, "wb")
 
@@ -178,7 +178,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
     f.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     f.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
-    
+
     import pdb;pdb.set_trace()
 
     # 2. vocab
@@ -194,9 +194,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
             f.write(text)
             f.write(struct.pack("f", -10000))
 
-    
+
     print(hparams)
-    
+
     def convert_qwen_to_fp32_tensor(src_name, dst_name, model, fout):
         #data = model[src_name]
         data = model[src_name].squeeze().numpy()
@@ -300,9 +300,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # print("Done. Output file: " + out_path)
     # print("")
-    
-        
-        
+
+
+
         # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
         #             f"transformer.h.{i}.ln_1.weight", list_vars, f)
         # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
@@ -324,7 +324,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         #             f"transformer.h.{i}.mlp.w2.weight", list_vars, f, quantize_config)
         # convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
         #             f"transformer.h.{i}.mlp.c_proj.weight", list_vars, f, quantize_config)
-        
+
 
 
     # GGUF loading
