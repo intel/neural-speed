@@ -18,6 +18,7 @@ import argparse
 from typing import List, Optional
 from transformers import AutoConfig
 import subprocess
+from huggingface_hub import snapshot_download
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 build_path = Path(Path(__file__).parent.absolute(), "../build/")
@@ -146,13 +147,24 @@ def main(args_in: Optional[List[str]] = None) -> None:
         action="store_true",
         help="Use ring-buffer and thus do not re-computing after reaching ctx_size (default: False)",
     )
+    parser.add_argument(
+        "--token",
+        type=str,
+        help="Access token ID for models that require it (LLaMa2, etc..)",
+    )
 
     args = parser.parse_args(args_in)
 
     if args.model.exists():
         dir_model = args.model.as_posix()
     else:
-        dir_model = args.model
+        try:
+            dir_model = snapshot_download(repo_id=str(args.model), resume_download=True, token=args.token)
+        # Handles Missing token ID for gated models
+        except Exception as e:
+            if e.response.status_code == 401:
+                print("You are required to input an acccess token ID for {}, please add it in option --token or download model weights locally".format(args.model))
+            sys.exit(f"{e}")
 
     parent_path = Path(__file__).parent.absolute()
     config = AutoConfig.from_pretrained(dir_model)
@@ -166,8 +178,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_cmd = ["python", path]
     convert_cmd.extend(["--outfile", Path(work_path, "ne_{}_f32.bin".format(model_type))])
     convert_cmd.extend(["--outtype", "f32"])
-    convert_cmd.append(args.model)
-    print("convert model ...")
+    convert_cmd.append(dir_model)
+    print("Convert model ...")
     subprocess.run(convert_cmd)
 
     # 2. quantize
@@ -186,7 +198,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         quant_cmd.extend(["--use_ggml"])
     quant_cmd.extend(["--build_dir", args.build_dir])
     quant_cmd.extend(["--one_click_run", "True"])
-    print("quantize model ...")
+    print("Quantize model ...")
     subprocess.run(quant_cmd)
 
     # 3. inference
@@ -208,7 +220,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         infer_cmd.extend(["--shift-roped-k"])
     if (model_type == "baichuan" or model_type == "qwen"):
         infer_cmd.extend(["--tokenizer", dir_model])
-    print("inferce model ...")
+    print("Inference model ...")
     subprocess.run(infer_cmd)
 
 
