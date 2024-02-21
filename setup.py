@@ -25,17 +25,20 @@ CMAKE_ARGS = os.environ.get("CMAKE_ARGS", "")
 CMAKE_BUILD_PARALLEL_LEVEL = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL", "")
 """ Set CMAKE_BUILD_PARALLEL_LEVEL to control the parallel build level across all generators """
 
+
 def check_env_flag(name: str, default: bool = False) -> bool:
     if default:  # if a flag meant to be true if not set / mal-formatted
         return not os.getenv(name, "").upper() in ["OFF", "0", "FALSE", "NO", "N"]
     else:
         return os.getenv(name, "").upper() in ["ON", "1", "TRUE", "YES", "Y"]
 
+
 NS_WITH_AVX2 = check_env_flag("NS_WITH_AVX2", 'avx512f' not in cpu_flags)
 """ Whether to limit the max ISA used to AVX2; otherwise AVX512 will be used; set to ON/OFF """
 NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
+
 
 class CMakeExtension(Extension):
     """CMakeExtension class."""
@@ -44,7 +47,8 @@ class CMakeExtension(Extension):
         """Init a CMakeExtension object."""
         Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
-        self.optional = lib_only  # we only deliver shared object but not as a python extension module
+        # we only deliver shared object but not as a python extension module
+        self.optional = lib_only
 
 
 class CMakeBuild(build_ext):
@@ -226,8 +230,11 @@ if __name__ == '__main__':
     check_submodules()
     ext_modules = [
         CMakeExtension("neural_speed.mpt_cpp", "./")
-        ]
-    cmdclass={'build_ext': CMakeBuild}
+    ]
+    ext_modules.extend([
+        CMakeExtension("qbits", "csrc/"),]
+    )
+    cmdclass = {'build_ext': CMakeBuild}
 
     setup(
         name="neural-speed",
