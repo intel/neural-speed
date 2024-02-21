@@ -231,9 +231,6 @@ if __name__ == '__main__':
     ext_modules = [
         CMakeExtension("neural_speed.mpt_cpp", "./")
     ]
-    ext_modules.extend([
-        CMakeExtension("qbits", "csrc/"),]
-    )
     cmdclass = {'build_ext': CMakeBuild}
 
     setup(

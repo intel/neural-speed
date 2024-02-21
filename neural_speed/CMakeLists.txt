@@ -28,6 +28,7 @@ link_directories(${COMMON_LIB_DIRS})
 add_subdirectory(core)
 add_subdirectory(vectors)
 add_subdirectory(models)
+add_subdirectory(torch_ops)
 
 if (NS_BUILD_APPLICATIONS)
     add_subdirectory(application)

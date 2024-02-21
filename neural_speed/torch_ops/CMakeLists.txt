@@ -35,7 +35,7 @@ find_package(PythonLibs 3 REQUIRED)
 
 include(FindOpenMP)
 add_subdirectory(dispatcher)
-add_subdirectory(../third_party/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/pybind11-build)
+# add_subdirectory(../third_party/pybind11 ${CMAKE_CURRENT_BINARY_DIR}/pybind11-build)
 
 file(GLOB HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 file(GLOB qbits_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
