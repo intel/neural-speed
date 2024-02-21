@@ -173,7 +173,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
     f.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     f.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
-    
+
     import pdb;pdb.set_trace()
 
     # 2. vocab
@@ -218,7 +218,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     #                 f"transformer.h.{i}.mlp.w2.weight", list_vars, f, quantize_config)
     #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
     #                 f"transformer.h.{i}.mlp.c_proj.weight", list_vars, f, quantize_config)
-        
+
 
 
     # GGUF loading
