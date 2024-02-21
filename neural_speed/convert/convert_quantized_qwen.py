@@ -135,7 +135,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     # model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
     # hparams = model.config.to_dict()
     # list_vars = model.state_dict()
-    
+
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     f = open(out_path, "wb")
 
@@ -196,9 +196,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
             f.write(text)
             f.write(struct.pack("f", -10000))
 
-    
+
     print(hparams)
-    
+
     def convert_qwen_to_fp32_tensor(src_name, dst_name, model, fout):
         #data = model[src_name]
         # qwen-gptq is torch.bfloat16 mostly.
@@ -269,8 +269,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         #             f"transformer.h.{i}.mlp.w2.weight", list_vars, f)
         # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
         #             f"transformer.h.{i}.mlp.c_proj.weight", list_vars, f)
-        
-        
+
+
         convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
                     f"transformer.h.{i}.ln_1.weight", list_vars, f)
         convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
@@ -330,7 +330,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # print("Done. Output file: " + out_path)
     # print("")
-         
+
 
 
     # GGUF loading
