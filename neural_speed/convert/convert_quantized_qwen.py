@@ -77,6 +77,8 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
         gptq_scales = gptq_scales / 32
         gptq_zeros = (gptq_zeros - 4) * 32
         weight_dtype = "int3"
+    else:
+        ValueError(f"Unsupported q_config[bits]: {q_config['bits']}")
 
     dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
     int_weight = np.ascontiguousarray(int_weight.numpy())
@@ -97,7 +99,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
                                             alg="sym" if q_config['sym'] else "asym",
                                             compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
-    print(f"converting {dst_name} quantized tensor to bestla q4 block")
+    print(f"Processing non-Q4 variable:     {src_name} -> {dst_name}, byte_size: {byte_size} quantized tensor to bestla q4 block")
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
@@ -137,9 +139,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
         ftype = 1
 
     # 1. write hparams
+    # 0x67676d6c is unversioned ne
+    # 0x67676d66 is versioned ggmf (requires token scores)
     ne_file_magic = 0x67676d66
+    #ne_file_version = 0x00000001 # v1
+
     f.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
     f.write(struct.pack("i", 1))
+
     f.write(struct.pack("i", hparams["vocab_size"]))
     f.write(struct.pack("i", hparams["hidden_size"]))
     f.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
@@ -166,6 +173,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
     f.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     f.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
+    
+    import pdb;pdb.set_trace()
 
     # 2. vocab
     for i in range(hparams["vocab_size"]):
@@ -183,33 +192,62 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 3. write tensors
     list_vars = model
+    # convert_to_fp32_tensor("transformer.wte.weight", "transformer.wte.weight", list_vars, f)
+    # convert_to_fp32_tensor("transformer.ln_f.weight", "transformer.ln_f.weight", list_vars, f)
+    # convert_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, f)
 
+    # for i in range(hparams["num_hidden_layers"]):
+    #     convert_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
+    #                 f"transformer.h.{i}.ln_1.weight", list_vars, f)
+    #     convert_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
+    #                 f"transformer.h.{i}.ln_2.weight", list_vars, f)
+
+    #     # qkv GEMM
+    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_attn.weight",
+    #                 f"transformer.h.{i}.attn.c_attn.weight", list_vars, f, quantize_config)
+    #     convert_to_fp32_tensor(f"transformer.h.{i}.attn.c_attn.bias",
+    #                     f"transformer.h.{i}.attn.c_attn.bias", list_vars, f)
+    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_proj.weight",
+    #                 f"transformer.h.{i}.attn.c_proj.weight", list_vars, f, quantize_config)
+
+
+    #     # ffn GEMM
+    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w1.weight",
+    #                 f"transformer.h.{i}.mlp.w1.weight", list_vars, f, quantize_config)
+    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w2.weight",
+    #                 f"transformer.h.{i}.mlp.w2.weight", list_vars, f, quantize_config)
+    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
+    #                 f"transformer.h.{i}.mlp.c_proj.weight", list_vars, f, quantize_config)
+        
+
+
+    # GGUF loading
     convert_to_fp32_tensor("transformer.wte.weight", "tok_embeddings.weight", list_vars, f)
     convert_to_fp32_tensor("transformer.ln_f.weight", "output_norm.weight", list_vars, f)
     convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
 
     for i in range(hparams["num_hidden_layers"]):
         convert_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
-                    f"blk.h.{i}.attn_norm.weight", list_vars, f)
+                    f"blk.{i}.attn_norm.weight", list_vars, f)
         convert_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
-                    f"blk.h.{i}.ffn_norm.weight", list_vars, f)
+                    f"blk.{i}.ffn_norm.weight", list_vars, f)
 
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_attn.weight",
-                    f"blk.h.{i}.attn_qkv.weight", list_vars, f, quantize_config)
+                    f"blk.{i}.attn_qkv.weight", list_vars, f, quantize_config)
         convert_to_fp32_tensor(f"transformer.h.{i}.attn.c_attn.bias",
-                        f"blk.h.{i}.attn_qkv.bias", list_vars, f)
+                        f"blk.{i}.attn_qkv.bias", list_vars, f)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_proj.weight",
-                    f"blk.h.{i}.attn_output.weight", list_vars, f, quantize_config)
+                    f"blk.{i}.attn_output.weight", list_vars, f, quantize_config)
 
 
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w1.weight",
-                    f"blk.h.{i}.ffn_up.weight", list_vars, f, quantize_config)
+                    f"blk.{i}.ffn_up.weight", list_vars, f, quantize_config)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w2.weight",
-                    f"blk.h.{i}.ffn_gate.weight", list_vars, f, quantize_config)
+                    f"blk.{i}.ffn_gate.weight", list_vars, f, quantize_config)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
-                    f"blk.h.{i}.ffn_down.weight", list_vars, f, quantize_config)
+                    f"blk.{i}.ffn_down.weight", list_vars, f, quantize_config)
 
 
     f.close()

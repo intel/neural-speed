@@ -314,12 +314,12 @@ def load_quantized_model(model_path):
         quantize_config["sym"] = not quantize_config["zero_point"]
     return model, config, config["quantization_config"]
 
-
 def convert_to_fp32_tensor(src_name, dst_name, model, fout):
     v = model[src_name]
     shape = v.shape
-    # print("Processing non-Q4 variable: " + src_name +
-    #       " with shape: ", shape, " and type: ", v.dtype)
+    n_dims = len(shape)
+    print("Processing non-Q4 variable:     " + src_name + " -> " + dst_name +
+          " with shape: ", shape, " and type: ", v.dtype, "data: ", v[:2, :2].tolist() if n_dims > 1 else v[:2].tolist())
     v = v.to(torch.float32)
 
     ftype_cur = {torch.float16: 1, torch.float32: 0}[v.dtype]
@@ -329,7 +329,7 @@ def convert_to_fp32_tensor(src_name, dst_name, model, fout):
 
     # data
     v.numpy().tofile(fout)
-    print(f"converting {dst_name} float tensor")
+    #print(f"converting {src_name} -> {dst_name} float tensor")
 
 def convert_q4_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head2=0, permute_func=None):
     qzeros = model[f"{src_name}.qzeros"]
