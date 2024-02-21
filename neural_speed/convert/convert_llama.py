@@ -1446,8 +1446,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
             model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
             tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
-
-            model_plus = load_some_model(cache_path)
             args.model = cache_path
 
         model_plus = load_some_model(args.model)

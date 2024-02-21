@@ -36,6 +36,7 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
 
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -1306,6 +1307,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
         OutputFile.write_vocab_only(outfile, vocab)
         print(f"Wrote {outfile}")
     else:
+        if Path(args.model).is_dir():
+            print("Loadding the model from the local path.")
+        else:
+            print("Loadding the model from HF.")
+            model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            cache_path = Path(tokenizer.vocab_file).parent
+            args.model = cache_path
+
         model_plus = load_some_model(args.model)
         if args.dump:
             do_dump_model(model_plus)
