@@ -53,6 +53,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
                                       const int n_threads) {
   model_context& lctx = *ctx;
   // static batching for now
+  // const int N = 5;
   const int N = inputs->n_tokens;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
@@ -146,8 +147,14 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
   ne_set_name(embd, "embd");
+  // uint32_t input_tokens[5] = {1, 5713, 3714,  264,  727};
+  // for (int i = 0; i < N; ++i) {
+  //   printf("input ids:%d \n", input_tokens[i]);
+  // }
+
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
+    // memcpy(static_cast<model_token*>(embd->data) + i * N, input_tokens, N * ne_element_size(embd));
   }
 
 #ifdef NS_TP_MODEL
@@ -372,6 +379,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         weights_sum = ne_repeat(ctx0, weights_sum, weights);
         weights = ne_div(ctx0, weights, weights_sum);
         ne_tensor* moe_out = nullptr;
+        
         for (int i = 0; i < n_expert_used; ++i) {
           ne_tensor* cur_expert;
 
@@ -398,6 +406,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
           if (i == 0) {
             moe_out = cur_expert;
+            ne_build_forward_expand(&gf, moe_out);
           } else {
             moe_out = ne_add(ctx0, moe_out, cur_expert);
             ne_set_name(moe_out, "ffn_moe_out");
@@ -467,7 +476,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
              sizeof(float) * n_vocab);
     }
   }
-
   // extract embeddings
   if (!lctx.embedding.empty()) {
     auto& embedding_out = lctx.embedding;

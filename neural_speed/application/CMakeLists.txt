@@ -93,6 +93,7 @@ set(mymap_mistral 14)
 set(mymap_qwen 15)
 set(mymap_phi 16)
 set(mymap_whisper 17)
+set(mymap_mixtral 18)
 
 
 
@@ -129,6 +130,7 @@ compile_run(run_baichuan  main_run.cpp   main_pybind.cpp baichuan  baichuan)
 compile_run(run_mistral   main_run.cpp   main_pybind.cpp mistral   llama)
 compile_run(run_qwen      main_run.cpp   main_pybind.cpp qwen      qwen)
 compile_run(run_phi      main_run.cpp   main_pybind.cpp phi      phi)
+compile_run(run_mixtral   main_run.cpp   main_pybind.cpp mixtral   llama)
 
 # speech recognition
 compile_run(run_whisper   audio_run.cpp  whisper_pybind.cpp whisper   whisper)
