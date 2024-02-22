@@ -1941,7 +1941,9 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
     static mha_stable_interface_t<GemmKernelFP16TrackMax, GemmKernelFP16> kernel;
     [[maybe_unused]] const auto ret = kernel.compute(params, *pth);
     assert(ret == BTLA_CODE::Success);
-  } else if (_cd->AMX_BF16()) {
+  } else if (_cd->AMX_BF16() &&                           //
+             params.K_layout == ATTN_FWD_LAYOUT_PLAIN &&  //
+             params.V_layout == ATTN_FWD_LAYOUT_PLAIN) {
     if (params.step_k_head_size == 1) {
       using GemmKernelFP32FP16BF16ExpSum = ::launcher_base_off_t<  //
           BTLA_ISA::AMX_BF16,                                      //
@@ -2680,7 +2682,6 @@ void bestla_fusion_attn_fp32_batch_cpy_k(const bestla_fusion_attn_fp32_batch_cpy
                             : bestla_fusion_attn_fp32_batch_cpy_k_<true>(params);
 }
 
-// TODO
 template <bool zero_padding>
 void bestla_fusion_attn_fp32_batch_cpy_v_(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params) {
   GetCPUDevice();
@@ -2738,7 +2739,6 @@ class TestMhaDese {
     printf("Test suit: %s\n", __FUNCTION__);
     GetCPUDevice();
     ne_threading::get()->set_threads(std::min(_cd->getThreads(), omp_get_max_threads()));
-    utils::request_perm_xtile_data();
 
 #if CompileFP16()
     if (CheckISA(AMX_BF16)) {
