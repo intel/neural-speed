@@ -96,28 +96,9 @@ endif()
 
 if (MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX)
-    add_compile_options(/wd4244 /wd4267)  # possible loss of data
-    add_compile_options(/wd4305)  # truncation from 'double' to 'float'
-    add_compile_options(/wd4018)  # '>': signed/unsigned mismatch
-    add_compile_options(/wd4334)  # '<<': result of 32-bit shift implicitly converted to 64 bits
     if (BUILD_SHARED_LIBS)
         set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     endif()
-
-    # 'std::codecvt_utf8<wchar_t,1114111,(std::codecvt_mode)0>': warning STL4017: std::wbuffer_convert,
-    # std::wstring_convert, and the <codecvt> header (containing std::codecvt_mode, std::codecvt_utf8,
-    # std::codecvt_utf16, and std::codecvt_utf8_utf16) are deprecated in C++17. (The std::codecvt class template is NOT
-    # deprecated.) The C++ Standard doesn't provide equivalent non-deprecated functionality; consider using
-    # MultiByteToWideChar() and WideCharToMultiByte() from <Windows.h> instead. You can define
-    # _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING or _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS to suppress this
-    # warning.
-    add_compile_definitions(_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
-
-    # Microsoft renamed some POSIX and Microsoft-specific library functions in the CRT to conform with C99 and C++03
-    # constraints on reserved and global implementation-defined names. If you need to use the existing function names
-    # for portability reasons, you can turn off these warnings. The functions are still available in the library under
-    # their original names.
-    add_compile_definitions(_CRT_NONSTDC_NO_WARNINGS)
 endif()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)  # default to false so that pybind11 will not try to use IPO

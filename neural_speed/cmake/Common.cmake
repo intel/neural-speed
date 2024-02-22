@@ -18,6 +18,27 @@ function(warning_check TARGET)
     #     target_compile_definitions(${TARGET} PUBLIC -DPLATFORM_WINDOWS -DNOGDI -DNOMINMAX -D_USE_MATH_DEFINES -D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
         target_compile_options(${TARGET} PRIVATE "$<$<COMPILE_LANGUAGE:DPCPP>:SHELL:--compiler-options /utf-8>" "$<$<NOT:$<COMPILE_LANGUAGE:DPCPP>>:/utf-8>")
     #     target_compile_options(${TARGET} PRIVATE "$<$<COMPILE_LANGUAGE:DPCPP>:SHELL:--compiler-options /sdl>" "$<$<NOT:$<COMPILE_LANGUAGE:DPCPP>>:/sdl>")
+
+        # Use public to affect pybind targets
+        target_compile_options(${TARGET} PUBLIC /wd4244 /wd4267)  # possible loss of data
+        target_compile_options(${TARGET} PUBLIC /wd4305)  # truncation from 'double' to 'float'
+        target_compile_options(${TARGET} PUBLIC /wd4018)  # '>': signed/unsigned mismatch
+        target_compile_options(${TARGET} PUBLIC /wd4334)  # '<<': result of 32-bit shift implicitly converted to 64 bits
+
+        # 'std::codecvt_utf8<wchar_t,1114111,(std::codecvt_mode)0>': warning STL4017: std::wbuffer_convert,
+        # std::wstring_convert, and the <codecvt> header (containing std::codecvt_mode, std::codecvt_utf8,
+        # std::codecvt_utf16, and std::codecvt_utf8_utf16) are deprecated in C++17. (The std::codecvt class template is NOT
+        # deprecated.) The C++ Standard doesn't provide equivalent non-deprecated functionality; consider using
+        # MultiByteToWideChar() and WideCharToMultiByte() from <Windows.h> instead. You can define
+        # _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING or _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS to suppress this
+        # warning.
+        target_compile_definitions(${TARGET} PUBLIC _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
+
+        # Microsoft renamed some POSIX and Microsoft-specific library functions in the CRT to conform with C99 and C++03
+        # constraints on reserved and global implementation-defined names. If you need to use the existing function names
+        # for portability reasons, you can turn off these warnings. The functions are still available in the library under
+        # their original names.
+        target_compile_definitions(${TARGET} PUBLIC _CRT_NONSTDC_NO_WARNINGS)
     else()
     #     # Enable warning
     #     target_compile_options(${TARGET} PRIVATE "$<$<COMPILE_LANGUAGE:DPCPP>:SHELL:--compiler-options -Wall>" "$<$<NOT:$<COMPILE_LANGUAGE:DPCPP>>:-Wall>")
