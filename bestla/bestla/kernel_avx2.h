@@ -24,7 +24,7 @@ namespace avx2 {
 #if CompileAVX2()
 #ifdef __GNUC__
 #pragma GCC push_options
-#pragma GCC target("avx2", "fma")
+#pragma GCC target("avx2", "fma", "f16c")
 #else
 #endif
 
