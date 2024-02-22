@@ -133,7 +133,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     args = parser.parse_args(args_in)
     print(args)
     if args.file:
-        with open(args.file, 'r') as f:
+        with open(args.file, 'r', encoding='utf-8') as f:
             prompt_text = f.read()
     else:
         prompt_text = args.prompt
