@@ -14,6 +14,8 @@
 
 find_package(Threads REQUIRED)
 file(GLOB layers_srcs "layers/*.cpp")
+file(GLOB test_srcs "layers/*test*.cpp")
+list(REMOVE_ITEM layers_srcs ${test_srcs})
 set(sources ne_layers.c ${layers_srcs})
 
 add_shareable_library_w_warning(ne_layers "${sources}")
@@ -37,7 +39,7 @@ endif()
 
 if (NS_BUILD_TESTS)
 
-function(add_test_target src)
+function(add_test_target src)  # ARGN: additional source
   get_filename_component(test_target ${src} NAME_WE)
   get_filename_component(src_dir ${src} DIRECTORY)
   string(REGEX REPLACE [/\\] "_" src_dir ${src_dir})
@@ -45,7 +47,7 @@ function(add_test_target src)
     set (test_target "${src_dir}_${test_target}")
   endif()
   set (test_target "test_${test_target}")
-  add_executable_w_warning(${test_target} ${src})
+  add_executable_w_warning(${test_target} ${src} ${ARGN})
   target_compile_definitions(${test_target} PRIVATE NS_TESTS)
   target_compile_options(${test_target} PRIVATE -fsanitize=address)
   target_link_options(${test_target} PRIVATE -fsanitize=address)
@@ -58,6 +60,6 @@ function(add_test_target src)
   set_tests_properties(${test_target} PROPERTIES LABELS "${src_dir}_test")
 endfunction()
 
-add_test_target(layers/mha_dense.cpp)
+add_test_target(layers/mha_dense.cpp layers/mha_dense_tests.cpp)
 
 endif()

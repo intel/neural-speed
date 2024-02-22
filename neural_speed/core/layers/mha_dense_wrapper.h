@@ -1,3 +1,19 @@
+//  Copyright (c) 2024 Intel Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+#ifndef NE_CORE_GRAPH_MHA_DENSE_WRAPPER_H
+#define NE_CORE_GRAPH_MHA_DENSE_WRAPPER_H
+
 #include <immintrin.h>
 
 #include <algorithm>
@@ -16,6 +32,13 @@
 #include "bestla/bestla_wrapper.h"
 #include "core/data_types.h"
 #include "layers/bestla_common.hpp"
+
+#ifdef NS_TESTS
+#include <memory>
+#include <tuple>
+
+#include "layers/ne_test_layers_utils.hpp"
+#endif
 
 #define MHA_2ND_EXP 1
 constexpr bool MHA_PREFER_AVX512FP16 = true;
@@ -1762,14 +1785,14 @@ class mha_stable_interface_t {
 };
 
 template <typename Q_T, typename K_T, typename V_T, typename DST_T>
-void bestla_fusion_attn_forward(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& params) = delete;
+inline void bestla_fusion_attn_forward(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& params) = delete;
 
 template <class GEMM_T, BTLA_ISA ISA_T>
 using WeightPackBatchBf16Bf16NonTr = weight_pack_batch_bf16_non_tr_t<GEMM_T, ISA_T, bf16>;
 template <class GEMM_T, BTLA_ISA ISA_T>
 using WeightPackBatchBf16Bf16Trans = weight_pack_batch_bf16_trans_t<GEMM_T, ISA_T, bf16>;
 template <>
-void bestla_fusion_attn_forward<bf16, bf16, bf16, bf16>(const attn_fwd_args_t<bf16, bf16, bf16, bf16>& p) {
+inline void bestla_fusion_attn_forward<bf16, bf16, bf16, bf16>(const attn_fwd_args_t<bf16, bf16, bf16, bf16>& p) {
   using GemmKernelBF16ExpSum = mha::launcher_base_off_t<  //
       BTLA_ISA::AMX_BF16,                                 //
       gemm::HCoreRowNAmxbf16<64, 16>,                     //
@@ -1793,7 +1816,8 @@ using WeightPackBatchFp16Bf16NonTr = weight_pack_batch_bf16_non_tr_t<GEMM_T, ISA
 template <class GEMM_T, BTLA_ISA ISA_T>
 using WeightPackBatchFp16Bf16Trans = weight_pack_batch_bf16_trans_t<GEMM_T, ISA_T, fp16>;
 template <>
-void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<float, fp16, fp16, float>& params) {
+inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
+    const attn_fwd_args_t<float, fp16, fp16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
   if (MHA_PREFER_AVX512FP16 && _cd->AVX512_FP16() && params.step_k_sl == 1) {
@@ -1872,7 +1896,7 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
 }
 
 template <>
-void bestla_fusion_attn_forward<fp16, fp16, fp16, fp16>(const attn_fwd_args_t<fp16, fp16, fp16, fp16>& params) {
+inline void bestla_fusion_attn_forward<fp16, fp16, fp16, fp16>(const attn_fwd_args_t<fp16, fp16, fp16, fp16>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
   if (_cd->AMX_BF16()) {
@@ -1897,7 +1921,7 @@ void bestla_fusion_attn_forward<fp16, fp16, fp16, fp16>(const attn_fwd_args_t<fp
 }
 
 template <>
-void bestla_fusion_attn_forward<int8_t, int8_t, int8_t, int8_t>(
+inline void bestla_fusion_attn_forward<int8_t, int8_t, int8_t, int8_t>(
     const attn_fwd_args_t<int8_t, int8_t, int8_t, int8_t>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
@@ -1940,7 +1964,8 @@ void bestla_fusion_attn_forward<int8_t, int8_t, int8_t, int8_t>(
 }
 
 template <>
-void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<float, bf16, bf16, float>& params) {
+inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
+    const attn_fwd_args_t<float, bf16, bf16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
   if (_cd->AVX512F() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) {
@@ -1981,7 +2006,7 @@ void bestla_fusion_attn_forward<float, bf16, bf16, float>(const attn_fwd_args_t<
 }
 
 template <typename Q_T, typename K_T, typename V_T, typename DST_T>
-void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& p) {
+inline void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& p) {
   const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
   const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
   const bool prefer_fp32 = (p.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0;
@@ -2127,3 +2152,4 @@ void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>&
 }  // namespace mha
 }  // namespace custom
 }  // namespace ne_bestla
+#endif  // NE_CORE_GRAPH_MHA_DENSE_WRAPPER_H
