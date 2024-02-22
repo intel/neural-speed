@@ -120,6 +120,7 @@ if (MSVC)
     add_compile_definitions(_CRT_NONSTDC_NO_WARNINGS)
 endif()
 
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)  # default to false so that pybind11 will not try to use IPO
 if (NS_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT result OUTPUT output)
