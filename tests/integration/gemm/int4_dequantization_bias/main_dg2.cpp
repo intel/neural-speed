@@ -42,6 +42,71 @@ public:
     using data_type_b = int4x2;
     using data_type_c = fp16;
 };
+class t1 {
+public:
+  //Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 32;
+  static constexpr size_t wg_n = 32;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 32;
+  static constexpr size_t num_buffer = 64;
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
+class t2 {
+public:
+  //Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 8;
+  static constexpr size_t wg_n = 32;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 32;
+  static constexpr size_t num_buffer = 64;
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+class t3 {
+public:
+  //Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 16;
+  static constexpr size_t wg_n = 32;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 32;
+  static constexpr size_t num_buffer = 64;
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
 class test2 {
 public:
     //Extract the parameters required by different test cases
@@ -540,7 +605,11 @@ void dequantize_gemm_run(int iter) {
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
+<<<<<<< HEAD
     int constexpr warm = 0;
+=======
+    int constexpr warm = 10;
+>>>>>>> fc6054c (add dg2)
     try {
         for (int i = 0; i < iter + warm; i++) {
             if (i >= warm) prof.cpu_start();
@@ -565,7 +634,7 @@ void dequantize_gemm_run(int iter) {
     }
 
     //performance
-    prof.print_profiling_result(profiling_selector::GPU);
+    prof.print_profiling_result(profiling_selector::CPU);
 
     std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
     for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
@@ -616,7 +685,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<test1>;
+using tests = ::testing::Types<t1,t2,t3>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7, qkv8,
 //         qkv9, qkv10>;
 

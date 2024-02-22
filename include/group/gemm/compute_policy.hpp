@@ -130,6 +130,30 @@ struct compute_policy_default_fpu<compute_attr_, perf_tuning_knob_,
     static constexpr uint32_t block_size_y_b = block_size_x_a;
 };
 
+/// @brief Specialized for Xe architecture.
+template <typename compute_attr_, typename perf_tuning_knob_>
+struct compute_policy_default_fpu<compute_attr_, perf_tuning_knob_,
+  gpu_arch::Dg2> {
+  using compute_attr = compute_attr_;
+  using perf_tuning_knob = perf_tuning_knob_;
+  static constexpr int k_stride = perf_tuning_knob::k_stride;
+  static constexpr int stages = perf_tuning_knob::stages;
+  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+  static constexpr gpu_arch arch_tag = gpu_arch::Dg2;
+  using dtype_mma_acc = typename compute_attr::dtype_acc;
+  using dtype_mma_a = typename compute_attr::dtype_a;
+  using dtype_mma_b = typename compute_attr::dtype_b;
+
+  static constexpr uint32_t block_bytes_x_a = 32;
+  static constexpr uint32_t block_size_x_a
+    = block_bytes_x_a / sizeof(dtype_mma_a);
+  static constexpr uint32_t block_size_y_a = 16;
+  static constexpr uint32_t block_bytes_x_b = 32;
+  static constexpr uint32_t block_size_x_b
+    = block_bytes_x_b / sizeof(dtype_mma_b);
+  static constexpr uint32_t block_size_y_b = block_size_x_a;
+};
+
 /// @} xetla_gemm
 
 } // namespace gpu::xetla::group
