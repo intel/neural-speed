@@ -21,7 +21,6 @@
 #include <random>
 #include <vector>
 
-
 #include "core/data_types.h"
 #include "mha_dense_wrapper.h"
 
