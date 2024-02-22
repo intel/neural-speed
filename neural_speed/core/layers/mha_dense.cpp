@@ -42,7 +42,7 @@
 #define MHA_2ND_EXP 1
 constexpr bool MHA_PREFER_AVX512FP16 = true;
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__clang_major__)  // clang cannot understand target("t1", "t2", "t3" ...)
 #define ADD_TARGET(T, ...) __VA_ARGS__, T
 #define TARGETS_512_0() "avx512f", "avx512bw", "avx512vl"
 #if CompileBF16()
@@ -187,7 +187,7 @@ TARGET_512 inline __m512 exp_ph_0_1(const __m512 x) {
 }
 #endif
 
-alignas(32) static const uint32_t mask8[9][8]{
+alignas(32) const uint32_t mask8[9][8]{
     {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
     {0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
     {0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
@@ -229,7 +229,7 @@ static inline std::array<__m128i, 8> tr_x8_word(std::array<__m128i, 8>& src) {  
 }
 
 template <int tail>
-static inline std::array<__m128i, 8> load_fp32_fp16_tr_x8_word(const float* a, size_t lda) {
+inline std::array<__m128i, 8> load_fp32_fp16_tr_x8_word(const float* a, size_t lda) {
   static_assert(tail > 0 && tail <= 8, "Unexpected tail value.");
   std::array<__m128i, 8> dst;
   for (int i = 0; i < tail; ++i) {
@@ -238,13 +238,13 @@ static inline std::array<__m128i, 8> load_fp32_fp16_tr_x8_word(const float* a, s
   for (int i = tail; i < 8; ++i) dst[i] = _mm_setzero_si128();
   return tr_x8_word(dst);
 }
-static constexpr decltype(load_fp32_fp16_tr_x8_word<1>)* load_fp32_fp16_tr_x8_word_tbl[9]{
+constexpr decltype(load_fp32_fp16_tr_x8_word<1>)* load_fp32_fp16_tr_x8_word_tbl[9]{
     load_fp32_fp16_tr_x8_word<1>, load_fp32_fp16_tr_x8_word<1>, load_fp32_fp16_tr_x8_word<2>,
     load_fp32_fp16_tr_x8_word<3>, load_fp32_fp16_tr_x8_word<4>, load_fp32_fp16_tr_x8_word<5>,
     load_fp32_fp16_tr_x8_word<6>, load_fp32_fp16_tr_x8_word<7>, load_fp32_fp16_tr_x8_word<8>};
 
 template <int tail>
-static inline std::array<__m128i, 8> load_maskz_fp32_fp16_tr_x8_word(const float* a, size_t lda, __m256i mask) {
+inline std::array<__m128i, 8> load_maskz_fp32_fp16_tr_x8_word(const float* a, size_t lda, __m256i mask) {
   static_assert(tail > 0 && tail <= 8, "Unexpected tail value.");
   std::array<__m128i, 8> dst;
   for (int i = 0; i < tail; ++i) {
@@ -253,7 +253,7 @@ static inline std::array<__m128i, 8> load_maskz_fp32_fp16_tr_x8_word(const float
   for (int i = tail; i < 8; ++i) dst[i] = _mm_setzero_si128();
   return tr_x8_word(dst);
 }
-static constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_x8_word_tbl[9]{
+constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_x8_word_tbl[9]{
     load_maskz_fp32_fp16_tr_x8_word<1>, load_maskz_fp32_fp16_tr_x8_word<1>, load_maskz_fp32_fp16_tr_x8_word<2>,
     load_maskz_fp32_fp16_tr_x8_word<3>, load_maskz_fp32_fp16_tr_x8_word<4>, load_maskz_fp32_fp16_tr_x8_word<5>,
     load_maskz_fp32_fp16_tr_x8_word<6>, load_maskz_fp32_fp16_tr_x8_word<7>, load_maskz_fp32_fp16_tr_x8_word<8>};
@@ -1318,7 +1318,7 @@ class weight_cvt_bf16_ntile48_t {
 
 #if CompileAVX2()
 template <class _GemmCore_T, BTLA_ISA ISA_T>
-class WeightCvtF16NTile24 {  // convert fp16 weight to fp32 using F16C
+class weight_cvt_f16_n_tile24_t {  // convert fp16 weight to fp32 using F16C
  public:
   using BType = typename _GemmCore_T::BType;
   using SType = fp16;
@@ -1327,7 +1327,7 @@ class WeightCvtF16NTile24 {  // convert fp16 weight to fp32 using F16C
     int ldb;
     bool is_padded;
   };
-  WeightCvtF16NTile24() {}
+  weight_cvt_f16_n_tile24_t() = default;
   BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
                       int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);
@@ -1982,13 +1982,13 @@ void bestla_fusion_attn_forward<float, fp16, fp16, float>(const attn_fwd_args_t<
         BTLA_ISA::AVX2,                                   //
         gemm::SCoreRowNAvx2<24, 4>,                       //
         prologue_a::gemm::ActivationBase,                 //
-        ::WeightCvtF16NTile24,                            //
+        ::weight_cvt_f16_n_tile24_t,                      //
         ::ScaleTrackMaxFp32Fp32>;                         //
     using GemmKernelId = ::launcher_base_weight_t<        //
         BTLA_ISA::AVX2,                                   //
         gemm::SCoreRowNAvx2<24, 4>,                       //
         ::activation_identity_t,                          // pretty sure we have enough paddings for P-matrix
-        ::WeightCvtF16NTile24,                            //
+        ::weight_cvt_f16_n_tile24_t,                      //
         epilogue::gemm::AccumulatorWriteBackFp32>;        //
     static mha_stable_interface_t<GemmKernelTrackMax, GemmKernelId> mha;
     [[maybe_unused]] const auto ret = mha.compute(params, *pth);
