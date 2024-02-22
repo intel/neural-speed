@@ -33,6 +33,7 @@ def check_env_flag(name: str, default: bool = False) -> bool:
 
 NS_WITH_AVX2 = check_env_flag("NS_WITH_AVX2", 'avx512f' not in cpu_flags)
 """ Whether to limit the max ISA used to AVX2; otherwise AVX512 will be used; set to ON/OFF """
+NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -104,6 +105,7 @@ class CMakeBuild(build_ext):
             f"-DNS_WITH_AVX2={'ON' if NS_WITH_AVX2 else 'OFF'}",
             f"-DNS_WITH_TESTS=OFF",
             f"-DNS_PYTHON_API=ON",
+            f"-DNS_PROFILING={NS_PROFILING_ENV}",
         ]
         if sys.platform == "linux":  # relative_rpath
             cmake_args.append('-DCMAKE_BUILD_RPATH=$ORIGIN/')
@@ -215,7 +217,7 @@ def check_submodules():
         end = time.time()
         print(f' --- Submodule initialization took {end - start:.2f} sec')
     except Exception:
-        print(' --- Submodule initalization failed')
+        print(' --- Submodule initialization failed')
         print('Please run:\n\tgit submodule update --init --recursive')
         sys.exit(1)
 

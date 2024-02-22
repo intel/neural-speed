@@ -391,15 +391,16 @@ struct logits_info;
 
 class logits_processor {
  public:
-  explicit logits_processor(model_context* lctx) : ctx(lctx), min_new_tokens(lctx->generation_conf.min_new_tokens) {}
+  explicit logits_processor(model_context* lctx) : ctx(lctx) {}
   ~logits_processor() {}
 
-  void process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id);
-  void min_new_tokens_logits_process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id);
+  void process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id,
+               const std::vector<uint32_t>& min_new_tokens = {});
+  void min_new_tokens_logits_process(const std::vector<uint32_t>& cur_lens, const model_vocab::id& eos_token_id,
+                                     const std::vector<uint32_t>& min_new_tokens);
 
  private:
   model_context* ctx = nullptr;
-  const uint32_t min_new_tokens;
 };
 
 // base kv_cache reorder class for beam search
@@ -426,8 +427,12 @@ class beam_search_kv_cache_reorder {
 
 class beam_search_flow {
  public:
-  explicit beam_search_flow(model_context* lctx, const int batch_size = 1)
-      : ctx(lctx), beam_size(lctx->beam_size), request_bs(batch_size), lp(logits_processor(lctx)) {
+  beam_search_flow(model_context* lctx, const int batch_size = 1, const int n_threads = 4)
+      : ctx(lctx),
+        beam_size(lctx->beam_size),
+        request_bs(batch_size),
+        num_threads(n_threads),
+        lp(logits_processor(lctx)) {
     cur_beams.resize(batch_size * beam_size);
     next_beams.resize(batch_size * beam_size);
     for (int i = 0; i < batch_size; ++i) {
@@ -437,20 +442,35 @@ class beam_search_flow {
     requests_done.assign(batch_size, false);
     request_running_indices.reserve(batch_size);
     next_done_request_ids.reserve(batch_size);
-    n_tokens.reserve(batch_size);
-    n_past.reserve(batch_size);
-    n_prompt_tokens.reserve(batch_size);
-    n_total.reserve(batch_size);
-    padding_side.reserve(batch_size);
-    n_padding.reserve(batch_size);
+    n_tokens.resize(batch_size);
+    n_past.resize(batch_size);
+    n_prompt_tokens.resize(batch_size);
+    n_total.resize(batch_size);
+    padding_side.resize(batch_size);
+    n_padding.resize(batch_size);
+    gen_confs.resize(batch_size);
+    next_inputs.reserve(batch_size * beam_size);
+    kv_reorder = ctx->bs_kv_reorder;
+    if (kv_reorder == nullptr) {
+      kv_reorder = std::make_shared<beam_search_kv_cache_reorder>(ctx);
+#ifdef NS_BEAM_SEARCH_VERBOSE_ON
+      printf(
+          "WARNING: Using default kv cache update function. Ignore this warning if your K shape = [head_dim, N, "
+          "n_head], "
+          "V shape = [N, head_dim, n_head]\n");
+#endif
+    }
   }
   ~beam_search_flow() {}
 
   // public interface
-  // static batching (padding inputs or batch = 1)
-  const std::vector<std::vector<model_token>>& loop(const std::vector<model_input>& inputs, const int& n_threads);
-  // continuous batching (scheduling from the outside)
-  void step(model_token* dst);  // TODO one step
+  // static batching (batched inputs -> generate max new tokens -> emit batched outputs, like offline scenario)
+  // this api doesn't care about if each sequence in batch has the same length or not (padding or not padding)
+  const std::vector<std::vector<model_token>>& loop(const std::vector<model_input>& inputs);
+  // continuous batching (scheduling from the outside, like server scenario)
+  bool step(const std::vector<model_input>& inputs);
+  std::vector<int> request_done_ids();
+  std::vector<std::vector<model_token>> request_done_reponse();
 
  private:
   std::vector<beam_next_token> beam_top_k_next_tokens(model_context* ctx, const std::vector<float>& beams_score,
@@ -458,9 +478,15 @@ class beam_search_flow {
                                                       const std::vector<int>& beam_indices, const int& sample_scale = 2,
                                                       const int& dim = -1);
   void fill_next_beams_by_top_scores();
+  void next_candidate_beams(const std::vector<int>& num_beams, const int& sample_scale,
+                            const std::vector<beam_next_token>& next_top_k_tokens);
   std::vector<std::tuple<int, int>> update_kv_cache_reorder_indices();
   void update_status();
   const beam& finalize(const int& request_idx);
+  // continuous batching (scheduling from the outside)
+  bool step_check_and_prepare_inputs(const std::vector<model_input>& inputs);
+  bool step_update_beams_and_kv_cache();
+  bool step_check_done_requests();
 
   model_context* ctx = nullptr;
   const int beam_size;
@@ -477,7 +503,9 @@ class beam_search_flow {
   std::vector<uint32_t> n_total;
   std::vector<int> padding_side;
   std::vector<uint32_t> n_padding;
-  int num_threads = 4;  // default by 4
+  std::vector<generation_config> gen_confs;
+  std::vector<model_input> next_inputs;
+  int num_threads;  // default by 4
   logits_processor lp;
   std::shared_ptr<beam_search_kv_cache_reorder> kv_reorder;
   std::vector<std::vector<model_token>> response;
@@ -487,7 +515,8 @@ class beam_search_flow {
 MODEL_API std::vector<std::vector<model_token>> beam_search(model_context* lctx, const int& n_predict,
                                                             const std::vector<model_input>& inputs,
                                                             const int& n_threads);
-
+// split model inputs into continuous inference groups which have num_requests length
+MODEL_API std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs, const int n_input);
 // Internal API to be implemented by model.cpp and used by tests/benchmarks only
 #ifdef MODEL_API_INTERNAL
 

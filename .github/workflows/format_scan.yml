@@ -7,6 +7,7 @@ on:
       - neural_speed/**
       - bestla/**
       - scripts/**
+      - clang-format.py
       - setup.py
       - .github/workflows/format_scan.yml
       - .github/workflows/scripts/formatScan/**

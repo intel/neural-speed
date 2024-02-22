@@ -67,7 +67,8 @@ compile_quant(quant_chatglm   quant_model.cpp chatglm   chatglm)
 compile_quant(quant_chatglm2  quant_model.cpp chatglm2  chatglm2)
 compile_quant(quant_baichuan  quant_model.cpp baichuan  baichuan)
 compile_quant(quant_mistral   quant_model.cpp mistral   llama)
-compile_quant(quant_qwen      quant_model.cpp qwen   qwen)
+compile_quant(quant_qwen   quant_model.cpp qwen   qwen)
+compile_quant(quant_phi   quant_model.cpp phi   phi)
 compile_quant(quant_whisper   quant_whisper.cpp whisper   whisper)
 
 # all models running
@@ -90,7 +91,9 @@ set(mymap_baichuan 12)
 set(mymap_polyglot 13)
 set(mymap_mistral 14)
 set(mymap_qwen 15)
-set(mymap_whisper 16)
+set(mymap_phi 16)
+set(mymap_whisper 17)
+
 
 
 function(compile_run TARGET MAIN_CPP MAIN_PY MODEL_NAME MODEL_LIB)
@@ -125,6 +128,7 @@ compile_run(run_chatglm   main_run.cpp   main_pybind.cpp chatglm   chatglm)
 compile_run(run_baichuan  main_run.cpp   main_pybind.cpp baichuan  baichuan)
 compile_run(run_mistral   main_run.cpp   main_pybind.cpp mistral   llama)
 compile_run(run_qwen      main_run.cpp   main_pybind.cpp qwen      qwen)
+compile_run(run_phi      main_run.cpp   main_pybind.cpp phi      phi)
 
 # speech recognition
 compile_run(run_whisper   audio_run.cpp  whisper_pybind.cpp whisper   whisper)

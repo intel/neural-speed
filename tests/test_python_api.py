@@ -47,13 +47,13 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         inputs = tokenizer(prompt, return_tensors="pt")
-        
+
         pt_logits = torch.load("/tf_dataset2/inc-ut/nlptoolkit_ut_model/llama2_pt_logits.pth")[:,-1]
         pt_generate_ids = torch.load("/tf_dataset2/inc-ut/nlptoolkit_ut_model/llama2_pt_generate_ids.pth")[0].tolist()
         print(tokenizer.decode(pt_generate_ids))
 
         # check output ids
-        woq_config_fp32 = {"use_quant":False, "compute_dtype":"fp32", "weight_dtype":"fp32", "use_cache":True, "use_ggml":False, "group_size":128}
+        woq_config_fp32 = {"use_quant":False, "compute_dtype":"fp32", "weight_dtype":"fp32", "use_ggml":False, "group_size":128}
         itrex_model = Model()
 
         itrex_model.init(model_name, use_quant=False)
@@ -65,10 +65,10 @@ class TestLLMRUNTIME(unittest.TestCase):
 
         # check diff of logits
         woq_configs = {
-            "fp32": {"use_cache":True, "use_quant":False},
-            # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True, "use_ggml":True},
-            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_cache":True},
-            # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8", "use_cache":True},
+            "fp32": {"use_quant":False},
+            # "ggml_int4": {"compute_dtype":"int8", "weight_dtype":"int4", "use_ggml":True},
+            "jblas_int4": {"compute_dtype":"int8", "weight_dtype":"int4"},
+            # "jblas_int8": {"compute_dtype":"bf16", "weight_dtype":"int8"},
         }
         for config_type in woq_configs:
             itrex_model = Model()
@@ -102,12 +102,18 @@ class TestLLMRUNTIME(unittest.TestCase):
         # llm runtime fp32
         itrex_model = Model()
         itrex_model.init(model_name, use_quant=False)
-        itrex_generate_ids = itrex_model.generate(
-            inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True, pad_token=pad_token)
-        for i in range(len(itrex_generate_ids)):
-            self.assertListEqual(pt_generate_ids[i], itrex_generate_ids[i])
+        itrex_generate_ids_padded = itrex_model.generate(
+            inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True,
+            pad_token=pad_token, continuous_batching=False)
+        for i in range(len(itrex_generate_ids_padded)):
+            self.assertListEqual(pt_generate_ids[i], itrex_generate_ids_padded[i])
+        itrex_model.model = None
+        itrex_generate_ids_cont = itrex_model.generate(
+            inputs.input_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30, early_stopping=True,
+            pad_token=pad_token, continuous_batching=True)
+        for i in range(len(itrex_generate_ids_cont)):
+            self.assertListEqual(itrex_generate_ids_cont[i], itrex_generate_ids_cont[i])
 
 
 if __name__ == "__main__":
     unittest.main()
-    

@@ -24,7 +24,7 @@ from common import *
 
 def permute_func(weights, n_head: int, n_head_kv: int):
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head_kv, 2, weights.shape[0] // n_head_kv // 2, *weights.shape[1:])
                 .swapaxes(1, 2)
                 .reshape(weights.shape))
@@ -42,7 +42,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     model, config, quantize_config = load_quantized_model(model_path)
     f = open(out_path, "wb")
-    
+
     # 1. write hparams
     n_vocab = config["vocab_size"]
     n_embd = config["hidden_size"]
@@ -70,7 +70,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         n_embd // n_head,  # rot (obsolete)
         0, #file_type.value, # TODO
     ]
-    # import pdb; pdb.set_trace()
+
     f.write(struct.pack("i" * len(values), *values))
     f.write(struct.pack("i", 0))
     f.write(struct.pack("f", 0))
@@ -87,7 +87,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("f", config["rope_theta"] if "rope_theta" in config else 10000))
     f.write(struct.pack("f", rope_scale))
 
-    # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json 
+    # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
     # but bos_token_id = 1 in llama.cpp
     f.write(struct.pack("i", 1))
     f.write(struct.pack("i", 2))
@@ -105,9 +105,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 3. write tensors
     list_vars = model
-    convert_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
-    convert_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
-    convert_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
+    convert_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
+    convert_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
+    convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
 
     for i in range(n_layer):
         convert_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
@@ -127,9 +127,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         convert_q4_bestla_tensor(f"model.layers.{i}.mlp.up_proj",
                     f"layers.{i}.feed_forward.w3.weight", list_vars, f, quantize_config, n_head)
 
-        convert_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",
+        convert_to_fp32_tensor(f"model.layers.{i}.input_layernorm.weight",
                         f"layers.{i}.attention_norm.weight", list_vars, f)
-        convert_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight",
+        convert_to_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight",
                         f"layers.{i}.ffn_norm.weight", list_vars, f)
 
 

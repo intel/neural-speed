@@ -27,6 +27,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     )
     parser.add_argument("--outfile", type=Path, required=True, help="path to write to")
     parser.add_argument("model", type=Path, help="directory containing model file or model id")
+    parser.add_argument("--use_quantized_model", action="store_true", help="use quantized model: awq/gptq/autoround")
     args = parser.parse_args(args_in)
 
     if args.model.exists():
@@ -34,7 +35,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         dir_model = args.model
 
-    convert_model(dir_model, args.outfile, args.outtype)
+    convert_model(dir_model, args.outfile, args.outtype, use_quantized_model=args.use_quantized_model)
 
 
 if __name__ == "__main__":

@@ -220,4 +220,3 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -21,6 +21,7 @@ from neural_speed.convert import convert_model
 from transformers import AutoConfig, AutoTokenizer
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
+max_request_num_default = 8
 
 
 class Model:
@@ -30,6 +31,7 @@ class Model:
         self.model_type = None
         self.bin_file = None
         self.generate_round = 0
+        self.max_request_num = -1
 
     def __import_package(self, model_type):
         if self.module:
@@ -60,12 +62,18 @@ class Model:
             import neural_speed.baichuan_cpp as cpp_model
         elif model_type == "polyglot":
             import neural_speed.polyglot_cpp as cpp_model
+        elif model_type == "qwen":
+            import neural_speed.qwen_cpp as cpp_model
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
+        elif model_type == "qwen":
+            import neural_speed.qwen_cpp as cpp_model
+        elif model_type == "phi":
+            import neural_speed.phi_cpp as cpp_model
         elif model_type == "whisper":
             import neural_speed.whisper_cpp as cpp_model
         else:
-            raise TypeError("Unspported model type {}!".format(model_type))
+            raise TypeError("Unsupported model type {}!".format(model_type))
         self.module = cpp_model
 
     @staticmethod
@@ -75,11 +83,12 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, use_quant=True, use_cache=False, use_gptq=False, use_awq=False,
+    def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False, use_autoround=False,
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
+        self.model_type = model_type
         self.__import_package(model_type)
 
         # check cache and quantization
@@ -99,20 +108,25 @@ class Model:
             quant_desc = "gptq"
         if use_awq:
             quant_desc = "awq"
+        if use_awq:
+            quant_desc = "autoround"
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
             self.bin_file = fp32_bin
         else:
             self.bin_file = quant_bin
-        if use_cache and os.path.exists(self.bin_file):
+
+        if os.path.exists(self.bin_file):
+            print("{} existed, will use cache file. Otherwise please remove the file".
+                  format(self.bin_file))
             return
 
-        if use_gptq or use_awq:
-            convert_model(model_name, quant_bin, "f32")
+        if use_gptq or use_awq or use_autoround:
+            convert_model(model_name, quant_bin, use_quantized_model=True)
             return
-        
-        if not use_cache or not os.path.exists(fp32_bin):
+
+        if not os.path.exists(fp32_bin):
             convert_model(model_name, fp32_bin, "f32")
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
 
@@ -125,12 +139,14 @@ class Model:
         assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
-        if not use_cache:
-            os.remove(fp32_bin)
+        os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)
         self.model = self.module.Model()
+        if self.max_request_num == -1:
+            self.max_request_num = max(generate_kwargs.get("max_request_num",
+                            max_request_num_default), generate_kwargs.get("batch_size", 1))
         if "threads" not in generate_kwargs:
             threads = os.getenv("OMP_NUM_THREADS")
             import platform
@@ -154,9 +170,18 @@ class Model:
     def generate(self, input_ids, streamer=None, interactive=False, ignore_prompt=False,
                  stopping_criteria=None,  **generate_kwargs):
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
-        if self.model is None:
-            self.init_from_bin(self.model_type, self.bin_file, batch_size=input_ids.shape[0],
-                               **generate_kwargs)
+        input_bs = input_ids.shape[0]
+        max_request_num = generate_kwargs.pop("max_request_num", max_request_num_default)
+        reinit_from_bin = False
+        if max_request_num > self.max_request_num or input_bs > self.max_request_num:
+            reinit_from_bin = True
+            if self.max_request_num > 0:
+                print("Will start to reinit model from bin due to different max request num.")
+            self.max_request_num = max(input_bs, max_request_num)
+
+        if self.model is None or reinit_from_bin:
+            self.init_from_bin(self.model_type, self.bin_file, batch_size=input_bs,
+                               max_request_num = self.max_request_num, **generate_kwargs)
             self.generate_round = 0
         elif not interactive:
             self.model.reinit()
@@ -171,7 +196,7 @@ class Model:
             beam_search = True
         if not beam_search:
             # TODO support multi batch
-            assert input_ids.shape[0] == 1, "Unsupport multi-batch input ids."
+            assert input_ids.shape[0] == 1, "Unsupported multi-batch input ids."
 
         if streamer:
             assert input_ids.shape[0] == 1, "Streamer only supports batch size 1."
@@ -183,7 +208,12 @@ class Model:
         if interactive:
             self.model.reset_token_end()
         out_count = 0
-        input_list = input_ids.tolist()
+        input_list = None
+        pad_token_id = generate_kwargs.get("pad_token", None)
+        if generate_kwargs.get("continuous_batching", False):
+            input_list = self._cont_batching_input(input_ids, pad_token_id)
+        else:
+            input_list = input_ids.tolist()
         while True:
             response = self.model.generate(input_ids=input_list)
             input_list = []  # next-token stage will use previous output
@@ -237,3 +267,17 @@ class Model:
         else:
             print("Please input torch.Tensor")
         return
+
+    def _cont_batching_input(self, input_ids, pad_token_id=None):
+        assert isinstance(input_ids, torch.Tensor), "Input must be torch.Tensor."
+        input_list = input_ids.tolist()
+        pti = pad_token_id
+        if pti == None:
+            pti = self.tokenizer.pad_token_id
+        assert pti != None, "Please supply pad token id."
+        for il in range(len(input_list)):
+            count = input_list[il].count(pti)
+            # padding left
+            del input_list[il][0: count]
+            assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
+        return input_list

@@ -266,7 +266,7 @@ int main(int argc, char* argv[]) {
         // "What is the meaning of life?",
         "2017: It is done, and submitted. You can play 'Survival of the Tastiest' on Android, and on the web. Playing "
         "on the web works, but you have to simulate multiple touch for table moving and that can be a bit confusing. "
-        "There is a lot I'd like to talk about. I will go through every topic, insted of making the typical what went "
+        "There is a lot I'd like to talk about. I will go through every topic, instead of making the typical what went "
         "right/wrong list. Concept Working over the theme was probably one of the hardest tasks which I had to face. "
         "Originally, I had an idea of what kind of game I wanted to develop, gameplay wise - something with a lot of "
         "enemies/actors, simple graphics, maybe set in space, controlled from a top-down view. I was confident that I "
@@ -277,7 +277,7 @@ int main(int argc, char* argv[]) {
         "That control goes against what evolution is supposed to be like. If you allow the user to pick how to evolve "
         "something, it's not evolution anymore - it's the equivalent of intelligent design, the fable invented by "
         "creationists to combat the idea of evolution. Being agnostic and a Pastafarian, that's not something that "
-        "rubbed me the right way. Hence, my biggest dillema when deciding what to create was not with what I wanted to "
+        "rubbed me the right way. Hence, my biggest dilemma when deciding what to create was not with what I wanted to "
         "create, but with what I did not. I didn't want to create an 'intelligent design' simulator and wrongly call "
         "it evolution. This is a problem, of course, every other contestant also had to face. And judging by the "
         "entries submitted, not many managed to work around it. I'd say the only real solution was through the use of "
