@@ -719,7 +719,7 @@ struct elemwise_reduce_op_t {};
 /// @brief Is the element-wise reduce op functor, specialized for Xe architecture.
 template <reduce_op reduce_kind_, typename dtype_in_, gpu_arch arch_tag>
 struct elemwise_reduce_op_t<reduce_kind_, dtype_in_, arch_tag,
-        std::enable_if_t<(arch_tag == gpu_arch::Xe)>> {
+        std::enable_if_t<(arch_tag <= gpu_arch::Xe)>> {
     using dtype_in = dtype_in_;
     using mem_desc_in_t
             = mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -1148,7 +1148,7 @@ struct linear_op_t {};
 /// @brief Is the linear_op functor, specialized for Xe architecture.
 template <typename dtype_in_, gpu_arch arch_tag>
 struct linear_op_t<dtype_in_, arch_tag,
-        std::enable_if_t<(arch_tag == gpu_arch::Xe)>> {
+        std::enable_if_t<(arch_tag <= gpu_arch::Xe)>> {
     using dtype_in = dtype_in_;
     using mem_desc_in_t
             = mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
