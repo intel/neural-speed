@@ -168,7 +168,8 @@ std::vector<sequence> Iter_level_scheduler::pop_completed_requests() {
       return std::vector<sequence>();
     }
     if (log_level == 0) {
-      fprintf(stdout, "%s: info: tokens generation time of sequence (query_id %lu, request_idx: %d) is %8.2fms.\n",
+      fprintf(stdout,
+              "%s: info: tokens generation time of sequence (query_id %" PRIu64 ", request_idx: %d) is %8.2fms.\n",
               __func__, ret_seqs[l].query_id, ret_seqs[l].request_idx,
               (ret_seqs[l].end_time - ret_seqs[l].receive_time) / 1000.0);
     }
@@ -213,7 +214,8 @@ bool Cont_batch_gen_scheduler::add_request(sequence seq) {
   seq.status = seq_status::WAITING;
   seq.request_idx = waiting_free_req_idx_seqs_num > 0 ? -1 : query_free_req_idx();
   if (log_level == 0) {
-    fprintf(stdout, "%s: info: added seq query_id: %lu, request_idx: %d \n", __func__, seq.query_id, seq.request_idx);
+    fprintf(stdout, "%s: info: added seq query_id: %" PRIu64 ", request_idx: %d \n", __func__, seq.query_id,
+            seq.request_idx);
   }
   if (seq.request_idx == -1) waiting_free_req_idx_seqs_num++;
   return waiting_pool.add(seq);
@@ -246,7 +248,7 @@ bool Cont_batch_gen_scheduler::prepare_seqs() {
             }
             executed_seqs[cur_running_num + np].request_idx = fidx;
             if (log_level == 0) {
-              fprintf(stdout, "%s: info: updated seq query_id: %lu, request_idx: %d \n", __func__,
+              fprintf(stdout, "%s: info: updated seq query_id: %" PRIu64 ", request_idx: %d \n", __func__,
                       executed_seqs[cur_running_num + np].query_id, executed_seqs[cur_running_num + np].request_idx);
             }
             waiting_free_req_idx_seqs_num--;
@@ -320,15 +322,15 @@ bool Cont_batch_gen_scheduler::update_pools() {
       finished_pool.add(executed_seqs[ns]);
       free_req_idx[executed_seqs[ns].request_idx] = true;
       if (log_level == 0) {
-        fprintf(stdout, "%s: info: seq query_id: %lu, request_idx: %d finished.\n", __func__,
+        fprintf(stdout, "%s: info: seq query_id: %" PRIu64 ", request_idx: %d finished.\n", __func__,
                 executed_seqs[ns].query_id, executed_seqs[ns].request_idx);
       }
     } else {
-      fprintf(
-          stderr,
-          "%s: error: wrong seq status: %d of seq query_id: %lu, request_idx: %d, should be in DECODING OR FINISHED.\n",
-          __func__, static_cast<int>(executed_seqs[ns].status), executed_seqs[ns].query_id,
-          executed_seqs[ns].request_idx);
+      fprintf(stderr,
+              "%s: error: wrong seq status: %d of seq query_id: %" PRIu64
+              ", request_idx: %d, should be in DECODING OR FINISHED.\n",
+              __func__, static_cast<int>(executed_seqs[ns].status), executed_seqs[ns].query_id,
+              executed_seqs[ns].request_idx);
       return false;
     }
   }

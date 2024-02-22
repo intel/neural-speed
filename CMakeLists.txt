@@ -54,17 +54,17 @@ option(NS_SANITIZE_UNDEFINED     "neural_speed: enable undefined sanitizer"     
 # instruction set specific
 option(NS_AVX                    "neural_speed: enable AVX"                                     ON)
 option(NS_AVX2                   "neural_speed: enable AVX2"                                    ON)
+option(NS_F16C                   "neural_speed: enable F16C"                                    ON)
 option(NS_AVX512                 "neural_speed: enable AVX512"                                  OFF)
 option(NS_AVX512_VBMI            "neural_speed: enable AVX512-VBMI"                             OFF)
 option(NS_AVX512_VNNI            "neural_speed: enable AVX512-VNNI"                             OFF)
 option(NS_FMA                    "neural_speed: enable FMA"                                     ON)
 option(NS_AMX                    "neural_speed: enable AMX"                                     OFF)
-option(NS_F16C                   "neural_speed: enable F16C"                                    ON)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
 option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
 option(NS_BUILD_EXAMPLES         "neural_speed: build examples"                    ${NS_STANDALONE})
-option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)                               
+option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)
 
 
 if(NS_BUILD_TESTS)
@@ -101,6 +101,7 @@ if (MSVC)
     endif()
 endif()
 
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)  # default to false so that pybind11 will not try to use IPO
 if (NS_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT result OUTPUT output)

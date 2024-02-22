@@ -1059,10 +1059,10 @@ struct model_file_loader {
     char gguf_magic[4];
     const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
     bool ok = true;
-    ok = ok & gguf_magic[0] == 'G';
-    ok = ok & gguf_magic[1] == 'G';
-    ok = ok & gguf_magic[2] == 'U';
-    ok = ok & gguf_magic[3] == 'F';
+    ok &= gguf_magic[0] == 'G';
+    ok &= gguf_magic[1] == 'G';
+    ok &= gguf_magic[2] == 'U';
+    ok &= gguf_magic[3] == 'F';
 
     if (ok) {
       model_magic = GGUF;
