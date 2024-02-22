@@ -234,7 +234,7 @@ if __name__ == '__main__':
     cmdclass = {'build_ext': CMakeBuild}
 
     setup(
-        name="neural-speed",
+        name="qbits",
         author="Intel AISE/AIPC Team",
         author_email="feng.tian@intel.com, haihao.shen@intel.com,hanwen.chang@intel.com, penghui.cheng@intel.com",
         description="Repository of Intel® Intel Extension for Transformers",
@@ -260,5 +260,6 @@ if __name__ == '__main__':
             'License :: OSI Approved :: Apache Software License',
         ],
         setup_requires=['setuptools_scm'],
-        use_scm_version=True,
+        version='0.0'
+        # use_scm_version=True,
     )
