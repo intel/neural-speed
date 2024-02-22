@@ -163,7 +163,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         # Handles Missing token ID for gated models
         except Exception as e:
             if e.response.status_code == 401:
-                print("You are required to input an acccess token ID for {}, please add it in option --token or download model weights locally".format(args.model))
+                print("You are required to input an access token ID for {}, please add it in option --token or download model weights locally".format(args.model))
             sys.exit(f"{e}")
 
     parent_path = Path(__file__).parent.absolute()
