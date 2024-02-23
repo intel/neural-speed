@@ -1062,7 +1062,7 @@ class OutputFile:
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("i", params.ffn_hidden_size))
         self.fout.write(struct.pack("i", 0))
-        
+
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("f", params.rms_norm_eps))
