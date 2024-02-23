@@ -708,13 +708,18 @@ class StdThreading : public IThreading {
   const thread_func* func_[100];
 };
 
-class SingleThread : public StdThreading {
+class SingleThread : public IThreading {
  public:
-  SingleThread() : StdThreading(1) {}
+  SingleThread() : IThreading(1) {}
 
-  void set_threads(int nthreads) override { (void)(nthreads); }
+  void set_threads(int nthreads) override {
+    assert(0);
+    (void)(nthreads);
+  }
 
-  inline void sync(int idx) override {}
+  inline void parallel_for(const thread_func& func) override { func(0); }
+
+  inline void sync(int idx = 0) override {}
 };
 
 template <class Parallel_T, class Launch_T>
