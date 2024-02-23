@@ -147,7 +147,6 @@ struct model_hparams {
   int32_t original_max_position_embeddings = 0;
   int32_t use_yarn = 0;
 
-
   bool operator!=(const model_hparams& other) const {
     return static_cast<bool>(memcmp(this, &other, sizeof(model_hparams)));
   }

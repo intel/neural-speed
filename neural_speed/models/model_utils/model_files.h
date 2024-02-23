@@ -1233,7 +1233,6 @@ struct model_file_saver {
     file.write_raw(&hparams.rope_scaling_factor, sizeof(float));
     file.write_u32(hparams.original_max_position_embeddings);
     file.write_u32(hparams.use_yarn);
-
   }
   void write_vocab() {
     if (any_file_loader->file_version == MODEL_FILE_VERSION_NE) {
