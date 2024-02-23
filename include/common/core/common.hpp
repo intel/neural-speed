@@ -112,9 +112,8 @@ enum class data_size : uint8_t {
 /// The specific LSC shared function to fence with xetla_fence
 enum class memory_kind : uint8_t {
     untyped_global = 0, /// untyped global memory
-    untyped_global_low_pri = 1, /// low-priority untyped global memory
-    typed_global = 2, /// typed global memory
-    shared_local = 3, /// shared local memory
+    typed_global = 1, /// typed global memory
+    shared_local = 2, /// shared local memory
 };
 
 /// The xetla_fence operation to apply to caches
@@ -122,10 +121,8 @@ enum class fence_op : uint8_t {
     none = 0, /// no operation
     evict = 1, /// dirty lines evicted and invalidated from L1
     invalidate = 2, /// invalidate all clean lines
-    discard = 3, /// direct and clean lines are discarded w/o eviction
+
     clean = 4, /// dirty lines are written to memory, but retained in cache
-    /// in clean state
-    flushl2 = 5, /// flush only L2
 };
 /// The scope that xetla_fence operation should apply to
 enum class fence_scope : uint8_t {
