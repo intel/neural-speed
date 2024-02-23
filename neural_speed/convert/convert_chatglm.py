@@ -359,6 +359,8 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["multi_query_group_num"]))
     fout.write(struct.pack("i", hparams["ffn_hidden_size"]))
     fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
