@@ -1098,6 +1098,8 @@ struct model_file_loader {
 
     // For ChatGLM-2
     hparams.inner_hidden_size = file.read_u32();
+    hparams.n_experts = file.read_u32();
+    hparams.n_experts_used = file.read_u32();
 
     file.read_raw(&hparams.rms_norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
@@ -1218,10 +1220,13 @@ struct model_file_saver {
     file.write_u32(hparams.multi_query_group_num);
     file.write_u32(hparams.ffn_hidden_size);
     file.write_u32(hparams.inner_hidden_size);
+    file.write_u32(hparams.n_experts);
+    file.write_u32(hparams.n_experts_used);
 
     file.write_raw(&hparams.rms_norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
     file.write_raw(&hparams.freq_scale, sizeof(float));
+    
   }
   void write_vocab() {
     if (any_file_loader->file_version == MODEL_FILE_VERSION_NE) {
