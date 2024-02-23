@@ -145,8 +145,6 @@ class Model:
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)
-        import pdb
-        pdb.set_trace()
         self.model = self.module.Model()
         if self.max_request_num == -1:
             self.max_request_num = max(generate_kwargs.get("max_request_num",
