@@ -404,7 +404,7 @@ struct whisper_model_t {
 struct whisper_sequence_t {
   std::vector<whisper_token_data> tokens;
 
-  // the accumulated transcription in the current interation (used to truncate
+  // the accumulated transcription in the current interaction (used to truncate
   // the tokens array)
   int result_len;
 

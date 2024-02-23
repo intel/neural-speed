@@ -8,6 +8,9 @@ on:
       - tests/**
       - .github/workflows/unit-test-llmruntime.yml
       - .github/workflows/unitTest/**
+      - 'CMakeLists.txt'
+      - 'setup.py'
+      - '!**/*.md'
   workflow_dispatch:
 
 # If there is a new commit, the previous jobs will be canceled
@@ -28,7 +31,7 @@ jobs:
     steps:
       - name: Load environment variables
         run: cat ~/actions-runner3/.env >> $GITHUB_ENV
-      
+
       - name: Docker Clean Up
         run: |
           docker ps -a

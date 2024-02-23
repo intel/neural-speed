@@ -8,6 +8,9 @@ on:
        - '.github/workflows/scripts/models/cpp_graph_inference.sh'
        - 'neural_speed/**'
        - 'bestla/**'
+       - 'CMakeLists.txt'
+       - 'setup.py'
+       - '!**/*.md'
   workflow_dispatch:
     inputs:
       compiler_version:
@@ -59,7 +62,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/.github/workflows/scripts/models
           bash cpp_graph_inference.sh cpp-graph-test-neural-speed ${{ matrix.modelName }} ${{ env.INPUT_COMPILER_VERSION }}
-      
+
       - name: Rename summary
         run: |
           cd ${{ github.workspace }}
@@ -93,7 +96,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           path: ${{ env.OUT_SCRIPT_PATH }}/generated/log
-      
+
       - name: Merge CPP Graph Summary Log
         run: |
           cd ${{ env.OUT_SCRIPT_PATH }}/generated/log/cpp_graph

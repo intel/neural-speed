@@ -331,7 +331,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
                                                  head_size, n_ctx, n_head, update_bs,  // ne
                                                  0, 0, v_size,                         // nb (bestla managed)
                                                  il * kv_n_ctx_block * v_size + update_block_id * v_size);  // offset);
-        // bestla alway view V as (D, n_head, seq, bs)
+        // bestla always view V as (D, n_head, seq, bs)
         struct ne_tensor* v_cur_g =
             ne_view_4d(ctx0, Vcur, head_size, n_head, update_sl, update_bs, ne_element_size(Vcur) * head_size,
                        ne_element_size(Vcur) * head_size * n_head,

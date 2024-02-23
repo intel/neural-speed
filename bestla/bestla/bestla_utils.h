@@ -211,6 +211,24 @@ struct fp16 {
   }
 };
 
+struct bit2x4 {
+  int8_t a : 2;
+  int8_t b : 2;
+  int8_t c : 2;
+  int8_t d : 2;
+};
+
+struct bit1x8 {
+  int8_t a : 1;
+  int8_t b : 1;
+  int8_t c : 1;
+  int8_t d : 1;
+  int8_t e : 1;
+  int8_t f : 1;
+  int8_t g : 1;
+  int8_t h : 1;
+};
+
 struct bit4x2 {
   int8_t x : 4;
   int8_t y : 4;

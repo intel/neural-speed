@@ -3526,8 +3526,10 @@ static void ne_compute_forward_dump_tensor(const struct ne_compute_params* param
   const int64_t ne03 = src0->ne[3];
   const int64_t nr = ne_nrows(src0);
 
-  fprintf(file, "Total element is %ld\n", ne_nelements(src0));
-  fprintf(file, "ne[0] size is %ld ne[1] size is %ld ne[2] size is %ld ne[3] size is %ld \n", ne00, ne01, ne02, ne03);
+  fprintf(file, "Total element is %" PRId64 "\n", ne_nelements(src0));
+  fprintf(file,
+          "ne[0] size is %" PRId64 " ne[1] size is %" PRId64 " ne[2] size is %" PRId64 " ne[3] size is %" PRId64 " \n",
+          ne00, ne01, ne02, ne03);
   switch (src0->type) {
     case NE_TYPE_F32: {
       for (int64_t ir = 0; ir < nr; ++ir) {
@@ -4798,7 +4800,7 @@ static void ne_compute_forward_acc_f32(const struct ne_compute_params* params, c
   NE_ASSERT(ne_nelements(opt0) == 5);
 
   // view src0 and dst with these strides and data offset inbytes during acc
-  // nb0 is implicitely element_size because src0 and dst are contiguous
+  // nb0 is implicitly element_size because src0 and dst are contiguous
   size_t nb1 = ((int32_t*)opt0->data)[0];
   size_t nb2 = ((int32_t*)opt0->data)[1];
   size_t nb3 = ((int32_t*)opt0->data)[2];
@@ -6115,6 +6117,11 @@ static void ne_compute_forward_norm_f32(const struct ne_compute_params* params, 
 
   const float eps = 1e-5f;  // TODO: make this a parameter
 
+  if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
+    bestla_layernormalization(ne03 * ne02 * ne01, ne00, false, eps, (const float*)src0->data, (float*)dst->data);
+    return;
+  }
+
   // TODO: optimize
   for (int64_t i03 = 0; i03 < ne03; i03++) {
     for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -6187,6 +6194,10 @@ static void ne_compute_forward_rms_norm_f32(const struct ne_compute_params* para
   float eps;
   memcpy(&eps, dst->op_params, sizeof(float));
 
+  if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
+    bestla_layernormalization(ne03 * ne02 * ne01, ne00, true, eps, (const float*)src0->data, (float*)dst->data);
+    return;
+  }
   // TODO: optimize
   for (int64_t i03 = 0; i03 < ne03; i03++) {
     for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -7624,7 +7635,7 @@ static void ne_compute_forward_set_f32(const struct ne_compute_params* params, c
   NE_ASSERT(ne_nelements(opt0) == 5);
 
   // view src0 and dst with these strides and data offset inbytes during set
-  // nb0 is implicitely element_size because src0 and dst are contiguous
+  // nb0 is implicitly element_size because src0 and dst are contiguous
   size_t nb1 = ((int32_t*)opt0->data)[0];
   size_t nb2 = ((int32_t*)opt0->data)[1];
   size_t nb3 = ((int32_t*)opt0->data)[2];
@@ -8342,7 +8353,7 @@ static void ne_compute_forward_alibi_f32(const struct ne_compute_params* params,
   assert(nb0 == sizeof(float));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
 #ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
@@ -8412,7 +8423,7 @@ static void ne_compute_forward_alibi_f16(const struct ne_compute_params* params,
   assert(nb0 == sizeof(ne_fp16_t));
   assert(ne1 + n_past == ne0);
   (void)n_past;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
 #ifdef NS_TP_MODEL
   parallel_context* p_ctx = init_parallel_context();
@@ -10331,12 +10342,12 @@ static void ne_compute_backward(struct ne_context* ctx, struct ne_tensor* tensor
     } break;
     case NE_OP_SQRT: {
       if (src0->grad) {
-        src0->grad = ne_add_impl(
-            ctx, src0->grad,
-            ne_mul(ctx,
-                   tensor->grad,  // this was not catched by test_grad because in test_grad tensor->grad is 1
-                   ne_div(ctx, ne_repeat(ctx, ne_new_f32(ctx, 0.5f), tensor), tensor)),
-            inplace);
+        src0->grad =
+            ne_add_impl(ctx, src0->grad,
+                        ne_mul(ctx,
+                               tensor->grad,  // this was not caught by test_grad because in test_grad tensor->grad is 1
+                               ne_div(ctx, ne_repeat(ctx, ne_new_f32(ctx, 0.5f), tensor), tensor)),
+                        inplace);
       }
     } break;
     case NE_OP_LOG: {
@@ -11121,7 +11132,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_NEG:
         case NE_OP_STEP:
         case NE_OP_MUL:
-        case NE_OP_RMS_NORM:
         case NE_OP_RELU: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
@@ -11129,10 +11139,21 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
             node->n_tasks = 1;
           }
         } break;
+        case NE_OP_NORM:
+        case NE_OP_RMS_NORM: {
+          if (ne_is_contiguous(node->src0)) {
+            node->n_tasks = 1;
+          } else {
+            if (node->src0->ne[1] > 4) {
+              node->n_tasks = n_threads;
+            } else {
+              node->n_tasks = 1;
+            }
+          }
+        } break;
         case NE_OP_GELU:
         case NE_OP_SILU:
         case NE_OP_SILU_BACK:
-        case NE_OP_NORM:
         case NE_OP_RMS_NORM_BACK: {
           node->n_tasks = n_threads;
         } break;
@@ -11540,6 +11561,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 }
 
 void ne_graph_profiling(const struct ne_cgraph* cgraph) {
+#ifdef NS_PERF
   int64_t perf_total_per_op_us[NE_OP_COUNT] = {0};
 
   NE_PRINT("=== GRAPH Profiling ===\n");
@@ -11562,6 +11584,10 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
   NE_PRINT("========================================\n");
+
+#else
+  NE_PRINT("\n[Warning] To collect profiling data, please recompile with NS_PROFILING=ON.\n");
+#endif
 }
 
 void ne_graph_reset(struct ne_cgraph* cgraph) {

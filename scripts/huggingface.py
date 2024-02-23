@@ -351,7 +351,7 @@ class HuggingFaceAutoLM(BaseLM):
                             load_in_8bit=load_in_8bit,
                             trust_remote_code=trust_remote_code,
                             torch_dtype=torch_dtype
-                        )   
+                        )
             else:
                 if load_in_4bit:
                     assert (
@@ -468,7 +468,7 @@ class HuggingFaceAutoLM(BaseLM):
         elif self.model_format == "runtime":
             return True
         elif self.AUTO_MODEL_CLASS is transformers.AutoModelForCausalLM:
-            return False 
+            return False
         elif self.AUTO_MODEL_CLASS is transformers.AutoModel:
             return False
         elif self.AUTO_MODEL_CLASS is transformers.AutoModelForSeq2SeqLM:
@@ -614,16 +614,21 @@ class AutoCausalLM(HuggingFaceAutoLM):
 
     def __init__(self, *args, pretrained, model_format, **kwargs):
         self.model_format = model_format
-        # if self.model_format == "runtime":
-        #     from intel_extension_for_transformers.transformers import WeightOnlyQuantConfig
-        #     use_gptq = kwargs.pop("use_gptq", False)
-        #     self.woq_config = WeightOnlyQuantConfig(compute_dtype="int8", weight_dtype="int4", use_gptq=use_gptq)
+        if self.model_format == "runtime":
+            self.use_gptq = kwargs.pop("use_gptq", False)
+            self.use_awq = kwargs.pop("use_awq", False)
+            self.use_autoround = kwargs.pop("use_autoround", False)
+            self.use_quant = kwargs.pop("use_quant", True)
         super().__init__(*args, pretrained=pretrained, model_format=model_format, **kwargs)
 
         if self.model_format == "runtime":
             from neural_speed import Model
             self.runtime_model = Model()
-            self.runtime_model.init(pretrained, weight_dtype="int4", compute_dtype="int8")
+            self.runtime_model.init(pretrained, weight_dtype="int4", compute_dtype="int8",
+                                    use_quant=self.use_quant,
+                                    use_gptq=self.use_gptq,
+                                    use_awq=self.use_awq,
+                                    use_autoround=self.use_autoround)
 
         if self.model_format == "onnx":
             if not os.path.exists(os.path.join(pretrained, "decoder_model.onnx")) and \

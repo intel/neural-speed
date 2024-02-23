@@ -33,7 +33,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-tags: true
-      
+
       - name: Env build
         run: |
           echo "do not need conda env"
@@ -42,7 +42,7 @@ jobs:
           #if [[ "${{ env.INPUT_COMPILER_VERSION }}" != "11.4.1" ]]; then
           #  conda install --update-deps -c conda-forge gxx==${{ env.INPUT_COMPILER_VERSION }} gcc==${{ env.INPUT_COMPILER_VERSION }} gxx_linux-64==${{ env.INPUT_COMPILER_VERSION }} libstdcxx-ng sysroot_linux-64 -y
           #fi
-  
+
       - name: Run UT
         run: |
           source /opt/rh/gcc-toolset-12/enable

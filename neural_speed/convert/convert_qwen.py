@@ -110,11 +110,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["intermediate_size"]))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
+
+    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
 
     fout.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
     fout.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))

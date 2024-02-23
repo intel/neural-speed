@@ -48,7 +48,6 @@
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
@@ -427,14 +426,14 @@ std::map<std::string, std::vector<gpt_vocab::id>> extract_tests_from_file(const 
   std::map<std::string, std::vector<gpt_vocab::id>> tests;
 
   auto fin = std::ifstream(fpath_test, std::ios_base::in);
-  const char* delimeter = " => ";
+  const char* delimiter = " => ";
   const char del_tok = ',';
   std::string line;
   while (std::getline(fin, line)) {
-    size_t delimiterPos = line.find(delimeter);
+    size_t delimiterPos = line.find(delimiter);
     if (delimiterPos != std::string::npos) {
       std::string text = line.substr(0, delimiterPos);
-      std::string s_tokens = line.substr(delimiterPos + std::strlen(delimeter));
+      std::string s_tokens = line.substr(delimiterPos + std::strlen(delimiter));
       tests[text] = parse_tokens_from_string(s_tokens, del_tok);
     }
   }
