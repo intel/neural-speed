@@ -379,7 +379,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         weights_sum = ne_repeat(ctx0, weights_sum, weights);
         weights = ne_div(ctx0, weights, weights_sum);
         ne_tensor* moe_out = nullptr;
-        
+
         for (int i = 0; i < n_expert_used; ++i) {
           ne_tensor* cur_expert;
 

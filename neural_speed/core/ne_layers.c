@@ -6883,9 +6883,159 @@ static void ne_compute_forward_mul_mat(const struct ne_compute_params* params, c
   }
 }
 
+static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* params, const struct ne_tensor* ids,
+                                                const struct ne_tensor* src1, struct ne_tensor* dst) {
+  int64_t t0 = ne_perf_time_us();
+  UNUSED(t0);
+  const struct ne_tensor* src0 = dst->opt[0];
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+
+  const size_t nb11 = src1->nb[1];
+  UNUSED(nb11);
+  const size_t nb12 = src1->nb[2];
+  UNUSED(nb12);
+  const size_t nb13 = src1->nb[3];
+  UNUSED(nb13);
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  const int ith = params->ith;
+  const int nth = params->nth;
+
+  const enum ne_type type = src0->type;
+  quantize_row_q_t const quantize_row_q_dot = quantize_fns[type].quantize_row_q_dot;
+  vec_dot_q_t const vec_dot_q = quantize_fns[type].vec_dot_q;
+  enum ne_type const vec_dot_type = quantize_fns[type].vec_dot_type;
+
+  NE_ASSERT(ne0 == ne01);
+  NE_ASSERT(ne1 == ne11);
+  NE_ASSERT(ne2 == ne12);
+  NE_ASSERT(ne3 == ne13);
+
+  // we don't support permuted src0 or src1
+  NE_ASSERT(nb00 == (int)NE_TYPE_SIZE[type]);
+  NE_ASSERT(nb10 == sizeof(float));
+
+  // dst cannot be transposed or permuted
+  NE_ASSERT(nb0 == sizeof(float));
+  NE_ASSERT(nb0 <= nb1);
+  NE_ASSERT(nb1 <= nb2);
+  NE_ASSERT(nb2 <= nb3);
+  const int id = dst->op_params[0];
+  const int n_as = dst->op_params[1];
+  // char * wdata_src1_end = (char *)params->wdata;
+  // int64_t wdata_src1_end = 0;
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t* matrix_rows[4096];      // [n_as][ne11]
+#define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+
+  // nb01 >= nb00 - src0 is not transposed
+  //   compute by src0 rows
+
+  if (params->type == NE_TASK_INIT) {
+    memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
+    memset(matrix_rows, -1, 4096 * sizeof(int64_t));
+    for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
+      const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
+      NE_ASSERT(row_id >= 0 && row_id < n_as);
+      MMID_MATRIX_ROW(row_id, matrix_row_counts[row_id]) = i01;
+      matrix_row_counts[row_id] += 1;
+    }
+    char* wdata = params->wdata;
+    const size_t row_size = ne10 * NE_TYPE_SIZE[vec_dot_type] / NE_BLCK_SIZE[vec_dot_type];
+    for (int64_t i13 = 0; i13 < ne13; ++i13) {
+      for (int64_t i12 = 0; i12 < ne12; ++i12) {
+        for (int64_t i11 = 0; i11 < ne11; ++i11) {
+          quantize_row_q_dot((float*)((char*)src1->data + i13 * nb13 + i12 * nb12 + i11 * nb11), (void*)wdata, ne10);
+          wdata += row_size;
+        }
+      }
+    }
+
+    return;
+  }
+
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  for (int cur_a = 0; cur_a < n_as; ++cur_a) {
+    const int64_t cne1 = matrix_row_counts[cur_a];
+    if (cne1 == 0) {
+      continue;
+    }
+    const struct ne_tensor* src0_cur = dst->opt[cur_a];
+    // parallelize by src0 rows
+    const int64_t dr = (ne01 + nth - 1) / nth;
+
+    const int64_t ir10 = dr * ith;
+    const int64_t ir11 = MIN(ir10 + dr, ne01);
+
+    // src1 rows
+    const int64_t nr1 = cne1 * ne12 * ne13;
+
+    void* wdata = params->wdata;
+    const size_t row_size = ne10 * NE_TYPE_SIZE[vec_dot_type] / NE_BLCK_SIZE[vec_dot_type];
+
+    for (int64_t ir1 = 0; ir1 < nr1; ++ir1) {
+      const int64_t i13 = (ir1 / (ne12 * cne1));
+      const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
+      const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
+      const int64_t i11 = MMID_MATRIX_ROW(cur_a, _i11);
+      if (i11 == -1) {
+        continue;
+      }
+
+      const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
+      const int64_t i03 = (ir0 / (ne02));
+      // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
+      // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
+      const int64_t i02 = (i12 / (ne12 / ne02));
+      // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
+      // const int64_t i02 = (ir0 - i03*ne02);
+
+      const int64_t i1 = i11;
+      const int64_t i2 = i12;
+      const int64_t i3 = i13;
+
+      char* src0_row = (char*)src0_cur->data + (0 + i02 * nb02 + i03 * nb03);
+      char* src1_col = (char*)wdata + (i11 + i12 * ne11 + i13 * ne12 * ne11) * row_size;
+
+      float* dst_col = (float*)((char*)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
+
+      for (int64_t ir = ir10; ir < ir11; ++ir) {
+        vec_dot_q(ne00, &dst_col[ir], src0_row + ir * nb01, src1_col);
+      }
+    }
+  }
+}
 
 static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* params, const struct ne_tensor* ids,
-                                          const struct ne_tensor* src1, struct ne_tensor* dst) {
+                                              const struct ne_tensor* src1, struct ne_tensor* dst) {
   int64_t t0 = ne_perf_time_us();
   UNUSED(t0);
   const struct ne_tensor* src0 = dst->opt[0];
@@ -6946,8 +7096,8 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
   const int n_as = dst->op_params[1];
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
-  int64_t matrix_row_counts[100];                       // [n_as]
-  int64_t* matrix_rows[4096];  // [n_as][ne11]
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t* matrix_rows[4096];      // [n_as][ne11]
 #define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -6980,7 +7130,6 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
 
     const int64_t ir10 = dr * ith;
     const int64_t ir11 = MIN(ir10 + dr, ne01);
-
 
     // src1 rows
     const int64_t nr1 = cne1 * ne12 * ne13;
@@ -7019,7 +7168,7 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
 }
 
 static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params* params, const struct ne_tensor* ids,
-                                          const struct ne_tensor* src1, struct ne_tensor* dst) {
+                                                  const struct ne_tensor* src1, struct ne_tensor* dst) {
   int64_t t0 = ne_perf_time_us();
   UNUSED(t0);
   const struct ne_tensor* src0 = dst->opt[0];
@@ -7080,8 +7229,8 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
   const int n_as = dst->op_params[1];
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
-  int64_t matrix_row_counts[100];                       // [n_as]
-  int64_t* matrix_rows[4096];  // [n_as][ne11]
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t* matrix_rows[4096];      // [n_as][ne11]
 #define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7169,8 +7318,9 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
   }
 }
 
-static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_params* params, const struct ne_tensor* ids,
-                                          const struct ne_tensor* src1, struct ne_tensor* dst) {
+static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_params* params,
+                                                       const struct ne_tensor* ids, const struct ne_tensor* src1,
+                                                       struct ne_tensor* dst) {
   int64_t t0 = ne_perf_time_us();
   UNUSED(t0);
   const struct ne_tensor* src0 = dst->opt[0];
@@ -7235,8 +7385,8 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
   const int n_as = dst->op_params[1];
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
-  int64_t matrix_row_counts[100];                       // [n_as]
-  int64_t* matrix_rows[4096];  // [n_as][ne11]
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t* matrix_rows[4096];      // [n_as][ne11]
 #define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7296,17 +7446,15 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
 
       float* dst_col = (float*)((char*)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
 
-      
-  
-    // parallelize by src0 rows
-    
-    bestla_f32f32_forward((float*)src1_col, (float*)src0_row, dst_col, 1, ne0, ne10, nb11 / ne_element_size(src1),
-                        nb1 / ne_element_size(dst), params->wdata);
+      // parallelize by src0 rows
+
+      bestla_f32f32_forward((float*)src1_col, (float*)src0_row, dst_col, 1, ne0, ne10, nb11 / ne_element_size(src1),
+                            nb1 / ne_element_size(dst), params->wdata);
     }
   }
 }
 static void ne_compute_forward_mul_mat_id(const struct ne_compute_params* params, const struct ne_tensor* ids,
-                                          const struct ne_tensor* src1, struct ne_tensor* dst){
+                                          const struct ne_tensor* src1, struct ne_tensor* dst) {
   switch (dst->opt[0]->type) {
     case NE_TYPE_Q4_0:
     case NE_TYPE_Q4_1:
@@ -7315,7 +7463,7 @@ static void ne_compute_forward_mul_mat_id(const struct ne_compute_params* params
     case NE_TYPE_Q8_0:
     case NE_TYPE_Q6_K:
     case NE_TYPE_Q8_1: {
-      ne_compute_forward_mul_mat_id_f32(params, ids, src1, dst);
+      ne_compute_forward_mul_mat_id_q_f32(params, ids, src1, dst);
     } break;
     case NE_TYPE_BTLA: {
       ne_compute_forward_mul_mat_id_q_f32_bestla(params, ids, src1, dst);
