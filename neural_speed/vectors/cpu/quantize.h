@@ -240,7 +240,7 @@ static inline float hsum_float_4x4(const __m128 a, const __m128 b, const __m128 
 #endif  // defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__) || defined(__SSSE3__)
 
 // reference implementation for deterministic creation of model files
-static void quantize_row_q4_0_reference(const float* x, block_q4_0* y, int k) {
+static void quantize_row_q4_0_reference(const float* restrict x, block_q4_0* restrict y, int k) {
   static const int qk = QK4_0;
 
   assert(k % qk == 0);
@@ -277,7 +277,9 @@ static void quantize_row_q4_0_reference(const float* x, block_q4_0* y, int k) {
   }
 }
 
-static void quantize_row_q4_0(const float* x, void* y, int k) { quantize_row_q4_0_reference(x, (block_q4_0*)y, k); }
+static void quantize_row_q4_0(const float* restrict x, void* restrict y, int k) {
+  quantize_row_q4_0_reference(x, (block_q4_0*)y, k);
+}
 
 static void quantize_row_q4_1_reference(const float* x, block_q4_1* y, int k) {
   const int qk = QK4_1;
@@ -316,9 +318,11 @@ static void quantize_row_q4_1_reference(const float* x, block_q4_1* y, int k) {
   }
 }
 
-static void quantize_row_q4_1(const float* x, void* y, int k) { quantize_row_q4_1_reference(x, (block_q4_1*)y, k); }
+static void quantize_row_q4_1(const float* restrict x, void* restrict y, int k) {
+  quantize_row_q4_1_reference(x, (block_q4_1*)y, k);
+}
 
-static void quantize_row_q5_0_reference(const float* x, block_q5_0* y, int k) {
+static void quantize_row_q5_0_reference(const float* restrict x, block_q5_0* restrict y, int k) {
   static const int qk = QK5_0;
 
   assert(k % qk == 0);
@@ -362,9 +366,11 @@ static void quantize_row_q5_0_reference(const float* x, block_q5_0* y, int k) {
   }
 }
 
-static void quantize_row_q5_0(const float* x, void* y, int k) { quantize_row_q5_0_reference(x, (block_q5_0*)y, k); }
+static void quantize_row_q5_0(const float* restrict x, void* restrict y, int k) {
+  quantize_row_q5_0_reference(x, (block_q5_0*)y, k);
+}
 
-static void quantize_row_q5_1_reference(const float* x, block_q5_1* y, int k) {
+static void quantize_row_q5_1_reference(const float* restrict x, block_q5_1* restrict y, int k) {
   const int qk = QK5_1;
 
   assert(k % qk == 0);
@@ -408,10 +414,12 @@ static void quantize_row_q5_1_reference(const float* x, block_q5_1* y, int k) {
   }
 }
 
-static void quantize_row_q5_1(const float* x, void* y, int k) { quantize_row_q5_1_reference(x, (block_q5_1*)y, k); }
+static void quantize_row_q5_1(const float* restrict x, void* restrict y, int k) {
+  quantize_row_q5_1_reference(x, (block_q5_1*)y, k);
+}
 
 // reference implementation for deterministic creation of model files
-static void quantize_row_q8_0_reference(const float* x, block_q8_0* y, int k) {
+static void quantize_row_q8_0_reference(const float* restrict x, block_q8_0* restrict y, int k) {
   assert(k % QK8_0 == 0);
   const int nb = k / QK8_0;
 
@@ -436,7 +444,7 @@ static void quantize_row_q8_0_reference(const float* x, block_q8_0* y, int k) {
   }
 }
 
-static void quantize_row_q8_0(const float* x, void* vy, int k) {
+static void quantize_row_q8_0(const float* restrict x, void* restrict vy, int k) {
   assert(QK8_0 == 32);
   assert(k % QK8_0 == 0);
   const int nb = k / QK8_0;
@@ -535,7 +543,7 @@ static void quantize_row_q8_0(const float* x, void* vy, int k) {
 }
 
 // reference implementation for deterministic creation of model files
-static void quantize_row_q8_1_reference(const float* x, block_q8_1* y, int k) {
+static void quantize_row_q8_1_reference(const float* restrict x, block_q8_1* restrict y, int k) {
   assert(QK8_1 == 32);
   assert(k % QK8_1 == 0);
   const int nb = k / QK8_1;
@@ -570,7 +578,7 @@ static void quantize_row_q8_1_reference(const float* x, block_q8_1* y, int k) {
   }
 }
 
-static void quantize_row_q8_1(const float* x, void* vy, int k) {
+static void quantize_row_q8_1(const float* restrict x, void* restrict vy, int k) {
   assert(k % QK8_1 == 0);
   const int nb = k / QK8_1;
 
@@ -675,7 +683,7 @@ static void quantize_row_q8_1(const float* x, void* vy, int k) {
 #endif
 }
 
-static void dequantize_row_q4_0(const block_q4_0* x, float* y, int k) {
+static void dequantize_row_q4_0(const block_q4_0* restrict x, float* restrict y, int k) {
   static const int qk = QK4_0;
 
   assert(k % qk == 0);
@@ -695,7 +703,7 @@ static void dequantize_row_q4_0(const block_q4_0* x, float* y, int k) {
   }
 }
 
-static void dequantize_row_q4_1(const block_q4_1* x, float* y, int k) {
+static void dequantize_row_q4_1(const block_q4_1* restrict x, float* restrict y, int k) {
   static const int qk = QK4_1;
 
   assert(k % qk == 0);
@@ -716,7 +724,7 @@ static void dequantize_row_q4_1(const block_q4_1* x, float* y, int k) {
   }
 }
 
-static void dequantize_row_q5_0(const block_q5_0* x, float* y, int k) {
+static void dequantize_row_q5_0(const block_q5_0* restrict x, float* restrict y, int k) {
   static const int qk = QK5_0;
 
   assert(k % qk == 0);
@@ -742,7 +750,7 @@ static void dequantize_row_q5_0(const block_q5_0* x, float* y, int k) {
   }
 }
 
-static void dequantize_row_q5_1(const block_q5_1* x, float* y, int k) {
+static void dequantize_row_q5_1(const block_q5_1* restrict x, float* restrict y, int k) {
   static const int qk = QK5_1;
 
   assert(k % qk == 0);
@@ -769,7 +777,7 @@ static void dequantize_row_q5_1(const block_q5_1* x, float* y, int k) {
   }
 }
 
-static void dequantize_row_q8_0(const void* vx, float* y, int k) {
+static void dequantize_row_q8_0(const void* restrict vx, float* restrict y, int k) {
   static const int qk = QK8_0;
 
   assert(k % qk == 0);

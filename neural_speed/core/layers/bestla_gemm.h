@@ -53,3 +53,6 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
 
 bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
                          const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool);
+
+bool BTLALayerNorm(size_t norm_count, size_t norm_size, bool isrms, float epsilon, const float* FpIn, float* FpOut,
+                   void* ThreadPool);

@@ -50,7 +50,7 @@ def bytes_to_unicode():
             n += 1
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
-        
+
 def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("phi.gguf converting: ")
     list_vars = model.state_dict()
@@ -257,7 +257,7 @@ def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
     print("Done. Output file: " + fname_out)
     print("")
-    
+
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
@@ -288,9 +288,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
     else:
         phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
-    
+
 
 
 if __name__ == '__main__':
     main()
-

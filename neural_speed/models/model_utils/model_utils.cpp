@@ -99,7 +99,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
   const auto wtype_alloc = wtype == NE_TYPE_BTLA ? NE_TYPE_I8 : wtype;
 
   if (model) {  // non-null param of model for kv-cache as components of model->layers[il]
-    for (int il = 0; il < hparams.n_layer; ++il) {
+    for (int il = 0; il < n_layer; ++il) {
       auto& k_cache = model->layers[il].k_cache;
       auto& v_cache = model->layers[il].v_cache;
       if (wtype == NE_TYPE_F16) {  // chatglm does not support fp32 kv-cache in original impl of chatglm_util.cpp
@@ -1286,7 +1286,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.gen_conf.do_early_stopping = params.do_early_stopping;
   lparams.model_scratch_enlarge_scale = params.model_scratch_enlarge_scale;
 
-  NE_ASSERT(("Start size cannot be greater than the maximun context size!", lparams.n_keep < lparams.n_ctx));
+  NE_ASSERT(("Start size cannot be greater than the maximum context size!", lparams.n_keep < lparams.n_ctx));
 
   model_context* lctx = model_init_from_file(params.model.c_str(), lparams);
 
@@ -1698,7 +1698,7 @@ int model_tokenize(struct model_context* ctx, const char* text, model_token* tok
 }
 
 std::vector<model_token> model_tokenize(struct model_context* ctx, const std::string& text, bool add_bos) {
-  // initialize to prompt numer of chars, since n_tokens <= n_prompt_chars
+  // initialize to prompt number of chars, since n_tokens <= n_prompt_chars
   std::vector<model_token> res(text.size() + static_cast<int>(add_bos));
   const int n = model_tokenize(ctx, text.c_str(), res.data(), res.size(), add_bos);
   assert(n >= 0);
@@ -2053,7 +2053,7 @@ void beam_search_kv_cache_reorder::update(const std::vector<uint32_t>& n_past,
                                           const std::vector<int>& request_running_indices,
                                           const std::vector<std::tuple<int, int>>& kv_reorder_indices,
                                           const std::vector<beam>& next_beams) {
-  // beam search unsupport shift kv cache when prompt + new_tokens > nctx
+  // beam search unsupported shift kv cache when prompt + new_tokens > nctx
   NE_ASSERT(("error: unimplement shifted kv cache update\n", !ctx->model.kv_self.has_shift));
 #ifdef NS_BEAM_SEARCH_VERBOSE_ON
   printf("start to update kv cache for next step...\n");
@@ -2376,7 +2376,7 @@ std::vector<std::tuple<int, int>> beam_search_flow::update_kv_cache_reorder_indi
     }
     // we arrange beams by inference batch indice rather score for memcpy time reduction
     // so there will be 2 circumstances (ignore no memcpy : 0,1,2,3 --> 0,1,2,3)
-    // 1. cpoy former beams into latter beams, like: 0,1,2,3 --> 0,0,0,1
+    // 1. copy former beams into latter beams, like: 0,1,2,3 --> 0,0,0,1
     // 2. copy latter beams into former beams, like: 0,1,2,3 -- > 1,2,2,3
     // kv cache memcpy happens in itself which would cause memory dislocation if follows wrong order
     // so we give the contrary order to beams vector indice, which is:
@@ -2693,7 +2693,7 @@ bool beam_search_flow::step_update_beams_and_kv_cache() {
   std::vector<beam_next_token> next_tokens =
       beam_top_k_next_tokens(ctx, beams_score, num_beams, beam_indices, sample_scale);
   if (next_tokens.size() != num_sample_k) {
-    fprintf(stderr, "%s: error: sampled next tokens size is %ld which is not equal to %d.\n", __func__,
+    fprintf(stderr, "%s: error: sampled next tokens size is %zu which is not equal to %d.\n", __func__,
             next_tokens.size(), num_sample_k);
     return false;
   }

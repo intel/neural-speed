@@ -143,6 +143,11 @@ struct model_hparams {
   uint32_t n_experts = 0;
   uint32_t n_experts_used = 0;
 
+  float rope_scaling_factor = 0.0f;
+  int32_t original_max_position_embeddings = 0;
+  int32_t use_yarn = 0;
+
+
   bool operator!=(const model_hparams& other) const {
     return static_cast<bool>(memcmp(this, &other, sizeof(model_hparams)));
   }

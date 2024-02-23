@@ -152,8 +152,8 @@ void bestla_fusion_attn_fp32_batch_cpy_v(const bestla_fusion_attn_fp32_batch_cpy
 
 typedef struct bestla_reordered_attn_fp32_fp32_fwd_args_t {
   float* Q;
-  char* K;  // K/V should be of type and layout used in corrsponding bestla_reordered_attn_xxx_update_kv
-  char* V;  // K/V should be of type and layout used in corrsponding bestla_reordered_attn_xxx_update_kv
+  char* K;  // K/V should be of type and layout used in corresponding bestla_reordered_attn_xxx_update_kv
+  char* V;  // K/V should be of type and layout used in corresponding bestla_reordered_attn_xxx_update_kv
   float* dst;
   float Q_sc, K_sc, V_sc, dst_sc;
   char* tmp;

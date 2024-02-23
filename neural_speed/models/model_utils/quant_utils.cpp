@@ -238,6 +238,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   if (params.bits == quant_bits::q8) {
     quant_type = BTLA_DTYPE::S8;
   }
+  if (params.bits == quant_bits::q3) quant_type = BTLA_DTYPE::S3_CLIP;
   auto dtype_type = static_cast<BTLA_DTYPE>(
       bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
   if (dtype_type == BTLA_DTYPE::TypeFloat) {
@@ -280,6 +281,9 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   bestla::parallel::StdThreading threading(nthread);
 #endif
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
+  if (params.bits == quant_bits::q3) {
+    quant_type = BTLA_DTYPE::S3_CLIP;
+  }
   if (params.bits == quant_bits::q8) {
     quant_type = BTLA_DTYPE::S8;
   }
@@ -418,7 +422,6 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   }
   printf("size = %8.2f MB -> %8.2f MB\n", tensor.size / 1024.0 / 1024.0, new_size / 1024.0 / 1024.0);
 
-__WRITE_FILE:
   size_org += tensor.size;
   size_new += new_size;
   saver.write_tensor(tensor, new_type, new_data, new_size);

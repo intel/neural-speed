@@ -923,7 +923,7 @@ struct gguf_loader {
     GGUF_GET_KEY(ctx_gguf, ftype, gguf_get_val_u32, GGUF_TYPE_UINT32, false, "ftype");
     hparams.ftype = (enum ne_ftype)ftype;
 
-    // Get specific model paramters
+    // Get specific model parameters
     GGUF_GET_KEY(ctx_gguf, hparams.max_seq_len, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_CONTEXT_LENGTH));
     GGUF_GET_KEY(ctx_gguf, hparams.alibi_bias_max, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false,
                  kv(LLM_KV_ATTENTION_MAX_ALIBI_BIAS));
@@ -1062,10 +1062,10 @@ struct model_file_loader {
     char gguf_magic[4];
     const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
     bool ok = true;
-    ok = ok & gguf_magic[0] == 'G';
-    ok = ok & gguf_magic[1] == 'G';
-    ok = ok & gguf_magic[2] == 'U';
-    ok = ok & gguf_magic[3] == 'F';
+    ok &= gguf_magic[0] == 'G';
+    ok &= gguf_magic[1] == 'G';
+    ok &= gguf_magic[2] == 'U';
+    ok &= gguf_magic[3] == 'F';
 
     if (ok) {
       model_magic = GGUF;
@@ -1104,6 +1104,10 @@ struct model_file_loader {
     file.read_raw(&hparams.rms_norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
+
+    file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
+    hparams.original_max_position_embeddings = file.read_u32();
+    hparams.use_yarn = file.read_u32();
   }
 
   void read_ne_vocab() {
@@ -1226,7 +1230,10 @@ struct model_file_saver {
     file.write_raw(&hparams.rms_norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
     file.write_raw(&hparams.freq_scale, sizeof(float));
-    
+    file.write_raw(&hparams.rope_scaling_factor, sizeof(float));
+    file.write_u32(hparams.original_max_position_embeddings);
+    file.write_u32(hparams.use_yarn);
+
   }
   void write_vocab() {
     if (any_file_loader->file_version == MODEL_FILE_VERSION_NE) {
@@ -1583,7 +1590,7 @@ struct model_model_loader {
         tmp_buf.resize(lt.size * lt.world_size);
         file.read_raw(tmp_buf.addr, lt.size * lt.world_size);
         size_t offset = 0;
-        // different data type may have differnet per_row_size
+        // different data type may have different per_row_size
         size_t per_row_size = lt.size / num_rows;
         if (lt.split_type == TP_1D_QKV_COLUMN) {
           for (size_t i = 0; i < num_rows; ++i) {

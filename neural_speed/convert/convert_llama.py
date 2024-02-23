@@ -35,6 +35,7 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
                     Union)
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 import gguf
 
 if TYPE_CHECKING:
@@ -154,6 +155,7 @@ class Params:
     rope_scale: float
     bos_token_id: int
     eos_token_id: int
+    pad_token_id: int
 
     @staticmethod
     def guessed(model: 'LazyModel') -> 'Params':
@@ -187,6 +189,7 @@ class Params:
             rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
         bos_token_id = config["bos_token_id"]
         eos_token_id = config["eos_token_id"]
+        pad_token_id = config["pad_token_id"] if "pad_token_id" in config else -1
 
         return Params(
             n_vocab=n_vocab,
@@ -201,6 +204,7 @@ class Params:
             rope_scale=rope_scale,
             bos_token_id = bos_token_id,
             eos_token_id = eos_token_id,
+            pad_token_id = pad_token_id,
         )
 
     # LLaMA v2 70B params.json
@@ -218,6 +222,7 @@ class Params:
         ffn_hidden_size = config["intermediate_size"]
         bos_token_id = config["bos_token_id"]
         eos_token_id = config["eos_token_id"]
+        pad_token_id = config["pad_token_id"] if "pad_token_id" in config else -1
         # hack to determine LLaMA v1 vs v2 vs CodeLlama
 
         if n_vocab == -1:
@@ -233,6 +238,7 @@ class Params:
             ffn_hidden_size=ffn_hidden_size,
             bos_token_id = bos_token_id,
             eos_token_id = eos_token_id,
+            pad_token_id = pad_token_id,
         )
 
     @staticmethod
@@ -279,7 +285,7 @@ class SentencePieceVocab:
     def sentencepiece_tokens(self) -> Iterable[Tuple[bytes, float]]:
         tokenizer = self.sentencepiece_tokenizer
         for i in range(self.params_vocab_size):
-            text: bytes           
+            text: bytes
             if i < tokenizer.vocab_size():
                 if tokenizer.is_unknown(i):
                     text = " \u2047 ".encode("utf-8")
@@ -331,7 +337,7 @@ Vocab = Union[SentencePieceVocab, NEVocab]
 
 def permute(weights: NDArray, n_head: int, n_head_kv: int) -> NDArray:
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
@@ -699,7 +705,7 @@ def merge_multifile_models(models_plus: List[ModelPlus]) -> ModelPlus:
 
     if any("model.embed_tokens.weight" in mp.model for mp in models_plus):
         # Transformers models put different tensors in different files, but
-        # don't split indivdual tensors between files.
+        # don't split individual tensors between files.
         model: LazyModel = {}
         for mp in models_plus:
             model.update(mp.model)
@@ -1087,11 +1093,15 @@ class OutputFile:
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
+        self.fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+        self.fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+        self.fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+
         # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
         self.fout.write(struct.pack("i", params.bos_token_id))
         self.fout.write(struct.pack("i", params.eos_token_id))
-        self.fout.write(struct.pack("i", -1))
+        self.fout.write(struct.pack("i", params.pad_token_id))
         self.fout.write(struct.pack("i", -1))
 
     def write_tensor_header(self, name: str, shape: Sequence[int], data_type: DataType) -> None:
@@ -1432,6 +1442,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
         OutputFile.write_vocab_only(outfile, vocab)
         print(f"Wrote {outfile}")
     else:
+        if Path(args.model).is_dir():
+            print("Loadding the model from the local path.")
+            model_plus = load_some_model(args.model)
+        else:
+            print("Loadding the model from HF.")
+            model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            cache_path = Path(tokenizer.vocab_file).parent
+            args.model = cache_path
+
         model_plus = load_some_model(args.model)
         if args.dump:
             do_dump_model(model_plus)

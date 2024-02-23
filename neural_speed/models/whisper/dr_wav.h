@@ -28,7 +28,7 @@ Version 0.12 includes breaking changes to custom chunk handling.
 
 Changes to Chunk Callback
 -------------------------
-dr_wav supports the ability to fire a callback when a chunk is encounted (except
+dr_wav supports the ability to fire a callback when a chunk is encountered (except
 for WAVE and FMT chunks). The callback has been updated to include both the
 container (RIFF or Wave64) and the FMT chunk which contains information about
 the format of the data in the wave file.
@@ -3330,7 +3330,7 @@ static drwav_result drwav_wfopen(FILE** ppFile, const wchar_t* pFilePath, const 
   annoying because fopen() is locale specific. The only real way I can think of
   to do this is with wcsrtombs(). Note that wcstombs() is apparently not
   thread-safe because it uses a static global mbstate_t object for maintaining
-  state. I've checked this with -std=c89 and it works, but if somebody get's a
+  state. I've checked this with -std=c89 and it works, but if somebody gets a
   compiler error I'll look into improving compatibility.
   */
   {

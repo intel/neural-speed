@@ -171,7 +171,7 @@ class Cpu {
     }
     bool operator==(const Type& rhs) const { return H == rhs.H && L == rhs.L; }
     bool operator!=(const Type& rhs) const { return !operator==(rhs); }
-    // without explicit because backward compatilibity
+    // without explicit because backward compatibility
     operator bool() const { return (H | L) != 0; }
     uint64_t getL() const { return L; }
     uint64_t getH() const { return H; }

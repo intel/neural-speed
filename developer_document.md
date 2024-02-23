@@ -362,7 +362,7 @@ index aaeab8d16a..12a835e652 100644
 +        elif model_name == "new_model": # read from config.json->model_type
 +            import neural_speed.new_model_cpp as cpp_model
          else:
-             raise TypeError("Unspported model type {}!".format(model_name))
+             raise TypeError("Unsupported model type {}!".format(model_name))
          self.module = cpp_model
 diff --git a/neural_speed/application/CMakeLists.txt b/neural_speed/application/CMakeLists.txt
 index d86107d26e..36d30cabe3 100644
@@ -426,4 +426,3 @@ We can improve the performance by fusion the FFN process.
 - [FFN-Fusion example](https://github.com/intel/intel-extension-for-transformers/pull/160)
 # 4. A complete example
 - [Enable baichuan](https://github.com/intel/intel-extension-for-transformers/pull/376)
-

@@ -40,8 +40,8 @@ option(NS_ALL_WARNINGS           "neural_speed: enable all compiler warnings"   
 option(NS_ALL_WARNINGS_3RD_PARTY "neural_speed: enable all compiler warnings in 3rd party libs" OFF)
 option(NS_GPROF                  "neural_speed: enable gprof"                                   OFF)
 
-# tensor parallism
-option(NS_TP                     "neural_speed: enable tensor parallism"                        OFF)
+# tensor parallelism
+option(NS_TP                     "neural_speed: enable tensor parallelism"                        OFF)
 if (NS_TP)
   add_compile_definitions(NS_TP_MODEL)
 endif()
@@ -54,17 +54,17 @@ option(NS_SANITIZE_UNDEFINED     "neural_speed: enable undefined sanitizer"     
 # instruction set specific
 option(NS_AVX                    "neural_speed: enable AVX"                                     ON)
 option(NS_AVX2                   "neural_speed: enable AVX2"                                    ON)
+option(NS_F16C                   "neural_speed: enable F16C"                                    ON)
 option(NS_AVX512                 "neural_speed: enable AVX512"                                  OFF)
 option(NS_AVX512_VBMI            "neural_speed: enable AVX512-VBMI"                             OFF)
 option(NS_AVX512_VNNI            "neural_speed: enable AVX512-VNNI"                             OFF)
 option(NS_FMA                    "neural_speed: enable FMA"                                     ON)
 option(NS_AMX                    "neural_speed: enable AMX"                                     OFF)
-option(NS_F16C                   "neural_speed: enable F16C"                                    ON)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
 option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
 option(NS_BUILD_EXAMPLES         "neural_speed: build examples"                    ${NS_STANDALONE})
-option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)                               
+option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)
 
 
 if(NS_BUILD_TESTS)
@@ -101,6 +101,7 @@ if (MSVC)
     endif()
 endif()
 
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)  # default to false so that pybind11 will not try to use IPO
 if (NS_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT result OUTPUT output)
@@ -139,6 +140,7 @@ if (NS_BTLA_UT)
 endif()
 include(FindOpenMP)
 
+set(BTLA_USE_OPENMP ON CACHE BOOL "BesTLA use OpenMP")
 add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)

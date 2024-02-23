@@ -36,6 +36,7 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
 
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
+from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -685,7 +686,7 @@ def merge_multifile_models(models_plus: List[ModelPlus]) -> ModelPlus:
 
     if any("model.embed_tokens.weight" in mp.model for mp in models_plus):
         # Transformers models put different tensors in different files, but
-        # don't split indivdual tensors between files.
+        # don't split individual tensors between files.
         model: LazyModel = {}
         for mp in models_plus:
             model.update(mp.model)
@@ -1065,10 +1066,14 @@ class OutputFile:
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
+        self.fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+        self.fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+        self.fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+
         self.fout.write(
             struct.pack("i", 1)
-        )  
-        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json 
+        )
+        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
         self.fout.write(struct.pack("i", 2))
 
@@ -1306,6 +1311,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
         OutputFile.write_vocab_only(outfile, vocab)
         print(f"Wrote {outfile}")
     else:
+        if Path(args.model).is_dir():
+            print("Loadding the model from the local path.")
+        else:
+            print("Loadding the model from HF.")
+            model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            cache_path = Path(tokenizer.vocab_file).parent
+            args.model = cache_path
+
         model_plus = load_some_model(args.model)
         if args.dump:
             do_dump_model(model_plus)

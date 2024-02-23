@@ -25,4 +25,3 @@ cd build
 cmake ..
 cmake --build . -j --config Release
 ```
-

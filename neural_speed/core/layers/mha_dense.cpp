@@ -463,7 +463,7 @@ class launcher_base_off_t                  //
 
   void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config,
            int w_offset /* weight offset for batching */) {
-    // TO(Yi) temperarily configure to max tiling size
+    // TO(Yi) temporarily configure to max tiling size
     this->mGemmCore.configure(16, 16, 16);  // Need 'this->' here; See：https://stackoverflow.com/questions/11405
     auto StackTmp = alloca(_config.stacksize);
     auto tmpB = reinterpret_cast<BType*>(StackTmp);
@@ -827,7 +827,7 @@ class mha_interface_t {
 
 /**
  * @brief An Epilogue that optionally apply a casual mask (but may not filling zero) and scale the fp32 result, update
- * the maximun of each line of the reuslt, and storing exp as bf16 results
+ * the maximum of each line of the result, and storing exp as bf16 results
  */
 template <BTLA_ISA ISA_T, typename T_SRC, typename T_DST>
 class scale_track_max_t {
@@ -1345,7 +1345,7 @@ class mha_stable_interface_t {
     const auto group_heads = p.head_num / p.heads_kv;
     const auto sl_diff = p.sl_kv - p.sl_q;
 
-    // TP will need the real rank oder of k
+    // TP will need the real rank order of k
     int32_t k_offset = 0;
     int32_t log_head_num = p.head_num;
 #ifdef NS_TP_MODEL
@@ -1731,7 +1731,7 @@ void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>&
   const auto ROWPACK = p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4   ? 4
                        : p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2 ? 2
                                                                         : 0;
-  // TP will need the real rank oder of k
+  // TP will need the real rank order of k
   int32_t k_offset = 0;
   int32_t log_head_num = p.head_num;
 #ifdef NS_TP_MODEL
@@ -2008,7 +2008,7 @@ void bestla_reordered_attn_fp32_update_v_(const bestla_fusion_attn_fp32_update_k
             src, dst, p.seq_size, p.head_size, padto(p.seq_size, 32), padto(p.head_size, 48), p.step_seq, pad_seq_max);
       } else {
         for (int i = 0; i < padto(p.seq_off + p.seq_size, 32) - p.seq_off; ++i) {  // K-dim padding for PV_GEMM
-          for (int j = 0; j < p.head_size; ++j) {  // PV_GEMM should't require 0-padding on head_size (i.e. N-dim)
+          for (int j = 0; j < p.head_size; ++j) {  // PV_GEMM shouldn't require 0-padding on head_size (i.e. N-dim)
             const auto i_dst = p.seq_off + i;
             const auto ii = i_dst % 2;
             const auto i_blk = i_dst - ii;

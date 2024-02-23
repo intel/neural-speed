@@ -49,7 +49,6 @@
 #include <unistd.h>
 #elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <signal.h>
 #include <windows.h>
 #endif
@@ -162,7 +161,7 @@ class ModelServer {
           Cont_batch_gen_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
-            {                                               // add waitting tasks queue to running queue
+            {                                               // add waiting tasks queue to running queue
               std::lock_guard<std::mutex> lock(queue_mtx);  // need lock as issueQuery may also access waiting
 
               // TODO(Yi): should have some limitations
@@ -488,7 +487,7 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
       if (iter == input_ids[bs].end()) fprintf(stderr, "\nERROR: there are all pad tokens in batch %d!\n", bs);
       padding_count.push_back(std::distance(input_ids[bs].begin(), iter));
     }
-    // shoule be same in static batching inference
+    // should be same in static batching inference
     n_prompt_tokens = input_ids[STATIC_INPUT_HEAD_IDX].size();
     return true;
   }
@@ -519,7 +518,7 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
   std::vector<model_input> inputs;
   for (int bs = 0; bs < ctx->batch_size; ++bs) {
     const auto& input_id_cb = input_ids.empty() ? empty_id : input_ids[bs];
-    if (input_id_cb.empty()) {  // use internel input id
+    if (input_id_cb.empty()) {  // use internal input id
       if (curr_input_ids[bs].empty()) {
         fprintf(stderr, "%s: error: no input\n", __func__);
         return empty_ret;
@@ -528,7 +527,7 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
       fprintf(stderr, "%s: error: prompt confliction\n", __func__);
       return empty_ret;
     } else if (input_id_cb.size() > n_ctx - 4) {  // long input_id_cb and empty curr_input_ids[bs]
-      fprintf(stderr, "\n%s: Warning: prompt is too long (%d tokens, max %d), will be truncated\n", __func__,
+      fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
               input_id_cb.size(), n_ctx - 4);
       curr_input_ids[bs].resize(n_ctx - 4);
       std::copy(input_id_cb.end() - n_ctx - 8, input_id_cb.end(), curr_input_ids[bs].begin() + 4);
@@ -643,7 +642,7 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
 
   if (curr_input_ids[STATIC_INPUT_HEAD_IDX].empty()) {
     if (input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx - 4) {
-      fprintf(stderr, "\n%s: Warning: prompt is too long (%d tokens, max %d), will be truncated\n", __func__,
+      fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
               input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - 4);
       curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - 4);
       std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - 8, input_ids[STATIC_INPUT_HEAD_IDX].end(),

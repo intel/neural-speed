@@ -75,7 +75,7 @@ class Model:
         elif model_type == "mixtral":
             import neural_speed.mixtral_cpp as cpp_model
         else:
-            raise TypeError("Unspported model type {}!".format(model_type))
+            raise TypeError("Unsupported model type {}!".format(model_type))
         self.module = cpp_model
 
     @staticmethod
@@ -85,11 +85,12 @@ class Model:
             model_type = "chatglm2"
         return model_type
 
-    def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False,
+    def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False, use_autoround=False,
             weight_dtype="int4", alg="sym", group_size=32,
             scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
         self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
+        self.model_type = model_type
         self.__import_package(model_type)
 
         # check cache and quantization
@@ -109,22 +110,24 @@ class Model:
             quant_desc = "gptq"
         if use_awq:
             quant_desc = "awq"
+        if use_awq:
+            quant_desc = "autoround"
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
             self.bin_file = fp32_bin
         else:
             self.bin_file = quant_bin
-        
+
         if os.path.exists(self.bin_file):
             print("{} existed, will use cache file. Otherwise please remove the file".
                   format(self.bin_file))
             return
 
-        if use_gptq or use_awq:
-            convert_model(model_name, quant_bin, "f32")
+        if use_gptq or use_awq or use_autoround:
+            convert_model(model_name, quant_bin, use_quantized_model=True)
             return
-        
+
         if not os.path.exists(fp32_bin):
             convert_model(model_name, fp32_bin, "f32")
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
@@ -142,11 +145,9 @@ class Model:
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         self.__import_package(model_type)
-        import pdb
-        pdb.set_trace()
         self.model = self.module.Model()
         if self.max_request_num == -1:
-            self.max_request_num = max(generate_kwargs.get("max_request_num", 
+            self.max_request_num = max(generate_kwargs.get("max_request_num",
                             max_request_num_default), generate_kwargs.get("batch_size", 1))
         if "threads" not in generate_kwargs:
             threads = os.getenv("OMP_NUM_THREADS")
@@ -178,7 +179,7 @@ class Model:
             reinit_from_bin = True
             if self.max_request_num > 0:
                 print("Will start to reinit model from bin due to different max request num.")
-            self.max_request_num = max(input_bs, max_request_num) 
+            self.max_request_num = max(input_bs, max_request_num)
 
         if self.model is None or reinit_from_bin:
             self.init_from_bin(self.model_type, self.bin_file, batch_size=input_bs,
@@ -197,7 +198,7 @@ class Model:
             beam_search = True
         if not beam_search:
             # TODO support multi batch
-            assert input_ids.shape[0] == 1, "Unsupport multi-batch input ids."
+            assert input_ids.shape[0] == 1, "Unsupported multi-batch input ids."
 
         if streamer:
             assert input_ids.shape[0] == 1, "Streamer only supports batch size 1."

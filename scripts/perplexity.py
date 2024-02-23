@@ -20,6 +20,7 @@ import logging
 import math
 import os
 import pathlib
+import psutil
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
@@ -64,7 +65,7 @@ def perplexity(model_name, dataset_name, **kwargs):
 
     ctx_size = kwargs.get("ctx_size", 256)
     prompt_size = kwargs.get("prompt_size", ctx_size // 4)  # use one quarter as prompt
-    n_threads = kwargs.get("n_threads", len(os.sched_getaffinity(0)))  # Note: linux only
+    n_threads = kwargs.get("n_threads", psutil.cpu_count(logical=False) or 1)
     n_pred_per_sample = kwargs.get("n_pred_per_sample", ctx_size * 2)
     n_sampels = kwargs.get("n_sampels", 2)
     data_text_concat = kwargs.get("data_text_concat", "wikitext-2-raw-v1" in dataset_name)  # concat samples with `\n\n`
@@ -72,7 +73,8 @@ def perplexity(model_name, dataset_name, **kwargs):
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     data = datasets.load_from_disk(dataset_name)
-    test_text = data['text']
+    test_column = 'article' if 'cnn_dailymail' in dataset_name else 'text'
+    test_text = data[test_column]
     if data_text_concat:
         test_text = ['\n\n'.join(test_text)]
 
@@ -113,7 +115,7 @@ def perplexity(model_name, dataset_name, **kwargs):
     model_kwargs = {**default_model_kwargs, **model_kwargs}
 
     ppl_hist = [{} for _ in range(n_sampels)]  # ppl_hist[i_sample][end_pos] = ppl
-    sum_nll = [0. for _ in range(n_sampels)]  # sum of negative log likelyhood
+    sum_nll = [0. for _ in range(n_sampels)]  # sum of negative log likelihood
     sum_nll2 = [0. for _ in range(n_sampels)]  # sum of nll square
 
     pbar = tqdm(range(n_pred_per_sample * n_sampels))
