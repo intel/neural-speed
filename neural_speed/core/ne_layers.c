@@ -374,76 +374,78 @@ static bool NE_IS_QUANTIZED[NE_TYPE_COUNT] = {
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_IS_QUANTIZED is outdated");
 
-static const char* NE_OP_LABEL[NE_OP_COUNT] = {"NONE",
+static const char* NE_OP_LABEL[NE_OP_COUNT] = {
+    "NONE",
 
-                                               "DUP",
-                                               "ADD",
-                                               "ADD1",
-                                               "ACC",
-                                               "SUB",
-                                               "MUL",
-                                               "DIV",
-                                               "SQR",
-                                               "SQRT",
-                                               "LOG",
-                                               "SUM",
-                                               "SUM_ROWS",
-                                               "MEAN",
-                                               "REPEAT",
-                                               "ABS",
-                                               "SGN",
-                                               "NEG",
-                                               "STEP",
-                                               "RELU",
-                                               "GELU",
-                                               "SILU",
-                                               "SILU_BACK",
-                                               "NORM",
-                                               "RMS_NORM",
-                                               "RMS_NORM_BACK",
-                                               "ARGSORT",
-                                               "MUL_MAT",
-                                               "MUL_MAT_WITH_BIAS",
-                                               "MUL_MAT_ID",
-                                               "SCALE",
-                                               "SET",
-                                               "CPY",
-                                               "CONT",
-                                               "RESHAPE",
-                                               "VIEW",
-                                               "PERMUTE",
-                                               "TRANSPOSE",
-                                               "GET_ROWS",
-                                               "GET_ROWS_BACK",
-                                               "DIAG",
-                                               "DIAG_MASK_INF",
-                                               "DIAG_MASK_ZERO",
-                                               "PADDING_MASK_INF",
-                                               "SOFT_MAX",
-                                               "ROPE",
-                                               "ROPE_BACK",
-                                               "ALIBI",
-                                               "CLAMP",
-                                               "CONV_1D_1S",
-                                               "CONV_1D_2S",
+    "DUP",
+    "ADD",
+    "ADD1",
+    "ACC",
+    "SUB",
+    "MUL",
+    "DIV",
+    "SQR",
+    "SQRT",
+    "LOG",
+    "SUM",
+    "SUM_ROWS",
+    "MEAN",
+    "REPEAT",
+    "ABS",
+    "SGN",
+    "NEG",
+    "STEP",
+    "RELU",
+    "GELU",
+    "SILU",
+    "SILU_BACK",
+    "NORM",
+    "RMS_NORM",
+    "RMS_NORM_BACK",
+    "ARGSORT",
+    "MUL_MAT",
+    "MUL_MAT_WITH_BIAS",
+    "MUL_MAT_ID",
+    "SCALE",
+    "SET",
+    "CPY",
+    "CONT",
+    "RESHAPE",
+    "VIEW",
+    "PERMUTE",
+    "TRANSPOSE",
+    "GET_ROWS",
+    "GET_ROWS_BACK",
+    "DIAG",
+    "DIAG_MASK_INF",
+    "DIAG_MASK_ZERO",
+    "PADDING_MASK_INF",
+    "SOFT_MAX",
+    "ROPE",
+    "ROPE_BACK",
+    "ALIBI",
+    "CLAMP",
+    "CONV_1D_1S",
+    "CONV_1D_2S",
 
-                                               "MUL_QKV",
-                                               "FFN_SILU",
-                                               "FFN_GeLU",
-                                               "FFN_ADD_GeLU",
-                                               "FLASH_ATTN",
-                                               "FLASH_ATTN_KV_UPDATE",
-                                               "FLASH_FF",
-                                               "MAP_UNARY",
-                                               "MAP_BINARY",
-                                               "SPLIT",
-                                               "ALL_REDUCE",
-                                               "TP_CONCAT",
-                                               "DUMP_TENSOR",
-                                               "CONV_1D",
-                                               "DEBUG"};
+    "MUL_QKV",
+    "FFN_SILU",
+    "FFN_GeLU",
+    "FFN_ADD_GeLU",
+    "FLASH_ATTN",
+    "FLASH_ATTN_KV_UPDATE",
+    "FLASH_FF",
+    "MAP_UNARY",
+    "MAP_BINARY",
+    "SPLIT",
+    "ALL_REDUCE",
+    "TP_CONCAT",
+    "DUMP_TENSOR",
+    "CONV_1D",
+    "DEBUG",
+};
 
-static_assert(NE_OP_COUNT == 65, "NE_OP_COUNT != 65");
+static_assert(NE_OP_COUNT == 66, "NE_OP_COUNT != 66");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
@@ -6962,8 +6964,8 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t* matrix_rows[4096];      // [n_as][ne11]
-#define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+  int64_t matrix_rows[4096];       // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
   //   compute by src0 rows
@@ -6974,7 +6976,7 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
-      MMID_MATRIX_ROW(row_id, matrix_row_counts[row_id]) = i01;
+      mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
       matrix_row_counts[row_id] += 1;
     }
     char* wdata = params->wdata;
@@ -7016,7 +7018,7 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
       const int64_t i13 = (ir1 / (ne12 * cne1));
       const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
       const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
-      const int64_t i11 = MMID_MATRIX_ROW(cur_a, _i11);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
       if (i11 == -1) {
         continue;
       }
@@ -7108,8 +7110,8 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t* matrix_rows[4096];      // [n_as][ne11]
-#define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+  int64_t matrix_rows[4096];       // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
   //   compute by src0 rows
@@ -7120,7 +7122,7 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
-      MMID_MATRIX_ROW(row_id, matrix_row_counts[row_id]) = i01;
+      mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
       matrix_row_counts[row_id] += 1;
     }
 
@@ -7149,7 +7151,7 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
       const int64_t i13 = (ir1 / (ne12 * cne1));
       const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
       const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
-      const int64_t i11 = MMID_MATRIX_ROW(cur_a, _i11);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
       if (i11 == -1) {
         continue;
       }
@@ -7241,8 +7243,8 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t* matrix_rows[4096];      // [n_as][ne11]
-#define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+  int64_t matrix_rows[4096];       // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
   //   compute by src0 rows
@@ -7253,7 +7255,7 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
-      MMID_MATRIX_ROW(row_id, matrix_row_counts[row_id]) = i01;
+      mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
       matrix_row_counts[row_id] += 1;
     }
     ne_fp16_t* const wdata = params->wdata;
@@ -7300,7 +7302,7 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
       const int64_t i13 = (ir1 / (ne12 * cne1));
       const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
       const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
-      const int64_t i11 = MMID_MATRIX_ROW(cur_a, _i11);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
       if (i11 == -1) {
         continue;
       }
@@ -7397,8 +7399,8 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t* matrix_rows[4096];      // [n_as][ne11]
-#define MMID_MATRIX_ROW(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+  int64_t matrix_rows[4096];       // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
   //   compute by src0 rows
@@ -7409,7 +7411,7 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
-      MMID_MATRIX_ROW(row_id, matrix_row_counts[row_id]) = i01;
+      mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
       matrix_row_counts[row_id] += 1;
     }
 
@@ -7435,7 +7437,7 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
       const int64_t i13 = (ir1 / (ne12 * cne1));
       const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
       const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
-      const int64_t i11 = MMID_MATRIX_ROW(cur_a, _i11);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
       if (i11 == -1) {
         continue;
       }

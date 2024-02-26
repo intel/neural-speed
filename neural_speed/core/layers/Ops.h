@@ -89,8 +89,8 @@ enum ne_op {
   NE_OP_DUMP_TENSOR,
   NE_OP_DEBUG,
   NE_OP_CONV_1D,
-  NE_OP_COUNT,
   NE_OP_ARGSORT,
+  NE_OP_COUNT,
 };
 
 #ifdef __cplusplus
