@@ -16,7 +16,7 @@
 
 #include "xetla.hpp"
 #include <utils/utils.hpp>
-#define UT_DEBUG 1
+// #define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
 constexpr int ITER = 1;
@@ -24,9 +24,9 @@ constexpr int ITER = 1;
 class test1 {
 public:
     //Extract the parameters required by different test cases
-    static constexpr size_t mat_m = 16;
+    static constexpr size_t mat_m = 32;
     static constexpr size_t mat_n = 32;
-    static constexpr size_t mat_k = 32;
+    static constexpr size_t mat_k = 16;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
@@ -36,7 +36,7 @@ public:
     static constexpr size_t num_buffer = 64;
     static constexpr size_t local_kslicing = 1;
     static constexpr size_t global_kslicing = 1;
-    static constexpr mem_layout layout_a = mem_layout::row_major;
+    static constexpr mem_layout layout_a = mem_layout::col_major;
     static constexpr mem_layout layout_b = mem_layout::row_major;
     using data_type_a = fp16;
     using data_type_b = int4x2;
@@ -606,10 +606,14 @@ void dequantize_gemm_run(int iter) {
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
 <<<<<<< HEAD
+<<<<<<< HEAD
     int constexpr warm = 0;
 =======
     int constexpr warm = 10;
 >>>>>>> fc6054c (add dg2)
+=======
+    int constexpr warm = 0;
+>>>>>>> 4e44a75 (save)
     try {
         for (int i = 0; i < iter + warm; i++) {
             if (i >= warm) prof.cpu_start();

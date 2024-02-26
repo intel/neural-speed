@@ -449,7 +449,7 @@ public:
                 scale_prefetch_addr_i++;
             }
             SW_BARRIER();
-            matA_payload.template update_tdesc<update_dir_a>(
+            matA_payload.template update_tdesc<update_dir_b>(
                     matA_t::tile_size_x);
             matB_payload.template update_tdesc<update_dir_b>(
                     matB_t::tile_size_y);
@@ -480,6 +480,31 @@ public:
             subgroup::elemwise_cvt(matA_acc, matA);
             dequantize(matB_acc, matB, scale, zero_pt);
             SW_BARRIER();
+
+            // static const char vec_c[]
+            //     = " vec_c after load %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n";
+            // auto thread_idx=g.get_id();
+
+            // for(int z=0;z<16;z+=1){
+            // sycl::ext::oneapi::experimental::printf(vec_c,
+            // (int)(half)matA_acc.reg[z*16+0],
+            // (int)(half)matA_acc.reg[z*16+1],
+            // (int)(half)matA_acc.reg[z*16+2],
+            // (int)(half)matA_acc.reg[z*16+3],
+            // (int)(half)matA_acc.reg[z*16+4],
+            // (int)(half)matA_acc.reg[z*16+5],
+            // (int)(half)matA_acc.reg[z*16+6],
+            // (int)(half)matA_acc.reg[z*16+7],
+            // (int)(half)matA_acc.reg[z*16+8],
+            // (int)(half)matA_acc.reg[z*16+9],
+            // (int)(half)matA_acc.reg[z*16+10],
+            // (int)(half)matA_acc.reg[z*16+11],
+            // (int)(half)matA_acc.reg[z*16+12],
+            // (int)(half)matA_acc.reg[z*16+13],
+            // (int)(half)matA_acc.reg[z*16+14],
+            // (int)(half)matA_acc.reg[z*16+15]
+            // );
+            // }
 
             tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
 sycl::ext::oneapi::experimental::printf("after mma A:  \n");
