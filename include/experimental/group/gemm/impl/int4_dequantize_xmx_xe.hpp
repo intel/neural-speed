@@ -440,7 +440,7 @@ public:
                 scale_prefetch_addr_i++;
             }
             SW_BARRIER();
-            matA_payload.template update_tdesc<update_dir_b>(
+            matA_payload.template update_tdesc<update_dir_a>(
                     matA_t::tile_size_x);
             matB_payload.template update_tdesc<update_dir_b>(
                     matB_t::tile_size_y);

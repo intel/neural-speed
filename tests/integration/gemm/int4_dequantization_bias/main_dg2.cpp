@@ -16,7 +16,7 @@
 
 #include "xetla.hpp"
 #include <utils/utils.hpp>
-// #define UT_DEBUG 1
+#define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
 constexpr int ITER = 1;
@@ -24,9 +24,9 @@ constexpr int ITER = 1;
 class test1 {
 public:
     //Extract the parameters required by different test cases
-    static constexpr size_t mat_m = 32;
-    static constexpr size_t mat_n = 32;
-    static constexpr size_t mat_k = 16;
+    static constexpr size_t mat_m = 16;
+    static constexpr size_t mat_n = 16;
+    static constexpr size_t mat_k = 32;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
@@ -440,11 +440,10 @@ void dequantize_gemm_run(int iter) {
                     size_bias * sizeof(data_type_bias), device, context));
 
     for (unsigned i = 0; i < size_a; ++i) {
-        // A_h[i] = random_float()*100;
-        A_h[i] = i % 128;
-        // #ifdef UT_DEBUG
-        // A_h[i] = 1.f;
-        // #endif
+        A_h[i] = random_float();
+#ifdef UT_DEBUG
+        A_h[i] = 1.f;
+#endif
     }
 
     for (int i = 0; i < matrix_k; i++) {
