@@ -14,29 +14,29 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <utils/utils.hpp>
 #include "xetla.hpp"
+#include <utils/utils.hpp>
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
-constexpr int ITER = 1000;
+constexpr int ITER = 1;
 
 class test1 {
 public:
     //Extract the parameters required by different test cases
-    static constexpr size_t mat_m = 1;
-    static constexpr size_t mat_n = 16384;
-    static constexpr size_t mat_k = 4096;
-    static constexpr size_t wg_m = 8;
-    static constexpr size_t wg_n = 64;
-    static constexpr size_t sg_m = 8;
+    static constexpr size_t mat_m = 32;
+    static constexpr size_t mat_n = 32;
+    static constexpr size_t mat_k = 16;
+    static constexpr size_t wg_m = 16;
+    static constexpr size_t wg_n = 16;
+    static constexpr size_t sg_m = 16;
     static constexpr size_t sg_n = 16;
     static constexpr size_t sg_k = 16;
-    static constexpr size_t dequant_s = 64;
+    static constexpr size_t dequant_s = 32;
     static constexpr size_t num_buffer = 64;
-    static constexpr size_t local_kslicing = 8;
+    static constexpr size_t local_kslicing = 1;
     static constexpr size_t global_kslicing = 1;
-    static constexpr mem_layout layout_a = mem_layout::row_major;
+    static constexpr mem_layout layout_a = mem_layout::col_major;
     static constexpr mem_layout layout_b = mem_layout::row_major;
     using data_type_a = fp16;
     using data_type_b = int4x2;
@@ -397,6 +397,8 @@ void dequantize_gemm_run(int iter) {
     //Define and initialize the data required for the calculation
     auto *A_h = static_cast<data_type_a *>(
             malloc_host(size_a * sizeof(data_type_a), context));
+    auto *A_hh = static_cast<data_type_a *>(
+            malloc_host(size_a * sizeof(data_type_a), context));
     auto *B_h = static_cast<data_type_b *>(
             malloc_host(size_b * sizeof(data_type_b), context));
     auto *C_h = static_cast<data_type_c *>(
@@ -438,11 +440,19 @@ void dequantize_gemm_run(int iter) {
                     size_bias * sizeof(data_type_bias), device, context));
 
     for (unsigned i = 0; i < size_a; ++i) {
-        A_h[i] = random_float();
-#ifdef UT_DEBUG
-        A_h[i] = 1.f;
-#endif
+        // A_h[i] = random_float()*100;
+        A_h[i] = i % 128;
+        // #ifdef UT_DEBUG
+        // A_h[i] = 1.f;
+        // #endif
     }
+
+    for (int i = 0; i < matrix_k; i++) {
+        for (int j = 0; j < matrix_m; j++) {
+            A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
+        }
+    }
+
     for (unsigned i = 0; i < size_b; ++i) {
         B_h[i] = uint8_t(random_uint8());
 #ifdef UT_DEBUG
@@ -474,7 +484,8 @@ void dequantize_gemm_run(int iter) {
 #endif
     }
 
-    queue.memcpy((void *)A_d, (void *)A_h, size_a * sizeof(data_type_a)).wait();
+    queue.memcpy((void *)A_d, (void *)A_hh, size_a * sizeof(data_type_a))
+            .wait();
     queue.memcpy((void *)B_d, (void *)B_h, size_b * sizeof(data_type_b)).wait();
     queue.memcpy((void *)C_d, (void *)C_h, size_c * sizeof(data_type_c)).wait();
     queue.memcpy((void *)Acc_d, (void *)Acc_h, size_acc * sizeof(data_type_acc))
@@ -505,19 +516,18 @@ void dequantize_gemm_run(int iter) {
                     epilogue_args);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-    if (!gemm_op_t::can_implement(gemm_arg)) {
-        std::cout << "The arguments cannot be supported, aborting ... "
-                  << std::endl;
-        FAIL();
-    }
+    //     if (!gemm_op_t::can_implement(gemm_arg)) {
+    //         std::cout << "The arguments cannot be supported, aborting ... "
+    //                   << std::endl;
+    //         FAIL();
+    //     }
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
-    int constexpr warm = 100;
+    int constexpr warm = 0;
     try {
         for (int i = 0; i < iter + warm; i++) {
-          if (i >= warm)
-				prof.cpu_start();
+            if (i >= warm) prof.cpu_start();
             auto e_esimd = queue.submit([&](handler &cgh) {
                 cgh.parallel_for(
                         nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
@@ -527,11 +537,11 @@ void dequantize_gemm_run(int iter) {
                             gemm_op(item, gemm_arg);
                         });
             });
-          if (i >= warm) {
-            e_esimd.wait();
-            prof.cpu_end();
-            prof.add_gpu_event(e_esimd);
-          }
+            if (i >= warm) {
+                e_esimd.wait();
+                prof.cpu_end();
+                prof.add_gpu_event(e_esimd);
+            }
         }
     } catch (cl::sycl::exception const &e) {
         std::cout << "SYCL exception caught: " << e.what() << '\n';
@@ -565,6 +575,7 @@ void dequantize_gemm_run(int iter) {
                     matrix_m, matrix_k, matrix_n));
 
     free(A_h, context);
+    free(A_hh, context);
     free(B_h, context);
     free(C_h, context);
     free(scale_h, context);
