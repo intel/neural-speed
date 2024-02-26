@@ -315,8 +315,10 @@ public:
                 }
             }
             SW_BARRIER();
+            sycl::ext::oneapi::experimental::printf("tile_load A \n");
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     matA, matA_payload);
+            sycl::ext::oneapi::experimental::printf("tile_load B \n");
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     matB, matB_payload);
             matA_payload.template update_tdesc<update_dir_a>(
@@ -339,7 +341,72 @@ public:
             subgroup::elemwise_cvt(matB_acc, matB);
             pre_processing(matA_acc, matB_acc, matA, matB);
             SW_BARRIER();
+        //     static const char vec_a[]
+        //             = "vec_a after load %f %f %f %f %f %f %f %f %f %f %f %f %f "
+        //               "%f %f %f\n";
+        //     static const char vec_b[]
+        //             = "vec_b after load %f %f %f %f %f %f %f %f %f %f %f %f %f "
+        //               "%f %f %f\n";
+// #pragma unroll
+        //     for (int i = 0; i < 256; i += 16) {
+        //         sycl::ext::oneapi::experimental::printf(vec_a,
+        //                 (float)matA_acc.reg[i + 0], (float)matA_acc.reg[i + 1],
+        //                 (float)matA_acc.reg[i + 2], (float)matA_acc.reg[i + 3],
+        //                 (float)matA_acc.reg[i + 4], (float)matA_acc.reg[i + 5],
+        //                 (float)matA_acc.reg[i + 6], (float)matA_acc.reg[i + 7],
+        //                 (float)matA_acc.reg[i + 8], (float)matA_acc.reg[i + 9],
+        //                 (float)matA_acc.reg[i + 10],
+        //                 (float)matA_acc.reg[i + 11],
+        //                 (float)matA_acc.reg[i + 12],
+        //                 (float)matA_acc.reg[i + 13],
+        //                 (float)matA_acc.reg[i + 14],
+        //                 (float)matA_acc.reg[i + 15]);
+        //     }
+        //     for (int i = 0; i < 256; i += 16) {
+        //         sycl::ext::oneapi::experimental::printf(vec_b,
+        //                 (float)matB_acc.reg[i + 0], (float)matB_acc.reg[i + 1],
+        //                 (float)matB_acc.reg[i + 2], (float)matB_acc.reg[i + 3],
+        //                 (float)matB_acc.reg[i + 4], (float)matB_acc.reg[i + 5],
+        //                 (float)matB_acc.reg[i + 6], (float)matB_acc.reg[i + 7],
+        //                 (float)matB_acc.reg[i + 8], (float)matB_acc.reg[i + 9],
+        //                 (float)matB_acc.reg[i + 10],
+        //                 (float)matB_acc.reg[i + 11],
+        //                 (float)matB_acc.reg[i + 12],
+        //                 (float)matB_acc.reg[i + 13],
+        //                 (float)matB_acc.reg[i + 14],
+        //                 (float)matB_acc.reg[i + 15]);
+        //     }
+        //     sycl::ext::oneapi::experimental::printf(vec_b,
+        //             (float)matB_acc.reg[0], (float)matB_acc.reg[1],
+        //             (float)matB_acc.reg[2], (float)matB_acc.reg[3],
+        //             (float)matB_acc.reg[4], (float)matB_acc.reg[5],
+        //             (float)matB_acc.reg[6], (float)matB_acc.reg[7],
+        //             (float)matB_acc.reg[8], (float)matB_acc.reg[9],
+        //             (float)matB_acc.reg[10], (float)matB_acc.reg[11],
+        //             (float)matB_acc.reg[12], (float)matB_acc.reg[13],
+        //             (float)matB_acc.reg[14], (float)matB_acc.reg[15]);
+        //     sycl::ext::oneapi::experimental::printf(vec_c, (float)matAcc.reg[0],
+        //             (float)matAcc.reg[1], (float)matAcc.reg[2],
+        //             (float)matAcc.reg[3], (float)matAcc.reg[4],
+        //             (float)matAcc.reg[5], (float)matAcc.reg[6],
+        //             (float)matAcc.reg[7], (float)matAcc.reg[8],
+        //             (float)matAcc.reg[9], (float)matAcc.reg[10],
+        //             (float)matAcc.reg[11], (float)matAcc.reg[12],
+        //             (float)matAcc.reg[13], (float)matAcc.reg[14],
+        //             (float)matAcc.reg[15]);
             tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+            static const char vec_c[]
+                    = "vec_c after load %f %f %f %f %f %f %f %f %f %f %f %f %f "
+                      "%f %f %f\n";
+            sycl::ext::oneapi::experimental::printf(vec_c, (float)matAcc.reg[0],
+                    (float)matAcc.reg[1], (float)matAcc.reg[2],
+                    (float)matAcc.reg[3], (float)matAcc.reg[4],
+                    (float)matAcc.reg[5], (float)matAcc.reg[6],
+                    (float)matAcc.reg[7], (float)matAcc.reg[8],
+                    (float)matAcc.reg[9], (float)matAcc.reg[10],
+                    (float)matAcc.reg[11], (float)matAcc.reg[12],
+                    (float)matAcc.reg[13], (float)matAcc.reg[14],
+                    (float)matAcc.reg[15]);
             SW_BARRIER();
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {

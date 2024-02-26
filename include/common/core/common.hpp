@@ -71,7 +71,7 @@ __XETLA_API int32_t xetla_get_subdevice_id() {
 
 namespace gpu::xetla {
 
-enum class gpu_arch : uint8_t { Dg2 = 0, Xe = 1 };
+enum class gpu_arch : uint8_t { Igpu = 0, Dg2 = 1, Xe = 2 };
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 
 enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };

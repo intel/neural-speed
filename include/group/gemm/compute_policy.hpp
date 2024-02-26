@@ -147,7 +147,7 @@ struct compute_policy_default_fpu<compute_attr_, perf_tuning_knob_,
   static constexpr uint32_t block_bytes_x_a = 32;
   static constexpr uint32_t block_size_x_a
     = block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_y_a = 16;
+  static constexpr uint32_t block_size_y_a = 8;
   static constexpr uint32_t block_bytes_x_b = 32;
   static constexpr uint32_t block_size_x_b
     = block_bytes_x_b / sizeof(dtype_mma_b);

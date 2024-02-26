@@ -414,6 +414,8 @@ __XETLA_API typename std::enable_if_t<
         detail::check_load_type<tile_t, payload_t>::is_global_block_2d
         && payload_t::arch_tag == gpu_arch::Dg2>
 tile_load(tile_t &tile, payload_t &payload) {
+    static const char vec_a[]
+            = "load_: %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n";
     using dtype = typename payload_t::dtype;
     using tile_desc = typename payload_t::tile_desc;
     using load_dtype = typename payload_t::mem_dtype;
@@ -478,6 +480,18 @@ tile_load(tile_t &tile, payload_t &payload) {
                 }
             }
         }
+    }
+#pragma unroll
+    for (int i = 0; i < 256; i += 16) {
+        sycl::ext::oneapi::experimental::printf(vec_a, (float)tile.reg[i + 0],
+                (float)tile.reg[i + 1], (float)tile.reg[i + 2],
+                (float)tile.reg[i + 3], (float)tile.reg[i + 4],
+                (float)tile.reg[i + 5], (float)tile.reg[i + 6],
+                (float)tile.reg[i + 7], (float)tile.reg[i + 8],
+                (float)tile.reg[i + 9], (float)tile.reg[i + 10],
+                (float)tile.reg[i + 11], (float)tile.reg[i + 12],
+                (float)tile.reg[i + 13], (float)tile.reg[i + 14],
+                (float)tile.reg[i + 15]);
     }
 
     if constexpr (payload_t::mem_transform) {
