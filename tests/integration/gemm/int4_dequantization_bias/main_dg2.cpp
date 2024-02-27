@@ -24,8 +24,8 @@ constexpr int ITER = 1;
 class test1 {
 public:
     //Extract the parameters required by different test cases
-    static constexpr size_t mat_m = 32;
-    static constexpr size_t mat_n = 32;
+    static constexpr size_t mat_m = 16;
+    static constexpr size_t mat_n = 16;
     static constexpr size_t mat_k = 16;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
@@ -523,9 +523,9 @@ void dequantize_gemm_run(int iter) {
 
         for (size_t i = 0; i < matrix_k; i++) {
             for (size_t j = 0; j < matrix_m; j++) {
-                // A_hh[i * matrix_m + j] = A_h[i * matrix_m + j];
+                A_hh[i * matrix_m + j] = A_h[i * matrix_m + j];
 //
-                A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
+                // A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
             }
         }
 

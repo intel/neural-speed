@@ -831,8 +831,7 @@ public:
     static constexpr reg_layout register_layout = tile_desc::register_layout;
     static constexpr bool reg_transpose
             = register_layout == reg_layout::transpose_tiled;
-    static constexpr bool trans = mem_transpose; // ^ reg_transpose;
-    //     static constexpr bool trans = mem_transpose ^ reg_transpose;
+    static constexpr bool trans = mem_transpose ^ reg_transpose;
 
     static constexpr bool mem_transform = (sizeof(dtype) < 4)
             && (register_layout == reg_layout::vnni_tiled
@@ -873,7 +872,12 @@ public:
 
     inline mem_payload_t(mem_desc_t &mem_tdesc) {
         pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
+<<<<<<< HEAD
         sycl::ext::oneapi::experimental::printf("pitch_in_bytes : %d  %d\n" , pitch_in_bytes, trans);
+=======
+        sycl::ext::oneapi::experimental::printf(
+                "pitch_in_bytes : %d  %d\n", pitch_in_bytes, trans);
+>>>>>>> 297a6e8 (col or row major)
         base_x = mem_tdesc.coord.x;
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;
