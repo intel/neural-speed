@@ -52,7 +52,7 @@ void QWEN::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
-  n_ff = hparams.ffn_hidden_size / 2;
+  n_ff = hparams.ffn_hidden_size;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
@@ -117,9 +117,21 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
 
       // qkv GEMM
+      if (ml->verify_tensor(layers_i + ".attn_qkv.weight")){
       layer.attn[0] = ml->get_tensor(layers_i + ".attn_qkv.weight", {n_embd, 3 * n_embd}, backend);
       layer.attn[1] = ml->get_tensor(layers_i + ".attn_qkv.bias", {3 * n_embd}, backend);
       layer.attn[2] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+      }
+      else {
+      layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".attn_q.bias", {n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".attn_k.bias", {n_embd}, backend);
+      layer.attn[4] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd, n_embd}, backend);
+      layer.attn[5] = ml->get_tensor(layers_i + ".attn_v.bias", {n_embd}, backend);
+      layer.attn[6] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+      }
+      
 
       // ffn GEMM
       layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, n_ff}, backend);
@@ -201,5 +213,5 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
   ms->init(fname.c_str(), ctx, n_gpu_layers, use_mmap, use_mlock, vocab_only);
   ms->load(ctx, progress_callback, progress_callback_user_data);
   model_context& lctx = *ctx;
-  lctx.support_bestla_kv = true;
+  lctx.support_bestla_kv = false;
 }
