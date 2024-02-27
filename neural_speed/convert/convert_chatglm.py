@@ -50,6 +50,7 @@ def bytes_to_unicode():
 
 
 class SentencePieceVocab:
+
     def __init__(self, fname_tokenizer: Path, fname_added_tokens: Optional[Path]) -> None:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
@@ -149,7 +150,7 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("ChatGLM-2.gguf converting: ")
     list_vars = model.state_dict()
     for name in list_vars.keys():
-        print(name, list_vars[name].shape, list_vars[name].dtype)
+        print("%-80s" % name, list_vars[name].shape, list_vars[name].dtype)
 
     print(hparams)
 
@@ -285,9 +286,41 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("gguf: get tensor metadata")
     for name in list_vars.keys():
         data = list_vars[name].squeeze().numpy()
-
-        print("Processing variable: " + name + " with shape: ", data.shape)
         if 'inv_freq' in name:
+            print("Converting: %-80s" % name, " shape: %-20s" % str(data.shape))
+            continue
+
+        print("Converting: %-80s" % name, " shape: %-20s" % str(data.shape), end="      ")
+        if "mlp.dense_h_to_4h" in name:
+            shape_0 = data.shape[0]
+            half_shape_0 = int(shape_0 / 2)
+            data_0 = data[0:half_shape_0, :]
+            data_1 = data[half_shape_0:shape_0, :]
+            n_dims = len(data.shape)
+
+            # ftype == 0 -> float32, ftype == 1 -> float16
+            ftype_cur = 0
+            if ftype != 0:
+                if name[-7:] == ".weight" and n_dims == 2:
+                    print("  to float16".rjust(15))
+                    data = data.astype(np.float16)
+                    ftype_cur = 1
+                else:
+                    print("  to float32".rjust(15))
+                    data = data.astype(np.float32)
+                    ftype_cur = 0
+            else:
+                if data.dtype != np.float32:
+                    print("  to float32".rjust(15))
+                    data = data.astype(np.float32)
+                    ftype_cur = 0
+
+            name_0 = name + "_0"
+            name_1 = name + "_1"
+            gguf_writer.add_tensor(name_0, data_0)
+            gguf_writer.add_tensor(name_1, data_1)
+            print("Converting: %-80s" % name_0, " shape: %-20s" % str(data_0.shape))
+            print("Converting: %-80s" % name_1, " shape: %-20s" % str(data_1.shape))
             continue
 
         n_dims = len(data.shape)
@@ -296,21 +329,18 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
         ftype_cur = 0
         if ftype != 0:
             if name[-7:] == ".weight" and n_dims == 2:
-                print("  Converting to float16")
+                print("  to float16".rjust(15))
                 data = data.astype(np.float16)
                 ftype_cur = 1
             else:
-                print("  Converting to float32")
+                print("  to float32".rjust(15))
                 data = data.astype(np.float32)
                 ftype_cur = 0
         else:
             if data.dtype != np.float32:
-                print("  Converting to float32")
+                print("  to float32".rjust(15))
                 data = data.astype(np.float32)
                 ftype_cur = 0
-
-        # print(f"[{i+1:{padi}d}/{len(model)}]
-        # Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4}")
 
         gguf_writer.add_tensor(name, data)
 
@@ -363,9 +393,9 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
 
-    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
