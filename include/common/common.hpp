@@ -21,9 +21,3 @@
 
 #include <common/core/core.hpp>
 #include <common/utils/utils.hpp>
-
-#ifdef __SYCL_DEVICE_ONLY__
-#define CONSTANT __attribute__((opencl_constant))
-#else
-#define CONSTANT
-#endif

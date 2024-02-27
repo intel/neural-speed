@@ -16,8 +16,8 @@
 
 #include "common.hpp"
 #include "kernel_func.hpp"
-#include <utils/utils.hpp>
 #include <gtest/gtest.h>
+#include <utils/utils.hpp>
 
 std::string esimd_compile_string
         = " -vc-codegen -doubleGRF "
@@ -28,8 +28,8 @@ template <typename T>
 class fp16_gemm_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(fp16_gemm_test);
 TYPED_TEST_P(fp16_gemm_test, esimd) {
-    gemm_exec<TypeParam, result_validate<TypeParam>, fp16_gemm_func<TypeParam>(
-        esimd_compile_string);
+    gemm_exec<TypeParam, result_validate<TypeParam>, fp16_gemm_func<TypeParam>>(
+            esimd_compile_string);
 }
 REGISTER_TYPED_TEST_SUITE_P(fp16_gemm_test, esimd);
 using tests = ::testing::Types<Test0, Test1, Test2, Test3, Test4, Test5, Test6,

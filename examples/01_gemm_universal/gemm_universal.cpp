@@ -13,8 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
 enum class kslicing_impl_t : uint8_t { none = 0, global = 1, local = 2 };
 
@@ -33,9 +33,9 @@ void gemm_universal_run(uint32_t iter) {
     size_t size_b = matrix_k * matrix_n;
     size_t size_c = matrix_m * matrix_n;
 
-    using data_type_a = fp16;
-    using data_type_b = fp16;
-    using data_type_c = fp16;
+    using data_type_a = bf16;
+    using data_type_b = bf16;
+    using data_type_c = bf16;
     using data_type_acc = float;
 
     //Turn on the profiling property to facilitate subsequent profiling
