@@ -1522,6 +1522,17 @@ static inline BTLA_CODE layernorm(const T* srcptr, const T* scaleptr, const T* b
   }
   return BTLA_CODE::Success;
 }
+
+inline float exp_ps_0_1(float x) {
+  static const float log2e = std::log2(std::exp(1.f));
+  static const float ln2 = std::log(2.f);
+  const float x1 = x * log2e + .5f;
+  const float z = std::floor(x1);
+  const float f = x1 - z;
+  constexpr std::array<float, 3> coeff{0.240226507f, 0.452920674f, 0.713483036f};
+  // same as a * std::pow(2, z) but more precise
+  return ldexpf(coeff[0] * f * f + coeff[1] * f + coeff[2], static_cast<int>(z));
+}
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla

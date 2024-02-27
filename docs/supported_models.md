@@ -44,6 +44,16 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>Latest</td>
   </tr>
+    <td><a href="https://huggingface.co/codellama/CodeLlama-7b-Instruct-hf" target="_blank" rel="noopener noreferrer">CodeLlama-7b</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>Latest</td>
+  </tr>
+  </tr>
     <td><a href="https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0" target="_blank" rel="noopener noreferrer">Solar-10.7B</a></td>
     <td>✅</td>
     <td>✅</td>
@@ -56,7 +66,7 @@ Neural Speed supports the following models:
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
     <td>✅</td>
-    <td> </td>
+    <td>✅</td>
     <td> </td>
     <td>✅</td>
     <td> </td>
