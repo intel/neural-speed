@@ -67,14 +67,13 @@ void CHATGLM2::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
-  n_ff = 4 * hparams.n_embd;
-  fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
-  fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
-  fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
-  fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
-  fprintf(stderr, "%s: n_layer    = %u\n", __func__, hparams.n_layer);
-  fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
-  fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
+  fprintf(stderr, "%s: hparams.n_vocab         = %u\n", __func__, hparams.n_vocab);
+  fprintf(stderr, "%s: hparams.n_embd          = %u\n", __func__, hparams.n_embd);
+  fprintf(stderr, "%s: hparams.n_mult          = %u\n", __func__, hparams.n_mult);
+  fprintf(stderr, "%s: hparams.n_head          = %u\n", __func__, hparams.n_head);
+  fprintf(stderr, "%s: hparams.n_layer         = %u\n", __func__, hparams.n_layer);
+  fprintf(stderr, "%s: hparams.n_rot           = %u\n", __func__, hparams.n_rot);
+  fprintf(stderr, "%s: hparams.ffn_hidden_size = %u\n", __func__, hparams.ffn_hidden_size);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
@@ -148,6 +147,16 @@ void CHATGLM2::load(model_context* ctx, model_progress_callback progress_callbac
                                   {n_embd, uint32_t(hparams.ffn_hidden_size * 2)}, backend);
     layer.ffn[1] =
         ml->get_tensor(layers_i + ".mlp.dense_4h_to_h.weight", {uint32_t(hparams.ffn_hidden_size), n_embd}, backend);
+
+    if (ml->verify_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight")) {
+      layer.ffn[2] =
+          ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight",{n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
+    }
+
+    if (ml->verify_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight")) {
+      layer.ffn[3] =
+          ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight", {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
+    }
 
     // kv-cache
     layer.k_cache = nullptr;  // kv-cache will be init later in model_utils
