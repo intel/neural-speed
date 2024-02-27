@@ -221,7 +221,7 @@ function main() {
         infer_cmd="./build/bin/run_dolly"
     elif [[ "${model}" == "chatglm2" ]]; then
         quant_script="./build/bin/quant_chatglm2"
-        convert_script="${convert_script}/convert_chatglm.py"
+        convert_script="${convert_script}/convert_chatglm.py --format=GGUF"
         infer_cmd="./build/bin/run_chatglm2"
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"
