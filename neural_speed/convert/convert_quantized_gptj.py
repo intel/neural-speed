@@ -151,6 +151,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
     fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
     fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))

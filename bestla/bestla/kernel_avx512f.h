@@ -2383,6 +2383,28 @@ static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, co
   }
   return BTLA_CODE::Success;
 }
+
+inline __m512 poly_scale_2nd_ps(const __m512 z, const __m512 f, const __m512 c0, const __m512 c1, const __m512 c2) {
+  const auto y = _mm512_fmadd_ps(_mm512_fmadd_ps(f, c0, c1), f, c2);  // auto y = (f * c0 + c1) * f + c2;
+  const auto exp = _mm512_scalef_ps(y, z);
+  return exp;
+}
+
+inline __m512 exp_ps_0_1(const __m512 x) {
+  static const auto c0 = _mm512_set1_ps(0.240226507f);
+  static const auto c1 = _mm512_set1_ps(0.452920674f);
+  static const auto c2 = _mm512_set1_ps(0.713483036f);
+  static const float v_log2e = std::log2(std::exp(1.f));
+  static const auto log2e = _mm512_set1_ps(v_log2e);
+  static const auto half = _mm512_set1_ps(.5f);
+
+  const auto x1 = _mm512_fmadd_ps(x, log2e, half);  // auto x1 = x * log2e + _mm512_set1_ps(.5f);
+  const auto z = _mm512_floor_ps(x1);
+  const auto f = _mm512_sub_ps(x1, z);  // auto f = x1 - z;
+
+  return poly_scale_2nd_ps(z, f, c0, c1, c2);
+}
+
 #ifdef __GNUC__
 #pragma GCC pop_options
 #else

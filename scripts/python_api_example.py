@@ -28,5 +28,6 @@ inputs = tokenizer(prompt, return_tensors="pt").input_ids
 streamer = TextStreamer(tokenizer)
 
 model = Model()
+# If you want to run GPTQ or AWQ models, just set use_gptq = True or use_awq = True.
 model.init(model_name, weight_dtype="int4", compute_dtype="int8")
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)
