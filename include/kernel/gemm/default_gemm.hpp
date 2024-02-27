@@ -61,10 +61,9 @@ template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
         typename dtype_acc, gpu_arch gpu_arch_tag = gpu_arch::Xe,
         typename tune_option = dict_t<>>
-struct default_gemm_t
-    : default_gemm_config_t<dtype_a, mem_layout_a, alignment_a, dtype_b,
-              mem_layout_b, alignment_b, dtype_c, mem_layout_c, alignment_c,
-              dtype_acc, gpu_arch_tag, tune_option>::type {};
+using default_gemm_t = typename default_gemm_config_t<dtype_a, mem_layout_a,
+        alignment_a, dtype_b, mem_layout_b, alignment_b, dtype_c, mem_layout_c,
+        alignment_c, dtype_acc, gpu_arch_tag, tune_option>::type;
 } // namespace kernel
 
 template <typename dict_t_>
@@ -158,11 +157,10 @@ template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         uint32_t alignment_b, mem_space mem_space_b, typename dtype_acc,
         typename wg_shape, uint32_t wg_tile_k,
         gpu_arch gpu_arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
-struct default_gemm_selector_t
-    : default_gemm_selector_config_t<dtype_a, mem_layout_a, alignment_a,
-              mem_space_a, dtype_b, mem_layout_b, alignment_b, mem_space_b,
-              dtype_acc, wg_shape, wg_tile_k, gpu_arch_tag, tune_option>::type {
-};
+using default_gemm_selector_t = typename default_gemm_selector_config_t<dtype_a,
+        mem_layout_a, alignment_a, mem_space_a, dtype_b, mem_layout_b,
+        alignment_b, mem_space_b, dtype_acc, wg_shape, wg_tile_k, gpu_arch_tag,
+        tune_option>::type;
 
 template <typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
         mem_space mem_space_c, typename wg_shape, uint32_t wg_tile_k,
@@ -188,10 +186,10 @@ struct default_epilogue_selector_config_t
 template <typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
         mem_space mem_space_c, typename wg_shape, uint32_t wg_tile_k,
         gpu_arch gpu_arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
-struct default_epilogue_selector_t
-    : default_epilogue_selector_config_t<dtype_c, mem_layout_c, alignment_c,
-              mem_space_c, wg_shape, wg_tile_k, gpu_arch_tag,
-              tune_option>::type {};
+using default_epilogue_selector_t =
+        typename default_epilogue_selector_config_t<dtype_c, mem_layout_c,
+                alignment_c, mem_space_c, wg_shape, wg_tile_k, gpu_arch_tag,
+                tune_option>::type;
 } // namespace group
 
 template <typename dict_t_>
