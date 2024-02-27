@@ -66,8 +66,8 @@ Neural Speed supports the following models:
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
     <td>✅</td>
-    <td>✅</td>
     <td> </td>
+    <td>✅</td>
     <td> </td>
     <td> </td>
     <td> </td>
