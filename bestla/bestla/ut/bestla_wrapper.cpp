@@ -86,7 +86,8 @@ class UT_Fp32Fp32 {
         parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         if (log.stop()) {
           double flops = double(psize) / log.avg_val / 1e6;
-          printf("%s %s Flops:%.3f PerCoreFlops:%.3f\n ", corestr, log.get_log_str(), flops, flops / threads);
+          printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n ", threads, corestr, log.get_log_str(), flops,
+                 flops / threads);
         }
       }
     }
@@ -108,11 +109,17 @@ class UT_Fp32Fp32 {
     float testtime = 500.f;
     GetCPUDevice();
     if (_cd->AVX512F()) {
-      benchmark<sAVX512F, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<sAVX512F, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
+      benchmark<sAVX512F, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getThreads());
+      benchmark<sAVX512F, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getCores());
     }
     if (_cd->AVX2()) {
-      benchmark<sAVX2, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
+      if (_cd->isHybrid()) {
+        benchmark<sAVX2, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getThreads());
+        benchmark<sAVX2, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getCores());
+        benchmark<sAVX2, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getPcoreNum());
+      } else {
+        benchmark<sAVX2, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getThreads());
+      }
     }
   }
 };
@@ -256,16 +263,37 @@ class UT_U8S8S32 {
     GetCPUDevice();
     if (_cd->AMX_INT8()) {
       request_perm_xtile_data();
-      benchmark<gemm::ICoreRowNAmxint8<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::ICoreRowNAmxint8<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::ICoreRowNAmxint8<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                     _cd->getThreads());
+      benchmark<gemm::ICoreRowNAmxint8<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                     _cd->getThreads());
+      benchmark<gemm::ICoreRowNAmxint8<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                     _cd->getThreads());
     }
     if (_cd->AVX512_VNNI()) {
-      benchmark<gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                       _cd->getThreads());
     }
     if (_cd->AVX_VNNI()) {
-      benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      if (_cd->isHybrid()) {
+        benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getThreads());
+        benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getCores());
+        benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getPcoreNum());
+        benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getThreads());
+        benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getCores());
+        benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getPcoreNum());
+      } else {
+        benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getThreads());
+        benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                      _cd->getThreads());
+      }
     }
   }
 };
@@ -387,9 +415,12 @@ class UT_S8S8S32 {
     GetCPUDevice();
     if (_cd->AMX_INT8()) {
       request_perm_xtile_data();
-      benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::ICoreRowNAmxint8SS<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::ICoreRowNAmxint8SS<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                       _cd->getThreads());
+      benchmark<gemm::ICoreRowNAmxint8SS<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                       _cd->getThreads());
+      benchmark<gemm::ICoreRowNAmxint8SS<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                       _cd->getThreads());
     }
   }
 };
@@ -493,9 +524,12 @@ class UT_Bf16Bf16Fp32 {
     GetCPUDevice();
     if (_cd->AMX_BF16()) {
       request_perm_xtile_data();
-      benchmark<gemm::HCoreRowNAmxbf16<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::HCoreRowNAmxbf16<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
-      benchmark<gemm::HCoreRowNAmxbf16<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<gemm::HCoreRowNAmxbf16<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                     _cd->getThreads());
+      benchmark<gemm::HCoreRowNAmxbf16<48, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                     _cd->getThreads());
+      benchmark<gemm::HCoreRowNAmxbf16<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                     _cd->getThreads());
     }
   }
 };
@@ -596,9 +630,10 @@ class UT_Fp16Fp16Fp16 {
     float testtime = 500.f;
     GetCPUDevice();
     if (_cd->AVX512_FP16()) {
-      benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
-      benchmark<gemm::HCoreRowNAvx512fp16<64, 12>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 56);
-      benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, 48);
+      benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getThreads());
+      benchmark<gemm::HCoreRowNAvx512fp16<64, 12>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                        _cd->getThreads());
+      benchmark<sAVX512_FP16, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, _cd->getThreads());
     }
   }
 };
