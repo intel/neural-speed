@@ -153,6 +153,7 @@ void CHATGLM2::load(model_context* ctx, model_progress_callback progress_callbac
           ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight", {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
       layer.ffn[3] =
           ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight", {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
+      layer.ffn_fusion = true;
     }
 
     // kv-cache

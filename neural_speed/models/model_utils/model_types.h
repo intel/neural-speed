@@ -160,6 +160,8 @@ struct model_layer {
 
   struct ne_tensor* k_cache;
   struct ne_tensor* v_cache;
+
+  bool ffn_fusion = false;
 };
 
 typedef int32_t model_pos;
