@@ -170,7 +170,12 @@ f.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 f.write(struct.pack("i", 0))
 f.write(struct.pack("i", 0))
 f.write(struct.pack("i", 0))
+f.write(struct.pack("i", 0))  # n_experts
+f.write(struct.pack("i", 0))  # n_expert_used
 f.write(struct.pack("f", 1e-6))  # rms norm eps
+f.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+f.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+f.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
 
 f.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
 f.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))

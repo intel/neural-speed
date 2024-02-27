@@ -372,7 +372,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         ne_tensor* logits = ne_mul_mat(ctx0, model.layers[il].ffn_gate_inp, cur);  // [n_tokens, num_experts]
         ne_tensor* probs = ne_soft_max_inplace(ctx0, logits);
         ne_tensor* selected_experts = ne_top_k(ctx0, probs, n_expert_used);
-        ne_build_forward_expand(&gf, selected_experts);
         ne_tensor* weights = ne_get_rows(ctx0, ne_reshape_3d(ctx0, probs, 1, n_expert, N), selected_experts);
         weights = ne_reshape_2d(ctx0, weights, n_expert_used, N);
         ne_tensor* weights_sum = ne_sum_rows(ctx0, weights);
@@ -406,7 +405,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
           if (i == 0) {
             moe_out = cur_expert;
-            ne_build_forward_expand(&gf, moe_out);
           } else {
             moe_out = ne_add(ctx0, moe_out, cur_expert);
             ne_set_name(moe_out, "ffn_moe_out");
