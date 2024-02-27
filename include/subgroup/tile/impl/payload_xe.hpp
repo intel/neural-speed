@@ -831,7 +831,7 @@ public:
     static constexpr reg_layout register_layout = tile_desc::register_layout;
     static constexpr bool reg_transpose
             = register_layout == reg_layout::transpose_tiled;
-    static constexpr bool trans = mem_transpose ^ reg_transpose;
+static constexpr bool trans = mem_transpose ^ reg_transpose;
 
     static constexpr bool mem_transform = (sizeof(dtype) < 4)
             && (register_layout == reg_layout::vnni_tiled
@@ -842,12 +842,12 @@ public:
     static constexpr uint32_t block_bytes
             = block_size_x * block_size_y * sizeof(dtype);
 
-    using mem_dtype = uint32_t;
-    //     using mem_dtype = typename std::conditional<
-    //             (block_per_row_bytes % sizeof(uint64_t) == 0), uint64_t,
-    //             typename std::conditional<(block_per_row_bytes % sizeof(uint32_t)
-    //                                               == 0),
-    //                     uint32_t, dtype>::type>::type;
+//     using mem_dtype = uint32_t;
+        using mem_dtype = typename std::conditional<
+                (block_per_row_bytes % sizeof(uint64_t) == 0), uint64_t,
+                typename std::conditional<(block_per_row_bytes % sizeof(uint32_t)
+                                                  == 0),
+                        uint32_t, dtype>::type>::type;
     static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
     // for pvc, we can use simd16 or simd32
     static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
@@ -872,6 +872,7 @@ public:
 
     inline mem_payload_t(mem_desc_t &mem_tdesc) {
         pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
+        sycl::ext::oneapi::experimental::printf("pitch_in_bytes : %d  %d\n" , pitch_in_bytes, trans);
         base_x = mem_tdesc.coord.x;
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;

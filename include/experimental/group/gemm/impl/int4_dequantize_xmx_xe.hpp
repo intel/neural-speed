@@ -412,6 +412,15 @@ public:
             }
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     matA, matA_payload);
+
+            sycl::ext::oneapi::experimental::printf("after load :  \n");
+            for (int z = 0; z < 16 * 16; z++) {
+                if (z % 16 == 0) sycl::ext::oneapi::experimental::printf("\n");
+                sycl::ext::oneapi::experimental::printf(
+                        "%f ", (float)(sycl::half)matA.reg[z]);
+            }
+            sycl::ext::oneapi::experimental::printf("\n");
+
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     matB, matB_payload);
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -472,32 +481,23 @@ public:
             dequantize(matB_acc, matB, scale, zero_pt);
             SW_BARRIER();
 
-            // static const char vec_c[]
-            //     = " vec_c after load %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n";
-            // auto thread_idx=g.get_id();
-
-            // for(int z=0;z<16;z+=1){
-            // sycl::ext::oneapi::experimental::printf(vec_c,
-            // (int)(half)matA_acc.reg[z*16+0],
-            // (int)(half)matA_acc.reg[z*16+1],
-            // (int)(half)matA_acc.reg[z*16+2],
-            // (int)(half)matA_acc.reg[z*16+3],
-            // (int)(half)matA_acc.reg[z*16+4],
-            // (int)(half)matA_acc.reg[z*16+5],
-            // (int)(half)matA_acc.reg[z*16+6],
-            // (int)(half)matA_acc.reg[z*16+7],
-            // (int)(half)matA_acc.reg[z*16+8],
-            // (int)(half)matA_acc.reg[z*16+9],
-            // (int)(half)matA_acc.reg[z*16+10],
-            // (int)(half)matA_acc.reg[z*16+11],
-            // (int)(half)matA_acc.reg[z*16+12],
-            // (int)(half)matA_acc.reg[z*16+13],
-            // (int)(half)matA_acc.reg[z*16+14],
-            // (int)(half)matA_acc.reg[z*16+15]
-            // );
-            // }
-
             tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+sycl::ext::oneapi::experimental::printf("after mma A:  \n");
+            for (int z = 0; z < 16 * 16; z++) {
+                if (z % 16 == 0) sycl::ext::oneapi::experimental::printf("\n");
+                sycl::ext::oneapi::experimental::printf(
+                        "%f ", (float)(sycl::half)matA_acc.reg[z]);
+            }
+            sycl::ext::oneapi::experimental::printf("\n");
+
+
+            sycl::ext::oneapi::experimental::printf("after mma C:  \n");
+            for (int z = 0; z < 16 * 16; z++) {
+                if (z % 16 == 0) sycl::ext::oneapi::experimental::printf("\n");
+                sycl::ext::oneapi::experimental::printf(
+                        "%f ", (float)(sycl::half)matAcc.reg[z]);
+            }
+            sycl::ext::oneapi::experimental::printf("\n");
             SW_BARRIER();
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
@@ -574,7 +574,7 @@ private:
                 }
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_FULLRANGE_NO_ZP) {
-                    xetla_vector<int8_t, block_size_x_b *block_size_y_b>
+                    xetla_vector<int8_t, block_size_x_b * block_size_y_b>
                             cvt_blk_i8
                             = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
                     cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());

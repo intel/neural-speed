@@ -26,13 +26,13 @@ public:
     //Extract the parameters required by different test cases
     static constexpr size_t mat_m = 16;
     static constexpr size_t mat_n = 16;
-    static constexpr size_t mat_k = 32;
+    static constexpr size_t mat_k = 16;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
     static constexpr size_t sg_n = 16;
     static constexpr size_t sg_k = 16;
-    static constexpr size_t dequant_s = 32;
+    static constexpr size_t dequant_s = 16;
     static constexpr size_t num_buffer = 64;
     static constexpr size_t local_kslicing = 1;
     static constexpr size_t global_kslicing = 1;
@@ -325,6 +325,9 @@ void dequantize_gemm_run(int iter) {
     using data_type_acc = fp16;
     using data_type_bias = fp16;
 
+    constexpr mem_layout layout_a = Test::layout_a;
+    constexpr mem_layout layout_b = Test::layout_b;
+
     constexpr size_t size_a = matrix_m * matrix_k;
     constexpr size_t size_b = matrix_k * matrix_n / 2;
 
@@ -339,6 +342,12 @@ void dequantize_gemm_run(int iter) {
     constexpr size_t size_c = matrix_m * matrix_n;
     constexpr size_t size_bias = matrix_n;
 
+    uint32_t lda = layout_a == mem_layout::row_major ? matrix_k : matrix_m;
+    uint32_t ldb = layout_b == mem_layout::row_major ? matrix_n : matrix_k;
+    uint32_t ldc = matrix_n;
+    //     uint32_t ld_scale = size_scale_n;
+    //     uint32_t ld_zero_pt = size_zero_pt_n;
+
     // Turn on the enable_profiling property to facilitate subsequent profiling
     sycl::property_list properties {sycl::property::queue::enable_profiling()};
     auto queue = sycl::queue(properties);
@@ -352,9 +361,9 @@ void dequantize_gemm_run(int iter) {
     static constexpr uint32_t periodic_sync_interval = 0;
     static constexpr uint32_t prefetch_distance = 0;
 
-    using mem_desc_a_t = xetla::mem_desc_t<data_type_a, mem_layout::row_major,
+    using mem_desc_a_t = xetla::mem_desc_t<data_type_a, layout_a,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
-    using mem_desc_b_t = xetla::mem_desc_t<data_type_b, mem_layout::row_major,
+    using mem_desc_b_t = xetla::mem_desc_t<data_type_b, layout_b,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
     using mem_desc_c_t = xetla::mem_desc_t<data_type_c, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_c)>;
@@ -443,14 +452,17 @@ void dequantize_gemm_run(int iter) {
         A_h[i] = random_float();
 #ifdef UT_DEBUG
         A_h[i] = 1.f;
+        A_h[i] = i % 16 + i / 16 * 100;
 #endif
     }
 
-    for (int i = 0; i < matrix_k; i++) {
-        for (int j = 0; j < matrix_m; j++) {
-            A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
+        for (size_t i = 0; i < matrix_k; i++) {
+            for (size_t j = 0; j < matrix_m; j++) {
+                A_hh[i * matrix_m + j] = A_h[i * matrix_m + j];
+//
+                // A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
+            }
         }
-    }
 
     for (unsigned i = 0; i < size_b; ++i) {
         B_h[i] = uint8_t(random_uint8());
@@ -458,24 +470,30 @@ void dequantize_gemm_run(int iter) {
         B_h[i] = 153;
 #endif
     }
+
     for (unsigned i = 0; i < size_scale; ++i) {
         scale_h[i] = random_float();
 #ifdef UT_DEBUG
         scale_h[i] = 1.f;
 #endif
     }
+
     for (unsigned i = 0; i < size_zero_pt; ++i) {
         zero_pt_h[i] = 0.f;
     }
+
     for (unsigned i = 0; i < size_c; ++i) {
         C_h[i] = 0;
     }
+
     for (unsigned i = 0; i < size_acc; ++i) {
         Acc_h[i] = 0;
     }
+
     for (unsigned i = 0; i < size_cnt; ++i) {
         Cnt_h[i] = 0;
     }
+
     for (unsigned i = 0; i < size_bias; ++i) {
         bias_h[i] = random_float();
 #ifdef UT_DEBUG
@@ -510,9 +528,8 @@ void dequantize_gemm_run(int iter) {
             {bias_d, bias_add_shape}});
 
     typename gemm_op_t::template arguments_t<compute_policy::quant_type>
-            gemm_arg(matrix_m, matrix_k, matrix_n, A_d, matrix_k, B_d, matrix_n,
-                    C_d, matrix_n, scale_d, matrix_n, Acc_d, Cnt_d,
-                    epilogue_args);
+            gemm_arg(matrix_m, matrix_k, matrix_n, A_d, lda, B_d, ldb, C_d, ldc,
+                    scale_d, matrix_n, Acc_d, Cnt_d, epilogue_args);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
     //     if (!gemm_op_t::can_implement(gemm_arg)) {
@@ -571,7 +588,7 @@ void dequantize_gemm_run(int iter) {
     queue.memcpy((void *)C_h, (void *)C_d, size_c * sizeof(data_type_c)).wait();
     ASSERT_EQ(0,
             gemm_result_validate(A_h, dequantize_b.data(), C_h, bias_h,
-                    matrix_m, matrix_k, matrix_n));
+                    matrix_m, matrix_k, matrix_n, layout_a, layout_b));
 
     free(A_h, context);
     free(A_hh, context);
