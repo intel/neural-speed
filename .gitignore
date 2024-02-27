@@ -16,6 +16,7 @@
 /out
 __pycache__
 neural_speed.egg-info/
+qbits.egg-info/
 build
 runtime_outs
 out

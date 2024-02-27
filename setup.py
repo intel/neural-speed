@@ -9,8 +9,6 @@ from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 from cmake import CMAKE_BIN_DIR
-from cpuinfo import get_cpu_info
-cpu_flags = get_cpu_info()['flags']
 
 
 CMAKE_BUILD_TYPE = os.environ.get("CMAKE_BUILD_TYPE", "Release")
@@ -32,10 +30,6 @@ def check_env_flag(name: str, default: bool = False) -> bool:
     else:
         return os.getenv(name, "").upper() in ["ON", "1", "TRUE", "YES", "Y"]
 
-
-NS_WITH_AVX2 = check_env_flag("NS_WITH_AVX2", 'avx512f' not in cpu_flags)
-""" Whether to limit the max ISA used to AVX2; otherwise AVX512 will be used; set to ON/OFF """
-NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -103,13 +97,7 @@ class CMakeBuild(build_ext):
             f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY={output_dir}",
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{CMAKE_BUILD_TYPE.upper()}={output_dir}",
             f"-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{CMAKE_BUILD_TYPE.upper()}={output_dir}",
-            f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={CMAKE_BUILD_TYPE}",
-            f"-DNS_VERSION_STRING={self.distribution.get_version()}",
-            f"-DNS_WITH_AVX2={'ON' if NS_WITH_AVX2 else 'OFF'}",
-            f"-DNS_WITH_TESTS=OFF",
-            f"-DNS_PYTHON_API=ON",
-            f"-DNS_PROFILING={NS_PROFILING_ENV}",
         ]
         if sys.platform == "linux":  # relative_rpath
             cmake_args.append('-DCMAKE_BUILD_RPATH=$ORIGIN/')
@@ -229,7 +217,7 @@ def check_submodules():
 if __name__ == '__main__':
     check_submodules()
     ext_modules = [
-        CMakeExtension("neural_speed.mpt_cpp", "./")
+        CMakeExtension("qbits", "qbits/")
     ]
     cmdclass = {'build_ext': CMakeBuild}
 
@@ -237,10 +225,9 @@ if __name__ == '__main__':
         name="qbits",
         author="Intel AISE/AIPC Team",
         author_email="feng.tian@intel.com, haihao.shen@intel.com,hanwen.chang@intel.com, penghui.cheng@intel.com",
-        description="Repository of Intel® Intel Extension for Transformers",
-        long_description=open("README.md", "r", encoding='utf-8').read(),
+        description="low-bits gemm accelerate package target Intel® platform",
         long_description_content_type="text/markdown",
-        keywords='Large Language Model, LLM, sub-byte',
+        keywords='GEMM, sub-byte',
         license='Apache 2.0',
         url="https://github.com/intel/neural-speed",
         ext_modules=ext_modules,
