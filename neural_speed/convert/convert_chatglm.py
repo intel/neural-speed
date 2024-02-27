@@ -287,10 +287,10 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     for name in list_vars.keys():
         data = list_vars[name].squeeze().numpy()
         if 'inv_freq' in name:
-            print("Converting: %-80s" % name, " shape: %-20s" % str(data.shape))
+            print("Converting: %-80s" % name, " shape: %-15s" % str(data.shape))
             continue
 
-        print("Converting: %-80s" % name, " shape: %-20s" % str(data.shape), end="      ")
+        print("Converting: %-80s" % name, " shape: %-15s" % str(data.shape), end="      ")
         if "mlp.dense_h_to_4h" in name:
             shape_0 = data.shape[0]
             half_shape_0 = int(shape_0 / 2)
@@ -315,12 +315,13 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
                     data = data.astype(np.float32)
                     ftype_cur = 0
 
+            gguf_writer.add_tensor(name, data)
             name_0 = name + "_0"
             name_1 = name + "_1"
             gguf_writer.add_tensor(name_0, data_0)
             gguf_writer.add_tensor(name_1, data_1)
-            print("Converting: %-80s" % name_0, " shape: %-20s" % str(data_0.shape))
-            print("Converting: %-80s" % name_1, " shape: %-20s" % str(data_1.shape))
+            print("Converting: %-80s" % name_0, " shape: %-15s" % str(data_0.shape))
+            print("Converting: %-80s" % name_1, " shape: %-15s" % str(data_1.shape))
             continue
 
         n_dims = len(data.shape)
