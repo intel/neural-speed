@@ -243,6 +243,27 @@ static size_t utf8_len(char src) {
   return lookup[highbits];
 }
 
+// only for sentencepiece tokenizer now (spm)
+static model_token model_byte_to_token(const model_vocab & vocab, uint8_t ch) {
+  static const char * hex = "0123456789ABCDEF";
+  const char buf[7] = { '<', '0', 'x', hex[ch >> 4], hex[ch & 15], '>', 0 };
+  auto token = vocab.token_to_id.find(buf);
+  if (token != vocab.token_to_id.end()) {
+      return (*token).second;
+  }
+  // Try to fall back to just the byte as a string
+  const char buf2[2] = { (char)ch, 0 };
+  return vocab.token_to_id.at(buf2);
+}
+
+static void model_escape_whitespace(std::string & text) {
+    replace_all(text, " ", "\xe2\x96\x81");
+}
+
+static void model_unescape_whitespace(std::string & word) {
+    replace_all(word, "\xe2\x96\x81", " ");
+}
+
 struct model_sp_symbol_t {
   using index = int;
   index prev;
@@ -269,6 +290,7 @@ struct model_sp_bigram_t {
 
 // original implementation:
 // https://github.com/ggerganov/model.cpp/commit/074bea2eb1f1349a0118239c4152914aecaa1be4
+// sentencepiece tokenizer
 struct model_tokenizer_t {
   model_tokenizer_t(const model_vocab& vocab) : vocab_(vocab) {}  // NOLINT
 
@@ -278,10 +300,10 @@ struct model_tokenizer_t {
     size_t offs = 0;
     while (offs < text.size()) {
       model_sp_symbol_t sym;
-      size_t char_len = std::min(text.size() - offs, utf8_len(text[offs]));
+      size_t len = utf8_len(text[offs]);
       sym.text = text.c_str() + offs;
-      sym.n = char_len;
-      offs += char_len;
+      sym.n = std::min(len, text.size() - offs);
+      offs += sym.n;
       sym.prev = index - 1;
       sym.next = offs == text.size() ? -1 : index + 1;
       index++;
@@ -326,22 +348,37 @@ struct model_tokenizer_t {
 
     for (int i = 0; i != -1; i = symbols_[i].next) {
       auto& symbol = symbols_[i];
-      auto symbol_text = std::string(symbol.text, symbol.n);
-      auto token = vocab_.token_to_id.find(symbol_text);
-
-      if (token == vocab_.token_to_id.end()) {
-        // output any symbols that did not form tokens as bytes.
-        for (int j = 0; j < static_cast<int>(symbol.n); ++j) {
-          model_vocab::id token_id = static_cast<uint8_t>(symbol.text[j]) + 3;
-          output.push_back(token_id);
-        }
-      } else {
-        output.push_back((*token).second);
-      }
+      resegment(symbol, output);
     }
   }
 
  private:
+  void resegment(model_sp_symbol_t & symbol, std::vector<model_vocab::id> & output) {
+        auto text = std::string(symbol.text, symbol.n);
+        auto token = vocab_.token_to_id.find(text);
+
+        // Do we need to support is_unused?
+        if (token != vocab_.token_to_id.end()) {
+            output.push_back((*token).second);
+            return;
+        }
+
+        const auto p = rev_merge_.find(text);
+
+        if (p == rev_merge_.end()) {
+            // output any symbols that did not form tokens as bytes.
+            output.reserve(output.size() + symbol.n);
+            for (int j = 0; j < (int)symbol.n; ++j) {
+                model_vocab::id token_id = model_byte_to_token(vocab_, symbol.text[j]);
+                output.push_back(token_id);
+            }
+            return;
+        }
+
+        resegment(symbols_[p->second.first],  output);
+        resegment(symbols_[p->second.second], output);
+  }
+
   void try_add_bigram(int left, int right) {
     if (left == -1 || right == -1) {
       return;
@@ -371,10 +408,13 @@ struct model_tokenizer_t {
   const model_vocab& vocab_;
   std::vector<model_sp_symbol_t> symbols_;
   model_sp_bigram_t::queue work_queue_;
+  std::map<std::string, std::pair<int, int>> rev_merge_;
 };
 
 static std::vector<model_vocab::id> model_tokenize(const model_vocab& vocab, const std::string& text, bool bos) {
   model_tokenizer_t tokenizer(vocab);
+  std::string raw_text(text);
+  model_escape_whitespace(raw_text);
   std::vector<model_vocab::id> output;
 
   if (text.empty()) {
@@ -385,7 +425,7 @@ static std::vector<model_vocab::id> model_tokenize(const model_vocab& vocab, con
     output.push_back(vocab.bos_token_id);
   }
 
-  tokenizer.tokenize(text, output);
+  tokenizer.tokenize(raw_text, output);
   return output;
 }
 
@@ -1724,6 +1764,45 @@ const char* model_token_to_str(const struct model_context* ctx, model_token toke
 
   return ctx->vocab.id_to_token[token].tok.c_str();
 }
+
+// does not write null-terminator to buf
+// int32_t llama_token_to_piece(const struct model_context * ctx, model_token token, char * buf, int32_t length) {
+//     if (0 <= token && token < model_n_vocab(ctx)) {
+//       // NOTE: we accept all unsupported token types,
+//       // suppressing them like CONTROL tokens.
+//       if (llama_is_normal_token(model->vocab, token)) {
+//           std::string result = model->vocab.id_to_token[token].text;
+//           llama_unescape_whitespace(result);
+//           if (length < (int) result.length()) {
+//               return -(int) result.length();
+//           }
+//           memcpy(buf, result.c_str(), result.length());
+//           return result.length();
+//       } else if (llama_is_user_defined_token(model->vocab, token)) {
+//           std::string result = model->vocab.id_to_token[token].text;
+//           if (length < (int) result.length()) {
+//               return -result.length();
+//           }
+//           memcpy(buf, result.c_str(), result.length());
+//           return result.length();
+//       } else if (llama_is_unknown_token(model->vocab, token)) { // NOLINT
+//           if (length < 3) {
+//               return -3;
+//           }
+//           memcpy(buf, "\xe2\x96\x85", 3);
+//           return 3;
+//       } else if (llama_is_control_token(model->vocab, token)) {
+//           ;
+//       } else if (llama_is_byte_token(model->vocab, token)) {
+//           if (length < 1) {
+//               return -1;
+//           }
+//           buf[0] = llama_token_to_byte(model->vocab, token);
+//           return 1;
+//       }
+//     }
+//     return 0;
+// }
 
 model_token model_token_nl() { return 13; }
 

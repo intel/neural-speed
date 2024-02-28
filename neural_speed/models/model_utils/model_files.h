@@ -974,6 +974,7 @@ struct gguf_loader {
       // NE_ASSERT(codepoints_from_utf8(word).size() > 0);
 
       vocab.token_to_id[word] = i;
+      printf("%s, : %d \n", word.c_str(), i);
 
       auto& tok_score = vocab.id_to_token[i];
       tok_score.tok = std::move(word);

@@ -237,6 +237,9 @@ int main(int argc, char** argv) {  // NOLINT
     }
   } else {
     embd_inp = ::model_tokenize(ctx, params.prompt, add_bos);
+    printf("model prompt tokens: \n");
+    for (const auto& e :embd_inp) printf("%d, ", e);
+    printf("\n");
   }
 
   const int n_ctx = model_n_ctx(ctx);
@@ -291,7 +294,7 @@ int main(int argc, char** argv) {  // NOLINT
   // determine newline token
   auto model_token_newline = ::model_tokenize(ctx, "\n", false);
 
-  if (params.verbose_prompt) {
+  if (true) {//(params.verbose_prompt) {
     fprintf(stderr, "\n");
     fprintf(stderr, "%s: prompt: '%s'\n", __func__, params.prompt.c_str());
     fprintf(stderr, "%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
@@ -654,7 +657,8 @@ int main(int argc, char** argv) {  // NOLINT
     } else {
       if (input_echo) {
         for (auto id : embd) {
-          printf("%s", model_token_to_str(ctx, id));
+          // printf("%s", model_token_to_str(ctx, id));
+          // printf("%d, ", id);
         }
         fflush(stdout);
       }
