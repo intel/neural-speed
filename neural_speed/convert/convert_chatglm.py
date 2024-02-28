@@ -453,9 +453,55 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
         for i in range(n_dims):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
         fout.write(str)
-
         # data
         data.tofile(fout)
+
+        if "mlp.dense_h_to_4h" in name:
+            name_0 = name.replace("dense_h_to_4h", "dense_h_to_4h_0")
+            name_1 = name.replace("dense_h_to_4h", "dense_h_to_4h_1")
+            shape_0 = data.shape[0]
+            half_shape_0 = int(shape_0 / 2)
+            data_0 = data[0:half_shape_0, :]
+            data_1 = data[half_shape_0:shape_0, :]
+
+            print("Converting: %-75s" % name_0, " shape: ", data_0.shape)
+            print("Converting: %-75s" % name_1, " shape: ", data_1.shape)
+
+            n_dims = len(data_0.shape)
+            assert (len(data_0.shape) == len(data_1.shape))
+            # ftype == 0 -> float32, ftype == 1 -> float16
+            ftype_cur = 0
+            if ftype != 0:
+                if name_0[-7:] == ".weight" and n_dims == 2:
+                    print("  to float16".rjust(15))
+                    data_0 = data_0.astype(np.float16)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 1
+                else:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+            else:
+                if data_0.dtype != np.float32:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+
+            str_0 = name_0.encode("utf-8")
+            fout.write(struct.pack("iii", n_dims, len(str_0), ftype_cur))
+            for i in range(n_dims):
+                fout.write(struct.pack("i", data_0.shape[n_dims - 1 - i]))
+            fout.write(str_0)
+            data_0.tofile(fout)
+
+            str_1 = name_1.encode("utf-8")
+            fout.write(struct.pack("iii", n_dims, len(str_1), ftype_cur))
+            for i in range(n_dims):
+                fout.write(struct.pack("i", data_1.shape[n_dims - 1 - i]))
+            fout.write(str_1)
+            data_1.tofile(fout)
 
     fout.close()
 

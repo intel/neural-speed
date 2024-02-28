@@ -168,6 +168,7 @@ void CHATGLM2::load(model_context* ctx, model_progress_callback progress_callbac
     }
   }
 
+  fprintf(stderr, "%s: layers[0].ffn_fusion    = %u\n", __func__, model.layers[0].ffn_fusion);
   // print memory requirements
   // this is the total memory required to run the inference
   const size_t mem_required = ctx_size + mmapped_size - vram_total +  // weights in VRAM not in memory
