@@ -28,6 +28,7 @@ struct Config2D {
   int threads;
   int size[2];
   int step[2];
+  int offset[2];
 };
 struct ThreadProblem2D {
   int tid;
@@ -57,8 +58,8 @@ class Scheduler2D {
     auto& tid = problem.tid;
     problem.tidx[1] = tid % mThdPerRow;
     problem.tidx[0] = tid / mThdPerRow;
-    problem.loc[0] = problem.tidx[0] * mThdSize[0];
-    problem.loc[1] = problem.tidx[1] * mThdSize[1];
+    problem.loc[0] = problem.tidx[0] * mThdSize[0] + moffset[0];
+    problem.loc[1] = problem.tidx[1] * mThdSize[1] + moffset[1];
     problem.size[0] = utils::remainsize(problem.loc[0], mSize[0], mThdSize[0]);
     problem.size[1] = utils::remainsize(problem.loc[1], mSize[1], mThdSize[1]);
     problem.valid = true;
@@ -69,6 +70,7 @@ class Scheduler2D {
     for (size_t i = 0; i < 2; i++) {
       mSize[i] = config.size[i];
       mStep[i] = config.step[i];
+      moffset[i] = config.offset[i];
     }
     schedule();
   }
@@ -112,6 +114,7 @@ class Scheduler2D {
   int mThdPerRow = 0;
   int mThdValid = 0;
   int mThdCount = 0;
+  int moffset[2] = {0, 0};
 
  private:
   int mThdSize[2] = {0, 0};
@@ -124,6 +127,7 @@ namespace gemm {
 struct Config {
   const int threads;
   const utils::GemmProblem problem;
+  const int offset[2];
   const size_t l2cache = 1024ULL * 1024;
   const size_t l1cache = 32ULL * 1024;
 };
@@ -157,6 +161,8 @@ class SchedulerBase : public Scheduler2D {
     mThdCount = config.threads;
     mL2Size = config.l2cache;
     mL1Size = config.l1cache;
+    moffset[0] = config.offset[0];
+    moffset[1] = config.offset[1];
     if (mSize[0] <= 0 || mSize[1] <= 0 || mSize[2] <= 0) {
       return;
     }
@@ -316,6 +322,8 @@ class SchedulerKBlock : public Scheduler2D {
     mThdCount = config.threads;
     mL2Size = config.l2cache;
     mL1Size = config.l1cache;
+    moffset[0] = config.offset[0];
+    moffset[1] = config.offset[1];
     mKBlock = config.problem.dims[4];
     if (mSize[0] <= 0 || mSize[1] <= 0 || mSize[2] <= 0) {
       return;
@@ -582,6 +590,60 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
   int mKBlock{0};
 };
 
+template <class Scheduler>
+class SchedulerDispatcher {
+ public:
+  using ThreadProblem = ThreadProblemBase;
+  SchedulerDispatcher() = default;
+  ~SchedulerDispatcher() {
+    delete Scheduler_P;
+    if (Scheduler_E) delete Scheduler_E;
+  }
+  SchedulerDispatcher(const int threads, const utils::GemmProblem& problem) {
+    device::CpuRuntime* cr = device::CpuRuntime::getInstance(threads);
+    isHybrid = cr->mHybrid;
+    if (!isHybrid) {
+      Scheduler_P = new Scheduler({threads, problem, {0, 0}, cr->mL2Cache, cr->mL1Cache});
+    } else {
+      utils::GemmProblem problem_P = problem, problem_E = problem;
+      assert(problem.n > 2);
+      const int N = problem.dims[2];
+      const int N_offset = N - int(N / (1 + cr->PE));
+      problem_P.dims[2] = N_offset;
+      problem_E.dims[2] = problem.dims[2] - N_offset;
+      Scheduler_P = new Scheduler({threads - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P});
+      Scheduler_E = new Scheduler({cr->E_core_num, problem_E, {0, N_offset}, cr->mL2Cache_E, cr->mL1Cache_E});
+    }
+  }
+
+  void getIndex(ThreadProblem& problem) {
+    if (!isHybrid) {
+      Scheduler_P->getIndex(problem);
+    } else {
+      if (problem.tid >= Pcore_num + Ecore_num) {
+        problem.tid -= Ecore_num;
+        Scheduler_P->getIndex(problem);
+      } else if (problem.tid >= Pcore_num) {
+        problem.tid -= Pcore_num;
+        Scheduler_E->getIndex(problem);
+      } else {
+        Scheduler_P->getIndex(problem);
+      }
+    }
+  }
+
+  void print() {
+    printf("dispatch to hybrid:%d\n", isHybrid);
+    Scheduler_P->print();
+    if (isHybrid) Scheduler_E->print();
+  }
+
+ private:
+  Scheduler *Scheduler_P = nullptr, *Scheduler_E = nullptr;
+  bool isHybrid = false;
+  int Pcore_num = 0, Ecore_num = 0;
+};
+
 }  // namespace gemm
 using thread_func = std::function<void(int tid)>;
 
@@ -589,7 +651,7 @@ class IThreading {
  public:
   explicit IThreading(int nthreads) : mThreadNum(nthreads) {}
   virtual void parallel_for(const thread_func& func) = 0;
-  virtual inline void sync(int idx=0) = 0;
+  virtual inline void sync(int idx = 0) = 0;
   virtual int num_threads() const { return mThreadNum; };
   virtual void set_threads(int nthreads) = 0;
 
@@ -618,7 +680,7 @@ class OMPThreading : public IThreading {
     mThreadNum = nthreads;
     omp_set_num_threads(nthreads);
   }
-  virtual inline void sync(int idx=0) override {
+  virtual inline void sync(int idx = 0) override {
 #pragma omp barrier
     (void)(0);  // make msvc happy with c++20
   }
@@ -633,8 +695,8 @@ class StdThreading : public IThreading {
   }
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
-      running.store(mThreadNum-1);
-      for(int i=0;i<10;i++) flag[i].store(mThreadNum);
+      running.store(mThreadNum - 1);
+      for (int i = 0; i < 10; i++) flag[i].store(mThreadNum);
       for (size_t i = 0; i < mThreadNum - 1; i++) {
         func_[i] = &func;
       }
@@ -645,6 +707,7 @@ class StdThreading : public IThreading {
         else
           _mm_pause();
       }
+      // todo: collect time and update PE to CR
     } else {
       func(0);
     }
@@ -658,15 +721,15 @@ class StdThreading : public IThreading {
     }
   }
 
-  inline void sync(int idx=0) override {
+  inline void sync(int idx = 0) override {
     flag[idx].fetch_sub(1);
     while (true) {
-        if (flag[idx].load() == 0)
-          break;
-        else
-          _mm_pause();
-      } 
+      if (flag[idx].load() == 0)
+        break;
+      else
+        _mm_pause();
     }
+  }
 
   ~StdThreading() { stop_threads(); }
 
@@ -685,7 +748,7 @@ class StdThreading : public IThreading {
     for (size_t i = 0; i < mThreadNum - 1; i++) {
       thdset[i] = std::thread(
           [&](int tidx) {
-            bestla::device::CpuDevice::core_bond(tidx+1);
+            bestla::device::CpuDevice::core_bond(tidx + 1);
             while (true) {
               if (stop.load() == true) break;
               if (func_[tidx] != nullptr) {
@@ -724,8 +787,7 @@ class SingleThread : public IThreading {
 
 template <class Parallel_T, class Launch_T>
 void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para({th->num_threads(), args.problem, cb.mL2Cache, cb.mL1Cache});
+  gemm::SchedulerDispatcher<Parallel_T> para(th->num_threads(), args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -743,8 +805,7 @@ void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel:
 
 template <class Parallel_T, class Launch_T>
 void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para({th->num_threads(), args.problem, cb.mL2Cache, cb.mL1Cache});
+  gemm::SchedulerDispatcher<Parallel_T> para(th->num_threads(), args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
   auto apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
   static bool flag = false;

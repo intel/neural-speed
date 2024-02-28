@@ -228,7 +228,7 @@ class CpuDevice {
   inline bool AMX_BF16() { return mHasAMX_BF16; }
   inline bool AVX512_BF16() { return mHasAVX512_BF16; }
   inline bool AVX512_FP16() { return mHasAVX512_FP16; }
-  inline float getPE() { return (P_core.size() * P_power) / (E_core.size() * E_power); }
+  inline float getPE() { return P_power / E_power; }
   inline size_t getPcoreNum() { return P_core.size(); }
   inline size_t getEcoreNum() { return E_core.size(); }
   inline size_t getSMTcoreNum() { return SMT_core.size(); }
@@ -447,16 +447,43 @@ class CpuDevice {
 
 #define GetCPUDevice() auto _cd = bestla::device::CpuDevice::getInstance();
 
-class CpuBase {
+class CpuRuntime {
  public:
-  CpuBase() {
+  static CpuRuntime* getInstance(int thread) {
+    static std::map<int, CpuRuntime*> instances;
+    if (instances.count(thread) == 0) instances[thread] = new CpuRuntime(thread);
+    return instances[thread];
+  }
+
+  CpuRuntime(int thread) {
     GetCPUDevice();
     mL2Cache = _cd->getL2CacheSize();
     mL1Cache = _cd->getL1CacheSize();
-    mNumThreads = _cd->getThreads();
+    maxThreads = _cd->getThreads();
+    mHybrid = false;
+    if (_cd->isHybrid() && thread > _cd->getPcoreNum()) {
+      if (thread > _cd->getPcoreNum() + _cd->getEcoreNum()) {
+        mL1Cache_P = mL1Cache / 2;
+        mL2Cache_P = mL2Cache / 2;
+        P_core_num = _cd->getPcoreNum();
+        E_core_num = _cd->getEcoreNum();
+      } else {
+        mL1Cache_P = mL1Cache;
+        mL2Cache_P = mL2Cache;
+        P_core_num = _cd->getPcoreNum();
+        E_core_num = thread - P_core_num;
+      }
+      mL1Cache_E = _cd->getL1CacheSize_E();
+      mL2Cache_E = _cd->getL2CacheSize_E();
+      mHybrid = true;
+      PE = _cd->getPE();
+    }
   }
-  size_t mL2Cache, mL1Cache;
-  int mNumThreads;
+  size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
+  int P_core_num = 0, E_core_num = 0;
+  float PE = 1;
+  bool mHybrid = false;
+  int maxThreads;
 };
 }  // namespace device
 }  // namespace bestla
