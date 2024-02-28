@@ -39,7 +39,33 @@ class UT_Threading {
   }
 
   static void set_threads(int n_thread) { get()->set_threads(n_thread); }
+
+  static std::vector<int> get_threads_config() {
+    GetCPUDevice();
+    if (_cd->isHybrid()) {
+      return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+    }
+    if (_cd->getThreads() == 56) {
+      return std::vector<int>{48, 56};
+    }
+    return std::vector<int>{_cd->getThreads()};
+  }
 };
+static inline size_t gemm_memsize(int m, int n, int k, BTLA_DTYPE dtA, BTLA_DTYPE dtB, BTLA_DTYPE dtC) {
+  size_t total = 0;
+  total += size_t(m) * k * utils::bestla_dtype_bits(dtA);
+  total += size_t(n) * k * utils::bestla_dtype_bits(dtB);
+  total += size_t(m) * n * utils::bestla_dtype_bits(dtC);
+  return total / 8;
+}
+
+static inline int auto_batch(size_t memsize) {
+  GetCPUDevice();
+  auto L3 = _cd->getL3CacheSize();
+  size_t constexpr Enlarge = 4;
+  auto batch = L3 * Enlarge / memsize;
+  return batch > 1 ? batch : 2;
+}
 
 constexpr size_t CacheSize = size_t(100) << 10;
 static int8_t cache[CacheSize];

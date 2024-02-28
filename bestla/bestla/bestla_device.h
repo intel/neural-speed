@@ -215,6 +215,7 @@ class CpuDevice {
  public:
   inline int getThreads() { return numthreads; }
   inline int getCores() { return numcores; }
+  inline uint32_t getL3CacheSize() { return L3Cache; }
   inline uint32_t getL2CacheSize() { return L2Cache; }
   inline uint32_t getL1CacheSize() { return L1Cache; }
   inline uint32_t getL2CacheSize_E() { return E_L2Cache; }
@@ -334,6 +335,7 @@ class CpuDevice {
       L2Cache = _cpu.getDataCacheSize(1);
       numthreads = numcores;
     }
+    L3Cache = _cpu.getDataCacheSize(2);
 #if FIXED_CACHE
     L2Cache = L2Cache >= FIXED_CACHE_SIZE ? FIXED_CACHE_SIZE : L2Cache;
     E_L2Cache = E_L2Cache >= FIXED_CACHE_SIZE ? FIXED_CACHE_SIZE : E_L2Cache;
@@ -407,7 +409,7 @@ class CpuDevice {
   }
   static void core_bond(int core) {
 #ifdef _WIN32
-    SetThreadAffinityMask(GetCurrentThread(), 1 << core);
+    SetThreadAffinityMask(GetCurrentThread(), 1LL << core);
 #else
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
@@ -420,7 +422,7 @@ class CpuDevice {
   static void core_bond(std::thread& thread, int core) {
 #ifdef _WIN32
     HANDLE handle = thread.native_handle();
-    SetThreadAffinityMask(handle, 1 << core);
+    SetThreadAffinityMask(handle, 1LL << core);
 #else
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
@@ -434,7 +436,7 @@ class CpuDevice {
   bool isHybrid() { return mHybrid; }
 
  protected:
-  uint32_t L2Cache, L1Cache;
+  uint32_t L2Cache, L1Cache, L3Cache;
   bool mHybrid = false;
   bool mHasAVX2, mHasAVX_VNNI, mHasAVX, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512F, mHasAVX512_BF16,
       mHasAVX512_FP16;
@@ -442,7 +444,7 @@ class CpuDevice {
   int numthreads;
   std::vector<int> P_core, E_core, SMT_core;
   uint32_t E_L2Cache, E_L1Cache;
-  float P_power = 4.8, E_power = 2.3;
+  float P_power = 4.8f, E_power = 2.3f;
 };
 
 #define GetCPUDevice() auto _cd = bestla::device::CpuDevice::getInstance();
