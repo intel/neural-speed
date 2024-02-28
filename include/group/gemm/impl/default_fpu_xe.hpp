@@ -315,10 +315,10 @@ public:
                 }
             }
             SW_BARRIER();
-            //     sycl::ext::oneapi::experimental::printf("tile_load A \n");
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     matA, matA_payload);
-            //     sycl::ext::oneapi::experimental::printf("tile_load B \n");
+            if constexpr (!is_col_major_a) reorder_matA(matA);
+
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
                     matB, matB_payload);
             matA_payload.template update_tdesc<update_dir_a>(
@@ -341,72 +341,25 @@ public:
             subgroup::elemwise_cvt(matB_acc, matB);
             pre_processing(matA_acc, matB_acc, matA, matB);
             SW_BARRIER();
-            //     static const char vec_a[]
-            //             = "vec_a after load %f %f %f %f %f %f %f %f %f %f %f %f %f "
-            //               "%f %f %f\n";
-            //     static const char vec_b[]
-            //             = "vec_b after load %f %f %f %f %f %f %f %f %f %f %f %f %f "
-            //               "%f %f %f\n";
-            // #pragma unroll
-            //     for (int i = 0; i < 256; i += 16) {
-            //         sycl::ext::oneapi::experimental::printf(vec_a,
-            //                 (float)matA_acc.reg[i + 0], (float)matA_acc.reg[i + 1],
-            //                 (float)matA_acc.reg[i + 2], (float)matA_acc.reg[i + 3],
-            //                 (float)matA_acc.reg[i + 4], (float)matA_acc.reg[i + 5],
-            //                 (float)matA_acc.reg[i + 6], (float)matA_acc.reg[i + 7],
-            //                 (float)matA_acc.reg[i + 8], (float)matA_acc.reg[i + 9],
-            //                 (float)matA_acc.reg[i + 10],
-            //                 (float)matA_acc.reg[i + 11],
-            //                 (float)matA_acc.reg[i + 12],
-            //                 (float)matA_acc.reg[i + 13],
-            //                 (float)matA_acc.reg[i + 14],
-            //                 (float)matA_acc.reg[i + 15]);
-            //     }
-            //     for (int i = 0; i < 256; i += 16) {
-            //         sycl::ext::oneapi::experimental::printf(vec_b,
-            //                 (float)matB_acc.reg[i + 0], (float)matB_acc.reg[i + 1],
-            //                 (float)matB_acc.reg[i + 2], (float)matB_acc.reg[i + 3],
-            //                 (float)matB_acc.reg[i + 4], (float)matB_acc.reg[i + 5],
-            //                 (float)matB_acc.reg[i + 6], (float)matB_acc.reg[i + 7],
-            //                 (float)matB_acc.reg[i + 8], (float)matB_acc.reg[i + 9],
-            //                 (float)matB_acc.reg[i + 10],
-            //                 (float)matB_acc.reg[i + 11],
-            //                 (float)matB_acc.reg[i + 12],
-            //                 (float)matB_acc.reg[i + 13],
-            //                 (float)matB_acc.reg[i + 14],
-            //                 (float)matB_acc.reg[i + 15]);
-            //     }
-            //     sycl::ext::oneapi::experimental::printf(vec_b,
-            //             (float)matB_acc.reg[0], (float)matB_acc.reg[1],
-            //             (float)matB_acc.reg[2], (float)matB_acc.reg[3],
-            //             (float)matB_acc.reg[4], (float)matB_acc.reg[5],
-            //             (float)matB_acc.reg[6], (float)matB_acc.reg[7],
-            //             (float)matB_acc.reg[8], (float)matB_acc.reg[9],
-            //             (float)matB_acc.reg[10], (float)matB_acc.reg[11],
-            //             (float)matB_acc.reg[12], (float)matB_acc.reg[13],
-            //             (float)matB_acc.reg[14], (float)matB_acc.reg[15]);
-            //     sycl::ext::oneapi::experimental::printf(vec_c, (float)matAcc.reg[0],
-            //             (float)matAcc.reg[1], (float)matAcc.reg[2],
-            //             (float)matAcc.reg[3], (float)matAcc.reg[4],
-            //             (float)matAcc.reg[5], (float)matAcc.reg[6],
-            //             (float)matAcc.reg[7], (float)matAcc.reg[8],
-            //             (float)matAcc.reg[9], (float)matAcc.reg[10],
-            //             (float)matAcc.reg[11], (float)matAcc.reg[12],
-            //             (float)matAcc.reg[13], (float)matAcc.reg[14],
-            //             (float)matAcc.reg[15]);
+            //         static const char vec_a[]
+            //                 = "vec_a after load %d %d %d %d %d %d %d %d %d %d %d %d %d "
+            //                   "%d %d %d\n";
+            //     #pragma unroll
+            //         for (int i = 0; i < 256; i += 16) {
+            //             sycl::ext::oneapi::experimental::printf(vec_a,
+            //                     (int)matA_acc.reg[i + 0], (int)matA_acc.reg[i + 1],
+            //                     (int)matA_acc.reg[i + 2], (int)matA_acc.reg[i + 3],
+            //                     (int)matA_acc.reg[i + 4], (int)matA_acc.reg[i + 5],
+            //                     (int)matA_acc.reg[i + 6], (int)matA_acc.reg[i + 7],
+            //                     (int)matA_acc.reg[i + 8], (int)matA_acc.reg[i + 9],
+            //                     (int)matA_acc.reg[i + 10],
+            //                     (int)matA_acc.reg[i + 11],
+            //                     (int)matA_acc.reg[i + 12],
+            //                     (int)matA_acc.reg[i + 13],
+            //                     (int)matA_acc.reg[i + 14],
+            //                     (int)matA_acc.reg[i + 15]);
+            //         }
             tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
-            //     static const char vec_c[]
-            //             = "vec_c after load %f %f %f %f %f %f %f %f %f %f %f %f %f "
-            //               "%f %f %f\n";
-            //     sycl::ext::oneapi::experimental::printf(vec_c, (float)matAcc.reg[0],
-            //             (float)matAcc.reg[1], (float)matAcc.reg[2],
-            //             (float)matAcc.reg[3], (float)matAcc.reg[4],
-            //             (float)matAcc.reg[5], (float)matAcc.reg[6],
-            //             (float)matAcc.reg[7], (float)matAcc.reg[8],
-            //             (float)matAcc.reg[9], (float)matAcc.reg[10],
-            //             (float)matAcc.reg[11], (float)matAcc.reg[12],
-            //             (float)matAcc.reg[13], (float)matAcc.reg[14],
-            //             (float)matAcc.reg[15]);
             SW_BARRIER();
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
@@ -419,6 +372,22 @@ public:
     }
 
 private:
+    inline void reorder_matA(matA_t &matA) {
+        constexpr uint32_t num_block_x = tile_size_x_a / block_size_x_a;
+        constexpr uint32_t num_block_y = tile_size_y_a / block_size_y_a;
+        for (int i = 0; i < num_block_y * num_block_x; i++) {
+            auto dst_blk = matA.reg.xetla_select<matA_t::block_elems, 1>(
+                    i * matA_t::block_elems);
+            xetla_vector<float, matA_t::block_elems> trans_blk;
+            for (int j = 0; j < block_size_y_a; j++) {
+                trans_blk.xetla_select<block_size_y_a, block_size_x_a>(j)
+                        = dst_blk.xetla_select<block_size_y_a, 1>(
+                                j * block_size_x_a);
+            }
+            dst_blk = trans_blk;
+        }
+        //  sycl::ext::oneapi::experimental::printf("block x:%d y: %d\n",num_block_x,num_block_y);
+    }
     /// @brief Updates tile base descriptor based on the tid.
     __XETLA_API static void update_sg_tile_tdesc(
             arguments_t &args, int32_t sg_idx, int32_t sg_idy) {

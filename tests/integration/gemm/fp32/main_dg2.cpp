@@ -24,8 +24,8 @@ class t1 {
 public:
     //Extract the parameters required by different test cases
     static constexpr size_t mat_m = 16;
-    static constexpr size_t mat_n = 16;
-    static constexpr size_t mat_k = 16;
+    static constexpr size_t mat_n = 32;
+    static constexpr size_t mat_k = 32;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
@@ -33,7 +33,7 @@ public:
     static constexpr size_t sg_k = 16;
     static constexpr uint32_t global_kslicing = 1;
     static constexpr uint32_t local_kslicing = 1;
-    static constexpr mem_layout layout_a = mem_layout::col_major;
+    static constexpr mem_layout layout_a = mem_layout::row_major;
     static constexpr mem_layout layout_b = mem_layout::row_major;
     using data_type_a = float;
     using data_type_b = float;
@@ -207,7 +207,7 @@ void fpu_fp32_gemm_run(int iter) {
 
     for (unsigned i = 0; i < size_a; ++i) {
         A_h[i] = random_float();
-        // A_h[i] = i / 16 * 100 + i % 16;
+        // A_h[i] = i ;
         // A_h[i] = 1.f;
     }
 
