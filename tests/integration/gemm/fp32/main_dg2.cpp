@@ -16,7 +16,6 @@
 
 #include "xetla.hpp"
 #include <utils/utils.hpp>
-// #define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
 constexpr int ITER = 1;
@@ -25,8 +24,8 @@ class t1 {
 public:
     //Extract the parameters required by different test cases
     static constexpr size_t mat_m = 16;
-    static constexpr size_t mat_n = 16;
-    static constexpr size_t mat_k = 16;
+    static constexpr size_t mat_n = 512;
+    static constexpr size_t mat_k = 512;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
@@ -110,6 +109,8 @@ void fpu_fp32_gemm_run(int iter) {
     constexpr size_t matrix_m = Test::mat_m;
     constexpr size_t matrix_n = Test::mat_n;
     constexpr size_t matrix_k = Test::mat_k;
+    constexpr mem_layout layout_a = Test::layout_a;
+    constexpr mem_layout layout_b = Test::layout_b;
     constexpr uint32_t global_kslicing = Test::global_kslicing;
     constexpr uint32_t local_kslicing = Test::local_kslicing;
 
@@ -127,6 +128,10 @@ void fpu_fp32_gemm_run(int iter) {
     constexpr size_t size_b = matrix_k * matrix_n;
     constexpr size_t size_c = matrix_m * matrix_n;
 
+    uint32_t lda = layout_a == mem_layout::row_major ? matrix_k : matrix_m;
+    uint32_t ldb = layout_b == mem_layout::row_major ? matrix_n : matrix_k;
+    uint32_t ldc = matrix_n;
+
     // Turn on the enable_profiling property to facilitate subsequent profiling
     sycl::property_list properties {sycl::property::queue::enable_profiling()};
     auto queue = sycl::queue(properties);
@@ -140,9 +145,9 @@ void fpu_fp32_gemm_run(int iter) {
     static constexpr uint32_t periodic_sync_interval = 0;
     static constexpr uint32_t prefetch_distance = 1;
 
-    using mem_desc_a_t = xetla::mem_desc_t<data_type_a, mem_layout::row_major,
+    using mem_desc_a_t = xetla::mem_desc_t<data_type_a, layout_a,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
-    using mem_desc_b_t = xetla::mem_desc_t<data_type_b, mem_layout::row_major,
+    using mem_desc_b_t = xetla::mem_desc_t<data_type_b, layout_b,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
     using mem_desc_c_t = xetla::mem_desc_t<data_type_c, mem_layout::row_major,
             mem_space::global, DEVICE_MEM_ALIGNMENT / sizeof(data_type_c)>;
@@ -175,8 +180,6 @@ void fpu_fp32_gemm_run(int iter) {
     //Define and initialize the data required for the calculation
     auto *A_h = static_cast<data_type_a *>(
             malloc_host(size_a * sizeof(data_type_a), context));
-    auto *A_h_t = static_cast<data_type_a *>(
-            malloc_host(size_a * sizeof(data_type_a), context));
     auto *B_h = static_cast<data_type_b *>(
             malloc_host(size_b * sizeof(data_type_b), context));
     auto *C_h = static_cast<data_type_c *>(
@@ -207,15 +210,10 @@ void fpu_fp32_gemm_run(int iter) {
         // A_h[i] = i / 16 * 100 + i % 16;
         // A_h[i] = 1.f;
     }
-    for (unsigned i = 0; i < matrix_k; i++) {
-        for (unsigned j = 0; j < matrix_m; j++) {
-                A_h_t[i * matrix_m + j] = A_h[j * matrix_k + i];
-        }
-    }
+
     for (unsigned i = 0; i < size_b; ++i) {
         // B_h[i] = i % 16 + i / 16  * 100;
         B_h[i] = random_float();
-        // B_h[i] = 1.f;
     }
 
     for (unsigned i = 0; i < size_c; ++i) {
@@ -228,8 +226,7 @@ void fpu_fp32_gemm_run(int iter) {
         Cnt_h[i] = 0;
     }
 
-    queue.memcpy((void *)A_d, (void *)A_h_t, size_a * sizeof(data_type_a))
-            .wait();
+    queue.memcpy((void *)A_d, (void *)A_h, size_a * sizeof(data_type_a)).wait();
     queue.memcpy((void *)B_d, (void *)B_h, size_b * sizeof(data_type_b)).wait();
     queue.memcpy((void *)C_d, (void *)C_h, size_c * sizeof(data_type_c)).wait();
     queue.memcpy((void *)Acc_d, (void *)Acc_h, size_acc * sizeof(data_type_acc))
@@ -238,7 +235,7 @@ void fpu_fp32_gemm_run(int iter) {
             .wait();
 
     typename gemm_op_t::arguments_t gemm_arg(matrix_m, matrix_k, matrix_n, A_d,
-            matrix_k, B_d, matrix_n, C_d, matrix_n, Acc_d, Cnt_d);
+            lda, B_d, ldb, C_d, ldc, Acc_d, Cnt_d);
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
     if (!gemm_op_t::can_implement(gemm_arg)) {
         std::cout << "The arguments cannot be supported, aborting ... "
@@ -276,10 +273,10 @@ void fpu_fp32_gemm_run(int iter) {
     prof.print_profiling_result(profiling_selector::GPU);
     queue.memcpy((void *)C_h, (void *)C_d, size_c * sizeof(data_type_c)).wait();
     ASSERT_EQ(0,
-            gemm_result_validate(A_h, B_h, C_h, matrix_m, matrix_k, matrix_n));
+            gemm_result_validate(A_h, B_h, C_h, matrix_m, matrix_k, matrix_n,
+                    mem_layout::col_major, layout_b));
 
     free(A_h, context);
-    free(A_h_t, context);
     free(B_h, context);
     free(C_h, context);
     free(A_d, context);
