@@ -25,8 +25,8 @@ class test1 {
 public:
     //Extract the parameters required by different test cases
     static constexpr size_t mat_m = 16;
-    static constexpr size_t mat_n = 16;
-    static constexpr size_t mat_k = 16;
+    static constexpr size_t mat_n = 32;
+    static constexpr size_t mat_k = 32;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
@@ -36,7 +36,7 @@ public:
     static constexpr size_t num_buffer = 64;
     static constexpr size_t local_kslicing = 1;
     static constexpr size_t global_kslicing = 1;
-    static constexpr mem_layout layout_a = mem_layout::col_major;
+    static constexpr mem_layout layout_a = mem_layout::row_major;
     static constexpr mem_layout layout_b = mem_layout::row_major;
     using data_type_a = fp16;
     using data_type_b = int4x2;
@@ -458,9 +458,9 @@ void dequantize_gemm_run(int iter) {
 
         for (size_t i = 0; i < matrix_k; i++) {
             for (size_t j = 0; j < matrix_m; j++) {
-                A_hh[i * matrix_m + j] = A_h[i * matrix_m + j];
+                // A_hh[i * matrix_m + j] = A_h[i * matrix_m + j];
 //
-                // A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
+                A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
             }
         }
 
