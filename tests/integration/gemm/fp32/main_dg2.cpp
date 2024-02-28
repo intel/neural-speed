@@ -24,8 +24,8 @@ class t1 {
 public:
     //Extract the parameters required by different test cases
     static constexpr size_t mat_m = 16;
-    static constexpr size_t mat_n = 512;
-    static constexpr size_t mat_k = 512;
+    static constexpr size_t mat_n = 16;
+    static constexpr size_t mat_k = 16;
     static constexpr size_t wg_m = 16;
     static constexpr size_t wg_n = 16;
     static constexpr size_t sg_m = 16;
@@ -274,7 +274,7 @@ void fpu_fp32_gemm_run(int iter) {
     queue.memcpy((void *)C_h, (void *)C_d, size_c * sizeof(data_type_c)).wait();
     ASSERT_EQ(0,
             gemm_result_validate(A_h, B_h, C_h, matrix_m, matrix_k, matrix_n,
-                    mem_layout::col_major, layout_b));
+                    layout_a, layout_b));
 
     free(A_h, context);
     free(B_h, context);
@@ -287,144 +287,6 @@ void fpu_fp32_gemm_run(int iter) {
     free(Acc_d, context);
     free(Cnt_d, context);
 }
-
-// template <class Test>
-// void sycl_fpu_fp32_gemm_run(int iter) {
-//     using namespace gpu;
-//     // Accept incoming parameters
-//     constexpr size_t matrix_m = Test::mat_m;
-//     constexpr size_t matrix_n = Test::mat_n;
-//     constexpr size_t matrix_k = Test::mat_k;
-//     constexpr uint32_t global_kslicing = Test::global_kslicing;
-//     constexpr uint32_t local_kslicing = Test::local_kslicing;
-
-//     constexpr size_t wg_tile_m = Test::wg_m;
-//     constexpr size_t wg_tile_n = Test::wg_n;
-//     constexpr size_t sg_tile_m = Test::sg_m;
-//     constexpr size_t sg_tile_n = Test::sg_n;
-//     constexpr size_t sg_tile_k = Test::sg_k;
-//     using data_type_a = typename Test::data_type_a;
-//     using data_type_b = typename Test::data_type_b;
-//     using data_type_c = typename Test::data_type_c;
-//     using data_type_acc = float;
-
-//     constexpr size_t size_a = matrix_m * matrix_k;
-//     constexpr size_t size_b = matrix_k * matrix_n;
-//     constexpr size_t size_c = matrix_m * matrix_n;
-
-//     // Turn on the enable_profiling property to facilitate subsequent profiling
-//     sycl::property_list properties {sycl::property::queue::enable_profiling()};
-//     auto queue = sycl::queue(properties);
-//     auto context = queue.get_info<info::queue::context>();
-//     auto device = queue.get_info<info::queue::device>();
-
-//     std::cout << "Running on " << device.get_info<info::device::name>() << "\n";
-
-//     static constexpr uint32_t periodic_sync_interval = 0;
-//     static constexpr uint32_t prefetch_distance = 1;
-
-//     //Define and initialize the data required for the calculation
-//     auto *A_h = static_cast<data_type_a *>(
-//             malloc_host(size_a * sizeof(data_type_a), context));
-//     auto *B_h = static_cast<data_type_b *>(
-//             malloc_host(size_b * sizeof(data_type_b), context));
-//     auto *C_h = static_cast<data_type_c *>(
-//             malloc_host(size_c * sizeof(data_type_c), context));
-
-//     auto *A_d = static_cast<data_type_a *>(
-//             aligned_alloc_device(DEVICE_MEM_ALIGNMENT,
-//                     size_a * sizeof(data_type_a), device, context));
-//     auto *B_d = static_cast<data_type_b *>(
-//             aligned_alloc_device(DEVICE_MEM_ALIGNMENT,
-//                     size_b * sizeof(data_type_b), device, context));
-//     auto *C_d = static_cast<data_type_c *>(
-//             aligned_alloc_device(DEVICE_MEM_ALIGNMENT,
-//                     size_c * sizeof(data_type_c), device, context));
-
-//     for (unsigned i = 0; i < size_a; ++i) {
-//         A_h[i] = random_float();
-//     }
-//     for (unsigned i = 0; i < size_b; ++i) {
-//         B_h[i] = random_float();
-//     }
-
-//     for (unsigned i = 0; i < size_c; ++i) {
-//         C_h[i] = 0;
-//     }
-
-//     queue.memcpy((void *)A_d, (void *)A_h, size_a * sizeof(data_type_a)).wait();
-//     queue.memcpy((void *)B_d, (void *)B_h, size_b * sizeof(data_type_b)).wait();
-//     queue.memcpy((void *)C_d, (void *)C_h, size_c * sizeof(data_type_c)).wait();
-
-//     cl::sycl::nd_range<2> nd_range
-//             = sycl::nd_range<2> {sycl::range<2> {matrix_m, matrix_n},
-//                     sycl::range<2> {wg_tile_m, wg_tile_n}};
-
-//     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
-//     profiling_helper prof("dequantize_gemm", ops, "gflops");
-//     int constexpr warm = 10;
-//     try {
-//         for (int i = 0; i < iter + warm; i++) {
-//             if (i >= warm) prof.cpu_start();
-//             auto e_esimd = queue.submit([&](handler &cgh) {
-//                 sycl::stream out(65536, 128, cgh);
-//                 cgh.parallel_for(sycl::range<1> {matrix_m / sg_tile_m * matrix_n
-//                                          / sg_tile_n},
-//                         [=](sycl::item<1> it) {
-//                             int tid = int(it);
-//                             int tstride = matrix_n / sg_tile_n;
-//                             int tn = tid % tstride;
-//                             tn *= sg_tile_n;
-//                             int tm = tid / tstride;
-//                             tm *= sg_tile_m;
-//                             float tmp[sg_tile_m * sg_tile_n];
-//                             for (size_t im = 0; im < sg_tile_m * sg_tile_n;
-//                                     im++)
-//                                 tmp[im] = 0.f;
-//                             for (size_t i = 0; i < matrix_k; i++) {
-//                                 float tmpB[sg_tile_n];
-//                                 for (size_t in = 0; in < sg_tile_n; in++) {
-//                                     tmpB[in] = B_d[tn + in + i * matrix_n];
-//                                 }
-//                                 for (size_t im = 0; im < sg_tile_m; im++) {
-//                                     auto tmpA = A_d[(tm + im) * matrix_k + i];
-//                                     for (size_t in = 0; in < sg_tile_n; in++) {
-//                                         tmp[im * sg_tile_n + in]
-//                                                 += tmpA * tmpB[in];
-//                                     }
-//                                 }
-//                             }
-//                             for (size_t im = 0; im < sg_tile_m; im++)
-//                                 for (size_t in = 0; in < sg_tile_n; in++) {
-//                                     C_d[(tm + im) * matrix_n + tn + in]
-//                                             = tmp[im * sg_tile_n + in];
-//                                 }
-//                         });
-//             });
-//             if (i >= warm) {
-//                 e_esimd.wait();
-//                 prof.cpu_end();
-//                 prof.add_gpu_event(e_esimd);
-//             }
-//         }
-//     } catch (cl::sycl::exception const &e) {
-//         std::cout << "SYCL exception caught: " << e.what() << '\n';
-//         FAIL();
-//     }
-
-//     //performance
-//     prof.print_profiling_result(profiling_selector::GPU);
-//     queue.memcpy((void *)C_h, (void *)C_d, size_c * sizeof(data_type_c)).wait();
-//     ASSERT_EQ(0,
-//             gemm_result_validate(A_h, B_h, C_h, matrix_m, matrix_k, matrix_n));
-
-//     free(A_h, context);
-//     free(B_h, context);
-//     free(C_h, context);
-//     free(A_d, context);
-//     free(B_d, context);
-//     free(C_d, context);
-// }
 
 template <typename T>
 class fpu_fp32_gemm_test : public ::testing::Test {};

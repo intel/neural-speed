@@ -481,18 +481,18 @@ tile_load(tile_t &tile, payload_t &payload) {
             }
         }
     }
-#pragma unroll
-    for (int i = 0; i < 256; i += 16) {
-        sycl::ext::oneapi::experimental::printf(vec_a, (float)tile.reg[i + 0],
-                (float)tile.reg[i + 1], (float)tile.reg[i + 2],
-                (float)tile.reg[i + 3], (float)tile.reg[i + 4],
-                (float)tile.reg[i + 5], (float)tile.reg[i + 6],
-                (float)tile.reg[i + 7], (float)tile.reg[i + 8],
-                (float)tile.reg[i + 9], (float)tile.reg[i + 10],
-                (float)tile.reg[i + 11], (float)tile.reg[i + 12],
-                (float)tile.reg[i + 13], (float)tile.reg[i + 14],
-                (float)tile.reg[i + 15]);
-    }
+    // #pragma unroll
+    //     for (int i = 0; i < 256; i += 16) {
+    //         sycl::ext::oneapi::experimental::printf(vec_a, (float)tile.reg[i + 0],
+    //                 (float)tile.reg[i + 1], (float)tile.reg[i + 2],
+    //                 (float)tile.reg[i + 3], (float)tile.reg[i + 4],
+    //                 (float)tile.reg[i + 5], (float)tile.reg[i + 6],
+    //                 (float)tile.reg[i + 7], (float)tile.reg[i + 8],
+    //                 (float)tile.reg[i + 9], (float)tile.reg[i + 10],
+    //                 (float)tile.reg[i + 11], (float)tile.reg[i + 12],
+    //                 (float)tile.reg[i + 13], (float)tile.reg[i + 14],
+    //                 (float)tile.reg[i + 15]);
+    //     }
 
     if constexpr (payload_t::mem_transform) {
         SW_BARRIER();
