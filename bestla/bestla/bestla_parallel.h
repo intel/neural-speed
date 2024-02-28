@@ -608,7 +608,7 @@ class SchedulerDispatcher {
       utils::GemmProblem problem_P = problem, problem_E = problem;
       assert(problem.n > 2);
       const int N = problem.dims[2];
-      const int N_offset = N - int(N / (1 + cr->PE));
+      const int N_offset = N - int(N / (1 + cr->getPE()));
       problem_P.dims[2] = N_offset;
       problem_E.dims[2] = problem.dims[2] - N_offset;
       Scheduler_P = new Scheduler({threads - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P});
@@ -707,7 +707,7 @@ class StdThreading : public IThreading {
         else
           _mm_pause();
       }
-      // todo: collect time and update PE to CR
+      // todo: collect time and update PE to cr
     } else {
       func(0);
     }
@@ -744,11 +744,25 @@ class StdThreading : public IThreading {
     // printf("create %d\n", mThreadNum);
     thdset.resize(mThreadNum - 1);
     stop = false;
-    bestla::device::CpuDevice::core_bond(0);
+    GetCPUDevice();
+    int* core_order; // Note: client CPU earlier than Gen 12th will get poor perf when not using all cores.
+    if (_cd->isHybrid()) {
+      core_order = new int[_cd->getThreads()];
+      memcpy(reinterpret_cast<void*>(core_order), reinterpret_cast<void*>(_cd->getPCores()),
+             _cd->getPcoreNum() * sizeof(int));
+      memcpy(reinterpret_cast<void*>(core_order + _cd->getPcoreNum()), reinterpret_cast<void*>(_cd->getECores()),
+             _cd->getEcoreNum() * sizeof(int));
+      memcpy(reinterpret_cast<void*>(core_order + _cd->getPcoreNum() + _cd->getEcoreNum()),
+             reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
+    } else {
+      core_order = new int[mThreadNum];
+      for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+    }
+    _cd->core_bond(core_order[0]);
     for (size_t i = 0; i < mThreadNum - 1; i++) {
       thdset[i] = std::thread(
-          [&](int tidx) {
-            bestla::device::CpuDevice::core_bond(tidx + 1);
+          [&](int tidx, int core_id) {
+            _cd->core_bond(core_id);
             while (true) {
               if (stop.load() == true) break;
               if (func_[tidx] != nullptr) {
@@ -760,8 +774,9 @@ class StdThreading : public IThreading {
               }
             }
           },
-          int(i));
+          int(i), core_order[i+1]);
     }
+    delete[] core_order;
   }
 
   std::vector<std::thread> thdset;

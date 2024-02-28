@@ -457,6 +457,15 @@ class CpuRuntime {
     return instances[thread];
   }
 
+  inline float getPE() const { return 1.0f * P_core_num / E_core_num;  }
+
+  inline float setPE(float& PE_) { PE = PE_; }
+
+  size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
+  int P_core_num = 0, E_core_num = 0;
+  bool mHybrid = false;
+
+ private:
   CpuRuntime(int thread) {
     GetCPUDevice();
     mL2Cache = _cd->getL2CacheSize();
@@ -481,10 +490,7 @@ class CpuRuntime {
       PE = _cd->getPE();
     }
   }
-  size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
-  int P_core_num = 0, E_core_num = 0;
   float PE = 1;
-  bool mHybrid = false;
   int maxThreads;
 };
 }  // namespace device
