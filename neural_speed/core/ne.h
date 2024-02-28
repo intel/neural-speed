@@ -40,7 +40,7 @@
 #define NE_FILE_VERSION 1
 
 #define NE_MAX_DIMS 4
-#define NE_MAX_NODES 16384
+#define NE_MAX_NODES 24576
 #define NE_MAX_PARAMS 256
 #define NE_MAX_CONTEXTS 64
 #define NE_MAX_OPT 36

@@ -82,7 +82,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
                      float temperature = 0.8, int min_new_tokens = 0, float length_penalty = 1.0f,
                      bool early_stopping = false, int n_keep = 0, int n_discard = -1, bool shift_roped_k = false,
                      int batch_size = 1, model_vocab::id pad_token = -1, const std::string& memory_dtype = "auto",
-                     const bool& continuous_batching = false, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
+                     const bool& continuous_batching = true, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
                      const float& model_scratch_enlarge_scale = 1.0f) {
   MODEL_ASSERT(params != nullptr);
 #ifdef MODEL_NAME
@@ -114,7 +114,8 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
     params->memory_type = KV_MEM_TYPE_AUTO;
   else
     fprintf(stderr, "Unexpected memory dtype %s!", memory_dtype.c_str());
-  if (batch_size > 1 && (!continuous_batching || params->model_arch != model_archs::MODEL_GPTJ)) {
+  static std::set<model_archs> cont_batching_model_archs = {MODEL_GPTJ, MODEL_LLAMA};
+  if (batch_size > 1 && (!continuous_batching || cont_batching_model_archs.count(params->model_arch) == 0)) {
     params->memory_type = KV_MEM_TYPE_F16;  // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
   }
   params->cont_batching = continuous_batching;
@@ -466,9 +467,9 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
   } else {  // multi-batch inputs (first token)
     ctx->batch_size = input_ids.size();
     MODEL_ASSERT(input_ids.size() <= ctx->max_request_num);
-    static std::set<model_archs> batched_model_archs = {MODEL_GPTJ, MODEL_GPTNEOX, MODEL_CHATGLM};
+    static std::set<model_archs> batched_model_archs = {MODEL_GPTJ, MODEL_GPTNEOX, MODEL_CHATGLM, MODEL_LLAMA};
     if (batched_model_archs.count(params.model_arch) == 0) {
-      fprintf(stderr, "\nERROR: Only gpt-j, gpt-neox, chatglm support multi-batch generation!\n");
+      fprintf(stderr, "\nERROR: Only gpt-j, gpt-neox, chatglm, llama support multi-batch generation!\n");
       return false;
     }
     if (ctx->vocab.pad_token_id == -1) {
@@ -738,7 +739,7 @@ std::vector<std::vector<model_token>> Model::post_beam_search(model_context* lct
                                                               const std::vector<model_input>& inputs,
                                                               const int& n_threads) {
   // TODO(Zhentao): to implement
-  static std::set<model_archs> supported_archs = {MODEL_GPTJ, MODEL_GPTNEOX};
+  static std::set<model_archs> supported_archs = {MODEL_GPTJ, MODEL_GPTNEOX, MODEL_LLAMA};
   if (supported_archs.count(params.model_arch) != 0) {
     return beam_search(lctx, n_predict, inputs, n_threads);
   } else {
@@ -914,7 +915,7 @@ PYBIND11_MODULE(mixtral_cpp, m)
            py::arg("min_new_tokens") = 0, py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false,
            py::arg("n_keep") = 0, py::arg("n_discard") = -1, py::arg("shift_roped_k") = false,
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto",
-           py::arg("continuous_batching") = false, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM,
+           py::arg("continuous_batching") = true, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM,
            py::arg("model_scratch_enlarge_scale") = 1.0f)
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
