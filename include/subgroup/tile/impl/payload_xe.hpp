@@ -873,11 +873,19 @@ public:
     inline mem_payload_t(mem_desc_t &mem_tdesc) {
         pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
 <<<<<<< HEAD
+<<<<<<< HEAD
         sycl::ext::oneapi::experimental::printf("pitch_in_bytes : %d  %d\n" , pitch_in_bytes, trans);
 =======
         sycl::ext::oneapi::experimental::printf(
                 "pitch_in_bytes : %d  %d\n", pitch_in_bytes, trans);
 >>>>>>> 297a6e8 (col or row major)
+=======
+        sycl::ext::oneapi::experimental::printf(
+                "pitch_in_bytes : %d  %d\n", pitch_in_bytes, trans);
+=======
+        // sycl::ext::oneapi::experimental::printf("pitch_in_bytes : %d  %d\n" , pitch_in_bytes, trans);
+>>>>>>> 9767666 (save)
+>>>>>>> 7940eb7 (save)
         base_x = mem_tdesc.coord.x;
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;
@@ -974,10 +982,10 @@ public:
     __XETLA_API void update_tdesc(int offset) {
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
             base_offset += int64_t(offset) * sizeof(dtype);
-            trans ? base_y += offset : base_x += offset;
+            mem_transpose ? base_y += offset : base_x += offset;
         } else {
             base_offset += int64_t(offset) * pitch_in_bytes;
-            trans ? base_x += offset : base_y += offset;
+            mem_transpose ? base_x += offset : base_y += offset;
         }
     }
 };

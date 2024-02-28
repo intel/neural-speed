@@ -392,6 +392,9 @@ void dequantize_gemm_run(int iter) {
 
     constexpr mem_layout layout_a = Test::layout_a;
     constexpr mem_layout layout_b = Test::layout_b;
+    constexpr mem_layout dev_layout_a = layout_a == mem_layout::row_major
+            ? mem_layout::col_major
+            : mem_layout::row_major;
 
     constexpr size_t size_a = matrix_m * matrix_k;
     constexpr size_t size_b = matrix_k * matrix_n / 2;
@@ -516,8 +519,8 @@ void dequantize_gemm_run(int iter) {
     for (unsigned i = 0; i < size_a; ++i) {
         A_h[i] = random_float();
 #ifdef UT_DEBUG
-        A_h[i] = 1.f;
-        A_h[i] = i % 16 + i / 16 * 100;
+        // A_h[i] = 1.f;
+        // A_h[i] = i % 16 + i / 16 * 100;
 #endif
     }
 
@@ -528,6 +531,7 @@ void dequantize_gemm_run(int iter) {
                 // A_hh[i * matrix_m + j] = A_h[j * matrix_k + i];
             }
         }
+    }
 
     for (unsigned i = 0; i < size_b; ++i) {
         B_h[i] = uint8_t(random_uint8());
@@ -661,7 +665,7 @@ void dequantize_gemm_run(int iter) {
     queue.memcpy((void *)C_h, (void *)C_d, size_c * sizeof(data_type_c)).wait();
     ASSERT_EQ(0,
             gemm_result_validate(A_h, dequantize_b.data(), C_h, bias_h,
-                    matrix_m, matrix_k, matrix_n, layout_a, layout_b));
+                    matrix_m, matrix_k, matrix_n, dev_layout_a, layout_b));
 
     free(A_h, context);
     free(A_hh, context);
