@@ -270,10 +270,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         struct ne_tensor* const v_cache =
             ne_view_1d(ctx0, kv_self.v, n_ctx * n_embd_gqa * kv_n_ctx_block,
                        il * n_ctx * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block);
-        std::vector<ne_tensor*> Kcur_bs(batch_size);
-        std::vector<ne_tensor*> Vcur_bs(batch_size);
-        std::vector<ne_tensor*> k_bs(batch_size);
-        std::vector<ne_tensor*> v_bs(batch_size);
         // cache = [tokens, beams, requests, layers],
         // tokens = [head_dim, head_num, n_ctx] (may different orders)
         size_t off_N_i = 0;
