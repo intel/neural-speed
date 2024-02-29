@@ -67,7 +67,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   // input shape will be [1, l_sum]
   if (batch_size > 1)
     MODEL_ASSERT(
-        ("llama arch only supports contiuous batching inference when giving multi prompts.", lctx.cont_batching));
+        ("llama arch only supports continuous batching inference when giving multi prompts.", lctx.cont_batching));
   const bool concat_multi_seqs = batch_size > 1 ? true : false;
   std::vector<int> n_tokens(batch_size);
   std::vector<int> n_pasts(batch_size);
