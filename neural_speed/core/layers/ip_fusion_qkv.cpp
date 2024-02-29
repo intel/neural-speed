@@ -21,7 +21,7 @@ namespace ip_qkv {
 
 template <class Parallel_T, class Launch_T>
 void GemmRun_QKV(Launch_T* launcher, const typename Launch_T::Param* args, parallel::IThreading* th) {
-  parallel::gemm::SchedulerDispatcher<Parallel_T> para({th->num_threads(), args[0].problem});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para({th, args[0].problem});
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -41,7 +41,7 @@ void GemmRun_QKV(Launch_T* launcher, const typename Launch_T::Param* args, paral
 
 template <class Parallel_T, class Launch_T>
 void GemmRunWithA_QKV(Launch_T* launcher, const typename Launch_T::Param* args, parallel::IThreading* th) {
-  parallel::gemm::SchedulerDispatcher<Parallel_T> para({th->num_threads(), args[0].problem});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para({th, args[0].problem});
   using AParall = typename Launch_T::PrologueA::Parallel;
   auto apara = launcher->mProA.createParallel(th->num_threads(), args[0].problem);
   static bool flag = false;
