@@ -11754,7 +11754,7 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
     NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", NE_OP_LABEL[i], (double)perf_total_per_op_us[i] / 1000.0);
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
-  NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "MUL_MAT_ID", (double)mul_mat_duration / 1000.0);
+  NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "MUL_MAT_ID", (double)mul_mat_id_duration / 1000.0);
   NE_PRINT("========================================\n");
 
 #else
