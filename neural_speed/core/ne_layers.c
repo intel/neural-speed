@@ -11657,12 +11657,16 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
   NE_PRINT("=== GRAPH Profiling ===\n");
 
   int64_t ip_duration = 0;
+  int64_t mul_mat_id_duration = 0;
   for (int i = 0; i < cgraph->n_nodes; i++) {
     struct ne_tensor* node = cgraph->nodes[i];
     if (node->op == NE_OP_MUL_MAT && node->ne[1] == node->ne[2]) {
       ip_duration += node->perf_time_us;
     } else {
       perf_total_per_op_us[node->op] += node->perf_time_us;
+      if (node->op == NE_OP_MUL_MAT_ID) {
+        mul_mat_id_duration += node->perf_time_us;
+      }
     }
   }
 
@@ -11673,6 +11677,7 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
     NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", NE_OP_LABEL[i], (double)perf_total_per_op_us[i] / 1000.0);
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
+  NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "MUL_MAT_ID", (double)mul_mat_duration / 1000.0);
   NE_PRINT("========================================\n");
 
 #else
