@@ -600,19 +600,19 @@ class SchedulerDispatcher {
     if (Scheduler_E) delete Scheduler_E;
   }
   SchedulerDispatcher(const int threads, const utils::GemmProblem& problem) {
-    device::CpuRuntime* cr = device::CpuRuntime::getInstance(threads);
-    isHybrid = cr->mHybrid;
+    const device::CpuRuntime& cr = device::CpuRuntime::getInstance(threads);
+    isHybrid = cr.mHybrid;
     if (!isHybrid) {
-      Scheduler_P = new Scheduler({threads, problem, {0, 0}, cr->mL2Cache, cr->mL1Cache});
+      Scheduler_P = new Scheduler({threads, problem, {0, 0}, cr.mL2Cache, cr.mL1Cache});
     } else {
       utils::GemmProblem problem_P = problem, problem_E = problem;
       assert(problem.n > 2);
       const int N = problem.dims[2];
-      const int N_offset = N - int(N / (1 + cr->getPE()));
+      const int N_offset = N - int(N / (1 + cr.getPE()));
       problem_P.dims[2] = N_offset;
       problem_E.dims[2] = problem.dims[2] - N_offset;
-      Scheduler_P = new Scheduler({threads - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P});
-      Scheduler_E = new Scheduler({cr->E_core_num, problem_E, {0, N_offset}, cr->mL2Cache_E, cr->mL1Cache_E});
+      Scheduler_P = new Scheduler({threads - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
+      Scheduler_E = new Scheduler({cr.E_core_num, problem_E, {0, N_offset}, cr.mL2Cache_E, cr.mL1Cache_E});
     }
   }
 
@@ -654,16 +654,16 @@ class SchedulerDispatcher<Scheduler2D> {
     if (Scheduler_E) delete Scheduler_E;
   }
   SchedulerDispatcher(const Config2D& config) {
-    device::CpuRuntime* cr = device::CpuRuntime::getInstance(config.threads);
-    isHybrid = cr->mHybrid;
+    const device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
+    isHybrid = cr.mHybrid;
     if (!isHybrid) {
       Scheduler_P = new Scheduler2D(config);
     } else {
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
-      const int N_offset = N - int(N / (1 + cr->getPE()));
-      config_P.threads = config.threads - cr->E_core_num;
-      config_E.threads = cr->E_core_num;
+      const int N_offset = N - int(N / (1 + cr.getPE()));
+      config_P.threads = config.threads - cr.E_core_num;
+      config_E.threads = cr.E_core_num;
       config_P.size[1] = N_offset;
       config_E.size[1] = config.size[1] - N_offset;
       config_E.offset[1] += N_offset;

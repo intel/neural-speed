@@ -451,9 +451,10 @@ class CpuDevice {
 
 class CpuRuntime {
  public:
-  static CpuRuntime* getInstance(int thread) {
-    static std::map<int, CpuRuntime*> instances;
-    if (instances.count(thread) == 0) instances[thread] = new CpuRuntime(thread);
+  CpuRuntime() = default;
+  static CpuRuntime& getInstance(int thread) {
+    static std::map<int, CpuRuntime> instances;
+    if (instances.count(thread) == 0) instances[thread] = CpuRuntime(thread);
     return instances[thread];
   }
 
