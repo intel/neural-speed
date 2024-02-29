@@ -223,7 +223,6 @@ class Scheduler2D {
     problem.size[1] = utils::remainsize(problem.loc[1], mSize[1], mThdSize[1]);
     problem.loc[0] += moffset[0];
     problem.loc[1] += moffset[1];
-    //printf("%d %d %d %d\n", problem.loc[0], problem.loc[1], problem.size[0], problem.size[1]);
     problem.valid = true;
   }
 
@@ -243,7 +242,6 @@ class Scheduler2D {
   }
 
   constexpr int* thread_size() { return mThdSize; }
-  int mSize[2] = {0, 0};
 
  protected:
   void set(const int* thdsize, const int* size, const int* step) {
@@ -281,6 +279,7 @@ class Scheduler2D {
 
  private:
   int mThdSize[2] = {0, 0};
+  int mSize[2] = {0, 0};
   int mStep[2] = {0, 0};
 };
 
@@ -778,10 +777,10 @@ class SchedulerDispatcher {
       Ecore_num = cr.E_core_num;
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
-      problem_P.dims[2] = N - int(N / (1 + cr.getPE()));
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())),Scheduler::mStep[1]);
+      problem_P.dims[2] = N_offset;
       Scheduler_P = new Scheduler({th->num_threads() - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
-      const int N_offset = Scheduler_P->mSizePadded[1];
-      problem_E.dims[2] = problem.dims[2] - N_offset;
+      problem_E.dims[2] = N - N_offset;
       Scheduler_E = new Scheduler({cr.E_core_num, problem_E, {0, N_offset}, cr.mL2Cache_E, cr.mL1Cache_E});
     }
   }
@@ -833,12 +832,12 @@ class SchedulerDispatcher<Scheduler2D> {
       Ecore_num = cr.E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())), config.step[1]);
       config_P.threads = config.threads - cr.E_core_num;
-      config_P.size[1] = N - int(N / (1 + cr.getPE()));
+      config_P.size[1] = N_offset;
       Scheduler_P = new Scheduler2D(config_P);
       config_E.threads = cr.E_core_num;
-      const int N_offset = Scheduler_P->mSize[1];
-      config_E.size[1] = config.size[1] - N_offset;
+      config_E.size[1] = N - N_offset;
       config_E.offset[1] += N_offset;
       Scheduler_E = new Scheduler2D(config_E);
     }

@@ -236,6 +236,7 @@ class UT_Fp16Fp16Fp16 {
  public:
   UT_Fp16Fp16Fp16() {
     UT_START();
+    CheckISA(AVX512_FP16);
     ut<sAVX512_FP16>(1, 1, 1);
     ut<sAVX512_FP16>(8, 48, 2);
     ut<sAVX512_FP16>(8, 4096, 4096);
