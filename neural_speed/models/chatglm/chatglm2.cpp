@@ -300,15 +300,17 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
     struct ne_tensor* mlp_output = ne_rms_norm(ctx0, hidden_states, hparams.rms_norm_eps);
     mlp_output = ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[1], mlp_output), mlp_output);
 
-    if (model.layers[il].ffn_fusion && bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[2]->data,
-                                              model.layers[il].ffn[1]->data, model.layers[il].ffn[3]->data,
-                                              N, int(cur->ne[0] / 2),
-                                              model.layers[il].ffn[2]->ne[1], model.layers[il].ffn[1]->ne[1])){
-      mlp_output = ne_ffn_silu(ctx0, model.layers[il].ffn[2], model.layers[il].ffn[1], model.layers[il].ffn[3], mlp_output);
+    if (model.layers[il].ffn_fusion &&
+        bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[2]->data, model.layers[il].ffn[1]->data,
+                                              model.layers[il].ffn[3]->data, N, int(cur->ne[0] / 2),
+                                              model.layers[il].ffn[2]->ne[1], model.layers[il].ffn[1]->ne[1])) {
+      mlp_output =
+          ne_ffn_silu(ctx0, model.layers[il].ffn[2], model.layers[il].ffn[1], model.layers[il].ffn[3], mlp_output);
     } else {
       // mlp.forward
       mlp_output = ne_mul_mat(ctx0, model.layers[il].ffn[0], mlp_output);
-      struct ne_tensor* x0 = ne_view_2d(ctx0, mlp_output, mlp_output->ne[0] / 2, mlp_output->ne[1], mlp_output->nb[1], 0);
+      struct ne_tensor* x0 =
+          ne_view_2d(ctx0, mlp_output, mlp_output->ne[0] / 2, mlp_output->ne[1], mlp_output->nb[1], 0);
       x0 = ne_silu(ctx0, x0);
       struct ne_tensor* x1 = ne_view_2d(ctx0, mlp_output, mlp_output->ne[0] / 2, mlp_output->ne[1], mlp_output->nb[1],
                                         mlp_output->ne[0] / 2 * ne_element_size(mlp_output));

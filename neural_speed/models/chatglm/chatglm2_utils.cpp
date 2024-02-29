@@ -148,11 +148,12 @@ void CHATGLM2::load(model_context* ctx, model_progress_callback progress_callbac
     layer.ffn[1] =
         ml->get_tensor(layers_i + ".mlp.dense_4h_to_h.weight", {uint32_t(hparams.ffn_hidden_size), n_embd}, backend);
 
-    if (ml->verify_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight") && ml->verify_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight")) {
-      layer.ffn[2] =
-          ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight", {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
-      layer.ffn[3] =
-          ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight", {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
+    if (ml->verify_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight") &&
+        ml->verify_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight")) {
+      layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_0.weight",
+                                    {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
+      layer.ffn[3] = ml->get_tensor(layers_i + ".mlp.dense_h_to_4h_1.weight",
+                                    {n_embd, uint32_t(hparams.ffn_hidden_size)}, backend);
       layer.ffn_fusion = true;
     }
 

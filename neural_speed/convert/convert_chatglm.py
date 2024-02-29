@@ -154,7 +154,7 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
 
     print(hparams)
 
-    gguf_file = fname_out + '.gguf'
+    gguf_file = fname_out
     gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm2")
 
     arch = "chatglm2."
