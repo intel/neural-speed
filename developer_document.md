@@ -296,7 +296,7 @@ We recommend to use continuous batching way since it has no padding effect and c
 +      }
 
 // 3. for-loop kv cache concat
-// we suggest stroing permuted kv tensors for unified kv cache operations without MHA fusion
+// we suggest storing permuted kv tensors for unified kv cache operations without MHA fusion
 -  struct ne_tensor* k = ne_view_1d(ctx0, kv_self.k, N * n_embd_gqa,
 -                                    (ne_element_size(kv_self.k) * n_embd_gqa) * (il * n_ctx + n_past));
 -  struct ne_tensor* v =
