@@ -6964,7 +6964,7 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[30000];       // [n_as][ne11]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7110,7 +7110,7 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[30000];       // [n_as][ne11]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7243,7 +7243,7 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[30000];       // [n_as][ne11]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7399,7 +7399,7 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[30000];       // [n_as][ne11]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
