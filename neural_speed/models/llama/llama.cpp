@@ -380,7 +380,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         for (int i = 0; i < n_expert_used; ++i) {
           ne_tensor* cur_expert;
           if (N == 1 && ctx0, model.layers[il].ffn_down_exp[0]->type == NE_TYPE_BTLA) {
-            cur_expert = ne_mul_mat_id_silu(ctx0, model.layers[il].ffn_down_exp, model.layers[il].ffn_gate_exp,
+            cur_expert = ne_mul_id_ffn_silu(ctx0, model.layers[il].ffn_down_exp, model.layers[il].ffn_gate_exp,
                                             model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
           } else {
             ne_tensor* cur_up = ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
