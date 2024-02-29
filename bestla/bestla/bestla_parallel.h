@@ -777,7 +777,7 @@ class SchedulerDispatcher {
       Ecore_num = cr.E_core_num;
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
-      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())),Scheduler::mStep[1]);
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
       Scheduler_P = new Scheduler({th->num_threads() - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
       problem_E.dims[2] = N - N_offset;

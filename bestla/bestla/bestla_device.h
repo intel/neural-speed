@@ -458,7 +458,7 @@ class CpuRuntime {
     return instances[thread];
   }
 
-  inline float getPE() const { return 1.0f * P_core_num / E_core_num;  }
+  inline float getPE() const { return 1.0f * P_core_num / E_core_num; }
 
   inline void setPE(float& PE_) { PE = PE_; }
 
