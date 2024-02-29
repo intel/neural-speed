@@ -49,6 +49,7 @@ enum ne_op {
   NE_OP_MUL_MAT,
   NE_OP_MUL_MAT_BIAS,
   NE_OP_MUL_MAT_ID,
+  NE_OP_MUL_ID_FFN_SILU,
   NE_OP_SCALE,
   NE_OP_SET,
   NE_OP_CPY,

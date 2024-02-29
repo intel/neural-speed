@@ -256,6 +256,9 @@ NE_API struct ne_tensor* ne_mul_mat(struct ne_context* ctx, struct ne_tensor* a,
 
 NE_API struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor* const as[], int n_as,
                                        struct ne_tensor* ids, int id, struct ne_tensor* b);
+NE_API struct ne_tensor* ne_mul_mat_id_silu(struct ne_context* ctx, struct ne_tensor* const down[],
+                                            struct ne_tensor* const gate[], struct ne_tensor* const up[], int n_as,
+                                            struct ne_tensor* ids, int id, struct ne_tensor* b);
 
 NE_API struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor* w, struct ne_tensor* b,
                                               struct ne_tensor* a);

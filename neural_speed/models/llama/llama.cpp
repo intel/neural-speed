@@ -379,22 +379,27 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
         for (int i = 0; i < n_expert_used; ++i) {
           ne_tensor* cur_expert;
+          if (N == 1 && ctx0, model.layers[il].ffn_down_exp[0]->type == NE_TYPE_BTLA) {
+            cur_expert = ne_mul_mat_id_silu(ctx0, model.layers[il].ffn_down_exp, model.layers[il].ffn_gate_exp,
+                                            model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
+          } else {
+            ne_tensor* cur_up = ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
+            ne_set_name(cur_up, "ffn_moe_up");
 
-          ne_tensor* cur_up = ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
-          ne_set_name(cur_up, "ffn_moe_up");
+            ne_tensor* cur_gate =
+                ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur);
+            ne_set_name(cur_gate, "ffn_moe_gate");
 
-          ne_tensor* cur_gate = ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur);
-          ne_set_name(cur_gate, "ffn_moe_gate");
+            cur_gate = ne_silu(ctx0, cur_gate);
+            ne_set_name(cur_gate, "ffn_moe_silu");
 
-          cur_gate = ne_silu(ctx0, cur_gate);
-          ne_set_name(cur_gate, "ffn_moe_silu");
+            cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
+            ne_set_name(cur_expert, "ffn_moe_gate_par");
 
-          cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
-          ne_set_name(cur_expert, "ffn_moe_gate_par");
-
-          cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
-                                     cur_expert);  // [n_tokens, n_embd]
-          ne_set_name(cur_expert, "ffn_moe_down");
+            cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
+                                       cur_expert);  // [n_tokens, n_embd]
+            ne_set_name(cur_expert, "ffn_moe_down");
+          }
 
           cur_expert =
               ne_mul(ctx0, cur_expert,
