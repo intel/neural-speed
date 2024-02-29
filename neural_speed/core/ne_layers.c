@@ -432,6 +432,7 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "FFN_SILU",
     "FFN_GeLU",
     "FFN_ADD_GeLU",
+    "FFN_ID_SILU",
     "FLASH_ATTN",
     "FLASH_ATTN_KV_UPDATE",
     "FLASH_FF",
@@ -445,7 +446,7 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "DEBUG",
 };
 
-static_assert(NE_OP_COUNT == 66, "NE_OP_COUNT != 66");
+static_assert(NE_OP_COUNT == 67, "NE_OP_COUNT != 67");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
@@ -503,6 +504,7 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
 
     "QKV(x)",
     "ffn_silu(x)",
+    "ffn_id_silu(x)",
     "ffn_gelu(x)",
     "ffn_gelu_with_bias(x)",
     "flash_attn(x)",
