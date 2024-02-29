@@ -237,7 +237,7 @@ We recommend to use continuous batching way since it has no padding effect and c
 +  // input shape will be [1, l_sum]
 +  if (batch_size > 1)
 +    MODEL_ASSERT(
-+        ("llama arch only supports contiuous batching inference when giving multi prompts.", 
++        ("llama arch only supports continuous batching inference when giving multi prompts.", 
 +          lctx.cont_batching));
 +  const bool concat_multi_seqs = batch_size > 1 ? true : false;
 +  std::vector<int> n_tokens(batch_size);
