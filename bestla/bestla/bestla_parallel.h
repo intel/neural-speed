@@ -616,7 +616,7 @@ class SchedulerDispatcher {
     }
   }
 
-  void getIndex(ThreadProblem& problem) {
+  void getIndex(ThreadProblem& problem) const {
     if (!isHybrid) {
       Scheduler_P->getIndex(problem);
     } else {
@@ -640,6 +640,62 @@ class SchedulerDispatcher {
 
  private:
   Scheduler *Scheduler_P = nullptr, *Scheduler_E = nullptr;
+  bool isHybrid = false;
+  int Pcore_num = 0, Ecore_num = 0;
+};
+
+template <>
+class SchedulerDispatcher<Scheduler2D> {
+ public:
+  using ThreadProblem = ThreadProblem2D;
+  SchedulerDispatcher() = default;
+  ~SchedulerDispatcher() {
+    delete Scheduler_P;
+    if (Scheduler_E) delete Scheduler_E;
+  }
+  SchedulerDispatcher(const Config2D& config) {
+    device::CpuRuntime* cr = device::CpuRuntime::getInstance(config.threads);
+    isHybrid = cr->mHybrid;
+    if (!isHybrid) {
+      Scheduler_P = new Scheduler2D(config);
+    } else {
+      Config2D config_P = config, config_E = config;
+      const int N = config.size[1];
+      const int N_offset = N - int(N / (1 + cr->getPE()));
+      config_P.threads = config.threads - cr->E_core_num;
+      config_E.threads = cr->E_core_num;
+      config_P.size[1] = N_offset;
+      config_E.size[1] = config.size[1] - N_offset;
+      config_E.offset[1] += N_offset;
+      Scheduler_P = new Scheduler2D(config_P);
+      Scheduler_E = new Scheduler2D(config_E);
+    }
+  }
+
+  void getIndex(ThreadProblem& problem) const {
+    if (!isHybrid) {
+      Scheduler_P->getIndex(problem);
+    } else {
+      if (problem.tid >= Pcore_num + Ecore_num) {
+        problem.tid -= Ecore_num;
+        Scheduler_P->getIndex(problem);
+      } else if (problem.tid >= Pcore_num) {
+        problem.tid -= Pcore_num;
+        Scheduler_E->getIndex(problem);
+      } else {
+        Scheduler_P->getIndex(problem);
+      }
+    }
+  }
+
+  void print() {
+    printf("dispatch to hybrid:%d\n", isHybrid);
+    Scheduler_P->print();
+    if (isHybrid) Scheduler_E->print();
+  }
+
+ private:
+  Scheduler2D *Scheduler_P = nullptr, *Scheduler_E = nullptr;
   bool isHybrid = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
@@ -745,7 +801,7 @@ class StdThreading : public IThreading {
     thdset.resize(mThreadNum - 1);
     stop = false;
     GetCPUDevice();
-    int* core_order; // Note: client CPU earlier than Gen 12th will get poor perf when not using all cores.
+    int* core_order;  // Note: client CPU earlier than Gen 12th will get poor perf when not using all cores.
     if (_cd->isHybrid()) {
       core_order = new int[_cd->getThreads()];
       memcpy(reinterpret_cast<void*>(core_order), reinterpret_cast<void*>(_cd->getPCores()),
@@ -774,7 +830,7 @@ class StdThreading : public IThreading {
               }
             }
           },
-          int(i), core_order[i+1]);
+          int(i), core_order[i + 1]);
     }
     delete[] core_order;
   }

@@ -26,7 +26,7 @@ class UT_OMPThreading {
     int ld_src = col, ld_dst = row;
     kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col,
                                                                              row);
-    parallel::Scheduler2D _para({threads, row, col, 1, 1});
+    parallel::Scheduler2D _para({threads, row, col, 1, 1, 0, 0});
     UT_Threading::get()->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       _para.getIndex(thdp);
@@ -60,7 +60,7 @@ class UT_StdThreading {
     int ld_src = col, ld_dst = row;
     kernel::wrapper::Transpose2D<float>::template forward<BTLA_ISA::AVX512F>(src.data(), ref.data(), row, col, col,
                                                                              row);
-    parallel::Scheduler2D _para({threads, row, col, 1, 1});
+    parallel::Scheduler2D _para({threads, row, col, 1, 1, 0, 0});
     UT_Threading::get()->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       _para.getIndex(thdp);
@@ -90,7 +90,7 @@ class UT_Scheduler2D {
   void ut(int row, int col, int threads) {
     printf("%s %d %d %d\n", __FUNCTION__, row, col, threads);
     parallel::Scheduler2D sch;
-    sch.update({threads, row, col, 1, 1});
+    sch.update({threads, row, col, 1, 1, 0, 0});
     sch.print();
     parallel::ThreadProblem2D prb{threads - 1};
     sch.getIndex(prb);
@@ -117,8 +117,8 @@ class UT_SchedulerGemmBase {
     parallel::gemm::SchedulerBase<GemmCore_T> sch;
     GetCPUDevice();
     utils::GemmProblem gp(1, m, n, k);
-    sch.update(
-        {threads, gp, l2cache == 0 ? _cd->getL2CacheSize() : l2cache, l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
+    sch.update({threads, gp, 0, 0, l2cache == 0 ? _cd->getL2CacheSize() : l2cache,
+                l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
     sch.print();
     parallel::gemm::ThreadProblemBase prb{sch.valid_theads() - 1};
     sch.getIndex(prb);
@@ -156,7 +156,7 @@ class UT_SchedulerGemmKBlock {
     parallel::gemm::SchedulerKBlock<GemmCore_T> sch;
     GetCPUDevice();
     utils::GemmProblem gp(1, m, n, k, kblock);
-    sch.update({threads, gp, _cd->getL2CacheSize(), l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
+    sch.update({threads, gp, 0, 0, _cd->getL2CacheSize(), l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
     sch.print();
     parallel::gemm::ThreadProblemBase prb{sch.valid_theads() - 1};
     sch.getIndex(prb);
@@ -196,7 +196,7 @@ class UT_SchedulerGemmKBlockNew {
     parallel::gemm::SchedulerKBlockS<GemmCore_T> sch;
     GetCPUDevice();
     utils::GemmProblem gp(1, m, n, k, kblock);
-    sch.update({threads, gp, _cd->getL2CacheSize(), l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
+    sch.update({threads, gp, 0, 0, _cd->getL2CacheSize(), l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
     sch.print();
     parallel::gemm::ThreadProblemBase prb{sch.valid_theads() - 1};
     sch.getIndex(prb);

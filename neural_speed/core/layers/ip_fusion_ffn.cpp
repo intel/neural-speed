@@ -31,9 +31,8 @@ namespace ffn_2w {
 template <class Parallel_T, class Launch_T1, class Launch_T2>
 void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Launch_T1::Param& args1,
                       const typename Launch_T2::Param& args2, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para1({th->num_threads(), args1.problem, cb.mL2Cache, cb.mL1Cache});
-  Parallel_T para2({th->num_threads(), args2.problem, cb.mL2Cache, cb.mL1Cache});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th->num_threads(), args1.problem});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para2({th->num_threads(), args2.problem});
   using AParall1 = typename Launch_T1::PrologueA::Parallel;
   using AParall2 = typename Launch_T2::PrologueA::Parallel;
   auto apara1 = launcher1->mProA.createParallel(th->num_threads(), args1.problem);
@@ -75,9 +74,8 @@ void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename
 template <class Parallel_T, class Launch_T1, class Launch_T2>
 void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Launch_T1::Param& args1,
                  const typename Launch_T2::Param& args2, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para1({th->num_threads(), args1.problem, cb.mL2Cache, cb.mL1Cache});
-  Parallel_T para2({th->num_threads(), args2.problem, cb.mL2Cache, cb.mL1Cache});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th->num_threads(), args1.problem});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para2({th->num_threads(), args2.problem});
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -348,9 +346,8 @@ template <class Parallel_T, class Launch_T1, class Launch_T2, class Launch_T3>
 void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher3,
                       const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
                       const typename Launch_T3::Param& args3, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para1({th->num_threads(), args1.problem, cb.mL2Cache, cb.mL1Cache});
-  Parallel_T para3({th->num_threads(), args3.problem, cb.mL2Cache, cb.mL1Cache});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th->num_threads(), args1.problem});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para3({th->num_threads(), args3.problem});
   using AParall1 = typename Launch_T1::PrologueA::Parallel;
   using AParall3 = typename Launch_T3::PrologueA::Parallel;
   auto apara1 = launcher1->mProA.createParallel(th->num_threads(), args1.problem);
@@ -394,9 +391,8 @@ template <class Parallel_T, class Launch_T1, class Launch_T2, class Launch_T3>
 void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher3,
                  const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
                  const typename Launch_T3::Param& args3, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para1({th->num_threads(), args1.problem, cb.mL2Cache, cb.mL1Cache});
-  Parallel_T para3({th->num_threads(), args3.problem, cb.mL2Cache, cb.mL1Cache});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th->num_threads(), args1.problem});
+  parallel::gemm::SchedulerDispatcher<Parallel_T> para3({th->num_threads(), args3.problem});
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);

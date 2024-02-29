@@ -459,7 +459,7 @@ class CpuRuntime {
 
   inline float getPE() const { return 1.0f * P_core_num / E_core_num;  }
 
-  inline float setPE(float& PE_) { PE = PE_; }
+  inline void setPE(float& PE_) { PE = PE_; }
 
   size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
   int P_core_num = 0, E_core_num = 0;
