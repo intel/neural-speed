@@ -6964,7 +6964,7 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[4096];       // [n_as][ne11]
+  int64_t matrix_rows[30000];       // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -6972,7 +6972,7 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
 
   if (params->type == NE_TASK_INIT) {
     memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
-    memset(matrix_rows, -1, 4096 * sizeof(int64_t));
+    memset(matrix_rows, -1, 30000 * sizeof(int64_t));
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
@@ -7110,7 +7110,7 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[4096];       // [n_as][ne11]
+  int64_t matrix_rows[30000];       // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7118,7 +7118,7 @@ static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* pa
 
   if (params->type == NE_TASK_INIT) {
     memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
-    memset(matrix_rows, -1, 4096 * sizeof(int64_t));
+    memset(matrix_rows, -1, 30000 * sizeof(int64_t));
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
@@ -7243,7 +7243,7 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[4096];       // [n_as][ne11]
+  int64_t matrix_rows[30000];       // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7251,7 +7251,7 @@ static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params
 
   if (params->type == NE_TASK_INIT) {
     memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
-    memset(matrix_rows, -1, 4096 * sizeof(int64_t));
+    memset(matrix_rows, -1, 30000 * sizeof(int64_t));
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
@@ -7399,7 +7399,7 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
   int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[4096];       // [n_as][ne11]
+  int64_t matrix_rows[30000];       // [n_as][ne11]
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
@@ -7407,7 +7407,7 @@ static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_p
 
   if (params->type == NE_TASK_INIT) {
     memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
-    memset(matrix_rows, -1, 4096 * sizeof(int64_t));
+    memset(matrix_rows, -1, 30000 * sizeof(int64_t));
     for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
       const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
       NE_ASSERT(row_id >= 0 && row_id < n_as);
