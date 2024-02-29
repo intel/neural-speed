@@ -58,10 +58,13 @@ class Scheduler2D {
     auto& tid = problem.tid;
     problem.tidx[1] = tid % mThdPerRow;
     problem.tidx[0] = tid / mThdPerRow;
-    problem.loc[0] = problem.tidx[0] * mThdSize[0] + moffset[0];
-    problem.loc[1] = problem.tidx[1] * mThdSize[1] + moffset[1];
+    problem.loc[0] = problem.tidx[0] * mThdSize[0];
+    problem.loc[1] = problem.tidx[1] * mThdSize[1];
     problem.size[0] = utils::remainsize(problem.loc[0], mSize[0], mThdSize[0]);
     problem.size[1] = utils::remainsize(problem.loc[1], mSize[1], mThdSize[1]);
+    problem.loc[0] += moffset[0];
+    problem.loc[1] += moffset[1];
+    //printf("%d %d %d %d\n", problem.loc[0], problem.loc[1], problem.size[0], problem.size[1]);
     problem.valid = true;
   }
 
@@ -81,6 +84,7 @@ class Scheduler2D {
   }
 
   constexpr int* thread_size() { return mThdSize; }
+  int mStep[2] = {0, 0};
 
  protected:
   void set(const int* thdsize, const int* size, const int* step) {
@@ -119,7 +123,22 @@ class Scheduler2D {
  private:
   int mThdSize[2] = {0, 0};
   int mSize[2] = {0, 0};
-  int mStep[2] = {0, 0};
+};
+
+using thread_func = std::function<void(int tid)>;
+
+class IThreading {
+ public:
+  explicit IThreading(int nthreads, bool supportPE) : mThreadNum(nthreads), isSupportPE(supportPE) {}
+  virtual void parallel_for(const thread_func& func) = 0;
+  virtual inline void sync(int idx = 0) = 0;
+  virtual int num_threads() const { return mThreadNum; };
+  virtual int is_support_PE() const { return isSupportPE; };
+  virtual void set_threads(int nthreads) = 0;
+
+ protected:
+  int mThreadNum;
+  const bool isSupportPE;
 };
 
 namespace gemm {
@@ -161,8 +180,8 @@ class SchedulerBase : public Scheduler2D {
     mThdCount = config.threads;
     mL2Size = config.l2cache;
     mL1Size = config.l1cache;
-    moffset[0] = config.offset[0];
-    moffset[1] = config.offset[1];
+    Scheduler2D::moffset[0] = config.offset[0];
+    Scheduler2D::moffset[1] = config.offset[1];
     if (mSize[0] <= 0 || mSize[1] <= 0 || mSize[2] <= 0) {
       return;
     }
@@ -182,6 +201,9 @@ class SchedulerBase : public Scheduler2D {
     printf("Cache Size:%zu used:%zu\n", mL2Size, mL2Use);
   }
 
+  static constexpr int mStep[3] = {_GemmCore_T::MTILE, _GemmCore_T::NTILE, _GemmCore_T::KTILE};
+  static constexpr int mEleSize[3] = {sizeof(typename _GemmCore_T::AType), sizeof(typename _GemmCore_T::BType),
+                                      sizeof(typename _GemmCore_T::CType)};
  protected:
   virtual void schedule() {
     int rownum = utils::updiv(mSize[0], mStep[0]);
@@ -290,9 +312,6 @@ class SchedulerBase : public Scheduler2D {
  protected:
   int mSize[3] = {0, 0, 0};
   int mThdSize[3] = {0, 0, 0};
-  static constexpr int mStep[3] = {_GemmCore_T::MTILE, _GemmCore_T::NTILE, _GemmCore_T::KTILE};
-  static constexpr int mEleSize[3] = {sizeof(typename _GemmCore_T::AType), sizeof(typename _GemmCore_T::BType),
-                                      sizeof(typename _GemmCore_T::CType)};
   int mSizePadded[3] = {0, 0, 0};
   int mBlock[3] = {0, 0, 0};
 };
@@ -343,6 +362,9 @@ class SchedulerKBlock : public Scheduler2D {
     printf("GEMM MStep:%d NStep:%d KStep:%d\n", mBlock[0], mBlock[1], mBlock[2]);
     printf("Cache Size:%zu used:%zu\n", mL2Size, mL2Use);
   }
+  static constexpr int mStep[3] = {_GemmCore_T::MTILE, _GemmCore_T::NTILE, _GemmCore_T::KTILE};
+  static constexpr int mEleSize[3] = {sizeof(typename _GemmCore_T::AType), sizeof(typename _GemmCore_T::BType),
+                                      sizeof(typename _GemmCore_T::CType)};
 
  protected:
   void schedule() {
@@ -474,9 +496,6 @@ class SchedulerKBlock : public Scheduler2D {
  private:
   int mSize[3] = {0, 0, 0};
   int mThdSize[3] = {0, 0, 0};
-  static constexpr int mStep[3] = {_GemmCore_T::MTILE, _GemmCore_T::NTILE, _GemmCore_T::KTILE};
-  static constexpr int mEleSize[3] = {sizeof(typename _GemmCore_T::AType), sizeof(typename _GemmCore_T::BType),
-                                      sizeof(typename _GemmCore_T::CType)};
   int mSizePadded[3] = {0, 0, 0};
   int mBlock[3] = {0, 0, 0};
 };
@@ -599,25 +618,26 @@ class SchedulerDispatcher {
     delete Scheduler_P;
     if (Scheduler_E) delete Scheduler_E;
   }
-  SchedulerDispatcher(const int threads, const utils::GemmProblem& problem) {
-    const device::CpuRuntime& cr = device::CpuRuntime::getInstance(threads);
-    isHybrid = cr.mHybrid;
-    if (!isHybrid) {
-      Scheduler_P = new Scheduler({threads, problem, {0, 0}, cr.mL2Cache, cr.mL1Cache});
+  SchedulerDispatcher(IThreading* th, const utils::GemmProblem& problem) {
+    const device::CpuRuntime& cr = device::CpuRuntime::getInstance(th->num_threads());
+    needDispach = cr.mHybrid && th->is_support_PE();
+    if (!needDispach) {
+      Scheduler_P = new Scheduler({th->num_threads(), problem, {0, 0}, cr.mL2Cache, cr.mL1Cache});
     } else {
+      Pcore_num = cr.P_core_num;
+      Ecore_num = cr.E_core_num;
       utils::GemmProblem problem_P = problem, problem_E = problem;
-      assert(problem.n > 2);
       const int N = problem.dims[2];
-      const int N_offset = N - int(N / (1 + cr.getPE()));
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
       problem_E.dims[2] = problem.dims[2] - N_offset;
-      Scheduler_P = new Scheduler({threads - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
+      Scheduler_P = new Scheduler({th->num_threads() - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
       Scheduler_E = new Scheduler({cr.E_core_num, problem_E, {0, N_offset}, cr.mL2Cache_E, cr.mL1Cache_E});
     }
   }
 
   void getIndex(ThreadProblem& problem) const {
-    if (!isHybrid) {
+    if (!needDispach) {
       Scheduler_P->getIndex(problem);
     } else {
       if (problem.tid >= Pcore_num + Ecore_num) {
@@ -633,14 +653,14 @@ class SchedulerDispatcher {
   }
 
   void print() {
-    printf("dispatch to hybrid:%d\n", isHybrid);
+    printf("dispatch to hybrid:%d\n", needDispach);
     Scheduler_P->print();
-    if (isHybrid) Scheduler_E->print();
+    if (needDispach) Scheduler_E->print();
   }
 
  private:
   Scheduler *Scheduler_P = nullptr, *Scheduler_E = nullptr;
-  bool isHybrid = false;
+  bool needDispach = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
 
@@ -659,6 +679,8 @@ class SchedulerDispatcher<Scheduler2D> {
     if (!isHybrid) {
       Scheduler_P = new Scheduler2D(config);
     } else {
+      Pcore_num = cr.P_core_num;
+      Ecore_num = cr.E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
       const int N_offset = N - int(N / (1 + cr.getPE()));
@@ -701,23 +723,10 @@ class SchedulerDispatcher<Scheduler2D> {
 };
 
 }  // namespace gemm
-using thread_func = std::function<void(int tid)>;
-
-class IThreading {
- public:
-  explicit IThreading(int nthreads) : mThreadNum(nthreads) {}
-  virtual void parallel_for(const thread_func& func) = 0;
-  virtual inline void sync(int idx = 0) = 0;
-  virtual int num_threads() const { return mThreadNum; };
-  virtual void set_threads(int nthreads) = 0;
-
- protected:
-  int mThreadNum;
-};
 #if BTLA_OPENMP
 class OMPThreading : public IThreading {
  public:
-  explicit OMPThreading(int nthreads) : IThreading(nthreads) {
+  explicit OMPThreading(int nthreads) : IThreading(nthreads, false) {
     printf("Using OMP\n");
     omp_set_num_threads(nthreads);
   }
@@ -745,7 +754,7 @@ class OMPThreading : public IThreading {
 
 class StdThreading : public IThreading {
  public:
-  explicit StdThreading(int nthreads) : IThreading(nthreads) {
+  explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
     printf("Using Std\n");
     create_threads();
   }
@@ -844,7 +853,7 @@ class StdThreading : public IThreading {
 
 class SingleThread : public IThreading {
  public:
-  SingleThread() : IThreading(1) {}
+  SingleThread() : IThreading(1, false) {}
 
   void set_threads(int nthreads) override {
     assert(0);
@@ -858,7 +867,7 @@ class SingleThread : public IThreading {
 
 template <class Parallel_T, class Launch_T>
 void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
-  gemm::SchedulerDispatcher<Parallel_T> para(th->num_threads(), args.problem);
+  gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -876,9 +885,9 @@ void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel:
 
 template <class Parallel_T, class Launch_T>
 void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
-  gemm::SchedulerDispatcher<Parallel_T> para(th->num_threads(), args.problem);
+  gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
-  auto apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
+  auto apara = launcher.mProA.createParallel(th, args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
