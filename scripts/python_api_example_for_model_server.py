@@ -1,5 +1,5 @@
 import time
-import neural_speed.gptj_cpp as cpp
+import neural_speed.llama_cpp as cpp
 from transformers import AutoTokenizer
 
 prompts = [
@@ -20,7 +20,7 @@ prompts = [
             "I want to learn how to play the piano.",
             ]
 
-model_name = "EleutherAI/gpt-j-6b"  # model_name from huggingface or local model path
+model_name = "meta-llama/Llama-2-7b-hf"  # model_name from huggingface or local model path
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 res_collect = []
