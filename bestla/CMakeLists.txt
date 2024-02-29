@@ -4,7 +4,7 @@ project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
-option(BTLA_USE_OPENMP "Enable OpenMP thread pool" OFF)
+option(BTLA_ENABLE_OPENMP "Enable OpenMP thread pool if OMP can be found" OFF)
 
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
 option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
@@ -103,7 +103,7 @@ endif(UT_BUILD)
 
 if(BTLA_UT_BENCHMARK)
   file(GLOB srcs ${PROJECT_NAME}/ut/bestla_benchmark.cpp) #compile everything even run parts of UTs
-	file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
+  file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
   include_directories(${PROJECT_NAME})
 	add_executable(${PROJECT_NAME}_benchmark ${srcs} ${headers} ${ut_headers})
   if(BTLA_UT_OPENMP)

@@ -30,7 +30,7 @@ using sAVX2 = gemm::SCoreRowNAvx2<24, 4>;
 class UT_Threading {
  public:
   static bestla::parallel::IThreading* get() {
-#if BTLA_UT_OPENMP
+#if BTLA_OPENMP
     static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
     static bestla::parallel::StdThreading DefaultThreading(4);
