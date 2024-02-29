@@ -265,6 +265,11 @@ class ModelServer {
                     num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping,
                     n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching,
                     max_request_num, model_scratch_enlarge_scale);
+    static std::set<model_archs> server_supported_model_archs = {MODEL_GPTJ, MODEL_LLAMA};
+    if (server_supported_model_archs.count(params.model_arch) == 0) {
+      fprintf(stderr, "\nERROR: ModelServer only supports gpt-j, llama!\n");
+      running = false;
+    }
   }
 
   ~ModelServer() {
