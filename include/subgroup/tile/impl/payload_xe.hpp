@@ -831,7 +831,8 @@ public:
     static constexpr reg_layout register_layout = tile_desc::register_layout;
     static constexpr bool reg_transpose
             = register_layout == reg_layout::transpose_tiled;
-    static constexpr bool trans = mem_transpose ^ reg_transpose;
+    //     static constexpr bool trans = mem_transpose ^ reg_transpose;
+    static constexpr bool trans = mem_transpose;
 
     static constexpr bool mem_transform = (sizeof(dtype) < 4)
             && (register_layout == reg_layout::vnni_tiled
@@ -982,10 +983,10 @@ public:
     __XETLA_API void update_tdesc(int offset) {
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
             base_offset += int64_t(offset) * sizeof(dtype);
-            mem_transpose ? base_y += offset : base_x += offset;
+            trans ? base_y += offset : base_x += offset;
         } else {
             base_offset += int64_t(offset) * pitch_in_bytes;
-            mem_transpose ? base_x += offset : base_y += offset;
+            trans ? base_x += offset : base_y += offset;
         }
     }
 };
