@@ -22,7 +22,7 @@ import subprocess
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper"}
 
 
-def convert_model(model, outfile, outtype="f32", whisper_repo_path=None, use_quantized_model=False):
+def convert_model(model, outfile, outtype="f32", format="NE", whisper_repo_path=None, use_quantized_model=False):
     config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
@@ -34,6 +34,8 @@ def convert_model(model, outfile, outtype="f32", whisper_repo_path=None, use_qua
     cmd.extend(["python", path])
     cmd.extend(["--outfile", outfile])
     cmd.extend(["--outtype", outtype])
+    if model_type in {"phi", "stablelm"}:
+        cmd.extend(["--format", format])
     cmd.extend([model])
 
     print("cmd:", cmd)
