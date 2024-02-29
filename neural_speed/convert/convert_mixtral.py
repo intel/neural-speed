@@ -1095,9 +1095,6 @@ class OutputFile:
     def write_vocab(self, vocab: Vocab) -> None:
         for text, score in vocab.all_tokens():
             self.fout.write(struct.pack("i", len(text)))
-            print(len(text))
-            if(len(text)>100):
-                break
             self.fout.write(text)
             self.fout.write(struct.pack("f", score))
 
