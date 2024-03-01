@@ -30,10 +30,10 @@ target_include_directories(
 )
 
 
-if(BTLA_USE_OPENMP)
-  message(STATUS "BesTLA using OpenMP")
+if(BTLA_ENABLE_OPENMP)
+  message(STATUS "BesTLA enable OpenMP ThreadPool")
   target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
-endif(BTLA_USE_OPENMP)
+endif(BTLA_ENABLE_OPENMP)
 
 if(WIN32)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE _CRT_SECURE_NO_WARNINGS NOMINMAX)
