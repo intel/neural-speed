@@ -51,26 +51,6 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-def token_bytes_to_string(b):
-    byte_encoder = bytes_to_unicode()
-    return ''.join([byte_encoder[ord(char)] for char in b.decode('latin-1')])
-
-def bpe(mergeable_ranks, token, max_rank):
-    parts = [bytes([b]) for b in token]
-    while True:
-        min_idx = None
-        min_rank = None
-        for i, pair in enumerate(zip(parts[:-1], parts[1:])):
-            rank = mergeable_ranks.get(pair[0] + pair[1])
-            if rank is not None and (min_rank is None or rank < min_rank):
-                min_idx = i
-                min_rank = rank
-        if min_rank is None or (max_rank is not None and min_rank >= max_rank):
-            break
-        assert min_idx is not None
-        parts = parts[:min_idx] + [parts[min_idx] + parts[min_idx + 1]] + parts[min_idx + 2:]
-    return parts
-
 def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("stablelm.gguf converting: ")
     list_vars = model.state_dict()
@@ -133,62 +113,8 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
 
         special_vocab = gguf.SpecialVocab(dir_model, load_merges=True)
         special_vocab.add_to_gguf(gguf_writer)
-    
-    def write_vocab_gguf_stablelm2(dir_model, hparams, gguf_writer):
-        tokens: list[bytearray] = []
-        toktypes: list[int] = []
 
-        tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-        vocab_size = hparams["vocab_size"]
-        assert max(tokenizer.get_vocab().values()) < vocab_size
-
-        merges = []
-        vocab = {}
-        # mergeable_ranks: A dictionary mapping mergeable token bytes to their ranks
-        mergeable_ranks = tokenizer.mergeable_ranks
-        for token, rank in mergeable_ranks.items():
-            vocab[token_bytes_to_string(token)] = rank
-            if len(token) == 1:
-                continue
-            merged = bpe(mergeable_ranks, token, max_rank=rank)
-            assert len(merged) == 2
-            merges.append(' '.join(map(token_bytes_to_string, merged)))
-
-        added_vocab = tokenizer.special_tokens
-        reverse_vocab = {id_ : encoded_tok for encoded_tok, id_ in (vocab | added_vocab).items()}
-
-        for i in range(vocab_size):
-            if i not in reverse_vocab:
-                pad_token = f"[PAD{i}]".encode("utf-8")
-                tokens.append(bytearray(pad_token))
-                toktypes.append(gguf.TokenType.USER_DEFINED)
-            elif reverse_vocab[i] in added_vocab:
-                tokens.append(reverse_vocab[i])
-                toktypes.append(gguf.TokenType.CONTROL)
-            else:
-                tokens.append(reverse_vocab[i])
-                toktypes.append(gguf.TokenType.NORMAL)
-
-        gguf_writer.add_tokenizer_model("gpt2")
-        gguf_writer.add_token_list(tokens)
-        gguf_writer.add_token_types(toktypes)
-
-        special_vocab = gguf.SpecialVocab(dir_model, load_merges=False)
-        special_vocab.merges = merges
-        if not special_vocab.special_token_ids:
-            special_vocab._set_special_token("bos", tokenizer.special_tokens["<|endoftext|>"])
-            special_vocab._set_special_token("eos", tokenizer.special_tokens["<|endoftext|>"])
-        special_vocab._set_special_token("unk", tokenizer.special_tokens["<|endoftext|>"])
-        special_vocab.add_to_gguf(gguf_writer)
-
-    # StableLM2 1.6B is different from StableLM3B, by having a special tiktoken tokenizer,
-    # so we detect how to write vocab based on the presence of a tokenizer.json
-    tokenizer_path = os.path.join(dir_model, "tokenizer.json")
-    if os.path.exists(tokenizer_path):
-        write_vocab_gguf(dir_model, hparams, gguf_writer)
-    else:
-        write_vocab_gguf_stablelm2(dir_model, hparams, gguf_writer)
-
+    write_vocab_gguf(dir_model, hparams, gguf_writer)
 
     # tensor info
     print("gguf: get tensor metadata")
@@ -280,47 +206,17 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print(tokenizer_path)
     print(os.path.exists(tokenizer_path))
 
-    # For StableLM-3B
-    if os.path.exists(tokenizer_path):
-        for i in range(vocab_size):
-            if i < vocab_size:
-                text = tokenizer.decode([i]).encode('utf-8')
-                fout.write(struct.pack("i", len(text)))
-                fout.write(text)
-                fout.write(struct.pack("f", 0.0 - i))
-            else:
-                text = tokenizer.decode([vocab_size - 1]).encode('utf-8')
-                fout.write(struct.pack("i", len(text)))
-                fout.write(text)
-                fout.write(struct.pack("f", -10000))
-
-    # For StableLM2-1.6B & StableLM2-Zephyr-1.6B
-    else:
-        merges = []
-        vocab = {}
-        mergeable_ranks = tokenizer.mergeable_ranks
-        for token, rank in mergeable_ranks.items():
-            vocab[token_bytes_to_string(token)] = rank
-            if len(token) == 1:
-                continue
-            merged = bpe(mergeable_ranks, token, max_rank=rank)
-            assert len(merged) == 2
-            merges.append(' '.join(map(token_bytes_to_string, merged)))
-
-        added_vocab = tokenizer.special_tokens
-        reverse_vocab = {id_ : encoded_tok for encoded_tok, id_ in (vocab | added_vocab).items()}
-
-        for i in range(vocab_size):
-            if i in reverse_vocab:
-                text = reverse_vocab[i].encode('utf-8')
-                fout.write(struct.pack("i", len(text)))
-                fout.write(text)
-                fout.write(struct.pack("f", 0.0 - i))
-            else:
-                text = f"[PAD{i}]".encode("utf-8")
-                fout.write(struct.pack("i", len(text)))
-                fout.write(text)
-                fout.write(struct.pack("f", -10000))
+    for i in range(vocab_size):
+        if i < vocab_size:
+            text = tokenizer.decode([i]).encode('utf-8')
+            fout.write(struct.pack("i", len(text)))
+            fout.write(text)
+            fout.write(struct.pack("f", 0.0 - i))
+        else:
+            text = tokenizer.decode([vocab_size - 1]).encode('utf-8')
+            fout.write(struct.pack("i", len(text)))
+            fout.write(text)
+            fout.write(struct.pack("f", -10000))
 
     list_vars = model.state_dict()
 
@@ -390,7 +286,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     args = parser.parse_args(args_in)
 
-    dir_model = args.model.as_posix()
+    # dir_model = args.model.as_posix()
+    from huggingface_hub import snapshot_download
+    dir_model = snapshot_download(repo_id=str(args.model), resume_download=True)
     fname_out = args.outfile.as_posix()
 
     # possible data types
