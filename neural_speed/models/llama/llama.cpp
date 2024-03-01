@@ -379,7 +379,10 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
         for (int i = 0; i < n_expert_used; ++i) {
           ne_tensor* cur_expert;
-          if (N == 1 && ctx0, model.layers[il].ffn_down_exp[0]->type == NE_TYPE_BTLA) {
+          if (N == 1 && bestla_fusion_FFN_SiLu_f32f32_support(
+                            model.layers[il].ffn_gate_exp[0]->data, model.layers[il].ffn_down_exp[0]->data,
+                            model.layers[il].ffn_up_exp[0]->data, N, cur->ne[0],
+                            model.layers[il].ffn_gate_exp[0]->ne[1], model.layers[il].ffn_down_exp[0]->ne[1])) {
             cur_expert = ne_mul_id_ffn_silu(ctx0, model.layers[il].ffn_down_exp, model.layers[il].ffn_gate_exp,
                                             model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
           } else {
