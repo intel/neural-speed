@@ -7009,21 +7009,15 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
   const int n_as = dst->op_params[1];
   // char * wdata_src1_end = (char *)params->wdata;
   // int64_t wdata_src1_end = 0;
-  int64_t matrix_row_counts[100];  // [n_as]
-  int64_t matrix_rows[30000];      // [n_as][ne11]
+
 #define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
 
   // nb01 >= nb00 - src0 is not transposed
   //   compute by src0 rows
 
   if (params->type == NE_TASK_INIT) {
-    memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
-    memset(matrix_rows, -1, 30000 * sizeof(int64_t));
-    for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
-      const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
-      NE_ASSERT(row_id >= 0 && row_id < n_as);
-      mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
-      matrix_row_counts[row_id] += 1;
+    if (ith != 0) {
+      return;
     }
     char* wdata = params->wdata;
     const size_t row_size = ne10 * NE_TYPE_SIZE[vec_dot_type] / NE_BLCK_SIZE[vec_dot_type];
@@ -7042,6 +7036,16 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
   if (params->type == NE_TASK_FINALIZE) {
     return;
   }
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
+  memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
+  memset(matrix_rows, -1, 30000 * sizeof(int64_t));
+  for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
+    const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
+    NE_ASSERT(row_id >= 0 && row_id < n_as);
+    mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
+    matrix_row_counts[row_id] += 1;
+  }
   for (int cur_a = 0; cur_a < n_as; ++cur_a) {
     const int64_t cne1 = matrix_row_counts[cur_a];
     if (cne1 == 0) {
@@ -7057,7 +7061,7 @@ static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* 
     // src1 rows
     const int64_t nr1 = cne1 * ne12 * ne13;
 
-    void* wdata = params->wdata;
+    void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
     const size_t row_size = ne10 * NE_TYPE_SIZE[vec_dot_type] / NE_BLCK_SIZE[vec_dot_type];
 
     for (int64_t ir1 = 0; ir1 < nr1; ++ir1) {
@@ -11322,7 +11326,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_MUL_MAT_ID:
         case NE_OP_CONV_1D:
         case NE_OP_MUL_MAT: {
-          node->n_tasks = 1;
+          node->n_tasks = n_threads;
 
           // TODO: use different scheduling for different matrix sizes
           // const int nr0 = ne_nrows(node->src0);
@@ -11338,7 +11342,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           }
           if (wei->type == NE_TYPE_BTLA) {
             cur = bestla_f32f32_get_workspace_size(node->src1->ne[1], wei->ne[1], node->src1->ne[0], wei->data);
-            node->n_tasks = 1;
           } else if (wei->type == NE_TYPE_F16 && node->src1->type == NE_TYPE_F32) {
             cur = NE_TYPE_SIZE[NE_TYPE_F16] * ne_nelements(node->src1);
           } else if (wei->type == NE_TYPE_F32 && node->src1->type == NE_TYPE_F32) {
