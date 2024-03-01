@@ -103,7 +103,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", hparams["kv_channels"] if "kv_channels" in hparams
                            else int(hparams["hidden_size"]/hparams["num_attention_heads"])))
     fout.write(struct.pack("i", ftype))
-    fout.write(struct.pack("i", hparams["seq_length"] if "seq_length" in hparams 
+    fout.write(struct.pack("i", hparams["seq_length"] if "seq_length" in hparams
                            else hparams["max_position_embeddings"]))
     fout.write(struct.pack("f", 0.0))
     fout.write(struct.pack("f", 0.0))
@@ -121,9 +121,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
     fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
     fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
-    fout.write(struct.pack("i", hparams["bos_token_id"] if hparams["bos_token_id"] 
+    fout.write(struct.pack("i", hparams["bos_token_id"] if hparams["bos_token_id"]
                            else tokenizer.special_tokens['<|endoftext|>']))
-    fout.write(struct.pack("i", hparams["eos_token_id"] if hparams["eos_token_id"] 
+    fout.write(struct.pack("i", hparams["eos_token_id"] if hparams["eos_token_id"]
                            else tokenizer.special_tokens['<|endoftext|>']))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
