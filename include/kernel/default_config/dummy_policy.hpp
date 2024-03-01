@@ -255,8 +255,8 @@ struct dummy_optimizer : param_optimizer_base {
         using fallback_type = fallback_optimizer<dict_t_, type>;
     };
     static constexpr bool use_fallback
-            = !(param_optimizer_base::template validate_attribute<dict_t_,
-                    typename impl::type>::value);
+            = !(param_optimizer_base::template valid_attribute_v<dict_t_,
+                    typename impl::type>);
     using type = typename std::conditional<use_fallback,
             typename impl::fallback_type, impl>::type::type;
 };

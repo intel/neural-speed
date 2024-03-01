@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <iomanip>
 #include "common.hpp"
 #include "profiling.hpp"
 #include "xetla.hpp"
@@ -89,11 +90,13 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
         std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
         auto inputBundle
                 = get_kernel_bundle<bundle_state::input>(context, kernelId);
-        static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS="+compile_str;
-        putenv(const_cast<char*>(env_set_str.c_str()));
+        static const std::string env_set_str
+                = "SYCL_PROGRAM_COMPILE_OPTIONS=" + compile_str;
+        putenv(const_cast<char *>(env_set_str.c_str()));
         kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
-        static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-        putenv(const_cast<char*>(env_unset_str.c_str()));
+        static const std::string env_unset_str
+                = "SYCL_PROGRAM_COMPILE_OPTIONS=";
+        putenv(const_cast<char *>(env_unset_str.c_str()));
 
         using namespace gpu::xetla::group;
         using namespace gpu::xetla::kernel;
@@ -226,4 +229,96 @@ void kernel_run(auto nd_range, auto validate_result) {
     free(A_host);
     free(B_host);
     free(C_host);
+}
+
+template <template <gpu_arch> class F>
+class dispatch_arch {
+    using T_RET = std::invoke_result_t<decltype(F<gpu_arch::Xe>::exec)>;
+
+public:
+    template <typename... Args>
+    static T_RET exec(Args &&...args) {
+        // save default formatting
+        std::ios fmt_bak(nullptr);
+        fmt_bak.copyfmt(std::cout);
+
+        sycl::device device;
+        if (!device.has(aspect::ext_intel_device_id)) {
+            std::cout << "Can not get device ID\n";
+            return;
+        }
+        auto deviceID = device.get_info<ext::intel::info::device::device_id>();
+        std::cout << "deviceID: 0x" << std::hex //
+                  << std::right << std::setfill('0') << deviceID << "\n";
+
+        // restore default formatting
+        std::cout.copyfmt(fmt_bak);
+#if defined(SYCL_EXT_ONEAPI_DEVICE_ARCHITECTURE) \
+        && SYCL_EXT_ONEAPI_DEVICE_ARCHITECTURE
+        // https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_device_architecture.asciidoc#feature-test-macro
+        namespace ENS = sycl::ext::oneapi::experimental;
+        auto deviceArch = device.get_info<ENS::info::device::architecture>();
+        switch (deviceArch) {
+            case ENS::architecture::intel_gpu_pvc:
+                return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
+                return;
+            case ENS::architecture::intel_gpu_dg2_g10:
+            case ENS::architecture::intel_gpu_dg2_g11:
+            case ENS::architecture::intel_gpu_dg2_g12:
+                return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
+                return;
+            default: break;
+        }
+
+#endif
+        std::cout << "No maching architecture, checking device ID ...\n";
+        switch (deviceID) {
+            // DG2 devices: https://gfxspecs.intel.com/Predator/Home/Index/44477
+            case 0x56a0: // Intel® Arc ™ A770 Graphics
+            case 0x56a1: // Intel® Arc ™ A750 Graphics
+            case 0x56a2: // Intel® Arc ™ A580 Graphics
+            case 0x5690: // Intel® Arc ™ A770M Graphics
+            case 0x5691: // Intel® Arc ™ A730M Graphics
+            case 0x5692: // Intel® Arc ™ A550M Graphics
+                return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
+            // PVC devices: https://gfxspecs.intel.com/Predator/Home/Index/44484
+            case 0x0bda: //
+                return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
+            default: std::cout << "Unknown device ID \n"; return;
+        }
+    }
+};
+
+void print_device_details(const sycl::device &d) {
+    std::cout << "Running on " << d.get_info<info::device::name>() << "\n";
+    std::cout << "  max_compute_units: "
+              << d.get_info<info::device::max_compute_units>() << "\n";
+    std::cout << "  max_work_group_size: "
+              << d.get_info<info::device::max_work_group_size>() << "\n";
+    std::cout << "  max_num_sub_groups: "
+              << d.get_info<info::device::max_num_sub_groups>() << "\n";
+    std::cout << "  global_mem_size: "
+              << d.get_info<info::device::global_mem_size>() << "\n";
+    std::cout << "  local_mem_size: "
+              << d.get_info<info::device::local_mem_size>() << "\n";
+    const auto max_wi_sizes
+            = d.get_info<info::device::max_work_item_sizes<3>>();
+    std::cout << "  max_work_item_sizes: " << max_wi_sizes[0] << " "
+              << max_wi_sizes[1] << " " << max_wi_sizes[2] << "\n";
+    std::cout << "  sub_group_sizes:";
+    const auto d_sg_sizes = d.get_info<info::device::sub_group_sizes>();
+    for (const auto sg_size : d_sg_sizes) {
+        std::cout << " " << sg_size;
+    }
+    std::cout << "\n";
+    if (d.has(aspect::ext_intel_gpu_subslices_per_slice)) {
+        auto subslices = d.get_info<
+                ext::intel::info::device::gpu_subslices_per_slice>();
+        std::cout << "  gpu_subslices_per_slice: " << subslices << "\n";
+    }
+    if (d.has(aspect::ext_intel_gpu_eu_count_per_subslice)) {
+        auto euCount = d.get_info<
+                ext::intel::info::device::gpu_eu_count_per_subslice>();
+        std::cout << "  gpu_eu_count_per_subslice: " << euCount << "\n";
+    }
 }

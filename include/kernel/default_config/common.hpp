@@ -52,8 +52,38 @@ enum class tune_key : uint8_t {
     dispatch_policy,
     group_swizzle_policy,
     param_optimizer_type,
+    param_optimizer_mode,
     source_location
 };
+template <typename T>
+using data_type_a_t =
+        typename T::template find_elem_t<tune_key::data_type_a>::type;
+template <typename T>
+using data_type_b_t =
+        typename T::template find_elem_t<tune_key::data_type_b>::type;
+template <typename T>
+using data_type_c_t =
+        typename T::template find_elem_t<tune_key::data_type_c>::type;
+template <typename T>
+constexpr auto memory_layout_a_v
+        = T::template find_elem_v<tune_key::memory_layout_a>;
+template <typename T>
+constexpr auto memory_alignment_a_v
+        = T::template find_elem_v<tune_key::memory_alignment_a>;
+template <typename T>
+constexpr auto memory_layout_b_v
+        = T::template find_elem_v<tune_key::memory_layout_b>;
+template <typename T>
+constexpr auto memory_alignment_b_v
+        = T::template find_elem_v<tune_key::memory_alignment_b>;
+template <typename T>
+constexpr auto memory_layout_c_v
+        = T::template find_elem_v<tune_key::memory_layout_c>;
+template <typename T>
+constexpr auto memory_alignment_c_v
+        = T::template find_elem_v<tune_key::memory_alignment_c>;
+template <typename T>
+constexpr auto gpu_arch_v = T::template find_elem_v<tune_key::gpu_arch>;
 
 enum class tune_key_value : uint8_t {
     pre_processing_default,
@@ -68,45 +98,24 @@ enum class tune_key_value : uint8_t {
 // parameter optimizer
 
 enum class param_optimizer_tag : uint8_t { kernel, work_group };
+enum class param_optimizer_mode : uint8_t { full, keep_shape };
 
 template <param_optimizer_tag tag_, typename dict_t_>
 struct param_optimizer;
 
 struct param_optimizer_base {
     template <typename T, typename U>
-    struct validate_attribute {
-        static constexpr bool value = []() constexpr {
-            bool valid = true;
-            valid &= std::is_same<typename T::template find_elem_t<
-                                          tune_key::data_type_a>::type,
-                    typename U::template find_elem_t<
-                            tune_key::data_type_a>::type>::value;
-            valid &= T::template find_elem_v<tune_key::
-                                     memory_layout_a> == U::template find_elem_v<tune_key::memory_layout_a>;
-            valid &= T::template find_elem_v<tune_key::
-                                     memory_alignment_a> == U::template find_elem_v<tune_key::memory_alignment_a>;
-            valid &= std::is_same<typename T::template find_elem_t<
-                                          tune_key::data_type_b>::type,
-                    typename U::template find_elem_t<
-                            tune_key::data_type_b>::type>::value;
-            valid &= T::template find_elem_v<tune_key::
-                                     memory_layout_b> == U::template find_elem_v<tune_key::memory_layout_b>;
-            valid &= T::template find_elem_v<tune_key::
-                                     memory_alignment_b> == U::template find_elem_v<tune_key::memory_alignment_b>;
-            valid &= std::is_same<typename T::template find_elem_t<
-                                          tune_key::data_type_c>::type,
-                    typename U::template find_elem_t<
-                            tune_key::data_type_c>::type>::value;
-            valid &= T::template find_elem_v<tune_key::
-                                     memory_layout_c> == U::template find_elem_v<tune_key::memory_layout_c>;
-            valid &= T::template find_elem_v<tune_key::
-                                     memory_alignment_c> == U::template find_elem_v<tune_key::memory_alignment_c>;
-            valid &= T::template find_elem_v<tune_key::
-                                     gpu_arch> == U::template find_elem_v<tune_key::gpu_arch>;
-            return valid;
-        }
-        ();
-    };
+    static constexpr bool valid_attribute_v
+        = std::is_same_v<data_type_a_t<T>, data_type_a_t<U>>   //
+        && memory_layout_a_v<T> == memory_layout_a_v<U>        //
+        && memory_alignment_a_v<T> == memory_alignment_a_v<U>  //
+        && std::is_same_v<data_type_b_t<T>, data_type_b_t<U>>  //
+        && memory_layout_b_v<T> == memory_layout_b_v<U>        //
+        && memory_alignment_b_v<T> == memory_alignment_b_v<U>  //
+        && std::is_same_v<data_type_c_t<T>, data_type_c_t<U>>  //
+        && memory_layout_c_v<T> == memory_layout_c_v<U>        //
+        && memory_alignment_c_v<T> == memory_alignment_c_v<U>  //
+        && gpu_arch_v<T> == gpu_arch_v<U>;
 };
 
 // parameter adaptor

@@ -29,8 +29,8 @@ template <typename dtype_a, typename dtype_b, typename dtype_c,
         uint32_t global_kslicing, uint32_t local_kslicing, mma_engine engine>
 struct fp16_gemm_test_func {
     using tile_shape = tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-    static constexpr uint32_t periodic_sync_interval = 0;
-    static constexpr uint32_t prefetch_distance = 0;
+    static constexpr uint32_t periodic_sync_interval = 8;
+    static constexpr uint32_t prefetch_distance = 3;
 
     using compute_attr = typename std::conditional<(engine == mma_engine::fpu),
             compute_attr_t<dtype_acc, dtype_acc, dtype_acc>,
@@ -40,9 +40,9 @@ struct fp16_gemm_test_func {
     using compute_policy =
             typename std::conditional<(engine == mma_engine::fpu),
                     compute_policy_default_fpu<compute_attr, perf_tuning_knob,
-                            gpu_arch::Dg2>,
+                            gpu_arch::Xe>,
                     compute_policy_default_xmx<compute_attr, perf_tuning_knob,
-                            gpu_arch::Dg2>>::type;
+                            gpu_arch::Xe>>::type;
 
     using mem_desc_input_a = mem_desc_t<dtype_a, layout_a, mem_space::global>;
     using mem_desc_input_b = mem_desc_t<dtype_b, layout_b, mem_space::global>;
@@ -52,11 +52,11 @@ struct fp16_gemm_test_func {
     using gemm_t = gemm_t<compute_policy, tile_shape, mem_desc_input_a,
             mem_desc_input_b>;
 
-    using epilogue_t = epilogue_t<epilogue_policy_default<gpu_arch::Dg2>,
+    using epilogue_t = epilogue_t<epilogue_policy_default<gpu_arch::Xe>,
             tile_shape, mem_desc_output_c>;
 
     using group_swizzle
-            = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
+            = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
 
     using dispatch_policy = dispatch_policy_kslicing<group_swizzle,
             global_kslicing, local_kslicing>;

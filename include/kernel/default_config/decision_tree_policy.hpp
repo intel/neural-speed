@@ -264,53 +264,47 @@ struct kslicing_handler {
 };
 } // namespace decision_tree_rule
 
-template <typename dict_t_, typename opt_dict_t_>
+template <typename dict, typename opt_dict>
 struct fallback_optimizer {
-    using type = typename opt_dict_t_::template update_t<
-            elem_t_t<tune_key::data_type_a,
-                    typename dict_t_::template find_elem_t<
-                            tune_key::data_type_a>::type>,
-            elem_t_t<tune_key::data_type_b,
-                    typename dict_t_::template find_elem_t<
-                            tune_key::data_type_b>::type>,
-            elem_t_t<tune_key::data_type_c,
-                    typename dict_t_::template find_elem_t<
-                            tune_key::data_type_c>::type>,
-            elem_v_t<tune_key::memory_layout_a,
-                    dict_t_::template find_elem_v<tune_key::memory_layout_a>>,
-            elem_v_t<tune_key::memory_layout_b,
-                    dict_t_::template find_elem_v<tune_key::memory_layout_b>>,
-            elem_v_t<tune_key::memory_layout_c,
-                    dict_t_::template find_elem_v<tune_key::memory_layout_c>>,
-            elem_v_t<tune_key::memory_alignment_a,
-                    dict_t_::template find_elem_v<
-                            tune_key::memory_alignment_a>>,
-            elem_v_t<tune_key::memory_alignment_b,
-                    dict_t_::template find_elem_v<
-                            tune_key::memory_alignment_b>>,
-            elem_v_t<tune_key::memory_alignment_c,
-                    dict_t_::template find_elem_v<
-                            tune_key::memory_alignment_c>>,
-            elem_v_t<tune_key::gpu_arch,
-                    dict_t_::template find_elem_v<tune_key::gpu_arch>>>;
+    using type = typename opt_dict::template update_t<
+            elem_t_t<tune_key::data_type_a, data_type_a_t<dict>>,
+            elem_t_t<tune_key::data_type_b, data_type_b_t<dict>>,
+            elem_t_t<tune_key::data_type_c, data_type_c_t<dict>>,
+            elem_v_t<tune_key::memory_layout_a, memory_layout_a_v<dict>>,
+            elem_v_t<tune_key::memory_layout_b, memory_layout_b_v<dict>>,
+            elem_v_t<tune_key::memory_layout_c, memory_layout_c_v<dict>>,
+            elem_v_t<tune_key::memory_alignment_a, memory_alignment_a_v<dict>>,
+            elem_v_t<tune_key::memory_alignment_b, memory_alignment_b_v<dict>>,
+            elem_v_t<tune_key::memory_alignment_c, memory_alignment_c_v<dict>>,
+            elem_v_t<tune_key::gpu_arch, gpu_arch_v<dict>>>;
 };
 
-template <param_optimizer_tag tag_, typename dict_t_, typename... candidates_t>
+template <param_optimizer_tag tag_, typename dict_t_,
+        param_optimizer_mode mode_, typename... candidates_t>
 struct decision_tree_optimizer : param_optimizer_base {
     struct impl {
-        using type = typename dict_t_ ::template update_generator_t<
-                decision_tree_rule::data_type_handler>::
-                template update_generator_t<
-                        decision_tree_rule::tile_shape_handler>::
-                        template update_generator_t<
-                                decision_tree_rule::kslicing_handler>;
+        template <typename T, template <typename> typename G>
+        using apply_handeler = T::template update_generator_t<G>;
+        static constexpr bool keep_shape
+                = (mode_ == param_optimizer_mode::keep_shape);
+
+        using t0 = dict_t_;
+        using t1 = apply_handeler<t0, decision_tree_rule::data_type_handler>;
+        using t2_0 = apply_handeler<t1, decision_tree_rule::tile_shape_handler>;
+        using t2 = std::conditional_t<keep_shape, t1, t2_0>;
+        using t3 = apply_handeler<t2, decision_tree_rule::kslicing_handler>;
+
+        using type = t3;
+
+        // If any of data_type / mem_layout / mem_align is changed,
+        // then change it back via fallback_optimizer
         using fallback_type = fallback_optimizer<dict_t_, type>;
     };
     static constexpr bool use_fallback
-            = !(param_optimizer_base::template validate_attribute<dict_t_,
-                    typename impl::type>::value);
-    using type = typename std::conditional<use_fallback,
-            typename impl::fallback_type, impl>::type::type;
+            = !(param_optimizer_base::template valid_attribute_v<dict_t_,
+                    typename impl::type>);
+    using type = typename std::conditional_t<use_fallback,
+            typename impl::fallback_type, impl>::type;
 };
 
 } // namespace gpu::xetla

@@ -55,7 +55,6 @@ struct compute_policy_default_xmx<compute_attr_, perf_tuning_knob_, arch_tag_,
     static constexpr uint32_t block_size_y_a = 16;
 
     static constexpr uint32_t block_size_x_b = arch_tag < gpu_arch::Xe ? 8 : 16;
-
     static constexpr uint32_t block_bytes_y_b = 32;
     static constexpr uint32_t block_size_y_b
             = block_bytes_y_b / sizeof(dtype_mma_b);
@@ -119,7 +118,6 @@ struct compute_policy_default_fpu<compute_attr_, perf_tuning_knob_, arch_tag_,
     static constexpr int stages = perf_tuning_knob::stages;
     static constexpr int sync_freq = perf_tuning_knob::sync_freq;
     static constexpr gpu_arch arch_tag = arch_tag_;
-
     using dtype_mma_acc = typename compute_attr::dtype_acc;
     using dtype_mma_a = typename compute_attr::dtype_a;
     using dtype_mma_b = typename compute_attr::dtype_b;

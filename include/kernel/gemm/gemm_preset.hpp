@@ -71,7 +71,9 @@ using default_param_t = dict_t<>::template update_dict_t<
                 elem_t_t<tune_key::wg_tile_shape, shape<256, 256>>,
                 elem_t_t<tune_key::sg_tile_shape, shape<64, 32>>,
                 elem_v_t<tune_key::param_optimizer_type,
-                        tune_key_value::param_optimizer_dummy>>;
+                        tune_key_value::param_optimizer_dummy>,
+                elem_v_t<tune_key::param_optimizer_mode,
+                        param_optimizer_mode::full, param_optimizer_mode>>;
 
 namespace kernel {
 using param_kslicing_g1l1_t = default_param_t::template update_t<

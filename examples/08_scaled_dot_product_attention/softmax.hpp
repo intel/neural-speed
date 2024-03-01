@@ -24,7 +24,7 @@ using namespace gpu::xetla::subgroup;
 
 template <typename dtype_in_, typename dtype_out_, typename tile_shape_,
         mem_space mem_space_in_, mem_space mem_space_out_, uint32_t SIMD_,
-        uint32_t thread_num_, uint32_t softmax_size_>
+        uint32_t thread_num_, uint32_t softmax_size_, gpu_arch arch_tag>
 struct xetla_softmax_fwd_t {
     using dtype_in = dtype_in_;
     using dtype_out = dtype_out_;
@@ -56,16 +56,14 @@ struct xetla_softmax_fwd_t {
     using softmax_load_payload_t = subgroup::mem_payload_t<
             mem_desc_t<dtype_in, mem_layout::row_major, mem_space_in>,
             softmax_tile_desc_t,
-            subgroup::msg_type_v<softmax_tile_desc_t, mem_space_in>,
-            gpu_arch::Dg2>;
+            subgroup::msg_type_v<softmax_tile_desc_t, mem_space_in>, arch_tag>;
 
     // this tile will store the softmax result to global memory
     using softmax_store_t = subgroup::tile_t<dtype_out, softmax_tile_desc_t>;
     using softmax_store_payload_t = subgroup::mem_payload_t<
             mem_desc_t<dtype_out, mem_layout::row_major, mem_space_out>,
             softmax_tile_desc_t,
-            subgroup::msg_type_v<softmax_tile_desc_t, mem_space_out>,
-            gpu_arch::Dg2>;
+            subgroup::msg_type_v<softmax_tile_desc_t, mem_space_out>, arch_tag>;
 
     struct arguments_t {
         // available while original data is from SLM
@@ -113,10 +111,10 @@ struct xetla_softmax_fwd_t {
             row_data_32 = softmax_load.reg.xetla_select<softmax_size, 1>(0);
 
             // get max
-            float xmax = hmax<float, float, softmax_size>(row_data_32);
+            float x_max = hmax<float, float, softmax_size>(row_data_32);
 
             // get exp_sum
-            row_data_32 -= xmax;
+            row_data_32 -= x_max;
             row_data_32 = exp(row_data_32);
             float exp_sum = sum<float, float, softmax_size>(row_data_32);
 
