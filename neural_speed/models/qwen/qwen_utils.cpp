@@ -105,7 +105,7 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
   model.layers.resize(n_layer);
   size_t vram_total = 0;
 
-  if (ml->verify_tensor("token_embd.weight")) {
+  if (ml->verify_tensor("token_embd.weight")) {  // gguf
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -124,7 +124,7 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
         layer.attn[0] = ml->get_tensor(layers_i + ".attn_qkv.weight", {n_embd, 3 * n_embd}, backend);
         layer.attn[1] = ml->get_tensor(layers_i + ".attn_qkv.bias", {3 * n_embd}, backend);
         layer.attn[2] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
-      } else {
+      } else {  // qwen2 gguf
         layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd}, backend);
         layer.attn[1] = ml->get_tensor(layers_i + ".attn_q.bias", {n_embd}, backend);
         layer.attn[2] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, n_embd}, backend);
@@ -139,7 +139,7 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, n_ff}, backend);
       layer.ffn[2] = ml->get_tensor(layers_i + ".ffn_down.weight", {n_ff, n_embd}, backend);
     }
-  } else if (ml->verify_tensor("transformer.wte.weight")) {
+  } else if (ml->verify_tensor("transformer.wte.weight")) {  // qwen1 bin
     model.others[0] = ml->get_tensor("transformer.wte.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("transformer.ln_f.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -163,7 +163,7 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.w2.weight", {n_embd, n_ff}, backend);
       layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.c_proj.weight", {n_ff, n_embd}, backend);
     }
-  } else {
+  } else {  // qwen2 bin
     model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
