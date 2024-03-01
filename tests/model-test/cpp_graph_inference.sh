@@ -155,6 +155,7 @@ model_name_map["qwen-7b"]="Qwen/Qwen-7B-Chat"
 model_name_map["magicoder"]="ise-uiuc/Magicoder-S-DS-6.7B"
 model_name_map["whisper"]="openai/whisper-tiny"
 model_name_map["phi2"]="microsoft/phi-2"
+model_name_map["qwen-1_5"]="Qwen/Qwen1.5-7B-Chat"
 
 function main() {
     conda_env="$1"
@@ -247,6 +248,10 @@ function main() {
         infer_cmd="./build/bin/run_mistral"
         requirements_file="$working_dir/neural_speed/models/requirements/mistral.txt"
     elif [[ "${model}" == "qwen-7b" ]]; then
+        quant_script="./build/bin/quant_qwen"
+        convert_script="${convert_script}/convert_qwen.py"
+        infer_cmd="./build/bin/run_qwen"
+    elif [[ "${model}" == "qwen-1_5" ]]; then
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
         infer_cmd="./build/bin/run_qwen"
