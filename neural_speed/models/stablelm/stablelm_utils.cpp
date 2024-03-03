@@ -112,12 +112,14 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
   const int i_gpu_start = n_layer - n_gpu_layer;
   model.layers.resize(n_layer);
   size_t vram_total = 0;
+
   // Embedding layer + Normalization layer + lm_head layer
   model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
   model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
   model.others[2] = ml->get_tensor("model.norm.bias", {n_embd}, NE_BACKEND_CPU);
-  model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab},
-                                        n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+  model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+  
+  // TODO: Add bias or not in qkv based on n_layer
   for (uint32_t i = 0; i < n_layer; ++i) {
     const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
     auto& layer = model.layers[i];
@@ -144,12 +146,13 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.norm[3] = ml->get_tensor(layers_i + ".post_attention_layernorm.bias", {n_embd}, backend);
 
 
+    // TODO: Change after enabling stablelm-3B
     if (backend != NE_BACKEND_CPU) {
-      vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
-                    ne_nbytes(layer.attn[1]) + ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) +
-                    ne_nbytes(layer.attn[4]) + ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) +
-                    ne_nbytes(layer.attn[7]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]) +
-                    ne_nbytes(layer.ffn[2]) + ne_nbytes(layer.ffn[3]);
+      vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
+                    ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                    ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
+                    ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) + ne_nbytes(layer.ffn[0]) + 
+                    ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
     }
   }
 
@@ -176,7 +179,7 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
 }
 
 #undef MODEL_BACKEND_OFFLOAD
-class phi_quant_layer : public quant_layer_base {
+class stablelm_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
@@ -192,4 +195,4 @@ class phi_quant_layer : public quant_layer_base {
     }
   }
 };
-REGISTER_QUANT_LAYER_CLASS(phi);
+REGISTER_QUANT_LAYER_CLASS(stablelm);

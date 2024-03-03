@@ -178,7 +178,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 1))
     fout.write(struct.pack("i", hparams["vocab_size"]))
     fout.write(struct.pack("i", hparams["hidden_size"]))
-    fout.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
+    fout.write(struct.pack("i", 0))  
     fout.write(struct.pack("i", hparams["num_attention_heads"]))
     fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
@@ -191,20 +191,16 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
-    fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("f", hparams["layer_norm_eps"]))  # rms norm eps
+    fout.write(struct.pack("f", hparams["layer_norm_eps"]))  # rms_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
-    fout.write(struct.pack("f", hparams["partial_rotary_factor"]))  # rope_factor
+    fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
+    fout.write(struct.pack("i", 0)) # multi_query_group_num
+    fout.write(struct.pack("i", hparams["intermediate_size"])) # ffn_hidden_size
+
     fout.write(struct.pack("i", hparams["bos_token_id"]))
     fout.write(struct.pack("i", hparams["eos_token_id"]))
     fout.write(struct.pack("i", hparams["pad_token_id"] if hparams["pad_token_id"] else 0))
     fout.write(struct.pack("i", hparams["sep_token_id"] if hparams["sep_token_id"] else 0))
-
-    tokenizer_path = os.path.join(dir_model, "tokenizer.json")
-    print(tokenizer_path)
-    print(os.path.exists(tokenizer_path))
 
     for i in range(vocab_size):
         if i < vocab_size:
