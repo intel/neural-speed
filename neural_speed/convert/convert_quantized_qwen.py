@@ -171,7 +171,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     f.write(struct.pack("f", 10000.0))  # freq_base
     f.write(struct.pack("f", 1.0))  # rope_factor
-    
+
     f.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
     f.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
     f.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
@@ -189,7 +189,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     print(f'hparams["kv_channels"] = {hparams["kv_channels"]:^20}')
     print(f'hparams["seq_length"] = {hparams["seq_length"]:^20}')
     print(f'hparams["intermediate_size"] = {hparams["intermediate_size"]:^20}')
-    
+
     # 2. vocab
     for i in range(hparams["vocab_size"]):
         if i < tokenizer.vocab_size:
