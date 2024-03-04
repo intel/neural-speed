@@ -313,7 +313,7 @@ struct model_context {
   bool support_bestla_kv = false;  // whether the model graph supports bestla-kvcache
   int beam_size = 1;
   int kv_n_ctx_block = 1;
-  bool cont_batching = false;
+  bool cont_batching = true;
   generation_config generation_conf;  // global generation config
   std::shared_ptr<beam_search_kv_cache_reorder> bs_kv_reorder;
   std::vector<std::vector<std::string>> tensors_name;
