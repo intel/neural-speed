@@ -306,6 +306,14 @@ Neural Speed supports the following models:
     <td></td>
   </tr>
   <tr>
+    <td><a href="https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUFF</a>,
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+  <tr>
     <td><a href="https://huggingface.co/TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF</td>
     <td>✅</td>
     <td>✅</td>
