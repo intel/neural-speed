@@ -18,7 +18,7 @@
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
 
-enum new_model {
+enum stablelm_model {
   STABLELM_UNKNOWN,
   STABLELM_1_6B,
   STABLELM_3B,
