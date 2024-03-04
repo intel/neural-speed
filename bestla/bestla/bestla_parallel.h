@@ -236,6 +236,8 @@ class Scheduler2D {
     schedule();
   }
 
+  constexpr static BTLA_ISA gemm_ISA() { return BTLA_ISA::NoSIMD; }
+
   void print() {
     printf("Thread Block:(%d,%d)\n", mThdSize[0], mThdSize[1]);
     printf("Thread in use:%d of %d, Nx%d\n", mThdValid, mThdCount, mThdPerRow);
@@ -333,6 +335,8 @@ class SchedulerBase : public Scheduler2D {
     assert(this->mBlock[1] > 0);
     assert(this->mBlock[2] > 0);
   }
+
+  constexpr static BTLA_ISA gemm_ISA() { return _GemmCore_T::ISA; }
 
   constexpr int valid_theads() { return mThdValid; }
 
@@ -496,6 +500,8 @@ class SchedulerKBlock : public Scheduler2D {
     assert(this->mBlock[1] > 0);
     assert(this->mBlock[2] > 0);
   }
+
+  constexpr static BTLA_ISA gemm_ISA() { return _GemmCore_T::ISA; }
 
   constexpr int valid_theads() { return mThdValid; }
 
@@ -669,6 +675,8 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
     assert(this->mBlock[2] % _GemmCore_T::KTILE == 0);
   }
 
+  constexpr static BTLA_ISA gemm_ISA() { return _GemmCore_T::ISA; }
+
   template <class T>
   friend class SchedulerDispatcher;
 
@@ -768,7 +776,7 @@ class SchedulerDispatcher {
     if (Scheduler_E) delete Scheduler_E;
   }
   SchedulerDispatcher(const IThreading* th, const utils::GemmProblem& problem) {
-    const device::CpuRuntime& cr = device::CpuRuntime::getInstance(th->num_threads());
+    device::CpuRuntime& cr = device::CpuRuntime::getInstance(th->num_threads());
     needDispach = cr.mHybrid && th->is_support_PE();
     if (!needDispach) {
       Scheduler_P = new Scheduler({th->num_threads(), problem, {0, 0}, cr.mL2Cache, cr.mL1Cache});
@@ -777,7 +785,7 @@ class SchedulerDispatcher {
       Ecore_num = cr.E_core_num;
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
-      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())), Scheduler::mStep[1]);
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(Scheduler::gemm_ISA()))), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
       Scheduler_P = new Scheduler({th->num_threads() - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
       problem_E.dims[2] = N - N_offset;
@@ -823,7 +831,7 @@ class SchedulerDispatcher<Scheduler2D> {
     if (Scheduler_E) delete Scheduler_E;
   }
   SchedulerDispatcher(const IThreading* th, const Config2D& config) {
-    const device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
+    device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
     needDispach = cr.mHybrid && th->is_support_PE();
     if (!needDispach) {
       Scheduler_P = new Scheduler2D(config);
@@ -832,7 +840,7 @@ class SchedulerDispatcher<Scheduler2D> {
       Ecore_num = cr.E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
-      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE())), config.step[1]);
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(BTLA_ISA::NoSIMD))), config.step[1]);
       config_P.threads = config.threads - cr.E_core_num;
       config_P.size[1] = N_offset;
       Scheduler_P = new Scheduler2D(config_P);

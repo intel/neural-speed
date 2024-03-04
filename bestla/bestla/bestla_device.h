@@ -229,7 +229,7 @@ class CpuDevice {
   inline bool AMX_BF16() { return mHasAMX_BF16; }
   inline bool AVX512_BF16() { return mHasAVX512_BF16; }
   inline bool AVX512_FP16() { return mHasAVX512_FP16; }
-  inline float getPE() { return P_power / E_power; }
+  inline float* const getPE() { return PE; }
   inline size_t getPcoreNum() { return P_core.size(); }
   inline size_t getEcoreNum() { return E_core.size(); }
   inline size_t getSMTcoreNum() { return SMT_core.size(); }
@@ -330,6 +330,28 @@ class CpuDevice {
       }
       numcores = P_core.size() + E_core.size();
       numthreads = P_core.size() * 2 + E_core.size();
+
+      {
+        //set PE
+        uint32_t tmp[4];
+        _cpu.getCpuid(1, tmp);
+        if (p) printf("!!!\t%x\t%x\t%x\t%x!!!\n", tmp[0], tmp[1], tmp[2], tmp[3]);
+        const int famliy = (tmp[0] >> 8) & ((1u << 4) - 1);  // cpu.extractBit(a[0], 8, 11);
+        const int extendedModel = (tmp[0] >> 16) & ((1u << 4) - 1);  // cpu.extractBit(a[0], 16, 24);
+        {
+          for (int i = 0; i < int(BTLA_ISA::ISA_COUNT); i++) PE[i] = 1.0f;
+          if (famliy == 6) switch (extendedModel) {
+              case 9:  // ALD
+                PE[int(BTLA_ISA::AVX2)] = 3.0f;
+                PE[int(BTLA_ISA::AVX_VNNI)] = 5.0f;
+                break;
+              case 11:  // RPL
+                PE[int(BTLA_ISA::AVX2)] = 1.8f;
+                PE[int(BTLA_ISA::AVX_VNNI)] = 2.6f;
+                break;
+            }
+        }
+      }
     } else {
       L1Cache = _cpu.getDataCacheSize(0);
       L2Cache = _cpu.getDataCacheSize(1);
@@ -359,7 +381,7 @@ class CpuDevice {
     Xbyak::util::Cpu cpu;
     uint32_t tmp[4];
     cpu.getCpuid(0x1A, tmp);
-    int core_type = (tmp[0] >> 24) & ((1u << 7) - 1);  // cpu.extractBit(a[0], 24, 31);
+    int core_type = (tmp[0] >> 24) & ((1u << 8) - 1);  // cpu.extractBit(a[0], 24, 31);
     switch (core_type) {
       case 32:
         // printf("Atom\n");
@@ -444,7 +466,7 @@ class CpuDevice {
   int numthreads;
   std::vector<int> P_core, E_core, SMT_core;
   uint32_t E_L2Cache, E_L1Cache;
-  float P_power = 4.8f, E_power = 2.3f;
+  float PE[int(BTLA_ISA::ISA_COUNT)];
 };
 
 #define GetCPUDevice() auto _cd = bestla::device::CpuDevice::getInstance();
@@ -458,9 +480,12 @@ class CpuRuntime {
     return instances[thread];
   }
 
-  inline float getPE() const { return 1.0f * P_core_num / E_core_num; }
+  inline float getPE(BTLA_ISA isa) {
+    cur_PE = &PE[int(isa)];
+    return *cur_PE * P_core_num / E_core_num;
+  }
 
-  inline void setPE(float& PE_) { PE = PE_; }
+  inline void setPE(float& PE_) { *cur_PE = PE_; }
 
   size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
   int P_core_num = 0, E_core_num = 0;
@@ -489,9 +514,11 @@ class CpuRuntime {
       mL2Cache_E = _cd->getL2CacheSize_E();
       mHybrid = true;
       PE = _cd->getPE();
+      cur_PE = PE;
     }
   }
-  float PE = 1;
+  float* cur_PE;
+  float* PE;
   int maxThreads;
 };
 }  // namespace device
