@@ -1083,31 +1083,57 @@ struct model_file_loader {
     hparams.n_head_kv = file.read_u32();
     hparams.n_layer = file.read_u32();
     hparams.n_rot = file.read_u32();
+    printf("%s: hparams.n_vocab = %-30d\n", __func__, hparams.n_vocab);
+    printf("%s: hparams.n_embd = %-30d\n", __func__, hparams.n_embd);
+    printf("%s: hparams.n_mult = %-30d\n", __func__, hparams.n_mult);
+    printf("%s: hparams.n_head = %-30d\n", __func__, hparams.n_head);
+    printf("%s: hparams.n_head_kv = %-30d\n", __func__, hparams.n_head_kv);
+    printf("%s: hparams.n_layer = %-30d\n", __func__, hparams.n_layer);
+    printf("%s: hparams.n_rot = %-30d\n", __func__, hparams.n_vocab);
+
     hparams.ftype = (enum ne_ftype)file.read_u32();
     hparams.max_seq_len = file.read_u32();
     file.read_raw(&hparams.alibi_bias_max, sizeof(float));
     file.read_raw(&hparams.clip_qkv, sizeof(float));
     hparams.par_res = file.read_u32();
-
     hparams.word_embed_proj_dim = file.read_u32();
     hparams.do_layer_norm_before = bool(file.read_u32());
+    printf("%s: hparams.ftype = %-30d\n", __func__, hparams.ftype);
+    printf("%s: hparams.max_seq_len = %-30d\n", __func__, hparams.max_seq_len);
+    printf("%s: hparams.alibi_bias_max = %-30d\n", __func__, hparams.alibi_bias_max);
+    printf("%s: hparams.clip_qkv = %-30d\n", __func__, hparams.clip_qkv);
+    printf("%s: hparams.par_res = %-30d\n", __func__, hparams.par_res);
+    printf("%s: hparams.word_embed_proj_dim = %-30d\n", __func__, hparams.word_embed_proj_dim);
+    printf("%s: hparams.do_layer_norm_before = %-30d\n", __func__, hparams.do_layer_norm_before);
 
     // For ChatGLM-2
     hparams.multi_query_group_num = file.read_u32();
     hparams.ffn_hidden_size = file.read_u32();
+    printf("%s: hparams.multi_query_group_num = %-30d\n", __func__, hparams.multi_query_group_num);
+    printf("%s: hparams.ffn_hidden_size = %-30d\n", __func__, hparams.ffn_hidden_size);
 
     // For ChatGLM-2
     hparams.inner_hidden_size = file.read_u32();
     hparams.n_experts = file.read_u32();
     hparams.n_experts_used = file.read_u32();
+    printf("%s: hparams.inner_hidden_size = %-30d\n", __func__, hparams.inner_hidden_size);
+    printf("%s: hparams.n_experts = %-30d\n", __func__, hparams.n_experts);
+    printf("%s: hparams.n_experts_used = %-30d\n", __func__, hparams.n_experts_used);
 
+    // rms related
     file.read_raw(&hparams.rms_norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
+    printf("%s: hparams.inner_hidden_size = %-30d\n", __func__, hparams.inner_hidden_size);
+    printf("%s: hparams.n_experts = %-30d\n", __func__, hparams.n_experts);
+    printf("%s: hparams.n_experts_used = %-30d\n", __func__, hparams.n_experts_used);
 
     file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
     hparams.original_max_position_embeddings = file.read_u32();
     hparams.use_yarn = file.read_u32();
+    printf("%s: hparams.rope_scaling_factor = %-30d\n", __func__, hparams.rope_scaling_factor);
+    printf("%s: hparams.original_max_position_embeddings = %-30d\n", __func__, hparams.original_max_position_embeddings);
+    printf("%s: hparams.use_yarn = %-30d\n", __func__, hparams.use_yarn);
   }
 
   void read_ne_vocab() {
@@ -1120,6 +1146,7 @@ struct model_file_loader {
     for (uint32_t i = 0; i < hparams.n_vocab; i++) {
       uint32_t len = file.read_u32();
       std::string word = file.read_string(len);
+      // std::cout << "word = " << word << std::endl;
 
       float score = 0.0f;
       if (file_version >= MODEL_FILE_VERSION_GGMF_V1) {
