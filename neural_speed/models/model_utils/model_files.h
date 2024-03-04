@@ -908,6 +908,9 @@ struct gguf_loader {
     GGUF_GET_KEY(ctx_gguf, hparams.n_head, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_ATTENTION_HEAD_COUNT));
     GGUF_GET_KEY(ctx_gguf, hparams.n_head_kv, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
                  kv(LLM_KV_ATTENTION_HEAD_COUNT_KV));
+    GGUF_GET_KEY(ctx_gguf, hparams.n_experts, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_NUM_EXPERTS));
+    GGUF_GET_KEY(ctx_gguf, hparams.n_experts_used, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 kv(LLM_KV_NUM_EXPERTS_USED));
     GGUF_GET_KEY(ctx_gguf, hparams.n_layer, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_BLOCK_COUNT));
     GGUF_GET_KEY(ctx_gguf, hparams.n_rot, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_ROPE_DIMENSION_COUNT));
 
@@ -1059,10 +1062,10 @@ struct model_file_loader {
     char gguf_magic[4];
     const size_t n = fread(&gguf_magic, 1, sizeof(gguf_magic), file.fp);
     bool ok = true;
-    ok = ok & gguf_magic[0] == 'G';
-    ok = ok & gguf_magic[1] == 'G';
-    ok = ok & gguf_magic[2] == 'U';
-    ok = ok & gguf_magic[3] == 'F';
+    ok &= gguf_magic[0] == 'G';
+    ok &= gguf_magic[1] == 'G';
+    ok &= gguf_magic[2] == 'U';
+    ok &= gguf_magic[3] == 'F';
 
     if (ok) {
       model_magic = GGUF;
@@ -1095,10 +1098,16 @@ struct model_file_loader {
 
     // For ChatGLM-2
     hparams.inner_hidden_size = file.read_u32();
+    hparams.n_experts = file.read_u32();
+    hparams.n_experts_used = file.read_u32();
 
     file.read_raw(&hparams.rms_norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
+
+    file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
+    hparams.original_max_position_embeddings = file.read_u32();
+    hparams.use_yarn = file.read_u32();
   }
 
   void read_ne_vocab() {
@@ -1215,10 +1224,15 @@ struct model_file_saver {
     file.write_u32(hparams.multi_query_group_num);
     file.write_u32(hparams.ffn_hidden_size);
     file.write_u32(hparams.inner_hidden_size);
+    file.write_u32(hparams.n_experts);
+    file.write_u32(hparams.n_experts_used);
 
     file.write_raw(&hparams.rms_norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
     file.write_raw(&hparams.freq_scale, sizeof(float));
+    file.write_raw(&hparams.rope_scaling_factor, sizeof(float));
+    file.write_u32(hparams.original_max_position_embeddings);
+    file.write_u32(hparams.use_yarn);
   }
   void write_vocab() {
     if (any_file_loader->file_version == MODEL_FILE_VERSION_NE) {

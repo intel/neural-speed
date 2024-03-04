@@ -49,7 +49,6 @@
 #include <unistd.h>
 #elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <signal.h>
 #include <windows.h>
 #endif
@@ -528,7 +527,7 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
       fprintf(stderr, "%s: error: prompt confliction\n", __func__);
       return empty_ret;
     } else if (input_id_cb.size() > n_ctx - 4) {  // long input_id_cb and empty curr_input_ids[bs]
-      fprintf(stderr, "\n%s: Warning: prompt is too long (%d tokens, max %d), will be truncated\n", __func__,
+      fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
               input_id_cb.size(), n_ctx - 4);
       curr_input_ids[bs].resize(n_ctx - 4);
       std::copy(input_id_cb.end() - n_ctx - 8, input_id_cb.end(), curr_input_ids[bs].begin() + 4);
@@ -643,7 +642,7 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
 
   if (curr_input_ids[STATIC_INPUT_HEAD_IDX].empty()) {
     if (input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx - 4) {
-      fprintf(stderr, "\n%s: Warning: prompt is too long (%d tokens, max %d), will be truncated\n", __func__,
+      fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
               input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - 4);
       curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - 4);
       std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - 8, input_ids[STATIC_INPUT_HEAD_IDX].end(),
@@ -898,6 +897,10 @@ PYBIND11_MODULE(phi_cpp, m)
 #elif MODEL_NAME_ID == 17
 
 PYBIND11_MODULE(whisper_cpp, m)
+
+#elif MODEL_NAME_ID == 18
+
+PYBIND11_MODULE(mixtral_cpp, m)
 
 #endif
 {

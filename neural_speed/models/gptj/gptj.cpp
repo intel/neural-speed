@@ -41,6 +41,9 @@
 #define MHA_FUSION 0  //  turn it off for naive beam_search kv cache reorder
 #define MHA_FP16 (MHA_FUSION && 0)
 
+static const bool NE_ATTN_PREFER_FP32 =
+    getenv("NE_ATTN_PREFER_FP32") != nullptr && std::string("1") == getenv("NE_ATTN_PREFER_FP32");
+
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -437,6 +440,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       struct ne_tensor* KQV_merged_gi;
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
       ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
+      if (NE_ATTN_PREFER_FP32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
       if (attn_n_total == 0 || !shift_roped_k)
         attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
       if (run_mha_reordered) {                 // reordered kv-cache bf16 mha must be used if run_mha_reordered

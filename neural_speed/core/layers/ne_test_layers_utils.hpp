@@ -11,15 +11,17 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+#ifndef NE_CORE_GRAPH_NE_TEST_LAYERS_UTILS_H
+#define NE_CORE_GRAPH_NE_TEST_LAYERS_UTILS_H
 
+#include <algorithm>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <random>
-#include <limits>
 #include <vector>
-#include <algorithm>
 
-#include "bestla/jit_blas_utils.h"
+#include "bestla/bestla_utils.h"
 
 #ifndef NS_TESTS
 static_assert(false, "Only include this header file for testing!");
@@ -91,3 +93,4 @@ bool compare_data(const T* buf1, const T* buf2, size_t size, float eps = 1e-6) {
   }
   return true;
 }
+#endif  // NE_CORE_GRAPH_NE_TEST_LAYERS_UTILS_H

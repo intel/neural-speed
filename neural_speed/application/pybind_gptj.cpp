@@ -57,6 +57,9 @@ bool gptj_model_eval_ids(model_context* ctx, model_token* tokens, size_t n_eval,
   return true;
 }
 
+static const char* memory_dtype =
+    (getenv("NE_MEM_DTYPE") != nullptr && strlen(getenv("NE_MEM_DTYPE")) > 0) ? getenv("NE_MEM_DTYPE") : "auto";
+
 extern "C" {
 void* init_gptj(int seed, int n_predict, int n_batch, int top_k, float top_p, float temp, float repeat_penalty,
                 bool perplexity, int n_ctx, const char* model_file, bool beam_search = false, int beam_size = 4,
@@ -79,7 +82,17 @@ void* init_gptj(int seed, int n_predict, int n_batch, int top_k, float top_p, fl
   params.batch_size = batch_size;
   params.beam_search = beam_search;
   params.beam_size = beam_size;
-  if (batch_size > 1) params.memory_type = KV_MEM_TYPE_F16;  // TODO(Yi): NO MHA IN MULTI-BATCH
+  if (batch_size > 1)  // TODO(Yi): NO MHA IN MULTI-BATCH
+    params.memory_type = KV_MEM_TYPE_F16;
+  else if (strcmp(memory_dtype, "f32") == 0)
+    params.memory_type = KV_MEM_TYPE_F32;
+  else if (strcmp(memory_dtype, "f16") == 0)
+    params.memory_type = KV_MEM_TYPE_F16;
+  else if (strcmp(memory_dtype, "auto") == 0)
+    params.memory_type = KV_MEM_TYPE_AUTO;
+  else
+    fprintf(stderr, "Unexpected memory dtype!");
+
   // params.use_mmap = false;
   // params.use_mlock= true;
   model_init_backend();
@@ -238,6 +251,7 @@ char* eval_gptj_char(void* ctx, const char* prom, int n_predict, int top_k, floa
 
   char* res_c_str = new char[res.size() + 1];
   std::strncpy(res_c_str, res.c_str(), res.size());
+  res_c_str[res.size()] = '\0';
   return res_c_str;
 }
 
@@ -254,7 +268,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto gptj_in_all_bs =
-      init_gptj(1234, 32, 32, 40, 1.0, 0.8, 1.02, false, 2048, argv[1], true, 4, 1, 56, 30, 1.0, true);
+      init_gptj(1234, 32, 32, 40, 1.f, 0.8f, 1.02f, false, 2048, argv[1], true, 4, 1, 56, 30, 1.0, true);
   std::vector<void*> ctxs = {gptj_in_all_bs};
   for (auto gptj_in_all : ctxs) {
     auto res = eval_gptj_char(
@@ -341,7 +355,7 @@ int main(int argc, char* argv[]) {
         "out-of-place-and-still-not-obvious 'Call Waiter' button. But in hindsight, I should have gone with a simple "
         "HUD from the start, especially one that indicated each team's colors and general state of the game without "
         "the need for zooming in and out. Development Development went fast.",
-        128, 40, 1.0, 0.8, 2048);
+        128, 40, 1.0f, 0.8f, 2048);
     std::cout << res << std::endl;
     exit_gptj(gptj_in_all);
     delete[] res;

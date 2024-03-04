@@ -422,7 +422,6 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   }
   printf("size = %8.2f MB -> %8.2f MB\n", tensor.size / 1024.0 / 1024.0, new_size / 1024.0 / 1024.0);
 
-__WRITE_FILE:
   size_org += tensor.size;
   size_new += new_size;
   saver.write_tensor(tensor, new_type, new_data, new_size);

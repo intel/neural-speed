@@ -42,7 +42,6 @@
 #include <unistd.h>
 #elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <signal.h>
 #include <windows.h>
 #endif
@@ -446,7 +445,7 @@ void Model::inference(const std::string& fname_inp) {
       }
 
       if (whisper_full_parallel(ctx, wparams, pcmf32.data(), pcmf32.size(), params.n_processors) != 0) {
-        fprintf(stderr, "%s: failed to process audio\n", fname_inp);
+        fprintf(stderr, "%s: failed to process audio\n", fname_inp.c_str());
         return;
       }
     }
