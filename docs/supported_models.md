@@ -182,11 +182,13 @@ Neural Speed supports the following models:
   </tr>
   <tr>
     <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B</a>,
-    <a href="https://huggingface.co/Qwen/Qwen-14B-Chat" target="_blank" rel="noopener noreferrer">Qwen-14B</a></td>
+    <a href="https://huggingface.co/Qwen/Qwen-14B-Chat" target="_blank" rel="noopener noreferrer">Qwen-14B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen1.5-7B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-0.5B" target="_blank" rel="noopener noreferrer">Qwen1.5-0.5B</a></td>
     <td>✅</td>
     <td> </td>
     <td> </td>
-    <td>✅</td>
+    <td>✅</td> 
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -355,7 +357,8 @@ Neural Speed supports the following models:
     <td>✅</td>
   </tr>
   <tr>
-    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B-Chat</td>
+    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B-Chat</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-7B-Chat-GGUF" target="_blank" rel="noopener noreferrer">Qwen1.5-7B-Chat-GGUF</a></td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
