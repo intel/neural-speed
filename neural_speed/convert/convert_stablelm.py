@@ -191,11 +191,17 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
+    fout.write(struct.pack("i", 0)) # multi_query_group_num
+    fout.write(struct.pack("i", hparams["intermediate_size"])) # ffn_hidden_size
+    fout.write(struct.pack("i", 0)) # inner_hidden_size for ChatGLM2
+
     fout.write(struct.pack("f", hparams["layer_norm_eps"]))  # rms_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
     fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
-    fout.write(struct.pack("i", 0)) # multi_query_group_num
-    fout.write(struct.pack("i", hparams["intermediate_size"])) # ffn_hidden_size
+    fout.write(struct.pack("f", 1.0))  # rope_scaling_factor, was removed in config.json (by default=1.0)
+
+    fout.write(struct.pack("i", 0))  # original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # use_yarn
 
     fout.write(struct.pack("i", hparams["bos_token_id"]))
     fout.write(struct.pack("i", hparams["eos_token_id"]))
