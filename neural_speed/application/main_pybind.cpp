@@ -118,6 +118,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   if (batch_size > 1 && (!continuous_batching || params->model_arch != model_archs::MODEL_GPTJ)) {
     params->memory_type = KV_MEM_TYPE_F16;  // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
   }
+  // params->memory_type = KV_MEM_TYPE_F16;
   params->cont_batching = continuous_batching;
   params->max_request_num = std::max(batch_size, max_request_num);
   params->min_new_tokens = min_new_tokens;

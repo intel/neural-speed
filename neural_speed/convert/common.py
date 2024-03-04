@@ -336,9 +336,11 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
         g_idx = model[f"{src_name}.g_idx"]
         weight = (gptq_scales[g_idx.long()] * (weight - gptq_zeros[g_idx.long()]))
     else:
+        weight = weight.reshape(-1, weight.shape[-1])
         infeatures = weight.shape[0]
         g_idx = torch.tensor([i // q_config["group_size"] for i in range(infeatures)], dtype=torch.int32)
         scale_zeros = gptq_zeros * gptq_scales
+        # import pdb; pdb.set_trace()
         weight = (gptq_scales[g_idx.long()] * weight - scale_zeros[g_idx.long()])
     
     weight = weight.t()
@@ -411,6 +413,6 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
                                                weight_dtype="int4" if q_config['bits'] == 4 else "int8",
                                                group_size=q_config['group_size'],
                                                alg="sym" if q_config['sym'] else "asym",
-                                               compute_dtype="int8")
+                                               compute_dtype="int8")  # fp32
     dst.flatten()[:byte_size].tofile(fout)
     print(f"converting {dst_name} qauntized tensor to bestla q4 block")

@@ -51,6 +51,7 @@
 //
 static bool llama_model_eval_internal(model_context* ctx, const model_input* inputs, const int n_input,
                                       const int n_threads) {
+  // printf("=====in neural speed eval funtion====\n");
   model_context& lctx = *ctx;
   // static batching for now
   const int N = inputs->n_tokens;
@@ -175,6 +176,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
                                          model.layers[il].attn[2]->data, N, model.layers[il].attn[0]->ne[1],
                                          model.layers[il].attn[0]->ne[0]) &&
         n_head == n_head_kv) {  // fused execution of QKV
+    // if (false) {
       struct ne_tensor* QKVcur =
           ne_mul_qkv(ctx0, model.layers[il].attn[0], model.layers[il].attn[1], model.layers[il].attn[2], cur);
       const size_t qkv_size = head_size * n_head * N;
@@ -272,6 +274,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       // projection (no bias)
       cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
     } else {
+      // printf("badmha....\n");
       const auto k_size = kv_cache_info.k_bytes;
       const auto v_size = kv_cache_info.v_bytes;
       // store key and value to memory
@@ -351,8 +354,11 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
                                                 model.layers[il].ffn[2]->data, N, cur->ne[0],
                                                 model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
+      // if (false) {
+        printf("ffn \n");
         cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
       } else {
+        printf("no ffn\n");
         struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);
         cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
         cur = ne_silu(ctx0, cur);
