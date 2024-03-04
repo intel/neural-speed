@@ -156,6 +156,8 @@ model_name_map["magicoder"]="ise-uiuc/Magicoder-S-DS-6.7B"
 model_name_map["whisper"]="openai/whisper-tiny"
 model_name_map["phi2"]="microsoft/phi-2"
 model_name_map["qwen-1_5"]="Qwen/Qwen1.5-7B-Chat"
+model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
+
 
 function main() {
     conda_env="$1"
@@ -222,7 +224,7 @@ function main() {
         infer_cmd="./build/bin/run_dolly"
     elif [[ "${model}" == "chatglm2" ]]; then
         quant_script="./build/bin/quant_chatglm2"
-        convert_script="${convert_script}/convert_chatglm.py"
+        convert_script="${convert_script}/convert_chatglm.py --format=GGUF"
         infer_cmd="./build/bin/run_chatglm2"
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"
@@ -268,6 +270,10 @@ function main() {
         quant_script="./build/bin/quant_phi"
         convert_script="${convert_script}/convert_phi.py"
         infer_cmd="./build/bin/run_phi"
+    elif [[ "${model}" == "mixtral" ]]; then
+        quant_script="./build/bin/quant_mixtral"
+        convert_script="${convert_script}/convert_mixtral.py"
+        infer_cmd="./build/bin/run_mixtral"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1

@@ -185,7 +185,7 @@ struct model_context_params model_context_default_params() {
       /*.beam_search                 =*/false,
       /*.beam_size                   =*/1,
       /*.shift_roped_k               =*/false,
-      /*cont_batching                =*/false,
+      /*cont_batching                =*/true,
       /*.max_request_num             =*/1,
       /*.gen_conf                    =*/generation_config(),
       /*model_scratch_enlarge_scale  =*/1.0f,

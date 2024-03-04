@@ -45,6 +45,7 @@
 #define MODEL_MAX_ATTN 8
 #define MODEL_MAX_FFN 6
 #define MODEL_MAX_OTHERS 7
+#define MODEL_MAX_EXPERTS 8
 
 #define MODEL_USE_SCRATCH
 #define MODEL_MAX_SCRATCH_BUFFERS 16
@@ -139,6 +140,9 @@ struct model_hparams {
 
   // ChatGLM-1
   int32_t inner_hidden_size = 0;
+  uint32_t n_experts = 0;
+  uint32_t n_experts_used = 0;
+
   float rope_scaling_factor = 0.0f;
   int32_t original_max_position_embeddings = 0;
   int32_t use_yarn = 0;
@@ -158,8 +162,18 @@ struct model_layer {
   // ff
   struct ne_tensor* ffn[MODEL_MAX_FFN];
 
+  struct ne_tensor* ffn_gate_inp;
+
+  struct ne_tensor* ffn_gate_exp[MODEL_MAX_EXPERTS];
+
+  struct ne_tensor* ffn_down_exp[MODEL_MAX_EXPERTS];
+
+  struct ne_tensor* ffn_up_exp[MODEL_MAX_EXPERTS];
+
   struct ne_tensor* k_cache;
   struct ne_tensor* v_cache;
+
+  bool ffn_fusion = false;
 };
 
 typedef int32_t model_pos;
@@ -299,7 +313,7 @@ struct model_context {
   bool support_bestla_kv = false;  // whether the model graph supports bestla-kvcache
   int beam_size = 1;
   int kv_n_ctx_block = 1;
-  bool cont_batching = false;
+  bool cont_batching = true;
   generation_config generation_conf;  // global generation config
   std::shared_ptr<beam_search_kv_cache_reorder> bs_kv_reorder;
   std::vector<std::vector<std::string>> tensors_name;
@@ -469,7 +483,8 @@ class model_name_to_arch {
       {"dolly", MODEL_GPTNEOX},   {"polyglot", MODEL_GPTNEOX},  {"starcoder", MODEL_STARCODER},
       {"falcon", MODEL_FALCON},   {"bloom", MODEL_BLOOM},       {"chatglm2", MODEL_CHATGLM2},
       {"chatglm", MODEL_CHATGLM}, {"baichuan", MODEL_BAICHUAN}, {"mistral", MODEL_LLAMA},
-      {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"whisper", MODEL_WHISPER}};
+      {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"whisper", MODEL_WHISPER},
+      {"mixtral", MODEL_LLAMA}};
 };
 
 #ifdef __cplusplus

@@ -50,6 +50,7 @@ def bytes_to_unicode():
 
 
 class SentencePieceVocab:
+
     def __init__(self, fname_tokenizer: Path, fname_added_tokens: Optional[Path]) -> None:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
@@ -149,11 +150,11 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("ChatGLM-2.gguf converting: ")
     list_vars = model.state_dict()
     for name in list_vars.keys():
-        print(name, list_vars[name].shape, list_vars[name].dtype)
+        print("%-80s" % name, list_vars[name].shape, list_vars[name].dtype)
 
     print(hparams)
 
-    gguf_file = fname_out + '.gguf'
+    gguf_file = fname_out
     gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm2")
 
     arch = "chatglm2."
@@ -285,34 +286,67 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("gguf: get tensor metadata")
     for name in list_vars.keys():
         data = list_vars[name].squeeze().numpy()
-
-        print("Processing variable: " + name + " with shape: ", data.shape)
         if 'inv_freq' in name:
+            print("Converting: %-75s" % name, " shape: %-15s" % str(data.shape))
             continue
 
+        print("Converting: %-75s" % name, " shape: %-15s" % str(data.shape), end="      ")
         n_dims = len(data.shape)
 
         # ftype == 0 -> float32, ftype == 1 -> float16
         ftype_cur = 0
         if ftype != 0:
             if name[-7:] == ".weight" and n_dims == 2:
-                print("  Converting to float16")
+                print("  to float16".rjust(15))
                 data = data.astype(np.float16)
                 ftype_cur = 1
             else:
-                print("  Converting to float32")
+                print("  to float32".rjust(15))
                 data = data.astype(np.float32)
                 ftype_cur = 0
         else:
             if data.dtype != np.float32:
-                print("  Converting to float32")
+                print("  to float32".rjust(15))
                 data = data.astype(np.float32)
                 ftype_cur = 0
 
-        # print(f"[{i+1:{padi}d}/{len(model)}]
-        # Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4}")
-
         gguf_writer.add_tensor(name, data)
+
+        if "mlp.dense_h_to_4h" in name:
+            name_0 = name.replace("dense_h_to_4h", "dense_h_to_4h_0")
+            name_1 = name.replace("dense_h_to_4h", "dense_h_to_4h_1")
+            shape_0 = data.shape[0]
+            half_shape_0 = int(shape_0 / 2)
+            data_0 = data[0:half_shape_0, :]
+            data_1 = data[half_shape_0:shape_0, :]
+
+            print("Converting: %-75s" % name_0, " shape: %-15s" % str(data_0.shape))
+            print("Converting: %-75s" % name_1, " shape: %-15s" % str(data_1.shape))
+
+            n_dims = len(data_0.shape)
+            assert (len(data_0.shape) == len(data_1.shape))
+            # ftype == 0 -> float32, ftype == 1 -> float16
+            ftype_cur = 0
+            if ftype != 0:
+                if name_0[-7:] == ".weight" and n_dims == 2:
+                    print("  to float16".rjust(15))
+                    data_0 = data_0.astype(np.float16)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 1
+                else:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+            else:
+                if data_0.dtype != np.float32:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+
+            gguf_writer.add_tensor(name_0, data_0)
+            gguf_writer.add_tensor(name_1, data_1)
 
     print("gguf: write header")
     gguf_writer.write_header_to_file()
@@ -359,13 +393,15 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["multi_query_group_num"]))
     fout.write(struct.pack("i", hparams["ffn_hidden_size"]))
     fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
 
-    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
@@ -419,9 +455,55 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
         for i in range(n_dims):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
         fout.write(str)
-
         # data
         data.tofile(fout)
+
+        if "mlp.dense_h_to_4h" in name:
+            name_0 = name.replace("dense_h_to_4h", "dense_h_to_4h_0")
+            name_1 = name.replace("dense_h_to_4h", "dense_h_to_4h_1")
+            shape_0 = data.shape[0]
+            half_shape_0 = int(shape_0 / 2)
+            data_0 = data[0:half_shape_0, :]
+            data_1 = data[half_shape_0:shape_0, :]
+
+            print("Converting: %-75s" % name_0, " shape: ", data_0.shape)
+            print("Converting: %-75s" % name_1, " shape: ", data_1.shape)
+
+            n_dims = len(data_0.shape)
+            assert (len(data_0.shape) == len(data_1.shape))
+            # ftype == 0 -> float32, ftype == 1 -> float16
+            ftype_cur = 0
+            if ftype != 0:
+                if name_0[-7:] == ".weight" and n_dims == 2:
+                    print("  to float16".rjust(15))
+                    data_0 = data_0.astype(np.float16)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 1
+                else:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+            else:
+                if data_0.dtype != np.float32:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+
+            str_0 = name_0.encode("utf-8")
+            fout.write(struct.pack("iii", n_dims, len(str_0), ftype_cur))
+            for i in range(n_dims):
+                fout.write(struct.pack("i", data_0.shape[n_dims - 1 - i]))
+            fout.write(str_0)
+            data_0.tofile(fout)
+
+            str_1 = name_1.encode("utf-8")
+            fout.write(struct.pack("iii", n_dims, len(str_1), ftype_cur))
+            for i in range(n_dims):
+                fout.write(struct.pack("i", data_1.shape[n_dims - 1 - i]))
+            fout.write(str_1)
+            data_1.tofile(fout)
 
     fout.close()
 

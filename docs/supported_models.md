@@ -171,14 +171,15 @@ Neural Speed supports the following models:
     <td>4.33.1</td>
   </tr>
   <tr>
-    <td><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener noreferrer">Mistral-7B</a></td>
+    <td><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener noreferrer">Mistral-7B</a>,
+     <a href="https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1" target="_blank" rel="noopener noreferrer">Mixtral-8x7B</a></td>
     <td>✅</td>
+    <td> </td>
+    <td> </td>
     <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>4.34.0 or newer</td>
+    <td> </td>
+    <td> </td>
+    <td>4.36.0 or newer</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B</a>,

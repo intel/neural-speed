@@ -82,10 +82,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))
     f.write(struct.pack("i", ffn_hidden_size))
     f.write(struct.pack("i", 0))
+    f.write(struct.pack("i", 0))  # n_experts
+    f.write(struct.pack("i", 0))  # n_expert_used
 
     f.write(struct.pack("f", config["rms_norm_eps"]))
     f.write(struct.pack("f", config["rope_theta"] if "rope_theta" in config else 10000))
     f.write(struct.pack("f", rope_scale))
+    f.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
+    f.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
+    f.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
 
     # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
     # but bos_token_id = 1 in llama.cpp

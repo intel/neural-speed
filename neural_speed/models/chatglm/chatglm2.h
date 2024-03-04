@@ -26,7 +26,7 @@ enum chatglm2_model {
 static const model_scratch chatglm_mem_req(int n_layers) {
   switch (n_layers) {
     case 28:
-      return {2048ull * MB, 2048ull * MB, 4096ull * MB};
+      return {4096ull * MB, 4096ull * MB, 8192ull * MB};
     default:
       MODEL_ASSERT(false);
   }
