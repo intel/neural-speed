@@ -72,6 +72,8 @@ class Model:
             import neural_speed.phi_cpp as cpp_model
         elif model_type == "whisper":
             import neural_speed.whisper_cpp as cpp_model
+        elif model_type == "mixtral":
+            import neural_speed.mixtral_cpp as cpp_model
         else:
             raise TypeError("Unsupported model type {}!".format(model_type))
         self.module = cpp_model
