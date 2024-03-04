@@ -329,7 +329,7 @@ class CpuDevice {
         }
       }
       numcores = P_core.size() + E_core.size();
-      numthreads = P_core.size() * 2 + E_core.size();
+      numthreads = P_core.size() + E_core.size() + SMT_core.size();
 
       {
         //set PE
@@ -340,10 +340,15 @@ class CpuDevice {
         const int extendedModel = (tmp[0] >> 16) & ((1u << 4) - 1);  // cpu.extractBit(a[0], 16, 24);
         {
           for (int i = 0; i < int(BTLA_ISA::ISA_COUNT); i++) PE[i] = 1.0f;
+          // CPU identification refer to: https://en.wikichip.org/wiki/intel/cpuid
           if (famliy == 6) switch (extendedModel) {
               case 9:  // ALD
                 PE[int(BTLA_ISA::AVX2)] = 3.0f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 5.0f;
+                break;
+              case 10: // MTL
+                PE[int(BTLA_ISA::AVX2)] = 2.2f;
+                PE[int(BTLA_ISA::AVX_VNNI)] = 3.0f;
                 break;
               case 11:  // RPL
                 PE[int(BTLA_ISA::AVX2)] = 1.8f;
