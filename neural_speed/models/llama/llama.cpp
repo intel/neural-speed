@@ -567,7 +567,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
             if (i == 0) {
               moe_out_i = cur_expert;
             } else {
-              moe_out_i = ne_add(ctx0, moe_out, cur_expert);
+              moe_out_i = ne_add(ctx0, moe_out_i, cur_expert);
               ne_set_name(moe_out_i, std::string("ffn_moe_out_" + suffix).c_str());
             }
           }

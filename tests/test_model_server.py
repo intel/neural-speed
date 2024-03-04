@@ -14,6 +14,8 @@
 
 import time
 import unittest
+import shutil
+from neural_speed import Model
 import neural_speed.llama_cpp as cpp
 from transformers import AutoTokenizer
 
@@ -25,7 +27,7 @@ class TestModelServer(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        pass
+        shutil.rmtree("./runtime_outs", ignore_errors=True)
 
     def test_model_server(self):
         prompts = [
@@ -46,8 +48,12 @@ class TestModelServer(unittest.TestCase):
                 "I want to learn how to play the piano.",
                 ]
         model_name = "/tf_dataset2/models/nlp_toolkit/llama-2-7b-chat/Llama-2-7b-chat-hf"
-        model_path = "/tf_dataset2/inc-ut/nlptoolkit_ut_model/ns_llama_q_int4_bestla_cint8_g32.bin"
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        model = Model()
+        # get quantized model
+        model.init(model_name, use_quant=True, weight_dtype="int4", compute_dtype="int8")
+        del model
+        model_path = "./runtime_outs/ne_llama_q_int4_bestla_cint8_g32.bin"
 
         res_collect = []
         # response function (deliver generation results and current remain working size in server)
