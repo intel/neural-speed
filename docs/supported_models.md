@@ -206,7 +206,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>4.36.0 or newer</td>
@@ -263,21 +265,29 @@ Neural Speed supports the following models:
 <thead>
   <tr>
     <th rowspan="2">Model Name</th>
-    <th colspan="2">INT8</th>
-    <th colspan="2">INT4</th>
+    <th colspan="4">INT8</th>
+    <th colspan="4">INT4</th>
     <th rowspan="2">Transformer Version</th>
   </tr>
   <tr>
     <th>RTN</th>
     <th>GPTQ</th>
+    <th>AWQ</th>
+    <th>AutoRound</th>
     <th>RTN</th>
     <th>GPTQ</th>
+    <th>AWQ</th>
+    <th>AutoRound</th>
   </tr>
 </thead>
 <tbody>
   <tr>
     <td><a href="https://huggingface.co/codellama/CodeLlama-7b-hf" target="_blank" rel="noopener noreferrer">Code-LLaMA-7B</a>,
     <a href="https://huggingface.co/codellama/CodeLlama-13b-hf" target="_blank" rel="noopener noreferrer">Code-LLaMA-13B</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -290,6 +300,10 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>Latest</td>
   </tr>
   <tr>
@@ -298,7 +312,11 @@ Neural Speed supports the following models:
     <a href="https://huggingface.co/bigcode/starcoder" target="_blank" rel="noopener noreferrer">StarCoder-15.5B</a></td>
     <td>✅</td>
     <td> </td>
+    <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
+    <td> </td>
     <td> </td>
     <td>Latest</td>
   </tr>
