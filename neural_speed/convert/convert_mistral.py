@@ -317,7 +317,7 @@ Vocab = Union[SentencePieceVocab, NEVocab]
 
 def permute(weights: NDArray, n_head: int, n_head_kv: int) -> NDArray:
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head_kv, 2, weights.shape[0] // n_head_kv // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
@@ -1062,6 +1062,9 @@ class OutputFile:
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("i", params.ffn_hidden_size))
         self.fout.write(struct.pack("i", 0))
+
+        self.fout.write(struct.pack("i", 0))  # n_experts
+        self.fout.write(struct.pack("i", 0))  # n_expert_used
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))

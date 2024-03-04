@@ -26,18 +26,38 @@ enum llama_model {
   LLAMA_65B,
 };
 
-static const model_scratch llama_mem_req(int n_layers) {
+static const model_scratch llama_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
     case 32:
-      return {1024ull * MB, 1024ull * MB, 1608ull * MB};
+      return {
+          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
+      };
     case 40:
-      return {512ull * MB, 512ull * MB, 1608ull * MB};
+      return {
+          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
+      };
     case 48:
-      return {512ull * MB, 512ull * MB, 2366ull * MB};
+      return {
+          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 2366) * MB,
+      };
     case 60:
-      return {512ull * MB, 512ull * MB, 3124ull * MB};
+      return {
+          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 3124) * MB,
+      };
     case 80:
-      return {2048ull * MB, 2048ull * MB, 10240ull * MB};
+      return {
+          static_cast<unsigned long long>(enlarge_scale * 2048) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 2048) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 10240) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }
@@ -47,7 +67,7 @@ class Llama : public IModel {
  private:
   model_archs arch = MODEL_LLAMA;
   std::unique_ptr<model_model_loader> ml;
-  uint32_t n_layer, n_embd, n_ff, n_vocab, n_head, n_head_kv;
+  uint32_t n_layer, n_embd, n_ff, n_vocab, n_head, n_head_kv, n_expert, n_expert_used;
   int n_gpu_layer;
   bool use_mmap, use_mlock, vocab_only;
   model_scratch scratch;
