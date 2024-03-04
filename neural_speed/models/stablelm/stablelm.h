@@ -19,8 +19,9 @@
 #include "models/model_utils/model_types.h"
 
 enum new_model {
-  MODEL_UNKNOWN,
-  STABLELM,
+  STABLELM_UNKNOWN,
+  STABLELM_1_6B,
+  STABLELM_3B,
 };
 
 static const model_scratch stablelm_mem_req(int n_layers) {
