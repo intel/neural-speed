@@ -33,6 +33,8 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>Latest</td>
   </tr>
   <tr>
@@ -44,9 +46,13 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>Latest</td>
   </tr>
     <td><a href="https://huggingface.co/codellama/CodeLlama-7b-Instruct-hf" target="_blank" rel="noopener noreferrer">CodeLlama-7b</a></td>
+    <td>✅</td>
+    <td>✅</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -63,14 +69,18 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>Latest</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
     <td>✅</td>
-    <td>✅</td>
+    <td> </td>
+    <td> </td>
     <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -80,7 +90,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -90,7 +102,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>4.28.1 or newer</td>
@@ -101,7 +115,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -112,7 +128,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -122,7 +140,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -134,7 +154,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -142,6 +164,8 @@ Neural Speed supports the following models:
     <tr>
     <td><a href="https://huggingface.co/Intel/neural-chat-7b-v3-1" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-1</a>,
     <a href="https://huggingface.co/Intel/neural-chat-7b-v3-2" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-2</a></td>
+    <td>✅</td>
+    <td>✅</td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
@@ -156,7 +180,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>4.33.1</td>
@@ -167,7 +193,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>4.33.1</td>
@@ -189,7 +217,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -201,7 +231,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -215,7 +247,9 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
