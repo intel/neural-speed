@@ -7,17 +7,19 @@ Neural Speed supports the following models:
 <thead>
   <tr>
     <th rowspan="2">Model Name</th>
-    <th colspan="3">INT8</th>
-    <th colspan="3">INT4</th>
+    <th colspan="4">INT8</th>
+    <th colspan="4">INT4</th>
     <th rowspan="2">Transformer Version</th>
   </tr>
   <tr>
     <th>RTN</th>
     <th>GPTQ</th>
     <th>AWQ</th>
+    <th>AutoRound</th>
     <th>RTN</th>
     <th>GPTQ</th>
     <th>AWQ</th>
+    <th>AutoRound</th>
   </tr>
 </thead>
 <tbody>
