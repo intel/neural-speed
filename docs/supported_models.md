@@ -215,7 +215,9 @@ Neural Speed supports the following models:
   </tr>
   <tr>
     <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B</a>,
-    <a href="https://huggingface.co/Qwen/Qwen-14B-Chat" target="_blank" rel="noopener noreferrer">Qwen-14B</a></td>
+    <a href="https://huggingface.co/Qwen/Qwen-14B-Chat" target="_blank" rel="noopener noreferrer">Qwen-14B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen1.5-7B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-0.5B" target="_blank" rel="noopener noreferrer">Qwen1.5-0.5B</a></td>
     <td>✅</td>
     <td> </td>
     <td> </td>
@@ -359,6 +361,14 @@ Neural Speed supports the following models:
     <td></td>
   </tr>
   <tr>
+    <td><a href="https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUFF</a>,
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td></td>
+  </tr>
+  <tr>
     <td><a href="https://huggingface.co/TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF" target="_blank" rel="noopener noreferrer">TheBloke/SOLAR-10.7B-Instruct-v1.0-GGUF</td>
     <td>✅</td>
     <td>✅</td>
@@ -410,7 +420,8 @@ Neural Speed supports the following models:
     <td>✅</td>
   </tr>
   <tr>
-    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B-Chat</td>
+    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B-Chat</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-7B-Chat-GGUF" target="_blank" rel="noopener noreferrer">Qwen1.5-7B-Chat-GGUF</a></td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
