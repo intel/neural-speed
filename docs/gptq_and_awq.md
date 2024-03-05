@@ -6,11 +6,12 @@ Neural Speed supports multiple weight-only quantization algorithms, such as GPTQ
 More algorithm details please check [GPTQ](https://arxiv.org/abs/2210.17323) and [AWQ](https://arxiv.org/abs/2306.00978).
 
 Validated GPTQ & AWQ models directly from the HuggingFace:
-* [Llama-2-7B-Chat-GPT](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GPTQ) & [Llama-2-13B-Chat-GPT](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GPTQ)
-* [CodeLlama-7B-Instruct-GPTQ](https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GPTQ) & [CodeLlama-13B-Instruct-GPTQ](https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GPTQ)
+* [Llama-2-7B-Chat-GPTQ](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GPTQ) & [Llama-2-13B-Chat-GPTQ](https://huggingface.co/TheBloke/Llama-2-13B-Chat-GPTQ) & [Llama-2-7B-AWQ](https://huggingface.co/TheBloke/Llama-2-7B-AWQ) & [Llama-2-13B-chat-AWQ](https://huggingface.co/TheBloke/Llama-2-13B-chat-AWQ)
+* [CodeLlama-7B-Instruct-GPTQ](https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GPTQ) & [CodeLlama-13B-Instruct-GPTQ](https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GPTQ) & [CodeLlama-7B-AWQ](https://huggingface.co/TheBloke/CodeLlama-7B-AWQ) & [CodeLlama-13B-AWQ](https://huggingface.co/TheBloke/CodeLlama-13B-AWQ)
+* [Mistral-7B-Instruct-v0.1-GPTQ](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GPTQ) & [Mistral-7B-Instruct-v0.1-AWQ](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GPTQ)
+* [Mixtral-8x7B-Instruct-v0.1-GPTQ](https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ) & [Mixtral-8x7B-Instruct-v0.1-AWQ](https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-AWQ)
+* [Qwen-7B-Chat-GPTQ](https://huggingface.co/TheBloke/Qwen-7B-Chat-GPTQ) & [Qwen-7B-Chat-AWQ](https://huggingface.co/TheBloke/Qwen-7B-Chat-AWQ)
 * [SOLAR-10.7B-v1.0-GPTQ](https://huggingface.co/TheBloke/SOLAR-10.7B-v1.0-GPTQ)
-* [Llama-2-7B-AWQ](https://huggingface.co/TheBloke/Llama-2-7B-AWQ) & [Llama-2-13B-chat-AWQ](https://huggingface.co/TheBloke/Llama-2-13B-chat-AWQ)
-* [CodeLlama-7B-AWQ](https://huggingface.co/TheBloke/CodeLlama-7B-AWQ) & [CodeLlama-13B-AWQ](https://huggingface.co/TheBloke/CodeLlama-13B-AWQ)
 
 Please check more validated GPTQ & AWQ models in the list of [supported_models](./docs/supported_models.md).
 

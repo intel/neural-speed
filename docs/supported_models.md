@@ -76,12 +76,12 @@ Neural Speed supports the following models:
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
+    <td>✅</td>
     <td>✅</td>
     <td> </td>
-    <td> </td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td> </td>
     <td>Latest</td>
   </tr>
@@ -204,12 +204,12 @@ Neural Speed supports the following models:
     <td><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener noreferrer">Mistral-7B</a>,
      <a href="https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1" target="_blank" rel="noopener noreferrer">Mixtral-8x7B</a></td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
+    <td>✅</td>
     <td>✅</td>
     <td> </td>
-    <td> </td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td> </td>
     <td>4.36.0 or newer</td>
   </tr>
