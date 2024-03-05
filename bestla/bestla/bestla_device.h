@@ -487,10 +487,16 @@ class CpuRuntime {
 
   inline float getPE(BTLA_ISA isa) {
     cur_PE = &PE[int(isa)];
+    if (isa == BTLA_ISA::NoSIMD) return P_core_num / E_core_num;
+    //printf("GET:%d\t%f\n",int(isa), *cur_PE);
     return *cur_PE * P_core_num / E_core_num;
   }
 
-  inline void setPE(float& PE_) { *cur_PE = PE_; }
+  inline void adjustPE(const float PE_) {
+    //printf("Adjust:%d,%f\n",cur_PE-PE,PE_);
+    if (cur_PE - PE == int(BTLA_ISA::AVX2) || cur_PE - PE == int(BTLA_ISA::AVX_VNNI))
+    *cur_PE *= PE_;
+  }
 
   size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
   int P_core_num = 0, E_core_num = 0;
@@ -518,12 +524,12 @@ class CpuRuntime {
       mL1Cache_E = _cd->getL1CacheSize_E();
       mL2Cache_E = _cd->getL2CacheSize_E();
       mHybrid = true;
-      PE = _cd->getPE();
+      memcpy(PE, _cd->getPE(), int(BTLA_ISA::ISA_COUNT) * sizeof(float));
       cur_PE = PE;
     }
   }
   float* cur_PE;
-  float* PE;
+  float PE[int(BTLA_ISA::ISA_COUNT)];
   int maxThreads;
 };
 }  // namespace device

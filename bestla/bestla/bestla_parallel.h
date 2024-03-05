@@ -74,23 +74,43 @@ class StdThreading : public IThreading {
  public:
   explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
     printf("Using Std\n");
+    cr = &device::CpuRuntime::getInstance(nthreads);
     create_threads();
   }
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
       running.store(mThreadNum - 1);
       for (int i = 0; i < 10; i++) flag[i].store(mThreadNum);
-      for (size_t i = 0; i < mThreadNum - 1; i++) {
-        func_[i] = &func;
+      if (cr->mHybrid) {
+        pe_time[0].store(0);
+        pe_time[1].store(0);
+        for (size_t i = 0; i < mThreadNum - 1; i++) func_[i] = &func;
+        utils::timer tm;
+        tm.start();
+        func(0);
+        pe_time[0].fetch_add(int(TIME_SCALE * tm.stop()));
+        while (true) {
+          if (running.load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
+        const float time_per_p = pe_time[0].load() / (1.0 * TIME_SCALE * (mThreadNum - cr->E_core_num));
+        const float time_per_e = pe_time[1].load() / (1.0 * TIME_SCALE * cr->E_core_num);
+        if(time_per_e!=0 && time_per_p != 0)
+          cr->adjustPE(time_per_e / time_per_p);
+      }else {
+        for (size_t i = 0; i < mThreadNum - 1; i++) {
+          func_[i] = &func;
+        }
+        func(0);
+        while (true) {
+          if (running.load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
       }
-      func(0);
-      while (true) {
-        if (running.load() == 0)
-          break;
-        else
-          _mm_pause();
-      }
-      // todo: collect time and update PE to cr
     } else {
       func(0);
     }
@@ -100,17 +120,30 @@ class StdThreading : public IThreading {
     if (nthreads != mThreadNum) {
       stop_threads();
       mThreadNum = nthreads;
+      cr = &device::CpuRuntime::getInstance(nthreads);
       create_threads();
     }
   }
 
   inline void sync(int idx = 0) override {
     flag[idx].fetch_sub(1);
-    while (true) {
-      if (flag[idx].load() == 0)
-        break;
-      else
-        _mm_pause();
+    if (cr->mHybrid) {
+      utils::timer tm;
+      tm.start();
+      while (true) {
+        if (flag[idx].load() == 0)
+          break;
+        else
+          _mm_pause();
+      }
+      pe_time[device::CpuDevice::isEcore()].fetch_sub(int(TIME_SCALE * tm.stop()));
+    } else {
+      while (true) {
+        if (flag[idx].load() == 0)
+          break;
+        else
+          _mm_pause();
+      }
     }
   }
 
@@ -142,7 +175,27 @@ class StdThreading : public IThreading {
       for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
     }
     _cd->core_bond(core_order[0]);
-    for (size_t i = 0; i < mThreadNum - 1; i++) {
+    if (cr->mHybrid)
+      for (size_t i = 0; i < mThreadNum - 1; i++) {
+        thdset[i] = std::thread(
+            [&](int tidx, int core_id) {
+              _cd->core_bond(core_id);
+              utils::timer tm;
+              while (true) {
+                if (stop.load() == true) break;
+                if (func_[tidx] != nullptr) {
+                  tm.start();
+                  (*func_[tidx])(tidx + 1);
+                  func_[tidx] = nullptr;
+                  pe_time[device::CpuDevice::isEcore()].fetch_add(int(TIME_SCALE * tm.stop()));
+                  running.fetch_sub(1);
+                } else {
+                  _mm_pause();
+                }
+              }
+            },
+            int(i), core_order[i + 1]);
+    }else for (size_t i = 0; i < mThreadNum - 1; i++) {
       thdset[i] = std::thread(
           [&](int tidx, int core_id) {
             _cd->core_bond(core_id);
@@ -161,7 +214,9 @@ class StdThreading : public IThreading {
     }
     delete[] core_order;
   }
-
+  device::CpuRuntime* cr;
+  const int TIME_SCALE = 10000;  // used to convert float to int
+  std::atomic_int pe_time[2];  // C++ 20 support std::atomic_float
   std::vector<std::thread> thdset;
   std::atomic_bool stop;
   std::atomic_int running;
