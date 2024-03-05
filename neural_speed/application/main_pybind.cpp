@@ -91,7 +91,12 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
 #endif
   params->model_arch = model_name_to_arch::init().find(params->model_name);
   params->model = model_path;
-  params->n_predict = max_new_tokens;
+  if (max_new_tokens <= 0) {
+    fprintf(stderr, "warning: max_new_tokens must be not less than 0, reseting it to 0.\n");
+    params->n_predict = 0;
+  } else {
+    params->n_predict = max_new_tokens;
+  }
   params->n_batch = n_batch;
   params->n_ctx = ctx_size;
   params->seed = seed;

@@ -1291,10 +1291,18 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.shift_roped_k = params.shift_roped_k;
   lparams.cont_batching = params.cont_batching;
   lparams.max_request_num = params.max_request_num;
-  lparams.gen_conf.max_new_tokens = params.n_predict;
-  lparams.gen_conf.min_new_tokens = params.min_new_tokens;
-  lparams.gen_conf.length_penalty = params.length_penalty;
-  lparams.gen_conf.do_early_stopping = params.do_early_stopping;
+  generation_config gen_conf = {
+      /*.max_new_tokens    =*/(uint32_t)params.n_predict,
+      /*.min_new_tokens    =*/params.min_new_tokens,
+      /*.length_penalty    =*/params.length_penalty,
+      /*.do_early_stopping =*/params.do_early_stopping,
+      /*.do_sample         =*/params.do_sample,
+      /*.top_k             =*/params.top_k,
+      /*.top_p             =*/params.top_p,
+      /*.temp              =*/params.temp,
+      /*.repeat_penalty    =*/params.repeat_penalty,
+  };
+  lparams.gen_conf = gen_conf;
   lparams.scratch_size_ratio = params.scratch_size_ratio;
 
   NE_ASSERT(("Start size cannot be greater than the maximum context size!", lparams.n_keep < lparams.n_ctx));
@@ -2504,8 +2512,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
   for (int ni = 0; ni < next_inputs.size(); ++ni) {
     n_tokens[ni] = next_inputs[ni].n_tokens;
     if (n_tokens[ni] > model_n_ctx(ctx)) {
-      fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, n_tokens[ni],
-              model_n_ctx(ctx) - 4);
+      fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, n_tokens[ni], model_n_ctx(ctx));
       return response;
     }
     n_prompt_tokens[ni] = next_inputs[ni].n_tokens;
@@ -2783,4 +2790,77 @@ std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs
     groups.back().push_back(i);
   }
   return groups;
+}
+
+std::vector<model_token> model_post_greedy_search(const float* logits, model_context* ctx) {
+  std::vector<model_token> ids(ctx->batch_size);
+  const int n_vocab = model_n_vocab(ctx);
+  static int n_vocab_segment = 1024;
+  int num_segments = (n_vocab + n_vocab_segment - 1) / n_vocab_segment;
+  std::vector<model_token> candidate_tokens(ctx->batch_size * num_segments);
+  std::vector<float> candidate_logits(ctx->batch_size * num_segments);
+#pragma omp parallel for collapse(2)
+  for (int bs = 0; bs < ctx->batch_size; ++bs) {
+    for (int vocab = 0; vocab < n_vocab; vocab += n_vocab_segment) {
+      auto max_e =
+          std::max_element(logits + bs * n_vocab + vocab, vocab + n_vocab_segment > n_vocab
+                                                              ? logits + bs * n_vocab + n_vocab
+                                                              : logits + bs * n_vocab + vocab + n_vocab_segment);
+      candidate_tokens[bs * num_segments + vocab / n_vocab_segment] = max_e - (logits + bs * n_vocab);
+      candidate_logits[bs * num_segments + vocab / n_vocab_segment] = *max_e;
+    }
+  }
+  for (int bs = 0; bs < ctx->batch_size; ++bs) {
+    ids[bs] = candidate_tokens[std::distance(candidate_logits.begin(),
+                                             std::max_element(candidate_logits.begin() + bs * num_segments,
+                                                              candidate_logits.begin() + (bs + 1) * num_segments))];
+  }
+  return ids;
+}
+
+std::vector<model_token> model_post_sample_top_k_top_p_repeat(
+    const float* logits, model_context* ctx, const std::vector<std::vector<model_token>>& last_n_tokens,
+    const std::vector<int>& last_n_tokens_indices) {
+  int alpha_frequency = 0;
+  int alpha_presence = 0;
+  int repeat_last_n = 64;
+  int top_k = ctx->generation_conf.top_k;
+  float tfs_z = 1.00f;
+  float typical_p = 1.00f;
+  float top_p = ctx->generation_conf.top_p;
+  float temp = ctx->generation_conf.temp;
+  std::vector<model_token> ids(ctx->batch_size);
+  const int n_vocab = model_n_vocab(ctx);
+  if (!last_n_tokens_indices.empty()) MODEL_ASSERT(last_n_tokens_indices.size() == ctx->batch_size);
+  // #pragma omp parallel for  // omp will affect sampling positions in batch dimension
+  for (int bs = 0; bs < ctx->batch_size; ++bs) {
+    std::vector<model_token_data> candidates;
+    candidates.reserve(n_vocab);
+    for (model_token token_id = 0; token_id < n_vocab; token_id++) {
+      candidates.emplace_back(model_token_data{token_id, logits[bs * n_vocab + token_id], 0.0f});
+    }
+    model_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
+
+    // Apply penalties
+    float nl_logit = logits[bs * n_vocab + model_token_nl()];
+    // continuous batching will update last_n_tokens in request_idx dimension
+    int idx = last_n_tokens_indices.empty() ? bs : last_n_tokens_indices.at(bs);
+    auto last_n_repeat =
+        std::min(std::min(static_cast<int>(last_n_tokens[idx].size()), repeat_last_n), model_n_ctx(ctx));
+    model_sample_repetition_penalty(ctx, &candidates_p,
+                                    last_n_tokens[idx].data() + last_n_tokens[idx].size() - last_n_repeat,
+                                    last_n_repeat, ctx->generation_conf.repeat_penalty);
+    model_sample_frequency_and_presence_penalties(ctx, &candidates_p,
+                                                  last_n_tokens[idx].data() + last_n_tokens[idx].size() - last_n_repeat,
+                                                  last_n_repeat, alpha_frequency, alpha_presence);
+    // int id = model_sample_token_greedy(ctx, &candidates_p);
+    // Temperature sampling
+    model_sample_top_k(ctx, &candidates_p, top_k, 1);
+    model_sample_tail_free(ctx, &candidates_p, tfs_z, 1);
+    model_sample_typical(ctx, &candidates_p, typical_p, 1);
+    model_sample_top_p(ctx, &candidates_p, top_p, 1);
+    model_sample_temperature(ctx, &candidates_p, temp);
+    ids[bs] = model_sample_token(ctx, &candidates_p);
+  }
+  return ids;
 }

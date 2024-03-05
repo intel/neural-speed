@@ -517,6 +517,11 @@ MODEL_API std::vector<std::vector<model_token>> beam_search(model_context* lctx,
                                                             const int& n_threads);
 // split model inputs into continuous inference groups which have num_requests length
 MODEL_API std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs, const int n_input);
+// token sampling function
+MODEL_API std::vector<model_token> model_post_greedy_search(const float* logits, model_context* ctx);
+MODEL_API std::vector<model_token> model_post_sample_top_k_top_p_repeat(
+    const float* logits, model_context* ctx, const std::vector<std::vector<model_token>>& last_n_tokens,
+    const std::vector<int>& last_n_tokens_indices = {});
 // Internal API to be implemented by model.cpp and used by tests/benchmarks only
 #ifdef MODEL_API_INTERNAL
 

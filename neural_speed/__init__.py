@@ -345,13 +345,13 @@ class Model:
                 ret[i].extend(response[i])
             if beam_search:
                 break
+            out_count += 1
             if stopping_criteria is not None:
                 if stopping_criteria(torch.tensor(ret), None):
                     break
             elif ret[0][-1] == self.__get_eos_id() or \
-                    (max_new_tokens != -1 and out_count > max_new_tokens):
+                    (max_new_tokens != -1 and out_count >= max_new_tokens):
                 break
-            out_count += 1
         if streamer:
             streamer.end()
 

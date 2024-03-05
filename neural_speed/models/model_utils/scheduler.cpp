@@ -22,10 +22,18 @@ Iter_level_worker::Iter_level_worker(const gpt_params& params) : m_ctx(model_ini
   }
   if (m_ctx->beam_search && bsf == nullptr) {
     bsf = new beam_search_flow(m_ctx, m_ctx->max_request_num, params.n_threads);
+    fprintf(stdout, "%s: use beam search generation in model server.\n", __func__);
+  } else if (m_ctx->generation_conf.do_sample == false) {
+    fprintf(stdout, "%s: use greedy search generation in model server.\n", __func__);
+  } else {
+    fprintf(stdout, "%s: use top_k_top_p sampling generation in model server.\n", __func__);
   }
+  // for repetition penalizing sampling and long context
   if (!m_ctx->beam_search) {
-    fprintf(stderr, "%s: error: only supports beam search.\n", __func__);
-    exit(0);
+    last_n_tokens.resize(m_ctx->max_request_num);
+    for (int i = 0; i < m_ctx->max_request_num; ++i) {
+      last_n_tokens[i].resize(m_ctx->n_ctx, 0);
+    }
   }
   threads = params.n_threads;
 }
@@ -46,30 +54,43 @@ Cont_batch_gen_worker::Cont_batch_gen_worker(const gpt_params& params) : Iter_le
 
 bool Cont_batch_gen_worker::prepare_inputs(std::vector<sequence>* seqs, const int& n_input, model_input* inputs) {
   for (int i = 0; i < n_input; ++i) {
-    if ((seqs->at(i)).status != seq_status::PREFILL && (seqs->at(i)).status != seq_status::DECODING) {
+    if (seqs->at(i).status != seq_status::PREFILL && seqs->at(i).status != seq_status::DECODING) {
       fprintf(stderr, "%s: error: request %d status is unright (%d).\n", __func__, seqs->at(i).request_idx,
-              static_cast<int>((seqs->at(i)).status));
+              static_cast<int>(seqs->at(i).status));
       return false;
-    } else if ((seqs->at(i)).status == seq_status::PREFILL) {
-      inputs[i].tokens = (seqs->at(i)).prompt_ids.data();
-      inputs[i].n_tokens = (seqs->at(i)).n_prompt_tokens;
-      inputs[i].n_prompt_tokens = (seqs->at(i)).n_prompt_tokens;
+    } else if (seqs->at(i).status == seq_status::PREFILL) {
+      if (seqs->at(i).n_prompt_tokens + seqs->at(i).gen_conf.max_new_tokens > m_ctx->n_ctx) {
+        fprintf(stderr, "%s: error: prompt + max_new_tokens is too long (%d tokens, max %d) for model server.\n",
+                __func__, seqs->at(i).n_prompt_tokens + seqs->at(i).gen_conf.max_new_tokens, m_ctx->n_ctx);
+        return false;
+      }
+      inputs[i].tokens = seqs->at(i).prompt_ids.data();
+      inputs[i].n_tokens = seqs->at(i).n_prompt_tokens;
+      inputs[i].n_prompt_tokens = seqs->at(i).n_prompt_tokens;
       inputs[i].n_past = 0;
       inputs[i].n_total = 0;
-      inputs[i].request_idx = (seqs->at(i)).request_idx;
+      inputs[i].request_idx = seqs->at(i).request_idx;
       // do not support padding for now
       inputs[i].n_padding = 0;
-      inputs[i].gen_conf = (seqs->at(i)).gen_conf;
-    } else if ((seqs->at(i)).status == seq_status::DECODING) {
-      inputs[i].tokens = &(seqs->at(i)).generated_ids.back();
+      inputs[i].gen_conf = seqs->at(i).gen_conf;
+    } else if (seqs->at(i).status == seq_status::DECODING) {
+      inputs[i].tokens = (bsf != nullptr) ? nullptr : &(seqs->at(i).generated_ids.back());
       inputs[i].n_tokens = 1;
-      inputs[i].n_past = (seqs->at(i)).n_past;
-      inputs[i].n_total = (seqs->at(i)).n_total;
-      inputs[i].request_idx = (seqs->at(i)).request_idx;
+      inputs[i].n_past = seqs->at(i).n_past;
+      inputs[i].n_total = seqs->at(i).n_total;
+      inputs[i].request_idx = seqs->at(i).request_idx;
       // do not support padding for now
       inputs[i].n_padding = 0;
     } else {
       continue;
+    }
+    // update last_n_tokens
+    if (!m_ctx->beam_search &&
+        (seqs->at(i).status == seq_status::PREFILL || seqs->at(i).status == seq_status::DECODING)) {
+      int req_idx = inputs[i].request_idx;
+      last_n_tokens[req_idx].erase(last_n_tokens[req_idx].begin(), last_n_tokens[req_idx].begin() + inputs[i].n_tokens);
+      last_n_tokens[req_idx].insert(last_n_tokens[req_idx].end(), inputs[i].tokens,
+                                    inputs[i].tokens + inputs[i].n_tokens);
     }
   }
   return true;
@@ -87,17 +108,66 @@ bool Cont_batch_gen_worker::beam_search_step(std::vector<sequence>* seqs, const 
   return true;
 }
 
+bool Cont_batch_gen_worker::greedy_search_step(std::vector<sequence>* seqs, const int& n_input) {
+  // prepare inputs
+  std::vector<model_input> step_inputs(n_input);
+  if (!prepare_inputs(seqs, n_input, step_inputs.data())) {
+    return false;
+  }
+  m_ctx->batch_size = n_input;
+  m_ctx->request_running_bs = n_input;
+  // model eval
+  if (model_eval(m_ctx, step_inputs.data(), step_inputs.size(), threads) > 0) {
+    return false;
+  }
+  // greedy search
+  next_tokens = model_post_greedy_search(m_ctx->logits.data(), m_ctx);
+  return true;
+}
+
+bool Cont_batch_gen_worker::top_k_top_p_sample_step(std::vector<sequence>* seqs, const int& n_input) {
+  // prepare inputs
+  std::vector<model_input> step_inputs(n_input);
+  if (!prepare_inputs(seqs, n_input, step_inputs.data())) {
+    return false;
+  }
+  m_ctx->batch_size = n_input;
+  m_ctx->request_running_bs = n_input;
+  // model eval
+  if (model_eval(m_ctx, step_inputs.data(), step_inputs.size(), threads) > 0) {
+    return false;
+  }
+  // top_k_top_p sampling
+  std::vector<int> last_n_tokens_indices(n_input, 0);
+  for (int ni = 0; ni < n_input; ++ni) {
+    last_n_tokens_indices[ni] = seqs->at(ni).request_idx;
+  }
+  next_tokens = model_post_sample_top_k_top_p_repeat(m_ctx->logits.data(), m_ctx, last_n_tokens, last_n_tokens_indices);
+  return true;
+}
+
 bool Cont_batch_gen_worker::step(std::vector<sequence>* seqs, const int& n_input) {
   reqidx_to_vecid.clear();
   for (int ni = 0; ni < n_input; ++ni) {
     reqidx_to_vecid.emplace(seqs->at(ni).request_idx, ni);
   }
-  if (m_ctx->beam_search && bsf != nullptr) {
-    if (!beam_search_step(seqs, n_input)) {
+  // beam search
+  if (m_ctx->beam_search) {
+    if (bsf == nullptr || !beam_search_step(seqs, n_input)) {
       return false;
     }
+    // greedy search
+  } else if (m_ctx->generation_conf.do_sample == false) {
+    if (!greedy_search_step(seqs, n_input)) {
+      return false;
+    }
+    // top_k_top_p sampling
+  } else {
+    if (!top_k_top_p_sample_step(seqs, n_input)) {
+      return  false;
+    }
   }
-  // TODO (YZT) greedy search and top_p-top_k sampling
+
   return update_seqs(seqs, n_input);
 }
 
@@ -117,8 +187,17 @@ bool Cont_batch_gen_worker::update_seqs(std::vector<sequence>* seqs, const int& 
       fprintf(stderr, "%s: error: wrong sequence status %d.\n", __func__, static_cast<int>(seqs->at(ni).status));
       return false;
     }
+    if (!m_ctx->beam_search) {
+      if (next_tokens.size() != n_input) {
+        fprintf(stderr, "%s: error: wrong next_tokens size %d, which should be %d.\n", __func__, next_tokens.size(),
+                n_input);
+        return false;
+      }
+      seqs->at(ni).generated_ids.emplace_back(next_tokens[ni]);
+    }
   }
-  if (m_ctx->beam_search && bsf != nullptr) {
+  if (m_ctx->beam_search) {
+    if (bsf == nullptr) return false;
     request_done_ids = bsf->request_done_ids();
     std::vector<std::vector<model_token>> req_done_res = bsf->request_done_reponse();
     if (request_done_ids.size() != req_done_res.size()) {
@@ -140,8 +219,19 @@ bool Cont_batch_gen_worker::update_seqs(std::vector<sequence>* seqs, const int& 
       seqs->at(vecid).end_time = model_time_us();
     }
     return true;
+  } else {
+    for (int ni = 0; ni < n_input; ++ni) {
+      if (seqs->at(ni).status == seq_status::DECODING && !seqs->at(ni).generated_ids.empty() &&
+          (seqs->at(ni).generated_ids.back() == m_ctx->vocab.eos_token_id ||
+           seqs->at(ni).generated_ids.size() >= seqs->at(ni).gen_conf.max_new_tokens)) {
+        seqs->at(ni).status = seq_status::FINISHED;
+        seqs->at(ni).end_time = model_time_us();
+        request_done_ids.emplace_back(seqs->at(ni).request_idx);
+        last_n_tokens[seqs->at(ni).request_idx].resize(m_ctx->n_ctx, 0);
+      }
+    }
+    return true;
   }
-  return false;  // TODO (YZT) greedy search and top_p-top_k sampling
 }
 
 // Iter_level_scheduler
@@ -240,6 +330,8 @@ bool Cont_batch_gen_scheduler::prepare_seqs() {
       for (int np = 0; np < n_perfill_seqs; ++np) {
         if (waiting_pool.pop(&executed_seqs[cur_running_num + np])) {
           executed_seqs[cur_running_num + np].status = seq_status::PREFILL;
+          executed_seqs[cur_running_num + np].generated_ids.reserve(
+              executed_seqs[cur_running_num + np].gen_conf.max_new_tokens);
           if (executed_seqs[cur_running_num + np].request_idx == -1) {
             const int fidx = query_free_req_idx();
             if (fidx == -1) {
