@@ -81,7 +81,7 @@ void Llama::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_head = hparams.n_head;
   n_expert = hparams.n_experts;
   n_expert_used = hparams.n_experts_used;
-  scratch = llama_mem_req(n_layer);
+  scratch = llama_mem_req(n_layer, lctx.model_scratch_enlarge_scale);
   model.scratchs = scratch;
 }
 

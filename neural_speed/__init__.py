@@ -212,7 +212,7 @@ class Model:
         out_count = 0
         input_list = None
         pad_token_id = generate_kwargs.get("pad_token", None)
-        if generate_kwargs.get("continuous_batching", False):
+        if input_ids.shape[0] > 1 and generate_kwargs.get("continuous_batching", True):
             input_list = self._cont_batching_input(input_ids, pad_token_id)
         else:
             input_list = input_ids.tolist()
