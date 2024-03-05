@@ -217,11 +217,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         # default type is fp32
         ftype_cur = 0
         if ftype == 1 and n_dims > 1:
-            # print("  Converting to float16", data.shape, data[:3, :3].tolist())
             data = data.astype(np.float16)
             ftype_cur = 1
         else:
-            # print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
             data = data.astype(np.float32)
 
         # header
@@ -234,7 +232,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
         # data
         data.tofile(f)
-        #data.numpy().tofile(fout)
 
     # 3. write tensors
     list_vars = model

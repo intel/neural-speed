@@ -104,9 +104,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
                                                 alg="sym" if q_config['sym'] else "asym",
                                                 compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
-    print(
-        f"convert_to_qx_bestla_tensor: {src_name:>40} -> {dst_name:<40} shape: {shape}, byte_size: {byte_size:>10} quantized tensor to bestla q4 block"
-    )
+    print(f"convert_to_q4_bestla_tensor: {src_name:>40} -> {dst_name:<40} shape: {shape}, byte_size: {byte_size:<10}")
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
@@ -123,8 +121,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     def load_GPTQ_qwen(model_path):
         from safetensors.torch import load_file
-        model_1 = load_file("/home/zhenzhong/model/Qwen-7B-Chat-GPTQ/model-00001-of-00002.safetensors")
-        model = load_file("/home/zhenzhong/model/Qwen-7B-Chat-GPTQ/model-00002-of-00002.safetensors")
+        model_1 = load_file(model_path + "/model-00001-of-00002.safetensors")
+        model = load_file(model_path + "/model-00002-of-00002.safetensors")
         model.update(model_1)
 
         with open(model_path + '/config.json', "r", encoding="utf-8") as f:
@@ -148,8 +146,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f = open(out_path, "wb")
 
     # possible data types
-    #   ftype == 0 -> float32
-    #   ftype == 1 -> float16
+    #   ftype == 0 -> float32, ftype == 1 -> float16
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
@@ -221,74 +218,43 @@ def main(args_in: Optional[List[str]] = None) -> None:
     print(hparams)
 
     def convert_qwen_to_fp32_tensor(src_name, dst_name, model, fout):
-        #data = model[src_name]
         # qwen-gptq is torch.bfloat16 mostly.
         if model[src_name].dtype == torch.float32:
             data = model[src_name].squeeze().numpy()
         else:
             data = model[src_name].squeeze().to(torch.float32).numpy()
-        #data = model[src_name].squeeze().numpy()
         data = data.astype(np.float32)
         shape = data.shape
         n_dims = len(shape)
         print("convert_qwen_to_fp32_tensor:  %40s" % src_name + "-> %-40s" % dst_name + " shape: ", shape, " type: ",
-              data.dtype, "data: ", data[:2, :2].tolist() if n_dims > 1 else data[:2].tolist())
-        #data = data.to(torch.float32)
+              data.dtype)
 
         #ftype_cur = {torch.float16: 1, torch.float32: 0}[data.dtype]
         # default type is fp32
         ftype_cur = 0
         if ftype == 1 and n_dims > 1:
-            # print("  Converting to float16", data.shape, data[:3, :3].tolist())
             data = data.astype(np.float16)
             ftype_cur = 1
         else:
-            # print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
             data = data.astype(np.float32)
 
         # header
         # write_header(fout, shape, dst_name, ftype_cur)
         str = src_name.encode('utf-8')
-        f.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
         for i in range(n_dims):
-            f.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-        f.write(str)
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(str)
 
         # data
         data.tofile(f)
-        #data.numpy().tofile(fout)
-
-    # for src_name in list_vars.keys():
-    #     convert_qwen_to_fp32_tensor(src_name, src_name, list_vars, f)
 
     #3. write tensors
-    #list_vars = model
     convert_qwen_to_fp32_tensor("transformer.wte.weight", "transformer.wte.weight", list_vars, f)
     convert_qwen_to_fp32_tensor("transformer.ln_f.weight", "transformer.ln_f.weight", list_vars, f)
     convert_qwen_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, f)
 
     for i in range(hparams["num_hidden_layers"]):
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
-        #             f"transformer.h.{i}.ln_1.weight", list_vars, f)
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
-        #             f"transformer.h.{i}.ln_2.weight", list_vars, f)
-
-        # # qkv GEMM
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.attn.c_attn.weight",
-        #             f"transformer.h.{i}.attn.c_attn.weight", list_vars, f)
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.attn.c_attn.bias",
-        #                 f"transformer.h.{i}.attn.c_attn.bias", list_vars, f)
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.attn.c_proj.weight",
-        #             f"transformer.h.{i}.attn.c_proj.weight", list_vars, f)
-
-        # # ffn GEMM
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.mlp.w1.weight",
-        #             f"transformer.h.{i}.mlp.w1.weight", list_vars, f)
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.mlp.w2.weight",
-        #             f"transformer.h.{i}.mlp.w2.weight", list_vars, f)
-        # convert_qwen_to_fp32_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
-        #             f"transformer.h.{i}.mlp.c_proj.weight", list_vars, f)
-
         convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight", f"transformer.h.{i}.ln_1.weight", list_vars, f)
         convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight", f"transformer.h.{i}.ln_2.weight", list_vars, f)
 
@@ -307,71 +273,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                     f, quantize_config)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight", f"transformer.h.{i}.mlp.c_proj.weight",
                                     list_vars, f, quantize_config)
-
-    # for name in list_vars.keys():
-    #     # No gradients for these
-    #     list_vars[name].requires_grad = False
-    #     src = name
-
-    #     print(src, ' -> ', name)
-    #     data = list_vars[src].squeeze().numpy()
-    #     data = data.astype(np.float32)
-
-    #     n_dims = len(data.shape)
-    #     print(name, n_dims, data.shape)
-
-    #     # default type is fp32
-    #     ftype_cur = 0
-    #     if ftype == 1 and n_dims > 1:
-    #         print("  Converting to float16", data.shape, data[:3, :3].tolist())
-    #         data = data.astype(np.float16)
-    #         ftype_cur = 1
-    #     else:
-    #         print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
-    #         data = data.astype(np.float32)
-
-    #     # header
-    #     str = name.encode('utf-8')
-    #     f.write(struct.pack("iii", n_dims, len(str), ftype_cur))
-    #     for i in range(n_dims):
-    #         f.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-    #     print(str)
-    #     f.write(str)
-
-    #     # data
-    #     data.tofile(f)
-
-    # f.close()
-
-    # print("Done. Output file: " + out_path)
-    # print("")
-
-    # GGUF loading
-    # convert_qwen_to_fp32_tensor("transformer.wte.weight", "tok_embeddings.weight", list_vars, f)
-    # convert_qwen_to_fp32_tensor("transformer.ln_f.weight", "output_norm.weight", list_vars, f)
-    # convert_qwen_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
-
-    # for i in range(hparams["num_hidden_layers"]):
-    #     convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_1.weight",
-    #                 f"blk.{i}.attn_norm.weight", list_vars, f)
-    #     convert_qwen_to_fp32_tensor(f"transformer.h.{i}.ln_2.weight",
-    #                 f"blk.{i}.ffn_norm.weight", list_vars, f)
-
-    #     # qkv GEMM
-    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_attn.weight",
-    #                 f"blk.{i}.attn_qkv.weight", list_vars, f, quantize_config)
-    #     convert_qwen_to_fp32_tensor(f"transformer.h.{i}.attn.c_attn.bias",
-    #                     f"blk.{i}.attn_qkv.bias", list_vars, f)
-    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_proj.weight",
-    #                 f"blk.{i}.attn_output.weight", list_vars, f, quantize_config)
-
-    #     # ffn GEMM
-    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w1.weight",
-    #                 f"blk.{i}.ffn_up.weight", list_vars, f, quantize_config)
-    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w2.weight",
-    #                 f"blk.{i}.ffn_gate.weight", list_vars, f, quantize_config)
-    #     convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight",
-    #                 f"blk.{i}.ffn_down.weight", list_vars, f, quantize_config)
 
     f.close()
     print(f"Success! saved as {out_path}")
