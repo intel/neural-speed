@@ -71,7 +71,6 @@ def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_hea
     n_dims = len(shape)
     str = dst_name.encode('utf-8')
     fout.write(struct.pack("iii", n_dims, len(str), GGML_QJBLAS_TYPE))
-    # import pdb;pdb.set_trace()
     for i in range(n_dims):
         fout.write(struct.pack("i", shape[n_dims - 1 - i]))
     fout.write(str)
@@ -119,7 +118,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     out_path = args.outfile.as_posix()
     model_path = args.model.as_posix()
 
-    model, config, quantize_config = load_quantized_model(model_path)
+    model, config, quantize_config = load_quantized_safetensors(model_path)
     f = open(out_path, "wb")
 
     # possible data types
@@ -199,19 +198,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
         f.write(struct.pack("f", score))
 
     def convert_mixtral_to_fp32_tensor(src_name, dst_name, model, fout):
-        #data = model[src_name]
         # qwen-gptq is torch.bfloat16 mostly.
         if model[src_name].dtype == torch.float32:
             data = model[src_name].squeeze().numpy()
         else:
             data = model[src_name].squeeze().to(torch.float32).numpy()
-        #data = model[src_name].squeeze().numpy()
         data = data.astype(np.float32)
         shape = data.shape
         n_dims = len(shape)
         print("convert_mixtral_to_fp32_tensor:  %40s" % src_name + "-> %-40s" % dst_name + " shape: ", shape, " type: ",
               data.dtype)
-        #data = data.to(torch.float32)
 
         #ftype_cur = {torch.float16: 1, torch.float32: 0}[data.dtype]
         # default type is fp32
@@ -238,9 +234,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_mixtral_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
     convert_mixtral_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
     convert_mixtral_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
-
-    for name in list_vars.keys():
-        print(f"name = {name}")
 
     for i in range(n_layer):
         convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",

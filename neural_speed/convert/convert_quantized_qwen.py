@@ -59,7 +59,6 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     n_dims = len(shape)
     str = dst_name.encode('utf-8')
     fout.write(struct.pack("iii", n_dims, len(str), GGML_QJBLAS_TYPE))
-    # import pdb;pdb.set_trace()
     for i in range(n_dims):
         fout.write(struct.pack("i", shape[n_dims - 1 - i]))
     fout.write(str)
@@ -118,23 +117,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     model_path = args.model.as_posix()
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    def load_GPTQ_qwen(model_path):
-        from safetensors.torch import load_file
-        model_1 = load_file(model_path + "/model-00001-of-00002.safetensors")
-        model = load_file(model_path + "/model-00002-of-00002.safetensors")
-        model.update(model_1)
-
-        with open(model_path + '/config.json', "r", encoding="utf-8") as f:
-            config = json.load(f)
-
-        quantize_config = config["quantization_config"]
-        if "zero_point" in quantize_config:
-            quantize_config["sym"] = not quantize_config["zero_point"]
-        return model, config, config["quantization_config"]
-
-    # QWEN-GPTQ
-    model, hparams, quantize_config = load_GPTQ_qwen(model_path)
+    # QWEN-GPTQ & AWQ
+    model, hparams, quantize_config = load_quantized_safetensors(model_path)
     list_vars = model
 
     # orinal QWEN

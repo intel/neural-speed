@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import torch
+import os
 from pathlib import Path
 import numpy as np
 import struct
@@ -300,6 +301,30 @@ def find_quantized_model_file(model_path):
                 warnings.warn(f'Detected {len(found)} {ext} model, use the first one {found[0]}.')
             print(f"Detected model file {found[0]}")
             return str(found[0])
+
+
+def load_quantized_safetensors(model_path):
+    # load GPTQ & AWQ models, only for safetensors
+    from safetensors.torch import load_file
+    safetensors = []
+    for file in os.listdir(model_path):
+        if file.endswith(".safetensors"):
+            safetensors.append(file)
+
+    print(f"safetensors list = {safetensors}")
+    model = {}
+    for file in safetensors:
+        tmp = load_file(model_path + "/" + file)
+        if isinstance(tmp, dict):
+            model.update(tmp)
+
+    with open(model_path + '/config.json', "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    quantize_config = config["quantization_config"]
+    if "zero_point" in quantize_config:
+        quantize_config["sym"] = not quantize_config["zero_point"]
+    return model, config, config["quantization_config"]
 
 
 def load_quantized_model(model_path):
