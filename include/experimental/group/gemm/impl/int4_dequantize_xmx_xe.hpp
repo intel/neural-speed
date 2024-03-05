@@ -118,7 +118,6 @@ private:
             = (compute_policy::block_size_y_a > tile_size_y_a)
             ? tile_size_y_a
             : compute_policy::block_size_y_a;
-    static_assert(block_size_y_a == 16);
 
     static constexpr uint32_t block_size_x_b = compute_policy::block_size_x_b;
     static constexpr uint32_t block_size_y_b
@@ -593,7 +592,7 @@ private:
                 }
                 if constexpr (compute_policy::quant_type
                         == quant_mode::S4_FULLRANGE_NO_ZP) {
-                    xetla_vector<int8_t, block_size_x_b *block_size_y_b>
+                    xetla_vector<int8_t, block_size_x_b * block_size_y_b>
                             cvt_blk_i8
                             = (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
                     cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());

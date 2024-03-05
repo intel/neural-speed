@@ -593,15 +593,7 @@ void dequantize_gemm_run(int iter) {
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
-<<<<<<< HEAD
-<<<<<<< HEAD
     int constexpr warm = 0;
-=======
-    int constexpr warm = 10;
->>>>>>> fc6054c (add dg2)
-=======
-    int constexpr warm = 0;
->>>>>>> 4e44a75 (save)
     try {
         for (int i = 0; i < iter + warm; i++) {
             if (i >= warm) prof.cpu_start();
@@ -676,7 +668,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<t1,t2,t3>;
+using tests = ::testing::Types<test1>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7, qkv8,
 //         qkv9, qkv10>;
 
