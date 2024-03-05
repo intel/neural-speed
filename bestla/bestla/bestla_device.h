@@ -485,17 +485,14 @@ class CpuRuntime {
     return instances[thread];
   }
 
-  inline float getPE(BTLA_ISA isa) {
-    cur_PE = &PE[int(isa)];
-    if (isa == BTLA_ISA::NoSIMD) return P_core_num / E_core_num;
+  inline float getPE(const BTLA_ISA isa) {
     //printf("GET:%d\t%f\n",int(isa), *cur_PE);
-    return *cur_PE * P_core_num / E_core_num;
+    return PE[int(isa)] * P_core_num / E_core_num;
   }
 
-  inline void adjustPE(const float PE_) {
-    //printf("Adjust:%d,%f\n",cur_PE-PE,PE_);
-    if (cur_PE - PE == int(BTLA_ISA::AVX2) || cur_PE - PE == int(BTLA_ISA::AVX_VNNI))
-    *cur_PE *= PE_;
+  inline void adjustPE(const BTLA_ISA isa, const float PE_) {
+    //printf("Adjust:%d,%f\n",int(isa),PE_);
+    PE[int(isa)] *= PE_;
   }
 
   size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
@@ -525,10 +522,8 @@ class CpuRuntime {
       mL2Cache_E = _cd->getL2CacheSize_E();
       mHybrid = true;
       memcpy(PE, _cd->getPE(), int(BTLA_ISA::ISA_COUNT) * sizeof(float));
-      cur_PE = PE;
     }
   }
-  float* cur_PE;
   float PE[int(BTLA_ISA::ISA_COUNT)];
   int maxThreads;
 };

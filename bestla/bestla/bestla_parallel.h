@@ -35,6 +35,7 @@ class IThreading {
   virtual int num_threads() const { return mThreadNum; };
   virtual int is_support_PE() const { return isSupportPE; };
   virtual void set_threads(int nthreads) = 0;
+  virtual std::pair<float, float> get_PEtime() const { return {0.0f, 0.0f}; };
 
  protected:
   int mThreadNum;
@@ -78,27 +79,33 @@ class StdThreading : public IThreading {
     create_threads();
   }
   void parallel_for(const thread_func& func) override {
+    time_per_p = 0;
+    time_per_e = 0;
     if (mThreadNum > 1) {
       running.store(mThreadNum - 1);
       for (int i = 0; i < 10; i++) flag[i].store(mThreadNum);
       if (cr->mHybrid) {
-        pe_time[0].store(0);
-        pe_time[1].store(0);
+        int time_p = 0, time_e = 0;
+        sync_time[0].store(0);
+        sync_time[1].store(0);
         for (size_t i = 0; i < mThreadNum - 1; i++) func_[i] = &func;
         utils::timer tm;
         tm.start();
         func(0);
-        pe_time[0].fetch_add(int(TIME_SCALE * tm.stop()));
+        time_p = int(tm.stop());
         while (true) {
           if (running.load() == 0)
             break;
           else
             _mm_pause();
         }
-        const float time_per_p = pe_time[0].load() / (1.0 * TIME_SCALE * (mThreadNum - cr->E_core_num));
-        const float time_per_e = pe_time[1].load() / (1.0 * TIME_SCALE * cr->E_core_num);
-        if(time_per_e!=0 && time_per_p != 0)
-          cr->adjustPE(time_per_e / time_per_p);
+        for (int i = 0; i < mThreadNum - 1; i++)
+          if (i + 1 >= cr->P_core_num && i + 1 < cr->P_core_num + cr->E_core_num)
+            time_e += thread_time[i];
+          else
+            time_p += thread_time[i];
+        time_per_p = (time_p - sync_time[0].load()) / (1.0 * (mThreadNum - cr->E_core_num));
+        time_per_e = (time_e - sync_time[1].load()) / (1.0 * cr->E_core_num);
       }else {
         for (size_t i = 0; i < mThreadNum - 1; i++) {
           func_[i] = &func;
@@ -136,7 +143,7 @@ class StdThreading : public IThreading {
         else
           _mm_pause();
       }
-      pe_time[device::CpuDevice::isEcore()].fetch_sub(int(TIME_SCALE * tm.stop()));
+      sync_time[device::CpuDevice::isEcore()].fetch_add(int(tm.stop()));
     } else {
       while (true) {
         if (flag[idx].load() == 0)
@@ -146,6 +153,8 @@ class StdThreading : public IThreading {
       }
     }
   }
+
+  std::pair<float, float> get_PEtime() const override { return {time_per_p, time_per_e}; };
 
   ~StdThreading() { stop_threads(); }
 
@@ -175,7 +184,8 @@ class StdThreading : public IThreading {
       for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
     }
     _cd->core_bond(core_order[0]);
-    if (cr->mHybrid)
+    if (cr->mHybrid) {
+      thread_time.resize(mThreadNum - 1);
       for (size_t i = 0; i < mThreadNum - 1; i++) {
         thdset[i] = std::thread(
             [&](int tidx, int core_id) {
@@ -187,7 +197,7 @@ class StdThreading : public IThreading {
                   tm.start();
                   (*func_[tidx])(tidx + 1);
                   func_[tidx] = nullptr;
-                  pe_time[device::CpuDevice::isEcore()].fetch_add(int(TIME_SCALE * tm.stop()));
+                  thread_time[tidx] = int(tm.stop());
                   running.fetch_sub(1);
                 } else {
                   _mm_pause();
@@ -195,7 +205,9 @@ class StdThreading : public IThreading {
               }
             },
             int(i), core_order[i + 1]);
-    }else for (size_t i = 0; i < mThreadNum - 1; i++) {
+    }
+    }
+      else for (size_t i = 0; i < mThreadNum - 1; i++) {
       thdset[i] = std::thread(
           [&](int tidx, int core_id) {
             _cd->core_bond(core_id);
@@ -215,8 +227,9 @@ class StdThreading : public IThreading {
     delete[] core_order;
   }
   device::CpuRuntime* cr;
-  const int TIME_SCALE = 10000;  // used to convert float to int
-  std::atomic_int pe_time[2];  // C++ 20 support std::atomic_float
+  std::atomic_int sync_time[2];  // C++ 20 support std::atomic_float
+  std::vector<int> thread_time;
+  float time_per_p, time_per_e;
   std::vector<std::thread> thdset;
   std::atomic_bool stop;
   std::atomic_int running;
@@ -827,24 +840,29 @@ class SchedulerDispatcher {
   using ThreadProblem = ThreadProblemBase;
   SchedulerDispatcher() = default;
   ~SchedulerDispatcher() {
+    std::pair<float,float> PEtime = th_->get_PEtime();
+    if (needDispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
+        cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
     delete Scheduler_P;
     if (Scheduler_E) delete Scheduler_E;
   }
   SchedulerDispatcher(const IThreading* th, const utils::GemmProblem& problem) {
-    device::CpuRuntime& cr = device::CpuRuntime::getInstance(th->num_threads());
-    needDispach = cr.mHybrid && th->is_support_PE();
+    th_ = th;
+    cr = &device::CpuRuntime::getInstance(th->num_threads());
+    needDispach = cr->mHybrid && th->is_support_PE();
     if (!needDispach) {
-      Scheduler_P = new Scheduler({th->num_threads(), problem, {0, 0}, cr.mL2Cache, cr.mL1Cache});
+      Scheduler_P = new Scheduler({th->num_threads(), problem, {0, 0}, cr->mL2Cache, cr->mL1Cache});
     } else {
-      Pcore_num = cr.P_core_num;
-      Ecore_num = cr.E_core_num;
+      Pcore_num = cr->P_core_num;
+      Ecore_num = cr->E_core_num;
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
-      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(Scheduler::gemm_ISA()))), Scheduler::mStep[1]);
+      const int N_offset = utils::padto(N - int(N / (1 + cr->getPE(Scheduler::gemm_ISA()))), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
-      Scheduler_P = new Scheduler({th->num_threads() - cr.E_core_num, problem_P, {0, 0}, cr.mL2Cache_P, cr.mL1Cache_P});
+      Scheduler_P =
+          new Scheduler({th->num_threads() - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P});
       problem_E.dims[2] = N - N_offset;
-      Scheduler_E = new Scheduler({cr.E_core_num, problem_E, {0, N_offset}, cr.mL2Cache_E, cr.mL1Cache_E});
+      Scheduler_E = new Scheduler({cr->E_core_num, problem_E, {0, N_offset}, cr->mL2Cache_E, cr->mL1Cache_E});
     }
   }
 
@@ -872,6 +890,8 @@ class SchedulerDispatcher {
 
  private:
   Scheduler *Scheduler_P = nullptr, *Scheduler_E = nullptr;
+  const IThreading* th_;
+  device::CpuRuntime* cr;
   bool needDispach = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
