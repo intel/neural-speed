@@ -1131,7 +1131,8 @@ struct model_file_loader {
     hparams.original_max_position_embeddings = file.read_u32();
     hparams.use_yarn = file.read_u32();
     printf("%-16s %d.hparams.rope_scaling_factor = %-30d\n", __func__, count++, hparams.rope_scaling_factor);
-    printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++, hparams.original_max_position_embeddings);
+    printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++,
+           hparams.original_max_position_embeddings);
     printf("%-16s %d.hparams.use_yarn = %-30d\n", __func__, count++, hparams.use_yarn);
     unsigned int total = 25;
     if (count != total) {
@@ -1146,10 +1147,10 @@ struct model_file_loader {
     file.read_raw(&vocab.eos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.pad_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.sep_token_id, sizeof(model_vocab::id));
-    printf("%-16s %d.vocab.bos_token_id = %-30d\n", __func__, ne_hparams_total + count++ , vocab.bos_token_id);
-    printf("%-16s %d.vocab.eos_token_id = %-30d\n", __func__, ne_hparams_total + count++ , vocab.eos_token_id);
-    printf("%-16s %d.vocab.pad_token_id = %-30d\n", __func__, ne_hparams_total + count++ , vocab.pad_token_id);
-    printf("%-16s %d.vocab.sep_token_id = %-30d\n", __func__, ne_hparams_total + count++ , vocab.sep_token_id);
+    printf("%-16s %d.vocab.bos_token_id = %-30d\n", __func__, ne_hparams_total + count++, vocab.bos_token_id);
+    printf("%-16s %d.vocab.eos_token_id = %-30d\n", __func__, ne_hparams_total + count++, vocab.eos_token_id);
+    printf("%-16s %d.vocab.pad_token_id = %-30d\n", __func__, ne_hparams_total + count++, vocab.pad_token_id);
+    printf("%-16s %d.vocab.sep_token_id = %-30d\n", __func__, ne_hparams_total + count++, vocab.sep_token_id);
 
     vocab.id_to_token.resize(hparams.n_vocab);
     for (uint32_t i = 0; i < hparams.n_vocab; i++) {
