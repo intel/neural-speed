@@ -1422,7 +1422,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], 
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
                         default="huggingface", help="hub to load model")
     parser.add_argument("model",
                         type=Path,
