@@ -29,7 +29,6 @@ from pathlib import Path
 import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
@@ -59,6 +58,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -68,7 +68,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
-
+    if args.model_hub == "modelscope":
+        from modelscope import  AutoModelForCausalLM, AutoTokenizer
+    else:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)

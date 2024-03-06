@@ -19,11 +19,15 @@ from pathlib import Path
 from transformers import AutoConfig
 import subprocess
 
-model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper"}
+model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper", "qwen2": "qwen"}
 
 
-def convert_model(model, outfile, outtype="f32", whisper_repo_path=None, use_quantized_model=False):
-    config = AutoConfig.from_pretrained(model, trust_remote_code=True)
+def convert_model(model, outfile, outtype="f32", model_hub="huggingface", use_quantized_model=False):
+    if model_hub == "modelscope":
+        from modelscope import AutoConfig
+        config = AutoConfig.from_pretrained(model, trust_remote_code=True)
+    else:       
+        config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
     if use_quantized_model:
@@ -34,6 +38,7 @@ def convert_model(model, outfile, outtype="f32", whisper_repo_path=None, use_qua
     cmd.extend(["python", path])
     cmd.extend(["--outfile", outfile])
     cmd.extend(["--outtype", outtype])
+    cmd.extend(["--model_hub", model_hub])
     cmd.extend([model])
 
     print("cmd:", cmd)

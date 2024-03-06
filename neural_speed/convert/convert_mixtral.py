@@ -36,7 +36,6 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
 
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -1300,6 +1299,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
@@ -1320,8 +1320,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
             print("Loadding the model from the local path.")
         else:
             print("Loadding the model from HF.")
-            model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
-            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            if args.model_hub == "modelscope":
+                from modelscope import AutoConfig, AutoModel, AutoTokenizer
+            else:
+                from transformers import AutoConfig, AutoModel, AutoTokenizer
+            model = AutoModel.from_pretrained(str(args.model), low_cpu_mem_usage=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
             args.model = cache_path
 

@@ -56,6 +56,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="fp32",
                         help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -68,7 +69,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     use_f16 = False
     if args.outtype == "f16":
         use_f16 = True
-
+    if args.model_hub == "modelscope":
+        from modelscope import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+    else:
+        from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
     tokenizer = AutoTokenizer.from_pretrained(dir_model)
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
