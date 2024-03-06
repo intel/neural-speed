@@ -447,7 +447,7 @@ class SchedulerBase : public Scheduler2D {
     mL2Use += static_cast<size_t>(mBlock[1]) * mBlock[2] * mEleSize[1];
     mL2Use += static_cast<size_t>(mStep[0]) * mBlock[2] * mEleSize[0];
   }
-  const float DensityThres = 16;
+  static float constexpr DensityThres = 16;
   static size_t constexpr ReservedSize = 32ULL * 1024ULL;
 
   virtual float calculate_score() {
@@ -612,7 +612,7 @@ class SchedulerKBlock : public Scheduler2D {
     mL2Use += static_cast<size_t>(mBlock[1]) * mBlock[2] * mEleSize[1];
     mL2Use += static_cast<size_t>(mStep[0]) * mBlock[2] * mEleSize[0];
   }
-  const float DensityThres = 16;
+  static float constexpr DensityThres = 16;
 
   float calculate_score() {
     int tmpnstep = mThdSize[1] < _GemmCore_T::PREFERRED_N ? mThdSize[1] : _GemmCore_T::PREFERRED_N;
@@ -749,7 +749,7 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
   friend class SchedulerDispatcher;
 
  protected:
-  const float DensityThres = 16;
+  static float constexpr DensityThres = 16;
   static size_t constexpr ReservedSize = 32ULL * 1024ULL;
 
   void cache_blocking_compute() override {
@@ -843,15 +843,13 @@ class SchedulerDispatcher {
     std::pair<float, float> PEtime = th_->get_PEtime();
     if (needDispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
       cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
-    delete Scheduler_P;
-    if (Scheduler_E) delete Scheduler_E;
   }
   SchedulerDispatcher(const IThreading* th, const utils::GemmProblem& problem) {
     th_ = th;
     cr = &device::CpuRuntime::getInstance(th->num_threads());
     needDispach = cr->mHybrid && th->is_support_PE();
     if (!needDispach) {
-      Scheduler_P = new Scheduler({th->num_threads(), problem, {0, 0}, cr->mL2Cache, cr->mL1Cache});
+      Scheduler_P = std::move(Scheduler({th->num_threads(), problem, {0, 0}, cr->mL2Cache, cr->mL1Cache}));
     } else {
       Pcore_num = cr->P_core_num;
       Ecore_num = cr->E_core_num;
@@ -860,36 +858,36 @@ class SchedulerDispatcher {
       const int N_offset = utils::padto(N - int(N / (1 + cr->getPE(Scheduler::gemm_ISA()))), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
       Scheduler_P =
-          new Scheduler({th->num_threads() - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P});
+          std::move(Scheduler({th->num_threads() - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P}));
       problem_E.dims[2] = N - N_offset;
-      Scheduler_E = new Scheduler({cr->E_core_num, problem_E, {0, N_offset}, cr->mL2Cache_E, cr->mL1Cache_E});
+      Scheduler_E = std::move(Scheduler({cr->E_core_num, problem_E, {0, N_offset}, cr->mL2Cache_E, cr->mL1Cache_E}));
     }
   }
 
-  void getIndex(ThreadProblem& problem) const {
+  void getIndex(ThreadProblem& problem) {
     if (!needDispach) {
-      Scheduler_P->getIndex(problem);
+      Scheduler_P.getIndex(problem);
     } else {
       if (problem.tid >= Pcore_num + Ecore_num) {
         problem.tid -= Ecore_num;
-        Scheduler_P->getIndex(problem);
+        Scheduler_P.getIndex(problem);
       } else if (problem.tid >= Pcore_num) {
         problem.tid -= Pcore_num;
-        Scheduler_E->getIndex(problem);
+        Scheduler_E.getIndex(problem);
       } else {
-        Scheduler_P->getIndex(problem);
+        Scheduler_P.getIndex(problem);
       }
     }
   }
 
   void print() {
     printf("dispatch to hybrid:%d\n", needDispach);
-    Scheduler_P->print();
-    if (needDispach) Scheduler_E->print();
+    Scheduler_P.print();
+    if (needDispach) Scheduler_E.print();
   }
 
  private:
-  Scheduler *Scheduler_P = nullptr, *Scheduler_E = nullptr;
+  Scheduler Scheduler_P, Scheduler_E;
   const IThreading* th_;
   device::CpuRuntime* cr;
   bool needDispach = false;
@@ -901,15 +899,12 @@ class SchedulerDispatcher<Scheduler2D> {
  public:
   using ThreadProblem = ThreadProblem2D;
   SchedulerDispatcher() = default;
-  ~SchedulerDispatcher() {
-    delete Scheduler_P;
-    if (Scheduler_E) delete Scheduler_E;
-  }
+  ~SchedulerDispatcher() {}
   SchedulerDispatcher(const IThreading* th, const Config2D& config) {
     device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
     needDispach = cr.mHybrid && th->is_support_PE();
     if (!needDispach) {
-      Scheduler_P = new Scheduler2D(config);
+      Scheduler_P = std::move(Scheduler2D(config));
     } else {
       Pcore_num = cr.P_core_num;
       Ecore_num = cr.E_core_num;
@@ -918,38 +913,38 @@ class SchedulerDispatcher<Scheduler2D> {
       const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(BTLA_ISA::NoSIMD))), config.step[1]);
       config_P.threads = config.threads - cr.E_core_num;
       config_P.size[1] = N_offset;
-      Scheduler_P = new Scheduler2D(config_P);
+      Scheduler_P = std::move(Scheduler2D(config_P));
       config_E.threads = cr.E_core_num;
       config_E.size[1] = N - N_offset;
       config_E.offset[1] += N_offset;
-      Scheduler_E = new Scheduler2D(config_E);
+      Scheduler_E = std::move(Scheduler2D(config_E));
     }
   }
 
-  void getIndex(ThreadProblem& problem) const {
+  void getIndex(ThreadProblem& problem) {
     if (!needDispach) {
-      Scheduler_P->getIndex(problem);
+      Scheduler_P.getIndex(problem);
     } else {
       if (problem.tid >= Pcore_num + Ecore_num) {
         problem.tid -= Ecore_num;
-        Scheduler_P->getIndex(problem);
+        Scheduler_P.getIndex(problem);
       } else if (problem.tid >= Pcore_num) {
         problem.tid -= Pcore_num;
-        Scheduler_E->getIndex(problem);
+        Scheduler_E.getIndex(problem);
       } else {
-        Scheduler_P->getIndex(problem);
+        Scheduler_P.getIndex(problem);
       }
     }
   }
 
   void print() {
     printf("dispatch to hybrid:%d\n", needDispach);
-    Scheduler_P->print();
-    if (needDispach) Scheduler_E->print();
+    Scheduler_P.print();
+    if (needDispach) Scheduler_E.print();
   }
 
  private:
-  Scheduler2D *Scheduler_P = nullptr, *Scheduler_E = nullptr;
+  Scheduler2D Scheduler_P, Scheduler_E;
   bool needDispach = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
