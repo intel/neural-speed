@@ -79,7 +79,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     hparams = config.to_dict()
     print("Loading model: ", dir_model)
-    
+
     print("Model loaded: ", dir_model)
 
     fout = open(fname_out, "wb")
