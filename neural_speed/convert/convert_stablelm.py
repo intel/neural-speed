@@ -288,9 +288,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     args = parser.parse_args(args_in)
 
-    # dir_model = args.model.as_posix()
-    from huggingface_hub import snapshot_download
-    dir_model = snapshot_download(repo_id=str(args.model), resume_download=True)
+    dir_model = args.model.as_posix()
     fname_out = args.outfile.as_posix()
 
     # possible data types
