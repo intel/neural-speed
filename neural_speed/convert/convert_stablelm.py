@@ -178,7 +178,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 1))
     fout.write(struct.pack("i", hparams["vocab_size"]))
     fout.write(struct.pack("i", hparams["hidden_size"]))
-    fout.write(struct.pack("i", 0))  
+    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", hparams["num_attention_heads"]))
     fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
@@ -265,7 +265,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to an NE or GGUF compatible file")
     parser.add_argument(
         "--outtype",
-        choices=["f32", "f16"], 
+        choices=["f32", "f16"],
         help="output format (default: based on input)"
     )
     parser.add_argument(
