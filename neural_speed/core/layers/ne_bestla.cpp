@@ -69,7 +69,6 @@ void bestla_parallel_for(forward_compute_fptr fcomp, ne_compute_params* mainpara
       }
     });
   }
-  
 }
 
 void bestla_unpackweight_fp32(void* wptr, int n, int k, float* fp32data, int ld) {

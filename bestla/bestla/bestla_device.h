@@ -332,11 +332,11 @@ class CpuDevice {
       numthreads = P_core.size() + E_core.size() + SMT_core.size();
 
       {
-        //set PE
+        // set PE
         uint32_t tmp[4];
         _cpu.getCpuid(1, tmp);
         if (p) printf("!!!\t%x\t%x\t%x\t%x!!!\n", tmp[0], tmp[1], tmp[2], tmp[3]);
-        const int famliy = (tmp[0] >> 8) & ((1u << 4) - 1);  // cpu.extractBit(a[0], 8, 11);
+        const int famliy = (tmp[0] >> 8) & ((1u << 4) - 1);          // cpu.extractBit(a[0], 8, 11);
         const int extendedModel = (tmp[0] >> 16) & ((1u << 4) - 1);  // cpu.extractBit(a[0], 16, 24);
         {
           for (int i = 0; i < int(BTLA_ISA::ISA_COUNT); i++) PE[i] = 1.0f;
@@ -346,7 +346,7 @@ class CpuDevice {
                 PE[int(BTLA_ISA::AVX2)] = 3.0f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 5.0f;
                 break;
-              case 10: // MTL
+              case 10:  // MTL
                 PE[int(BTLA_ISA::AVX2)] = 2.2f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 3.0f;
                 break;
@@ -486,12 +486,12 @@ class CpuRuntime {
   }
 
   inline float getPE(const BTLA_ISA isa) {
-    //printf("GET:%d\t%f\n",int(isa), *cur_PE);
+    // printf("GET:%d\t%f\n",int(isa), *cur_PE);
     return PE[int(isa)] * P_core_num / E_core_num;
   }
 
   inline void adjustPE(const BTLA_ISA isa, const float PE_) {
-    //printf("Adjust:%d,%f\n",int(isa),PE_);
+    // printf("Adjust:%d,%f\n",int(isa),PE_);
     PE[int(isa)] *= PE_;
   }
 

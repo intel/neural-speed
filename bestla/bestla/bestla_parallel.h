@@ -106,7 +106,7 @@ class StdThreading : public IThreading {
             time_p += thread_time[i];
         time_per_p = (time_p - sync_time[0].load()) / (1.0 * (mThreadNum - cr->E_core_num));
         time_per_e = (time_e - sync_time[1].load()) / (1.0 * cr->E_core_num);
-      }else {
+      } else {
         for (size_t i = 0; i < mThreadNum - 1; i++) {
           func_[i] = &func;
         }
@@ -205,25 +205,25 @@ class StdThreading : public IThreading {
               }
             },
             int(i), core_order[i + 1]);
-    }
-    }
-      else for (size_t i = 0; i < mThreadNum - 1; i++) {
-      thdset[i] = std::thread(
-          [&](int tidx, int core_id) {
-            _cd->core_bond(core_id);
-            while (true) {
-              if (stop.load() == true) break;
-              if (func_[tidx] != nullptr) {
-                (*func_[tidx])(tidx + 1);
-                func_[tidx] = nullptr;
-                running.fetch_sub(1);
-              } else {
-                _mm_pause();
+      }
+    } else
+      for (size_t i = 0; i < mThreadNum - 1; i++) {
+        thdset[i] = std::thread(
+            [&](int tidx, int core_id) {
+              _cd->core_bond(core_id);
+              while (true) {
+                if (stop.load() == true) break;
+                if (func_[tidx] != nullptr) {
+                  (*func_[tidx])(tidx + 1);
+                  func_[tidx] = nullptr;
+                  running.fetch_sub(1);
+                } else {
+                  _mm_pause();
+                }
               }
-            }
-          },
-          int(i), core_order[i + 1]);
-    }
+            },
+            int(i), core_order[i + 1]);
+      }
     delete[] core_order;
   }
   device::CpuRuntime* cr;
@@ -840,9 +840,9 @@ class SchedulerDispatcher {
   using ThreadProblem = ThreadProblemBase;
   SchedulerDispatcher() = default;
   ~SchedulerDispatcher() {
-    std::pair<float,float> PEtime = th_->get_PEtime();
+    std::pair<float, float> PEtime = th_->get_PEtime();
     if (needDispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
-        cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
+      cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
     delete Scheduler_P;
     if (Scheduler_E) delete Scheduler_E;
   }
