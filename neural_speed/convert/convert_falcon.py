@@ -70,13 +70,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
-    with open(os.path.join(dir_model, "config.json"), "r", encoding="utf-8") as f:
-        hparams = json.load(f)
-    if hparams["architectures"][0] != "FalconForCausalLM":
-        print("Model architecture not supported: " + hparams["architectures"][0])
-        sys.exit(1)
     print("Loading model: ", dir_model)
     model = AutoModelForCausalLM.from_pretrained(dir_model,
                                                  config=config,
@@ -84,6 +77,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
     print("Model loaded: ", dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
+    with open(os.path.join(dir_model, "config.json"), "r", encoding="utf-8") as f:
+        hparams = json.load(f)
+    if hparams["architectures"][0] != "FalconForCausalLM":
+        print("Model architecture not supported: " + hparams["architectures"][0])
+        sys.exit(1)
 
     n_head_kv = hparams.get("num_kv_heads", 1)
     n_head = hparams["num_attention_heads"]

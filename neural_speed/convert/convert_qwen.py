@@ -73,8 +73,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     #   ftype == 0 -> float32
     #   ftype == 1 -> float16
     ftype = 0
-    import pdb
-    pdb.set_trace()
     if args.outtype == "f16":
         ftype = 1
     if args.model_hub == "modelscope":
@@ -82,8 +80,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
     model = AutoModelForCausalLM.from_pretrained(dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model)
     model.eval()
     for p in model.parameters():
         p.requires_grad = False

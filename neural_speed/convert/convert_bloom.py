@@ -70,15 +70,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
-    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
-    hparams = config.to_dict()
-    print("Loading model: ", dir_model)
     model = AutoModelForCausalLM.from_pretrained(dir_model,
                                                  config=config,
                                                  torch_dtype=torch.float16 if ftype == 1 else torch.float32,
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
+    hparams = config.to_dict()
+    print("Loading model: ", dir_model)
+    
     print("Model loaded: ", dir_model)
 
     fout = open(fname_out, "wb")

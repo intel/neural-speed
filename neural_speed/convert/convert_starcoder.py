@@ -74,15 +74,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
-    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
-    hparams = config.to_dict()
     model = AutoModelForCausalLM.from_pretrained(dir_model, config=config,
                                                  torch_dtype=torch.float16 \
                                                  if use_f16 else torch.float32,
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
     print("Model loaded: ", dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
+    hparams = config.to_dict()
 
     list_vars = model.state_dict()
 

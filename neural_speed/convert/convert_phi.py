@@ -289,9 +289,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import AutoModelForCausalLM, AutoTokenizer
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     print("Loading model: ", dir_model)
     model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = model.config.to_dict()
     if args.format == "GGUF":
         phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)

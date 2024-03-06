@@ -633,9 +633,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import AutoConfig, AutoModel, AutoTokenizer
     else:
         from transformers import AutoConfig, AutoModel, AutoTokenizer
+    model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-    model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
 
     hparams = config.to_dict()
 

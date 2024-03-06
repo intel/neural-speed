@@ -1453,6 +1453,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             else:
                 from transformers import AutoModelForCausalLM, AutoTokenizer
             model = AutoModelForCausalLM.from_pretrained(str(args.model), low_cpu_mem_usage=True, trust_remote_code=True)
+            import pdb;pdb.set_trace()
             tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
             args.model = cache_path
