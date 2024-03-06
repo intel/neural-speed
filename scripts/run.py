@@ -182,7 +182,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 1. convert
     path = Path(parent_path, "convert.py")
-    outfile = f"gguf_{model_type}_f32" if str(args.format) == "GGUF" else "ne_{model_type}_f32.bin"
+    outfile = f"gguf_{model_type}_f32" if str(args.format) == "GGUF" else f"ne_{model_type}_f32.bin"
     convert_cmd = ["python", path]
     convert_cmd.extend(["--format", str(args.format)])
     convert_cmd.extend(["--outfile", Path(work_path, outfile)])
@@ -193,10 +193,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 2. quantize
     path = Path(parent_path, "quantize.py")
-    quant_file = f"gguf_{model_type}_{args.weight_dtype}" if str(args.format) == "GGUF" else f"ne_{model_type}_{args.weight_dtype}.bin"
+    quant_file = f"gguf_{model_type}_{args.weight_dtype}.gguf" if str(args.format) == "GGUF" else f"ne_{model_type}_{args.weight_dtype}.bin"
     quant_cmd = ["python", path]
     quant_cmd.extend(["--model_name", model_type])
-    quant_cmd.extend(["--model_file", Path(work_path, outfile)])
+    quant_cmd.extend(["--model_file", Path(work_path, outfile + ".gguf" if str(args.format) == "GGUF" else outfile)])
     quant_cmd.extend(["--out_file", Path(work_path, quant_file)])
     quant_cmd.extend(["--weight_dtype", args.weight_dtype])
     quant_cmd.extend(["--group_size", str(args.group_size)])

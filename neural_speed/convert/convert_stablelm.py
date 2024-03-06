@@ -155,7 +155,7 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
 
     gguf_writer.close()
 
-    print("Done. Output file: " + fname_out)
+    print("Done. Output file: " + gguf_file)
     print("")
 
 def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
