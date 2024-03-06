@@ -248,9 +248,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
+    model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
 
     hparams = config.to_dict()
 
