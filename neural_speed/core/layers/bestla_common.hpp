@@ -26,7 +26,7 @@ namespace ne_bestla {
 class ne_threading {
  public:
   static bestla::parallel::IThreading* get() {
-#if BTLA_OPENMP
+#ifdef NS_USE_OMP
     static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
     static bestla::parallel::StdThreading DefaultThreading(4);

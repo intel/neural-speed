@@ -60,6 +60,7 @@ option(NS_AVX512_VBMI            "neural_speed: enable AVX512-VBMI"             
 option(NS_AVX512_VNNI            "neural_speed: enable AVX512-VNNI"                             OFF)
 option(NS_FMA                    "neural_speed: enable FMA"                                     ON)
 option(NS_AMX                    "neural_speed: enable AMX"                                     OFF)
+option(NS_USE_OMP                "neural_speed: use OpenMP thread pool."                        OFF)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
 option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
@@ -138,9 +139,14 @@ endif()
 if (NS_BTLA_UT)
   set(BTLA_UT_ALL ON)
 endif()
-include(FindOpenMP)
 
-set(BTLA_ENABLE_OPENMP ON CACHE BOOL "BesTLA enable OpenMP threading")
+if(NS_USE_OMP)
+  include(FindOpenMP)
+  # compile BesTLA's OMPTheading class, then it can be used in ne_layers
+  set(BTLA_ENABLE_OPENMP ON CACHE BOOL "BesTLA enable compiling OpenMP threading")
+  add_compile_definitions(NS_USE_OMP)
+endif()
+
 add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)

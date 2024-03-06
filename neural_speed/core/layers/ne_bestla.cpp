@@ -57,12 +57,12 @@ void bestla_parallel_for(forward_compute_fptr fcomp, ne_compute_params* mainpara
       if (tidx == 0) {
         fcomp(&params, node);
       }
-      threading->sync();
+      threading->sync(0);
       params.type = NE_TASK_COMPUTE;
       if (params.ith < params.nth) {
         fcomp(&params, node);
       }
-      threading->sync();
+      threading->sync(1);
       params.type = NE_TASK_FINALIZE;
       if (params.ith < params.nth) {
         fcomp(&params, node);

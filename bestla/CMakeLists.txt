@@ -4,7 +4,7 @@ project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
-option(BTLA_ENABLE_OPENMP "Enable OpenMP thread pool if OMP can be found" OFF)
+option(BTLA_ENABLE_OPENMP "Compile OpenMP thread pool if OMP can be found" OFF)
 
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
 option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
@@ -19,7 +19,7 @@ option(BTLA_UT_KERNEL_INTRIN "Enable unit test for intrinsic kernels" OFF)
 option(BTLA_UT_KERNEL_WRAPPER "Enable unit test for runtime ISA kernels" OFF)
 option(BTLA_UT_NOASAN "Disable sanitize" OFF)
 option(BTLA_UT_BENCHMARK "Benchmark ON may take a long time to finish all tests" ON)
-option(BTLA_UT_OPENMP "Use OpenMP" OFF)
+option(BTLA_UT_OPENMP "Use OpenMP for UT tests" OFF)
 
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(neural_speed::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
