@@ -149,6 +149,15 @@ static torch::Tensor qbits_dropout_fwd(torch::Tensor& output, double p) { return
 
 static void qbits_dropout_bwd(torch::Tensor& grad, torch::Tensor& scale) { dropout_bwd(grad, scale); }
 
+static bool check_isa_supported(std::string isa) {
+  if (isa == "AMX") return dispatcher_utils::check_amx();
+  if (isa == "AVX512_VNNI") return dispatcher_utils::check_avx512_vnni();
+  if (isa == "AVX_VNNI") return dispatcher_utils::check_avx_vnni();
+  if (isa == "AVX512F") return dispatcher_utils::check_avx512f();
+  if (isa == "AVX2") return dispatcher_utils::check_avx2();
+  return false;
+}
+
 PYBIND11_MODULE(qbits, m) {
   m.def("woq_quantize", &woq_quantize);
   m.def("woq_linear", &woq_linear);
@@ -159,4 +168,5 @@ PYBIND11_MODULE(qbits, m) {
   m.def("acquire_woq_packw_info", &acquire_woq_packw_info);
   m.def("dropout_fwd", &qbits_dropout_fwd);
   m.def("dropout_bwd", &qbits_dropout_bwd);
+  m.def("check_isa_supported", &check_isa_supported);
 }
