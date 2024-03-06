@@ -16,7 +16,6 @@
 # limitations under the License.
 
 from pathlib import Path
-from transformers import AutoConfig
 import subprocess
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper", "qwen2": "qwen"}
@@ -27,6 +26,7 @@ def convert_model(model, outfile, outtype="f32", model_hub="huggingface", use_qu
         from modelscope import AutoConfig
         config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     else:
+        from transformers import AutoConfig
         config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
