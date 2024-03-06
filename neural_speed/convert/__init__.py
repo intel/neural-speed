@@ -26,7 +26,7 @@ def convert_model(model, outfile, outtype="f32", model_hub="huggingface", use_qu
     if model_hub == "modelscope":
         from modelscope import AutoConfig
         config = AutoConfig.from_pretrained(model, trust_remote_code=True)
-    else:       
+    else:
         config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
