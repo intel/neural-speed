@@ -112,8 +112,9 @@ enum class data_size : uint8_t {
 /// The specific LSC shared function to fence with xetla_fence
 enum class memory_kind : uint8_t {
     untyped_global = 0, /// untyped global memory
-    typed_global = 1, /// typed global memory
-    shared_local = 2, /// shared local memory
+    // "1" reserved for low-priority untyped global memory
+    typed_global = 2, /// typed global memory
+    shared_local = 3, /// shared local memory
 };
 
 /// The xetla_fence operation to apply to caches
