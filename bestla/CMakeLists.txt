@@ -66,7 +66,6 @@ function(add_ut_flag UT_OPTION)
 	if(${${UT_OPTION}})
 	  # target_compile_definitions(${PROJECT_NAME}_ut PRIVATE ${UT_OPTION})
     add_compile_definitions(${UT_OPTION})
-    message(${UT_OPTION})
 	endif()
 endfunction()
 
