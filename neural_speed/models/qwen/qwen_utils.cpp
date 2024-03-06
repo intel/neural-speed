@@ -58,10 +58,14 @@ void QWEN::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   }
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
+  fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
+  fprintf(stderr, "%s: n_head_kv  = %u\n", __func__, hparams.n_head_kv);
   fprintf(stderr, "%s: n_layer    = %u\n", __func__, hparams.n_layer);
   fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
-  fprintf(stderr, "%s: n_ff       = %u\n", __func__, hparams.ffn_hidden_size);
+  fprintf(stderr, "%s: ftype      = %u\n", __func__, hparams.ftype);
+  fprintf(stderr, "%s: max_seq_len= %u\n", __func__, hparams.max_seq_len);
+  fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
