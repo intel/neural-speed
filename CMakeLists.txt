@@ -60,7 +60,7 @@ option(NS_AVX512_VBMI            "neural_speed: enable AVX512-VBMI"             
 option(NS_AVX512_VNNI            "neural_speed: enable AVX512-VNNI"                             OFF)
 option(NS_FMA                    "neural_speed: enable FMA"                                     ON)
 option(NS_AMX                    "neural_speed: enable AMX"                                     OFF)
-option(NS_USE_OMP                "neural_speed: use OpenMP thread pool."                        OFF)
+option(NS_USE_OMP                "neural_speed: use OpenMP thread pool."                        ON)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
 option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
