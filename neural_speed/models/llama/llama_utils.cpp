@@ -118,7 +118,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   const int i_gpu_start = n_layer - n_gpu_layer;
   model.layers.resize(n_layer);
   size_t vram_total = 0;
-  if (ml->verify_tensor("token_embd.weight")) { // GGUF
+  if (ml->verify_tensor("token_embd.weight")) {  // GGUF
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
