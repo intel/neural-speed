@@ -97,7 +97,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="fp32",
                         help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], 
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
     dir_model = args.model

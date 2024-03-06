@@ -18,7 +18,6 @@ import os
 
 import torch
 from neural_speed.convert import convert_model
-from transformers import AutoConfig, AutoTokenizer
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 max_request_num_default = 8
@@ -92,6 +91,7 @@ class Model:
             from modelscope import AutoConfig
             self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         else:
+            from transformers import AutoConfig
             self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
         self.model_type = model_type

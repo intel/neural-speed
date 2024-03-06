@@ -56,7 +56,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="fp32",
                         help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], 
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -74,6 +75,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(dir_model, config=config,
                                                  torch_dtype=torch.float16 \
                                                  if use_f16 else torch.float32,
@@ -81,7 +83,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                                  trust_remote_code=True)
     print("Model loaded: ", dir_model)
     tokenizer = AutoTokenizer.from_pretrained(dir_model)
-    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     hparams = config.to_dict()
 
     list_vars = model.state_dict()

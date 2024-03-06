@@ -1422,7 +1422,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], 
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
@@ -1452,7 +1453,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 from modelscope import AutoModelForCausalLM, AutoTokenizer
             else:
                 from transformers import AutoModelForCausalLM, AutoTokenizer
-            model = AutoModelForCausalLM.from_pretrained(str(args.model), low_cpu_mem_usage=True, trust_remote_code=True)
+            model = AutoModelForCausalLM.from_pretrained(str(args.model), low_cpu_mem_usage=True,
+                                                         trust_remote_code=True)
             import pdb;pdb.set_trace()
             tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent

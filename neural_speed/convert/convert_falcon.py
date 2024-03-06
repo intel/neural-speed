@@ -66,7 +66,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
-        if args.model_hub == "modelscope":
+    if args.model_hub == "modelscope":
         from modelscope import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer

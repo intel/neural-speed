@@ -53,7 +53,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default = "huggingface", help="hub to load model")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -70,13 +71,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     else:
         from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(dir_model,
                                                  config=config,
                                                  torch_dtype=torch.float16 if ftype == 1 else torch.float32,
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model)
-    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     hparams = config.to_dict()
     print("Loading model: ", dir_model)
 
