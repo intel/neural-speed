@@ -406,15 +406,15 @@ class Model {
   model_context* ctx = nullptr;
   gpt_params params;
   std::vector<std::vector<model_token>> curr_input_ids;
-  int n_past = 0;
-  int n_total = 0;
+  std::vector<int> n_past;
+  std::vector<int> n_total;
   int n_vocab = 0;
   int n_ctx = 0;
   std::vector<std::vector<model_token>> last_n_tokens;
   bool token_eos = false;
   int64_t generate_count = 0;
   std::vector<uint32_t> padding_count;
-  uint32_t n_prompt_tokens = 0;
+  std::vector<uint32_t> n_prompt_tokens;
   std::vector<float> times;
 
   std::vector<std::vector<model_token>> beam_generate(const std::vector<std::vector<model_token>>& input_ids);
@@ -437,8 +437,9 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                   n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching, max_request_num,
                   scratch_size_ratio);
 
-  n_past = 0;
-  n_total = 0;
+  n_past.assign(params.max_request_num, 0);
+  n_total.assign(params.max_request_num, 0);
+  n_prompt_tokens.assign(params.max_request_num, 0);
   token_eos = false;
   curr_input_ids.clear();
   curr_input_ids.resize(params.max_request_num);
@@ -453,8 +454,9 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
 }
 
 void Model::reinit() {
-  n_past = 0;
-  n_total = 0;
+  n_past.assign(params.max_request_num, 0);
+  n_total.assign(params.max_request_num, 0);
+  n_prompt_tokens.assign(params.max_request_num, 0);
   last_n_tokens.clear();
   last_n_tokens.resize(params.max_request_num);
   for (int i = 0; i < params.max_request_num; ++i) {
@@ -467,7 +469,6 @@ void Model::reinit() {
   ctx->t_sample_us = 0;
   generate_count = 0;
   padding_count.clear();
-  n_prompt_tokens = 0;
 }
 
 bool Model::check_input_and_count_padding(const std::vector<std::vector<model_token>>& input_ids) {
@@ -480,7 +481,7 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
   } else if (input_ids.size() == 1) {
     padding_count = {0};
     ctx->batch_size = 1;
-    n_prompt_tokens = input_ids[STATIC_INPUT_HEAD_IDX].size();
+    n_prompt_tokens[STATIC_INPUT_HEAD_IDX] = input_ids[STATIC_INPUT_HEAD_IDX].size();
     return true;
   } else {  // multi-batch inputs (first token)
     ctx->batch_size = input_ids.size();
@@ -495,19 +496,17 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
       return false;
     }
     if (!padding_count.empty()) padding_count.clear();
-    if (ctx->cont_batching) {
-      padding_count.assign(input_ids.size(), 0);
-      return true;
-    }
+    padding_count.assign(input_ids.size(), 0);
     for (int bs = 0; bs < input_ids.size(); ++bs) {
-      model_vocab::id pad_token_id = ctx->vocab.pad_token_id;
-      auto iter = std::find_if(input_ids[bs].begin(), input_ids[bs].end(),
-                               [&pad_token_id](model_token t) { return (t != pad_token_id); });
-      if (iter == input_ids[bs].end()) fprintf(stderr, "\nERROR: there are all pad tokens in batch %d!\n", bs);
-      padding_count.push_back(std::distance(input_ids[bs].begin(), iter));
+      n_prompt_tokens[bs] = input_ids[bs].size();
+      if (!ctx->cont_batching) {
+        model_vocab::id pad_token_id = ctx->vocab.pad_token_id;
+        auto iter = std::find_if(input_ids[bs].begin(), input_ids[bs].end(),
+                                 [&pad_token_id](model_token t) { return (t != pad_token_id); });
+        if (iter == input_ids[bs].end()) fprintf(stderr, "\nERROR: there are all pad tokens in batch %d!\n", bs);
+        padding_count[bs] = std::distance(input_ids[bs].begin(), iter);
+      }
     }
-    // should be same in static batching inference
-    n_prompt_tokens = input_ids[STATIC_INPUT_HEAD_IDX].size();
     return true;
   }
 }
@@ -518,7 +517,7 @@ std::vector<std::vector<model_token>> Model::beam_generate(const std::vector<std
     inputs.push_back(model_input{
         /*.tokens              =*/input_ids[bs].data(),
         /*.n_tokens           =*/(uint32_t)input_ids[bs].size(),
-        /*.n_prompt_tokens    =*/0,
+        /*.n_prompt_tokens    =*/n_prompt_tokens[bs],
         /*.n_past             =*/0,
         /*.n_total            =*/0,
         /*.request_idx        =*/bs,
@@ -561,9 +560,9 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
     last_n_tokens[bs].insert(last_n_tokens[bs].end(), curr_input_ids[bs].begin(), curr_input_ids[bs].end());
 
     // infinite text generation via context swapping
-    if (n_past + curr_input_ids[bs].size() > n_ctx) {
+    if (n_past[bs] + curr_input_ids[bs].size() > n_ctx) {
       // always keep the first token
-      n_past = std::max(1, params.n_keep);
+      n_past[bs] = std::max(1, params.n_keep);
 
       int n_discard = params.n_discard;
       if (!params.shift_roped_k) {  // shift_roped_k can use ring-buffer and thus does not need re-computing
@@ -579,19 +578,19 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
     inputs.push_back({
         /*.tokens              =*/curr_input_ids[bs].data(),
         /*.n_tokens           =*/(uint32_t)curr_input_ids[bs].size(),
-        /*.n_prompt_tokens    =*/n_prompt_tokens,
-        /*.n_past             =*/(uint32_t)n_past,
-        /*.n_total            =*/(uint32_t)n_total,
+        /*.n_prompt_tokens    =*/n_prompt_tokens[bs],
+        /*.n_past             =*/(uint32_t)n_past[bs],
+        /*.n_total            =*/(uint32_t)n_total[bs],
         /*.request_idx        =*/bs,
         /*.beam_idx           =*/0,
         /*.padding_side       =*/0,
         /*n_padding           =*/padding_count[bs],
     });
+    // update n_past and n_total
+    n_past[bs] += curr_input_ids[bs].size();
+    n_total[bs] += curr_input_ids[bs].size();
   }
   model_eval(ctx, inputs.data(), inputs.size(), params.n_threads);
-  // static batching inference should have same input length and context window length
-  n_past += curr_input_ids[STATIC_INPUT_HEAD_IDX].size();
-  n_total += curr_input_ids[STATIC_INPUT_HEAD_IDX].size();
 
   return ctx->logits;
 }
@@ -680,9 +679,9 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
       last_n_tokens[STATIC_INPUT_HEAD_IDX].push_back(item);
     }
     // infinite text generation via context swapping
-    if (n_past + curr_input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx) {
+    if (n_past[STATIC_INPUT_HEAD_IDX] + curr_input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx) {
       // always keep the first token
-      n_past = std::max(1, params.n_keep);
+      n_past[STATIC_INPUT_HEAD_IDX] = std::max(1, params.n_keep);
 
       int n_discard = params.n_discard;
       if (!params.shift_roped_k) {  // shift_roped_k can use ring-buffer and thus does not need re-computing
@@ -700,16 +699,16 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
         /*.tokens              =*/curr_input_ids[STATIC_INPUT_HEAD_IDX].data(),
         /*.n_tokens           =*/(uint32_t)curr_input_ids[STATIC_INPUT_HEAD_IDX].size(),
         /*.n_prompt_tokens    =*/0,
-        /*.n_past             =*/(uint32_t)n_past,
-        /*.n_total            =*/(uint32_t)n_total,
+        /*.n_past             =*/(uint32_t)n_past[STATIC_INPUT_HEAD_IDX],
+        /*.n_total            =*/(uint32_t)n_total[STATIC_INPUT_HEAD_IDX],
         /*.request_idx        =*/0,
         /*.beam_idx           =*/0,
         /*.padding_side       =*/0,
         /*n_padding           =*/0,
     }};
     model_eval(ctx, inputs.data(), inputs.size(), params.n_threads);
-    n_past += curr_input_ids[STATIC_INPUT_HEAD_IDX].size();
-    n_total += curr_input_ids[STATIC_INPUT_HEAD_IDX].size();
+    n_past[STATIC_INPUT_HEAD_IDX] += curr_input_ids[STATIC_INPUT_HEAD_IDX].size();
+    n_total[STATIC_INPUT_HEAD_IDX] += curr_input_ids[STATIC_INPUT_HEAD_IDX].size();
 
     float* logits = model_get_logits(ctx);
     std::vector<model_token> next_token_id = post_process(logits);
@@ -730,28 +729,7 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
 }
 
 std::vector<model_token> Model::post_greedy_search(const float* logits) {
-  std::vector<model_token> ids(ctx->batch_size);
-  static int n_vocab_segment = 1024;
-  int num_segments = (n_vocab + n_vocab_segment - 1) / n_vocab_segment;
-  std::vector<model_token> candidate_tokens(ctx->batch_size * num_segments);
-  std::vector<float> candidate_logits(ctx->batch_size * num_segments);
-#pragma omp parallel for collapse(2)
-  for (int bs = 0; bs < ctx->batch_size; ++bs) {
-    for (int vocab = 0; vocab < n_vocab; vocab += n_vocab_segment) {
-      auto max_e =
-          std::max_element(logits + bs * n_vocab + vocab, vocab + n_vocab_segment > n_vocab
-                                                              ? logits + bs * n_vocab + n_vocab
-                                                              : logits + bs * n_vocab + vocab + n_vocab_segment);
-      candidate_tokens[bs * num_segments + vocab / n_vocab_segment] = max_e - (logits + bs * n_vocab);
-      candidate_logits[bs * num_segments + vocab / n_vocab_segment] = *max_e;
-    }
-  }
-  for (int bs = 0; bs < ctx->batch_size; ++bs) {
-    ids[bs] = candidate_tokens[std::distance(candidate_logits.begin(),
-                                             std::max_element(candidate_logits.begin() + bs * num_segments,
-                                                              candidate_logits.begin() + (bs + 1) * num_segments))];
-  }
-  return ids;
+  return model_post_greedy_search(logits, ctx);
 }
 
 std::vector<std::vector<model_token>> Model::post_beam_search(model_context* lctx, const int& n_predict,
@@ -768,44 +746,7 @@ std::vector<std::vector<model_token>> Model::post_beam_search(model_context* lct
 }
 
 std::vector<model_token> Model::post_sample_top_k_top_p_repeat(const float* logits) {
-  int alpha_frequency = 0;
-  int alpha_presence = 0;
-  int repeat_last_n = 64;
-  int top_k = params.top_k;
-  float tfs_z = 1.00f;
-  float typical_p = 1.00f;
-  float top_p = params.top_p;
-  float temp = params.temp;
-  std::vector<model_token> ids(ctx->batch_size);
-  // #pragma omp parallel for  // omp will affect sampling positions in batch infer
-  // TODO(Zhentao): (make sample functions support batch processing)
-  for (int bs = 0; bs < ctx->batch_size; ++bs) {
-    std::vector<model_token_data> candidates;
-    candidates.reserve(n_vocab);
-    for (model_token token_id = 0; token_id < n_vocab; token_id++) {
-      candidates.emplace_back(model_token_data{token_id, logits[bs * n_vocab + token_id], 0.0f});
-    }
-    model_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
-
-    // Apply penalties
-    float nl_logit = logits[bs * n_vocab + model_token_nl()];
-    auto last_n_repeat = std::min(std::min(static_cast<int>(last_n_tokens[bs].size()), repeat_last_n), n_ctx);
-    model_sample_repetition_penalty(ctx, &candidates_p,
-                                    last_n_tokens[bs].data() + last_n_tokens[bs].size() - last_n_repeat, last_n_repeat,
-                                    params.repeat_penalty);
-    model_sample_frequency_and_presence_penalties(ctx, &candidates_p,
-                                                  last_n_tokens[bs].data() + last_n_tokens[bs].size() - last_n_repeat,
-                                                  last_n_repeat, alpha_frequency, alpha_presence);
-    // int id = model_sample_token_greedy(ctx, &candidates_p);
-    // Temperature sampling
-    model_sample_top_k(ctx, &candidates_p, top_k, 1);
-    model_sample_tail_free(ctx, &candidates_p, tfs_z, 1);
-    model_sample_typical(ctx, &candidates_p, typical_p, 1);
-    model_sample_top_p(ctx, &candidates_p, top_p, 1);
-    model_sample_temperature(ctx, &candidates_p, temp);
-    ids[bs] = model_sample_token(ctx, &candidates_p);
-  }
-  return ids;
+  return model_post_sample_top_k_top_p_repeat(logits, ctx, last_n_tokens);
 }
 
 std::vector<model_token> Model::post_process(const float* logits) {
