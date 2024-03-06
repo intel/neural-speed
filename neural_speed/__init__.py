@@ -70,6 +70,8 @@ class Model:
             import neural_speed.qwen_cpp as cpp_model
         elif model_type == "phi":
             import neural_speed.phi_cpp as cpp_model
+        elif model_type == "gemma":
+            import neural_speed.gemma_cpp as cpp_model
         elif model_type == "whisper":
             import neural_speed.whisper_cpp as cpp_model
         elif model_type == "mixtral":
