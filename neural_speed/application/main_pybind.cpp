@@ -909,7 +909,7 @@ PYBIND11_MODULE(stablelm_cpp, m)
 
 PYBIND11_MODULE(whisper_cpp, m)
 
-#elif MODEL_NAME_ID == 18
+#elif MODEL_NAME_ID == 19
 
 PYBIND11_MODULE(mixtral_cpp, m)
 
