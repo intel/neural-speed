@@ -119,7 +119,6 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
   model.others[2] = ml->get_tensor("model.norm.bias", {n_embd}, NE_BACKEND_CPU);
   model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
   
-  // TODO: Add bias or not in qkv based on n_layer
   for (uint32_t i = 0; i < n_layer; ++i) {
     const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
     auto& layer = model.layers[i];
@@ -130,13 +129,20 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.norm[1] = ml->get_tensor(layers_i + ".input_layernorm.bias", {n_embd}, backend);
 
     // qkv GEMM + out proj GEMM
-    layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
-    layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
-    layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
-    layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd}, backend);
-    layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
-    layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
-    layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+    if (ml->verify_tensor(layers_i + ".attn.q_proj.bias")) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd}, backend);
+      layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
+      layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+    } else { // Stablelm 3B
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+    }
 
     // Post Attention norm
     layer.norm[2] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
@@ -147,13 +153,19 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.down_proj.weight", {n_ff, n_embd}, backend);
     layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
 
-    // TODO: Change after enabling stablelm-3B
     if (backend != NE_BACKEND_CPU) {
-      vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
-                    ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
-                    ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
-                    ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) + ne_nbytes(layer.ffn[0]) + 
-                    ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      if (ml->verify_tensor(layers_i + ".attn.q_proj.bias")) {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
+                      ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                      ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
+                      ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) + ne_nbytes(layer.ffn[0]) + 
+                      ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      } else {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
+                      ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                      ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.ffn[0]) + 
+                      ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      }
     }
   }
 

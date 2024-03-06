@@ -139,16 +139,22 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
         cur = ne_add(ctx0, cur, model.layers[il].norm[1]);
       }
 
-      // compute QKV
-      struct ne_tensor* Qcur =
-          ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
-                        head_dim, n_head, N, 1);
-      struct ne_tensor* Kcur =
-          ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
-                        head_dim, n_head, N, 1);
-      struct ne_tensor* Vcur =
-          ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
-                        head_dim, n_head, N, 1);
+      // Compute QKV
+      struct ne_tensor* Qcur;
+      struct ne_tensor* Kcur;
+      struct ne_tensor* Vcur;
+      if (n_layer == 24) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+        Qcur = ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
+                             head_dim, n_head, N, 1);
+        Kcur = ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
+                             head_dim, n_head, N, 1);
+        Vcur = ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
+                             head_dim, n_head, N, 1);
+      } else { // Stablelm 3B
+        Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N, 1);
+        Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head, N, 1);
+        Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head, N, 1);
+      }
 
       // using mode = 2 for GPT-NeoX mode
       struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
@@ -281,8 +287,15 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
         struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
         cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
       }
+
       // projection
-      { cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur); }
+      { 
+        if (n_layer == 24) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+          cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
+        } else { // Stablelm 3B
+          cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
+        }
+      }
     }
     lctx.use_buf(ctx0, 1);
 
