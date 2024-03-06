@@ -1101,8 +1101,8 @@ struct model_file_loader {
     hparams.do_layer_norm_before = bool(file.read_u32());
     printf("%-16s %d.hparams.ftype = %-30d\n", __func__, count++, hparams.ftype);
     printf("%-16s %d.hparams.max_seq_len = %-30d\n", __func__, count++, hparams.max_seq_len);
-    printf("%-16s %d.hparams.alibi_bias_max = %-30d\n", __func__, count++, hparams.alibi_bias_max);
-    printf("%-16s %d.hparams.clip_qkv = %-30d\n", __func__, count++, hparams.clip_qkv);
+    printf("%-16s %d.hparams.alibi_bias_max = %-30f\n", __func__, count++, hparams.alibi_bias_max);
+    printf("%-16s %d.hparams.clip_qkv = %-30f\n", __func__, count++, hparams.clip_qkv);
     printf("%-16s %d.hparams.par_res = %-30d\n", __func__, count++, hparams.par_res);
     printf("%-16s %d.hparams.word_embed_proj_dim = %-30d\n", __func__, count++, hparams.word_embed_proj_dim);
     printf("%-16s %d.hparams.do_layer_norm_before = %-30d\n", __func__, count++, hparams.do_layer_norm_before);
@@ -1124,13 +1124,13 @@ struct model_file_loader {
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
     printf("%-16s %d.hparams.inner_hidden_size = %-30d\n", __func__, count++, hparams.inner_hidden_size);
-    printf("%-16s %d.hparams.freq_base = %-30d\n", __func__, count++, hparams.freq_base);
-    printf("%-16s %d.hparams.freq_scale = %-30d\n", __func__, count++, hparams.freq_scale);
+    printf("%-16s %d.hparams.freq_base = %-30f\n", __func__, count++, hparams.freq_base);
+    printf("%-16s %d.hparams.freq_scale = %-30f\n", __func__, count++, hparams.freq_scale);
 
     file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
     hparams.original_max_position_embeddings = file.read_u32();
     hparams.use_yarn = file.read_u32();
-    printf("%-16s %d.hparams.rope_scaling_factor = %-30d\n", __func__, count++, hparams.rope_scaling_factor);
+    printf("%-16s %d.hparams.rope_scaling_factor = %-30f\n", __func__, count++, hparams.rope_scaling_factor);
     printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++,
            hparams.original_max_position_embeddings);
     printf("%-16s %d.hparams.use_yarn = %-30d\n", __func__, count++, hparams.use_yarn);
