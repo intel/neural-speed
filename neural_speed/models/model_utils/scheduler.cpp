@@ -164,7 +164,7 @@ bool Cont_batch_gen_worker::step(std::vector<sequence>* seqs, const int& n_input
     // top_k_top_p sampling
   } else {
     if (!top_k_top_p_sample_step(seqs, n_input)) {
-      return  false;
+      return false;
     }
   }
 
