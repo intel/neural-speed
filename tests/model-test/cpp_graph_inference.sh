@@ -307,7 +307,7 @@ function main() {
     fi
     export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     # setup conda env for LLM
-    python setup.py install
+    python $working_dir/setup.py install
     # get cpu info
     # sockets=$(lscpu |grep 'Socket(s):' |sed 's/.*://;s/ //g')
     # cores_per_instance=$(lscpu |grep 'Core(s) per socket:' |sed 's/.*://;s/ //g')
