@@ -129,7 +129,7 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.norm[1] = ml->get_tensor(layers_i + ".input_layernorm.bias", {n_embd}, backend);
 
     // qkv GEMM + out proj GEMM
-    if (ml->verify_tensor(layers_i + ".attn.q_proj.bias")) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+    if (ml->verify_tensor(layers_i + ".self_attn.q_proj.bias")) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
       layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
       layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
@@ -154,7 +154,7 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
 
     if (backend != NE_BACKEND_CPU) {
-      if (ml->verify_tensor(layers_i + ".attn.q_proj.bias")) {
+      if (ml->verify_tensor(layers_i + ".self_attn.q_proj.bias")) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
                       ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
