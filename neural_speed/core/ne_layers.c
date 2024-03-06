@@ -11463,22 +11463,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
     }
   }
 
-  // join thread pool
-#ifndef _OPENMP
-  if (n_threads > 1) {
-    atomic_store(&state_shared.stop, true);
-    atomic_store(&state_shared.has_work, true);
-
-    for (int j = 0; j < n_threads - 1; j++) {
-      int rc = ne_thread_join(workers[j].thrd, NULL);
-      NE_ASSERT(rc == 0);
-      UNUSED(rc);
-    }
-
-    ne_lock_destroy(&state_shared.spin);
-  }
-#endif
-
   // performance stats (graph)
   {
     int64_t perf_cycles_cur = ne_perf_cycles() - perf_start_cycles;
