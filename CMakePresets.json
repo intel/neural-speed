@@ -49,23 +49,51 @@
         "value": "x64",
         "strategy": "external"
       },
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NS_PROFILING": "ON",
+        "NS_USE_OMP": "ON",
+        "BTLA_UT_DEBUG": "ON"
+      }
     },
     {
       "name": "x64-release",
       "displayName": "x64 Release",
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
       "inherits": "x64-debug",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BTLA_UT_DEBUG": "OFF"
+      }
+    },
+    {
+      "name": "x64-release-thread",
+      "displayName": "x64 Release without OpenMP",
+      "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
+      "inherits": "x64-release",
+      "cacheVariables": {
+        "NS_USE_OMP": "OFF"
+      }
     },
     {
       "name": "x64-bestla-UT",
       "displayName": "x64 BesTLA unit test",
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
-      "inherits": "x64-debug",
+      "inherits": "x64-release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "NS_BTLA_UT": "ON"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BTLA_UT_ALL": "ON",
+        "BTLA_UT_BENCHMARK": "ON",
+        "BTLA_UT_OPENMP": "ON"
+      }
+    },
+    {
+      "name": "x64-ut-thread",
+      "displayName": "x64 BesTLA UT without OpenMP",
+      "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
+      "inherits": "x64-bestla-UT",
+      "cacheVariables": {
+        "BTLA_UT_OPENMP": "OFF"
       }
     }
   ]

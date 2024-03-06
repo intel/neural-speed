@@ -93,6 +93,7 @@ class Benchmark_U8S8S32 {
  public:
   Benchmark_U8S8S32() {
     UT_START();
+    benchmark_all(1, 4096, 4096);
     benchmark_all(1024, 4096, 4096);
     benchmark_all(2048, 4096, 4096);
   }
@@ -184,6 +185,7 @@ class Benchmark_S8S8S32 {
  public:
   Benchmark_S8S8S32() {
     UT_START();
+    benchmark_all(1, 4096, 4096);
     benchmark_all(1024, 4096, 4096);
     benchmark_all(2048, 4096, 4096);
   }
@@ -268,6 +270,7 @@ class Benchmark_Bf16Bf16Fp32 {
  public:
   Benchmark_Bf16Bf16Fp32() {
     UT_START();
+    benchmark_all(1, 4096, 4096);
     benchmark_all(1024, 4096, 4096);
     benchmark_all(2048, 4096, 4096);
   }
@@ -349,6 +352,7 @@ class Benchmark_Fp16Fp16Fp16 {
  public:
   Benchmark_Fp16Fp16Fp16() {
     UT_START();
+    benchmark_all(1, 4096, 4096);
     benchmark_all(1024, 4096, 4096);
     benchmark_all(2048, 4096, 4096);
   }
@@ -557,8 +561,8 @@ class UTWOQ_CompFp32 {
     double t = log.min_val / batch;
     double flops = double(psize) / t / 1e6;
     double band = double(memsize) / t / 1e6;
-    printf("Threads %d %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, corestr, flops,
-           flops / threads, band);
+    printf("Threads %d Block %d %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
+           corestr, flops, flops / threads, band);
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -623,16 +627,19 @@ class UTWOQ_CompBf16 {
   void ut_s4() {
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S4_CLIP);
   }
 
   void ut_s8() {
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S8);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S8);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S8);
   }
 
   void ut_f4() {
     benchmark_all<prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::F4_BNB);
     benchmark_all<prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::F4_BNB);
+    benchmark_all<prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::F4_BNB);
   }
 
   template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>

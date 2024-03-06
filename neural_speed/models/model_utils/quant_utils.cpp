@@ -45,9 +45,7 @@
 #include "core/layers/mha_dense.h"
 #include "core/ne_layers.h"
 #include "core/layers/bestla_gemm.h"
-#include "bestla/bestla_parallel.h"
-// #include "jblas/jblas/jit_blas_weight_compression.h"
-// #include "models/model_utils/model_config.h"
+#include "core/ne_bestla.h"
 
 #include "models/model_utils/model_files.h"
 #include "models/whisper/whisper.h"
@@ -275,11 +273,9 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
                        size_t k) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
-#ifdef __OPENMP
-  static bestla::parallel::OMPThreading threading(nthread);
-#else
-  static bestla::parallel::StdThreading threading(nthread);
-#endif
+  bestla_set_threads(nthread);
+  auto thdptr = bestla_get_thread_handle();
+
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q3) {
     quant_type = BTLA_DTYPE::S3_CLIP;
@@ -327,7 +323,7 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   bool constexpr IsTrans_TorchWeight = true;
   if (size) {
     if (!BTLAGemmQuantPackB(dstpr, f32ptr, n, k, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype,
-                            IsTrans_TorchWeight, &threading)) {
+                            IsTrans_TorchWeight, thdptr)) {
       printf("Failed to quant this weight\n");
       return 0;
     }

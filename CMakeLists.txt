@@ -63,7 +63,6 @@ option(NS_AMX                    "neural_speed: enable AMX"                     
 option(NS_USE_OMP                "neural_speed: use OpenMP thread pool."                        ON)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
-option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
 option(NS_BUILD_EXAMPLES         "neural_speed: build examples"                    ${NS_STANDALONE})
 option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)
 
@@ -134,10 +133,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 if (NS_PYTHON_API)
   add_subdirectory(third_party/pybind11)
-endif()
-
-if (NS_BTLA_UT)
-  set(BTLA_UT_ALL ON)
 endif()
 
 if(NS_USE_OMP)
