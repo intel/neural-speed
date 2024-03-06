@@ -307,7 +307,7 @@ function main() {
     fi
     export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     # setup conda env for LLM
-
+    python setup.py install
     # get cpu info
     # sockets=$(lscpu |grep 'Socket(s):' |sed 's/.*://;s/ //g')
     # cores_per_instance=$(lscpu |grep 'Core(s) per socket:' |sed 's/.*://;s/ //g')
@@ -409,12 +409,12 @@ function main() {
                     if [[ "${model}" == "whisper" ]];then NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
                          $infer_cmd -f "/tf_dataset2/models/nlp_toolkit/whisper-tiny/jfk.wav" -m ${model}-${precision}.bin
                     else
-                        real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
+                        $ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
                         [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
                             "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]]
 
                         NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
-                            $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $real_ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
+                            $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
                         monitor
 
                         echo "=======  Inference End  ======="
