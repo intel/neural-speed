@@ -91,7 +91,7 @@ class Model:
         if model_hub == "modelscope":
             from modelscope import AutoConfig
             self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        else:           
+        else:
             self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
         self.model_type = model_type
