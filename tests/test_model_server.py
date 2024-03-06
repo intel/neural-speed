@@ -67,39 +67,39 @@ class TestModelServer(unittest.TestCase):
                 print(a)
                 print("=====================================")
 
+        log_map = {"auto": "MHA", "f16": "NON-MHA",
+                   "greedy": "GREEDY SEARCH", "beam": "BEAM SEARCH"}
         for md in ["auto", "f16"]:
-            if md == "auto":
-                print("=======MHA MODEL SERVER TESTING=========")
-            else:
-                print("=======NON-MHA MODEL SERVER TESTING=========")
-            added_count = 0
-            s = cpp.ModelServer(f_response,
-                                model_path,
-                                max_new_tokens=128,
-                                num_beams=4,
-                                min_new_tokens=30,
-                                early_stopping=True,
-                                do_sample=False,
-                                continuous_batching=True,
-                                return_prompt=True,
-                                max_request_num=8,
-                                threads=56,
-                                print_log=False,
-                                scratch_size_ratio = 1.0,
-                                memory_dtype= md,
-                            )
-            for i in range(len(prompts)):
-                p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
-                s.issueQuery([cpp.Query(i, p_token_ids)])
-                added_count += 1
-                time.sleep(2)  # adjust query sending time interval
+            for policy in ["greedy", "beam"]:
+                print("============={} {} MODEL SERVER TESTING========".format(log_map[md], log_map[policy]))
+                added_count = 0
+                s = cpp.ModelServer(f_response,
+                                    model_path,
+                                    max_new_tokens=128,
+                                    num_beams=4 if policy == "beam" else 1,
+                                    min_new_tokens=30,
+                                    early_stopping=True,
+                                    do_sample=False,
+                                    continuous_batching=True,
+                                    return_prompt=True,
+                                    max_request_num=8,
+                                    threads=56,
+                                    print_log=False,
+                                    scratch_size_ratio = 1.0,
+                                    memory_dtype= md,
+                                )
+                for i in range(len(prompts)):
+                    p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
+                    s.issueQuery([cpp.Query(i, p_token_ids)])
+                    added_count += 1
+                    time.sleep(2)  # adjust query sending time interval
 
-            # recommend to use time.sleep in while loop to exit program
-            # let cpp server owns more resources
-            while (added_count != len(prompts) or not s.Empty()):
-                time.sleep(1)
-            del s
-            print("should finished")
+                # recommend to use time.sleep in while loop to exit program
+                # let cpp server owns more resources
+                while (added_count != len(prompts) or not s.Empty()):
+                    time.sleep(1)
+                del s
+                print("should finished")
 
 if __name__ == "__main__":
     unittest.main()
