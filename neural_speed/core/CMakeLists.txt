@@ -36,6 +36,7 @@ endif()
 if(NOT WIN32)
   target_link_libraries(ne_layers PUBLIC rt)
 endif()
+target_link_options(ne_layers PUBLIC /STACK:5242880)
 
 if (NS_BUILD_TESTS)
 

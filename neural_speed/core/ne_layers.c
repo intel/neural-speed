@@ -96,10 +96,6 @@ static int sched_yield(void) {
 typedef void* thread_ret_t;
 #endif
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 static_assert(sizeof(block_q4_0) == sizeof(ne_fp16_t) + QK4_0 / 2, "wrong q4_0 block size/padding");
 static_assert(sizeof(block_q4_1) == 2 * sizeof(ne_fp16_t) + QK4_1 / 2, "wrong q4_1 block size/padding");
 static_assert(sizeof(block_q5_0) == sizeof(ne_fp16_t) + sizeof(uint32_t) + QK5_0 / 2, "wrong q5_0 block size/padding");
@@ -11299,7 +11295,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
   }
 #else
   n_threads = bestla_set_threads(n_threads);  // prevent from using two sockets
-  omp_set_num_threads(n_threads);
 #endif
   // initialize tasks + work buffer
   {
@@ -11732,34 +11727,8 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         /*.wsize =*/cgraph->work ? ne_nbytes(cgraph->work) : 0,
         /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
     };
-    ne_compute_forward(&params, node);
-    if (node->n_tasks == 1) {
-      params.type = NE_TASK_COMPUTE;
-      ne_compute_forward(&params, node);
-      params.type = NE_TASK_FINALIZE;
-      ne_compute_forward(&params, node);
 
-    } else {
-#pragma omp parallel
-      {
-        struct ne_compute_params params = {
-            /*.type  =*/NE_TASK_COMPUTE,
-            /*.ith   =*/omp_get_thread_num(),
-            /*.nth   =*/node->n_tasks,
-            /*.wsize =*/cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
-        };
-        if (params.ith < node->n_tasks) {
-          ne_compute_forward(&params, node);
-        }
-#pragma omp barrier
-        params.type = NE_TASK_FINALIZE;
-        if (params.ith < node->n_tasks) {
-          ne_compute_forward(&params, node);
-        }
-      }
-    }
-
+    bestla_parallel_for(ne_compute_forward,&params,node);
 #endif
 #if NE_DEBUG
     printf("Node %d ", node->op);
