@@ -121,6 +121,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     model, hparams, quantize_config = load_quantized_safetensors(model_path)
     list_vars = model
 
+    print(hparams)
+
     # orinal QWEN
     # model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
     # hparams = model.config.to_dict()
@@ -176,11 +178,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
     f.write(
-        struct.pack("i",
-                    hparams["bos_token_id"] if hparams["bos_token_id"] else tokenizer.special_tokens['<|endoftext|>']))
+        struct.pack(
+            "i", hparams["bos_token_id"] if "bos_token_id" in hparams else tokenizer.special_tokens['<|endoftext|>']))
     f.write(
-        struct.pack("i",
-                    hparams["eos_token_id"] if hparams["eos_token_id"] else tokenizer.special_tokens['<|endoftext|>']))
+        struct.pack(
+            "i", hparams["eos_token_id"] if "eos_token_id" in hparams else tokenizer.special_tokens['<|endoftext|>']))
     f.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     f.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
@@ -196,8 +198,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
             f.write(struct.pack("i", len(text)))
             f.write(text)
             f.write(struct.pack("f", -10000))
-
-    print(hparams)
 
     def convert_qwen_to_fp32_tensor(src_name, dst_name, model, fout):
         # qwen-gptq is torch.bfloat16 mostly.
