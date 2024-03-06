@@ -146,6 +146,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))
     f.write(struct.pack("i", ffn_hidden_size))
     f.write(struct.pack("i", 0))
+    f.write(struct.pack("i", 0))  # n_experts
+    f.write(struct.pack("i", 0))  # n_expert_used
 
     f.write(struct.pack("f", config["rms_norm_eps"]))
     f.write(struct.pack("f", config["rope_theta"] if "rope_theta" in config else 10000))

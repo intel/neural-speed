@@ -19,7 +19,7 @@ from pathlib import Path
 from transformers import AutoConfig
 import subprocess
 
-model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper"}
+model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper", "qwen2": "qwen"}
 
 
 def convert_model(model, outfile, outtype="f32", format="NE", whisper_repo_path=None, use_quantized_model=False):

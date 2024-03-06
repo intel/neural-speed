@@ -41,6 +41,9 @@
 #define MHA_FUSION 0  //  turn it off for naive beam_search kv cache reorder
 #define MHA_FP16 (MHA_FUSION && 0)
 
+static const bool NE_ATTN_PREFER_FP32 =
+    getenv("NE_ATTN_PREFER_FP32") != nullptr && std::string("1") == getenv("NE_ATTN_PREFER_FP32");
+
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -60,9 +63,10 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   const int N = inputs->n_tokens;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
-  // continuous batching
+  // continuous batching (no padding)
   // if each sequence length l_i ! = l_k
   // input shape will be [1, l_sum]
+  const bool concat_multi_seqs = (batch_size > 1 && lctx.cont_batching) ? true : false;
   std::vector<int> n_tokens(batch_size);
   std::vector<int> n_pasts(batch_size);
   std::vector<int> n_totals(batch_size);
@@ -75,15 +79,15 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     n_pasts[i] = inputs[i].n_past;
     n_totals[i] = inputs[i].n_total;
     block_ids[i] = inputs[i].request_idx * beam_size + inputs[i].beam_idx;
-    if (!lctx.cont_batching) {
+    if (!concat_multi_seqs) {
       n_padding.push_back(inputs[i].n_padding);
       if (no_padding && inputs[i].n_padding != 0) no_padding = false;
     }
   }
   const int seq_len_sum = std::accumulate(n_tokens.begin(), n_tokens.end(), 0);
-  if (!lctx.cont_batching) MODEL_ASSERT(seq_len_sum == N * batch_size);
-  const int infer_bs = lctx.cont_batching ? 1 : batch_size;
-  const int infer_seq_len = lctx.cont_batching ? seq_len_sum : N;
+  if (!concat_multi_seqs) MODEL_ASSERT(seq_len_sum == N * batch_size);
+  const int infer_bs = concat_multi_seqs ? 1 : batch_size;
+  const int infer_seq_len = concat_multi_seqs ? seq_len_sum : N;
   const std::vector<std::vector<int>> infer_groups = split_inputs_into_groups(inputs, n_input);
   const auto& model = lctx.model;
   const auto& hparams = model.hparams;
@@ -97,7 +101,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   const int n_ctx = lctx.n_ctx;  // max number fo tokens to keep in the kv-cache
   const int n_keep = lctx.n_keep;
   const bool shift_roped_k = lctx.shift_roped_k;
-  MODEL_ASSERT(("continuous batching mechanism doesn't support shift rope.\n", !(lctx.cont_batching && shift_roped_k)));
+  MODEL_ASSERT(("continuous batching mechanism doesn't support shift rope.\n", !(concat_multi_seqs && shift_roped_k)));
   const bool is_ring_full = shift_roped_k && n_total > n_past;
   const int n_cached = shift_roped_k ? std::min(n_total + N, n_ctx) : (n_past + N);  // #tokens cached after kv-append
   int n_head = hparams.n_head;
@@ -117,7 +121,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
   }
 #endif
 
-  MODEL_ASSERT(("continuous batching mechanism doesn't support TP.\n", !(lctx.cont_batching && enable_tp)));
+  MODEL_ASSERT(("continuous batching mechanism doesn't support TP.\n", !(concat_multi_seqs && enable_tp)));
   auto& mem_per_token = lctx.mem_per_token;
   auto& buf_compute = lctx.buf_compute;
 
@@ -205,7 +209,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
                            infer_bs);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
     }
-    if (lctx.cont_batching) {
+    if (concat_multi_seqs) {
       size_t off_sl = 0;
       // per_request rope
       for (int gi = 0; gi < infer_groups.size(); ++gi) {
@@ -411,9 +415,9 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
           K = ne_permute(ctx0, K, 0, 2, 1, 3);
         }
       } else {
-        std::vector<int> attn_block_ids;
-        for (const auto& bsi : infer_groups[gi]) {
-          attn_block_ids.push_back(block_ids[bsi]);
+        std::vector<int> attn_block_ids(infer_groups[gi].size());
+        for (int j = 0; j < infer_groups[gi].size(); ++j) {
+          attn_block_ids[j] = block_ids[infer_groups[gi][j]];
         }
         K = model_kv_cache_seq_concat(&gf, &lctx, ctx0, head_size, n_cached_gi, n_head, attn_bs, attn_block_ids, il);
         if (is_ring_full) {
@@ -437,6 +441,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       struct ne_tensor* KQV_merged_gi;
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
       ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
+      if (NE_ATTN_PREFER_FP32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
       if (attn_n_total == 0 || !shift_roped_k)
         attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
       if (run_mha_reordered) {                 // reordered kv-cache bf16 mha must be used if run_mha_reordered

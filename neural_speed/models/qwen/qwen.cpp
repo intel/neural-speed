@@ -102,6 +102,12 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
   const int n_vocab = hparams.n_vocab;
   const int n_rot = hparams.n_rot;
   const int head_dim = n_embd / n_head;
+  int qwen_version = 0;
+  if (hparams.max_seq_len == 8192) {
+    qwen_version = 1;
+  } else {
+    qwen_version = 2;
+  }
 
   auto& mem_per_token = lctx.mem_per_token;
   auto& buf_compute = lctx.buf_compute;
@@ -164,20 +170,36 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
       }
 
       // compute QKV
-      {
+      struct ne_tensor* Qcur;
+      struct ne_tensor* Kcur;
+      struct ne_tensor* Vcur;
+
+      if (qwen_version == 1) {
         cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
 
         cur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[1], cur), cur);
+        size_t fused_qkv_row_nb = (3 * n_embd) * sizeof(float);
+        Qcur = ne_cont(ctx0, ne_view_3d(ctx0, cur, head_dim, n_head, N, head_dim * sizeof(float), fused_qkv_row_nb,
+                                        0 * sizeof(float) * n_embd));
+        // head_dim, n_head, N --> head_dim, N, n_head
+        Kcur = ne_cont(ctx0, ne_view_3d(ctx0, cur, head_dim, n_head, N, head_dim * sizeof(float), fused_qkv_row_nb,
+                                        1 * sizeof(float) * n_embd));
+        // head_dim, n_head, N --> N, head_dim, n_head
+        Vcur = ne_cont(ctx0, ne_view_3d(ctx0, cur, head_dim, n_head, N, head_dim * sizeof(float), fused_qkv_row_nb,
+                                        2 * sizeof(float) * n_embd));
+      } else {
+        Qcur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
+        Qcur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[1], Qcur), Qcur);
+        Qcur = ne_reshape_3d(ctx0, Qcur, head_dim, n_head, N);
+
+        Kcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+        Kcur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[3], Kcur), Kcur);
+        Kcur = ne_reshape_3d(ctx0, Kcur, head_dim, n_head, N);
+
+        Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
+        Vcur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[5], Vcur), Vcur);
+        Vcur = ne_reshape_3d(ctx0, Vcur, head_dim, n_head, N);
       }
-      size_t fused_qkv_row_nb = (3 * n_embd) * sizeof(float);
-      struct ne_tensor* Qcur = ne_cont(ctx0, ne_view_3d(ctx0, cur, head_dim, n_head, N, head_dim * sizeof(float),
-                                                        fused_qkv_row_nb, 0 * sizeof(float) * n_embd));
-      // head_dim, n_head, N --> head_dim, N, n_head
-      struct ne_tensor* Kcur = ne_cont(ctx0, ne_view_3d(ctx0, cur, head_dim, n_head, N, head_dim * sizeof(float),
-                                                        fused_qkv_row_nb, 1 * sizeof(float) * n_embd));
-      // head_dim, n_head, N --> N, head_dim, n_head
-      struct ne_tensor* Vcur = ne_cont(ctx0, ne_view_3d(ctx0, cur, head_dim, n_head, N, head_dim * sizeof(float),
-                                                        fused_qkv_row_nb, 2 * sizeof(float) * n_embd));
 
       // using mode = 2 for GPT-NeoX mode
       Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
@@ -300,7 +322,11 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
         cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
       }
       // projection
-      { cur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur); }
+      if (qwen_version == 1) {
+        cur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+      } else {
+        cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
+      }
     }
     lctx.use_buf(ctx0, 1);
 

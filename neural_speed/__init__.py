@@ -66,7 +66,7 @@ class Model:
             import neural_speed.qwen_cpp as cpp_model
         elif model_type == "mistral":
             import neural_speed.mistral_cpp as cpp_model
-        elif model_type == "qwen":
+        elif model_type == "qwen2":
             import neural_speed.qwen_cpp as cpp_model
         elif model_type == "phi":
             import neural_speed.phi_cpp as cpp_model
@@ -74,6 +74,8 @@ class Model:
             import neural_speed.stablelm_cpp as cpp_model
         elif model_type == "whisper":
             import neural_speed.whisper_cpp as cpp_model
+        elif model_type == "mixtral":
+            import neural_speed.mixtral_cpp as cpp_model
         else:
             raise TypeError("Unsupported model type {}!".format(model_type))
         self.module = cpp_model
@@ -212,7 +214,7 @@ class Model:
         out_count = 0
         input_list = None
         pad_token_id = generate_kwargs.get("pad_token", None)
-        if generate_kwargs.get("continuous_batching", False):
+        if input_ids.shape[0] > 1 and generate_kwargs.get("continuous_batching", True):
             input_list = self._cont_batching_input(input_ids, pad_token_id)
         else:
             input_list = input_ids.tolist()

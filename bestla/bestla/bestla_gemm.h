@@ -2716,7 +2716,7 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
-            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), vreg_t(BReg + i));
           }
         }
       }
