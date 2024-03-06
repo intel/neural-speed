@@ -15,11 +15,23 @@
 *******************************************************************************/
 #pragma once
 
-#include <utils/common.hpp>
 #include "xetla.hpp"
+#include <utils/common.hpp>
 
 using namespace gpu::xetla;
 using namespace cl::sycl;
+
+namespace {
+// abs for floating point types is non-standard and has been deprecated.
+// Please use fabs instead. [-Wdeprecated-declarations]
+template <typename T>
+inline T _abs(const T &v) {
+    if constexpr (is_floating_point_v<T>)
+        return fabs(v);
+    else
+        return abs(v);
+};
+} // namespace
 
 template <typename data_type_in, typename data_type_out, typename data_type_acc>
 int data_transformer_result_validate(data_type_in *in_device,
@@ -42,8 +54,8 @@ int data_transformer_result_validate(data_type_in *in_device,
         for (uint32_t j = 0; j < mat_n; j++) {
             int idx = i * mat_n + j;
 
-            cpu_max = (cpu_max > abs(in[idx])) ? cpu_max
-                                               : abs((data_type_acc)in[idx]);
+            cpu_max = (cpu_max > _abs(in[idx])) ? cpu_max
+                                                : _abs((data_type_acc)in[idx]);
 
             res = out[idx];
 
@@ -56,7 +68,7 @@ int data_transformer_result_validate(data_type_in *in_device,
                         : (data_type_out)(in[j * mat_m + i]);
             }
 
-            if (abs(res - ref) > abs(0.01 * res)) {
+            if (_abs(res - ref) > _abs(0.01 * res)) {
                 std::cout << "i: " << i << " j: " << j << " idx: " << idx
                           << " in: " << in[idx] << " cpu: " << ref
                           << " gpu: " << res << std::endl;
@@ -69,7 +81,7 @@ int data_transformer_result_validate(data_type_in *in_device,
     cpu_max = cpu_max * scale[0];
 
     if (need_fp8_op) {
-        if (abs(cpu_max - amax_ptr[0]) > abs(0.01 * cpu_max)) {
+        if (_abs(cpu_max - amax_ptr[0]) > _abs(0.01 * cpu_max)) {
             std::cout << "cpu_max: " << cpu_max << " gpu_max: " << amax_ptr[0]
                       << std::endl;
             return 1;

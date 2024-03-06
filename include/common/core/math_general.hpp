@@ -462,7 +462,11 @@ __XETLA_API xetla_vector<T, SZ> xetla_add_c(xetla_vector<T, SZ> src0,
     static_assert((std::is_same<remove_const_t<T>, uint32_t>::value),
             "For addc, only uint32_t is supported");
     xetla_vector<T, SZ> carry_tmp;
+#if __INTEL_LLVM_COMPILER >= 20240100
+    xetla_vector<T, SZ> out = __ESIMD_NS::addc(carry_tmp, src0, src1);
+#else
     xetla_vector<T, SZ> out = __ESIMD_ENS::addc(carry_tmp, src0, src1);
+#endif
     carry = carry_tmp;
     return out;
 }
@@ -480,7 +484,11 @@ __XETLA_API xetla_vector<T, SZ> xetla_add_c(xetla_vector<T, SZ> src0, T src1,
     static_assert((std::is_same<remove_const_t<T>, uint32_t>::value),
             "For addc, only uint32_t is supported");
     xetla_vector<T, SZ> carry_tmp;
+#if __INTEL_LLVM_COMPILER >= 20240100
+    xetla_vector<T, SZ> out = __ESIMD_NS::addc(carry_tmp, src0, src1);
+#else
     xetla_vector<T, SZ> out = __ESIMD_ENS::addc(carry_tmp, src0, src1);
+#endif
     carry = carry_tmp;
     return out;
 }
