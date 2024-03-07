@@ -73,16 +73,57 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>Latest</td>
   </tr>
+    <tr>
+    <td><a href="https://huggingface.co/Intel/neural-chat-7b-v3-1" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-1</a>,
+    <a href="https://huggingface.co/Intel/neural-chat-7b-v3-2" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-2</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>Latest</td>
+  </tr>
+  <tr>
+    <td><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener noreferrer">Mistral-7B</a>,
+     <a href="https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1" target="_blank" rel="noopener noreferrer">Mixtral-8x7B</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>4.36.0 or newer</td>
+  </tr>
+  <tr>
+    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen-14B-Chat" target="_blank" rel="noopener noreferrer">Qwen-14B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen1.5-7B</a>,
+    <a href="https://huggingface.co/Qwen/Qwen1.5-0.5B" target="_blank" rel="noopener noreferrer">Qwen1.5-0.5B</a></td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>Latest</td>
+  </tr>
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>Latest</td>
   </tr>
   <tr>
@@ -161,19 +202,6 @@ Neural Speed supports the following models:
     <td> </td>
     <td>Latest</td>
   </tr>
-    <tr>
-    <td><a href="https://huggingface.co/Intel/neural-chat-7b-v3-1" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-1</a>,
-    <a href="https://huggingface.co/Intel/neural-chat-7b-v3-2" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-2</a></td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>✅</td>
-    <td>Latest</td>
-  </tr>
   <tr>
     <td><a href="https://huggingface.co/THUDM/chatglm-6b" target="_blank" rel="noopener noreferrer">ChatGLM-6B</a>,
     <a href="https://huggingface.co/THUDM/chatglm2-6b" target="_blank" rel="noopener noreferrer">ChatGLM2-6B</a></td>
@@ -199,34 +227,6 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>4.33.1</td>
-  </tr>
-  <tr>
-    <td><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener noreferrer">Mistral-7B</a>,
-     <a href="https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1" target="_blank" rel="noopener noreferrer">Mixtral-8x7B</a></td>
-    <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
-    <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
-    <td>4.36.0 or newer</td>
-  </tr>
-  <tr>
-    <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B</a>,
-    <a href="https://huggingface.co/Qwen/Qwen-14B-Chat" target="_blank" rel="noopener noreferrer">Qwen-14B</a>,
-    <a href="https://huggingface.co/Qwen/Qwen1.5-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen1.5-7B</a>,
-    <a href="https://huggingface.co/Qwen/Qwen1.5-0.5B" target="_blank" rel="noopener noreferrer">Qwen1.5-0.5B</a></td>
-    <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
-    <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
-    <td>Latest</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/microsoft/phi-2" target="_blank" rel="noopener noreferrer">phi-2</a>,
