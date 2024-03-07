@@ -307,7 +307,6 @@ function main() {
     fi
     export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     # setup conda env for LLM
-    python $working_dir/setup.py install
     # get cpu info
     # sockets=$(lscpu |grep 'Socket(s):' |sed 's/.*://;s/ //g')
     # cores_per_instance=$(lscpu |grep 'Core(s) per socket:' |sed 's/.*://;s/ //g')
@@ -329,7 +328,7 @@ function main() {
         echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
         exit 1
     fi
-
+    python $working_dir/setup.py install
     echo "=======  Convert Start  ======="
     ## prepare fp32 bin
     python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${model_path}
