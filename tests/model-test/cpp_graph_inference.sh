@@ -328,6 +328,7 @@ function main() {
         echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
         exit 1
     fi
+    pip install py-cpuinfo
     python $working_dir/setup.py install
     echo "=======  Convert Start  ======="
     ## prepare fp32 bin
