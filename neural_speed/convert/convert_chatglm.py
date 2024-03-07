@@ -541,8 +541,8 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", hparams["inner_hidden_size"]))
+    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
