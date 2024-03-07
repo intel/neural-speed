@@ -29,12 +29,12 @@ namespace kernel {
 template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         typename dtype_b, mem_layout mem_layout_b, uint32_t alignment_b,
         typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
-        typename dtype_acc, gpu_arch gpu_arch_tag = gpu_arch::Xe,
+        typename dtype_acc, gpu_arch arch_tag = gpu_arch::Xe,
         typename tune_option = dict_t<>>
 struct default_gemm_config_t
     : param_adaptor<param_adaptor_tag::kernel,
               typename param_optimizer<param_optimizer_tag::kernel,
-                      typename default_param_t::template update_dict_t<
+                      typename default_param_t<arch_tag>::template update_dict_t<
                               typename tune_option::template update_t<
                                       elem_t_t<tune_key::data_type_a, dtype_a>,
                                       elem_v_t<tune_key::memory_layout_a,
@@ -54,16 +54,16 @@ struct default_gemm_config_t
                                       elem_t_t<tune_key::data_type_acc,
                                               dtype_acc>,
                                       elem_v_t<tune_key::gpu_arch,
-                                              gpu_arch_tag>>>>::type> {};
+                                              arch_tag>>>>::type> {};
 
 template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         typename dtype_b, mem_layout mem_layout_b, uint32_t alignment_b,
         typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
-        typename dtype_acc, gpu_arch gpu_arch_tag = gpu_arch::Xe,
+        typename dtype_acc, gpu_arch arch_tag = gpu_arch::Xe,
         typename tune_option = dict_t<>>
 using default_gemm_t = typename default_gemm_config_t<dtype_a, mem_layout_a,
         alignment_a, dtype_b, mem_layout_b, alignment_b, dtype_c, mem_layout_c,
-        alignment_c, dtype_acc, gpu_arch_tag, tune_option>::type;
+        alignment_c, dtype_acc, arch_tag, tune_option>::type;
 } // namespace kernel
 
 template <typename dict_t_>
@@ -73,15 +73,20 @@ struct param_optimizer<param_optimizer_tag::kernel, dict_t_> {
                                param_optimizer_type> != dict_t_::impl::key_not_found)
             && (dict_t_::template find_elem_v<tune_key::
                                 param_optimizer_type> == tune_key_value::param_optimizer_decision_tree);
+    static constexpr auto arch_tag
+            = (dict_t_::impl::template find_elem_index<
+                       tune_key::gpu_arch> != dict_t_::impl::key_not_found)
+            ? dict_t_::template find_elem_v<tune_key::gpu_arch>
+            : gpu_arch::Xe;
     static constexpr auto optimizer_mode
             = dict_t_::template find_elem_v<tune_key::param_optimizer_mode>;
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::kernel, dict_t_,
                     optimizer_mode>,
             dummy_optimizer<param_optimizer_tag::kernel, dict_t_,
-                    kernel::param_kslicing_g1l1_t,
-                    kernel::param_kslicing_g2l1_t,
-                    kernel::param_kslicing_g1l2_t>>::type::type;
+                    kernel::param_kslicing_g1l1_t<arch_tag>,
+                    kernel::param_kslicing_g2l1_t<arch_tag>,
+                    kernel::param_kslicing_g1l2_t<arch_tag>>>::type::type;
 };
 
 template <typename dict_t_>
@@ -126,12 +131,12 @@ namespace group {
 template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         mem_space mem_space_a, typename dtype_b, mem_layout mem_layout_b,
         uint32_t alignment_b, mem_space mem_space_b, typename dtype_acc,
-        typename wg_shape, uint32_t wg_tile_k,
-        gpu_arch gpu_arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
+        typename wg_shape, uint32_t wg_tile_k, gpu_arch arch_tag = gpu_arch::Xe,
+        typename tune_option = dict_t<>>
 struct default_gemm_selector_config_t
     : param_adaptor<param_adaptor_tag::work_group_gemm,
               typename param_optimizer<param_optimizer_tag::work_group,
-                      typename default_param_t::template update_dict_t<
+                      typename default_param_t<arch_tag>::template update_dict_t<
                               typename tune_option::template update_t<
                                       elem_t_t<tune_key::data_type_a, dtype_a>,
                                       elem_v_t<tune_key::memory_layout_a,
@@ -153,25 +158,25 @@ struct default_gemm_selector_config_t
                                               wg_shape>,
                                       elem_v_t<tune_key::wg_tile_k, wg_tile_k>,
                                       elem_v_t<tune_key::gpu_arch,
-                                              gpu_arch_tag>>>>::type> {};
+                                              arch_tag>>>>::type> {};
 
 template <typename dtype_a, mem_layout mem_layout_a, uint32_t alignment_a,
         mem_space mem_space_a, typename dtype_b, mem_layout mem_layout_b,
         uint32_t alignment_b, mem_space mem_space_b, typename dtype_acc,
-        typename wg_shape, uint32_t wg_tile_k,
-        gpu_arch gpu_arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
+        typename wg_shape, uint32_t wg_tile_k, gpu_arch arch_tag = gpu_arch::Xe,
+        typename tune_option = dict_t<>>
 using default_gemm_selector_t = typename default_gemm_selector_config_t<dtype_a,
         mem_layout_a, alignment_a, mem_space_a, dtype_b, mem_layout_b,
-        alignment_b, mem_space_b, dtype_acc, wg_shape, wg_tile_k, gpu_arch_tag,
+        alignment_b, mem_space_b, dtype_acc, wg_shape, wg_tile_k, arch_tag,
         tune_option>::type;
 
 template <typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
         mem_space mem_space_c, typename wg_shape, uint32_t wg_tile_k,
-        gpu_arch gpu_arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
+        gpu_arch arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
 struct default_epilogue_selector_config_t
     : param_adaptor<param_adaptor_tag::work_group_epilogue,
               typename param_optimizer<param_optimizer_tag::work_group,
-                      typename default_param_t::template update_dict_t<
+                      typename default_param_t<arch_tag>::template update_dict_t<
                               typename tune_option::template update_t<
                                       elem_t_t<tune_key::data_type_c, dtype_c>,
                                       elem_v_t<tune_key::memory_layout_c,
@@ -184,14 +189,14 @@ struct default_epilogue_selector_config_t
                                               wg_shape>,
                                       elem_v_t<tune_key::wg_tile_k, wg_tile_k>,
                                       elem_v_t<tune_key::gpu_arch,
-                                              gpu_arch_tag>>>>::type> {};
+                                              arch_tag>>>>::type> {};
 
 template <typename dtype_c, mem_layout mem_layout_c, uint32_t alignment_c,
         mem_space mem_space_c, typename wg_shape, uint32_t wg_tile_k,
-        gpu_arch gpu_arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
+        gpu_arch arch_tag = gpu_arch::Xe, typename tune_option = dict_t<>>
 using default_epilogue_selector_t =
         typename default_epilogue_selector_config_t<dtype_c, mem_layout_c,
-                alignment_c, mem_space_c, wg_shape, wg_tile_k, gpu_arch_tag,
+                alignment_c, mem_space_c, wg_shape, wg_tile_k, arch_tag,
                 tune_option>::type;
 } // namespace group
 
@@ -204,11 +209,16 @@ struct param_optimizer<param_optimizer_tag::work_group, dict_t_> {
                                 param_optimizer_type> == tune_key_value::param_optimizer_decision_tree);
     static constexpr auto optimizer_mode
             = dict_t_::template find_elem_v<tune_key::param_optimizer_mode>;
+    static constexpr auto arch_tag
+            = (dict_t_::impl::template find_elem_index<
+                       tune_key::gpu_arch> != dict_t_::impl::key_not_found)
+            ? dict_t_::template find_elem_v<tune_key::gpu_arch>
+            : gpu_arch::Xe;
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::work_group, dict_t_,
                     optimizer_mode>,
             dummy_optimizer<param_optimizer_tag::work_group, dict_t_,
-                    group::param_dict1_wg_t>>::type::type;
+                    group::param_dict1_wg_t<arch_tag>>>::type::type;
 };
 
 template <typename dict_t_>

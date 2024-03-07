@@ -176,8 +176,8 @@ public:
     /// @return The size of local memory required.
     __XETLA_API static constexpr uint32_t get_slm_size() {
         constexpr uint32_t size = gemm_t::slm_size + epilogue_t::slm_size;
-        static_assert(size <= (128 * 1024),
-                "The local memory size should be less than 128KB!");
+        static_assert(size <= arch_attr_t<arch_tag>::local_mem_size,
+                "The local memory size excess!");
         return size;
     };
 

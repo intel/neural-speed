@@ -34,11 +34,11 @@ struct default_config_group_gemm_test_func {
     // should larger than 8
     static constexpr uint32_t k_stride = sg_k;
 
-    // Step 1: define mirco-kernel's configuration
+    // Step 1: define Micro-kernel's configuration
     using wg_shape = shape<wg_n, wg_m>;
     using sg_shape = shape<sg_n, sg_m>;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using gemm_tune_option = dict_t<
             elem_v_t<tune_key::param_optimizer_type,
                     tune_key_value::param_optimizer_decision_tree>,
@@ -59,7 +59,7 @@ struct default_config_group_gemm_test_func {
             layout_b, // memory layout for B
             8, // leading dimension alignment for B, in unit of element
             mem_space::global, // memory reading from global mem for B
-            dtype_acc, // accumulator data type for intermediate resutls
+            dtype_acc, // accumulator data type for intermediate results
             wg_shape, // computation tile shape
             k_stride, // elements in each iteration
             gpu_arch::Xe, // GPU arch

@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
-template <gpu_arch arch_tag_>
+template <gpu_arch arch_tag>
 void basic_gemm_run(sycl::queue queue, uint32_t iter) {
     // Tips, the example demonstrates programming kernel with XeTLA, it works as expected with current configurations.
     // Please make sure you fully understand these configurations before you do any modifications, incomplete changes may lead to unexpected behaviors.
@@ -110,11 +110,11 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                 // should larger than 8
                 static constexpr uint32_t k_stride = 32;
 
-                // Step 1: define mirco-kernel's configuration
+                // Step 1: define Micro-kernel's configuration
                 using wg_shape = shape<wg_tile_n, wg_tile_m>;
                 using sg_shape = shape<sg_tile_n, sg_tile_m>;
 
-                // Mirco-kernel configuration
+                // Micro-kernel configuration
                 using gemm_tune_option
                         = dict_t<elem_t_t<tune_key::sg_tile_shape, sg_shape>,
                                 elem_v_t<tune_key::prefetch_distance,
@@ -132,10 +132,10 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                         8, // leading dimension for B, in unit of element
                         mem_space::
                                 global, // memory reading from global mem for B
-                        data_type_acc, // accumulator data type for intermediate resutls
+                        data_type_acc, // accumulator data type for intermediate results
                         wg_shape, // computation tile shape
                         k_stride, // elements in each iteration
-                        arch_tag_, // GPU arch
+                        arch_tag, // GPU arch
                         gemm_tune_option>;
                 gemm_t gemm;
 
@@ -149,24 +149,26 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                         mem_space::global, // memory writing to global mem for C
                         wg_shape, // computation tile shape
                         k_stride, // elements in each iteration
-                        arch_tag_, // GPU arch
+                        arch_tag, // GPU arch
                         epilogue_tune_option>;
 
                 // Step 3: define the shared local memory usages
                 // developers have the responsibility to set
-                // shared loacal memory through XeTLA API
+                // shared local memory through XeTLA API
                 static constexpr uint32_t barrier_count = gemm_t::barrier_count;
                 static constexpr uint32_t slm_size = gemm_t::slm_size;
+                static_assert(slm_size <= arch_attr_t<arch_tag>::local_mem_size,
+                        "The local memory size excess!");
                 xetla_nbarrier_init<barrier_count>();
                 xetla_local_init<slm_size>();
 
-                // Step 4: ecah workgroup gets it individual index to start computation
+                // Step 4: each workgroup gets it individual index to start computation
                 int start_n = item.get_group(2) * wg_tile_n;
                 int start_m = item.get_group(1) * wg_tile_m;
                 // no slicing in K direction so start from zero for all WG
                 int start_k = 0;
 
-                // Each workgroup will compute all data in K based on no k_sliciing
+                // Each workgroup will compute all data in K based on no k_slicing
                 // The developer can set how much data a subgroup compute by k_stride
                 uint32_t wg_tile_k = matrix_k;
                 uint32_t inner_loop_count
@@ -183,7 +185,7 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                 mem_desc_output_c md_c(
                         {C}, {matrix_n, matrix_m, ldc}, {start_n, start_m});
 
-                // Step 6: real calculation with accumulator varibales which suppose
+                // Step 6: real calculation with accumulator variables which suppose
                 // will be in register.
                 typename gemm_t::matAcc_t matAcc;
                 matAcc.init(0);
@@ -194,7 +196,7 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
                 // the results is in the matAcc rather than real output C
                 typename gemm_t::work_group_t g(item.get_local_linear_id());
                 gemm(g, matAcc, gemm_args);
-                // Step 7: write the results from matACC to real output C
+                // Step 7: write the results from matAcc to real output C
                 epilogue_t epilogue;
                 epilogue(g, matAcc, md_c);
             });
@@ -219,23 +221,21 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
     free(C, context);
 }
 
+template <gpu_arch arch_tag>
+struct main_wrapper {
+    static constexpr auto exec = []() {
+        // This case shows how to use batch-reduce (br) GEMM microkernel to
+        // solve a standard GEMM
+        // Turn on the profiling property to facilitate subsequent profiling
+        sycl::property_list properties {
+                sycl::property::queue::enable_profiling()};
+
+        // Define SYCL queue, context and device
+        auto queue = sycl::queue(properties);
+        basic_gemm_run<arch_tag>(queue, 10);
+    };
+};
 int main() {
-    // This case shows how to use batch-reduce (br) GEMM microkernel to
-    // solve a standard GEMM
-    // Turn on the profiling property to facilitate subsequent profiling
-    sycl::property_list properties {sycl::property::queue::enable_profiling()};
-
-    // Define SYCL queue, context and device
-    auto queue = sycl::queue(properties);
-    auto device = queue.get_device();
-
-    // Detect the execution size, 8 for Arc, 16 for PVC.
-    int ExecSize
-            = device.get_info<ext::intel::info::device::gpu_eu_simd_width>();
-    if (ExecSize == 8) {
-        basic_gemm_run<gpu_arch::Dg2>(queue, 10);
-    } else {
-        basic_gemm_run<gpu_arch::Xe>(queue, 10);
-    }
-    return (0);
+    dispatch_arch<main_wrapper>::exec();
+    return 0;
 }

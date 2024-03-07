@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <utils/utils.hpp>
 #include "xetla.hpp"
+#include <utils/utils.hpp>
 
 using namespace gpu::xetla;
 //The number of times the kernel is executed
@@ -245,7 +245,7 @@ void stream_k_gemm_run(uint32_t iter) {
     static constexpr uint32_t periodic_sync_interval = 4;
     static constexpr uint32_t prefetch_distance = 4;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using gemm_config = typename xetla::group::gemm_selector_t<
             data_type_a, // input datatype for A
             data_type_b, // input datatype for B
@@ -255,7 +255,7 @@ void stream_k_gemm_run(uint32_t iter) {
             mem_space::global, // memory reading from global mem for B
             8, // leading dimension for A, in unit of element
             8, // leading dimension for B, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             tile_shape, // computation tile shape
             sg_tile_k, // elements in each iteration
             mma_engine::xmx, // compute engine
@@ -299,9 +299,11 @@ void stream_k_gemm_run(uint32_t iter) {
             gemm_config::k_stride, wg_tile_n, sg_tile_m, sg_tile_n,
             avail_xecores);
 
-
-    static const std::string env_set_str = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF -vc-disable-indvars-opt -Xfinalizer ' -printregusage -enableBCR -DPASTokenReduction '";
-    putenv(const_cast<char*>(env_set_str.c_str()));
+    static const std::string env_set_str
+            = "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF "
+              "-vc-disable-indvars-opt -Xfinalizer ' -printregusage -enableBCR "
+              "-DPASTokenReduction '";
+    putenv(const_cast<char *>(env_set_str.c_str()));
     //Define and initialize the data required for the calculation
     auto A = alloc_device_and_init<data_type_a>(
             size_a,
@@ -434,7 +436,7 @@ void stream_k_gemm_run(uint32_t iter) {
     }
 
     static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-    putenv(const_cast<char*>(env_unset_str.c_str()));
+    putenv(const_cast<char *>(env_unset_str.c_str()));
 
     ASSERT_EQ(0,
             gemm_result_validate(A, B, C, Bias, matrix_m, matrix_k, matrix_n,

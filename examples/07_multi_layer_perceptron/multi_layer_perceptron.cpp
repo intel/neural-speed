@@ -164,7 +164,7 @@ void mlp_run(uint32_t iter) {
     using wg_shape_layer1 = shape<wg_tile_n_layer1, wg_tile_m_layer1>;
     using sg_shape_layer1 = shape<sg_tile_n_layer1, sg_tile_m_layer1>;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using epilogue_policy_layer1 = xetla::group::epilogue_policy_tile_op<
             xetla::subgroup::chained_tile_op_t<gpu::xetla::subgroup::relu_op_t>,
             gpu_arch::Xe>;
@@ -184,7 +184,7 @@ void mlp_run(uint32_t iter) {
             mem_layout::row_major, // memory layout for W
             8, // leading dimension for W, in unit of element
             mem_space::global, // memory reading from global mem for W
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             wg_shape_layer1, // computation tile shape
             wg_tile_k, // elements in each iteration
             gpu_arch::Xe, // GPU arch
@@ -203,7 +203,7 @@ void mlp_run(uint32_t iter) {
     using wg_shape_layer2 = shape<wg_tile_n_layer2, wg_tile_m_layer2>;
     using sg_shape_layer2 = shape<sg_tile_n_layer2, sg_tile_m_layer2>;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using layer2_tune_option
             = dict_t<elem_v_t<tune_key::param_optimizer_type,
                              tune_key_value::param_optimizer_decision_tree>,
@@ -219,7 +219,7 @@ void mlp_run(uint32_t iter) {
             mem_layout::row_major, // memory layout for V
             8, // leading dimension for V, in unit of element
             mem_space::global, // memory reading from global mem for V
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             wg_shape_layer2, // computation tile shape
             wg_tile_k, // elements in each iteration
             gpu_arch::Xe, // GPU arch

@@ -17,6 +17,7 @@
 #pragma once
 
 #include <iomanip>
+#include <stdexcept>
 #include "common.hpp"
 #include "profiling.hpp"
 #include "xetla.hpp"
@@ -243,10 +244,8 @@ public:
         fmt_bak.copyfmt(std::cout);
 
         sycl::device device;
-        if (!device.has(aspect::ext_intel_device_id)) {
-            std::cout << "Can not get device ID\n";
-            return;
-        }
+        if (!device.has(aspect::ext_intel_device_id))
+            throw std::runtime_error("Can not get device ID");
         auto deviceID = device.get_info<ext::intel::info::device::device_id>();
         std::cout << "deviceID: 0x" << std::hex //
                   << std::right << std::setfill('0') << deviceID << "\n";
@@ -266,14 +265,13 @@ public:
             case ENS::architecture::intel_gpu_dg2_g11:
             case ENS::architecture::intel_gpu_dg2_g12:
                 return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
-                return;
             default: break;
         }
 
 #endif
-        std::cout << "No maching architecture, checking device ID ...\n";
+        std::cout << "No matching architecture, checking device ID ...\n";
         switch (deviceID) {
-            // DG2 devices: https://gfxspecs.intel.com/Predator/Home/Index/44477
+            // DG2 devices
             case 0x56a0: // Intel® Arc ™ A770 Graphics
             case 0x56a1: // Intel® Arc ™ A750 Graphics
             case 0x56a2: // Intel® Arc ™ A580 Graphics
@@ -281,10 +279,22 @@ public:
             case 0x5691: // Intel® Arc ™ A730M Graphics
             case 0x5692: // Intel® Arc ™ A550M Graphics
                 return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
-            // PVC devices: https://gfxspecs.intel.com/Predator/Home/Index/44484
+            // PVC devices
             case 0x0bda: //
                 return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
-            default: std::cout << "Unknown device ID \n"; return;
+            default: std::cout << "Unknown device ID \n"; break;
+        }
+
+        if (device.has(aspect::ext_intel_gpu_eu_simd_width))
+            throw std::runtime_error("Can not get eu_simd_width");
+        auto eu_simd_width = device.get_info<
+                ext::intel::info::device::gpu_eu_simd_width>();
+        if (eu_simd_width == 8) {
+            return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
+        } else if (eu_simd_width == 16) {
+            return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
+        } else {
+            throw std::runtime_error("Can not get device ID");
         }
     }
 };

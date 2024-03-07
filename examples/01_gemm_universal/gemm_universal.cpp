@@ -18,7 +18,8 @@
 
 enum class kslicing_impl_t : uint8_t { none = 0, global = 1, local = 2 };
 
-template <kslicing_impl_t kslicing_type = kslicing_impl_t::none>
+template <gpu_arch arch_tag,
+        kslicing_impl_t kslicing_type = kslicing_impl_t::none>
 void gemm_universal_run(uint32_t iter) {
     // Tips, the example demonstrates programming kernel with XeTLA, it works as expected with current configurations.
     // Please make sure you fully understand these configurations before you do any modifications, incomplete changes may lead to unexpected behaviors.
@@ -82,7 +83,7 @@ void gemm_universal_run(uint32_t iter) {
     constexpr uint32_t num_local_splitk
             = (kslicing_type == kslicing_impl_t::local) ? 2 : 1;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using tune_option = dict_t<
             elem_v_t<tune_key::param_optimizer_type,
                     tune_key_value::param_optimizer_decision_tree>,
@@ -91,11 +92,7 @@ void gemm_universal_run(uint32_t iter) {
                     tune_key_value::dispatch_policy_kslicing>,
             elem_v_t<tune_key::global_kslicing_ratio, num_global_splitk>,
             elem_v_t<tune_key::local_kslicing_ratio, num_local_splitk>,
-            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>,
-            elem_t_t<tune_key::group_swizzle_policy,
-                    gpu::xetla::kernel::group_swizzle_default<gpu_arch::Dg2>>,
-            elem_t_t<tune_key::epilogue_policy,
-                    gpu::xetla::group::epilogue_policy_default<gpu_arch::Dg2>>>;
+            elem_t_t<tune_key::wg_tile_shape, shape<wg_tile_n, wg_tile_m>>>;
     using gemm_op_t = gpu::xetla::kernel::default_gemm_t<
             data_type_a, // input datatype for A
             mem_layout::row_major, // memory layout for A
@@ -106,8 +103,8 @@ void gemm_universal_run(uint32_t iter) {
             data_type_c, // output datatype for C
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
-            gpu_arch::Dg2, // GPU arch
+            data_type_acc, // accumulator data type for intermediate results
+            arch_tag, // GPU arch
             tune_option>;
 
     // allocate temp buffers for global split
@@ -188,36 +185,42 @@ void gemm_universal_run(uint32_t iter) {
     free(Cnt, context);
 }
 
+template <gpu_arch arch_tag>
+struct main_wrapper {
+    static constexpr auto exec = []() {
+        // An example code for calculating matrix multiplication using
+        // GEMM_UNIVERSAL API:
+        //   C = A x B
+        // The resulted matrix C is partitioned by the group range
+        // in to multiple blocks. The block matrix
+        //  C<i_w, j_w>
+        // is computed by the workgroup with id: (0, i_w, j_w).
+        // (i_w, j_w) is an element in range specified by group range.
+        // Each thread with index (0, i_s, j_s) inside the same workgroup
+        // is responsible for a sub block of matrix multiplication, which is
+        //   C<i_w, j_w>[i_s*sg_m:(i_s+1):sg_m,j_s*sg_n:(j_s+1)*sg_n]
+
+        // Alternatively, some threads can cooperate on the same sub block
+        // matrix given the same (i_s, j_s), i.e. the index space is extended
+        // from (0, i_s, j_s) to (k_s, i_s, j_s).
+
+        // Another method to achieve the same effect is to extend the index space
+        // in group range, i.e. from (0, i_w, j_w) to (k_w, i_w, j_w)
+
+        // More detailed description referring to the cooperation (kslicing) could
+        // be found in the example 01_gemm_universal with custom implementation
+
+        // basic gemm_universal
+        gemm_universal_run<arch_tag, kslicing_impl_t::none>(10);
+
+        // basic gemm_universal with workgroup cooperation
+        // gemm_universal_run<arch_tag, kslicing_impl_t::global>(10);
+
+        // basic gemm_universal with thread cooperation
+        // gemm_universal_run<arch_tag, kslicing_impl_t::local>(10);
+    };
+};
 int main() {
-    // An example code for calculating matrix multiplication using
-    // GEMM_UNIVERSAL API:
-    //   C = A x B
-    // The resulted matrix C is partitioned by the group range
-    // in to multiple blocks. The block matrix
-    //  C<i_w, j_w>
-    // is computed by the workgroup with id: (0, i_w, j_w).
-    // (i_w, j_w) is an element in range specified by group range.
-    // Each thread with index (0, i_s, j_s) inside the same workgroup
-    // is responsible for a sub block of matrix multiplication, which is
-    //   C<i_w, j_w>[i_s*sg_m:(i_s+1):sg_m,j_s*sg_n:(j_s+1)*sg_n]
-
-    // Alternatively, some threads can cooperate on the same sub block
-    // matrix given the same (i_s, j_s), i.e. the index space is extended
-    // from (0, i_s, j_s) to (k_s, i_s, j_s).
-
-    // Another method to achieve the same effect is to extend the index space
-    // in group range, i.e. from (0, i_w, j_w) to (k_w, i_w, j_w)
-
-    // More detailed description referring to the cooperation (kslicing) could
-    // be found in the example 01_gemm_universal with custom implementation
-
-    // basic gemm_universal
-    gemm_universal_run<kslicing_impl_t::none>(10);
-
-    // basic gemm_universal with workgroup cooperation
-    // gemm_universal_run<kslicing_impl_t::global>(10);
-
-    // basic gemm_universal with thread cooperation
-    // gemm_universal_run<kslicing_impl_t::local>(10);
-    return (0);
+    dispatch_arch<main_wrapper>::exec();
+    return 0;
 }

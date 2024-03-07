@@ -228,8 +228,8 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
 
     constexpr uint32_t slm_size
             = wg_tile_m_qk * wg_tile_n_qk * sizeof(dtype_sfx);
-    XETLA_ASSERT(slm_size <= device.get_info<info::device::local_mem_size>(),
-            "SLM size too large!");
+    static_assert(slm_size <= arch_attr_t<arch_tag>::local_mem_size,
+            "The local memory size excess!");
 
     static_assert(subgroup_range_m * subgroup_range_n == thread_num,
             "Given thread number should equal to pre-set value 32!");
@@ -512,38 +512,33 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
 template <gpu_arch arch_tag>
 struct main_wrapper {
     static constexpr auto exec = []() {
-        if constexpr (arch_tag == gpu_arch::Dg2) {
-            sdp_fwd_run<arch_tag>(10);
-        } else {
-            sdp_fwd_run<arch_tag>(10);
-        }
+        // This example implements scaled-dot-production with batch_size: 16,
+        // num_heads: 16, sequence_length: 512, head_size: 64. It will be shown how to
+        // remap the index space of each work-item used for gemm1, softmax and gemm2.
+
+        // Description:
+        // Scaled-dot-production mechanism can be seen as two chained batch MatMul
+        // with a softmax in the middle layer. It can be described as following
+        // mathematical expression:
+        //   softmax(Q · (K.transpose(-1, -2)) * (1 / sqr_root(num_heads)) +
+        //   attn_mask) · V
+        // where:
+        //   Q, K, V: input data
+        //   shape(Q) = [16 x 16, 512, 64]
+        //   shape(K) = [16 x 16, 512, 64]
+        //   shape(V) = [16 x 16, 512, 64]
+        //   shape(attn_mask) = [16, 512, 512]
+        //   shape(DST) = [16, 512, 16, 64]
+
+        // This kernel is designed to execute the following task:
+        // 1: S = (Q · (K.transpose(-1, -2))) * (1 / sqr_root(num_heads)) + attn_mask
+        // 2: S' = softmax(S)
+        // 3: O = S' · V
+        sdp_fwd_run<arch_tag>(10);
     };
 };
 
 int main() {
-    // This example implements scaled-dot-production with batch_size: 16,
-    // num_heads: 16, sequence_length: 512, head_size: 64. It will be shown how to
-    // remap the index space of each work-item used for gemm1, softmax and gemm2.
-
-    // Description:
-    // Scaled-dot-production mechanism can be seen as two chained batch MatMul
-    // with a softmax in the middle layer. It can be described as following
-    // mathematical expression:
-    //   softmax(Q · (K.transpose(-1, -2)) * (1 / sqr_root(num_heads)) +
-    //   attn_mask) · V
-    // where:
-    //   Q, K, V: input data
-    //   shape(Q) = [16 x 16, 512, 64]
-    //   shape(K) = [16 x 16, 512, 64]
-    //   shape(V) = [16 x 16, 512, 64]
-    //   shape(attn_mask) = [16, 512, 512]
-    //   shape(DST) = [16, 512, 16, 64]
-
-    // This kernel is designed to execute the following task:
-    // 1: S = (Q · (K.transpose(-1, -2))) * (1 / sqr_root(num_heads)) + attn_mask
-    // 2: S' = softmax(S)
-    // 3: O = S' · V
-
     dispatch_arch<main_wrapper>::exec();
     return 0;
 }

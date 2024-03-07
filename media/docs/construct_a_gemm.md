@@ -6,16 +6,16 @@ As shown in the diagram below, each workgroup will calculate a sub-matrix, repre
 
 ![ALT](/media/docs/dom.jpg "GEMM decomposition by workgroup and subgroup")
 
-## Basic Components  
+## Basic Components
 
 1. Select a `GEMM building block`, considering the division of work-group and sub-group
-2. Decide if `splitK` or `steamK` is needed in specific shape 
+2. Decide if `splitK` or `steamK` is needed in specific shape
 3. Define `epilogue` that specifies what you want to fuse after the GEMM computation based on accumulator
 4. Instantiate a `gemm` implementation by the selections from 1)-3).
 
 For a runnable code example, you can refer to the code in the [02_basic_gemm](/examples/02_basic_gemm).
 
-### Task Mapping 
+### Task Mapping
 Before launching the GPU kernel, it is crucial to determine how to map the entire GEMM computation onto the GPU, considering work-group and sub-group configurations. Efficiently utilizing GPU resources requires careful consideration of factors such as the operation's shape, data type, and the hardware specifications of the GPU. A typical configuration for workgroups and subgroups may resemble the example below, especially when the input shape is sufficient to fully utilize the GPU.
 
 ```c++
@@ -64,7 +64,7 @@ Alternatively, the subgroup-level splitK is also available i which can accumulat
 
 ![ALT](/media/docs/subgroup_splitK.jpg "split K in subgroup level")
 
-For kernel level API, we can set two parameters in dispatch policy of `gemm_universal` API. Definitely, you can set both value to large than 1 for mixing workgroup and subgroup level split K together. 
+For kernel level API, we can set two parameters in dispatch policy of `gemm_universal` API. Definitely, you can set both value to large than 1 for mixing workgroup and subgroup level split K together.
 
 ```c++
  using dispatch_policy
@@ -87,7 +87,7 @@ decide the location of input and output matrix which is either from global or sh
             mem_space::global, // memory reading from global mem for B
             8, // buffer alignment for A, in unit of element
             8, // buffer alignment for B, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             tile_shape, // computation tile shape
             sg_tile_k, // elements in each iteration
             mma_engine::xmx, // compute engine
@@ -122,7 +122,7 @@ class epilogue_t {};
 - `tile_shape` is the problem size of each group and subgroup.
 - `mem_desc_c` is the description of buffer `c`, which includes `memory data type`, `memory space` and `memory layout`...
 
-In example [03_gemm_relu_bias](/examples/03_gemm_relu_bias), a chain of operations is effectively fused into the GEMM computation. 
+In example [03_gemm_relu_bias](/examples/03_gemm_relu_bias), a chain of operations is effectively fused into the GEMM computation.
 First, using pre-defined post-operations `relu` and `bias_add`, and then pass it to `epilogue_policy::tile_op_t`.
 
 ```c++
@@ -132,7 +132,7 @@ using tile_op_t = chained_tile_op_t<
                   >;
 ```
 
-### GEMM Instantiate 
+### GEMM Instantiate
 
 After configuration of BRGEMM and epilogue, it's simple to build entire GEMM with:
 - assigning tasks to each group, setting working boundaries and starting position accordingly.
@@ -153,7 +153,7 @@ Finally, the actual data will be passed using gemm_op_t::arguments_t, and all of
 typename gemm_op_t::arguments_t arg(matrix_n, matrix_k,
                      matrix_m, A, matrix_k, B, matrix_n, C, matrix_n);
 ```
-```c++ 
+```c++
 gemm_op_t gemm_op;
 
 gemm_op(item, arg);

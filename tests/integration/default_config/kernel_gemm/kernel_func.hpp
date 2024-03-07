@@ -48,7 +48,7 @@ struct default_config_kernel_gemm_test_func {
             dtype_c, // output datatype for C
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
-            dtype_acc, // accumulator data type for intermediate resutls
+            dtype_acc, // accumulator data type for intermediate results
             gpu_arch::Xe, // GPU arch
             tune_option>;
 
