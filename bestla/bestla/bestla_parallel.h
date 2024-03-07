@@ -46,7 +46,7 @@ class IThreading {
 class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads, false) {
-    printf("Using OMP\n");
+    // printf("Using OMP\n");
     omp_set_num_threads(nthreads);
   }
   void parallel_for(const thread_func& func) override {
@@ -77,7 +77,7 @@ class StdThreading : public IThreading {
  public:
   using Timer_T = utils::timer<utils::microseconds>;
   explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
-    printf("Using Std\n");
+    // printf("Using Std\n");
     cr = &device::CpuRuntime::getInstance(nthreads);
     create_threads();
   }
