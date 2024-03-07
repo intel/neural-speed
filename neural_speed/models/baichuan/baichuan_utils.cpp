@@ -75,7 +75,7 @@ void BAICHUAN::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
-  scratch = baichuan_mem_req(n_layer);
+  scratch = baichuan_mem_req(n_layer, lctx.model_scratch_enlarge_scale);
   model.scratchs = scratch;
 }
 

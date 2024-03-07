@@ -23,7 +23,7 @@ enum falcon_model {
   FALCON_7B,
 };
 
-static const model_scratch falcon_mem_req(int n_layers) {
+static const model_scratch falcon_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
     case 32:
       return {2048ull * MB, 2048ull * MB, 4096ull * MB};

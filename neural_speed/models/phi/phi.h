@@ -23,7 +23,7 @@ enum new_model {
   PHI,
 };
 
-static const model_scratch phi_mem_req(int n_layers) {
+static const model_scratch phi_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
     case 24:
       return {512ull * MB, 512ull * MB, 1026ull * MB};

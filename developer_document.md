@@ -8,7 +8,7 @@ For simplicity, we take [polyglot](https://huggingface.co/EleutherAI/polyglot-ko
 
 Firstly, we need to add its temp buffer in its [related model-arch header file](neural_speed/models/gptneox/gptneox.h) and [re-compile](README.md#Install).
 ```diff
-static const model_scratch gptneox_mem_req(int n_layers) {
+static const model_scratch gptneox_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
     case 44:
       return {2048ull * MB, 2048ull * MB, 4096ull * MB};
@@ -167,7 +167,7 @@ and update [model_name_to_arch()](neural_speed/models/model_utils/model_types.h#
 +  NEW_MODEL_13B,
 +};
 
-+static const model_scratch new_model_mem_req(int n_layers) {
++static const model_scratch new_model_mem_req(int n_layers, float enlarge_scale = 1.0f) {
 +  switch (n_layers) {
 +    case N:
 +      return {8192ull * MB, 8192ull * MB, 8192ull * MB};

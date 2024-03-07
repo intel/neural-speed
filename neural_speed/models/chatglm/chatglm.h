@@ -23,11 +23,10 @@ enum chatglm_model {
   CHATGLM_6B,
 };
 
-static const model_scratch chatglm_mem_req(int n_layers) {
+static const model_scratch chatglm_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
     case 28:
       return {2048ull * MB, 2048ull * MB, 4096ull * MB};
-    // TODO(hengyu): add more variants besides 6B
     default:
       MODEL_ASSERT(false);
   }
