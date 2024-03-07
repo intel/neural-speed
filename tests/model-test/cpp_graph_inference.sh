@@ -318,7 +318,8 @@ function main() {
     cmake .. -G Ninja
     ninja
     cd ..
-
+    pip install -r $working_dir/requirements.txt
+    python $working_dir/setup.py install
     ## prepare example requirement
     if [[ $requirements_file == *'.txt' ]]; then
         pip install -r "$requirements_file"
@@ -328,8 +329,6 @@ function main() {
         echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
         exit 1
     fi
-    pip install py-cpuinfo
-    python $working_dir/setup.py install
     echo "=======  Convert Start  ======="
     ## prepare fp32 bin
     python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${model_path}
