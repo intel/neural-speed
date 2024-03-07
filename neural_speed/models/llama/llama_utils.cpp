@@ -93,7 +93,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   size_t ctx_size;
   size_t mmapped_size;
   ml->calc_sizes(&ctx_size, &mmapped_size);
-  fprintf(stderr, "%s: ne ctx size = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
 
   // create the ne context
   lctx.model.buf.resize(ctx_size);
@@ -226,6 +226,9 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   // this is the total memory required to run the inference
   const size_t mem_required = ctx_size + mmapped_size - vram_total +  // weights in VRAM not in memory
                               scratch.scratch0 + scratch.scratch1 + scratch.eval;
+  fprintf(stderr, "%s: scratch0   = %7.2f MB\n", __func__, scratch.scratch0 / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: scratch1   = %7.2f MB\n", __func__, scratch.scratch1 / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: scratch2   = %7.2f MB\n", __func__, scratch.eval / 1024.0 / 1024.0);
   fprintf(stderr, "%s: mem required  = %7.2f MB (+ memory per state)\n", __func__, mem_required / 1024.0 / 1024.0);
 
   (void)n_gpu_layer;
