@@ -24,7 +24,7 @@ enum QWEN_model {
   QWEN_14B,
 };
 
-static const model_scratch qwen_mem_req(int n_layers, float enlarge_scale = 1.0f) {
+static const model_scratch qwen_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 40:
       return {2048ull * MB, 2048ull * MB, 4096ull * MB};

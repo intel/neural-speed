@@ -34,7 +34,7 @@ enum opt_model {
 };
 
 // TODO naive memory buffer size
-static const model_scratch opt_mem_req(int n_layers, float enlarge_scale = 1.0f) {
+static const model_scratch opt_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 12:  // OPT_125M
       return {512ull * MB, 512ull * MB, 1024ull * MB};

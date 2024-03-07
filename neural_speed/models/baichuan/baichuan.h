@@ -23,7 +23,7 @@ enum baichuan_model {
   BAICHUAN_13B,
 };
 
-static const model_scratch baichuan_mem_req(int n_layers, float enlarge_scale = 1.0f) {
+static const model_scratch baichuan_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 40:
       return {8192ull * MB, 8192ull * MB, 8192ull * MB};

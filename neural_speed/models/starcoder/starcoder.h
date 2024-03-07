@@ -26,7 +26,7 @@ enum starcoder_model {
   STARCODER_65B,
 };
 
-static const model_scratch starcoder_mem_req(int n_layers, float enlarge_scale = 1.0f) {
+static const model_scratch starcoder_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 24:
       return {8192ull * MB, 8192ull * MB, 8192ull * MB};

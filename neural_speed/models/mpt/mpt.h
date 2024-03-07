@@ -24,7 +24,7 @@ enum mpt_model {
   MPT_30B,
 };
 
-static const model_scratch mpt_mem_req(int n_layers, float enlarge_scale = 1.0f) {
+static const model_scratch mpt_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 32:
       return {2048ull * MB, 2048ull * MB, 4096ull * MB};

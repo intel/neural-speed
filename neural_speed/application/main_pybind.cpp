@@ -84,7 +84,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
                      bool early_stopping = false, int n_keep = 0, int n_discard = -1, bool shift_roped_k = false,
                      int batch_size = 1, model_vocab::id pad_token = -1, const std::string& memory_dtype = "auto",
                      bool continuous_batching = true, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
-                     const float& model_scratch_enlarge_scale = 1.0f) {
+                     const float& model_scratch_size_ratio = 1.0f) {
   MODEL_ASSERT(params != nullptr);
 #ifdef MODEL_NAME
   params->model_name = MODEL_NAME;
@@ -126,7 +126,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   params->min_new_tokens = min_new_tokens;
   params->length_penalty = length_penalty;
   params->do_early_stopping = early_stopping;
-  params->model_scratch_enlarge_scale = model_scratch_enlarge_scale;
+  params->model_scratch_size_ratio = model_scratch_size_ratio;
 
   printf(
       "beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d, "
@@ -142,7 +142,7 @@ class ModelServer {
               int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping,
               int n_keep, int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, bool continuous_batching, const int& max_request_num,
-              const float& model_scratch_enlarge_scale, const std::string& policy, bool print_log,
+              const float& model_scratch_size_ratio, const std::string& policy, bool print_log,
               const std::function<void()>& init_cb)
       : response(response),
         waiting(),
@@ -161,7 +161,7 @@ class ModelServer {
           this->InitServerParams(model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
                                  early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
-                                 true, max_request_num, model_scratch_enlarge_scale);
+                                 true, max_request_num, model_scratch_size_ratio);
           Cont_batch_gen_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
@@ -263,11 +263,11 @@ class ModelServer {
                         float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                         int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
                         const std::string& memory_dtype, bool continuous_batching, const int& max_request_num,
-                        const float& model_scratch_enlarge_scale) {
+                        const float& model_scratch_size_ratio) {
     init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                     num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping,
                     n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching,
-                    max_request_num, model_scratch_enlarge_scale);
+                    max_request_num, model_scratch_size_ratio);
     if (cont_batching_model_archs.count(params.model_arch) == 0) {
       fprintf(stderr, "\nERROR: ModelServer only supports gpt-j, llama!\n");
       running = false;
@@ -325,7 +325,7 @@ class Model {
                   float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p, float temperature,
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype,
-                  bool continuous_batching, const int& max_request_num, const float& model_scratch_enlarge_scale);
+                  bool continuous_batching, const int& max_request_num, const float& model_scratch_size_ratio);
   void reinit();
   std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
   // deprecated API
@@ -419,11 +419,11 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
                        const std::string& memory_dtype, bool continuous_batching, const int& max_request_num,
-                       const float& model_scratch_enlarge_scale) {
+                       const float& model_scratch_size_ratio) {
   init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty, num_beams,
                   do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping, n_keep,
                   n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching, max_request_num,
-                  model_scratch_enlarge_scale);
+                  model_scratch_size_ratio);
 
   n_past = 0;
   n_total = 0;
@@ -922,7 +922,7 @@ PYBIND11_MODULE(mixtral_cpp, m)
            py::arg("n_keep") = 0, py::arg("n_discard") = -1, py::arg("shift_roped_k") = false,
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto",
            py::arg("continuous_batching") = true, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM,
-           py::arg("model_scratch_enlarge_scale") = 1.0f)
+           py::arg("model_scratch_size_ratio") = 1.0f)
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
            py::arg("input_ids") = std::vector<std::vector<model_token>>{}, py::arg("logits_all") = false)
@@ -962,7 +962,7 @@ PYBIND11_MODULE(mixtral_cpp, m)
            py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
            py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = true,
-           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("model_scratch_enlarge_scale") = 1.0f,
+           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("model_scratch_size_ratio") = 1.0f,
            py::arg("policy") = "fcfs", py::arg("print_log") = false,
            py::arg("init_cb") = std::function<void()>{[]() {}})
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))

@@ -73,7 +73,7 @@ void BLOOM::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
-  scratch = bloom_mem_req(n_layer, lctx.model_scratch_enlarge_scale);
+  scratch = bloom_mem_req(n_layer, lctx.model_scratch_size_ratio);
   model.scratchs = scratch;
 }
 

@@ -77,7 +77,7 @@ void FALCON::init(const char* path_model, model_context* ctx, int n_gpu_layer_, 
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
   n_head_kv = hparams.n_head_kv;
-  scratch = falcon_mem_req(n_layer, lctx.model_scratch_enlarge_scale);
+  scratch = falcon_mem_req(n_layer, lctx.model_scratch_size_ratio);
   model.scratchs = scratch;
 }
 
