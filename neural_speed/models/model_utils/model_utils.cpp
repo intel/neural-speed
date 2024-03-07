@@ -188,7 +188,7 @@ struct model_context_params model_context_default_params() {
       /*cont_batching                =*/true,
       /*.max_request_num             =*/1,
       /*.gen_conf                    =*/generation_config(),
-      /*model_scratch_size_ratio  =*/1.0f,
+      /*scratch_size_ratio  =*/1.0f,
       /*.progress_callback           =*/nullptr,
       /*.progress_callback_user_data =*/nullptr,
   };
@@ -911,7 +911,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   }
   ctx->cont_batching = params.cont_batching;
   ctx->generation_conf = params.gen_conf;
-  ctx->model_scratch_size_ratio = params.model_scratch_size_ratio;
+  ctx->scratch_size_ratio = params.scratch_size_ratio;
   const model_archs arch = params.arch;
 
   // the type so that kv-cache allocated according to this type must be large enough
@@ -1284,7 +1284,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.gen_conf.min_new_tokens = params.min_new_tokens;
   lparams.gen_conf.length_penalty = params.length_penalty;
   lparams.gen_conf.do_early_stopping = params.do_early_stopping;
-  lparams.model_scratch_size_ratio = params.model_scratch_size_ratio;
+  lparams.scratch_size_ratio = params.scratch_size_ratio;
 
   NE_ASSERT(("Start size cannot be greater than the maximum context size!", lparams.n_keep < lparams.n_ctx));
 

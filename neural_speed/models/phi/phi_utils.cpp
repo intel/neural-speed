@@ -74,7 +74,7 @@ void phi::init(const char* path_model, model_context* ctx, int n_gpu_layer_, boo
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
   n_embd = hparams.n_embd;
-  scratch = phi_mem_req(n_layer, lctx.model_scratch_size_ratio);
+  scratch = phi_mem_req(n_layer, lctx.scratch_size_ratio);
   model.scratchs = scratch;
 }
 

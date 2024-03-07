@@ -74,7 +74,7 @@ void OPT::init(const char* path_model, model_context* ctx, int n_gpu_layer_, boo
   word_embed_proj_dim = hparams.word_embed_proj_dim;
   max_seq_len = hparams.max_seq_len;
   do_layer_norm_before = hparams.do_layer_norm_before;
-  scratch = opt_mem_req(n_layer, lctx.model_scratch_size_ratio);
+  scratch = opt_mem_req(n_layer, lctx.scratch_size_ratio);
   model.scratchs = scratch;
 }
 

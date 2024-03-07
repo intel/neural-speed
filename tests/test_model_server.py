@@ -85,7 +85,7 @@ class TestModelServer(unittest.TestCase):
                                 max_request_num=8,
                                 threads=56,
                                 print_log=False,
-                                model_scratch_size_ratio = 1.0,
+                                scratch_size_ratio = 1.0,
                                 memory_dtype= md,
                             )
             for i in range(len(prompts)):

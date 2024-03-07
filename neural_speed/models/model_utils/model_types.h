@@ -320,7 +320,7 @@ struct model_context {
 
   size_t mem_per_token = 0;
 
-  float model_scratch_size_ratio = 1.0f;  // model memory scratch enlarge scale
+  float scratch_size_ratio = 1.0f;  // model memory scratch enlarge scale
 
   // decode output (3-dimensional array: [batch_size] [n_tokens] [n_vocab])
   std::vector<float> logits;
@@ -441,7 +441,7 @@ struct model_context_params {
   // global generation config
   generation_config gen_conf;
   // model memory scratch enlarge scale
-  float model_scratch_size_ratio;
+  float scratch_size_ratio;
 
   // called with a progress value between 0 and 1, pass nullptr to disable
   model_progress_callback progress_callback;
