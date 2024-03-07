@@ -62,7 +62,7 @@
 #define MODEL_SESSION_MAGIC MODEL_FILE_MAGIC_GGSN
 #define MODEL_SESSION_VERSION 1
 
-#define MODEL_MAX_REQUEST_NUM 8
+#define MODEL_MAX_REQUEST_NUM 1
 
 #ifdef __cplusplus
 extern "C" {
