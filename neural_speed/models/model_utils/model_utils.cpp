@@ -911,7 +911,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   }
   ctx->cont_batching = params.cont_batching;
   ctx->generation_conf = params.gen_conf;
-  ctx->scratch_size_ratio = params.scratch_size_ratio;
+  ctx->scratch_size_ratio = ctx->batch_size > 1 ? params.scratch_size_ratio * params.max_request_num * params.beam_size : params.scratch_size_ratio;
   const model_archs arch = params.arch;
 
   // the type so that kv-cache allocated according to this type must be large enough
