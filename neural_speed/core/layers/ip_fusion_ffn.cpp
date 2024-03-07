@@ -50,19 +50,19 @@ void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename
     if (thdpA1.valid) {
       launcher1->mProA.run(args1.paramA, thdpA1);
     }
-    th->sync(0);
+    th->sync(tidx, 0);
     typename Parallel_T::ThreadProblem thdp1{tidx};
     para1.getIndex(thdp1);
     if (thdp1.valid) {
       launcher1->run(args1, thdp1);
     }
-    th->sync(1);
+    th->sync(tidx, 1);
     typename AParall2::ThreadProblem thdpA2{tidx};
     apara2.getIndex(thdpA2);
     if (thdpA2.valid) {
       launcher2->mProA.run(args2.paramA, thdpA2);
     }
-    th->sync(2);
+    th->sync(tidx, 2);
     typename Parallel_T::ThreadProblem thdp2{tidx};
     para2.getIndex(thdp2);
     if (thdp2.valid) {
@@ -89,7 +89,7 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Laun
     if (thdp1.valid) {
       launcher1->run(args1, thdp1);
     }
-    th->sync();
+    th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp2{tidx};
     para2.getIndex(thdp2);
     if (thdp2.valid) {
@@ -365,20 +365,20 @@ void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* lau
     if (thdpA1.valid) {
       launcher1->mProA.run(args1.paramA, thdpA1);
     }
-    th->sync(0);
+    th->sync(tidx, 0);
     typename Parallel_T::ThreadProblem thdp1{tidx};
     para1.getIndex(thdp1);
     if (thdp1.valid) {
       launcher1->run(args1, thdp1);
       launcher2->run(args2, thdp1);
     }
-    th->sync(1);
+    th->sync(tidx, 1);
     typename AParall3::ThreadProblem thdpA3{tidx};
     apara3.getIndex(thdpA3);
     if (thdpA3.valid) {
       launcher3->mProA.run(args3.paramA, thdpA3);
     }
-    th->sync(2);
+    th->sync(tidx, 2);
     typename Parallel_T::ThreadProblem thdp3{tidx};
     para3.getIndex(thdp3);
     if (thdp3.valid) {
@@ -407,7 +407,7 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher
       launcher1->run(args1, thdp1);
       launcher2->run(args2, thdp1);
     }
-    th->sync();
+    th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp3{tidx};
     para3.getIndex(thdp3);
     if (thdp3.valid) {

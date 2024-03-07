@@ -56,7 +56,7 @@ void GemmRunWithA_QKV(Launch_T* launcher, const typename Launch_T::Param* args, 
     if (thdpA.valid) {
       launcher->mProA.run(args[0].paramA, thdpA);
     }
-    th->sync();
+    th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {

@@ -31,7 +31,7 @@ class IThreading {
  public:
   explicit IThreading(int nthreads, bool supportPE) : mThreadNum(nthreads), isSupportPE(supportPE) {}
   virtual void parallel_for(const thread_func& func) = 0;
-  virtual inline void sync(int idx = 0) = 0;
+  virtual inline void sync(int tidx, int idx = 0) = 0;
   virtual int num_threads() const { return mThreadNum; };
   virtual int is_support_PE() const { return isSupportPE; };
   virtual void set_threads(int nthreads) = 0;
@@ -64,7 +64,9 @@ class OMPThreading : public IThreading {
     mThreadNum = nthreads;
     omp_set_num_threads(nthreads);
   }
-  virtual inline void sync(int idx = 0) override {
+  virtual inline void sync(int tidx, int idx = 0) override {
+    (void)(tidx);
+    (void)(idx);
 #pragma omp barrier
     (void)(0);  // make msvc happy with c++20
   }
@@ -73,6 +75,7 @@ class OMPThreading : public IThreading {
 
 class StdThreading : public IThreading {
  public:
+  using Timer_T = utils::timer<utils::microseconds>;
   explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
     printf("Using Std\n");
     cr = &device::CpuRuntime::getInstance(nthreads);
@@ -81,31 +84,32 @@ class StdThreading : public IThreading {
   void parallel_for(const thread_func& func) override {
     time_per_p = 0;
     time_per_e = 0;
+    Timer_T tm;
     if (mThreadNum > 1) {
       running.store(mThreadNum - 1);
       for (int i = 0; i < 10; i++) flag[i].store(mThreadNum);
       if (cr->mHybrid) {
         int time_p = 0, time_e = 0;
-        sync_time[0].store(0);
-        sync_time[1].store(0);
+
         for (size_t i = 0; i < mThreadNum - 1; i++) func_[i] = &func;
-        utils::timer tm;
+        thread_time[0] = 0;
         tm.start();
         func(0);
-        time_p = int(tm.stop());
+        thread_time[0] += int(tm.stop());
         while (true) {
           if (running.load() == 0)
             break;
           else
             _mm_pause();
         }
-        for (int i = 0; i < mThreadNum - 1; i++)
-          if (i + 1 >= cr->P_core_num && i + 1 < cr->P_core_num + cr->E_core_num)
+        for (int i = 0; i < mThreadNum; i++)
+          if (i >= cr->P_core_num && i < cr->P_core_num + cr->E_core_num)
             time_e += thread_time[i];
           else
             time_p += thread_time[i];
-        time_per_p = (time_p - sync_time[0].load()) / (1.0 * (mThreadNum - cr->E_core_num));
-        time_per_e = (time_e - sync_time[1].load()) / (1.0 * cr->E_core_num);
+        time_per_p = (time_p) / (1.0 * (mThreadNum - cr->E_core_num));
+        time_per_e = (time_e) / (1.0 * cr->E_core_num);
+        // printf("%d %d %f %f\n", time_p, time_e, time_per_p, time_per_e);
       } else {
         for (size_t i = 0; i < mThreadNum - 1; i++) {
           func_[i] = &func;
@@ -132,10 +136,10 @@ class StdThreading : public IThreading {
     }
   }
 
-  inline void sync(int idx = 0) override {
+  inline void sync(int tidx, int idx = 0) override {
     flag[idx].fetch_sub(1);
     if (cr->mHybrid) {
-      utils::timer tm;
+      Timer_T tm;
       tm.start();
       while (true) {
         if (flag[idx].load() == 0)
@@ -143,7 +147,7 @@ class StdThreading : public IThreading {
         else
           _mm_pause();
       }
-      sync_time[device::CpuDevice::isEcore()].fetch_add(int(tm.stop()));
+      thread_time[tidx] -= int(tm.stop());
     } else {
       while (true) {
         if (flag[idx].load() == 0)
@@ -170,34 +174,35 @@ class StdThreading : public IThreading {
     thdset.resize(mThreadNum - 1);
     stop = false;
     GetCPUDevice();
-    int* core_order;  // Note: client CPU earlier than Gen 12th will get poor perf when not using all cores.
+    std::vector<int> core_order;
     if (_cd->isHybrid()) {
-      core_order = new int[_cd->getThreads()];
-      memcpy(reinterpret_cast<void*>(core_order), reinterpret_cast<void*>(_cd->getPCores()),
+      core_order.resize(_cd->getThreads());
+      memcpy(reinterpret_cast<void*>(core_order.data()), reinterpret_cast<void*>(_cd->getPCores()),
              _cd->getPcoreNum() * sizeof(int));
-      memcpy(reinterpret_cast<void*>(core_order + _cd->getPcoreNum()), reinterpret_cast<void*>(_cd->getECores()),
+      memcpy(reinterpret_cast<void*>(core_order.data() + _cd->getPcoreNum()), reinterpret_cast<void*>(_cd->getECores()),
              _cd->getEcoreNum() * sizeof(int));
-      memcpy(reinterpret_cast<void*>(core_order + _cd->getPcoreNum() + _cd->getEcoreNum()),
+      memcpy(reinterpret_cast<void*>(core_order.data() + _cd->getPcoreNum() + _cd->getEcoreNum()),
              reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
     } else {
-      core_order = new int[mThreadNum];
+      core_order.resize(mThreadNum);
       for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
     }
     _cd->core_bond(core_order[0]);
     if (cr->mHybrid) {
-      thread_time.resize(mThreadNum - 1);
+      thread_time.resize(mThreadNum);
       for (size_t i = 0; i < mThreadNum - 1; i++) {
         thdset[i] = std::thread(
             [&](int tidx, int core_id) {
               _cd->core_bond(core_id);
-              utils::timer tm;
+              Timer_T tm;
               while (true) {
                 if (stop.load() == true) break;
                 if (func_[tidx] != nullptr) {
+                  thread_time[tidx + 1] = 0;
                   tm.start();
                   (*func_[tidx])(tidx + 1);
                   func_[tidx] = nullptr;
-                  thread_time[tidx] = int(tm.stop());
+                  thread_time[tidx + 1] += int(tm.stop());
                   running.fetch_sub(1);
                 } else {
                   _mm_pause();
@@ -224,10 +229,8 @@ class StdThreading : public IThreading {
             },
             int(i), core_order[i + 1]);
       }
-    delete[] core_order;
   }
   device::CpuRuntime* cr;
-  std::atomic_int sync_time[2];  // C++ 20 support std::atomic_float
   std::vector<int> thread_time;
   float time_per_p, time_per_e;
   std::vector<std::thread> thdset;
@@ -248,7 +251,10 @@ class SingleThread : public IThreading {
 
   inline void parallel_for(const thread_func& func) override { func(0); }
 
-  inline void sync(int idx = 0) override {}
+  inline void sync(int tidx, int idx = 0) override {
+    (void)(tidx);
+    (void)(idx);
+  }
 };
 
 struct Config2D {
@@ -855,7 +861,8 @@ class SchedulerDispatcher {
       Ecore_num = cr->E_core_num;
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
-      const int N_offset = utils::padto(N - int(N / (1 + cr->getPE(Scheduler::gemm_ISA()))), Scheduler::mStep[1]);
+      auto PE_Ratio = cr->getPE(Scheduler::gemm_ISA());
+      const int N_offset = utils::padto(N - int(N / (1 + PE_Ratio)), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
       Scheduler_P =
           std::move(Scheduler({th->num_threads() - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P}));
@@ -986,7 +993,7 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
     if (thdpA.valid) {
       launcher.mProA.run(args.paramA, thdpA);
     }
-    th->sync();
+    th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {

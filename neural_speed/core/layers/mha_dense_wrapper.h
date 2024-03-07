@@ -723,7 +723,7 @@ class mha_interface_t {
             thdpV, step_batch_v);
       }
 
-      th.sync();
+      th.sync(tid);
 
       // calculate mm + softmax + mm
       {
