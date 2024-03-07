@@ -67,7 +67,7 @@ from modelscope import AutoTokenizer
 from transformers import TextStreamer
 from neural_speed import Model
 
-model_name = "qwen/Qwen1.5-7B-Chat"     # Hugging Face model_id or local model
+model_name = "qwen/Qwen1.5-7B-Chat"     # modelscope model_id or local model
 prompt = "Once upon a time, there existed a little girl,"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 inputs = tokenizer(prompt, return_tensors="pt").input_ids
