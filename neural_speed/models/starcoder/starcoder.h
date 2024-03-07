@@ -29,11 +29,23 @@ enum starcoder_model {
 static const model_scratch starcoder_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 24:
-      return {8192ull * MB, 8192ull * MB, 8192ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+      };
     case 36:
-      return {8192ull * MB, 8192ull * MB, 8192ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+      };
     case 40:
-      return {32768ull * MB, 32768ull * MB, 32768ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 32768) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 32768) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 32768) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }

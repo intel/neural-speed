@@ -27,11 +27,23 @@ enum QWEN_model {
 static const model_scratch qwen_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 40:
-      return {2048ull * MB, 2048ull * MB, 4096ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     case 32:
-      return {1024ull * MB, 1024ull * MB, 1608ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+      };
     case 24:
-      return {512ull * MB, 512ull * MB, 1026ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }

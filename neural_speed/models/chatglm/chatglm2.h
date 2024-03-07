@@ -26,7 +26,11 @@ enum chatglm2_model {
 static const model_scratch chatglm_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 28:
-      return {4096ull * MB, 4096ull * MB, 8192ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }

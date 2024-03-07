@@ -26,7 +26,11 @@ enum bloom_model {
 static const model_scratch bloom_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 30:
-      return {4 * 2048ull * MB, 4 * 2048ull * MB, 4 * 4096ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 16384) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }
