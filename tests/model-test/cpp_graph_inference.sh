@@ -408,8 +408,11 @@ function main() {
                     if [[ "${model}" == "whisper" ]];then NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
                          $infer_cmd -f "/tf_dataset2/models/nlp_toolkit/whisper-tiny/jfk.wav" -m ${model}-${precision}.bin
                     else
+                        real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
+                        [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
+                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=1500
                         NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
-                            $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
+                            $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $real_ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
                         monitor
 
                         echo "=======  Inference End  ======="
