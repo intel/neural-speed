@@ -912,7 +912,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   ctx->cont_batching = params.cont_batching;
   ctx->generation_conf = params.gen_conf;
 
-  ctx->scratch_size_ratio = params.scratch_size_ratio * params.max_request_num * params.beam_size
+  ctx->scratch_size_ratio = params.scratch_size_ratio * params.max_request_num * params.beam_size;
 
   const model_archs arch = params.arch;
 

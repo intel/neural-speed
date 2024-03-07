@@ -241,9 +241,9 @@ int main(int argc, char** argv) {  // NOLINT
 
   const int n_ctx = model_n_ctx(ctx);
 
-  if (static_cast<int>(embd_inp.size()) > n_ctx - 4) {
+  if (static_cast<int>(embd_inp.size()) > n_ctx - n_keep) {
     fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, static_cast<int>(embd_inp.size()),
-            n_ctx - 4);
+            n_ctx - n_keep);
     return 1;
   }
 

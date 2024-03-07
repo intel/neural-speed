@@ -533,12 +533,12 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
     } else if (!curr_input_ids[bs].empty()) {
       fprintf(stderr, "%s: error: prompt confliction\n", __func__);
       return empty_ret;
-    } else if (input_id_cb.size() > n_ctx - 4) {  // long input_id_cb and empty curr_input_ids[bs]
+    } else if (input_id_cb.size() > n_ctx - n_keep) {  // long input_id_cb and empty curr_input_ids[bs]
       fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
-              input_id_cb.size(), n_ctx - 4);
-      curr_input_ids[bs].resize(n_ctx - 4);
-      std::copy(input_id_cb.end() - n_ctx - 8, input_id_cb.end(), curr_input_ids[bs].begin() + 4);
-      std::copy(input_id_cb.begin(), input_id_cb.begin() + 4, curr_input_ids[bs].begin());
+              input_id_cb.size(), n_ctx - n_keep);
+      curr_input_ids[bs].resize(n_ctx - n_keep);
+      std::copy(input_id_cb.end() - n_ctx - n_keep * 2, input_id_cb.end(), curr_input_ids[bs].begin() + n_keep);
+      std::copy(input_id_cb.begin(), input_id_cb.begin() + n_keep, curr_input_ids[bs].begin());
     } else {  // good input_id_cb and empty curr_input_ids[bs]
       curr_input_ids[bs] = input_id_cb;
     }
@@ -648,13 +648,13 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
   }
 
   if (curr_input_ids[STATIC_INPUT_HEAD_IDX].empty()) {
-    if (input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx - 4) {
+    if (input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx - n_keep) {
       fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
-              input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - 4);
-      curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - 4);
-      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - 8, input_ids[STATIC_INPUT_HEAD_IDX].end(),
-                curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + 4);
-      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].begin(), input_ids[STATIC_INPUT_HEAD_IDX].begin() + 4,
+              input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - n_keep);
+      curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - n_keep);
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - n_keep * 2, input_ids[STATIC_INPUT_HEAD_IDX].end(),
+                curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + n_keep);
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].begin(), input_ids[STATIC_INPUT_HEAD_IDX].begin() + n_keep,
                 curr_input_ids[STATIC_INPUT_HEAD_IDX].begin());
     } else {
       curr_input_ids[STATIC_INPUT_HEAD_IDX] = input_ids[STATIC_INPUT_HEAD_IDX];

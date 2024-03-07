@@ -35,9 +35,9 @@ static model_context** g_ctx;
 
 bool gptj_model_eval_ids(model_context* ctx, model_token* tokens, size_t n_eval, size_t n_past, size_t n_threads) {
   const int n_ctx = model_n_ctx(ctx);
-  if (static_cast<int>(n_eval) > n_ctx - 4) {
+  if (static_cast<int>(n_eval) > n_ctx - n_keep) {
     fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, static_cast<int>(n_eval),
-            n_ctx - 4);
+            n_ctx - n_keep);
     return true;
   }
 
