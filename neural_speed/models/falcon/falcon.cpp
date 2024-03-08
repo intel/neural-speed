@@ -134,12 +134,12 @@ static bool falcon_model_eval_internal(model_context* ctx, const model_input* in
     // self-attention
     {
       {
-        layernorm_output = ne_norm(ctx0, inpL);
+        layernorm_output = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
         layernorm_output =
             ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], layernorm_output), layernorm_output),
                    ne_repeat(ctx0, model.layers[il].norm[1], layernorm_output));
         if (n_head_kv == 8) {  //  40B  (FFN does not receive ATTN output)
-          cur = ne_norm(ctx0, inpL);
+          cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
           cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[2], cur), cur),
                        ne_repeat(ctx0, model.layers[il].norm[3], cur));
         } else {  //  7B
@@ -299,7 +299,7 @@ static bool falcon_model_eval_internal(model_context* ctx, const model_input* in
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
 
     // inpL = ln_f_g*inpL + ln_f_b
     inpL = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.others[1], inpL), inpL),

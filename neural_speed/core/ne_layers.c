@@ -2061,7 +2061,7 @@ struct ne_tensor* ne_silu_back(struct ne_context* ctx, struct ne_tensor* a, stru
 
 // ne_norm
 
-struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool inplace) {
+struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool inplace, float eps) {
   bool is_node = false;
 
   if (!inplace && (a->grad)) {
@@ -2071,20 +2071,21 @@ struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool
 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
+  ne_set_op_params(result, &eps, sizeof(eps));
+
   result->op = NE_OP_NORM;
   result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
   result->src0 = a;
-  result->src1 = NULL;  // TODO: maybe store epsilon here?
 
   return result;
 }
 
-struct ne_tensor* ne_norm(struct ne_context* ctx, struct ne_tensor* a) {
-  return ne_norm_impl(ctx, a, false);
+struct ne_tensor* ne_norm(struct ne_context* ctx, struct ne_tensor* a, float eps) {
+  return ne_norm_impl(ctx, a, false, eps);
 }
 
-struct ne_tensor* ne_norm_inplace(struct ne_context* ctx, struct ne_tensor* a) {
-  return ne_norm_impl(ctx, a, true);
+struct ne_tensor* ne_norm_inplace(struct ne_context* ctx, struct ne_tensor* a, float eps) {
+  return ne_norm_impl(ctx, a, true, eps);
 }
 
 struct ne_tensor* ne_rms_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool inplace, float eps) {
@@ -6052,7 +6053,8 @@ static void ne_compute_forward_norm_f32(const struct ne_compute_params* params, 
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
 
-  const float eps = 1e-5f;  // TODO: make this a parameter
+  float eps;
+  memcpy(&eps, dst->op_params, sizeof(float));
 
   if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
     bestla_layernormalization(ne03 * ne02 * ne01, ne00, false, eps, (const float*)src0->data, (float*)dst->data);

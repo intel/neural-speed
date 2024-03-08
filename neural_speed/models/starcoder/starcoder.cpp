@@ -138,7 +138,7 @@ static bool starcoder_model_eval_internal(model_context* ctx, const model_input*
     // norm
     {
       // [ 768, N]
-      cur = ne_norm(ctx0, inpL);
+      cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
 
       // cur = ln_1_g*cur + ln_1_b
       // [ 768, N]
@@ -317,7 +317,7 @@ static bool starcoder_model_eval_internal(model_context* ctx, const model_input*
     {
       // norm
       {
-        cur = ne_norm(ctx0, inpFF);
+        cur = ne_norm(ctx0, inpFF, hparams.rms_norm_eps);
 
         // cur = ln_2_g*cur + ln_2_b
         // [ 768, N]
@@ -372,7 +372,7 @@ static bool starcoder_model_eval_internal(model_context* ctx, const model_input*
   // norm
   {
     // [ 768, N]
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
 
     // inpL = ln_f_g*inpL + ln_f_b
     // [ 768, N]

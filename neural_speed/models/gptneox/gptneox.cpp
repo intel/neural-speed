@@ -38,9 +38,9 @@
 #include "models/model_utils/util.h"
 
 // feed-forward network
-struct ne_tensor* gpt_neox_ff(const model_layer& layer, const int batch_size, const int N, ne_context* ctx0,
+struct ne_tensor* gpt_neox_ff(const model_layer& layer, const int batch_size, const int N, const float eps, ne_context* ctx0,
                               ne_tensor* inp) {
-  struct ne_tensor* cur = ne_norm(ctx0, inp);
+  struct ne_tensor* cur = ne_norm(ctx0, inp, eps);
 
   cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.norm[2], cur), cur), ne_repeat(ctx0, layer.norm[3], cur));
   if (bestla_fusion_FFN_Add_GeLu_f32f32_support(layer.ffn[0]->data, layer.ffn[2]->data, N * batch_size, cur->ne[0],
@@ -167,7 +167,7 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
     // self-attention
     {
       {
-        cur = ne_norm(ctx0, inpL);
+        cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
 
         cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], cur), cur),
                      ne_repeat(ctx0, model.layers[il].norm[1], cur));
@@ -315,7 +315,7 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
     if (hparams.par_res == 0) {
       struct ne_tensor* inpFF = ne_add(ctx0, cur, inpL);
 
-      cur = gpt_neox_ff(model.layers[il], N, batch_size, ctx0, inpFF);
+      cur = gpt_neox_ff(model.layers[il], N, batch_size, hparams.rms_norm_eps, ctx0, inpFF);
 
       // input for next layer
       inpL = ne_add(ctx0, cur, inpFF);
@@ -324,7 +324,7 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
 
       // this is independent of the self-attention result, so it could be done in parallel to the self-attention
       // note here we pass inpL instead of cur
-      cur = gpt_neox_ff(model.layers[il], N, batch_size, ctx0, inpL);
+      cur = gpt_neox_ff(model.layers[il], N, batch_size, hparams.rms_norm_eps, ctx0, inpL);
 
       // layer input + FF
       cur = ne_add(ctx0, cur, inpFF);
@@ -339,7 +339,7 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
 
     // inpL = ln_f_g*inpL + ln_f_b
     inpL = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.others[1], inpL), inpL),
