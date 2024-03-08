@@ -42,7 +42,6 @@ import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
 
-from transformers import WhisperForConditionalGeneration
 
 conv_map = {
     'self_attn.k_proj': 'attn.key',
@@ -98,6 +97,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="fp32",
                         help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
     dir_model = args.model
@@ -108,7 +109,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     encoder = json.load((dir_model / "vocab.json").open("r", encoding="utf8"))
     encoder_added = json.load((dir_model / "added_tokens.json").open("r", encoding="utf8"))
     hparams = json.load((dir_model / "config.json").open("r", encoding="utf8"))
-
+    if args.model_hub == "modelscope":
+        from modelscope import WhisperForConditionalGeneration
+    else:
+        from transformers import WhisperForConditionalGeneration
     model = WhisperForConditionalGeneration.from_pretrained(dir_model)
 
     #code.interact(local=locals())

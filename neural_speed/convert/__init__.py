@@ -16,13 +16,16 @@
 # limitations under the License.
 
 from pathlib import Path
-from transformers import AutoConfig
 import subprocess
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper", "qwen2": "qwen"}
 
 
-def convert_model(model, outfile, outtype="f32", format="NE", whisper_repo_path=None, use_quantized_model=False):
+def convert_model(model, outfile, outtype="f32", format="NE", model_hub="huggingface", use_quantized_model=False):
+    if model_hub == "modelscope":
+        from modelscope import AutoConfig
+    else:
+        from transformers import AutoConfig
     config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
@@ -36,6 +39,7 @@ def convert_model(model, outfile, outtype="f32", format="NE", whisper_repo_path=
     cmd.extend(["--outtype", outtype])
     if model_type in {"phi", "stablelm"}:
         cmd.extend(["--format", format])
+    cmd.extend(["--model_hub", model_hub])
     cmd.extend([model])
 
     print("cmd:", cmd)

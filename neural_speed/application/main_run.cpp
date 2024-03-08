@@ -68,6 +68,15 @@ void sigint_handler(int signo) {
 
 int main(int argc, char** argv) {  // NOLINT
   gpt_params params;
+#ifdef _WIN32
+  if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)) {
+    auto dwError = GetLastError();
+    NE_PRINT_DEBUG("ERR: failed to set Procss Priority\n");
+    assert(dwError == ERROR_SUCCESS);
+  } else {
+    NE_PRINT_DEBUG("Set this process to high priority\n");
+  }
+#endif
 #ifdef MODEL_NAME
   params.model_name = MODEL_NAME;
   std::cout << "Welcome to use the " << params.model_name << " on the ITREX! " << std::endl;

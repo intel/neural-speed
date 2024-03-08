@@ -35,7 +35,6 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
                     Union)
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 import gguf
 
 if TYPE_CHECKING:
@@ -1423,6 +1422,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
@@ -1432,7 +1433,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         choices=["NE", "GGUF"],
                         help="convert to the GGUF or NE format")
     args = parser.parse_args(args_in)
-
     vocab: Vocab
     if args.dump_single:
         model_plus = lazy_load_file(args.model)
@@ -1449,8 +1449,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
             model_plus = load_some_model(args.model)
         else:
             print("Loadding the model from HF.")
-            model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
-            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            if args.model_hub == "modelscope":
+                from modelscope import AutoModelForCausalLM, AutoTokenizer
+            else:
+                from transformers import AutoModelForCausalLM, AutoTokenizer
+            model = AutoModelForCausalLM.from_pretrained(str(args.model), low_cpu_mem_usage=True,
+                                                         trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
             args.model = cache_path
 

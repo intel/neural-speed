@@ -60,7 +60,22 @@ streamer = TextStreamer(tokenizer)
 model = AutoModelForCausalLM.from_pretrained(model_name, model_file = model_file)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
+Pytorch format modelscpoe model
+```python
+import sys
+from modelscope import AutoTokenizer
+from transformers import TextStreamer
+from neural_speed import Model
 
+model_name = "qwen/Qwen1.5-7B-Chat"     # modelscope model_id or local model
+prompt = "Once upon a time, there existed a little girl,"
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+inputs = tokenizer(prompt, return_tensors="pt").input_ids
+streamer = TextStreamer(tokenizer)
+model = Model()
+model.init(model_name, weight_dtype="int4", compute_dtype="int8", model_hub="modelscope")
+outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
+```
 Please refer [this link](./docs/supported_models.md) to check supported models.
 
 If you want to use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(Intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers). Please refer to [ITREX Installation Page](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md).
