@@ -32,6 +32,8 @@
 #include <cassert>
 #include <vector>
 #include <cstdio>
+#include <string>
+#include <set>
 #ifdef _WIN32
 #include <cstdlib>
 #else
@@ -42,8 +44,6 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <string>
-#include <set>
 
 #define fatal_error(msg, ...) err(1, "[FAIL]\t" msg, ##__VA_ARGS__)
 #define XFEATURE_XTILECFG 17
