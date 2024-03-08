@@ -182,6 +182,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         f.write(struct.pack("i", hparams["eos_token_id"]))
     else:
         f.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
+        f.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
     f.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     f.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
