@@ -168,12 +168,15 @@ void gemm_exec(const std::string &compile_str, size_t batch = 1) {
     }
 }
 
-/// @brief The template function to execute kernel in esimd way for unit test framework
+/// @brief The template function to execute kernel in esimd way for unit test
+/// framework
 ///
-/// @tparam data_type data_type The data type of buffer used in kernel and buffer allocation
+/// @tparam data_type data_type The data type of buffer used in kernel and
+/// buffer allocation
 /// @tparam KERNEL the kernel function struct
 /// @param nd_range the range of workitems
-/// @param validate_result validation function, taking 3 parameters buffer A, B as input C as output
+/// @param validate_result validation function, taking 3 parameters buffer A, B
+/// as input C as output
 ///
 template <typename data_type, class KERNEL, size_t SLMSIZE = 8 * 1024,
         size_t BARNUM = 32, size_t Size = 4096>
@@ -232,6 +235,11 @@ void kernel_run(auto nd_range, auto validate_result) {
     free(C_host);
 }
 
+/// @brief Using gpu_arch of current machine to run F<arch>::exec
+///
+/// @tparam F The gpu_arch-templated function wrapper
+///
+/// @example example usage in /examples/01 or /examples/02
 template <template <gpu_arch> class F>
 class dispatch_arch {
     using T_RET = std::invoke_result_t<decltype(F<gpu_arch::Xe>::exec)>;

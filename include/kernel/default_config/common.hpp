@@ -98,7 +98,11 @@ enum class tune_key_value : uint8_t {
 // parameter optimizer
 
 enum class param_optimizer_tag : uint8_t { kernel, work_group };
-enum class param_optimizer_mode : uint8_t { full, keep_shape };
+// optimizer_mode (currently only useful with param_optimizer_decision_tree)
+enum class param_optimizer_mode : uint8_t {
+    full, // optimize all available options
+    keep_shape, // optimize all execept keepping the original wg/sg tile shape
+};
 
 template <param_optimizer_tag tag_, typename dict_t_>
 struct param_optimizer;
