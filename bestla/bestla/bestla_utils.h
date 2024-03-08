@@ -42,6 +42,8 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string>
+#include <set>
 
 #define fatal_error(msg, ...) err(1, "[FAIL]\t" msg, ##__VA_ARGS__)
 #define XFEATURE_XTILECFG 17
@@ -679,6 +681,19 @@ class timer_statistics_logger {
   minmax_statistics<float> statis;
   timer<milliseconds> logtm;
 };
+
+inline bool isFastExp() {
+  static std::set<std::string> valid_env_vars = {"1", "TRUE", "ON", "On", "True"};
+  if (getenv("BTLA_FAST_EXP") != nullptr) {
+    if (valid_env_vars.count(getenv("BTLA_FAST_EXP")) != 0) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
 }  // namespace utils
 
 static float fp4_bnb_dequant_fp32_LUT[] = {
