@@ -151,7 +151,7 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
     {
       // layer_norm
       {
-        cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+        cur = ne_norm(ctx0, inpL, hparams.norm_eps);
 
         // cur = cur*attention_norm(broadcasted)
         cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
@@ -321,7 +321,7 @@ static bool phi2_model_eval_internal(model_context* ctx, const model_input* inpu
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
     inpL = ne_add(ctx0, ne_mul(ctx0, inpL, model.others[1]), model.others[2]);
   }
   lctx.use_buf(ctx0, -1);

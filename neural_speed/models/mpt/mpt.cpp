@@ -128,7 +128,7 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
 
     // norm
     {
-      cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+      cur = ne_norm(ctx0, inpL, hparams.norm_eps);
 
       cur = ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], cur), cur);
     }
@@ -254,7 +254,7 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
 
     // m = self.ln_2(x)
     {
-      cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+      cur = ne_norm(ctx0, inpL, hparams.norm_eps);
 
       cur = ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[1], cur), cur);
     }
@@ -288,7 +288,7 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
 
   // norm
   {
-    inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
     // inpL = ln_f_g*inpL
     inpL = ne_mul(ctx0, ne_repeat(ctx0, model.others[1], inpL), inpL);
   }

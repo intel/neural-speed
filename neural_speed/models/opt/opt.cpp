@@ -127,7 +127,7 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
 
     // attn norm
     if (do_layer_norm_before) {
-      cur = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+      cur = ne_norm(ctx0, inpL, hparams.norm_eps);
       cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], cur), cur),
                    ne_repeat(ctx0, model.layers[il].norm[1], cur));
     }
@@ -241,7 +241,7 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
 
     // attn norm
     if (!do_layer_norm_before) {
-      cur = ne_norm(ctx0, cur, hparams.rms_norm_eps);
+      cur = ne_norm(ctx0, cur, hparams.norm_eps);
       cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], cur), cur),
                    ne_repeat(ctx0, model.layers[il].norm[1], cur));
     }
@@ -254,7 +254,7 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
     {
       // final norm
       if (do_layer_norm_before) {
-        cur = ne_norm(ctx0, inpFF, hparams.rms_norm_eps);
+        cur = ne_norm(ctx0, inpFF, hparams.norm_eps);
         // cur = ln_2_g*cur + ln_2_b
         // [ n_embd, N]
         cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[2], cur), cur),
@@ -283,7 +283,7 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
 
     // final norm
     if (!do_layer_norm_before) {
-      inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+      inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
       // cur = ln_2_g*cur + ln_2_b
       // [n_embd, N]
       inpL = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[2], inpL), inpL),
@@ -297,7 +297,7 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
   // final norm
   if (do_layer_norm_before) {
     // [n_embd, N]
-    inpL = ne_norm(ctx0, inpL, hparams.rms_norm_eps);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
     // inpL = ln_f_g*inpL + ln_f_b
     // [n_embd, N]
     inpL = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, model.others[2], inpL), inpL),
