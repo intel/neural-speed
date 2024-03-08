@@ -56,6 +56,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="fp32",
                         help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -68,17 +70,20 @@ def main(args_in: Optional[List[str]] = None) -> None:
     use_f16 = False
     if args.outtype == "f16":
         use_f16 = True
-
+    if args.model_hub == "modelscope":
+        from modelscope import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+    else:
+        from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
-    hparams = config.to_dict()
     model = AutoModelForCausalLM.from_pretrained(dir_model, config=config,
                                                  torch_dtype=torch.float16 \
                                                  if use_f16 else torch.float32,
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
     print("Model loaded: ", dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    hparams = config.to_dict()
 
     list_vars = model.state_dict()
 
@@ -110,6 +115,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("layer_norm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor

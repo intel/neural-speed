@@ -1,3 +1,5 @@
+#pragma once
+
 #include <random>
 #include <stdexcept>
 #include "bestla_utils.h"
@@ -24,11 +26,46 @@ using sAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;
 using sAVX2 = gemm::SCoreRowNAvx2<24, 4>;
-#ifdef _OPENMP
-static parallel::OMPThreading DefaultThreading(4);
+
+class UT_Threading {
+ public:
+  static bestla::parallel::IThreading* get() {
+#if BTLA_OPENMP
+    static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
-static parallel::StdThreading DefaultThreading(4);
+    static bestla::parallel::StdThreading DefaultThreading(4);
 #endif  // _OPNEMP
+    return &DefaultThreading;
+  }
+
+  static void set_threads(int n_thread) { get()->set_threads(n_thread); }
+
+  static std::vector<int> get_threads_config() {
+    GetCPUDevice();
+    if (_cd->isHybrid()) {
+      return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+    }
+    if (_cd->getThreads() == 56) {
+      return std::vector<int>{48, 56};
+    }
+    return std::vector<int>{_cd->getThreads()};
+  }
+};
+static inline size_t gemm_memsize(int m, int n, int k, BTLA_DTYPE dtA, BTLA_DTYPE dtB, BTLA_DTYPE dtC) {
+  size_t total = 0;
+  total += size_t(m) * k * utils::bestla_dtype_bits(dtA);
+  total += size_t(n) * k * utils::bestla_dtype_bits(dtB);
+  total += size_t(m) * n * utils::bestla_dtype_bits(dtC);
+  return total / 8;
+}
+
+static inline int auto_batch(size_t memsize) {
+  GetCPUDevice();
+  auto L3 = _cd->getL3CacheSize();
+  size_t constexpr Enlarge = 4;
+  auto batch = L3 * Enlarge / memsize;
+  return batch > 1 ? batch : 2;
+}
 
 constexpr size_t CacheSize = size_t(100) << 10;
 static int8_t cache[CacheSize];
@@ -127,11 +164,11 @@ utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   return buf;
 }
 
-#define UT_START()                                       \
-  {                                                      \
-    GetCPUDevice();                                      \
-    ut::DefaultThreading.set_threads(_cd->getThreads()); \
-    printf("Test Class: %s\n", __FUNCTION__);            \
+#define UT_START()                                    \
+  {                                                   \
+    GetCPUDevice();                                   \
+    ut::UT_Threading::set_threads(_cd->getThreads()); \
+    printf("Test Class: %s\n", __FUNCTION__);         \
   }
 template <typename _T>
 static double buffer_error(_T* ref, _T* tar, size_t size, _T thres = _T(0)) {

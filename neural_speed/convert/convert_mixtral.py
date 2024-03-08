@@ -128,11 +128,15 @@ def make_tensors_list() -> List[str]:
             f'layers.{i}.attention.wv.weight',
             f'layers.{i}.attention.wo.weight',
             f'layers.{i}.attention_norm.weight',
-            f'layers.{i}.feed_forward.w1.weight',
-            f'layers.{i}.feed_forward.w2.weight',
-            f'layers.{i}.feed_forward.w3.weight',
             f'layers.{i}.ffn_norm.weight',
+            f'layers.{i}.ffn_gate_inp.weight',
         ]
+        for j in range(8):
+            ret += [
+                f'layers.{i}.ffn_gate.{j}.weight',
+                f'layers.{i}.ffn_down.{j}.weight',
+                f'layers.{i}.ffn_up.{j}.weight',
+            ]
     return ret
 
 
@@ -316,7 +320,7 @@ Vocab = Union[SentencePieceVocab, NEVocab]
 
 def permute(weights: NDArray, n_head: int, n_head_kv: int) -> NDArray:
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head = n_head_kv
+        n_head //= n_head_kv
     return (weights.reshape(n_head_kv, 2, weights.shape[0] // n_head_kv // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
@@ -708,7 +712,6 @@ def convert_transformers_to_orig(model: LazyModel, params: Params) -> LazyModel:
     out["tok_embeddings.weight"] = model["model.embed_tokens.weight"]
     out["norm.weight"] = model["model.norm.weight"]
     out["output.weight"] = model["lm_head.weight"]
-
     for i in itertools.count():
         if f"model.layers.{i}.self_attn.q_proj.weight" not in model:
             break
@@ -718,11 +721,11 @@ def convert_transformers_to_orig(model: LazyModel, params: Params) -> LazyModel:
                                                               params.n_head, params.n_head_kv)
         out[f"layers.{i}.attention.wv.weight"] = model[f"model.layers.{i}.self_attn.v_proj.weight"]
         out[f"layers.{i}.attention.wo.weight"] = model[f"model.layers.{i}.self_attn.o_proj.weight"]
-
-        out[f"layers.{i}.feed_forward.w1.weight"] = model[f"model.layers.{i}.mlp.gate_proj.weight"]
-        out[f"layers.{i}.feed_forward.w2.weight"] = model[f"model.layers.{i}.mlp.down_proj.weight"]
-        out[f"layers.{i}.feed_forward.w3.weight"] = model[f"model.layers.{i}.mlp.up_proj.weight"]
-
+        for j in range(8):
+            out[f"layers.{i}.ffn_gate.{j}.weight"] = model[f"model.layers.{i}.block_sparse_moe.experts.{j}.w1.weight"]
+            out[f"layers.{i}.ffn_down.{j}.weight"] = model[f"model.layers.{i}.block_sparse_moe.experts.{j}.w2.weight"]
+            out[f"layers.{i}.ffn_up.{j}.weight"] = model[f"model.layers.{i}.block_sparse_moe.experts.{j}.w3.weight"]
+        out[f"layers.{i}.ffn_gate_inp.weight"] = model[f"model.layers.{i}.block_sparse_moe.gate.weight"]
         out[f"layers.{i}.attention_norm.weight"] = model[f"model.layers.{i}.input_layernorm.weight"]
         out[f"layers.{i}.ffn_norm.weight"] = model[f"model.layers.{i}.post_attention_layernorm.weight"]
     return out
@@ -1061,9 +1064,8 @@ class OutputFile:
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("i", params.ffn_hidden_size))
         self.fout.write(struct.pack("i", 0))
-
-        self.fout.write(struct.pack("i", 0))  # n_experts
-        self.fout.write(struct.pack("i", 0))  # n_expert_used
+        self.fout.write(struct.pack("i", 8))
+        self.fout.write(struct.pack("i", 2))
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
@@ -1303,6 +1305,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
     args = parser.parse_args(args_in)
+
     vocab: Vocab
     if args.dump_single:
         model_plus = lazy_load_file(args.model)

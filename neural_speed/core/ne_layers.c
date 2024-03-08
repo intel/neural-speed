@@ -96,10 +96,6 @@ static int sched_yield(void) {
 typedef void* thread_ret_t;
 #endif
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 static_assert(sizeof(block_q4_0) == sizeof(ne_fp16_t) + QK4_0 / 2, "wrong q4_0 block size/padding");
 static_assert(sizeof(block_q4_1) == 2 * sizeof(ne_fp16_t) + QK4_1 / 2, "wrong q4_1 block size/padding");
 static_assert(sizeof(block_q5_0) == sizeof(ne_fp16_t) + sizeof(uint32_t) + QK5_0 / 2, "wrong q5_0 block size/padding");
@@ -402,9 +398,10 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "NORM",
     "RMS_NORM",
     "RMS_NORM_BACK",
-
+    "ARGSORT",
     "MUL_MAT",
     "MUL_MAT_WITH_BIAS",
+    "MUL_MAT_ID",
     "SCALE",
     "SET",
     "CPY",
@@ -431,10 +428,10 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "FFN_SILU",
     "FFN_GeLU",
     "FFN_ADD_GeLU",
+    "FFN_ID_SILU",
     "FLASH_ATTN",
     "FLASH_ATTN_KV_UPDATE",
     "FLASH_FF",
-
     "MAP_UNARY",
     "MAP_BINARY",
     "SPLIT",
@@ -445,7 +442,7 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "DEBUG",
 };
 
-static_assert(NE_OP_COUNT == 64, "NE_OP_COUNT != 64");
+static_assert(NE_OP_COUNT == 67, "NE_OP_COUNT != 67");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
@@ -479,6 +476,7 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "X*Y",
     "X*Y+Z",
     "x*v",
+    "matmul_id",
     "y-\\>view(x)",
     "x-\\>y",
     "cont(x)",
@@ -502,16 +500,17 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
 
     "QKV(x)",
     "ffn_silu(x)",
+    "ffn_id_silu(x)",
     "ffn_gelu(x)",
     "ffn_gelu_with_bias(x)",
     "flash_attn(x)",
     "flash_attn_kv_update(x)",
     "flash_ff(x)",
-
     "f(x)",
     "f(x,y)",
     "conv_1d(x)",
     "debug(x)",
+    "argsort(x)",
 };
 
 static_assert(sizeof(struct ne_object) % NE_MEM_ALIGN == 0, "ne_object size must be a multiple of NE_MEM_ALIGN");
@@ -2179,6 +2178,109 @@ struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor*
   return result;
 }
 
+struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor* const as[], int n_as, struct ne_tensor* ids,
+                                int id, struct ne_tensor* b) {
+  NE_ASSERT(ids->type == NE_TYPE_I32);
+  NE_ASSERT(ids->ne[2] == 1 && ids->ne[3] == 1);
+  NE_ASSERT(ids->ne[1] == b->ne[1]);
+  NE_ASSERT(ids->ne[2] == b->ne[2] && ids->ne[3] == b->ne[3]);
+  NE_ASSERT(n_as > 0 && n_as <= 8);
+  NE_ASSERT(id >= 0 && id < ids->ne[0]);
+
+  bool is_node = false;
+
+  if (as[0]->grad || b->grad) {
+    is_node = true;
+  }
+
+  const int64_t ne[4] = {as[0]->ne[1], b->ne[1], b->ne[2], b->ne[3]};
+  struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, MAX(as[0]->n_dims, b->n_dims), ne, NE_SIZE_CALC);
+  int params[] = {id, n_as};
+  ne_set_op_params(result, &params, sizeof(params));
+  result->op = NE_OP_MUL_MAT_ID;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = ids;
+  result->src1 = b;
+
+  for (int i = 0; i < n_as; i++) {
+    struct ne_tensor* a = as[i];
+    NE_ASSERT(ne_are_same_shape(as[0], a));
+    NE_ASSERT(ne_can_mul_mat(a, b));
+    NE_ASSERT(!ne_is_transposed(a));
+    result->opt[i] = a;
+  }
+
+  return result;
+}
+
+struct ne_tensor* ne_mul_id_ffn_silu(struct ne_context* ctx, struct ne_tensor* const down[],
+                                     struct ne_tensor* const gate[], struct ne_tensor* const up[], int n_as,
+                                     struct ne_tensor* ids, int id, struct ne_tensor* src) {
+  struct ne_tensor* w1 = gate[0];
+  struct ne_tensor* w2 = down[0];
+  struct ne_tensor* w3 = up[0];
+  NE_ASSERT(ids->type == NE_TYPE_I32);
+  NE_ASSERT(ids->ne[2] == 1 && ids->ne[3] == 1);
+  NE_ASSERT(ids->ne[1] == src->ne[1]);
+  NE_ASSERT(ids->ne[2] == src->ne[2] && ids->ne[3] == src->ne[3]);
+  NE_ASSERT(n_as > 0 && n_as <= 8);
+  NE_ASSERT(id >= 0 && id < ids->ne[0]);
+  NE_ASSERT(ne_are_same_shape(w1, w3));
+  NE_ASSERT(w2->ne[0] == w1->ne[1]);
+
+  bool is_node = false;
+
+  if (down[0]->grad || src->grad) {
+    is_node = true;
+  }
+  const int64_t ne[4] = {w2->ne[1], src->ne[1], src->ne[2], src->ne[3]};
+  struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, ne, NE_SIZE_CALC);
+  const int64_t tne[4] = {w1->ne[1], src->ne[1], src->ne[2], src->ne[3]};
+  struct ne_tensor* tmp = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC);
+  struct ne_tensor* tmp1 = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC);
+  int params[] = {id, n_as};
+  ne_set_op_params(result, &params, sizeof(params));
+  result->op = NE_OP_MUL_ID_FFN_SILU;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = src;
+  result->src1 = ids;
+  for (int i = 0; i < n_as; i++) {
+    struct ne_tensor* a = gate[i];
+    struct ne_tensor* b = down[i];
+    struct ne_tensor* c = up[i];
+    result->opt[i] = a;
+    result->opt[i + 8] = b;
+    result->opt[i + 16] = c;
+  }
+  result->opt[24] = tmp;
+  result->opt[25] = tmp1;
+  // struct ne_tensor *result = ne_ffn_silu(ctx,gate[row_id], down[row_id],up[row_id], b);
+  return result;
+}
+struct ne_tensor* ne_argsort(struct ne_context* ctx, struct ne_tensor* a) {
+  bool is_node = false;
+
+  struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_I32, NE_MAX_DIMS, a->ne, NE_SIZE_CALC);
+
+  result->op = NE_OP_ARGSORT;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = a;
+
+  return result;
+}
+
+// ne_top_k
+
+struct ne_tensor* ne_top_k(struct ne_context* ctx, struct ne_tensor* a, int k) {
+  NE_ASSERT(a->ne[0] >= k);
+
+  struct ne_tensor* result = ne_argsort(ctx, a);
+
+  result = ne_view_4d(ctx, result, k, result->ne[1], result->ne[2], result->ne[3], result->nb[1], result->nb[2],
+                      result->nb[3], 0);
+
+  return result;
+}
 // ne_mul_qkv
 
 struct ne_tensor* ne_mul_qkv(struct ne_context* ctx, struct ne_tensor* qw, struct ne_tensor* kw, struct ne_tensor* vw,
@@ -2755,17 +2857,22 @@ struct ne_tensor* ne_transpose(struct ne_context* ctx, struct ne_tensor* a) {
 // ne_get_rows
 
 struct ne_tensor* ne_get_rows(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b) {
-  NE_ASSERT(ne_is_matrix(a) && ne_is_vector(b) && b->type == NE_TYPE_I32);
+  NE_ASSERT(a->ne[2] == b->ne[1]);
+  NE_ASSERT(b->ne[3] == 1);
+  NE_ASSERT(b->type == NE_TYPE_I32);
 
   bool is_node = false;
 
   if (a->grad || b->grad) {
     is_node = true;
   }
-
+  enum ne_type type = NE_TYPE_F32;
+  if (a->type == NE_TYPE_I32) {
+    type = a->type;
+  }
   // TODO: implement non F32 return
   // struct ne_tensor * result = ne_new_tensor_2d(ctx, a->type, a->ne[0], b->ne[0]);
-  struct ne_tensor* result = ne_new_tensor_2d(ctx, NE_TYPE_F32, a->ne[0], b->ne[0], NE_SIZE_CALC);
+  struct ne_tensor* result = ne_new_tensor_4d(ctx, NE_TYPE_F32, a->ne[0], b->ne[0], b->ne[1], b->ne[2], NE_SIZE_CALC);
 
   result->op = NE_OP_GET_ROWS;
   result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
@@ -2997,7 +3104,8 @@ struct ne_tensor* ne_soft_max_inplace(struct ne_context* ctx, struct ne_tensor* 
 
 struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                int prompt_size, bool inplace, int n_keep, struct ne_tensor* cossin, int* n_padding,
-                               bool padding_left, float freq_base, float freq_scale) {
+                               bool padding_left, float freq_base, float freq_scale, int yarn_orig_ctx,
+                               float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
   NE_ASSERT(n_past >= 0 || n_keep >= 0);
   NE_ASSERT(padding_left);
   bool is_node = false;
@@ -3037,7 +3145,9 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 
   ne_scratch_load(ctx);
 
-  float params[] = {freq_base, freq_scale};
+  /* what the difference of setting parameters in b->data and in op_parameters */
+  /* float and int are in different data ?? */
+  float params[] = {freq_base, freq_scale, (float)yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow};
   ne_set_op_params(result, &params, sizeof(params));
 
   result->op = NE_OP_ROPE;
@@ -3051,19 +3161,36 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 
 struct ne_tensor* ne_rope(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                           int prompt_size, float freq_base, float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale, 0,
+                      0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                   int prompt_size, float freq_base, float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale, 0,
+                      0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
                                         int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
+}
+
+struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
+                                         int prompt_size, float freq_base, float freq_scale, int yarn_orig_ctx,
+                                         float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
+                      yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow);
+}
+
+struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims,
+                                               int mode, int prompt_size, int n_keep, struct ne_tensor* cossin,
+                                               float freq_base, float freq_scale, int yarn_orig_ctx, float ext_factor,
+                                               float attn_factor, float beta_fast, float beta_slow) {
+  return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
+                      freq_scale, yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow);
 }
 
 // ne_rope_back
@@ -3101,14 +3228,14 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                        int prompt_size, int* n_padding, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, n_padding, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_with_padding_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
                                                int mode, int prompt_size, int* n_padding, float freq_base,
                                                float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base,
-                      freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base, freq_scale,
+                      0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 // ne_alibi
@@ -5266,7 +5393,7 @@ static void ne_compute_forward_mul(const struct ne_compute_params* params, const
 
 static void ne_compute_forward_div_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        const struct ne_tensor* src1, struct ne_tensor* dst) {
-  assert(params->ith == 0);
+  // assert(params->ith == 0);
   assert(ne_are_same_shape(src0, src1) && ne_are_same_shape(src0, dst));
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -5495,7 +5622,7 @@ static void ne_compute_forward_sum(const struct ne_compute_params* params, const
 
 static void ne_compute_forward_sum_rows_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                             struct ne_tensor* dst) {
-  NE_ASSERT(params->ith == 0);
+  // NE_ASSERT(params->ith == 0);
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
@@ -6437,7 +6564,7 @@ static void ne_compute_forward_mul_mat_f32(const struct ne_compute_params* param
 
     const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
     const int64_t i03 = (ir0 / (ne02));
-    // Hack for "Falcon multi-query-attention key stutter" / alternative to ggml_repeat2.
+    // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
     // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
     const int64_t i02 = (i12 / (ne12 / ne02));
     // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
@@ -6560,7 +6687,7 @@ static void ne_compute_forward_mul_mat_f16_f32(const struct ne_compute_params* p
 
     const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
     const int64_t i03 = (ir0 / (ne02));
-    // Hack for "Falcon multi-query-attention key stutter" / alternative to ggml_repeat2.
+    // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
     // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
     const int64_t i02 = (i12 / (ne12 / ne02));
     // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
@@ -6694,7 +6821,7 @@ static void ne_compute_forward_mul_mat_q_f32(const struct ne_compute_params* par
 
     const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
     const int64_t i03 = (ir0 / (ne02));
-    // Hack for "Falcon multi-query-attention key stutter" / alternative to ggml_repeat2.
+    // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
     // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
     const int64_t i02 = (i12 / (ne12 / ne02));
     // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
@@ -6833,6 +6960,606 @@ static void ne_compute_forward_mul_mat(const struct ne_compute_params* params, c
   }
 }
 
+static void ne_compute_forward_mul_mat_id_q_f32(const struct ne_compute_params* params, const struct ne_tensor* ids,
+                                                const struct ne_tensor* src1, struct ne_tensor* dst) {
+  int64_t t0 = ne_perf_time_us();
+  UNUSED(t0);
+  const struct ne_tensor* src0 = dst->opt[0];
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+
+  const size_t nb11 = src1->nb[1];
+  UNUSED(nb11);
+  const size_t nb12 = src1->nb[2];
+  UNUSED(nb12);
+  const size_t nb13 = src1->nb[3];
+  UNUSED(nb13);
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  const int ith = params->ith;
+  const int nth = params->nth;
+
+  const enum ne_type type = src0->type;
+  quantize_row_q_t const quantize_row_q_dot = quantize_fns[type].quantize_row_q_dot;
+  vec_dot_q_t const vec_dot_q = quantize_fns[type].vec_dot_q;
+  enum ne_type const vec_dot_type = quantize_fns[type].vec_dot_type;
+
+  NE_ASSERT(ne0 == ne01);
+  NE_ASSERT(ne1 == ne11);
+  NE_ASSERT(ne2 == ne12);
+  NE_ASSERT(ne3 == ne13);
+
+  // we don't support permuted src0 or src1
+  NE_ASSERT(nb00 == (int)NE_TYPE_SIZE[type]);
+  NE_ASSERT(nb10 == sizeof(float));
+
+  // dst cannot be transposed or permuted
+  NE_ASSERT(nb0 == sizeof(float));
+  NE_ASSERT(nb0 <= nb1);
+  NE_ASSERT(nb1 <= nb2);
+  NE_ASSERT(nb2 <= nb3);
+  const int id = dst->op_params[0];
+  const int n_as = dst->op_params[1];
+  // char * wdata_src1_end = (char *)params->wdata;
+  // int64_t wdata_src1_end = 0;
+
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+
+  // nb01 >= nb00 - src0 is not transposed
+  //   compute by src0 rows
+
+  if (params->type == NE_TASK_INIT) {
+    if (ith != 0) {
+      return;
+    }
+    char* wdata = params->wdata;
+    const size_t row_size = ne10 * NE_TYPE_SIZE[vec_dot_type] / NE_BLCK_SIZE[vec_dot_type];
+    for (int64_t i13 = 0; i13 < ne13; ++i13) {
+      for (int64_t i12 = 0; i12 < ne12; ++i12) {
+        for (int64_t i11 = 0; i11 < ne11; ++i11) {
+          quantize_row_q_dot((float*)((char*)src1->data + i13 * nb13 + i12 * nb12 + i11 * nb11), (void*)wdata, ne10);
+          wdata += row_size;
+        }
+      }
+    }
+
+    return;
+  }
+
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
+  memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
+  memset(matrix_rows, -1, 30000 * sizeof(int64_t));
+  for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
+    const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
+    NE_ASSERT(row_id >= 0 && row_id < n_as);
+    mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
+    matrix_row_counts[row_id] += 1;
+  }
+  for (int cur_a = 0; cur_a < n_as; ++cur_a) {
+    const int64_t cne1 = matrix_row_counts[cur_a];
+    if (cne1 == 0) {
+      continue;
+    }
+    const struct ne_tensor* src0_cur = dst->opt[cur_a];
+    // parallelize by src0 rows
+    const int64_t dr = (ne01 + nth - 1) / nth;
+
+    const int64_t ir10 = dr * ith;
+    const int64_t ir11 = MIN(ir10 + dr, ne01);
+
+    // src1 rows
+    const int64_t nr1 = cne1 * ne12 * ne13;
+
+    void* wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
+    const size_t row_size = ne10 * NE_TYPE_SIZE[vec_dot_type] / NE_BLCK_SIZE[vec_dot_type];
+
+    for (int64_t ir1 = 0; ir1 < nr1; ++ir1) {
+      const int64_t i13 = (ir1 / (ne12 * cne1));
+      const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
+      const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
+      if (i11 == -1) {
+        continue;
+      }
+
+      const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
+      const int64_t i03 = (ir0 / (ne02));
+      // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
+      // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
+      const int64_t i02 = (i12 / (ne12 / ne02));
+      // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
+      // const int64_t i02 = (ir0 - i03*ne02);
+
+      const int64_t i1 = i11;
+      const int64_t i2 = i12;
+      const int64_t i3 = i13;
+
+      char* src0_row = (char*)src0_cur->data + (0 + i02 * nb02 + i03 * nb03);
+      char* src1_col = (char*)wdata + (i11 + i12 * ne11 + i13 * ne12 * ne11) * row_size;
+
+      float* dst_col = (float*)((char*)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
+
+      for (int64_t ir = ir10; ir < ir11; ++ir) {
+        vec_dot_q(ne00, &dst_col[ir], src0_row + ir * nb01, src1_col);
+      }
+    }
+  }
+}
+
+static void ne_compute_forward_mul_mat_id_f32(const struct ne_compute_params* params, const struct ne_tensor* ids,
+                                              const struct ne_tensor* src1, struct ne_tensor* dst) {
+  int64_t t0 = ne_perf_time_us();
+  UNUSED(t0);
+  const struct ne_tensor* src0 = dst->opt[0];
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne11 = src1->ne[1];
+
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+
+  const size_t nb11 = src1->nb[1];
+  UNUSED(nb11);
+  const size_t nb12 = src1->nb[2];
+  UNUSED(nb12);
+  const size_t nb13 = src1->nb[3];
+  UNUSED(nb13);
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  const int ith = params->ith;
+  const int nth = params->nth;
+
+  NE_ASSERT(ne0 == ne01);
+  NE_ASSERT(ne1 == ne11);
+  NE_ASSERT(ne2 == ne12);
+  NE_ASSERT(ne3 == ne13);
+
+  // we don't support permuted src0 or src1
+  NE_ASSERT(nb00 == sizeof(float));
+  NE_ASSERT(nb10 == sizeof(float));
+
+  // dst cannot be transposed or permuted
+  NE_ASSERT(nb0 == sizeof(float));
+  NE_ASSERT(nb0 <= nb1);
+  NE_ASSERT(nb1 <= nb2);
+  NE_ASSERT(nb2 <= nb3);
+  const int id = dst->op_params[0];
+  const int n_as = dst->op_params[1];
+  // char * wdata_src1_end = (char *)params->wdata;
+  // int64_t wdata_src1_end = 0;
+
+  // nb01 >= nb00 - src0 is not transposed
+  //   compute by src0 rows
+
+  if (params->type == NE_TASK_INIT) {
+    return;
+  }
+
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+  memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
+  memset(matrix_rows, -1, 30000 * sizeof(int64_t));
+  for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
+    const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
+    NE_ASSERT(row_id >= 0 && row_id < n_as);
+    mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
+    matrix_row_counts[row_id] += 1;
+  }
+  for (int cur_a = 0; cur_a < n_as; ++cur_a) {
+    const int64_t cne1 = matrix_row_counts[cur_a];
+    if (cne1 == 0) {
+      continue;
+    }
+    const struct ne_tensor* src0_cur = dst->opt[cur_a];
+    // parallelize by src0 rows
+    const int64_t dr = (ne01 + nth - 1) / nth;
+
+    const int64_t ir10 = dr * ith;
+    const int64_t ir11 = MIN(ir10 + dr, ne01);
+
+    // src1 rows
+    const int64_t nr1 = cne1 * ne12 * ne13;
+
+    for (int64_t ir1 = 0; ir1 < nr1; ++ir1) {
+      const int64_t i13 = (ir1 / (ne12 * cne1));
+      const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
+      const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
+      if (i11 == -1) {
+        continue;
+      }
+
+      const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
+      const int64_t i03 = (ir0 / (ne02));
+      // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
+      // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
+      const int64_t i02 = (i12 / (ne12 / ne02));
+      // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
+      // const int64_t i02 = (ir0 - i03*ne02);
+
+      const int64_t i1 = i11;
+      const int64_t i2 = i12;
+      const int64_t i3 = i13;
+
+      char* src0_row = (char*)src0_cur->data + (0 + i02 * nb02 + i03 * nb03);
+      char* src1_col = (char*)src1->data + (i11 * nb11 + i12 * nb12 + i13 * nb13);
+
+      float* dst_col = (float*)((char*)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
+
+      for (int64_t ir = ir10; ir < ir11; ++ir) {
+        ne_vec_dot_f32(ne00, &dst_col[ir], (float*)(src0_row + ir * nb01), (float*)src1_col);
+      }
+    }
+  }
+}
+
+static void ne_compute_forward_mul_mat_id_f16_f32(const struct ne_compute_params* params, const struct ne_tensor* ids,
+                                                  const struct ne_tensor* src1, struct ne_tensor* dst) {
+  int64_t t0 = ne_perf_time_us();
+  UNUSED(t0);
+  const struct ne_tensor* src0 = dst->opt[0];
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+
+  const size_t nb11 = src1->nb[1];
+  UNUSED(nb11);
+  const size_t nb12 = src1->nb[2];
+  UNUSED(nb12);
+  const size_t nb13 = src1->nb[3];
+  UNUSED(nb13);
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  const int ith = params->ith;
+  const int nth = params->nth;
+
+  NE_ASSERT(ne0 == ne01);
+  NE_ASSERT(ne1 == ne11);
+  NE_ASSERT(ne2 == ne12);
+  NE_ASSERT(ne3 == ne13);
+
+  // we don't support permuted src0 or src1
+  NE_ASSERT(nb00 == sizeof(ne_fp16_t));
+
+  // dst cannot be transposed or permuted
+  NE_ASSERT(nb0 == sizeof(float));
+  NE_ASSERT(nb0 <= nb1);
+  NE_ASSERT(nb1 <= nb2);
+  NE_ASSERT(nb2 <= nb3);
+  const int id = dst->op_params[0];
+  const int n_as = dst->op_params[1];
+  // char * wdata_src1_end = (char *)params->wdata;
+  // int64_t wdata_src1_end = 0;
+
+  // nb01 >= nb00 - src0 is not transposed
+  //   compute by src0 rows
+
+  if (params->type == NE_TASK_INIT) {
+    ne_fp16_t* const wdata = params->wdata;
+
+    size_t id = 0;
+    for (int64_t i13 = 0; i13 < ne13; ++i13) {
+      for (int64_t i12 = 0; i12 < ne12; ++i12) {
+        for (int64_t i11 = 0; i11 < ne11; ++i11) {
+          for (int64_t i10 = 0; i10 < ne10; ++i10) {
+            wdata[id++] =
+                NE_FP32_TO_FP16(*(float*)((char*)src1->data + i13 * nb13 + i12 * nb12 + i11 * nb11 + i10 * nb10));
+          }
+        }
+      }
+    }
+
+    NE_ASSERT(id * sizeof(ne_fp16_t) <= params->wsize);
+
+    return;
+  }
+
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+  memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
+  memset(matrix_rows, -1, 30000 * sizeof(int64_t));
+  for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
+    const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
+    NE_ASSERT(row_id >= 0 && row_id < n_as);
+    mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
+    matrix_row_counts[row_id] += 1;
+  }
+  for (int cur_a = 0; cur_a < n_as; ++cur_a) {
+    const int64_t cne1 = matrix_row_counts[cur_a];
+    if (cne1 == 0) {
+      continue;
+    }
+    assert(nb10 / 2 == sizeof(ne_fp16_t));
+    const struct ne_tensor* src0_cur = dst->opt[cur_a];
+    // parallelize by src0 rows
+    const int64_t dr = (ne01 + nth - 1) / nth;
+
+    const int64_t ir10 = dr * ith;
+    const int64_t ir11 = MIN(ir10 + dr, ne01);
+
+    // src1 rows
+    const int64_t nr1 = cne1 * ne12 * ne13;
+    void* wdata = params->wdata;
+    const size_t row_size = ne10 * NE_TYPE_SIZE[NE_TYPE_F16];
+
+    for (int64_t ir1 = 0; ir1 < nr1; ++ir1) {
+      const int64_t i13 = (ir1 / (ne12 * cne1));
+      const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
+      const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
+      if (i11 == -1) {
+        continue;
+      }
+
+      const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
+      const int64_t i03 = (ir0 / (ne02));
+      // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
+      // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
+      const int64_t i02 = (i12 / (ne12 / ne02));
+      // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
+      // const int64_t i02 = (ir0 - i03*ne02);
+
+      const int64_t i1 = i11;
+      const int64_t i2 = i12;
+      const int64_t i3 = i13;
+
+      char* src0_row = (char*)src0_cur->data + (0 + i02 * nb02 + i03 * nb03);
+      char* src1_col = (char*)wdata + (i11 + i12 * ne11 + i13 * ne12 * ne11) * row_size;
+
+      float* dst_col = (float*)((char*)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
+
+      for (int64_t ir = ir10; ir < ir11; ++ir) {
+        ne_vec_dot_f16(ne00, &dst_col[ir], (ne_fp16_t*)(src0_row + ir * nb01), (ne_fp16_t*)src1_col);
+      }
+    }
+  }
+}
+
+static void ne_compute_forward_mul_mat_id_q_f32_bestla(const struct ne_compute_params* params,
+                                                       const struct ne_tensor* ids, const struct ne_tensor* src1,
+                                                       struct ne_tensor* dst) {
+  int64_t t0 = ne_perf_time_us();
+  UNUSED(t0);
+  const struct ne_tensor* src0 = dst->opt[0];
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+
+  const size_t nb11 = src1->nb[1];
+  UNUSED(nb11);
+  const size_t nb12 = src1->nb[2];
+  UNUSED(nb12);
+  const size_t nb13 = src1->nb[3];
+  UNUSED(nb13);
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  const int ith = params->ith;
+  const int nth = params->nth;
+
+  NE_ASSERT(ne0 == ne01);
+  NE_ASSERT(ne1 == ne11);
+  NE_ASSERT(ne2 == ne12);
+  NE_ASSERT(ne3 == ne13);
+
+  const enum ne_type type = src0->type;
+  quantize_row_q_t const quantize_row_q_dot = quantize_fns[type].quantize_row_q_dot;
+  vec_dot_q_t const vec_dot_q = quantize_fns[type].vec_dot_q;
+  enum ne_type const vec_dot_type = quantize_fns[type].vec_dot_type;
+  // we don't support permuted src0 or src1
+  NE_ASSERT(nb00 == (int)NE_TYPE_SIZE[type]);
+  NE_ASSERT(nb10 == sizeof(float));
+  // dst cannot be transposed or permuted
+  NE_ASSERT(nb0 == sizeof(float));
+  NE_ASSERT(nb0 <= nb1);
+  NE_ASSERT(nb1 <= nb2);
+  NE_ASSERT(nb2 <= nb3);
+  const int id = dst->op_params[0];
+  const int n_as = dst->op_params[1];
+  // char * wdata_src1_end = (char *)params->wdata;
+  // int64_t wdata_src1_end = 0;
+  int64_t matrix_row_counts[100];  // [n_as]
+  int64_t matrix_rows[30000];      // [n_as][ne11]
+#define mmid_matrix_row(row_id, i1) matrix_rows[(row_id)*ne11 + (i1)]
+
+  // nb01 >= nb00 - src0 is not transposed
+  //   compute by src0 rows
+
+  if (params->type == NE_TASK_INIT) {
+    memset(matrix_row_counts, 0, n_as * sizeof(int64_t));
+    memset(matrix_rows, -1, 30000 * sizeof(int64_t));
+    for (int64_t i01 = 0; i01 < ids->ne[1]; i01++) {
+      const int32_t row_id = *(const int32_t*)((const char*)ids->data + i01 * ids->nb[1] + id * ids->nb[0]);
+      NE_ASSERT(row_id >= 0 && row_id < n_as);
+      mmid_matrix_row(row_id, matrix_row_counts[row_id]) = i01;
+      matrix_row_counts[row_id] += 1;
+    }
+
+    return;
+  }
+
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  for (int cur_a = 0; cur_a < n_as; ++cur_a) {
+    const int64_t cne1 = matrix_row_counts[cur_a];
+    if (cne1 == 0) {
+      continue;
+    }
+    // assert(nb10 / 2 == sizeof(ne_fp16_t));
+    const struct ne_tensor* src0_cur = dst->opt[cur_a];
+    // parallelize by src0 rows
+
+    // src1 rows
+    const int64_t nr1 = cne1 * ne12 * ne13;
+    const size_t row_size = ne10 * NE_TYPE_SIZE[src1->type];
+    for (int64_t ir1 = 0; ir1 < nr1; ++ir1) {
+      const int64_t i13 = (ir1 / (ne12 * cne1));
+      const int64_t i12 = (ir1 - i13 * ne12 * cne1) / cne1;
+      const int64_t _i11 = (ir1 - i13 * ne12 * cne1 - i12 * cne1);
+      const int64_t i11 = mmid_matrix_row(cur_a, _i11);
+      if (i11 == -1) {
+        continue;
+      }
+
+      const int64_t ir0 = (ir1 / ne11) % (ne02 * ne03);
+      const int64_t i03 = (ir0 / (ne02));
+      // Hack for "Falcon multi-query-attention key stutter" / alternative to ne_repeat2.
+      // See https://github.com/ggerganov/llama.cpp/issues/1602#issuecomment-1606087470:
+      const int64_t i02 = (i12 / (ne12 / ne02));
+      // Original from PR/224 (and also essential/correct for non-broadcast matmuls in Falcon)
+      // const int64_t i02 = (ir0 - i03*ne02);
+
+      const int64_t i1 = i11;
+      const int64_t i2 = i12;
+      const int64_t i3 = i13;
+
+      char* src0_row = (char*)src0_cur->data;
+      char* src1_col = (char*)src1->data + (i11 * nb11 + i12 * nb12 + i13 * nb13);
+
+      float* dst_col = (float*)((char*)dst->data + (i1 * nb1 + i2 * nb2 + i3 * nb3));
+
+      // parallelize by src0 rows
+
+      bestla_f32f32_forward((float*)src1_col, (float*)src0_row, dst_col, 1, ne0, ne10, nb11 / ne_element_size(src1),
+                            nb1 / ne_element_size(dst), params->wdata);
+    }
+  }
+}
+static void ne_compute_forward_mul_mat_id(const struct ne_compute_params* params, const struct ne_tensor* ids,
+                                          const struct ne_tensor* src1, struct ne_tensor* dst) {
+  switch (dst->opt[0]->type) {
+    case NE_TYPE_Q4_0:
+    case NE_TYPE_Q4_1:
+    case NE_TYPE_Q5_0:
+    case NE_TYPE_Q5_1:
+    case NE_TYPE_Q8_0:
+    case NE_TYPE_Q6_K:
+    case NE_TYPE_Q8_1: {
+      ne_compute_forward_mul_mat_id_q_f32(params, ids, src1, dst);
+    } break;
+    case NE_TYPE_BTLA: {
+      ne_compute_forward_mul_mat_id_q_f32_bestla(params, ids, src1, dst);
+    } break;
+    case NE_TYPE_F16: {
+      ne_compute_forward_mul_mat_id_f16_f32(params, ids, src1, dst);
+    } break;
+    case NE_TYPE_F32: {
+      ne_compute_forward_mul_mat_id_f32(params, ids, src1, dst);
+    } break;
+    default: {
+      NE_ASSERT(false);
+    } break;
+  }
+}
+
 static void ne_compute_forward_mul_mat_bias_q_f32_bestla(const struct ne_compute_params* params,
                                                          const struct ne_tensor* src0, const struct ne_tensor* src1,
                                                          const struct ne_tensor* bias, struct ne_tensor* dst) {
@@ -6941,7 +7668,29 @@ static void ne_compute_forward_mul_qkv(const struct ne_compute_params* params, c
   bestla_fusion_QKV_f32f32_forward((float*)src->data, qw->data, kw->data, vw->data, (float*)dst->data, m, n, k, k, n,
                                    params->wdata);
 }
+static void ne_compute_forward_ffn_id_silu(const struct ne_compute_params* params, const struct ne_tensor* src,
+                                           const struct ne_tensor* ids, const struct ne_tensor* tmp,
+                                           struct ne_tensor* tmp1, struct ne_tensor* dst) {
+  const int id = dst->op_params[0];
+  if (params->type == NE_TASK_INIT) {
+    return;
+  }
 
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  const int32_t row_id = *(const int32_t*)((const char*)ids->data + id * ids->nb[0]);
+  const struct ne_tensor* w1 = dst->opt[row_id];
+  const struct ne_tensor* w2 = dst->opt[row_id + 8];
+  const struct ne_tensor* w3 = dst->opt[row_id + 16];
+
+  const int fin = src->ne[0];
+  const int fout = dst->ne[0];
+  const int fmid = w1->ne[1];
+  const int seq = dst->ne[1];
+  bestla_fusion_FFN_SiLu_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
+                                        (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
+}
 static void ne_compute_forward_ffn_silu(const struct ne_compute_params* params, const struct ne_tensor* src,
                                         const struct ne_tensor* w1, const struct ne_tensor* w2, struct ne_tensor* w3,
                                         const struct ne_tensor* tmp, struct ne_tensor* tmp1, struct ne_tensor* dst) {
@@ -7214,12 +7963,37 @@ static void ne_compute_forward_get_rows_q(const struct ne_compute_params* params
   assert(dst->ne[0] == nc);
   assert(dst->ne[1] == nr);
   assert(src0->nb[0] == NE_TYPE_SIZE[type]);
+  assert(src0->ne[2] == src1->ne[1]);
+  const int ne00 = src0->ne[0];
+  const int ne01 = src0->ne[1];
+  const int ne02 = src0->ne[2];
+  const int ne03 = src0->ne[3];
+  const int ne10 = src1->ne[0];
+  const int ne11 = src1->ne[1];
+  const int ne12 = src1->ne[2];
+  const int ne13 = src1->ne[3];
+  const int nb00 = src0->nb[0];
+  const int nb01 = src0->nb[1];
+  const int nb02 = src0->nb[2];
+  const int nb03 = src0->nb[3];
+  const int nb10 = src1->nb[0];
+  const int nb11 = src1->nb[1];
+  const int nb12 = src1->nb[2];
+  const int nb13 = src1->nb[3];
+  const int nb0 = dst->nb[0];
+  const int nb1 = dst->nb[1];
+  const int nb2 = dst->nb[2];
+  const int nb3 = dst->nb[3];
 
-  for (int i = 0; i < nr; ++i) {
-    const int r = ((int32_t*)src1->data)[i];
+  for (int64_t i12 = 0; i12 < ne12; ++i12) {
+    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+      for (int64_t i10 = 0; i10 < ne10; ++i10) {
+        const int64_t i01 = *(int32_t*)((char*)src1->data + i10 * nb10 + i11 * nb11 + i12 * nb12);
 
-    dequantize_row_q((const void*)((char*)src0->data + r * src0->nb[1]), (float*)((char*)dst->data + i * dst->nb[1]),
-                     nc);
+        dequantize_row_q((const void*)((char*)src0->data + i01 * nb01 + i11 * nb02 + i12 * nb03),
+                         (float*)((char*)dst->data + i10 * nb1 + i11 * nb2 + i12 * nb3), nc);
+      }
+    }
   }
 }
 
@@ -7237,13 +8011,35 @@ static void ne_compute_forward_get_rows_f16(const struct ne_compute_params* para
   assert(dst->ne[0] == nc);
   assert(dst->ne[1] == nr);
   assert(src0->nb[0] == sizeof(ne_fp16_t));
+  assert(src0->ne[2] == src1->ne[1]);
+  const int ne00 = src0->ne[0];
+  const int ne01 = src0->ne[1];
+  const int ne02 = src0->ne[2];
+  const int ne03 = src0->ne[3];
+  const int ne10 = src1->ne[0];
+  const int ne11 = src1->ne[1];
+  const int ne12 = src1->ne[2];
+  const int ne13 = src1->ne[3];
+  const int nb00 = src0->nb[0];
+  const int nb01 = src0->nb[1];
+  const int nb02 = src0->nb[2];
+  const int nb03 = src0->nb[3];
+  const int nb10 = src1->nb[0];
+  const int nb11 = src1->nb[1];
+  const int nb12 = src1->nb[2];
+  const int nb13 = src1->nb[3];
+  const int nb0 = dst->nb[0];
+  const int nb1 = dst->nb[1];
+  const int nb2 = dst->nb[2];
+  const int nb3 = dst->nb[3];
+  for (int64_t i12 = 0; i12 < ne12; ++i12) {
+    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+      for (int64_t i10 = 0; i10 < ne10; ++i10) {
+        const int64_t i01 = *(int32_t*)((char*)src1->data + i10 * nb10 + i11 * nb11 + i12 * nb12);
 
-  for (int i = 0; i < nr; ++i) {
-    const int r = ((int32_t*)src1->data)[i];
-
-    for (int j = 0; j < nc; ++j) {
-      ne_fp16_t v = ((ne_fp16_t*)((char*)src0->data + r * src0->nb[1]))[j];
-      ((float*)((char*)dst->data + i * dst->nb[1]))[j] = NE_FP16_TO_FP32(v);
+        ne_fp16_to_fp32_row((const void*)((char*)src0->data + i01 * nb01 + i11 * nb02 + i12 * nb03),
+                            (float*)((char*)dst->data + i10 * nb1 + i11 * nb2 + i12 * nb3), nc);
+      }
     }
   }
 }
@@ -7260,13 +8056,38 @@ static void ne_compute_forward_get_rows_f32(const struct ne_compute_params* para
   const int nr = ne_nelements(src1);
 
   assert(dst->ne[0] == nc);
-  assert(dst->ne[1] == nr);
+  assert(ne_nrows(dst) == nr);
+  assert(src0->ne[2] == src1->ne[1]);
   assert(src0->nb[0] == sizeof(float));
+  const int ne00 = src0->ne[0];
+  const int ne01 = src0->ne[1];
+  const int ne02 = src0->ne[2];
+  const int ne03 = src0->ne[3];
+  const int ne10 = src1->ne[0];
+  const int ne11 = src1->ne[1];
+  const int ne12 = src1->ne[2];
+  const int ne13 = src1->ne[3];
+  const int nb00 = src0->nb[0];
+  const int nb01 = src0->nb[1];
+  const int nb02 = src0->nb[2];
+  const int nb03 = src0->nb[3];
+  const int nb10 = src1->nb[0];
+  const int nb11 = src1->nb[1];
+  const int nb12 = src1->nb[2];
+  const int nb13 = src1->nb[3];
+  const int nb0 = dst->nb[0];
+  const int nb1 = dst->nb[1];
+  const int nb2 = dst->nb[2];
+  const int nb3 = dst->nb[3];
 
-  for (int i = 0; i < nr; ++i) {
-    const int r = ((int32_t*)src1->data)[i];
-
-    ne_vec_cpy_f32(nc, (float*)((char*)dst->data + i * dst->nb[1]), (float*)((char*)src0->data + r * src0->nb[1]));
+  for (int64_t i12 = 0; i12 < ne12; ++i12) {
+    for (int64_t i11 = 0; i11 < ne11; ++i11) {
+      for (int64_t i10 = 0; i10 < ne10; ++i10) {
+        const int64_t i01 = *(int32_t*)((char*)src1->data + i10 * nb10 + i11 * nb11 + i12 * nb12);
+        ne_vec_cpy_f32(nc, (float*)((char*)dst->data + i10 * nb1 + i11 * nb2 + i12 * nb3),
+                       (float*)((char*)src0->data + i01 * nb01 + i11 * nb02 + i12 * nb03));
+      }
+    }
   }
 }
 
@@ -7906,6 +8727,45 @@ static void ne_compute_forward_clamp(const struct ne_compute_params* params, con
   }
 }
 
+static float rope_yarn_ramp(const float low, const float high, const int i0) {
+  const float y = (i0 / 2 - low) / MAX(0.001f, high - low);
+  return 1.0 - MIN(1.0, MAX(0.0, y));
+}
+
+// YaRN algorithm based on LlamaYaRNScaledRotaryEmbedding.py from https://github.com/jquesnelle/yarn
+// MIT licensed. Copyright (c) 2023 Jeffrey Quesnelle and Bowen Peng.
+static void rope_yarn(float theta_extrap, float freq_scale, float corr_dims[2], int64_t i0, float ext_factor,
+                      float mscale, float* cos_theta, float* sin_theta) {
+  // Get n-d rotational scaling corrected for extrapolation
+  float theta_interp = freq_scale * theta_extrap;
+  float theta = theta_interp;
+  if (ext_factor != 0.0f) {
+    float ramp_mix = rope_yarn_ramp(corr_dims[0], corr_dims[1], i0) * ext_factor;
+    theta = theta_interp * (1 - ramp_mix) + theta_extrap * ramp_mix;
+
+    // Get n-d magnitude scaling corrected for interpolation
+    mscale *= 1.0f + 0.1f * logf(1.0f / freq_scale);
+  }
+  *cos_theta = cosf(theta) * mscale;
+  *sin_theta = sinf(theta) * mscale;
+}
+
+#ifndef NE_PI
+#define NE_PI (3.14159265358979323846)
+#endif
+// Apparently solving `n_rot = 2pi * x * base^((2 * max_pos_emb) / n_dims)` for x, we get
+// `corr_dim(n_rot) = n_dims * log(max_pos_emb / (n_rot * 2pi)) / (2 * log(base))`
+static float ggml_rope_yarn_corr_dim(int n_dims, int n_orig_ctx, float n_rot, float base) {
+  return n_dims * logf(n_orig_ctx / (n_rot * 2 * (float)NE_PI)) / (2 * logf(base));
+}
+
+void ggml_rope_yarn_corr_dims(int n_dims, int n_orig_ctx, float freq_base, float beta_fast, float beta_slow,
+                              float dims[2]) {
+  // start and end correction dims
+  dims[0] = MAX(0, floorf(ggml_rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_fast, freq_base)));
+  dims[1] = MIN(n_dims - 1, ceilf(ggml_rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_slow, freq_base)));
+}
+
 // ne_compute_forward_rope
 #define NE_TENSOR_UNARY_OP_LOCALS           \
   NE_TENSOR_LOCALS(int64_t, ne0, src0, ne); \
@@ -7918,12 +8778,18 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }
+
   const int bs = src0->ne[3];
   NE_ASSERT(src1->type == NE_TYPE_I32);
   NE_ASSERT(ne_nelements(src1) == 5 + bs);  // 5 + bs params
 
   const float freq_base = ((float*)(dst->op_params))[0];
   const float freq_scale = 1 / ((float*)(dst->op_params))[1];
+  const int n_orig_ctx = (int)((float*)(dst->op_params))[2];
+  const float ext_factor = ((float*)(dst->op_params))[3];
+  const float attn_factor = ((float*)(dst->op_params))[4];
+  const float beta_fast = ((float*)(dst->op_params))[5];
+  const float beta_slow = ((float*)(dst->op_params))[6];
 
   const int64_t n_past = ((int32_t*)src1->data)[ROPE_NPAST_IDX];
   const int64_t n_dims = ((int32_t*)src1->data)[ROPE_NDIMS_IDX];
@@ -7956,11 +8822,15 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   int ir = 0;
 
   const float theta_scale = powf(freq_base, -2.0f / n_dims);
+  const float inv_ndims = -1.f / n_dims;
+  float corr_dims[2];
+  ggml_rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
 
   const bool skip = mode & 1;
   const bool is_neox = mode & 2;
   const bool is_glm = mode & 4;
   const bool is_shift = n_keep >= 0;
+  const bool use_yarn = ((mode & 0x8) != 0);
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
   NE_ASSERT(ne3 == bs);
@@ -7971,21 +8841,21 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
         if (ir++ < ir0) continue;
         if (ir > ir1) break;
 
-        float theta = freq_scale * (float)p;
+        float theta_base = (float)p;
 
         // only for glm when mode == 4
         if (is_glm) {
           const int64_t n_padding = ((int32_t*)src1->data)[ROPE_PARAMS_NUM + i3];
           // position ids
-          theta = MIN(MAX(p - n_padding, 0), prompt_size - 2 - n_padding);
+          theta_base = MIN(MAX(p - n_padding, 0), prompt_size - 2 - n_padding);
           float block_theta = MAX(p - (prompt_size - 2), 0);
           for (int64_t i0 = 0; i0 < ne0 / 4; i0++) {
-            const float cos_theta = cosf(theta);
-            const float sin_theta = sinf(theta);
+            const float cos_theta = cosf(theta_base);
+            const float sin_theta = sinf(theta_base);
             const float cos_block_theta = cosf(block_theta);
             const float sin_block_theta = sinf(block_theta);
 
-            theta *= theta_scale;
+            theta_base *= theta_scale;
             block_theta *= theta_scale;
 
             const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
@@ -8002,11 +8872,12 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
             dst_data[n_dims / 2 * 3] = x2 * sin_block_theta + x3 * cos_block_theta;
           }
         } else if (!is_neox) {
+          // printf("theta_base = %ld, freq_scale %.4f, ne0 %d\n", p, freq_scale, ne0);
           for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
-            const float cos_theta = cosf(theta);
-            const float sin_theta = sinf(theta);
+            float cos_theta, sin_theta;
+            rope_yarn(theta_base, freq_scale, corr_dims, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
 
-            theta *= theta_scale;  // theta = i2 * theta_scale^(i0/2)
+            theta_base *= theta_scale;
 
             const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
             float* dst_data = (float*)((char*)dst->data + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
@@ -8021,12 +8892,18 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
           // TODO: this is probably wrong, but I can't figure it out ..
           // ref:
           // https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt_neox/modeling_gpt_neox.py#LL251C1-L294C28
+          theta_base = theta_base * freq_scale;
+
           for (int64_t ib = 0; ib < ne0 / n_dims; ++ib) {
             for (int64_t ic = 0; ic < n_dims; ic += 2) {
-              const float cos_theta = cosf(theta);
-              const float sin_theta = sinf(theta);
+              // simplified from `(ib * n_dims + ic) * inv_ndims`
+              float cur_rot = inv_ndims * ic - ib;
 
-              theta *= theta_scale;
+              float cos_theta, sin_theta;
+              rope_yarn(theta_base, freq_scale, corr_dims, (int)cur_rot, ext_factor, attn_factor, &cos_theta,
+                        &sin_theta);
+
+              theta_base *= theta_scale;
 
               const int64_t i0 = ib * n_dims + ic / 2;
 
@@ -9489,8 +10366,17 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
     case NE_OP_MUL_MAT: {
       ne_compute_forward_mul_mat(params, tensor->src0, tensor->src1, tensor);
     } break;
+    case NE_OP_MUL_MAT_ID: {
+      ne_compute_forward_mul_mat_id(params, tensor->src0, tensor->src1, tensor);
+    } break;
+    case NE_OP_ARGSORT: {
+      ne_compute_forward_argsort(params, tensor->src0, tensor);
+    } break;
     case NE_OP_MUL_QKV: {
       ne_compute_forward_mul_qkv(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1], tensor);
+    } break;
+    case NE_OP_MUL_ID_FFN_SILU: {
+      ne_compute_forward_ffn_id_silu(params, tensor->src0, tensor->src1, tensor->opt[24], tensor->opt[25], tensor);
     } break;
     case NE_OP_MUL_FFN_SILU: {
       ne_compute_forward_ffn_silu(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1], tensor->opt[2],
@@ -10247,172 +11133,10 @@ struct ne_cgraph ne_build_backward(struct ne_context* ctx, struct ne_cgraph* gf,
 // I tried using spin locks, but not sure how to use them correctly - the things I tried were slower than busy loops
 //
 
-#ifdef __APPLE__
-
-// #include <os/lock.h>
-//
-// typedef os_unfair_lock ne_lock_t;
-//
-// #define ne_lock_init(x)    UNUSED(x)
-// #define ne_lock_destroy(x) UNUSED(x)
-// #define ne_lock_lock       os_unfair_lock_lock
-// #define ne_lock_unlock     os_unfair_lock_unlock
-//
-// #define NE_LOCK_INITIALIZER OS_UNFAIR_LOCK_INIT
-
-typedef int ne_lock_t;
-
-#define ne_lock_init(x) UNUSED(x)
-#define ne_lock_destroy(x) UNUSED(x)
-#define ne_lock_lock(x) UNUSED(x)
-#define ne_lock_unlock(x) UNUSED(x)
-
-#define NE_LOCK_INITIALIZER 0
-
-typedef pthread_t ne_thread_t;
-
-#define ne_thread_create pthread_create
-#define ne_thread_join pthread_join
-
-#else
-
-// typedef pthread_spinlock_t ne_lock_t;
-
-// #define ne_lock_init(x) pthread_spin_init(x, PTHREAD_PROCESS_PRIVATE)
-// #define ne_lock_destroy pthread_spin_destroy
-// #define ne_lock_lock    pthread_spin_lock
-// #define ne_lock_unlock  pthread_spin_unlock
-
-typedef int ne_lock_t;
-
-#define ne_lock_init(x) UNUSED(x)
-#define ne_lock_destroy(x) UNUSED(x)
-#if defined(__x86_64__) || (defined(_MSC_VER) && defined(_M_AMD64))
-#define ne_lock_lock(x) _mm_pause()
-#else
-#define ne_lock_lock(x) UNUSED(x)
-#endif
-#define ne_lock_unlock(x) UNUSED(x)
-
-#define NE_LOCK_INITIALIZER 0
-
-typedef pthread_t ne_thread_t;
-
-#define ne_thread_create pthread_create
-#define ne_thread_join pthread_join
-
-#endif
-
-struct ne_compute_state_shared {
-  ne_lock_t spin;
-
-  int n_threads;
-
-  // synchronization primitives
-  atomic_int n_ready;
-  atomic_bool has_work;
-  atomic_bool stop;  // stop all threads
-};
-
-struct ne_compute_state {
-  ne_thread_t thrd;
-
-  struct ne_compute_params params;
-  struct ne_tensor* node;
-
-  struct ne_compute_state_shared* shared;
-};
-
-static thread_ret_t ne_graph_compute_thread(void* data) {
-  struct ne_compute_state* state = (struct ne_compute_state*)data;
-
-  const int n_threads = state->shared->n_threads;
-
-  while (true) {
-    if (atomic_fetch_add(&state->shared->n_ready, 1) == n_threads - 1) {
-      atomic_store(&state->shared->has_work, false);
-    } else {
-      while (atomic_load(&state->shared->has_work)) {
-        if (atomic_load(&state->shared->stop)) {
-          return 0;
-        }
-        ne_lock_lock(&state->shared->spin);
-        ne_lock_unlock(&state->shared->spin);
-      }
-    }
-
-    atomic_fetch_sub(&state->shared->n_ready, 1);
-
-    // wait for work
-    while (!atomic_load(&state->shared->has_work)) {
-      if (atomic_load(&state->shared->stop)) {
-        return 0;
-      }
-      ne_lock_lock(&state->shared->spin);
-      ne_lock_unlock(&state->shared->spin);
-    }
-
-    // check if we should stop
-    if (atomic_load(&state->shared->stop)) {
-      break;
-    }
-
-    if (state->node) {
-      if (state->params.ith < state->params.nth) {
-        ne_compute_forward(&state->params, state->node);
-      }
-
-      state->node = NULL;
-    } else {
-      break;
-    }
-  }
-
-  return 0;
-}
-
 void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
   int n_threads = cgraph->n_threads;
 
-  struct ne_compute_state_shared state_shared = {
-      /*.spin      =*/NE_LOCK_INITIALIZER,
-      /*.n_threads =*/n_threads,
-      /*.n_ready   =*/0,
-      /*.has_work  =*/false,
-      /*.stop      =*/false,
-  };
-  struct ne_compute_state* workers = n_threads > 1 ? alloca(sizeof(struct ne_compute_state) * (n_threads - 1)) : NULL;
-#ifndef _OPENMP
-  // create thread pool
-  if (n_threads > 1) {
-    ne_lock_init(&state_shared.spin);
-
-    atomic_store(&state_shared.has_work, true);
-
-    for (int j = 0; j < n_threads - 1; j++) {
-      workers[j] = (struct ne_compute_state){
-          .thrd = 0,
-          .params =
-              {
-                  .type = NE_TASK_COMPUTE,
-                  .ith = j + 1,
-                  .nth = n_threads,
-                  .wsize = cgraph->work ? ne_nbytes(cgraph->work) : 0,
-                  .wdata = cgraph->work ? cgraph->work->data : NULL,
-              },
-          .node = NULL,
-          .shared = &state_shared,
-      };
-
-      int rc = ne_thread_create(&workers[j].thrd, NULL, ne_graph_compute_thread, &workers[j]);
-      NE_ASSERT(rc == 0);
-      UNUSED(rc);
-    }
-  }
-#else
-  n_threads = bestla_set_threads(n_threads);  // prevent from using two sockets
-  omp_set_num_threads(n_threads);
-#endif
+  n_threads = bestla_set_threads(n_threads);
   // initialize tasks + work buffer
   {
     size_t work_size = 0;
@@ -10468,14 +11192,18 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           work_size = MAX(work_size, cur);
         } break;
         case NE_OP_SUB:
+        case NE_OP_SUM:
         case NE_OP_DIV:
+        case NE_OP_SUM_ROWS:
+        //  {
+        //   node->n_tasks = 1;
+        // } break;
         case NE_OP_SQR:
         case NE_OP_SQRT:
         case NE_OP_LOG:
-        case NE_OP_SUM:
-        case NE_OP_SUM_ROWS:
         case NE_OP_MEAN:
         case NE_OP_ABS:
+        case NE_OP_ARGSORT:
         case NE_OP_SGN:
         case NE_OP_NEG:
         case NE_OP_STEP:
@@ -10506,6 +11234,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           node->n_tasks = n_threads;
         } break;
         case NE_OP_MUL_MAT_BIAS:
+        case NE_OP_MUL_MAT_ID:
         case NE_OP_CONV_1D:
         case NE_OP_MUL_MAT: {
           node->n_tasks = n_threads;
@@ -10518,17 +11247,20 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           // printf("nr0 = %8d, nr1 = %8d, nr0*nr1 = %8d, n_tasks = %d\n", nr0, nr1, nr0*nr1, node->n_tasks);
 
           size_t cur = 0;
-          if (node->src0->type == NE_TYPE_BTLA) {
-            cur = bestla_f32f32_get_workspace_size(node->src1->ne[1], node->src0->ne[1], node->src1->ne[0],
-                                                   node->src0->data);
+          struct ne_tensor* wei = node->src0;
+          if (node->op == NE_OP_MUL_MAT_ID) {
+            wei = node->opt[0];
+          }
+          if (wei->type == NE_TYPE_BTLA) {
+            cur = bestla_f32f32_get_workspace_size(node->src1->ne[1], wei->ne[1], node->src1->ne[0], wei->data);
             node->n_tasks = 1;
-          } else if (node->src0->type == NE_TYPE_F16 && node->src1->type == NE_TYPE_F32) {
+          } else if (wei->type == NE_TYPE_F16 && node->src1->type == NE_TYPE_F32) {
             cur = NE_TYPE_SIZE[NE_TYPE_F16] * ne_nelements(node->src1);
-          } else if (node->src0->type == NE_TYPE_F32 && node->src1->type == NE_TYPE_F32) {
+          } else if (wei->type == NE_TYPE_F32 && node->src1->type == NE_TYPE_F32) {
             cur = 0;
-          } else if (ne_is_quantized(node->src0->type) && node->src1->type == NE_TYPE_F32) {
+          } else if (ne_is_quantized(wei->type) && node->src1->type == NE_TYPE_F32) {
             {
-              const enum ne_type type_q = quantize_fns[node->src0->type].vec_dot_type;
+              const enum ne_type type_q = quantize_fns[wei->type].vec_dot_type;
               cur = NE_TYPE_SIZE[type_q] * ne_nelements(node->src1) / NE_BLCK_SIZE[type_q];
             }
           } else {
@@ -10543,6 +11275,14 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           size_t cur = 0;
           cur = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->src1->ne[1],
                                                             node->opt[0]->ne[1], node->src1->data, node->opt[0]->data);
+          work_size = MAX(work_size, cur);
+          node->n_tasks = 1;
+        } break;
+        case NE_OP_MUL_ID_FFN_SILU: {
+          size_t cur = 0;
+          cur =
+              bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->opt[0]->ne[1],
+                                                          node->opt[9]->ne[1], node->opt[0]->data, node->opt[9]->data);
           work_size = MAX(work_size, cur);
           node->n_tasks = 1;
         } break;
@@ -10699,7 +11439,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 #if NE_DEBUG
     bestla_timer(true);
 #endif
-#ifndef _OPENMP
     // INIT
     struct ne_compute_params params = {
         /*.type  =*/NE_TASK_INIT,
@@ -10709,154 +11448,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
     };
 
-    ne_compute_forward(&params, node);
-
-    // COMPUTE
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      // launch thread pool
-      for (int j = 0; j < n_threads - 1; j++) {
-        workers[j].params = (struct ne_compute_params){
-            .type = NE_TASK_COMPUTE,
-            .ith = j + 1,
-            .nth = node->n_tasks,
-            .wsize = cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            .wdata = cgraph->work ? cgraph->work->data : NULL,
-        };
-        workers[j].node = node;
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) > 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_store(&state_shared.has_work, true);
-    }
-
-    params.type = NE_TASK_COMPUTE;
-    ne_compute_forward(&params, node);
-
-    // wait for thread pool
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) != 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-    }
-    // FINALIZE
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      // launch thread pool
-      for (int j = 0; j < n_threads - 1; j++) {
-        workers[j].params = (struct ne_compute_params){
-            .type = NE_TASK_FINALIZE,
-            .ith = j + 1,
-            .nth = node->n_tasks,
-            .wsize = cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            .wdata = cgraph->work ? cgraph->work->data : NULL,
-        };
-        workers[j].node = node;
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) > 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_store(&state_shared.has_work, true);
-    }
-
-    params.type = NE_TASK_FINALIZE;
-    ne_compute_forward(&params, node);
-
-    // wait for thread pool
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) != 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-    }
-#else
-    // INIT
-    struct ne_compute_params params = {
-        /*.type  =*/NE_TASK_INIT,
-        /*.ith   =*/0,
-        /*.nth   =*/node->n_tasks,
-        /*.wsize =*/cgraph->work ? ne_nbytes(cgraph->work) : 0,
-        /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
-    };
-    ne_compute_forward(&params, node);
-    if (node->n_tasks == 1) {
-      params.type = NE_TASK_COMPUTE;
-      ne_compute_forward(&params, node);
-      params.type = NE_TASK_FINALIZE;
-      ne_compute_forward(&params, node);
-
-    } else {
-#pragma omp parallel
-      {
-        struct ne_compute_params params = {
-            /*.type  =*/NE_TASK_COMPUTE,
-            /*.ith   =*/omp_get_thread_num(),
-            /*.nth   =*/node->n_tasks,
-            /*.wsize =*/cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
-        };
-        if (params.ith < node->n_tasks) {
-          ne_compute_forward(&params, node);
-        }
-#pragma omp barrier
-        params.type = NE_TASK_FINALIZE;
-        if (params.ith < node->n_tasks) {
-          ne_compute_forward(&params, node);
-        }
-      }
-    }
-
-#endif
+    bestla_parallel_for(ne_compute_forward, &params, node);
 #if NE_DEBUG
     printf("Node %d ", node->op);
     bestla_timer(false);
@@ -10871,22 +11463,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
       node->perf_time_us += perf_time_us_cur;
     }
   }
-
-  // join thread pool
-#ifndef _OPENMP
-  if (n_threads > 1) {
-    atomic_store(&state_shared.stop, true);
-    atomic_store(&state_shared.has_work, true);
-
-    for (int j = 0; j < n_threads - 1; j++) {
-      int rc = ne_thread_join(workers[j].thrd, NULL);
-      NE_ASSERT(rc == 0);
-      UNUSED(rc);
-    }
-
-    ne_lock_destroy(&state_shared.spin);
-  }
-#endif
 
   // performance stats (graph)
   {
@@ -10911,12 +11487,16 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
   NE_PRINT("=== GRAPH Profiling ===\n");
 
   int64_t ip_duration = 0;
+  int64_t mul_mat_id_duration = 0;
   for (int i = 0; i < cgraph->n_nodes; i++) {
     struct ne_tensor* node = cgraph->nodes[i];
     if (node->op == NE_OP_MUL_MAT && node->ne[1] == node->ne[2]) {
       ip_duration += node->perf_time_us;
     } else {
       perf_total_per_op_us[node->op] += node->perf_time_us;
+      if (node->op == NE_OP_MUL_MAT_ID) {
+        mul_mat_id_duration += node->perf_time_us;
+      }
     }
   }
 
@@ -10927,6 +11507,7 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
     NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", NE_OP_LABEL[i], (double)perf_total_per_op_us[i] / 1000.0);
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
+  NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "MUL_MAT_ID", (double)mul_mat_id_duration / 1000.0);
   NE_PRINT("========================================\n");
 
 #else

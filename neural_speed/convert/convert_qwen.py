@@ -32,7 +32,7 @@ from pathlib import Path
 import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
-from transformers import AutoModelForCausalLM, AutoTokenizer
+
 
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
@@ -62,6 +62,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -74,10 +76,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
-
-    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
+    if args.model_hub == "modelscope":
+        from modelscope import AutoModelForCausalLM, AutoTokenizer
+    else:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model)
     model.eval()
     for p in model.parameters():
         p.requires_grad = False
@@ -100,9 +105,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", hparams["num_attention_heads"]))
     fout.write(struct.pack("i", 0))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
-    fout.write(struct.pack("i", hparams["kv_channels"]))
+    fout.write(
+        struct.pack(
+            "i", hparams["kv_channels"] if "kv_channels" in hparams else int(hparams["hidden_size"] /
+                                                                             hparams["num_attention_heads"])))
     fout.write(struct.pack("i", ftype))
-    fout.write(struct.pack("i", hparams["seq_length"]))
+    fout.write(
+        struct.pack("i", hparams["seq_length"] if "seq_length" in hparams else hparams["max_position_embeddings"]))
     fout.write(struct.pack("f", 0.0))
     fout.write(struct.pack("f", 0.0))
     fout.write(struct.pack("i", 0))
@@ -112,16 +121,21 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", hparams["intermediate_size"]))
     fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
 
-    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
-
-    fout.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
-    fout.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
+    if hparams['model_type']=='qwen2':
+        fout.write(struct.pack("i", hparams["bos_token_id"]))
+        fout.write(struct.pack("i", hparams["eos_token_id"]))
+    else:
+        fout.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
+        fout.write(struct.pack("i", tokenizer.special_tokens['<|endoftext|>']))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 

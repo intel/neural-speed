@@ -52,13 +52,20 @@ void QWEN::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
-  n_ff = hparams.ffn_hidden_size / 2;
+  n_ff = hparams.ffn_hidden_size;
+  if (hparams.max_seq_len == 8192) {
+    n_ff = n_ff / 2;
+  }
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
+  fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
+  fprintf(stderr, "%s: n_head_kv  = %u\n", __func__, hparams.n_head_kv);
   fprintf(stderr, "%s: n_layer    = %u\n", __func__, hparams.n_layer);
   fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
-  fprintf(stderr, "%s: n_ff       = %u\n", __func__, hparams.ffn_hidden_size / 2);
+  fprintf(stderr, "%s: ftype      = %u\n", __func__, hparams.ftype);
+  fprintf(stderr, "%s: max_seq_len= %u\n", __func__, hparams.max_seq_len);
+  fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
@@ -102,7 +109,7 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
   model.layers.resize(n_layer);
   size_t vram_total = 0;
 
-  if (ml->verify_tensor("token_embd.weight")) {
+  if (ml->verify_tensor("token_embd.weight")) {  // gguf
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -117,16 +124,26 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
 
       // qkv GEMM
-      layer.attn[0] = ml->get_tensor(layers_i + ".attn_qkv.weight", {n_embd, 3 * n_embd}, backend);
-      layer.attn[1] = ml->get_tensor(layers_i + ".attn_qkv.bias", {3 * n_embd}, backend);
-      layer.attn[2] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+      if (ml->verify_tensor(layers_i + ".attn_qkv.weight")) {
+        layer.attn[0] = ml->get_tensor(layers_i + ".attn_qkv.weight", {n_embd, 3 * n_embd}, backend);
+        layer.attn[1] = ml->get_tensor(layers_i + ".attn_qkv.bias", {3 * n_embd}, backend);
+        layer.attn[2] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+      } else {  // qwen2 gguf
+        layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd}, backend);
+        layer.attn[1] = ml->get_tensor(layers_i + ".attn_q.bias", {n_embd}, backend);
+        layer.attn[2] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, n_embd}, backend);
+        layer.attn[3] = ml->get_tensor(layers_i + ".attn_k.bias", {n_embd}, backend);
+        layer.attn[4] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd, n_embd}, backend);
+        layer.attn[5] = ml->get_tensor(layers_i + ".attn_v.bias", {n_embd}, backend);
+        layer.attn[6] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+      }
 
       // ffn GEMM
       layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, n_ff}, backend);
       layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, n_ff}, backend);
       layer.ffn[2] = ml->get_tensor(layers_i + ".ffn_down.weight", {n_ff, n_embd}, backend);
     }
-  } else {
+  } else if (ml->verify_tensor("transformer.wte.weight")) {  // qwen1 bin
     model.others[0] = ml->get_tensor("transformer.wte.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("transformer.ln_f.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -149,6 +166,34 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.w1.weight", {n_embd, n_ff}, backend);
       layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.w2.weight", {n_embd, n_ff}, backend);
       layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.c_proj.weight", {n_ff, n_embd}, backend);
+    }
+  } else {  // qwen2 bin
+    model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+
+    for (uint32_t i = 0; i < n_layer; ++i) {
+      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
+      auto& layer = model.layers[i];
+      std::string layers_i = "model.layers." + std::to_string(i);
+
+      // norm: cur = ln_1_g*cur + ln_1_b
+      layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
+      layer.norm[1] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
+
+      // qkv GEMM + out proj GEMM
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd}, backend);
+      layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
+      layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+
+      // ffn GEMM
+      layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
+      layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.gate_proj.weight", {n_embd, n_ff}, backend);
+      layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.down_proj.weight", {n_ff, n_embd}, backend);
     }
   }
 
@@ -180,7 +225,7 @@ class qwen_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
-    if (layername == "transformer.wte.weight") {
+    if (layername == "transformer.wte.weight" || layername == "model.embed_tokens.weight") {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
     }

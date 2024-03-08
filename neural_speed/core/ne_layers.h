@@ -64,8 +64,9 @@ extern "C" {
 // Attention flags
 typedef enum NE_ATTN_FLAG {
   NE_ATTN_FLAG_NONE = 0,
-  NE_ATTN_FLAG_IS_CAUSAL = 1 << 1,
-  NE_ATTN_FLAG_IS_ALIBI8 = 1 << 2,
+  NE_ATTN_FLAG_IS_CAUSAL = 1 << 0,
+  NE_ATTN_FLAG_IS_ALIBI8 = 1 << 1,
+  NE_ATTN_FLAG_PREFER_FP32 = 1 << 2,  // prefer to use FP32 as compute type in attn
 } NE_ATTN_FLAG;
 typedef uint32_t ne_attn_flags_t;
 
@@ -252,9 +253,17 @@ NE_API struct ne_tensor* ne_rms_norm_back(struct ne_context* ctx, struct ne_tens
 // result is m columns, p rows
 NE_API struct ne_tensor* ne_mul_mat(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b);
 
+NE_API struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor* const as[], int n_as,
+                                       struct ne_tensor* ids, int id, struct ne_tensor* b);
+NE_API struct ne_tensor* ne_mul_id_ffn_silu(struct ne_context* ctx, struct ne_tensor* const down[],
+                                            struct ne_tensor* const gate[], struct ne_tensor* const up[], int n_as,
+                                            struct ne_tensor* ids, int id, struct ne_tensor* b);
+
 NE_API struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor* w, struct ne_tensor* b,
                                               struct ne_tensor* a);
+NE_API struct ne_tensor* ne_argsort(struct ne_context* ctx, struct ne_tensor* a);
 
+NE_API struct ne_tensor* ne_top_k(struct ne_context* ctx, struct ne_tensor* a, int k);
 // merged Q K V  ne_mul_mat
 NE_API struct ne_tensor* ne_mul_qkv(struct ne_context* ctx, struct ne_tensor* qw, struct ne_tensor* kw,
                                     struct ne_tensor* vw, struct ne_tensor* src);
@@ -403,6 +412,20 @@ NE_API struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tenso
 NE_API struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims,
                                                int mode, int prompt_size, int n_keep, struct ne_tensor* cossin,
                                                float freq_base, float freq_scale);
+
+// in-place, returns view(a)
+NE_API struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
+                                                int mode, int prompt_size, float freq_base, float freq_scale,
+                                                int yarn_orig_ctx, float ext_factor, float attn_factor, float beta_fast,
+                                                float beta_slow);
+
+// shift all tokens by a give p (n_shift)
+// Optionally give a 1d tensor of precomputed interleaved cos/sin value of n_shift*scale^k for k \in [0, n_dims)
+NE_API struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift,
+                                                      int n_dims, int mode, int prompt_size, int n_keep,
+                                                      struct ne_tensor* cossin, float freq_base, float freq_scale,
+                                                      int yarn_orig_ctx, float ext_factor, float attn_factor,
+                                                      float beta_fast, float beta_slow);
 
 // rotary position embedding backward, i.e compute dx from dy
 // a - dy

@@ -2,6 +2,7 @@
 #include "bestla_utils.h"
 #include "bestla_ut.h"
 
+#ifdef BTLA_UT_GEMM
 namespace bestla {
 using namespace utils;
 
@@ -1115,3 +1116,4 @@ static UT_GEMM_AMXINT8 sUT_GEMM_AMXINT8;
 #endif
 }  // namespace ut
 }  // namespace bestla
+#endif

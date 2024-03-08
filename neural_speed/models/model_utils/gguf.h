@@ -231,18 +231,17 @@ enum llm_arch {
   LLM_ARCH_CHATGLM,
   LLM_ARCH_CHATGLM2,
   LLM_ARCH_PHI,
+  LLM_ARCH_QWEN2,
   LLM_ARCH_UNKNOWN,
 };
 
 static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
-    {LLM_ARCH_LLAMA, "llama"},         {LLM_ARCH_FALCON, "falcon"},
-    {LLM_ARCH_GPT2, "gpt2"},           {LLM_ARCH_GPTJ, "gptj"},
-    {LLM_ARCH_GPTNEOX, "gptneox"},     {LLM_ARCH_MPT, "mpt"},
-    {LLM_ARCH_BAICHUAN, "baichuan"},   {LLM_ARCH_STARCODER, "starcoder"},
-    {LLM_ARCH_PERSIMMON, "persimmon"}, {LLM_ARCH_REFACT, "refact"},
-    {LLM_ARCH_BLOOM, "bloom"},         {LLM_ARCH_STABLELM, "stablelm"},
-    {LLM_ARCH_QWEN, "qwen"},           {LLM_ARCH_CHATGLM, "chatglm"},
-    {LLM_ARCH_CHATGLM2, "chatglm2"},   {LLM_ARCH_PHI, "phi"}};
+    {LLM_ARCH_LLAMA, "llama"},       {LLM_ARCH_FALCON, "falcon"},       {LLM_ARCH_GPT2, "gpt2"},
+    {LLM_ARCH_GPTJ, "gptj"},         {LLM_ARCH_GPTNEOX, "gptneox"},     {LLM_ARCH_MPT, "mpt"},
+    {LLM_ARCH_BAICHUAN, "baichuan"}, {LLM_ARCH_STARCODER, "starcoder"}, {LLM_ARCH_PERSIMMON, "persimmon"},
+    {LLM_ARCH_REFACT, "refact"},     {LLM_ARCH_BLOOM, "bloom"},         {LLM_ARCH_STABLELM, "stablelm"},
+    {LLM_ARCH_QWEN, "qwen"},         {LLM_ARCH_CHATGLM, "chatglm"},     {LLM_ARCH_CHATGLM2, "chatglm2"},
+    {LLM_ARCH_PHI, "phi"},           {LLM_ARCH_QWEN2, "qwen2"}};
 
 struct gguf_tensor_info {
   struct gguf_str name;
@@ -423,6 +422,8 @@ enum llm_kv {
   LLM_KV_ATTENTION_CLAMP_KQV,
   LLM_KV_ATTENTION_LAYERNORM_EPS,
   LLM_KV_ATTENTION_LAYERNORM_RMS_EPS,
+  LLM_KV_NUM_EXPERTS,
+  LLM_KV_NUM_EXPERTS_USED,
 
   LLM_KV_ROPE_DIMENSION_COUNT,
   LLM_KV_ROPE_FREQ_BASE,
@@ -466,6 +467,8 @@ static std::map<llm_kv, std::string> LLM_KV_NAMES = {
     {LLM_KV_FEED_FORWARD_LENGTH, "%s.feed_forward_length"},
     {LLM_KV_USE_PARALLEL_RESIDUAL, "%s.use_parallel_residual"},
     {LLM_KV_TENSOR_DATA_LAYOUT, "%s.tensor_data_layout"},
+    {LLM_KV_NUM_EXPERTS, "%s.expert_count"},
+    {LLM_KV_NUM_EXPERTS_USED, "%s.expert_used_count"},
 
     {LLM_KV_ATTENTION_HEAD_COUNT, "%s.attention.head_count"},
     {LLM_KV_ATTENTION_HEAD_COUNT_KV, "%s.attention.head_count_kv"},

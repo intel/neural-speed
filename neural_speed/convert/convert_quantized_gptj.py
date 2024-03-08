@@ -23,12 +23,6 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 
-def permute_func(weights, n_head: int, n_head_kv: int):
-    if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
-    return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
-                            *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
-
 def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     # unpack weight and repack into 3bits / 4bits BestLA format
     import neural_speed.llama_cpp as cpp_model
@@ -142,10 +136,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("layer_norm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
-
     fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
     fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
     fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
