@@ -18,7 +18,6 @@ import os
 
 import torch
 from neural_speed.convert import convert_model
-from transformers import AutoConfig, AutoTokenizer
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 max_request_num_default = 8
@@ -87,8 +86,13 @@ class Model:
 
     def init(self, model_name, use_quant=True, use_gptq=False, use_awq=False, use_autoround=False,
             weight_dtype="int4", alg="sym", group_size=32,
-            scale_dtype="fp32", compute_dtype="int8", use_ggml=False):
-        self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+            scale_dtype="fp32", compute_dtype="int8", use_ggml=False, model_hub="huggingface"):
+        if model_hub == "modelscope":
+            from modelscope import AutoConfig
+            self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+        else:
+            from transformers import AutoConfig
+            self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
         model_type = Model.get_model_type(self.config)
         self.model_type = model_type
         self.__import_package(model_type)
@@ -129,7 +133,7 @@ class Model:
             return
 
         if not os.path.exists(fp32_bin):
-            convert_model(model_name, fp32_bin, "f32")
+            convert_model(model_name, fp32_bin, "f32", model_hub = model_hub)
             assert os.path.exists(fp32_bin), "Fail to convert pytorch model"
 
         if not use_quant:
