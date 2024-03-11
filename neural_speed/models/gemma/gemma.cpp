@@ -76,7 +76,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   model_context& lctx = *ctx;
 
   // static batching for now
-  const int N = inputs->n_tokens;
+  const int N = 3;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
@@ -143,8 +143,9 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
   ne_set_name(embd, "embd");
+  int embd_tokens[3] = {2, 17534, 2134};
   for (int i = 0; i < batch_size; ++i) {
-    memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
+    memcpy(static_cast<model_token*>(embd->data) + i * N, embd_tokens, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);

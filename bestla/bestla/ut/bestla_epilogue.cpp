@@ -1,6 +1,7 @@
 #include "bestla_epilogue.h"
 #include "bestla_ut.h"
 
+#ifdef BTLA_UT_EPILOGUE
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -139,3 +140,4 @@ static UT_AlphaBetaProcessFp32 sUT_AlphaBetaProcessFp32;
 #endif
 }  // namespace ut
 }  // namespace bestla
+#endif

@@ -96,10 +96,6 @@ static int sched_yield(void) {
 typedef void* thread_ret_t;
 #endif
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 static_assert(sizeof(block_q4_0) == sizeof(ne_fp16_t) + QK4_0 / 2, "wrong q4_0 block size/padding");
 static_assert(sizeof(block_q4_1) == 2 * sizeof(ne_fp16_t) + QK4_1 / 2, "wrong q4_1 block size/padding");
 static_assert(sizeof(block_q5_0) == sizeof(ne_fp16_t) + sizeof(uint32_t) + QK5_0 / 2, "wrong q5_0 block size/padding");
@@ -3107,7 +3103,8 @@ struct ne_tensor* ne_soft_max_inplace(struct ne_context* ctx, struct ne_tensor* 
 
 struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                int prompt_size, bool inplace, int n_keep, struct ne_tensor* cossin, int* n_padding,
-                               bool padding_left, float freq_base, float freq_scale) {
+                               bool padding_left, float freq_base, float freq_scale, int yarn_orig_ctx,
+                               float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
   NE_ASSERT(n_past >= 0 || n_keep >= 0);
   NE_ASSERT(padding_left);
   bool is_node = false;
@@ -3147,7 +3144,9 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 
   ne_scratch_load(ctx);
 
-  float params[] = {freq_base, freq_scale};
+  /* what the difference of setting parameters in b->data and in op_parameters */
+  /* float and int are in different data ?? */
+  float params[] = {freq_base, freq_scale, (float)yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow};
   ne_set_op_params(result, &params, sizeof(params));
 
   result->op = NE_OP_ROPE;
@@ -3161,19 +3160,36 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 
 struct ne_tensor* ne_rope(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                           int prompt_size, float freq_base, float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale, 0,
+                      0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                   int prompt_size, float freq_base, float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale, 0,
+                      0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
                                         int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
+}
+
+struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
+                                         int prompt_size, float freq_base, float freq_scale, int yarn_orig_ctx,
+                                         float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
+                      yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow);
+}
+
+struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims,
+                                               int mode, int prompt_size, int n_keep, struct ne_tensor* cossin,
+                                               float freq_base, float freq_scale, int yarn_orig_ctx, float ext_factor,
+                                               float attn_factor, float beta_fast, float beta_slow) {
+  return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
+                      freq_scale, yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow);
 }
 
 // ne_rope_back
@@ -3211,14 +3227,14 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                        int prompt_size, int* n_padding, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, n_padding, true, freq_base,
-                      freq_scale);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 struct ne_tensor* ne_rope_with_padding_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
                                                int mode, int prompt_size, int* n_padding, float freq_base,
                                                float freq_scale) {
-  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base,
-                      freq_scale);
+  return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base, freq_scale,
+                      0, 0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 // ne_alibi
@@ -8709,6 +8725,45 @@ static void ne_compute_forward_clamp(const struct ne_compute_params* params, con
   }
 }
 
+static float rope_yarn_ramp(const float low, const float high, const int i0) {
+  const float y = (i0 / 2 - low) / MAX(0.001f, high - low);
+  return 1.0 - MIN(1.0, MAX(0.0, y));
+}
+
+// YaRN algorithm based on LlamaYaRNScaledRotaryEmbedding.py from https://github.com/jquesnelle/yarn
+// MIT licensed. Copyright (c) 2023 Jeffrey Quesnelle and Bowen Peng.
+static void rope_yarn(float theta_extrap, float freq_scale, float corr_dims[2], int64_t i0, float ext_factor,
+                      float mscale, float* cos_theta, float* sin_theta) {
+  // Get n-d rotational scaling corrected for extrapolation
+  float theta_interp = freq_scale * theta_extrap;
+  float theta = theta_interp;
+  if (ext_factor != 0.0f) {
+    float ramp_mix = rope_yarn_ramp(corr_dims[0], corr_dims[1], i0) * ext_factor;
+    theta = theta_interp * (1 - ramp_mix) + theta_extrap * ramp_mix;
+
+    // Get n-d magnitude scaling corrected for interpolation
+    mscale *= 1.0f + 0.1f * logf(1.0f / freq_scale);
+  }
+  *cos_theta = cosf(theta) * mscale;
+  *sin_theta = sinf(theta) * mscale;
+}
+
+#ifndef NE_PI
+#define NE_PI (3.14159265358979323846)
+#endif
+// Apparently solving `n_rot = 2pi * x * base^((2 * max_pos_emb) / n_dims)` for x, we get
+// `corr_dim(n_rot) = n_dims * log(max_pos_emb / (n_rot * 2pi)) / (2 * log(base))`
+static float ggml_rope_yarn_corr_dim(int n_dims, int n_orig_ctx, float n_rot, float base) {
+  return n_dims * logf(n_orig_ctx / (n_rot * 2 * (float)NE_PI)) / (2 * logf(base));
+}
+
+void ggml_rope_yarn_corr_dims(int n_dims, int n_orig_ctx, float freq_base, float beta_fast, float beta_slow,
+                              float dims[2]) {
+  // start and end correction dims
+  dims[0] = MAX(0, floorf(ggml_rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_fast, freq_base)));
+  dims[1] = MIN(n_dims - 1, ceilf(ggml_rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_slow, freq_base)));
+}
+
 // ne_compute_forward_rope
 #define NE_TENSOR_UNARY_OP_LOCALS           \
   NE_TENSOR_LOCALS(int64_t, ne0, src0, ne); \
@@ -8721,12 +8776,18 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }
+
   const int bs = src0->ne[3];
   NE_ASSERT(src1->type == NE_TYPE_I32);
   NE_ASSERT(ne_nelements(src1) == 5 + bs);  // 5 + bs params
 
   const float freq_base = ((float*)(dst->op_params))[0];
   const float freq_scale = 1 / ((float*)(dst->op_params))[1];
+  const int n_orig_ctx = (int)((float*)(dst->op_params))[2];
+  const float ext_factor = ((float*)(dst->op_params))[3];
+  const float attn_factor = ((float*)(dst->op_params))[4];
+  const float beta_fast = ((float*)(dst->op_params))[5];
+  const float beta_slow = ((float*)(dst->op_params))[6];
 
   const int64_t n_past = ((int32_t*)src1->data)[ROPE_NPAST_IDX];
   const int64_t n_dims = ((int32_t*)src1->data)[ROPE_NDIMS_IDX];
@@ -8759,11 +8820,15 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   int ir = 0;
 
   const float theta_scale = powf(freq_base, -2.0f / n_dims);
+  const float inv_ndims = -1.f / n_dims;
+  float corr_dims[2];
+  ggml_rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
 
   const bool skip = mode & 1;
   const bool is_neox = mode & 2;
   const bool is_glm = mode & 4;
   const bool is_shift = n_keep >= 0;
+  const bool use_yarn = ((mode & 0x8) != 0);
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
   NE_ASSERT(ne3 == bs);
@@ -8774,21 +8839,21 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
         if (ir++ < ir0) continue;
         if (ir > ir1) break;
 
-        float theta = freq_scale * (float)p;
+        float theta_base = (float)p;
 
         // only for glm when mode == 4
         if (is_glm) {
           const int64_t n_padding = ((int32_t*)src1->data)[ROPE_PARAMS_NUM + i3];
           // position ids
-          theta = MIN(MAX(p - n_padding, 0), prompt_size - 2 - n_padding);
+          theta_base = MIN(MAX(p - n_padding, 0), prompt_size - 2 - n_padding);
           float block_theta = MAX(p - (prompt_size - 2), 0);
           for (int64_t i0 = 0; i0 < ne0 / 4; i0++) {
-            const float cos_theta = cosf(theta);
-            const float sin_theta = sinf(theta);
+            const float cos_theta = cosf(theta_base);
+            const float sin_theta = sinf(theta_base);
             const float cos_block_theta = cosf(block_theta);
             const float sin_block_theta = sinf(block_theta);
 
-            theta *= theta_scale;
+            theta_base *= theta_scale;
             block_theta *= theta_scale;
 
             const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
@@ -8805,11 +8870,12 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
             dst_data[n_dims / 2 * 3] = x2 * sin_block_theta + x3 * cos_block_theta;
           }
         } else if (!is_neox) {
+          // printf("theta_base = %ld, freq_scale %.4f, ne0 %d\n", p, freq_scale, ne0);
           for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
-            const float cos_theta = cosf(theta);
-            const float sin_theta = sinf(theta);
+            float cos_theta, sin_theta;
+            rope_yarn(theta_base, freq_scale, corr_dims, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
 
-            theta *= theta_scale;  // theta = i2 * theta_scale^(i0/2)
+            theta_base *= theta_scale;
 
             const float* const src = (float*)((char*)src0->data + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
             float* dst_data = (float*)((char*)dst->data + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
@@ -8824,12 +8890,18 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
           // TODO: this is probably wrong, but I can't figure it out ..
           // ref:
           // https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt_neox/modeling_gpt_neox.py#LL251C1-L294C28
+          theta_base = theta_base * freq_scale;
+
           for (int64_t ib = 0; ib < ne0 / n_dims; ++ib) {
             for (int64_t ic = 0; ic < n_dims; ic += 2) {
-              const float cos_theta = cosf(theta);
-              const float sin_theta = sinf(theta);
+              // simplified from `(ib * n_dims + ic) * inv_ndims`
+              float cur_rot = inv_ndims * ic - ib;
 
-              theta *= theta_scale;
+              float cos_theta, sin_theta;
+              rope_yarn(theta_base, freq_scale, corr_dims, (int)cur_rot, ext_factor, attn_factor, &cos_theta,
+                        &sin_theta);
+
+              theta_base *= theta_scale;
 
               const int64_t i0 = ib * n_dims + ic / 2;
 
@@ -11059,172 +11131,10 @@ struct ne_cgraph ne_build_backward(struct ne_context* ctx, struct ne_cgraph* gf,
 // I tried using spin locks, but not sure how to use them correctly - the things I tried were slower than busy loops
 //
 
-#ifdef __APPLE__
-
-// #include <os/lock.h>
-//
-// typedef os_unfair_lock ne_lock_t;
-//
-// #define ne_lock_init(x)    UNUSED(x)
-// #define ne_lock_destroy(x) UNUSED(x)
-// #define ne_lock_lock       os_unfair_lock_lock
-// #define ne_lock_unlock     os_unfair_lock_unlock
-//
-// #define NE_LOCK_INITIALIZER OS_UNFAIR_LOCK_INIT
-
-typedef int ne_lock_t;
-
-#define ne_lock_init(x) UNUSED(x)
-#define ne_lock_destroy(x) UNUSED(x)
-#define ne_lock_lock(x) UNUSED(x)
-#define ne_lock_unlock(x) UNUSED(x)
-
-#define NE_LOCK_INITIALIZER 0
-
-typedef pthread_t ne_thread_t;
-
-#define ne_thread_create pthread_create
-#define ne_thread_join pthread_join
-
-#else
-
-// typedef pthread_spinlock_t ne_lock_t;
-
-// #define ne_lock_init(x) pthread_spin_init(x, PTHREAD_PROCESS_PRIVATE)
-// #define ne_lock_destroy pthread_spin_destroy
-// #define ne_lock_lock    pthread_spin_lock
-// #define ne_lock_unlock  pthread_spin_unlock
-
-typedef int ne_lock_t;
-
-#define ne_lock_init(x) UNUSED(x)
-#define ne_lock_destroy(x) UNUSED(x)
-#if defined(__x86_64__) || (defined(_MSC_VER) && defined(_M_AMD64))
-#define ne_lock_lock(x) _mm_pause()
-#else
-#define ne_lock_lock(x) UNUSED(x)
-#endif
-#define ne_lock_unlock(x) UNUSED(x)
-
-#define NE_LOCK_INITIALIZER 0
-
-typedef pthread_t ne_thread_t;
-
-#define ne_thread_create pthread_create
-#define ne_thread_join pthread_join
-
-#endif
-
-struct ne_compute_state_shared {
-  ne_lock_t spin;
-
-  int n_threads;
-
-  // synchronization primitives
-  atomic_int n_ready;
-  atomic_bool has_work;
-  atomic_bool stop;  // stop all threads
-};
-
-struct ne_compute_state {
-  ne_thread_t thrd;
-
-  struct ne_compute_params params;
-  struct ne_tensor* node;
-
-  struct ne_compute_state_shared* shared;
-};
-
-static thread_ret_t ne_graph_compute_thread(void* data) {
-  struct ne_compute_state* state = (struct ne_compute_state*)data;
-
-  const int n_threads = state->shared->n_threads;
-
-  while (true) {
-    if (atomic_fetch_add(&state->shared->n_ready, 1) == n_threads - 1) {
-      atomic_store(&state->shared->has_work, false);
-    } else {
-      while (atomic_load(&state->shared->has_work)) {
-        if (atomic_load(&state->shared->stop)) {
-          return 0;
-        }
-        ne_lock_lock(&state->shared->spin);
-        ne_lock_unlock(&state->shared->spin);
-      }
-    }
-
-    atomic_fetch_sub(&state->shared->n_ready, 1);
-
-    // wait for work
-    while (!atomic_load(&state->shared->has_work)) {
-      if (atomic_load(&state->shared->stop)) {
-        return 0;
-      }
-      ne_lock_lock(&state->shared->spin);
-      ne_lock_unlock(&state->shared->spin);
-    }
-
-    // check if we should stop
-    if (atomic_load(&state->shared->stop)) {
-      break;
-    }
-
-    if (state->node) {
-      if (state->params.ith < state->params.nth) {
-        ne_compute_forward(&state->params, state->node);
-      }
-
-      state->node = NULL;
-    } else {
-      break;
-    }
-  }
-
-  return 0;
-}
-
 void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
   int n_threads = cgraph->n_threads;
 
-  struct ne_compute_state_shared state_shared = {
-      /*.spin      =*/NE_LOCK_INITIALIZER,
-      /*.n_threads =*/n_threads,
-      /*.n_ready   =*/0,
-      /*.has_work  =*/false,
-      /*.stop      =*/false,
-  };
-  struct ne_compute_state* workers = n_threads > 1 ? alloca(sizeof(struct ne_compute_state) * (n_threads - 1)) : NULL;
-#ifndef _OPENMP
-  // create thread pool
-  if (n_threads > 1) {
-    ne_lock_init(&state_shared.spin);
-
-    atomic_store(&state_shared.has_work, true);
-
-    for (int j = 0; j < n_threads - 1; j++) {
-      workers[j] = (struct ne_compute_state){
-          .thrd = 0,
-          .params =
-              {
-                  .type = NE_TASK_COMPUTE,
-                  .ith = j + 1,
-                  .nth = n_threads,
-                  .wsize = cgraph->work ? ne_nbytes(cgraph->work) : 0,
-                  .wdata = cgraph->work ? cgraph->work->data : NULL,
-              },
-          .node = NULL,
-          .shared = &state_shared,
-      };
-
-      int rc = ne_thread_create(&workers[j].thrd, NULL, ne_graph_compute_thread, &workers[j]);
-      NE_ASSERT(rc == 0);
-      UNUSED(rc);
-    }
-  }
-#else
-  n_threads = bestla_set_threads(n_threads);  // prevent from using two sockets
-  omp_set_num_threads(n_threads);
-#endif
+  n_threads = bestla_set_threads(n_threads);
   // initialize tasks + work buffer
   {
     size_t work_size = 0;
@@ -11527,7 +11437,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 #if NE_DEBUG
     bestla_timer(true);
 #endif
-#ifndef _OPENMP
     // INIT
     struct ne_compute_params params = {
         /*.type  =*/NE_TASK_INIT,
@@ -11537,154 +11446,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
     };
 
-    ne_compute_forward(&params, node);
-
-    // COMPUTE
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      // launch thread pool
-      for (int j = 0; j < n_threads - 1; j++) {
-        workers[j].params = (struct ne_compute_params){
-            .type = NE_TASK_COMPUTE,
-            .ith = j + 1,
-            .nth = node->n_tasks,
-            .wsize = cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            .wdata = cgraph->work ? cgraph->work->data : NULL,
-        };
-        workers[j].node = node;
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) > 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_store(&state_shared.has_work, true);
-    }
-
-    params.type = NE_TASK_COMPUTE;
-    ne_compute_forward(&params, node);
-
-    // wait for thread pool
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) != 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-    }
-    // FINALIZE
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      // launch thread pool
-      for (int j = 0; j < n_threads - 1; j++) {
-        workers[j].params = (struct ne_compute_params){
-            .type = NE_TASK_FINALIZE,
-            .ith = j + 1,
-            .nth = node->n_tasks,
-            .wsize = cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            .wdata = cgraph->work ? cgraph->work->data : NULL,
-        };
-        workers[j].node = node;
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) > 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_store(&state_shared.has_work, true);
-    }
-
-    params.type = NE_TASK_FINALIZE;
-    ne_compute_forward(&params, node);
-
-    // wait for thread pool
-    if (node->n_tasks > 1) {
-      if (atomic_fetch_add(&state_shared.n_ready, 1) == n_threads - 1) {
-        atomic_store(&state_shared.has_work, false);
-      }
-
-      while (atomic_load(&state_shared.has_work)) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-
-      atomic_fetch_sub(&state_shared.n_ready, 1);
-
-      while (atomic_load(&state_shared.n_ready) != 0) {
-        ne_lock_lock(&state_shared.spin);
-        ne_lock_unlock(&state_shared.spin);
-      }
-    }
-#else
-    // INIT
-    struct ne_compute_params params = {
-        /*.type  =*/NE_TASK_INIT,
-        /*.ith   =*/0,
-        /*.nth   =*/node->n_tasks,
-        /*.wsize =*/cgraph->work ? ne_nbytes(cgraph->work) : 0,
-        /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
-    };
-    ne_compute_forward(&params, node);
-    if (node->n_tasks == 1) {
-      params.type = NE_TASK_COMPUTE;
-      ne_compute_forward(&params, node);
-      params.type = NE_TASK_FINALIZE;
-      ne_compute_forward(&params, node);
-
-    } else {
-#pragma omp parallel
-      {
-        struct ne_compute_params params = {
-            /*.type  =*/NE_TASK_COMPUTE,
-            /*.ith   =*/omp_get_thread_num(),
-            /*.nth   =*/node->n_tasks,
-            /*.wsize =*/cgraph->work ? ne_nbytes(cgraph->work) : 0,
-            /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
-        };
-        if (params.ith < node->n_tasks) {
-          ne_compute_forward(&params, node);
-        }
-#pragma omp barrier
-        params.type = NE_TASK_FINALIZE;
-        if (params.ith < node->n_tasks) {
-          ne_compute_forward(&params, node);
-        }
-      }
-    }
-
-#endif
+    bestla_parallel_for(ne_compute_forward, &params, node);
 #if NE_DEBUG
     printf("Node %d ", node->op);
     bestla_timer(false);
@@ -11699,22 +11461,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
       node->perf_time_us += perf_time_us_cur;
     }
   }
-
-  // join thread pool
-#ifndef _OPENMP
-  if (n_threads > 1) {
-    atomic_store(&state_shared.stop, true);
-    atomic_store(&state_shared.has_work, true);
-
-    for (int j = 0; j < n_threads - 1; j++) {
-      int rc = ne_thread_join(workers[j].thrd, NULL);
-      NE_ASSERT(rc == 0);
-      UNUSED(rc);
-    }
-
-    ne_lock_destroy(&state_shared.spin);
-  }
-#endif
 
   // performance stats (graph)
   {

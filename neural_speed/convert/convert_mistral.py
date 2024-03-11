@@ -36,7 +36,6 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
 
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -317,7 +316,7 @@ Vocab = Union[SentencePieceVocab, NEVocab]
 
 def permute(weights: NDArray, n_head: int, n_head_kv: int) -> NDArray:
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head_kv, 2, weights.shape[0] // n_head_kv // 2,
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
@@ -1298,11 +1297,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
     args = parser.parse_args(args_in)
-
     vocab: Vocab
     if args.dump_single:
         model_plus = lazy_load_file(args.model)
@@ -1318,8 +1318,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
             print("Loadding the model from the local path.")
         else:
             print("Loadding the model from HF.")
-            model = AutoModel.from_pretrained(args.model, low_cpu_mem_usage=True, trust_remote_code=True)
-            tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+            if args.model_hub == "modelscope":
+                from modelscope import AutoConfig, AutoModel, AutoTokenizer
+            else:
+                from transformers import AutoConfig, AutoModel, AutoTokenizer
+            model = AutoModel.from_pretrained(str(args.model), low_cpu_mem_usage=True, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
             args.model = cache_path
 
