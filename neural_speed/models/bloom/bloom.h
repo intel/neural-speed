@@ -27,9 +27,9 @@ static const model_scratch bloom_mem_req(int n_layers, float scratch_size_ratio 
   switch (n_layers) {
     case 30:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     default:
       MODEL_ASSERT(false);

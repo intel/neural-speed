@@ -31,9 +31,9 @@ static const model_scratch gptj_mem_req(int n_layers, float scratch_size_ratio =
     case 28:
       // should be enough for batch=8 * beam=4
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     default:
       MODEL_ASSERT(false);
