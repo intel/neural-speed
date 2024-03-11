@@ -432,6 +432,8 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
         weight = weight.reshape(-1, weight.shape[-1])
         weight = (gptq_scales[g_idx.long()] * (weight - gptq_zeros[g_idx.long()]))
     else:
+        if len(weight.shape) > 2:
+            weight = weight.reshape(-1, weight.shape[-1])
         infeatures = weight.shape[0]
         g_idx = torch.tensor([i // q_config["group_size"] for i in range(infeatures)], dtype=torch.int32)
         scale_zeros = gptq_zeros * gptq_scales
