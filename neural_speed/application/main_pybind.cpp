@@ -129,8 +129,8 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   params->scratch_size_ratio = scratch_size_ratio;
 
   printf(
-      "beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d, "
-      "early_stopping: %d, scratch_size_ratio: %f\n",
+      "beam_size: %d, do_sample: %d, top_k: %d, top_p: %.3f, continuous_batching: %d, max_request_num: %d, "
+      "early_stopping: %d, scratch_size_ratio: %.3f\n",
       params->beam_size, params->do_sample, params->top_k, params->top_p, params->cont_batching,
       params->max_request_num, params->do_early_stopping, params->scratch_size_ratio);
 }
