@@ -83,7 +83,7 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
   size_t ctx_size;
   size_t mmapped_size;
   ml->calc_sizes(&ctx_size, &mmapped_size);
-    fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
 
   // create the ne context
   lctx.model.buf.resize(ctx_size);
