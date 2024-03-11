@@ -27,21 +27,21 @@ static const model_scratch falcon_mem_req(int n_layers, float scratch_size_ratio
   switch (n_layers) {
     case 32:
       return {
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
       };
     case 60:
       return {
+          static_cast<unsigned long long>(scratch_size_ratio * 2 * 3072) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2 * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 2 * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 2 * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2 * 3072) * MB,
       };
     case 80:
       return {
+          static_cast<unsigned long long>(scratch_size_ratio * 3 * 3072) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 3 * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 3 * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 3 * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3 * 3072) * MB,
       };
     default:
       MODEL_ASSERT(false);

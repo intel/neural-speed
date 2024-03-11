@@ -30,33 +30,33 @@ static const model_scratch llama_mem_req(int n_layers, float scratch_size_ratio 
   switch (n_layers) {
     case 32:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 1608) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
       };
     case 40:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 1608) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
       };
     case 48:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 2366) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
       };
     case 60:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 3124) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
       };
     case 80:
       return {
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 10240) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072 * 3) * MB,
       };
     default:
       MODEL_ASSERT(false);
