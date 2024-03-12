@@ -152,11 +152,15 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
     constexpr uint32_t matrix_n_qk = sequence_len;
     constexpr uint32_t matrix_k_qk = head_size;
 
-    constexpr uint32_t wg_tile_m_qksv = arch_tag == gpu_arch::Xe ? 64 : 32;
+    constexpr double slm_ratio_to_pvc
+            = static_cast<double>(arch_attr_t<arch_tag>::local_mem_size)
+            / arch_attr_t<gpu_arch::Xe>::local_mem_size;
+
+    constexpr uint32_t wg_tile_m_qksv = 64 * slm_ratio_to_pvc;
 
     constexpr uint32_t wg_tile_m_qk = wg_tile_m_qksv;
     constexpr uint32_t wg_tile_n_qk = 512; // must == sl_kv
-    constexpr uint32_t sg_tile_m_qk = arch_tag == gpu_arch::Xe ? 32 : 16;
+    constexpr uint32_t sg_tile_m_qk = 32 * slm_ratio_to_pvc;
     constexpr uint32_t sg_tile_n_qk = 32;
     constexpr uint32_t wg_tile_k_qk = 32;
 
@@ -169,7 +173,7 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
     constexpr uint32_t wg_tile_m_sv = wg_tile_m_qksv;
     constexpr uint32_t wg_tile_n_sv = 64; // must == head_dim
     constexpr uint32_t sg_tile_m_sv = 8;
-    constexpr uint32_t sg_tile_n_sv = arch_tag == gpu_arch::Xe ? 16 : 8;
+    constexpr uint32_t sg_tile_n_sv = 16 * slm_ratio_to_pvc;
     constexpr uint32_t wg_tile_k_sv = 32;
 
     // buffer size of softmax row data
@@ -290,12 +294,14 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
                     using gemm0_t = xetla::group::default_gemm_selector_t<
                             dtype_in, // input datatype for A
                             mem_layout::row_major, // memory layout for A
-                            8, // leading dimension for A, in unit of element
+                            // alignment for A, in unit of element
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_in),
                             mem_space::
                                     global, // memory reading from global mem for A
                             dtype_in, // input datatype for B
                             mem_layout::row_major, // memory layout for B
-                            8, // leading dimension for B, in unit of element
+                            // alignment for B, in unit of element
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_in),
                             mem_space::
                                     global, // memory reading from global mem for B
                             float, // accumulator data type for intermediate results
@@ -306,7 +312,7 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
                     using epilogue0_t = xetla::group::default_epilogue_selector_t<
                             dtype_sfx, // onput datatype for C
                             mem_layout::row_major, // memory layout for C
-                            8, // leading dimension for C, in unit of element
+                            8, // alignment for C, in unit of element
                             mem_space::
                                     local, // memory writing to local mem for C
                             wg_shape0, // computation tile shape
@@ -382,12 +388,13 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
                     using gemm1_t = xetla::group::default_gemm_selector_t<
                             dtype_in, // input datatype for A
                             mem_layout::row_major, // memory layout for A
-                            8, // leading dimension for A, in unit of element
+                            8, // alignment for A, in unit of element
                             mem_space::
                                     local, // memory reading from local mem for A
                             dtype_in, // input datatype for B
                             mem_layout::row_major, // memory layout for B
-                            8, // leading dimension for B, in unit of element
+                            // alignment for B, in unit of element
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_in),
                             mem_space::
                                     global, // memory reading from global mem for B
                             float, // accumulator data type for intermediate results
@@ -402,8 +409,9 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
                     using work_group_t = typename gemm1_t::work_group_t;
                     using mem_desc_a_t = typename gemm1_t::mem_desc_a_t;
                     using mem_desc_b_t = typename gemm1_t::mem_desc_b_t;
-                    using mem_desc_c_t = mem_desc_t<dtype_out,
-                            mem_layout::row_major, mem_space::global>;
+                    using mem_desc_c_t = mem_desc_t< //
+                            dtype_out, mem_layout::row_major, mem_space::global,
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_out)>;
                     // Using gemm::matAcc init a matC class for future storage
                     using matAcc_t = typename gemm1_t::matAcc_t;
                     using matC_t = tile_t<dtype_out,
