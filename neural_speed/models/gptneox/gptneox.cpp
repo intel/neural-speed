@@ -38,8 +38,8 @@
 #include "models/model_utils/util.h"
 
 // feed-forward network
-struct ne_tensor* gpt_neox_ff(const model_layer& layer, const int batch_size, const int N, const float eps, ne_context* ctx0,
-                              ne_tensor* inp) {
+struct ne_tensor* gpt_neox_ff(const model_layer& layer, const int batch_size, const int N, const float eps,
+                              ne_context* ctx0, ne_tensor* inp) {
   struct ne_tensor* cur = ne_norm(ctx0, inp, eps);
 
   cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.norm[2], cur), cur), ne_repeat(ctx0, layer.norm[3], cur));
