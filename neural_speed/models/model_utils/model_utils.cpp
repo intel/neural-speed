@@ -1270,6 +1270,13 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.n_gpu_layers = params.n_gpu_layers;
   lparams.seed = params.seed;
   lparams.kv_type = params.memory_type;
+
+  // TODO(Yi): MHA FOR LONG TOKENS
+  int32_t long_tokens = 6144;
+  if (lparams.n_ctx > long_tokens) {
+    lparams.kv_type = KV_MEM_TYPE_F16;
+  }
+
   lparams.use_mmap = params.use_mmap;
   lparams.use_mlock = params.use_mlock;
   lparams.logits_all = params.perplexity;

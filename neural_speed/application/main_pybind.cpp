@@ -115,6 +115,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
     params->memory_type = KV_MEM_TYPE_AUTO;
   else
     fprintf(stderr, "Unexpected memory dtype %s!", memory_dtype.c_str());
+
   // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
   params->cont_batching = continuous_batching;
   if (params->shift_roped_k) params->cont_batching = false;
@@ -127,6 +128,12 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   params->length_penalty = length_penalty;
   params->do_early_stopping = early_stopping;
   params->scratch_size_ratio = scratch_size_ratio;
+
+  // TODO(Yi): MHA FOR LONG TOKENS
+  int32_t tokens_length = 6144;
+  if (params->n_ctx > tokens_length) {
+    params->memory_type = KV_MEM_TYPE_F16;
+  }
 
   printf(
       "beam_size: %d, do_sample: %d, top_k: %d, top_p: %.3f, continuous_batching: %d, max_request_num: %d, "
@@ -537,7 +544,8 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
       fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
               input_id_cb.size(), n_ctx - params.n_keep);
       curr_input_ids[bs].resize(n_ctx - params.n_keep);
-      std::copy(input_id_cb.end() - n_ctx - params.n_keep * 2, input_id_cb.end(), curr_input_ids[bs].begin() + params.n_keep);
+      std::copy(input_id_cb.end() - n_ctx - params.n_keep * 2, input_id_cb.end(),
+                curr_input_ids[bs].begin() + params.n_keep);
       std::copy(input_id_cb.begin(), input_id_cb.begin() + params.n_keep, curr_input_ids[bs].begin());
     } else {  // good input_id_cb and empty curr_input_ids[bs]
       curr_input_ids[bs] = input_id_cb;
@@ -652,8 +660,8 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
       fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
               input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - params.n_keep);
       curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - params.n_keep);
-      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - params.n_keep * 2, input_ids[STATIC_INPUT_HEAD_IDX].end(),
-                curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + params.n_keep);
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - params.n_keep * 2,
+                input_ids[STATIC_INPUT_HEAD_IDX].end(), curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + params.n_keep);
       std::copy(input_ids[STATIC_INPUT_HEAD_IDX].begin(), input_ids[STATIC_INPUT_HEAD_IDX].begin() + params.n_keep,
                 curr_input_ids[STATIC_INPUT_HEAD_IDX].begin());
     } else {
