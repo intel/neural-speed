@@ -234,9 +234,7 @@ class Model:
             ctx_size = generate_kwargs.get("ctx_size")
 
             if ctx_size > max_seq_length:
-                print(
-                    f'max_seq_length is {max_seq_length}, but ctx_size is {ctx_size}. Please reduce ctx_size in model.generate'
-                )
+                print(f'max_seq_length is {max_seq_length}, but ctx_size is {ctx_size}. Please reduce ctx_size.')
                 exit(0)
 
             if max_seq_length > 2048 and max_seq_length <= 4096:
