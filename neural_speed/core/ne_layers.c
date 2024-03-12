@@ -911,8 +911,10 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
     size_needed += sizeof(struct ne_tensor);
 
     if (cur_end + size_needed + NE_OBJECT_SIZE > ctx->mem_size) {
-      NE_PRINT("%s: not enough space in the context's memory pool (needed %zu, available %zu)\n", __func__,
-               cur_end + size_needed + NE_OBJECT_SIZE, ctx->mem_size);
+      NE_PRINT(
+          "%s: %d Context's memory pool is not enough(current %zu MB, ctx->mem_size available %zu MB), please increase "
+          "the scratch_size_ratio.\n",
+          __func__, __LINE__, (cur_end + size_needed + NE_OBJECT_SIZE) / 1024 / 1024, ctx->mem_size / 1024 / 1024);
       assert(false);
       return NULL;
     }
@@ -924,14 +926,17 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
     };
   } else {
     if (ctx->scratch.offs + size_needed > ctx->scratch.size) {
-      NE_PRINT("%s: not enough space in the scratch memory\n", __func__);
+      NE_PRINT(
+          "%s: %d scratch.size pool is not enough(current %zu MB, ctx->scratch.size available %zu MB), please increase "
+          "the scratch_size_ratio.\n",
+          __func__, __LINE__, (ctx->scratch.offs + size_needed) / 1024 / 1024, ctx->scratch.size / 1024 / 1024);
       assert(false);
       return NULL;
     }
 
     if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
-      NE_PRINT("%s: not enough space in the context's memory pool (needed %zu, available %zu)\n", __func__,
-               cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
+      NE_PRINT("%s: %d not enough space in the context's memory pool (needed %zu, ctx->mem_size available %zu)\n",
+               __func__, __LINE__, cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
       assert(false);
       return NULL;
     }
