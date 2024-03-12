@@ -27,9 +27,9 @@ enum stablelm_model {
 static const model_scratch stablelm_mem_req(int n_layers) {
   switch (n_layers) {
     case 24:
-      return {512ull * MB, 512ull * MB, 1026ull * MB};     // StableLM2-1.6B & StableLM2-Zephyr-1.6B
+      return {512ull * MB, 512ull * MB, 1026ull * MB};  // StableLM2-1.6B & StableLM2-Zephyr-1.6B
     case 32:
-      return {1024ull * MB, 1024ull * MB, 1026ull * MB};   // StableLM-3B
+      return {1024ull * MB, 1024ull * MB, 1026ull * MB};  // StableLM-3B
     default:
       MODEL_ASSERT(false);
   }

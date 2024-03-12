@@ -143,14 +143,17 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
       struct ne_tensor* Qcur;
       struct ne_tensor* Kcur;
       struct ne_tensor* Vcur;
-      if (n_layer == 24) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
-        Qcur = ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
-                             head_dim, n_head, N, 1);
-        Kcur = ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
-                             head_dim, n_head, N, 1);
-        Vcur = ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
-                             head_dim, n_head, N, 1);
-      } else { // Stablelm 3B
+      if (n_layer == 24) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+        Qcur =
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
+                          head_dim, n_head, N, 1);
+        Kcur =
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
+                          head_dim, n_head, N, 1);
+        Vcur =
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
+                          head_dim, n_head, N, 1);
+      } else {  // Stablelm 3B
         Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N, 1);
         Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head, N, 1);
         Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head, N, 1);
@@ -289,10 +292,10 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
       }
 
       // projection
-      { 
-        if (n_layer == 24) { // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+      {
+        if (n_layer == 24) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
           cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
-        } else { // Stablelm 3B
+        } else {  // Stablelm 3B
           cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
         }
       }
@@ -304,31 +307,29 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
 
     // FFN Block
     {
-        // Post Attention norm
-        {
-            cur = ne_norm(ctx0, cur);
-            cur = ne_mul(ctx0, cur, model.layers[il].norm[2]);
-            cur = ne_add(ctx0, cur, model.layers[il].norm[3]);
-        }
+      // Post Attention norm
+      {
+        cur = ne_norm(ctx0, cur);
+        cur = ne_mul(ctx0, cur, model.layers[il].norm[2]);
+        cur = ne_add(ctx0, cur, model.layers[il].norm[3]);
+      }
 
-        if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
-                                                  model.layers[il].ffn[2]->data, N, cur->ne[0],
-                                                  model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
-            cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
-        } else {
-            struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);
-            cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
-            cur = ne_silu(ctx0, cur);
-            cur = ne_mul(ctx0, cur, tmp);
-            cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
-        }
-        
+      if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
+                                                model.layers[il].ffn[2]->data, N, cur->ne[0],
+                                                model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
+        cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
+      } else {
+        struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);
+        cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
+        cur = ne_silu(ctx0, cur);
+        cur = ne_mul(ctx0, cur, tmp);
+        cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
+      }
     }
 
     // input for next layer
     inpL = ne_add(ctx0, cur, inpL);
     ne_set_name(inpL, "inpL");
-
   }
 
   lctx.use_buf(ctx0, 0);
