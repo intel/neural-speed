@@ -111,7 +111,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                                                              hparams["num_attention_heads"])))
     fout.write(struct.pack("i", ftype))
     fout.write(
-        struct.pack("i", hparams["seq_length"] if "seq_length" in hparams else hparams["max_position_embeddings"]))
+        struct.pack("i", hparams["max_position_embeddings"]))
     fout.write(struct.pack("f", 0.0))
     fout.write(struct.pack("f", 0.0))
     fout.write(struct.pack("i", 0))

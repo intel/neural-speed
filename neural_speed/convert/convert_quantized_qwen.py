@@ -159,7 +159,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
             "i", hparams["kv_channels"] if "kv_channels" in hparams else int(hparams["hidden_size"] /
                                                                              hparams["num_attention_heads"])))
     f.write(struct.pack("i", ftype))
-    f.write(struct.pack("i", hparams["seq_length"] if "seq_length" in hparams else hparams["max_position_embeddings"]))
+    f.write(struct.pack("i", hparams["max_position_embeddings"]))
     f.write(struct.pack("f", 0.0))
     f.write(struct.pack("f", 0.0))
     f.write(struct.pack("i", 0))
