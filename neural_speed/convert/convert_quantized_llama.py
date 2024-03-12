@@ -71,7 +71,7 @@ def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_hea
         int_weight = (int_weight - 8) * 16
         gptq_scales = gptq_scales / 16
         gptq_zeros = (gptq_zeros - 8) * 16
-        weight_dtype == "int4"
+        weight_dtype = "int4"
 
     dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
     int_weight = np.ascontiguousarray(int_weight.numpy())
@@ -98,6 +98,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 

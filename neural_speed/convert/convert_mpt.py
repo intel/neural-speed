@@ -51,6 +51,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -62,9 +64,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
-
-    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
+    if args.model_hub == "modelscope":
+        from modelscope import AutoModelForCausalLM, AutoTokenizer
+    else:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
     model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = model.config.to_dict()
 
     list_vars = model.state_dict()

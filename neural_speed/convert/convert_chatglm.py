@@ -19,7 +19,6 @@ from pathlib import Path
 import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from sentencepiece import SentencePieceProcessor  # type: ignore
 import gguf
 
@@ -541,11 +540,16 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", hparams["inner_hidden_size"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1))
@@ -612,6 +616,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     parser.add_argument("--format",
                         type=str,
@@ -629,10 +635,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
-
+    if args.model_hub == "modelscope":
+        from modelscope import AutoConfig, AutoModel, AutoTokenizer
+    else:
+        from transformers import AutoConfig, AutoModel, AutoTokenizer
+    model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-    model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
 
     hparams = config.to_dict()
 

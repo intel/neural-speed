@@ -27,9 +27,9 @@ class UT_Memcpy2D_AVX512F {
       kernel::jit::JitMemcpy2DAvx512f::forward<float, float>(src.data(), dst.data(), row, col, srcstep, dststep);
     }
     tm.start();
-    parallel::Scheduler2D para({DefaultThreading.num_threads(), row, col, 4, 64});
+    parallel::Scheduler2D para({UT_Threading::get()->num_threads(), row, col, 4, 64, 0, 0});
     for (size_t i = 0; i < TestLoop; i++) {
-      DefaultThreading.parallel_for([&](int tidx) {
+      UT_Threading::get()->parallel_for([&](int tidx) {
         parallel::ThreadProblem2D thdp{tidx};
         para.getIndex(thdp);
         if (thdp.valid) {
@@ -47,7 +47,7 @@ class UT_Memcpy2D_AVX512F {
 
     tm.start();
     for (size_t i = 0; i < TestLoop; i++) {
-      DefaultThreading.parallel_for([&](int tidx) {
+      UT_Threading::get()->parallel_for([&](int tidx) {
         parallel::ThreadProblem2D thdp{tidx};
         para.getIndex(thdp);
         if (thdp.valid) {

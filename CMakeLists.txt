@@ -60,9 +60,9 @@ option(NS_AVX512_VBMI            "neural_speed: enable AVX512-VBMI"             
 option(NS_AVX512_VNNI            "neural_speed: enable AVX512-VNNI"                             OFF)
 option(NS_FMA                    "neural_speed: enable FMA"                                     ON)
 option(NS_AMX                    "neural_speed: enable AMX"                                     OFF)
+option(NS_USE_OMP                "neural_speed: use OpenMP thread pool."                        ON)
 
 option(NS_BUILD_TESTS            "neural_speed: build tests"                       ${NS_STANDALONE})
-option(NS_BTLA_UT                "enable BesTLA's unit tests"                                   OFF)
 option(NS_BUILD_EXAMPLES         "neural_speed: build examples"                    ${NS_STANDALONE})
 option(NS_USE_CLANG_TIDY         "neural_speed: clang-tidy check"                               OFF)
 
@@ -135,12 +135,13 @@ if (NS_PYTHON_API)
   add_subdirectory(third_party/pybind11)
 endif()
 
-if (NS_BTLA_UT)
-  set(BTLA_UT_ALL ON)
+if(NS_USE_OMP)
+  include(FindOpenMP)
+  # compile BesTLA's OMPTheading class, then it can be used in ne_layers
+  set(BTLA_ENABLE_OPENMP ON CACHE BOOL "BesTLA enable compiling OpenMP threading")
+  add_compile_definitions(NS_USE_OMP)
 endif()
-include(FindOpenMP)
 
-set(BTLA_USE_OPENMP ON CACHE BOOL "BesTLA use OpenMP")
 add_subdirectory(bestla)
 
 add_subdirectory(neural_speed)

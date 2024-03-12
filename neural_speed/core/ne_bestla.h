@@ -13,7 +13,7 @@
 //  limitations under the License.
 #ifndef NE_CORE_GRAPH_INNER_PRODUCT_H
 #define NE_CORE_GRAPH_INNER_PRODUCT_H
-
+#include "ne.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -23,6 +23,10 @@ void bestla_timer(bool _init);
 int bestla_set_threads(int _nth);
 
 void* bestla_get_thread_handle();
+
+typedef void (*forward_compute_fptr)(struct ne_compute_params*, struct ne_tensor*);
+
+void bestla_parallel_for(forward_compute_fptr, struct ne_compute_params*, struct ne_tensor*);
 
 void bestla_init();
 
