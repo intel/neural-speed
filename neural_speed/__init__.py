@@ -20,7 +20,7 @@ import torch
 from neural_speed.convert import convert_model
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
-max_request_num_default = 8
+max_request_num_default = 1
 
 
 class Model:
