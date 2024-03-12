@@ -109,12 +109,12 @@ class ActivationKBlockQuantize {
   using QParam = storage::gemm::StorageQuantActivation;
   using SRCType = SRC_T;
   using Param = ParamActivationKBlockQuantize<SRC_T>;
-  using Parallel = parallel::Scheduler2D;
+  using Parallel = parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D>;
   using ThreadProblem = parallel::ThreadProblem2D;
 
-  inline Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
-    return Parallel({
-        nthreads, prbm.dims[1],  // m
+  inline Parallel createParallel(const parallel::IThreading* th, const utils::GemmProblem& prbm) {
+    return Parallel(th,{
+      th->num_threads(), prbm.dims[1],  // m
         prbm.dims[3],            // k
         1,
         prbm.dims[4]  // kblock
@@ -154,7 +154,7 @@ class ActivationKBlockQuantize {
   }
 
   BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
-    auto paral = Parallel({threading->num_threads(), m, k, 1, _param.quan->mBlockSize});
+    auto paral = Parallel(threading,{threading->num_threads(), m, k, 1, _param.quan->mBlockSize});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
@@ -229,12 +229,12 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
   using SType = storage::gemm::StorageReduce;
   using SRCType = SRC_T;
   using Param = ParamActivationKBlockBase<SRC_T>;
-  using Parallel = parallel::Scheduler2D;
+  using Parallel = parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D>;
   using ThreadProblem = parallel::ThreadProblem2D;
 
-  inline Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
-    return Parallel({
-        nthreads, prbm.dims[1],  // m
+  inline Parallel createParallel(parallel::IThreading* th, const utils::GemmProblem& prbm) {
+    return Parallel(th,{
+                            th->num_threads(), prbm.dims[1],  // m
         prbm.dims[3],            // k
         1,
         prbm.dims[4]  // kblock
@@ -260,7 +260,7 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, ISA_T, SRC_
   }
 
   BTLA_CODE reduce(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
-    auto paral = Parallel({threading->num_threads(), m, k, 1, kblock});
+    auto paral = Parallel(threading,{threading->num_threads(), m, k, 1, kblock});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
@@ -303,7 +303,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, ISA
   using RAType = storage::gemm::StorageReorderActivation;
   using SRCType = SRC_T;
   using Param = ParamShuffleActivationKBlockBase<SRC_T>;
-  using Parallel = parallel::Scheduler2D;
+  using Parallel = parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D>;
   using ThreadProblem = parallel::ThreadProblem2D;
   inline RAType createReorderStorage(int m, int k, int kblock) {
     RAType tmp(_GemmCore_T::ID);
@@ -384,7 +384,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
   using RAType = storage::gemm::StorageReorderActivation;
   using SRCType = SRC_T;
   using Param = ParamShuffleActivationKBlockQuantize<SRC_T>;
-  using Parallel = parallel::Scheduler2D;
+  using Parallel = parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D>;
   using ThreadProblem = parallel::ThreadProblem2D;
 
   inline QParam createQuantStorage(int m, int k, int kblock, bool hasreduce) {

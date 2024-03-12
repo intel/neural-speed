@@ -46,7 +46,7 @@ class IThreading {
 class OMPThreading : public IThreading {
  public:
   explicit OMPThreading(int nthreads) : IThreading(nthreads, false) {
-    // printf("Using OMP\n");
+     printf("Using OMP\n");
     omp_set_num_threads(nthreads);
   }
   void parallel_for(const thread_func& func) override {
@@ -77,7 +77,7 @@ class StdThreading : public IThreading {
  public:
   using Timer_T = utils::timer<utils::microseconds>;
   explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
-    // printf("Using Std\n");
+     printf("Using Std\n");
     cr = &device::CpuRuntime::getInstance(nthreads);
     create_threads();
   }
@@ -862,6 +862,7 @@ class SchedulerDispatcher {
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
       auto PE_Ratio = cr->getPE(Scheduler::gemm_ISA());
+      //printf("!!!%f!!!\n",PE_Ratio );
       const int N_offset = utils::padto(N - int(N / (1 + PE_Ratio)), Scheduler::mStep[1]);
       problem_P.dims[2] = N_offset;
       Scheduler_P =
@@ -906,22 +907,27 @@ class SchedulerDispatcher<Scheduler2D> {
  public:
   using ThreadProblem = ThreadProblem2D;
   SchedulerDispatcher() = default;
-  ~SchedulerDispatcher() {}
+  ~SchedulerDispatcher() {
+    std::pair<float, float> PEtime = th_->get_PEtime();
+    if (needDispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
+      cr->adjustPE(BTLA_ISA::NoSIMD, PEtime.second / PEtime.first);
+}
   SchedulerDispatcher(const IThreading* th, const Config2D& config) {
-    device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
-    needDispach = cr.mHybrid && th->is_support_PE();
+    th_ = th;
+    cr = &device::CpuRuntime::getInstance(th->num_threads());
+    needDispach = cr->mHybrid && th->is_support_PE();
     if (!needDispach) {
       Scheduler_P = std::move(Scheduler2D(config));
     } else {
-      Pcore_num = cr.P_core_num;
-      Ecore_num = cr.E_core_num;
+      Pcore_num = cr->P_core_num;
+      Ecore_num = cr->E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
-      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(BTLA_ISA::NoSIMD))), config.step[1]);
-      config_P.threads = config.threads - cr.E_core_num;
+      const int N_offset = utils::padto(N - int(N / (1 + cr->getPE(BTLA_ISA::NoSIMD))), config.step[1]);
+      config_P.threads = config.threads - Ecore_num;
       config_P.size[1] = N_offset;
       Scheduler_P = std::move(Scheduler2D(config_P));
-      config_E.threads = cr.E_core_num;
+      config_E.threads = Ecore_num;
       config_E.size[1] = N - N_offset;
       config_E.offset[1] += N_offset;
       Scheduler_E = std::move(Scheduler2D(config_E));
@@ -952,6 +958,8 @@ class SchedulerDispatcher<Scheduler2D> {
 
  private:
   Scheduler2D Scheduler_P, Scheduler_E;
+  const IThreading* th_;
+  device::CpuRuntime* cr;
   bool needDispach = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
@@ -980,7 +988,7 @@ template <class Parallel_T, class Launch_T>
 void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
   gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
-  AParall apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
+  AParall apara = launcher.mProA.createParallel(th, args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
