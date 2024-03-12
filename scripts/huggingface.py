@@ -636,14 +636,14 @@ class AutoCausalLM(HuggingFaceAutoLM):
             prompt = "Once upon a time, a little girl"
             inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
 
-            # woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=32)
-            # qmodel = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_quantization_config, device_map="xpu", trust_remote_code=True, use_llm_runtime=False, torch_dtype=torch.float16)
+            woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=32)
+            self.runtime_model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_quantization_config, device_map="xpu", trust_remote_code=True, use_llm_runtime=False, torch_dtype=torch.float16)
             # import pdb; pdb.set_trace()
             # qmodel.save_pretrained("llama_int4_saved_dir")
-            self.runtime_model = AutoModelForCausalLM.from_pretrained("llama_int4_saved_dir", trust_remote_code=True)
+            #self.runtime_model = AutoModelForCausalLM.from_pretrained("llama_int4_saved_dir", trust_remote_code=True)
 
             # optimize the model with ipex, it will improve performance.
-            self.runtime_model = ipex.optimize_transformers(self.runtime_model, inplace=True, dtype=torch.float16, woq=True, device="xpu")
+            self.runtime_model = ipex.optimize_transformers(self.runtime_model, inplace=True, dtype=torch.float16, quantization_config=True, device="xpu")
 
             # output = qmodel.generate(inputs, max_new_tokens=100, do_sample=True)
             # print(tokenizer.batch_decode(output, skip_special_tokens=True))
