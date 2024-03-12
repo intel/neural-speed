@@ -122,7 +122,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     if hparams['model_type']=='qwen2':
         fout.write(struct.pack("i", hparams["intermediate_size"]))
     else:
-        fout.write(struct.pack("i", hparams["intermediate_size"]/2))
+        fout.write(struct.pack("i", int(hparams["intermediate_size"]/2)))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
