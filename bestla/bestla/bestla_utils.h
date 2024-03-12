@@ -32,6 +32,8 @@
 #include <cassert>
 #include <vector>
 #include <cstdio>
+#include <string>
+#include <set>
 #ifdef _WIN32
 #include <cstdlib>
 #else
@@ -680,6 +682,19 @@ class timer_statistics_logger {
   minmax_statistics<float> statis;
   timer<milliseconds> logtm;
 };
+
+inline bool isFastExp() {
+  static std::set<std::string> valid_env_vars = {"1", "TRUE", "ON", "On", "True"};
+  if (getenv("BTLA_FAST_EXP") != nullptr) {
+    if (valid_env_vars.count(getenv("BTLA_FAST_EXP")) != 0) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
 }  // namespace utils
 
 static float fp4_bnb_dequant_fp32_LUT[] = {

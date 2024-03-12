@@ -311,7 +311,6 @@ function main() {
     fi
     export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     # setup conda env for LLM
-
     # get cpu info
     # sockets=$(lscpu |grep 'Socket(s):' |sed 's/.*://;s/ //g')
     # cores_per_instance=$(lscpu |grep 'Core(s) per socket:' |sed 's/.*://;s/ //g')
@@ -323,7 +322,8 @@ function main() {
     cmake .. -G Ninja
     ninja
     cd ..
-
+    pip install -r $working_dir/requirements.txt
+    python $working_dir/setup.py install
     ## prepare example requirement
     if [[ $requirements_file == *'.txt' ]]; then
         pip install -r "$requirements_file"
@@ -333,7 +333,6 @@ function main() {
         echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
         exit 1
     fi
-
     echo "=======  Convert Start  ======="
     ## prepare fp32 bin
     python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${model_path}
@@ -415,8 +414,7 @@ function main() {
                     else
                         real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
                         [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
-                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=2047
-
+                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=1300
                         NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
                             $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $real_ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
                         monitor
