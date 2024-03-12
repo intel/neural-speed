@@ -121,7 +121,7 @@ def bytes_to_unicode():
 
 model_name = "/mnt/disk1/data2/zhenweil/models/bloom/bloom-7b1"
 prompt = "Once upon a time, a little girl"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
 inputs = tokenizer(prompt, return_tensors="pt").input_ids
 streamer = TextStreamer(tokenizer)

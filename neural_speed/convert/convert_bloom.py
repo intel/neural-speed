@@ -77,7 +77,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                                  torch_dtype=torch.float16 if ftype == 1 else torch.float32,
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = config.to_dict()
     print("Loading model: ", dir_model)
 

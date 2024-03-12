@@ -82,7 +82,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
     print("Model loaded: ", dir_model)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = config.to_dict()
 
     list_vars = model.state_dict()

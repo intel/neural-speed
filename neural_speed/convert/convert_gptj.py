@@ -74,7 +74,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True)
+    model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = model.config.to_dict()
     list_vars = model.state_dict()

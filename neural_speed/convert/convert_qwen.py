@@ -81,8 +81,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    model = AutoModelForCausalLM.from_pretrained(dir_model)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     model.eval()
     for p in model.parameters():
         p.requires_grad = False
@@ -119,7 +119,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", hparams["intermediate_size"]))
+    if hparams['model_type']=='qwen2':
+        fout.write(struct.pack("i", hparams["intermediate_size"]))
+    else:
+        fout.write(struct.pack("i", hparams["intermediate_size"]/2))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
