@@ -52,7 +52,7 @@ enum class tune_key : uint8_t {
     dispatch_policy,
     group_swizzle_policy,
     param_optimizer_type,
-    param_optimizer_mode,
+    param_optimizer_level,
     source_location
 };
 template <typename T>
@@ -99,7 +99,7 @@ enum class tune_key_value : uint8_t {
 
 enum class param_optimizer_tag : uint8_t { kernel, work_group };
 // optimizer_mode (currently only useful with param_optimizer_decision_tree)
-enum class param_optimizer_mode : uint8_t {
+enum class param_optimizer_level : uint8_t {
     full, // optimize all available options
     keep_shape, // optimize all execept keepping the original wg/sg tile shape
 };

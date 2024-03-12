@@ -79,7 +79,7 @@ struct param_optimizer<param_optimizer_tag::kernel, dict_t_> {
             ? dict_t_::template find_elem_v<tune_key::gpu_arch>
             : gpu_arch::Xe;
     static constexpr auto optimizer_mode
-            = dict_t_::template find_elem_v<tune_key::param_optimizer_mode>;
+            = dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::kernel, dict_t_,
                     optimizer_mode>,
@@ -208,7 +208,7 @@ struct param_optimizer<param_optimizer_tag::work_group, dict_t_> {
             && (dict_t_::template find_elem_v<tune_key::
                                 param_optimizer_type> == tune_key_value::param_optimizer_decision_tree);
     static constexpr auto optimizer_mode
-            = dict_t_::template find_elem_v<tune_key::param_optimizer_mode>;
+            = dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
     static constexpr auto arch_tag
             = (dict_t_::impl::template find_elem_index<
                        tune_key::gpu_arch> != dict_t_::impl::key_not_found)

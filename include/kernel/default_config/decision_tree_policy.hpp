@@ -280,13 +280,13 @@ struct fallback_optimizer {
 };
 
 template <param_optimizer_tag tag_, typename dict_t_,
-        param_optimizer_mode mode_, typename... candidates_t>
+        param_optimizer_level mode_, typename... candidates_t>
 struct decision_tree_optimizer : param_optimizer_base {
     struct impl {
         template <typename T, template <typename> typename G>
         using apply_handeler = T::template update_generator_t<G>;
         static constexpr bool keep_shape
-                = (mode_ == param_optimizer_mode::keep_shape);
+                = (mode_ == param_optimizer_level::keep_shape);
 
         using t0 = dict_t_;
         using t1 = apply_handeler<t0, decision_tree_rule::data_type_handler>;

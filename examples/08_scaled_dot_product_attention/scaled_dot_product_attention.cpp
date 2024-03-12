@@ -277,8 +277,8 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
                     using group_swizzle = group_swizzle_default<arch_tag>;
 
                     using elem_opt_mode_t
-                            = elem_v_t<tune_key::param_optimizer_mode,
-                                    param_optimizer_mode::keep_shape>;
+                            = elem_v_t<tune_key::param_optimizer_level,
+                                    param_optimizer_level::keep_shape>;
                     using elem_opt_type_t = elem_v_t<
                             tune_key::param_optimizer_type,
                             tune_key_value::param_optimizer_decision_tree>;

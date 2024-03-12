@@ -73,8 +73,8 @@ using default_param_t = dict_t<>::template update_dict_t<
                 elem_t_t<tune_key::sg_tile_shape, shape<64, 32>>,
                 elem_v_t<tune_key::param_optimizer_type,
                         tune_key_value::param_optimizer_dummy>,
-                elem_v_t<tune_key::param_optimizer_mode,
-                        param_optimizer_mode::full, param_optimizer_mode>>;
+                elem_v_t<tune_key::param_optimizer_level,
+                        param_optimizer_level::full, param_optimizer_level>>;
 
 namespace kernel {
 template <gpu_arch arch_tag = gpu_arch::Xe>
