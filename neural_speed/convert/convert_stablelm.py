@@ -195,6 +195,8 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["intermediate_size"])) # ffn_hidden_size
     fout.write(struct.pack("i", 0)) # inner_hidden_size for ChatGLM2
 
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams["layer_norm_eps"]))  # rms_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
     fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
@@ -274,6 +276,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
         help="path to write to; default: based on input"
     )
     parser.add_argument(
+        "--model_hub",
+        choices=["huggingface","modelscope"],
+        default="huggingface",
+        help="hub to load model"
+    )
+    parser.add_argument(
         "--format",
         type=str,
         default="NE",
@@ -297,6 +305,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
+    if args.model_hub == "modelscope":
+        from modelscope import AutoModelForCausalLM, AutoTokenizer
+    else:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     print("Loading model: ", dir_model)
