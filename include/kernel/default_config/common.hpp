@@ -101,7 +101,7 @@ enum class param_optimizer_tag : uint8_t { kernel, work_group };
 // optimizer_mode (currently only useful with param_optimizer_decision_tree)
 enum class param_optimizer_level : uint8_t {
     full, // optimize all available options
-    keep_shape, // optimize all execept keepping the original wg/sg tile shape
+    keep_shape, // optimize all except keeping the original wg/sg tile shape
 };
 
 template <param_optimizer_tag tag_, typename dict_t_>

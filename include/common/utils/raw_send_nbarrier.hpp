@@ -111,15 +111,22 @@ struct xetla_nbarrier_t<num_producers, num_consumers, arch_tag,
 
     /// @brief Generic work-group split barrier.
     ///
-    __XETLA_API void arrive() { __ESIMD_NS::barrier(); }
+    __XETLA_API void arrive() {
+        __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::signal>();
+    }
 
     /// @brief named barrier wait within subgroup.
     ///
-    __XETLA_API void wait() { __ESIMD_NS::barrier(); }
+    __XETLA_API void wait() {
+        __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::wait>();
+    }
 
     /// @brief named barrier signal from subgroup.
     ///
-    __XETLA_API void arrive_wait() { __ESIMD_NS::barrier(); }
+    __XETLA_API void arrive_wait() {
+        arrive();
+        wait();
+    }
 };
 
 /// @} xetla_util_named_barrier

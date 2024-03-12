@@ -373,7 +373,7 @@ public:
         matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
         xetla_fence<memory_kind::shared_local>();
         nbarrier_a.arrive();
-        nbarrier_b.arrive();
+        if (arch_tag >= gpu_arch::Xe) nbarrier_b.arrive();
 #pragma unroll
         for (uint32_t i = 1; i < num_cyclic - 1; i++) {
             tile_load(partial_matA, matA_payload);
@@ -429,7 +429,7 @@ public:
             }
 
             nbarrier_a.wait();
-            nbarrier_b.wait();
+            if (arch_tag >= gpu_arch::Xe) nbarrier_b.wait();
 
             tile_load(matA, matA_local_ld_payload);
             tile_load(matB, matB_local_ld_payload);
@@ -463,7 +463,7 @@ public:
             }
 
             nbarrier_a.arrive();
-            nbarrier_b.arrive();
+            if (arch_tag >= gpu_arch::Xe) nbarrier_b.arrive();
             SW_BARRIER();
             matA_acc_t matA_acc;
             matB_acc_t matB_acc;
@@ -498,7 +498,7 @@ public:
         }
         SW_BARRIER();
         nbarrier_a.wait();
-        nbarrier_b.wait();
+        if (arch_tag >= gpu_arch::Xe) nbarrier_b.wait();
     }
 
 private:

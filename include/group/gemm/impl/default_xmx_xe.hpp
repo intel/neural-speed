@@ -310,7 +310,8 @@ public:
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.arrive(); }
-                    if constexpr (wg_size_y > 1) { nbarrier_b.arrive(); }
+                    if constexpr (arch_tag >= gpu_arch::Xe)
+                        if constexpr (wg_size_y > 1) { nbarrier_b.arrive(); }
                 }
             }
             subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -346,7 +347,8 @@ public:
             if constexpr (enable_periodic_sync) {
                 if ((i % sync_freq) == 0) {
                     if constexpr (wg_size_x > 1) { nbarrier_a.wait(); }
-                    if constexpr (wg_size_y > 1) { nbarrier_b.wait(); }
+                    if constexpr (arch_tag >= gpu_arch::Xe)
+                        if constexpr (wg_size_y > 1) { nbarrier_b.wait(); }
                 }
             }
         }
