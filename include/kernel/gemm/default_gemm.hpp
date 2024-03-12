@@ -78,11 +78,11 @@ struct param_optimizer<param_optimizer_tag::kernel, dict_t_> {
                        tune_key::gpu_arch> != dict_t_::impl::key_not_found)
             ? dict_t_::template find_elem_v<tune_key::gpu_arch>
             : gpu_arch::Xe;
-    static constexpr auto optimizer_mode
+    static constexpr auto optimizer_level
             = dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::kernel, dict_t_,
-                    optimizer_mode>,
+                    optimizer_level>,
             dummy_optimizer<param_optimizer_tag::kernel, dict_t_,
                     kernel::param_kslicing_g1l1_t<arch_tag>,
                     kernel::param_kslicing_g2l1_t<arch_tag>,
@@ -207,7 +207,7 @@ struct param_optimizer<param_optimizer_tag::work_group, dict_t_> {
                                param_optimizer_type> != dict_t_::impl::key_not_found)
             && (dict_t_::template find_elem_v<tune_key::
                                 param_optimizer_type> == tune_key_value::param_optimizer_decision_tree);
-    static constexpr auto optimizer_mode
+    static constexpr auto optimizer_level
             = dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
     static constexpr auto arch_tag
             = (dict_t_::impl::template find_elem_index<
@@ -216,7 +216,7 @@ struct param_optimizer<param_optimizer_tag::work_group, dict_t_> {
             : gpu_arch::Xe;
     using type = typename std::conditional<use_rule,
             decision_tree_optimizer<param_optimizer_tag::work_group, dict_t_,
-                    optimizer_mode>,
+                    optimizer_level>,
             dummy_optimizer<param_optimizer_tag::work_group, dict_t_,
                     group::param_dict1_wg_t<arch_tag>>>::type::type;
 };
