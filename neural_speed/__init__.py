@@ -186,7 +186,7 @@ class Model:
         # Setting scratch_size_ratio according to the ctx_size & tokens_length
         # If scratch_size_ratio has been set, will not enter this branch.
         if generate_kwargs.get("ctx_size") is not None and generate_kwargs.get(
-                "ctx_size") > 2048 and generate_kwargs["scratch_size_ratio"] is None:
+                "ctx_size") > 2048 and generate_kwargs.get("scratch_size_ratio") is None:
 
             def get_max_seq_length():
                 config = self.config.to_dict()
