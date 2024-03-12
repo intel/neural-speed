@@ -1334,7 +1334,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
       // norm
       {
         wstate->use_buf(ctx0, 0);
-        
+
         cur = ne_norm(ctx0, inpL, norm_eps);
 
         // cur = ln_0_w*cur + ln_0_b
