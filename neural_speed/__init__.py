@@ -185,7 +185,9 @@ class Model:
 
         # Setting scratch_size_ratio according to the ctx_size & tokens_length
         # If scratch_size_ratio has been set, will not enter this branch.
-        if generate_kwargs.get("ctx_size") is not None and generate_kwargs.get("ctx_size") > 2048 and generate_kwargs["scratch_size_ratio"] is None:
+        if generate_kwargs.get("ctx_size") is not None and generate_kwargs.get(
+                "ctx_size") > 2048 and generate_kwargs["scratch_size_ratio"] is None:
+
             def get_max_seq_length():
                 config = self.config.to_dict()
                 # chatglm2, bloom
@@ -216,6 +218,18 @@ class Model:
                     print("Not found max seq length, setting to default 512")
                     return 512
 
+            # when tokens less than 10240
+            def get_scratch_size_ratio(size):
+                if size > 2048 and size <= 4096:
+                    return 2
+                elif size > 4096 and size <= 8192:
+                    return 4
+                elif size > 8192 and size <= 10240:
+                    return 8
+                else:
+                    # more than 10240
+                    return -1
+
             max_seq_length = get_max_seq_length()
             ctx_size = generate_kwargs.get("ctx_size")
 
@@ -224,22 +238,22 @@ class Model:
                     f'max_seq_length is {max_seq_length}, but ctx_size is {ctx_size}. Please reduce ctx_size in model.generate'
                 )
                 exit(0)
-            elif max_seq_length > 2048 and max_seq_length <= 4096:
+
+            if max_seq_length > 2048 and max_seq_length <= 4096:
                 generate_kwargs["scratch_size_ratio"] = 2
             elif max_seq_length > 4096 and max_seq_length <= 8192:
-                generate_kwargs["scratch_size_ratio"] = 3
-            elif max_seq_length == 16384:
-                if ctx_size < 102400:
-                    generate_kwargs["scratch_size_ratio"] = 8
+                generate_kwargs["scratch_size_ratio"] = 4
+            elif max_seq_length > 8192:
+                if get_scratch_size_ratio(ctx_size) != -1:
+                    generate_kwargs["scratch_size_ratio"] = get_scratch_size_ratio(ctx_size)
                 else:
-                    generate_kwargs["scratch_size_ratio"] = 10
-            elif max_seq_length == 32768:
-                if ctx_size < 10240:
-                    generate_kwargs["scratch_size_ratio"] = 10
-                elif ctx_size < 20480:
-                    generate_kwargs["scratch_size_ratio"] = 20
-                else:
-                    generate_kwargs["scratch_size_ratio"] = 35
+                    if max_seq_length == 16384:
+                        generate_kwargs["scratch_size_ratio"] = 12
+                    elif max_seq_length == 32768:
+                        if ctx_size < 20480:
+                            generate_kwargs["scratch_size_ratio"] = 20
+                        else:
+                            generate_kwargs["scratch_size_ratio"] = 35
 
         self.model.init_model(model_path, **generate_kwargs)
 
