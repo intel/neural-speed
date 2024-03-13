@@ -54,10 +54,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         ftype = 1
 
     # 1. write hparams
-    #
-    # "n_head": 71,
-    # "n_layer": 32,
-    n_head_kv = hparams.get("num_kv_heads", 1)
+    n_head_kv = hparams.get("n_head_kv", 1)
     n_head = hparams["n_head"]
     head_dim = hparams["hidden_size"] // n_head
 
