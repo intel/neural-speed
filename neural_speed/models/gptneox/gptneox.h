@@ -23,14 +23,26 @@ enum gptneox_model {
   GPTNEOX_7B,
 };
 
-static const model_scratch gptneox_mem_req(int n_layers) {
+static const model_scratch gptneox_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 44:
-      return {2048ull * MB, 2048ull * MB, 4096ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     case 32:
-      return {512ull * MB, 512ull * MB, 1026ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     case 28:  // 5.8B
-      return {512ull * MB, 512ull * MB, 1024ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }

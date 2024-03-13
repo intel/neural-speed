@@ -84,7 +84,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
                      bool early_stopping = false, int n_keep = 0, int n_discard = -1, bool shift_roped_k = false,
                      int batch_size = 1, model_vocab::id pad_token = -1, const std::string& memory_dtype = "auto",
                      bool continuous_batching = true, const int& max_request_num = MODEL_MAX_REQUEST_NUM,
-                     const float& model_scratch_enlarge_scale = 1.0f) {
+                     const float& scratch_size_ratio = 1.0f) {
   MODEL_ASSERT(params != nullptr);
 #ifdef MODEL_NAME
   params->model_name = MODEL_NAME;
@@ -115,6 +115,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
     params->memory_type = KV_MEM_TYPE_AUTO;
   else
     fprintf(stderr, "Unexpected memory dtype %s!", memory_dtype.c_str());
+
   // TODO(Yi & YZT): MHA IN MULTI-BATCH For More Model Archs
   params->cont_batching = continuous_batching;
   if (params->shift_roped_k) params->cont_batching = false;
@@ -126,13 +127,19 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   params->min_new_tokens = min_new_tokens;
   params->length_penalty = length_penalty;
   params->do_early_stopping = early_stopping;
-  params->model_scratch_enlarge_scale = model_scratch_enlarge_scale;
+  params->scratch_size_ratio = scratch_size_ratio;
+
+  // TODO(Yi): MHA FOR LONG TOKENS
+  int32_t tokens_length = 6144;
+  if (params->n_ctx > tokens_length) {
+    params->memory_type = KV_MEM_TYPE_F16;
+  }
 
   printf(
-      "beam_size: %d, do_sample: %d, top_k: %d, top_p: %f, continuous_batching: %d, max_request_num: %d, "
-      "early_stopping: %d\n",
+      "beam_size: %d, do_sample: %d, top_k: %d, top_p: %.3f, continuous_batching: %d, max_request_num: %d, "
+      "early_stopping: %d, scratch_size_ratio: %.3f\n",
       params->beam_size, params->do_sample, params->top_k, params->top_p, params->cont_batching,
-      params->max_request_num, params->do_early_stopping);
+      params->max_request_num, params->do_early_stopping, params->scratch_size_ratio);
 }
 
 class ModelServer {
@@ -142,7 +149,7 @@ class ModelServer {
               int top_k, float top_p, float temperature, int min_new_tokens, float length_penalty, bool early_stopping,
               int n_keep, int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
               const std::string& memory_dtype, bool continuous_batching, const int& max_request_num,
-              const float& model_scratch_enlarge_scale, const std::string& policy, bool print_log,
+              const float& scratch_size_ratio, const std::string& policy, bool print_log,
               const std::function<void()>& init_cb)
       : response(response),
         waiting(),
@@ -161,7 +168,7 @@ class ModelServer {
           this->InitServerParams(model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                                  num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty,
                                  early_stopping, n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype,
-                                 true, max_request_num, model_scratch_enlarge_scale);
+                                 true, max_request_num, scratch_size_ratio);
           Cont_batch_gen_scheduler scheduler(this->params, policy, print_log ? 0 : 1);
           std::vector<sequence> added_seqs;
           while (running) {
@@ -263,11 +270,11 @@ class ModelServer {
                         float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                         int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
                         const std::string& memory_dtype, bool continuous_batching, const int& max_request_num,
-                        const float& model_scratch_enlarge_scale) {
+                        const float& scratch_size_ratio) {
     init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty,
                     num_beams, do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping,
                     n_keep, n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching,
-                    max_request_num, model_scratch_enlarge_scale);
+                    max_request_num, scratch_size_ratio);
     if (cont_batching_model_archs.count(params.model_arch) == 0) {
       fprintf(stderr, "\nERROR: ModelServer only supports gpt-j, llama!\n");
       running = false;
@@ -325,7 +332,7 @@ class Model {
                   float repetition_penalty, int num_beams, bool do_sample, int top_k, float top_p, float temperature,
                   int min_new_tokens, float length_penalty, bool early_stopping, int n_keep, int n_discard,
                   bool shift_roped_k, int batch_size, model_vocab::id pad_token, const std::string& memory_dtype,
-                  bool continuous_batching, const int& max_request_num, const float& model_scratch_enlarge_scale);
+                  bool continuous_batching, const int& max_request_num, const float& scratch_size_ratio);
   void reinit();
   std::vector<std::vector<model_token>> generate(const std::vector<std::vector<model_token>>& input_ids);
   // deprecated API
@@ -419,11 +426,11 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
                        float temperature, int min_new_tokens, float length_penalty, bool early_stopping, int n_keep,
                        int n_discard, bool shift_roped_k, int batch_size, model_vocab::id pad_token,
                        const std::string& memory_dtype, bool continuous_batching, const int& max_request_num,
-                       const float& model_scratch_enlarge_scale) {
+                       const float& scratch_size_ratio) {
   init_gpt_params(&params, model_path, max_new_tokens, n_batch, ctx_size, seed, threads, repetition_penalty, num_beams,
                   do_sample, top_k, top_p, temperature, min_new_tokens, length_penalty, early_stopping, n_keep,
                   n_discard, shift_roped_k, batch_size, pad_token, memory_dtype, continuous_batching, max_request_num,
-                  model_scratch_enlarge_scale);
+                  scratch_size_ratio);
 
   n_past = 0;
   n_total = 0;
@@ -533,12 +540,13 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
     } else if (!curr_input_ids[bs].empty()) {
       fprintf(stderr, "%s: error: prompt confliction\n", __func__);
       return empty_ret;
-    } else if (input_id_cb.size() > n_ctx - 4) {  // long input_id_cb and empty curr_input_ids[bs]
+    } else if (input_id_cb.size() > n_ctx - params.n_keep) {  // long input_id_cb and empty curr_input_ids[bs]
       fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
-              input_id_cb.size(), n_ctx - 4);
-      curr_input_ids[bs].resize(n_ctx - 4);
-      std::copy(input_id_cb.end() - n_ctx - 8, input_id_cb.end(), curr_input_ids[bs].begin() + 4);
-      std::copy(input_id_cb.begin(), input_id_cb.begin() + 4, curr_input_ids[bs].begin());
+              input_id_cb.size(), n_ctx - params.n_keep);
+      curr_input_ids[bs].resize(n_ctx - params.n_keep);
+      std::copy(input_id_cb.end() - n_ctx - params.n_keep * 2, input_id_cb.end(),
+                curr_input_ids[bs].begin() + params.n_keep);
+      std::copy(input_id_cb.begin(), input_id_cb.begin() + params.n_keep, curr_input_ids[bs].begin());
     } else {  // good input_id_cb and empty curr_input_ids[bs]
       curr_input_ids[bs] = input_id_cb;
     }
@@ -648,13 +656,13 @@ std::vector<std::vector<model_token>> Model::generate_tokens(const std::vector<s
   }
 
   if (curr_input_ids[STATIC_INPUT_HEAD_IDX].empty()) {
-    if (input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx - 4) {
+    if (input_ids[STATIC_INPUT_HEAD_IDX].size() > n_ctx - params.n_keep) {
       fprintf(stderr, "\n%s: Warning: prompt is too long (%zu tokens, max %d), will be truncated\n", __func__,
-              input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - 4);
-      curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - 4);
-      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - 8, input_ids[STATIC_INPUT_HEAD_IDX].end(),
-                curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + 4);
-      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].begin(), input_ids[STATIC_INPUT_HEAD_IDX].begin() + 4,
+              input_ids[STATIC_INPUT_HEAD_IDX].size(), n_ctx - params.n_keep);
+      curr_input_ids[STATIC_INPUT_HEAD_IDX].resize(n_ctx - params.n_keep);
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].end() - n_ctx - params.n_keep * 2,
+                input_ids[STATIC_INPUT_HEAD_IDX].end(), curr_input_ids[STATIC_INPUT_HEAD_IDX].begin() + params.n_keep);
+      std::copy(input_ids[STATIC_INPUT_HEAD_IDX].begin(), input_ids[STATIC_INPUT_HEAD_IDX].begin() + params.n_keep,
                 curr_input_ids[STATIC_INPUT_HEAD_IDX].begin());
     } else {
       curr_input_ids[STATIC_INPUT_HEAD_IDX] = input_ids[STATIC_INPUT_HEAD_IDX];
@@ -926,7 +934,7 @@ PYBIND11_MODULE(mixtral_cpp, m)
            py::arg("n_keep") = 0, py::arg("n_discard") = -1, py::arg("shift_roped_k") = false,
            py::arg("batch_size") = 1, py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto",
            py::arg("continuous_batching") = true, py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM,
-           py::arg("model_scratch_enlarge_scale") = 1.0f)
+           py::arg("scratch_size_ratio") = 1.0f)
       .def("generate", &Model::generate, "Generate token with input ids", py::arg("input_ids"))
       .def("evaluate", &Model::evaluate, "Evaluate token with input ids and output logits",
            py::arg("input_ids") = std::vector<std::vector<model_token>>{}, py::arg("logits_all") = false)
@@ -966,7 +974,7 @@ PYBIND11_MODULE(mixtral_cpp, m)
            py::arg("length_penalty") = 1.0, py::arg("early_stopping") = false, py::arg("n_keep") = 0,
            py::arg("n_discard") = -1, py::arg("shift_roped_k") = false, py::arg("batch_size") = 1,
            py::arg("pad_token") = -1, py::arg("memory_dtype") = "auto", py::arg("continuous_batching") = true,
-           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("model_scratch_enlarge_scale") = 1.0f,
+           py::arg("max_request_num") = MODEL_MAX_REQUEST_NUM, py::arg("scratch_size_ratio") = 1.0f,
            py::arg("policy") = "fcfs", py::arg("print_log") = false,
            py::arg("init_cb") = std::function<void()>{[]() {}})
       .def("issueQuery", &ModelServer::issueQuery, "desc placeholder", py::arg("qs"))

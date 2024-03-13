@@ -72,7 +72,7 @@ void CHATGLM::init(const char* path_model, model_context* ctx, int n_gpu_layer_,
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
-  scratch = chatglm_mem_req(n_layer);
+  scratch = chatglm_mem_req(n_layer, lctx.scratch_size_ratio);
   model.scratchs = scratch;
 }
 
@@ -86,7 +86,7 @@ void CHATGLM::load(model_context* ctx, model_progress_callback progress_callback
   size_t mmapped_size;
   ml->calc_sizes(&ctx_size, &mmapped_size);
   ctx_size = ctx_size * 2;
-  fprintf(stderr, "%s: ne ctx size = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
 
   const auto& hparams = model.hparams;
   const int head_dim = n_embd / hparams.n_head;
@@ -160,6 +160,9 @@ void CHATGLM::load(model_context* ctx, model_progress_callback progress_callback
   // this is the total memory required to run the inference
   const size_t mem_required = ctx_size + mmapped_size - vram_total +  // weights in VRAM not in memory
                               scratch.scratch0 + scratch.scratch1 + scratch.eval;
+  fprintf(stderr, "%s: scratch0   = %7.2f MB\n", __func__, scratch.scratch0 / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: scratch1   = %7.2f MB\n", __func__, scratch.scratch1 / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: scratch2   = %7.2f MB\n", __func__, scratch.eval / 1024.0 / 1024.0);
   fprintf(stderr, "%s: mem required  = %7.2f MB (+ memory per state)\n", __func__, mem_required / 1024.0 / 1024.0);
 
   (void)n_gpu_layer;

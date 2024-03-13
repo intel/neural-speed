@@ -180,7 +180,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     lctx.use_buf(ctx0, 0);
 
     // norm
-    cur = ne_norm(ctx0, inpL);
+    cur = ne_norm(ctx0, inpL, hparams.norm_eps);
 
     // cur = ln_1_g*cur + ln_1_b
     cur = ne_add(ctx0, ne_mul(ctx0, cur, model.layers[il].norm[0]), model.layers[il].norm[1]);
@@ -561,7 +561,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
 
   // norm
   {
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
 
     // inpL = inpL*norm(broadcasted)
     inpL = ne_add(ctx0, ne_mul(ctx0, inpL, model.others[1]), model.others[2]);
