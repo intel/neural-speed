@@ -256,9 +256,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         # data
         data.tofile(fout)
 
-    for name in list_vars.keys():
-        print(name)
-
     #3. write tensors
     convert_qwen_to_fp32_tensor("model.embed_tokens.weight", "model.embed_tokens.weight", list_vars, fout)
     convert_qwen_to_fp32_tensor("model.norm.weight", "model.norm.weight", list_vars, fout)
