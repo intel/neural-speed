@@ -21,7 +21,7 @@ Argument description of run.py ([supported MatMul combinations](#supported-matri
 | --repeat_penalty            | Penalize repeat sequence of tokens: Float (default: 1.1, 1.0 = disabled)                                      |
 | --color                     | Colorise output to distinguish prompt and user input from generations                                         |
 | --keep                      | Number of tokens to keep from the initial prompt: Int (default: 0, -1 = all)                                  |
-| --shift-roped-k             | Use [ring-buffer](./docs/infinite_inference.md#shift-rope-k-and-ring-buffer) and thus do not re-computing after reaching ctx_size (default: False) |
+| --shift-roped-k             | Use [ring-buffer](./infinite_inference.md#shift-rope-k-and-ring-buffer) and thus do not re-computing after reaching ctx_size (default: False) |
 
 
 ### 1. Conversion and Quantization
@@ -116,6 +116,6 @@ Argument description of inference.py:
 | --repeat_penalty                                  | Penalize repeat sequence of tokens: Float (default: 1.1, 1.0 = disabled)                                                                                                                |
 | --color                                           | Colorise output to distinguish prompt and user input from generations                                                                                                                   |
 | --keep                                            | Number of tokens to keep from the initial prompt: Int (default: 0, -1 = all)                                                                                                            |
-| --shift-roped-k                                   | Use [ring-buffer](./docs/infinite_inference.md#shift-rope-k-and-ring-buffer) and thus do not re-computing after reaching ctx_size (default: False)                                      |
+| --shift-roped-k                                   | Use [ring-buffer](./infinite_inference.md#shift-rope-k-and-ring-buffer) and thus do not re-computing after reaching ctx_size (default: False)                                      |
 | --glm_tokenizer                                   | The path of the chatglm tokenizer: String (default: THUDM/chatglm-6b)                                                                                                                   |
 | --memory-f32 <br> --memory-f16 <br> --memory-auto | Data type of kv memory (default to auto);<br>If set to auto, the runtime will try with bestla flash attn managed format (currently requires GCC11+ & AMX) and fall back to fp16 if failed |
