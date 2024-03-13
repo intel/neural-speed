@@ -17,7 +17,7 @@ Neural Speed is an innovative library designed to support the efficient inferenc
 |Intel Core Processors | ✔ |
 
 ## Supported Models
-Support almost all the LLMs in PyTorch format from Hugging Face such as Llama2, ChatGLM2, Baichuan2, Qwen, Mistral, Whisper, etc. File an issue if your favorite LLM does not work.
+Support almost all the LLMs in PyTorch format from Hugging Face such as Llama2, ChatGLM2, Baichuan2, Qwen, Mistral, Whisper, etc. File an [issue](https://github.com/intel/neural-speed/issues) if your favorite LLM does not work.
 
 Support typical LLMs in GGUF format such as Llama2, Falcon, MPT, Bloom etc. More are coming. Check out the [details](./docs/supported_models.md).
 
