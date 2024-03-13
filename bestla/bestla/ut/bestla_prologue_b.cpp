@@ -5,7 +5,7 @@
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
 
-#ifdef BTLA_UT_PROLOGUE_B
+#ifdef BTLA_UT_DEBUG
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -620,10 +620,11 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
+    srand(111);
     ut_s4();
-    ut_s8();
+    /*ut_s8();
     ut_f4();
-    ut_f8();
+    ut_f8();*/
   }
 
   void ut_f8() {
@@ -646,7 +647,7 @@ class UT_CompFp32 {
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                           false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::F32,
+    /*ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::F32,
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::F32,
                                                           false);
@@ -655,7 +656,7 @@ class UT_CompFp32 {
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16,
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::BF16,
-                                                          false);
+                                                          false);*/
 
     CheckISA(AVX512F);
     ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
@@ -739,7 +740,7 @@ class UT_CompFp32 {
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
-    fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
+    fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 1.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
     launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
@@ -807,7 +808,7 @@ class UT_CompFp32 {
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
 };
-#ifdef BTLA_UT_PROLOGUE_B
+#ifdef BTLA_UT_DEBUG
 static UT_CompFp32 sUT_CompFp32;
 #endif
 

@@ -940,14 +940,42 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
         dstptr[(j + ij) * ld_dst + i] = x << 4;
       }
     };
+    auto s4auto_calc_store_scale_and_quantv_sym = [&](int blocksize) {
+      float maxval = std::numeric_limits<float>::min();
+      float minval = std::numeric_limits<float>::max();
+      float absmax = 0;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        maxval = std::max(maxval, srcptr[(j + ij) * ld_src + i]);
+        minval = std::min(minval, srcptr[(j + ij) * ld_src + i]);
+        absmax = std::max(absmax, std::abs(srcptr[(j + ij) * ld_src + i]));
+      }
+      int NVal = 7;
+      auto sum = maxval + minval;
+      if (abs(sum) >= absmax / 7.5) {
+        NVal = sum > 0.f ? -8 : 8;
+      }
+      NVal = NVal << 4;
+      float scale = absmax / NVal;
+      float rscale = 1.f / scale;
+      scales[j / raw_blocksize * ld_dst + i] = scale;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
+      }
+    };
 
     auto dispatch_calc = [&](int blocksize) {
       switch (S4_T) {
         case BTLA_DTYPE::S8:
-        case BTLA_DTYPE::S4_CLIP:
         case BTLA_DTYPE::S3_CLIP:
           if (zero_points == nullptr) {
             s8_calc_store_scale_and_quantv_sym(blocksize);
+          } else {
+            s8_calc_store_scale_and_quantv_asym(blocksize);
+          }
+          break;
+        case BTLA_DTYPE::S4_CLIP:
+          if (zero_points == nullptr) {
+            s4auto_calc_store_scale_and_quantv_sym(blocksize);
           } else {
             s8_calc_store_scale_and_quantv_asym(blocksize);
           }

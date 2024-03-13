@@ -863,6 +863,61 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, 
   return BTLA_CODE::Success;
 }
 
+static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_s4(const float* srcptr, int8_t* dstptr, int row, int col,
+                                                              int ld_src, int ld_dst, float* scales, int blocksize) {
+  int constexpr VLen = 16;
+  int col16 = utils::padto_le(col, VLen);
+  int i = 0;
+  auto align_row = row / blocksize * blocksize;
+  for (; i < col16; i += VLen) {
+    int j = 0;
+    float tmp_min[VLen];
+    float tmp_max[VLen];
+    float tmp_abs[VLen];
+    auto simd_process_block = [&](int size) {
+      __m512 vscale;
+      __m512 vmaxval = _mm512_set1_ps(std::numeric_limits<float>::min());
+      __m512 vminval = _mm512_set1_ps(std::numeric_limits<float>::max());
+      __m512 vabsval = _mm512_set1_ps(0.f);
+      for (size_t ij = 0; ij < size; ij++) {
+        auto vsrc = _mm512_loadu_ps(&srcptr[(j + ij) * ld_src + i]);
+        vmaxval = _mm512_max_ps(vmaxval, vsrc);
+        vminval = _mm512_min_ps(vminval, vsrc);
+        vsrc = _mm512_abs_ps(vsrc);
+        vabsval = _mm512_max_ps(vabsval, vsrc);
+      }
+      _mm512_storeu_ps(tmp_min, vminval);
+      _mm512_storeu_ps(tmp_max, vmaxval);
+      _mm512_storeu_ps(tmp_abs, vabsval);
+      for (int iv = 0; iv < VLen; iv++) {
+        int NVal = 7;
+        auto sum = tmp_max[iv] + tmp_min[iv];
+        if (abs(sum) >= tmp_abs[iv] / 7.5) {
+          NVal = sum > 0.f ? -8 : 8;
+        }
+        NVal = NVal << 4;
+        tmp_abs[iv] = NVal;
+      }
+      auto vmag = _mm512_loadu_ps(tmp_abs);
+      vscale = _mm512_div_ps(vabsval, vmag);
+      auto vrscale = _mm512_div_ps(vmag, vabsval);
+      _mm512_storeu_ps(&scales[j / blocksize * ld_dst + i], vscale);
+      for (size_t ij = 0; ij < size; ij++) {
+        auto vsrc = _mm512_loadu_ps(&srcptr[(j + ij) * ld_src + i]);
+        vsrc = _mm512_mul_ps(vsrc, vrscale);
+        auto vdsrc = _mm512_cvtps_epi32(vsrc);
+        auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) * ld_dst + i]), vbsrc);
+      }
+    };
+    for (; j < align_row; j += blocksize) simd_process_block(blocksize);
+    if (j < row) simd_process_block(row - align_row);
+  }
+  kernel::ref::quantize_f32_sign_int_rowblock<BTLA_DTYPE::S4_CLIP>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst,
+                                                                   scales + i, nullptr, blocksize);
+  return BTLA_CODE::Success;
+}
+
 static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr, int8_t* dstptr, int row, int col,
                                                             int ld_src, int ld_dst, float* scales, int8_t* zero_points,
                                                             int blocksize) {
@@ -935,7 +990,11 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
                                                        int ld_src, int ld_dst, float* scales, int8_t* zero_points,
                                                        int blocksize) {
   if (zero_points == nullptr)
-    return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
+    if constexpr (S4_T == BTLA_DTYPE::S4_CLIP) {
+      return quantize_f32_sign_int_rowblock_sym_s4(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
+    } else {
+      return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
+    }
   else
     return quantize_f32_sign_int_rowblock_asym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
                                                blocksize);
