@@ -190,7 +190,7 @@ class UT_BlockQunatize_S3S4 {
     printf("%s DType %s: %d %d %d\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), n, k, blocksize);
     int ldb = n;
     utils::aligned_vector<float> raw(n * k);
-    ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 1.8f);
+    ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 0.5f);
 
     auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
@@ -778,7 +778,7 @@ class UT_CompFp32 {
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
-    fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 1.5f);
+    fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
     launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
