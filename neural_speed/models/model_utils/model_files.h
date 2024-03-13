@@ -1014,16 +1014,16 @@ struct model_file_loader {
     } else if (model_magic == NE) {
       std::cout << "Loading the bin file with NE format..." << std::endl;
       fseek(file.fp, 0, SEEK_SET);
-      read_ne_magic();
-      read_ne_hparams();
-      read_ne_vocab();
+      load_ne_magic();
+      load_ne_hparams();
+      load_ne_vocab();
       read_tensor_metadata(file_idx, tensors_map);
     } else {
       throw format("unknown file format model_maigc = %d", model_magic);
     }
   }
 
-  void read_ne_magic() {
+  void load_ne_magic() {
     uint32_t magic = file.read_u32();
 
     if (magic == MODEL_FILE_MAGIC_NE) {
@@ -1075,7 +1075,7 @@ struct model_file_loader {
     return model_magic;
   }
 
-  void read_ne_hparams() {
+  void load_ne_hparams() {
     unsigned int count = 0;
     hparams.n_vocab = file.read_u32();
     hparams.n_embd = file.read_u32();
@@ -1101,8 +1101,8 @@ struct model_file_loader {
     hparams.do_layer_norm_before = bool(file.read_u32());
     printf("%-16s %d.hparams.ftype = %-30d\n", __func__, count++, hparams.ftype);
     printf("%-16s %d.hparams.max_seq_len = %-30d\n", __func__, count++, hparams.max_seq_len);
-    printf("%-16s %d.hparams.alibi_bias_max = %-30f\n", __func__, count++, hparams.alibi_bias_max);
-    printf("%-16s %d.hparams.clip_qkv = %-30f\n", __func__, count++, hparams.clip_qkv);
+    printf("%-16s %d.hparams.alibi_bias_max = %-30.3f\n", __func__, count++, hparams.alibi_bias_max);
+    printf("%-16s %d.hparams.clip_qkv = %-30.3f\n", __func__, count++, hparams.clip_qkv);
     printf("%-16s %d.hparams.par_res = %-30d\n", __func__, count++, hparams.par_res);
     printf("%-16s %d.hparams.word_embed_proj_dim = %-30d\n", __func__, count++, hparams.word_embed_proj_dim);
     printf("%-16s %d.hparams.do_layer_norm_before = %-30d\n", __func__, count++, hparams.do_layer_norm_before);
@@ -1124,13 +1124,13 @@ struct model_file_loader {
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
     printf("%-16s %d.hparams.inner_hidden_size = %-30d\n", __func__, count++, hparams.inner_hidden_size);
-    printf("%-16s %d.hparams.freq_base = %-30f\n", __func__, count++, hparams.freq_base);
-    printf("%-16s %d.hparams.freq_scale = %-30f\n", __func__, count++, hparams.freq_scale);
+    printf("%-16s %d.hparams.freq_base = %-30.3f\n", __func__, count++, hparams.freq_base);
+    printf("%-16s %d.hparams.freq_scale = %-30.3f\n", __func__, count++, hparams.freq_scale);
 
     file.read_raw(&hparams.rope_scaling_factor, sizeof(float));
     hparams.original_max_position_embeddings = file.read_u32();
     hparams.use_yarn = file.read_u32();
-    printf("%-16s %d.hparams.rope_scaling_factor = %-30f\n", __func__, count++, hparams.rope_scaling_factor);
+    printf("%-16s %d.hparams.rope_scaling_factor = %-30.3f\n", __func__, count++, hparams.rope_scaling_factor);
     printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++,
            hparams.original_max_position_embeddings);
     printf("%-16s %d.hparams.use_yarn = %-30d\n", __func__, count++, hparams.use_yarn);
@@ -1140,7 +1140,7 @@ struct model_file_loader {
     }
   }
 
-  void read_ne_vocab() {
+  void load_ne_vocab() {
     unsigned int count = 0;
     unsigned int ne_hparams_total = 25;
     file.read_raw(&vocab.bos_token_id, sizeof(model_vocab::id));

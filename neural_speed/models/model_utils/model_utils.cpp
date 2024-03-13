@@ -188,7 +188,7 @@ struct model_context_params model_context_default_params() {
       /*cont_batching                =*/true,
       /*.max_request_num             =*/1,
       /*.gen_conf                    =*/generation_config(),
-      /*model_scratch_enlarge_scale  =*/1.0f,
+      /*scratch_size_ratio  =*/1.0f,
       /*.progress_callback           =*/nullptr,
       /*.progress_callback_user_data =*/nullptr,
   };
@@ -911,7 +911,9 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   }
   ctx->cont_batching = params.cont_batching;
   ctx->generation_conf = params.gen_conf;
-  ctx->model_scratch_enlarge_scale = params.model_scratch_enlarge_scale;
+
+  ctx->scratch_size_ratio = params.scratch_size_ratio * params.max_request_num * params.beam_size;
+
   const model_archs arch = params.arch;
 
   // the type so that kv-cache allocated according to this type must be large enough
@@ -1268,6 +1270,13 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.n_gpu_layers = params.n_gpu_layers;
   lparams.seed = params.seed;
   lparams.kv_type = params.memory_type;
+
+  // TODO(Yi): MHA FOR LONG TOKENS
+  int32_t long_tokens = 6144;
+  if (lparams.n_ctx > long_tokens) {
+    lparams.kv_type = KV_MEM_TYPE_F16;
+  }
+
   lparams.use_mmap = params.use_mmap;
   lparams.use_mlock = params.use_mlock;
   lparams.logits_all = params.perplexity;
@@ -1284,7 +1293,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.gen_conf.min_new_tokens = params.min_new_tokens;
   lparams.gen_conf.length_penalty = params.length_penalty;
   lparams.gen_conf.do_early_stopping = params.do_early_stopping;
-  lparams.model_scratch_enlarge_scale = params.model_scratch_enlarge_scale;
+  lparams.scratch_size_ratio = params.scratch_size_ratio;
 
   NE_ASSERT(("Start size cannot be greater than the maximum context size!", lparams.n_keep < lparams.n_ctx));
 
