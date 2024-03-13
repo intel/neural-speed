@@ -63,7 +63,8 @@ static inline int auto_batch(size_t memsize) {
   GetCPUDevice();
   auto L3 = _cd->getL3CacheSize();
   size_t constexpr Enlarge = 4;
-  auto batch = L3 * Enlarge / memsize;
+  size_t constexpr TargetMem = 1LL << 30;
+  auto batch = TargetMem / memsize;
   return batch > 1 ? batch : 2;
 }
 
