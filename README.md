@@ -39,7 +39,7 @@ pip install .
 ## Quick Start
 There are two approaches for utilizing the Neural Speed: 1. Transformer-like usage, you need to install [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) 2. llama.cpp-like usage
 
-### 1. Transformer-like usage
+### Transformer-like usage
 
 Pytorch format HF model
 ```python
@@ -94,9 +94,9 @@ Please refer [this link](./docs/supported_models.md) to check supported models.
 
 If you want to use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(Intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers). Please refer to [ITREX Installation Page](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md).
 
-### 2. llama.cpp-like usage:
+### llama.cpp-like usage
 
-#### One-click Python scripts
+#### One-click Python script
 Run LLM with one-click python script including conversion, quantization and inference.
 ```
 python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
@@ -130,31 +130,15 @@ python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 
 
 > For details please refer to [Advanced Usage](./docs/advanced_usage.md).
 
-<details>
-  ##<summary>Advanced Usage</summary>
+## Advanced Topics
 
-### 1. Quantization and inferenece
-More parameters in llama.cpp-like usage: [Advanced Usage](./docs/advanced_usage.md).
-
-### 2. Tensor Parallelism cross nodes/sockets
-
-We support tensor parallelism strategy for distributed inference/training on multi-node and multi-socket. You can refer to [tensor_parallelism.md](./docs/tensor_parallelism.md) to enable this feature.
-
-### 3. Custom Stopping Criteria
-
-You can customize the stopping criteria according to your own needs by processing the input_ids to determine if text generation needs to be stopped.
-Here is the document of Custom Stopping Criteria: [simple example with minimum generation length of 80 tokens](./docs/customized_stop.md)
-
-### 4. Verbose Mode
-
-Enable verbose mode and control tracing information using the `NEURAL_SPEED_VERBOSE` environment variable.
-
-Available modes:
-- 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling. (need to set `NS_PROFILING` to ON and recompile)
-- 1: Print evaluation time. Time taken for each evaluation.
-- 2: Profile individual operator. Identify performance bottleneck within the model. (need to set `NS_PROFILING` to ON and recompile)
-
-## Enable New Model
+### New model enabling
 You can consider adding your own models, please follow the document: [graph developer document](./developer_document.md).
 
-</details>
+### Performance profiling
+Enable `NEURAL_SPEED_VERBOSE` environment variable for performance profiling.
+
+Available modes:
+- 0: Print full information: evaluation time and operator profiling. Need to set `NS_PROFILING` to ON and recompile.
+- 1: Print evaluation time. Time taken for each evaluation.
+- 2: Profile individual operator. Identify performance bottleneck within the model. Need to set `NS_PROFILING` to ON and recompile.
