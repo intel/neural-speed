@@ -197,7 +197,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("f", hparams["layer_norm_eps"]))  # rms_norm_eps
+    fout.write(struct.pack("f", hparams.get("layer_norm_eps", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
     fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
     fout.write(struct.pack("f", 1.0))  # rope_scaling_factor, was removed in config.json (by default=1.0)
