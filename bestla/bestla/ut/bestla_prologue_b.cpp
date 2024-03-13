@@ -173,15 +173,54 @@ class UT_BlockQunatize_F8 {
 static UT_BlockQunatize_F8 sUT_BlockQunatize_F8;
 #endif
 
+class UT_BlockQunatize_S3S4 {
+ public:
+  UT_BlockQunatize_S3S4() {
+    UT_START();
+    CheckISA(AVX512F);
+    ut(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut(4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    ut(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+  }
+
+  void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
+    printf("%s DType %s: %d %d %d\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), n, k, blocksize);
+    int ldb = n;
+    utils::aligned_vector<float> raw(n * k);
+    ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 1.8f);
+
+    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    PrologueB kernel;
+    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
+    avector<int8_t> buffer(ptr.mSize);
+    ptr.assign(buffer.data());
+    kernel.packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
+    avector<float> dequant(n * k, 0);
+    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
+    ut::buffer_error(raw.data(), dequant.data(), dequant.size(), 0.01f);
+  }
+};
+#ifdef BTLA_UT_PROLOGUE_B
+// no proper threshold for this UT
+//static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
+#endif
+
 class UT_S3_WOQ {
  public:
   UT_S3_WOQ() {
     UT_START();
     CheckISA(AVX512F);
     ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 56);
-    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
-    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 56);
+    CheckISA(AVX512_VNNI);
     ut<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, BTLA_ISA::AVX512_VNNI>(1, 4096, 4096, 128, 56);
+    CheckISA(AMX_BF16);
+    ut<sAMX_BF16, BTLA_ISA::AMX_BF16>(1, 4096, 4096, 32, 56);
+    CheckISA(AMX_INT8);
+    ut<gemm::ICoreRowNAmxint8KBlock<48, 16>, BTLA_ISA::AMX_INT8>(1, 4096, 4096, 128, 56);
   }
 
   template <class GemmCore_T, BTLA_ISA ISA>

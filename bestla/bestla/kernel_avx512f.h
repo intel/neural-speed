@@ -862,9 +862,9 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, 
   }
   return BTLA_CODE::Success;
 }
-
-static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_s4(const float* srcptr, int8_t* dstptr, int row, int col,
-                                                              int ld_src, int ld_dst, float* scales, int blocksize) {
+template <BTLA_DTYPE QDT_T>
+static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* srcptr, int8_t* dstptr, int row, int col,
+                                                                int ld_src, int ld_dst, float* scales, int blocksize) {
   int constexpr VLen = 16;
   int col16 = utils::padto_le(col, VLen);
   int i = 0;
@@ -889,13 +889,16 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_s4(const float* srcpt
       _mm512_storeu_ps(tmp_min, vminval);
       _mm512_storeu_ps(tmp_max, vmaxval);
       _mm512_storeu_ps(tmp_abs, vabsval);
+      auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
+      int constexpr FullValue = 1 << (NBits - 1);
+      int constexpr GenValue = FullValue - 1;
       for (int iv = 0; iv < VLen; iv++) {
-        int NVal = 7;
+        int NVal = GenValue;
         auto sum = tmp_max[iv] + tmp_min[iv];
-        if (abs(sum) >= tmp_abs[iv] / 7.5) {
-          NVal = sum > 0.f ? -8 : 8;
+        if (abs(sum) >= tmp_abs[iv] / FullValue) {
+          NVal = sum > 0.f ? -FullValue : FullValue;
         }
-        NVal = NVal << 4;
+        NVal = NVal << (8 - NBits);
         tmp_abs[iv] = NVal;
       }
       auto vmag = _mm512_loadu_ps(tmp_abs);
@@ -913,8 +916,8 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_s4(const float* srcpt
     for (; j < align_row; j += blocksize) simd_process_block(blocksize);
     if (j < row) simd_process_block(row - align_row);
   }
-  kernel::ref::quantize_f32_sign_int_rowblock<BTLA_DTYPE::S4_CLIP>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst,
-                                                                   scales + i, nullptr, blocksize);
+  kernel::ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst,
+                                                                 scales + i, nullptr, blocksize);
   return BTLA_CODE::Success;
 }
 
@@ -985,13 +988,14 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr,
   return BTLA_CODE::Success;
 }
 
-template <BTLA_DTYPE S4_T>
+template <BTLA_DTYPE QDT_T>
 static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col,
                                                        int ld_src, int ld_dst, float* scales, int8_t* zero_points,
                                                        int blocksize) {
   if (zero_points == nullptr)
-    if constexpr (S4_T == BTLA_DTYPE::S4_CLIP) {
-      return quantize_f32_sign_int_rowblock_sym_s4(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
+    if constexpr (QDT_T == BTLA_DTYPE::S4_CLIP || QDT_T == BTLA_DTYPE::S3_CLIP) {
+      return quantize_f32_sign_int_rowblock_sym_auto<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+                                                            blocksize);
     } else {
       return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
     }

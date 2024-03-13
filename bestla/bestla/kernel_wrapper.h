@@ -297,17 +297,17 @@ class Transpose2D {
 
 class QuantizeSignIntRowBlock {
  public:
-  template <BTLA_ISA ISA_T, BTLA_DTYPE S4_T>
+  template <BTLA_ISA ISA_T, BTLA_DTYPE QDT_T>
   static inline BTLA_CODE forward(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
                                   float* scales, int8_t* zero_points, int blocksize) {
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f &&
-                  S4_T != BTLA_DTYPE::S4_FULLRANGE) {  // TODO(zhe): support simd version s4_fullrange quantization.
-      return avx512f::quantize_f32_sign_int_rowblock<S4_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+                  QDT_T != BTLA_DTYPE::S4_FULLRANGE) {  // TODO(zhe): support simd version s4_fullrange quantization.
+      return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
                                                            zero_points, blocksize);
     }
 #endif
-    return ref::quantize_f32_sign_int_rowblock<S4_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
+    return ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
                                                      blocksize);
   }
 };
