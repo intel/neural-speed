@@ -21,114 +21,27 @@ import sys
 import re
 import argparse
 from common import *
-
-
-def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
-    # unpack weight and repack into 3bits / 4bits BestLA format
-    import neural_speed.llama_cpp as cpp_model
-    if ".weight" in src_name:
-        src_name = src_name.replace(".weight", "")
-    qzeros = model[f"{src_name}.qzeros"]
-    zeros = qzeros_to_zeros(qzeros)
-    scales = model[f"{src_name}.scales"]
-    qweight = model[f"{src_name}.qweight"]
-
-    int_weight, gptq_scales, gptq_zeros = unpack_weight(qweight, scales, qzeros, q_config)
-    int_weight = int_weight.view(-1, int_weight.shape[-1])
-
-    # shuffle weight in GPTQ when act order is on
-    if 'desc_act' in q_config and q_config['desc_act']:
-        g_idx = model[f"{src_name}.g_idx"]
-        int_weight2 = int_weight.clone()
-        group_size = q_config['group_size']
-        group_dict = {}
-        for i in range(len(g_idx)):
-            group_idx = g_idx[i].item()
-            if group_idx not in group_dict:
-                target_idx = group_idx * group_size
-                group_dict[group_idx] = 0
-            else:
-                group_dict[group_idx] = group_dict[group_idx] + 1
-                target_idx = group_idx * group_size + group_dict[group_idx]
-            int_weight2[target_idx] = int_weight[i]
-        int_weight = int_weight2
-
-    # shape = int_weight.shape[::-1]
-    shape = int_weight.shape[::-1]
-    # write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
-    n_dims = len(shape)
-    str = dst_name.encode('utf-8')
-    fout.write(struct.pack("iii", n_dims, len(str), GGML_QJBLAS_TYPE))
-    for i in range(n_dims):
-        fout.write(struct.pack("i", shape[n_dims - 1 - i]))
-    fout.write(str)
-
-    # INC stores sig-int4 value as u4(range 0~15, they add a offset),
-    # BesTLA requires s4_clip((-8,7)*16), so we sub the offset and then mul 16.
-    # Int3 is the same as int4, but offset=4, mul scale==32.
-    weight_dtype = "int8"
-    if q_config['bits'] == 4:
-        int_weight = (int_weight - 8) * 16
-        gptq_scales = gptq_scales / 16
-        gptq_zeros = (gptq_zeros - 8) * 16
-        weight_dtype = "int4"
-    elif q_config['bits'] == 3:
-        int_weight = (int_weight - 4) * 32
-        gptq_scales = gptq_scales / 32
-        gptq_zeros = (gptq_zeros - 4) * 32
-        weight_dtype = "int3"
-    else:
-        ValueError(f"Unsupported q_config[bits]: {q_config['bits']}")
-
-    dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
-    int_weight = np.ascontiguousarray(int_weight.numpy())
-    gptq_scales = np.ascontiguousarray((gptq_scales.float()).numpy())
-    if q_config['sym']:
-        gptq_zeros = np.empty(0, dtype=np.int8)
-    else:
-        gptq_zeros = np.ascontiguousarray(gptq_zeros.numpy())
-    if 'desc_act' in q_config and q_config['desc_act']:
-        g_idx = np.ascontiguousarray(g_idx.numpy())
-    else:
-        g_idx = np.empty(0, dtype=np.int32)
-
-    # repack int weight in BesTLA format
-    byte_size = cpp_model.Model.np_bestla_qpack(int_weight,
-                                                gptq_scales,
-                                                gptq_zeros,
-                                                g_idx,
-                                                dst,
-                                                weight_dtype=weight_dtype,
-                                                group_size=q_config['group_size'],
-                                                alg="sym" if q_config['sym'] else "asym",
-                                                compute_dtype="int8")
-    dst.flatten()[:byte_size].tofile(fout)
-    print(f"convert_to_qx_bestla_tensor: {src_name:>40} -> {dst_name:<40} shape: {shape}, byte_size: {byte_size:<10}")
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
     out_path = args.outfile.as_posix()
     model_path = args.model.as_posix()
 
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    # QWEN-GPTQ & AWQ
     model, hparams, quantize_config = load_quantized_safetensors(model_path)
     list_vars = model
 
     print(hparams)
-
-    # orinal QWEN
-    # model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-    # hparams = model.config.to_dict()
-    # list_vars = model.state_dict()
 
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     f = open(out_path, "wb")
@@ -140,11 +53,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         ftype = 1
 
     # 1. write hparams
-    # 0x67676d6c is unversioned ne
-    # 0x67676d66 is versioned ggmf (requires token scores)
     ne_file_magic = 0x67676d66
-    #ne_file_version = 0x00000001 # v1
-
     f.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
     f.write(struct.pack("i", 1))
 
@@ -179,7 +88,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
     f.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
-    if hparams['model_type']=='qwen2':
+    if hparams['model_type'] == 'qwen2':
         f.write(struct.pack("i", hparams["bos_token_id"]))
         f.write(struct.pack("i", hparams["eos_token_id"]))
     else:
