@@ -113,7 +113,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import WhisperForConditionalGeneration
     else:
         from transformers import WhisperForConditionalGeneration
-    model = WhisperForConditionalGeneration.from_pretrained(dir_model)
+    model = WhisperForConditionalGeneration.from_pretrained(dir_model, trust_remote_code=True)
 
     #code.interact(local=locals())
     path = os.getcwd()

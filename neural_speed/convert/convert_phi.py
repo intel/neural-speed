@@ -86,7 +86,7 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
         toktypes: list[int] = []
 
         from transformers import AutoTokenizer  # type: ignore[attr-defined]
-        tokenizer = AutoTokenizer.from_pretrained(dir_model)
+        tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
         vocab_size = hparams.get("vocab_size", len(tokenizer.vocab))
         assert max(tokenizer.vocab.values()) < vocab_size
 
