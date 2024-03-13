@@ -146,7 +146,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
     struct ne_tensor* residual = inpL;
 
     // LayerNorm
-    cur = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+    cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
     cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
     // SelfAttention
     {
@@ -260,7 +260,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
     residual = cur;
 
     // post_attention_layernorm
-    struct ne_tensor* hidden_states = ne_rms_norm(ctx0, cur, hparams.rms_norm_eps);
+    struct ne_tensor* hidden_states = ne_rms_norm(ctx0, cur, hparams.norm_eps);
     hidden_states = ne_mul(ctx0, hidden_states, model.layers[il].norm[1]);
 
     // mlp.forward
@@ -291,7 +291,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+    inpL = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
     inpL = ne_mul(ctx0, inpL, model.others[1]);
   }
 
