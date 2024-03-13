@@ -50,7 +50,7 @@ struct ne_tensor* gemma_ff(const model_layer& layer, const int batch_size, const
     struct ne_tensor* cur_2 = ne_mul_mat(ctx0, layer.ffn[2], cur);
 
     // SILU activation
-    cur_2 = ne_gelu(ctx0, cur_2);
+    cur_1 = ne_gelu(ctx0, cur_1);
 
     // projection
     // cur = proj_w*cur + proj_b
@@ -76,7 +76,8 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   model_context& lctx = *ctx;
 
   // static batching for now
-  const int N = 3;
+  const int N = inputs->n_tokens;
+  // const int N = 2;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
@@ -143,13 +144,16 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
   ne_set_name(embd, "embd");
-  int embd_tokens[3] = {2, 17534, 2134};
+  // int tokens_id[2] = {2, 1};
+
   for (int i = 0; i < batch_size; ++i) {
-    memcpy(static_cast<model_token*>(embd->data) + i * N, embd_tokens, N * ne_element_size(embd));
+    memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
+    // memcpy(static_cast<model_token*>(embd->data) + i * N, tokens_id, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
-
+  inpL = ne_scale(ctx0, inpL, ne_new_f32(ctx0, sqrtf(static_cast<float>(3072))));
+  
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
 
@@ -166,21 +170,21 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       }
 
       // compute QKV
-       struct ne_tensor* Qcur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
-        Qcur = ne_reshape_3d(ctx0, Qcur, head_dim, n_head, N);
-
-       struct ne_tensor* Kcur = ne_mul_mat(ctx0, model.layers[il].attn[1], cur);
-        Kcur = ne_reshape_3d(ctx0, Kcur, head_dim, n_head, N);
-
-       struct ne_tensor* Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-        Vcur = ne_reshape_3d(ctx0, Vcur, head_dim, n_head, N);
+        struct ne_tensor* Kcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head, N);
+        ne_set_name(Kcur, "Kcur_matmul");
+        struct ne_tensor* Qcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N);
+        ne_set_name(Qcur, "Qcur_matmul");
+        struct ne_tensor* Vcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head, N);
+        ne_set_name(Vcur, "Vcur_matmul");
 
       // using mode = 2 for GPT-NeoX mode
       Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_set_name(Qcur, "Qcur");
+      Qcur = ne_scale_inplace(ctx0, Qcur, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>((n_gqa_embd) / n_head))));
+      
       Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_set_name(Kcur, "kcur");
-      const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
+      const float attn_scale = 1.0f / sqrtf(static_cast<float>(1));
       // store key and value to memory
       if (!run_mha_reordered) {
         {
@@ -219,6 +223,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
         }
         // Q = Qcur.contiguous().view(n_gqa_embd/n_head, n_head, N).permute(0, 2, 1, 3)
         struct ne_tensor* Q = ne_permute(ctx0, ne_reshape_4d(ctx0, Qcur, head_dim, n_head, N, batch_size), 0, 2, 1, 3);
+        
 
         // K = Kmem.view(n_gqa_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
         struct ne_tensor* K =
@@ -231,13 +236,13 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
         // KQ_scaled = KQ / sqrt(n_gqa_embd/n_head)
         struct ne_tensor* KQ_scaled =
-            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>((n_gqa_embd) / n_head))));
+            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f ));
 
         // KQ_masked = mask_past(KQ_scaled)
-        struct ne_tensor* KQ_masked = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
+        struct ne_tensor* KQ_masked = ne_diag_mask_inf(ctx0, KQ_scaled, n_past);
 
         // KQ = soft_max(KQ_masked)
-        struct ne_tensor* KQ_soft_max = ne_soft_max_inplace(ctx0, KQ_masked);
+        struct ne_tensor* KQ_soft_max = ne_soft_max(ctx0, KQ_masked);
 
         // V_trans = Vmem.view(n_gqa_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
         struct ne_tensor* V =
@@ -363,7 +368,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       }
     }
   }
-
+  
   // extract embeddings
   if (!lctx.embedding.empty()) {
     auto& embedding_out = lctx.embedding;

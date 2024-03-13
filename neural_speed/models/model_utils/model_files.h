@@ -1363,8 +1363,7 @@ struct model_model_loader {
   }
 
   uint32_t guess_n_parts() const {
-    auto it = tensors_map.name_to_idx.find("tok_embeddings.weight");
-    if (it == tensors_map.name_to_idx.end()) {
+    auto it = tensors_map.name_to_idx.find("tok_embeddings.weight");    if (it == tensors_map.name_to_idx.end()) {
       it = tensors_map.name_to_idx.find("transformer.wte.weight");
       if (it == tensors_map.name_to_idx.end()) {
         it = tensors_map.name_to_idx.find("gpt_neox.embed_in.weight");

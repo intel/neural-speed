@@ -19,7 +19,7 @@
 #include "models/model_utils/model_types.h"
 
 enum gemma_model {
-  GEMMA_UNKNOWN,
+  GEMMA_2B,
   GEMMA_7B,
   GEMMA_13B,
   GEMMA_30B,
@@ -28,6 +28,12 @@ enum gemma_model {
 
 static const model_scratch gemma_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
+    case 18:
+      return {
+          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
+      };
     case 28:
       return {
           static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
