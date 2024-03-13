@@ -90,9 +90,7 @@
 #define CompileAMXINT8() (CompileAMX())
 #endif
 
-#if CompileBF16() || CompileFP16()
 #include <immintrin.h>
-#endif
 
 namespace bestla {
 namespace utils {
