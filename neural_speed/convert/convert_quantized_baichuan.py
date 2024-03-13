@@ -274,11 +274,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.W_pack.weight", f"{prefix}.self_attn.W_pack.weight", list_vars,
                                     fout, quantize_config)
-        convert_qwen_to_fp32_tensor(f"{prefix}.self_attn.W_pack.bias", f"{prefix}.attn.c_attn.bias", list_vars, fout)
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.o_proj.weight", f"{prefix}.self_attn.o_proj.weight", list_vars,
                                     fout, quantize_config)
-        convert_qwen_to_fp32_tensor(f"{prefix}.self_attn.o_proj.bias", f"{prefix}.self_attn.o_proj.bias", list_vars,
-                                    fout)
 
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.gate_proj", f"{prefix}.mlp.gate_proj.weight", list_vars, fout,
