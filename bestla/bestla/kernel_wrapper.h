@@ -304,11 +304,11 @@ class QuantizeSignIntRowBlock {
     if constexpr (utils::isa_base<ISA_T>::avx512f &&
                   QDT_T != BTLA_DTYPE::S4_FULLRANGE) {  // TODO(zhe): support simd version s4_fullrange quantization.
       return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
-                                                           zero_points, blocksize);
+                                                            zero_points, blocksize);
     }
 #endif
     return ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
-                                                     blocksize);
+                                                      blocksize);
   }
 };
 

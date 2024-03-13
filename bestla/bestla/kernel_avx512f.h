@@ -916,8 +916,8 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* src
     for (; j < align_row; j += blocksize) simd_process_block(blocksize);
     if (j < row) simd_process_block(row - align_row);
   }
-  kernel::ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst,
-                                                                 scales + i, nullptr, blocksize);
+  kernel::ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst, scales + i,
+                                                     nullptr, blocksize);
   return BTLA_CODE::Success;
 }
 
