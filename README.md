@@ -4,8 +4,8 @@ Neural Speed is an innovative library designed to support the efficient inferenc
 
 ## Key Features
 - Highly optimized low-precision kernels on CPUs. Support AMX, VNNI, AVX512F, AVX_VNNI and AVX2 instruction set. See [details](neural_speed/core/README.md)
-- Up to 40x performance speedup on popular LLMs compared with [llama.cpp](https://github.com/ggerganov/llama.cpp). See [details](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
-- Tensor parallelism across sockets/nodes on CPUs. [tensor_parallelism.md](./docs/tensor_parallelism.md)
+- Up to 40x performance speedup on popular LLMs compared with llama.cpp. See [details](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
+- Tensor parallelism across sockets/nodes on CPUs. See [details](./docs/tensor_parallelism.md)
 
 > Neural Speed is under active development so APIs are subject to change.
 
