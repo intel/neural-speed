@@ -10,7 +10,7 @@ Neural Speed is an innovative library designed to support the efficient inferenc
 > Neural Speed is under active development so APIs are subject to change.
 
 ## Supported Hardware
-| Hardware | Optimization |
+| Hardware | Supported |
 |-------------|:-------------:|
 |Intel Xeon Scalable Processors | ✔ |
 |Intel Xeon CPU Max Series | ✔ |
