@@ -41,8 +41,12 @@ enum class nbarrier_role : uint8_t {
 /// as consumer.
 ///
 template <uint8_t num_producers = 1, uint8_t num_consumers = 1,
-        gpu_arch arch_tag = gpu_arch::Xe>
-struct xetla_nbarrier_t {
+        gpu_arch arch_tag = gpu_arch::Xe, typename enable = void>
+struct xetla_nbarrier_t;
+
+template <uint8_t num_producers, uint8_t num_consumers, gpu_arch arch_tag>
+struct xetla_nbarrier_t<num_producers, num_consumers, arch_tag,
+        std::enable_if_t<arch_tag == gpu_arch::Xe>> {
     ///
     /// @brief Description of named barrier objection.
     /// Structure is defined in
@@ -87,8 +91,9 @@ struct xetla_nbarrier_t {
     }
 };
 
-template <uint8_t num_producers, uint8_t num_consumers>
-struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Dg2> {
+template <uint8_t num_producers, uint8_t num_consumers, gpu_arch arch_tag>
+struct xetla_nbarrier_t<num_producers, num_consumers, arch_tag,
+        std::enable_if_t<arch_tag != gpu_arch::Xe>> {
     ///
     /// @brief Description of named barrier objection.
     /// Structure is defined in
@@ -114,7 +119,6 @@ struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Dg2> {
     ///
     __XETLA_API void wait() {
         __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::wait>();
-        // __ESIMD_NS::barrier();
     }
 
     /// @brief named barrier signal from subgroup.

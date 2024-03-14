@@ -120,6 +120,7 @@ struct arch_attr_t<gpu_arch::Xe> {
     using mma_attr = mma_attr_t<gpu_arch::Xe>;
 
     static constexpr uint32_t max_wg_num = 64;
+    static constexpr uint32_t local_mem_size = 128 * 1024;
 };
 
 template <>
@@ -133,6 +134,7 @@ struct arch_attr_t<gpu_arch::Dg2> {
     using mma_attr = mma_attr_t<gpu_arch::Dg2>;
 
     static constexpr uint32_t max_wg_num = 64;
+    static constexpr uint32_t local_mem_size = 64 * 1024;
 };
 
 /// @} xetla_core_arch_config

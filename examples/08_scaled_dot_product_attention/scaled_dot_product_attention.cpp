@@ -135,10 +135,12 @@ int sdp_fwd_result_validate(dtype_in *q_device, dtype_in *k_device,
     return result ? 0 : 1;
 }
 
-void sdp_fwd_run(uint32_t iter) {
-    // Tips, the example demonstrates programming kernel with XeTLA, it works as expected with current configurations.
-    // Please make sure you fully understand these configurations before you do any modifications, incomplete changes may lead to unexpected behaviors.
-    // Please contact us for support.
+template <gpu_arch arch_tag>
+void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
+    // Tips, the example demonstrates programming kernel with XeTLA, it works as
+    // expected with current configurations. Please make sure you fully understand
+    // these configurations before you do any modifications, incomplete changes
+    // may lead to unexpected behaviors. Please contact us for support.
 
     using dtype_in = bf16;
     using dtype_out = bf16;
@@ -150,9 +152,15 @@ void sdp_fwd_run(uint32_t iter) {
     constexpr uint32_t matrix_n_qk = sequence_len;
     constexpr uint32_t matrix_k_qk = head_size;
 
-    constexpr uint32_t wg_tile_m_qk = 64;
-    constexpr uint32_t wg_tile_n_qk = 512;
-    constexpr uint32_t sg_tile_m_qk = 32;
+    constexpr double slm_ratio_to_pvc
+            = static_cast<double>(arch_attr_t<arch_tag>::local_mem_size)
+            / arch_attr_t<gpu_arch::Xe>::local_mem_size;
+
+    constexpr uint32_t wg_tile_m_qksv = 64 * slm_ratio_to_pvc;
+
+    constexpr uint32_t wg_tile_m_qk = wg_tile_m_qksv;
+    constexpr uint32_t wg_tile_n_qk = 512; // must == sl_kv
+    constexpr uint32_t sg_tile_m_qk = 32 * slm_ratio_to_pvc;
     constexpr uint32_t sg_tile_n_qk = 32;
     constexpr uint32_t wg_tile_k_qk = 32;
 
@@ -161,10 +169,11 @@ void sdp_fwd_run(uint32_t iter) {
     constexpr uint32_t matrix_n_sv = head_size;
     constexpr uint32_t matrix_k_sv = sequence_len;
 
-    constexpr uint32_t wg_tile_m_sv = 64;
-    constexpr uint32_t wg_tile_n_sv = 64;
+    // constexpr uint32_t wg_tile_m_sv = 64;
+    constexpr uint32_t wg_tile_m_sv = wg_tile_m_qksv;
+    constexpr uint32_t wg_tile_n_sv = 64; // must == head_dim
     constexpr uint32_t sg_tile_m_sv = 8;
-    constexpr uint32_t sg_tile_n_sv = 16;
+    constexpr uint32_t sg_tile_n_sv = 16 * slm_ratio_to_pvc;
     constexpr uint32_t wg_tile_k_sv = 32;
 
     // buffer size of softmax row data
@@ -178,11 +187,12 @@ void sdp_fwd_run(uint32_t iter) {
     auto context = queue.get_info<info::queue::context>();
     auto device = queue.get_info<info::queue::device>();
 
-    std::cout << "Running on " << device.get_info<info::device::name>() << "\n";
+    print_device_details(device);
 
     constexpr uint32_t size_qkv = matrix_m_qk * matrix_k_qk;
     constexpr uint32_t size_mask = matrix_m_qk * matrix_n_qk;
     constexpr uint32_t size_out = matrix_m_sv * matrix_n_sv;
+    const float scale_qk = 1.f / std::sqrt(head_size);
 
     auto q = alloc_device_and_init<dtype_in>(
             batch_cnt * size_qkv,
@@ -220,6 +230,11 @@ void sdp_fwd_run(uint32_t iter) {
     constexpr uint32_t subgroup_range_m = wg_tile_m_qk / sg_tile_m_qk;
     constexpr uint32_t subgroup_range_n = wg_tile_n_qk / sg_tile_n_qk;
 
+    constexpr uint32_t slm_size
+            = wg_tile_m_qk * wg_tile_n_qk * sizeof(dtype_sfx);
+    static_assert(slm_size <= arch_attr_t<arch_tag>::local_mem_size,
+            "The local memory size excess!");
+
     static_assert(subgroup_range_m * subgroup_range_n == thread_num,
             "Given thread number should equal to pre-set value 32!");
     std::cout << "group_num_x: " << group_range_n
@@ -231,22 +246,20 @@ void sdp_fwd_run(uint32_t iter) {
     cl::sycl::range<3> local_range {1, subgroup_range_m, subgroup_range_n};
     cl::sycl::nd_range<3> nd_range(group_range * local_range, local_range);
 
-    constexpr uint32_t warmup = 10;
-    int64_t ops = int64_t(4 * batch_num * head_num * sequence_len) * sequence_len
-            * head_size;
+    int64_t ops = int64_t(4 * batch_num * head_num * sequence_len)
+            * sequence_len * head_size;
     profiling_helper prof("sdp", ops, "gflops");
     try {
         for (uint32_t i = 0; i < iter + warmup; i++) {
             if (i >= warmup) { prof.cpu_start(); }
             auto gpu_event = queue.submit([&](handler &cgh) {
-                cgh.parallel_for<
-                        class Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
+                cgh.parallel_for(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
                     using namespace gpu::xetla;
                     using namespace gpu::xetla::group;
                     using namespace gpu::xetla::kernel;
                     using namespace gpu::xetla::subgroup;
 
-                    uint32_t batch_id = item.get_group(0);
+                    const uint32_t batch_id = item.get_group(0);
                     // disable sync in gemm
                     static constexpr uint32_t periodic_sync_interval = 0;
                     static constexpr uint32_t prefetch_distance = 3;
@@ -254,19 +267,23 @@ void sdp_fwd_run(uint32_t iter) {
                     using wg_shape0 = shape<wg_tile_n_qk, wg_tile_m_qk>;
                     using sg_shape0 = shape<sg_tile_n_qk, sg_tile_m_qk>;
 
-                    using post_op0_t = scalar_mul_op_t<float, gpu_arch::Xe>;
+                    using post_op0_t = scalar_mul_op_t<float, arch_tag>;
                     using post_op1_t = elemwise_reduce_op_t<reduce_op::sum,
-                            dtype_in, gpu_arch::Xe>;
+                            dtype_in, arch_tag>;
                     using post_op_t = chained_tile_op_t<post_op0_t, post_op1_t>;
                     using epilogue_policy0
                             = xetla::group::epilogue_policy_tile_op<post_op_t,
-                                    gpu_arch::Xe>;
-                    using group_swizzle = group_swizzle_default<gpu_arch::Xe>;
+                                    arch_tag>;
+                    using group_swizzle = group_swizzle_default<arch_tag>;
 
-                    using tune_option0 = dict_t<
-                            elem_v_t<tune_key::param_optimizer_type,
-                                    tune_key_value::
-                                            param_optimizer_decision_tree>,
+                    using elem_opt_mode_t
+                            = elem_v_t<tune_key::param_optimizer_level,
+                                    param_optimizer_level::keep_shape>;
+                    using elem_opt_type_t = elem_v_t<
+                            tune_key::param_optimizer_type,
+                            tune_key_value::param_optimizer_decision_tree>;
+                    using tune_option0 = dict_t< //
+                            elem_opt_type_t, elem_opt_mode_t,
                             elem_t_t<tune_key::epilogue_policy,
                                     epilogue_policy0>,
                             elem_t_t<tune_key::sg_tile_shape, sg_shape0>,
@@ -277,28 +294,30 @@ void sdp_fwd_run(uint32_t iter) {
                     using gemm0_t = xetla::group::default_gemm_selector_t<
                             dtype_in, // input datatype for A
                             mem_layout::row_major, // memory layout for A
-                            8, // leading dimension for A, in unit of element
+                            // alignment for A, in unit of element
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_in),
                             mem_space::
                                     global, // memory reading from global mem for A
                             dtype_in, // input datatype for B
                             mem_layout::row_major, // memory layout for B
-                            8, // leading dimension for B, in unit of element
+                            // alignment for B, in unit of element
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_in),
                             mem_space::
                                     global, // memory reading from global mem for B
-                            float, // accumulator data type for intermediate resutls
+                            float, // accumulator data type for intermediate results
                             wg_shape0, // computation tile shape
                             wg_tile_k_qk, // elements in each iteration
-                            gpu_arch::Xe, // GPU arch
+                            arch_tag, // GPU arch
                             tune_option0>;
                     using epilogue0_t = xetla::group::default_epilogue_selector_t<
                             dtype_sfx, // onput datatype for C
                             mem_layout::row_major, // memory layout for C
-                            8, // leading dimension for C, in unit of element
+                            8, // alignment for C, in unit of element
                             mem_space::
                                     local, // memory writing to local mem for C
                             wg_shape0, // computation tile shape
                             wg_tile_k_qk, // elements in each iteration
-                            gpu_arch::Xe, // GPU arch
+                            arch_tag, // GPU arch
                             tune_option0>;
                     using gemm_op0_t = gemm_universal_t<
                             dispatch_policy_default<group_swizzle>, gemm0_t,
@@ -307,29 +326,27 @@ void sdp_fwd_run(uint32_t iter) {
                     using tile_shape0 = typename gemm0_t::tile_shape;
 
                     // initialize SLM size
-                    constexpr uint32_t slm_size
-                            = wg_tile_m_qk * wg_tile_n_qk * sizeof(dtype_sfx);
                     xetla_local_init<slm_size>();
 
                     // initialize named barrier count
                     // we only need to do thread sync while store gemm results to SLM
                     // one barrier is enough for that
                     xetla_nbarrier_init<1>();
-                    xetla_nbarrier_t<thread_num, thread_num, gpu_arch::Xe>
-                            nbarrier;
+                    xetla_nbarrier_t<thread_num, thread_num, arch_tag> nbarrier;
                     nbarrier.init_nbarrier(0, nbarrier_role::producer_consumer);
 
                     // initialize gemm op: gemm result store to shared local memory
-                    typename post_op0_t::arguments_t post_op0_arg(0.125);
+                    typename post_op0_t::arguments_t post_op0_arg(scale_qk);
                     typename post_op1_t::arguments_t post_op1_arg(
+                            // attn_mask pre-load ptr batch offset
                             attn_mask + batch_id / head_num * size_mask
                                     + wg_tile_m_qk * wg_tile_n_qk
-                                            * item.get_group(
-                                                    1), // attn_mask pre-load ptr batch offset
-                            {matrix_n_qk, // attn_mask tdesc width
+                                            * item.get_group(1),
+                            {
+                                    matrix_n_qk, // attn_mask tdesc width
                                     matrix_m_qk, // attn_mask tdesc height
-                                    matrix_n_qk} // attn_mask tdesc pitch
-                    );
+                                    matrix_n_qk, // attn_mask tdesc pitch
+                            });
                     typename gemm_op0_t::arguments_t arg0(matrix_m_qk,
                             matrix_k_qk, matrix_n_qk,
                             q + batch_id * size_qkv, // matA_ptr + batch offset
@@ -339,22 +356,20 @@ void sdp_fwd_run(uint32_t iter) {
                             0, // matC_base
                             matrix_n_qk, // matC load width
                             {{post_op0_arg, post_op1_arg}});
-                    gemm_op0_t gemm_op0;
-                    gemm_op0(item, arg0);
+                    gemm_op0_t {}(item, arg0);
                     xetla_fence<memory_kind::shared_local>();
                     nbarrier.arrive_wait();
 
                     // softmax start: result store to SLM
                     using softmax_op_t = xetla_softmax_fwd_t<dtype_sfx,
                             dtype_in, tile_shape0, mem_space::local,
-                            mem_space::local, SIMD, thread_num, softmax_sz>;
+                            mem_space::local, SIMD, thread_num, softmax_sz,
+                            arch_tag>;
                     typename softmax_op_t::arguments_t arg1;
-                    softmax_op_t softmax_op;
-
                     arg1.data_in_base = 0;
                     arg1.data_out_base = 0;
 
-                    softmax_op(item, &arg1);
+                    softmax_op_t {}(item, &arg1);
                     xetla_fence<memory_kind::shared_local>();
                     nbarrier.arrive_wait();
 
@@ -362,10 +377,8 @@ void sdp_fwd_run(uint32_t iter) {
                     using wg_shape1 = shape<wg_tile_n_sv, wg_tile_m_sv>;
                     using sg_shape1 = shape<sg_tile_n_sv, sg_tile_m_sv>;
 
-                    using tune_option1 = dict_t<
-                            elem_v_t<tune_key::param_optimizer_type,
-                                    tune_key_value::
-                                            param_optimizer_decision_tree>,
+                    using tune_option1 = dict_t< //
+                            elem_opt_type_t, elem_opt_mode_t,
                             elem_t_t<tune_key::sg_tile_shape, sg_shape1>,
                             elem_v_t<tune_key::prefetch_distance,
                                     prefetch_distance>,
@@ -375,18 +388,19 @@ void sdp_fwd_run(uint32_t iter) {
                     using gemm1_t = xetla::group::default_gemm_selector_t<
                             dtype_in, // input datatype for A
                             mem_layout::row_major, // memory layout for A
-                            8, // leading dimension for A, in unit of element
+                            8, // alignment for A, in unit of element
                             mem_space::
                                     local, // memory reading from local mem for A
                             dtype_in, // input datatype for B
                             mem_layout::row_major, // memory layout for B
-                            8, // leading dimension for B, in unit of element
+                            // alignment for B, in unit of element
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_in),
                             mem_space::
                                     global, // memory reading from global mem for B
-                            float, // accumulator data type for intermediate resutls
+                            float, // accumulator data type for intermediate results
                             wg_shape1, // computation tile shape
                             wg_tile_k_sv, // elements in each iteration
-                            gpu_arch::Xe, // GPU arch
+                            arch_tag, // GPU arch
                             tune_option1>;
 
                     // gemm arguments include matA & matB load information and
@@ -395,6 +409,9 @@ void sdp_fwd_run(uint32_t iter) {
                     using work_group_t = typename gemm1_t::work_group_t;
                     using mem_desc_a_t = typename gemm1_t::mem_desc_a_t;
                     using mem_desc_b_t = typename gemm1_t::mem_desc_b_t;
+                    using mem_desc_c_t = mem_desc_t< //
+                            dtype_out, mem_layout::row_major, mem_space::global,
+                            DEVICE_MEM_ALIGNMENT / sizeof(dtype_out)>;
                     // Using gemm::matAcc init a matC class for future storage
                     using matAcc_t = typename gemm1_t::matAcc_t;
                     using matC_t = tile_t<dtype_out,
@@ -416,9 +433,8 @@ void sdp_fwd_run(uint32_t iter) {
                     int start_m = item.get_group(1) * wg_tile_m_sv;
                     int start_k = 0;
                     uint32_t wg_tile_k = matrix_k;
-                    uint32_t boundary_n = (start_n + wg_tile_n_sv) > matrix_n
-                            ? matrix_n
-                            : (start_n + wg_tile_n_sv);
+                    uint32_t boundary_n
+                            = std::min(start_n + wg_tile_n_sv, matrix_n);
                     uint32_t boundary_k = wg_tile_k;
 
                     work_group_t g;
@@ -431,42 +447,45 @@ void sdp_fwd_run(uint32_t iter) {
                     mem_desc_b.init(matB_ptr, {boundary_n, boundary_k, matB_ld},
                             {start_n, start_k});
 
-                    uint32_t inner_loop_count
+                    uint32_t sg_k_count
                             = (wg_tile_k + wg_tile_k_sv - 1) / wg_tile_k_sv;
-                    gemm_args_t gemm_args(
-                            mem_desc_a, mem_desc_b, inner_loop_count);
+                    gemm_args_t gemm_args(mem_desc_a, mem_desc_b, sg_k_count);
                     matAcc_t matAcc;
-                    matC_t matC;
-                    gemm1_t gemm;
 
                     matAcc.init(0);
-                    gemm(g, matAcc, gemm_args);
-                    // permute store
-                    subgroup::elemwise_cvt<matC_t, matAcc_t>(matC, matAcc);
-                    xetla_tdescriptor transpose_tdecs;
-                    // Define a temprary vector as output buffer
-                    xetla_vector<dtype_out, sg_tile_n_sv> out_reg;
-                    // Calculate new coordination of each element
-                    uint32_t b = item.get_group(0) / head_num;
-                    uint32_t n = item.get_group(0) % head_num;
-                    uint32_t f = start_m + gemm1_t::get_matC_offset_y(g);
-                    uint32_t h = start_n + gemm1_t::get_matC_offset_x(g);
+                    gemm1_t {}(g, matAcc, gemm_args);
 
-                    // transpose 8 * 16 tile and store to global
-                    for (uint32_t j = 0; j < sg_tile_m_sv; ++j, ++f) {
-                        uint32_t dst_offset
-                                = b * head_num * sequence_len * head_size
-                                + f * head_num * head_size + n * head_size;
-                        out_reg = matC.reg.xetla_select<sg_tile_n_sv, 1>(
-                                j * sg_tile_n_sv);
-                        xetla_fill_tdesc<dtype_out, sg_tile_n_sv, 1, 1>(
-                                transpose_tdecs.xetla_format<uint32_t>(),
-                                out + dst_offset, head_size, 1, head_size, h,
-                                0);
-                        xetla_tstore_global<dtype_out, sg_tile_n_sv,
-                                cache_hint::write_back, cache_hint::write_back,
-                                gpu_arch::Xe>(transpose_tdecs, out_reg);
-                    }
+                    // permute store
+                    matC_t matC;
+                    subgroup::elemwise_cvt<matC_t, matAcc_t>(matC, matAcc);
+                    // Calculate new coordination of each element
+                    const uint32_t b = batch_id / head_num;
+                    const uint32_t n = batch_id % head_num;
+                    const uint32_t batch_offset
+                            = b * head_num * sequence_len * head_size
+                            + start_m * head_num * head_size + n * head_size
+                            + start_n;
+                    const uint32_t f = gemm1_t::get_matC_offset_y(g);
+                    const uint32_t h = gemm1_t::get_matC_offset_x(g);
+
+                    const auto ld_c = head_num * head_size;
+                    mem_desc_c_t mem_desc_c;
+                    mem_desc_c.init(
+                            out + batch_offset, // dst_base = out_ptr + wg offset
+                            {
+                                    std::min(h + sg_tile_n_sv, wg_tile_n_sv),
+                                    std::min(f + sg_tile_m_sv, wg_tile_m_sv),
+                                    ld_c,
+                            },
+                            {int(h), int(f)});
+
+                    constexpr auto msg_type_c = msg_type::block_2d;
+                    using mat_tile_desc = typename matC_t::tile_desc;
+                    using matC_payload_t = subgroup::mem_payload_t<mem_desc_c_t,
+                            mat_tile_desc, msg_type_c, arch_tag>;
+                    matC_payload_t matC_payload(mem_desc_c);
+                    subgroup::tile_store<cache_hint::write_back,
+                            cache_hint::write_back>(matC, matC_payload);
                 });
             });
             gpu_event.wait();
@@ -488,7 +507,7 @@ void sdp_fwd_run(uint32_t iter) {
                     mem_layout::col_major, mem_layout::row_major,
                     mem_layout::row_major));
 
-    //performance
+    // performance
     prof.print_profiling_result(profiling_selector::GPU);
 
     free(q, context);
@@ -498,28 +517,36 @@ void sdp_fwd_run(uint32_t iter) {
     free(out, context);
 }
 
+template <gpu_arch arch_tag>
+struct main_wrapper {
+    static constexpr auto exec = []() {
+        // This example implements scaled-dot-production with batch_size: 16,
+        // num_heads: 16, sequence_length: 512, head_size: 64. It will be shown how to
+        // remap the index space of each work-item used for gemm1, softmax and gemm2.
+
+        // Description:
+        // Scaled-dot-production mechanism can be seen as two chained batch MatMul
+        // with a softmax in the middle layer. It can be described as following
+        // mathematical expression:
+        //   softmax(Q · (K.transpose(-1, -2)) * (1 / sqr_root(num_heads)) +
+        //   attn_mask) · V
+        // where:
+        //   Q, K, V: input data
+        //   shape(Q) = [16 x 16, 512, 64]
+        //   shape(K) = [16 x 16, 512, 64]
+        //   shape(V) = [16 x 16, 512, 64]
+        //   shape(attn_mask) = [16, 512, 512]
+        //   shape(DST) = [16, 512, 16, 64]
+
+        // This kernel is designed to execute the following task:
+        // 1: S = (Q · (K.transpose(-1, -2))) * (1 / sqr_root(num_heads)) + attn_mask
+        // 2: S' = softmax(S)
+        // 3: O = S' · V
+        sdp_fwd_run<arch_tag>(10);
+    };
+};
+
 int main() {
-    // This example implements scaled-dot-production with batch_size: 16,
-    // num_heads: 16, sequence_lenth: 512, head_size: 64. It will be shown how to
-    // remap the index space of each work-item used for gemm1, softmax and gemm2.
-
-    // Description:
-    // Scaled-dot-production mechanism can be seen as two chained batch MatMul with
-    // a softmax in the middle layer. It can be descripted as following
-    // mathematical expression:
-    //   softmax(Q · (K.transpose(-1, -2)) * (1 / sqr_root(num_heads)) + attn_mask) · V
-    // where:
-    //   Q, K, V: input data
-    //   shape(Q) = [16 x 16, 512, 64]
-    //   shape(K) = [16 x 16, 512, 64]
-    //   shape(V) = [16 x 16, 512, 64]
-    //   shape(attn_mask) = [16, 512, 512]
-
-    // This kernel is designed to execute the following task:
-    // 1: S = (Q · (K.transpose(-1, -2))) * (1 / sqr_root(num_heads)) + attn_mask
-    // 2: S' = softmax(S)
-    // 3: O = S' · V
-
-    sdp_fwd_run(10);
+    dispatch_arch<main_wrapper>::exec();
     return 0;
 }

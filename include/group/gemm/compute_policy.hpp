@@ -31,19 +31,20 @@ namespace gpu::xetla::group {
 /// @tparam perf_tuning_knob_ Is performance-related knobs.
 /// @tparam arch_tag_ Is the HW architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
-        gpu_arch arch_tag_>
+        gpu_arch arch_tag_ = gpu_arch::Xe, typename enable = void>
 struct compute_policy_default_xmx {};
 
 /// @brief Specialized for Xe architecture.
-template <typename compute_attr_, typename perf_tuning_knob_>
-struct compute_policy_default_xmx<compute_attr_, perf_tuning_knob_,
-        gpu_arch::Xe> {
+template <typename compute_attr_, typename perf_tuning_knob_,
+        gpu_arch arch_tag_>
+struct compute_policy_default_xmx<compute_attr_, perf_tuning_knob_, arch_tag_,
+        std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
     using compute_attr = compute_attr_;
     using perf_tuning_knob = perf_tuning_knob_;
     static constexpr int k_stride = perf_tuning_knob::k_stride;
     static constexpr int stages = perf_tuning_knob::stages;
     static constexpr int sync_freq = perf_tuning_knob::sync_freq;
-    static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+    static constexpr gpu_arch arch_tag = arch_tag_;
     using dtype_mma_acc = typename compute_attr::dtype_acc;
     using dtype_mma_a = typename compute_attr::dtype_a;
     using dtype_mma_b = typename compute_attr::dtype_b;
@@ -53,7 +54,8 @@ struct compute_policy_default_xmx<compute_attr_, perf_tuning_knob_,
             = block_bytes_x_a / sizeof(dtype_mma_a);
     static constexpr uint32_t block_size_y_a = 16;
 
-    static constexpr uint32_t block_size_x_b = 16;
+    static constexpr uint32_t block_size_x_b
+            = arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem;
     static constexpr uint32_t block_bytes_y_b = 32;
     static constexpr uint32_t block_size_y_b
             = block_bytes_y_b / sizeof(dtype_mma_b);
@@ -90,7 +92,7 @@ struct compute_policy_unaligned_xmx<compute_attr_, perf_tuning_knob_, arch_tag_,
     static constexpr uint32_t block_size_y_a = 16;
 
     static constexpr uint32_t block_size_x_b
-            = arch_tag == gpu_arch::Dg2 ? 8 : 16;
+            = arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem;
     static constexpr uint32_t block_bytes_y_b = 32;
     static constexpr uint32_t block_size_y_b
             = block_bytes_y_b / sizeof(dtype_mma_b);
@@ -103,19 +105,20 @@ struct compute_policy_unaligned_xmx<compute_attr_, perf_tuning_knob_, arch_tag_,
 /// @tparam perf_tuning_knob_ Is performance-related knobs.
 /// @tparam arch_tag_ Is the HW architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
-        gpu_arch arch_tag_>
+        gpu_arch arch_tag_ = gpu_arch::Xe, typename enable = void>
 struct compute_policy_default_fpu {};
 
 /// @brief Specialized for Xe architecture.
-template <typename compute_attr_, typename perf_tuning_knob_>
-struct compute_policy_default_fpu<compute_attr_, perf_tuning_knob_,
-        gpu_arch::Xe> {
+template <typename compute_attr_, typename perf_tuning_knob_,
+        gpu_arch arch_tag_>
+struct compute_policy_default_fpu<compute_attr_, perf_tuning_knob_, arch_tag_,
+        std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
     using compute_attr = compute_attr_;
     using perf_tuning_knob = perf_tuning_knob_;
     static constexpr int k_stride = perf_tuning_knob::k_stride;
     static constexpr int stages = perf_tuning_knob::stages;
     static constexpr int sync_freq = perf_tuning_knob::sync_freq;
-    static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+    static constexpr gpu_arch arch_tag = arch_tag_;
     using dtype_mma_acc = typename compute_attr::dtype_acc;
     using dtype_mma_a = typename compute_attr::dtype_a;
     using dtype_mma_b = typename compute_attr::dtype_b;

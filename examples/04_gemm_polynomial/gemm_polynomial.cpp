@@ -14,8 +14,8 @@
  * limitations under the License.
  *******************************************************************************/
 #include <algorithm>
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
 #include "gemm_polynomial.hpp"
 
@@ -137,7 +137,7 @@ void gemm_polynomial_run(int iter) {
     using epilogue_policy
             = xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using tune_option = dict_t<
             elem_v_t<tune_key::param_optimizer_type,
                     tune_key_value::param_optimizer_decision_tree>,
@@ -154,7 +154,7 @@ void gemm_polynomial_run(int iter) {
             data_type_c, // output datatype for C
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             gpu_arch::Xe, // GPU arch
             tune_option>;
 

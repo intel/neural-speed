@@ -16,8 +16,8 @@
 
 #include "common.hpp"
 #include "kernel_func.hpp"
-#include <utils/utils.hpp>
 #include <gtest/gtest.h>
+#include <utils/utils.hpp>
 
 std::string esimd_compile_string
         = " -vc-codegen -doubleGRF "

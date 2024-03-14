@@ -39,7 +39,7 @@ template <int num_global_kslicing_, int num_local_kslicing_, typename gemm_t_,
 class gemm_universal_t<dispatch_policy_kslicing<group_swizzle_,
                                num_global_kslicing_, num_local_kslicing_>,
         gemm_t_, epilogue_t_,
-        std::enable_if_t<(group_swizzle_::arch_tag == gpu_arch::Xe)>> {
+        std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::Xe)>> {
     using gemm_t = gemm_t_;
     using epilogue_t = epilogue_t_;
     using gemm_args_t = typename gemm_t::arguments_t;
@@ -239,8 +239,8 @@ public:
     __XETLA_API static constexpr uint32_t get_slm_size() {
         constexpr uint32_t size = gemm_slm_size * num_local_kslicing
                 + kslicing_slm_size + epilogue_slm_size * num_local_kslicing;
-        static_assert(size <= (128 * 1024),
-                "The local memory size should be less than 128KB!");
+        static_assert(size <= arch_attr_t<arch_tag>::local_mem_size,
+                "The local memory size excess!");
         return size;
     }
 

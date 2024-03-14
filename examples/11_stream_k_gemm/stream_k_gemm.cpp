@@ -13,8 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
 void stream_k_gemm_run(uint32_t iter) {
     // Tips, the example demonstrates programming kernel with XeTLA, it works as expected with current configurations.
@@ -85,7 +85,7 @@ void stream_k_gemm_run(uint32_t iter) {
                     sg_tile_n, //	subgroup size in dim0
                     sg_tile_m>; //	subgroup size in dim1
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using gemm_config = xetla::group::gemm_selector_t<
             data_type_a, // input datatype for A
             data_type_b, // input datatype for B
@@ -95,7 +95,7 @@ void stream_k_gemm_run(uint32_t iter) {
             mem_space::global, // memory reading from global mem for B
             8, // leading dimension for A, in unit of element
             8, // leading dimension for B, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             tile_shape, // computation tile shape
             sg_tile_k, // elements in each iteration
             mma_engine::xmx, // compute engine
@@ -303,7 +303,7 @@ void stream_k_gemm_relu_biasadd_run(uint32_t iter) {
                     sg_tile_n, //	subgroup size in dim0
                     sg_tile_m>; //	subgroup size in dim1
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using gemm_config = xetla::group::gemm_selector_t<
             data_type_a, // input datatype for A
             data_type_b, // input datatype for B
@@ -313,7 +313,7 @@ void stream_k_gemm_relu_biasadd_run(uint32_t iter) {
             mem_space::global, // memory reading from global mem for B
             8, // leading dimension for A, in unit of element
             8, // leading dimension for B, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             tile_shape, // computation tile shape
             sg_tile_k, // elements in each iteration
             mma_engine::xmx, // compute engine

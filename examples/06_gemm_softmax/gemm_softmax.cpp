@@ -14,8 +14,8 @@
  * limitations under the License.
  *******************************************************************************/
 
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
 using namespace gpu::xetla;
 using namespace cl::sycl;
@@ -156,8 +156,8 @@ void gemm_softmax_run(uint32_t iter) {
     cl::sycl::nd_range<3> nd_range(group_range * local_range, local_range);
 
     uint32_t warmup = 10;
-    int64_t ops
-            = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k * batch_num;
+    int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k
+            * batch_num;
     profiling_helper prof("gemm_softmax", ops, "gflops");
     try {
         for (uint32_t i = 0; i < iter + warmup; i++) {
@@ -178,11 +178,11 @@ void gemm_softmax_run(uint32_t iter) {
                     // should larger than 8
                     static constexpr uint32_t k_iter_num = 16;
 
-                    // Step 1: define mirco-kernel's configuration
+                    // Step 1: define Micro-kernel's configuration
                     using wg_shape = shape<wg_tile_n, wg_tile_m>;
                     using sg_shape = shape<sg_tile_n, sg_tile_m>;
 
-                    // Mirco-kernel configuration
+                    // Micro-kernel configuration
                     using tune_option = dict_t<
                             elem_v_t<tune_key::param_optimizer_type,
                                     tune_key_value::
@@ -203,7 +203,7 @@ void gemm_softmax_run(uint32_t iter) {
                             8, // leading dimension for B, in unit of element
                             mem_space::
                                     global, // memory reading from global mem for B
-                            data_type_sfx, // accumulator data type for intermediate resutls
+                            data_type_sfx, // accumulator data type for intermediate results
                             wg_shape, // computation tile shape
                             k_iter_num, // elements in each iteration
                             gpu_arch::Xe, // GPU arch
@@ -326,12 +326,12 @@ int main() {
     // Softmax needs entire row data for reduced sum and reduced max,
     // So result of batch-GeMM will be written into SLM.
     // When all thread in a work group finishing their job softmax start.
-    // To simlify the calculation of softmax, we make each single thread
+    // To simplify the calculation of softmax, we make each single thread
     // load entire one row data so that there's no data sharing
     // necessity among threads.
 
     // Description:
-    // This kernel can be descripted as following
+    // This kernel can be described as following
     // mathematical expression:
     //   C = softmax(A · B.transpose(-1, -2))
     // where:

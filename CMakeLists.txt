@@ -9,14 +9,14 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 if(UNIX)
 else() # Windows
-    # Force CMake to use icx-cl rather than the default C++ compiler/linker 
+    # Force CMake to use icx-cl rather than the default C++ compiler/linker
     # (needed on Windows only)
     # include (CMakeForceCompiler)
     # CMAKE_FORCE_CXX_COMPILER (icx-cl IntelDPCPP)
     set(CMAKE_CXX_COMPILER icx-cl)
     include (Platform/Windows-Clang)
     include(cmake/GTestExternal.cmake)
-endif() 
+endif()
 
 project(XeTLA)
 

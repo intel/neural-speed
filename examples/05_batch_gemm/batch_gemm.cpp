@@ -90,7 +90,7 @@ void batch_gemm_run(uint32_t iter) {
     using wg_shape = shape<wg_tile_n, wg_tile_m>;
     using sg_shape = shape<sg_tile_n, sg_tile_m>;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using tune_option
             = dict_t<elem_v_t<tune_key::param_optimizer_type,
                              tune_key_value::param_optimizer_decision_tree>,
@@ -106,7 +106,7 @@ void batch_gemm_run(uint32_t iter) {
             mem_layout::row_major, // memory layout for B
             8, // leading dimension for B, in unit of element
             mem_space::global, // memory reading from global mem for B
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             wg_shape, // computation tile shape
             wg_tile_k, // elements in each iteration
             gpu_arch::Xe, // GPU arch

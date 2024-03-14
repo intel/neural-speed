@@ -35,7 +35,7 @@ namespace gpu::xetla::kernel {
 template <typename gemm_t_, typename epilogue_t_, typename group_swizzle_>
 class gemm_universal_t<dispatch_policy_default<group_swizzle_>, gemm_t_,
         epilogue_t_,
-        std::enable_if_t<(group_swizzle_::arch_tag == gpu_arch::Xe)>> {
+        std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::Xe)>> {
     using gemm_t = gemm_t_;
     using epilogue_t = epilogue_t_;
     using gemm_args_t = typename gemm_t::arguments_t;
@@ -176,8 +176,8 @@ public:
     /// @return The size of local memory required.
     __XETLA_API static constexpr uint32_t get_slm_size() {
         constexpr uint32_t size = gemm_t::slm_size + epilogue_t::slm_size;
-        static_assert(size <= (128 * 1024),
-                "The local memory size should be less than 128KB!");
+        static_assert(size <= arch_attr_t<arch_tag>::local_mem_size,
+                "The local memory size excess!");
         return size;
     };
 

@@ -13,8 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
 #include <chrono>
 #include <thread>
@@ -83,7 +83,7 @@ void gemm_large_n_run(uint32_t iter) {
     // default 8
     static constexpr uint32_t wg_num_n = 8;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using group_swizzle
             = xetla::kernel::group_swizzle_snake<wg_num_n, gpu_arch::Xe>;
 
@@ -106,7 +106,7 @@ void gemm_large_n_run(uint32_t iter) {
             data_type_c, // output datatype for C
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             gpu_arch::Xe, // GPU arch
             tune_option>;
 

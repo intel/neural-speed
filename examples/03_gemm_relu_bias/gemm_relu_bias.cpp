@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 #include <algorithm>
-#include <tests/utils/utils.hpp>
 #include "xetla.hpp"
+#include <tests/utils/utils.hpp>
 
 using namespace cl::sycl;
 using namespace gpu::xetla;
@@ -140,7 +140,7 @@ void gemm_relu_bias_run(uint32_t iter) {
     using epilogue_policy
             = xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>;
 
-    // Mirco-kernel configuration
+    // Micro-kernel configuration
     using tune_option = dict_t<
             elem_v_t<tune_key::param_optimizer_type,
                     tune_key_value::param_optimizer_decision_tree>,
@@ -156,7 +156,7 @@ void gemm_relu_bias_run(uint32_t iter) {
             data_type_c, // output datatype for C
             mem_layout::row_major, // memory layout for C
             8, // leading dimension alignment for C, in unit of element
-            data_type_acc, // accumulator data type for intermediate resutls
+            data_type_acc, // accumulator data type for intermediate results
             gpu_arch::Xe, // GPU arch
             tune_option>;
     using gemm_op_t = typename default_config_t::type;
@@ -223,7 +223,7 @@ int main() {
     // The purpose of this example is to illustrate the epilogue_t API in XeTLA.
 
     // It allows user to implement multiple Ops inside a kernel call to avoid
-    // overheads in invokation, memory transfer, etc.
+    // overheads in invocation, memory transfer, etc.
     // Take the following python code as an example:
 
     // Original:
@@ -231,7 +231,7 @@ int main() {
     // > x = to.matmul(A, B)
     // > y = to.nn.functional.relu(x)
 
-    // It takes two kernel invokations and the ReLU Op is a elementwise operation
+    // It takes two kernel invocations and the ReLU Op is a elementwise operation
     // that could be fused into MatMul Op, which is basically calling GEMM kernel.
 
     // Fusion:
