@@ -158,6 +158,7 @@ model_name_map["phi2"]="microsoft/phi-2"
 model_name_map["qwen-1_5"]="Qwen/Qwen1.5-7B-Chat"
 model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
 model_name_map["mixtral-gptq"]="Mixtral-8x7B-Instruct-v0.1-GPTQ"
+model_name_map["qwen-gptq"]="Qwen/Qwen1.5-7B-Chat-GPTQ"
 
 
 function main() {
