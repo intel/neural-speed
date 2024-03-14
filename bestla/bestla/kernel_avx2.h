@@ -552,6 +552,9 @@ static inline void dequant_f4_N(_DST_T* dstptr, int8_t* srcptr, __m256* vscales,
     LUT = fp4_e2m1_dequant_fp32_LUT;
   }
   int constexpr VLoop = N / 8;
+  auto vLutL = _mm256_loadu_ps(LUT);
+  auto vLutH = _mm256_loadu_ps(LUT + 8);
+  auto v8 = _mm256_set1_epi32(8);
   for (int iv = 0; iv < VLoop; iv++) {
     auto idx = _mm_loadl_epi64(reinterpret_cast<__m128i*>(srcptr + iv * 8));
     auto pad_idx = _mm256_cvtepu8_epi32(idx);
