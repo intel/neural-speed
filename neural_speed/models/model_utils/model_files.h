@@ -1090,7 +1090,7 @@ struct model_file_loader {
     printf("%-16s %d.hparams.n_head = %-30d\n", __func__, count++, hparams.n_head);
     printf("%-16s %d.hparams.n_head_kv = %-30d\n", __func__, count++, hparams.n_head_kv);
     printf("%-16s %d.hparams.n_layer = %-30d\n", __func__, count++, hparams.n_layer);
-    printf("%-16s %d.hparams.n_rot = %-30d\n", __func__, count++, hparams.n_vocab);
+    printf("%-16s %d.hparams.n_rot = %-30d\n", __func__, count++, hparams.n_rot);
 
     hparams.ftype = (enum ne_ftype)file.read_u32();
     hparams.max_seq_len = file.read_u32();
@@ -1122,7 +1122,7 @@ struct model_file_loader {
     file.read_raw(&hparams.norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
-    printf("%-16s %d.hparams.inner_hidden_size = %-30d\n", __func__, count++, hparams.inner_hidden_size);
+    printf("%-16s %d.hparams.norm_eps = %-30d\n", __func__, count++, hparams.norm_eps);
     printf("%-16s %d.hparams.freq_base = %-30.3f\n", __func__, count++, hparams.freq_base);
     printf("%-16s %d.hparams.freq_scale = %-30.3f\n", __func__, count++, hparams.freq_scale);
 

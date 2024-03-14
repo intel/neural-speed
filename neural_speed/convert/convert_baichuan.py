@@ -48,6 +48,7 @@ def bytes_to_unicode():
 
 
 class SentencePieceVocab:
+
     def __init__(self, fname_tokenizer: Path, fname_added_tokens: Optional[Path]) -> None:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
@@ -116,8 +117,7 @@ def load_vocab_for_baichuan(path: Path) -> SentencePieceVocab:
         else:
             raise FileNotFoundError(
                 f"Could not find tokenizer.model in {path} or its parent; if it's in another directory, \
-                pass the directory as --vocab-dir"
-            )
+                pass the directory as --vocab-dir")
     added_tokens_path = path.parent / "added_tokens.json"
     print(f"Loading vocab file {path}")
     return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
@@ -161,9 +161,112 @@ def baichuan13B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
 
-    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
+
+    fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
+    fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
+    fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
+
+    tokenizer_path = Path(tokenizer.vocab_file).parent
+    vocab = load_vocab_for_baichuan(Path(tokenizer_path))
+    counter = 0
+    for text, score in vocab.all_tokens():
+        fout.write(struct.pack("i", len(text)))
+        fout.write(text)
+        fout.write(struct.pack("f", score))
+        counter += 1
+
+    while counter < hparams["vocab_size"]:
+        fout.write(struct.pack("i", len(text)))
+        fout.write(text)
+        fout.write(struct.pack("f", 0))
+        counter += 1
+
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        print("Processing variable: " + name + " with shape: ", data.shape)
+        if 'inv_freq' in name:
+            continue
+
+        n_dims = len(data.shape)
+
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
+        if ftype != 0:
+            if name[-7:] == ".weight" and n_dims == 2:
+                print("  Converting to float16")
+                data = data.astype(np.float16)
+                ftype_cur = 14
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+        else:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+
+        # header
+        str = name.encode("utf-8")
+        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(str)
+
+        # data
+        data.tofile(fout)
+
+    fout.close()
+
+    print("Done. Output file: " + fname_out)
+    print("")
+
+
+def baichuan7B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
+    print("Baichuan-7B converting: ")
+    list_vars = model.state_dict()
+    for name in list_vars.keys():
+        print(name, list_vars[name].shape, list_vars[name].dtype)
+
+    fout = open(fname_out, "wb")
+
+    print(hparams)
+
+    fout.write(struct.pack("i", 0x67676d66))
+    fout.write(struct.pack("i", 1))
+
+    fout.write(struct.pack("i", hparams["vocab_size"]))
+    fout.write(struct.pack("i", hparams["hidden_size"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["num_attention_heads"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["num_hidden_layers"]))
+    fout.write(struct.pack("i", 128))
+    fout.write(struct.pack("i", ftype))
+    fout.write(struct.pack("i", hparams["model_max_length"]))
+    fout.write(struct.pack("f", 0))
+    fout.write(struct.pack("f", 0))
+    fout.write(struct.pack("i", 0))
+
+    fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
+    fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
+
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["intermediate_size"]))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
+    fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms_norm_eps or layer_norm_eps
+    fout.write(struct.pack("f", 10000.0))  # freq_base
+    fout.write(struct.pack("f", 1.0))  # rope_factor
+
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
@@ -230,8 +333,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -255,7 +360,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     hparams = config.to_dict()
 
-    baichuan13B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    if hparams['hidden_size'] == 4096:
+        baichuan7B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    else:
+        baichuan13B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
 
 
 if __name__ == '__main__':

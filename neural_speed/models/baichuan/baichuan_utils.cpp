@@ -71,6 +71,7 @@ void BAICHUAN::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
   fprintf(stderr, "%s: n_ff       = %u\n", __func__, hparams.ffn_hidden_size);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
+  fprintf(stderr, "%s: inner_hidden_size      = %u\n", __func__, hparams.inner_hidden_size);
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
@@ -91,10 +92,6 @@ void BAICHUAN::load(model_context* ctx, model_progress_callback progress_callbac
   fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
 
   const auto& hparams = model.hparams;
-  const int head_dim = n_embd / hparams.n_head;
-  const int kv_heads = hparams.n_head;  // 1 if MQA else hparams.n_head
-  const int kv_dim = kv_heads * head_dim;
-  const int max_len = 4096;
 
   // create the ne context
   lctx.model.buf.resize(ctx_size);
