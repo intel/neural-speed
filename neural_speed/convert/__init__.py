@@ -24,7 +24,8 @@ model_maps = {
     "whisper": "whisper",
     "qwen2": "qwen",
     "RefinedWebModel": "falcon",
-    "RefinedWeb": "falcon"
+    "RefinedWeb": "falcon",
+    "phi-msft": "phi"
 }
 
 

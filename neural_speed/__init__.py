@@ -87,6 +87,10 @@ class Model:
         if model_type == "RefinedWebModel" or model_type == "RefinedWeb":
             model_type = "falcon"
 
+        # for TheBloke/phi-2-GPTQ
+        if model_type == "phi-msft":
+            model_type = "phi"
+
         return model_type
 
     def init(self,
