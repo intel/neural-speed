@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import os
-import sys
 from pathlib import Path
 import argparse
 from typing import List, Optional
@@ -35,6 +34,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         type=str,
         help="Prompt to start generation with: String (default: empty)",
         default="",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="Path to a text file containing the prompt (for large prompts)",
+        default=None,
     )
     parser.add_argument(
         "--tokenizer",
@@ -126,13 +132,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     args = parser.parse_args(args_in)
     print(args)
+    if args.file:
+        with open(args.file, 'r', encoding='utf-8') as f:
+            prompt_text = f.read()
+    else:
+        prompt_text = args.prompt
     model_name = model_maps.get(args.model_name, args.model_name)
     package_path = os.path.dirname(neural_speed.__file__)
     path = Path(package_path, "./run_{}".format(model_name))
 
     cmd = [path]
     cmd.extend(["--model", args.model])
-    cmd.extend(["--prompt", args.prompt])
+    cmd.extend(["--prompt", prompt_text])
     cmd.extend(["--n-predict", str(args.n_predict)])
     cmd.extend(["--threads", str(args.threads)])
     cmd.extend(["--batch-size-truncate", str(args.batch_size_truncate)])
@@ -153,7 +164,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     if (args.model_name == "chatglm"):
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, trust_remote_code=True)
-        token_ids_list = tokenizer.encode(args.prompt)
+        token_ids_list = tokenizer.encode(prompt_text)
         token_ids_list = map(str, token_ids_list)
         token_ids_str = ', '.join(token_ids_list)
         cmd.extend(["--ids", token_ids_str])
@@ -193,14 +204,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 else:
                     ids.append(ASSISTANT_TOKEN_ID)
 
-                content_ids = tokenizer.encode(args.prompt)
+                content_ids = tokenizer.encode(prompt_text)
                 ids.extend(content_ids)
 
             ids.append(ASSISTANT_TOKEN_ID)
             truncate(ids, max_length)
             return ids
 
-        history = [args.prompt]
+        history = [prompt_text]
         token_ids_list = encode_history(history)
         token_ids_list = map(str, token_ids_list)
         token_ids_str = ', '.join(token_ids_list)
