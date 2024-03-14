@@ -279,7 +279,7 @@ function main() {
         quant_script="./build/bin/quant_mixtral"
         convert_script="${convert_script}/convert_mixtral.py"
         infer_cmd="./build/bin/run_mixtral"
-    elif [[ "${model}" == "mixtral-gptq" ]]; then
+    elif [[ "${model}" == *"-gptq" ]]; then
         infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
         precision_list+=("default")
         requirements_file="$working_dir/neural_speed/models/requirements/mixtral-gptq.txt"
@@ -422,7 +422,7 @@ function main() {
                         [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
                             "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=1300
                         if [[ "${model}" == *"gptq" ]]; then
-                            NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) $infer_cmd 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
+                             NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) $infer_cmd -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
                         else
                             NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
                             $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $real_ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
