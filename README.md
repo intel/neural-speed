@@ -83,7 +83,7 @@ outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 from transformers import TextStreamer
 from modelscope import AutoTokenizer
 from intel_extension_for_transformers.transformers import AutoModelForCausalLM
-model_name = "qwen/Qwen-7B"     # Hugging Face model_id or local model
+model_name = "qwen/Qwen-7B"     # Modelscope model_id or local model
 prompt = "Once upon a time, there existed a little girl,"
 
 model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True, model_hub="modelscope")
