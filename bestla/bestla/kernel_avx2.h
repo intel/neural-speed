@@ -47,6 +47,21 @@ static inline __m128i unpack_4bits_sse(void* srcptr) {
   return xmm2;
 }
 
+static inline __m256i unpack_4bits_avx2(void* srcptr, __m256i mask) {
+  auto raw_data = _mm_loadu_si128(reinterpret_cast<__m128i*>(srcptr));
+  auto ymm0 = _mm256_cvtepu8_epi16(raw_data);
+  auto ymm1 = _mm256_slli_epi16(ymm0, 8);
+  ymm0 = _mm256_slli_epi16(ymm0, 4);
+  ymm0 = _mm256_or_epi32(ymm0, ymm1);
+  ymm0 = _mm256_and_si256(ymm0, mask);
+  return ymm0;
+}
+
+static inline void convert_s4_s8_32_avx2(int8_t* dstptr, int8_t* srcptr, __m256i mask) {
+  auto dst0 = unpack_4bits_avx2(srcptr, mask);
+  _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr), dst0);
+}
+
 inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
   auto vf32 = _mm256_cvtepu16_epi32(vbf16);
   return _mm256_castsi256_ps(_mm256_slli_epi32(vf32, 16));
@@ -367,11 +382,19 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == ld_src) {
     size_t elesize = static_cast<size_t>(row) * col;
+#if 0
     size_t ele16 = utils::padto_le(elesize, 16);
     size_t i = 0;
     for (; i < ele16; i += 16) {
       convert_s4_s8_16_sse<S4_T>(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2));
     }
+#else
+    size_t velt = utils::padto_le(elesize, 32);
+    size_t i = 0;
+    for (; i < velt; i += 32) {
+      convert_s4_s8_32_avx2(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
+    }
+#endif
     for (; i < elesize; i += 2) {
       auto tmp = srcptr[i / 2];
       dstptr[i + 0] = kernel::ref::get_s8<S4_T>(tmp.x);
@@ -389,6 +412,7 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == ld_src) {
     size_t elesize = static_cast<size_t>(row) * col;
+#if 0
     size_t ele16 = utils::padto_le(elesize, 16);
     size_t i = 0;
     assert(tmpsize >= 16);
@@ -397,6 +421,18 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
       convert_s8_fp_v8(dstptr + i, tmp);
       convert_s8_fp_v8(dstptr + i + 8, tmp + 8);
     }
+#else
+    size_t velt = utils::padto_le(elesize, 32);
+    size_t i = 0;
+    assert(tmpsize >= 32);
+    for (; i < velt; i += 32) {
+      convert_s4_s8_32_avx2(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2));
+      convert_s8_fp_v8(dstptr + i, tmp);
+      convert_s8_fp_v8(dstptr + i + 8, tmp + 8);
+      convert_s8_fp_v8(dstptr + i + 16, tmp + 16);
+      convert_s8_fp_v8(dstptr + i + 24, tmp + 24);
+    }
+#endif
     for (; i < elesize; i += 2) {
       auto tmp = srcptr[i / 2];
       dstptr[i + 0] = static_cast<_DST_T>(static_cast<float>(ref::get_s8<S4_T>(tmp.x)));
