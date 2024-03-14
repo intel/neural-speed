@@ -71,7 +71,7 @@ void BAICHUAN::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
   fprintf(stderr, "%s: n_ff       = %u\n", __func__, hparams.ffn_hidden_size);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
-  fprintf(stderr, "%s: inner_hidden_size      = %u\n", __func__, hparams.inner_hidden_size);
+  fprintf(stderr, "%s: inner_hidden_size = %u\n", __func__, hparams.inner_hidden_size);
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
