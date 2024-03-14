@@ -579,11 +579,23 @@ static inline void unpack_f4_N(_DST_T* dstptr, int8_t* srcptr) {
   } else if constexpr (F4_T == BTLA_DTYPE::F4_E2M1) {
     LUT = fp4_e2m1_dequant_fp32_LUT;
   }
+  auto vLutL = _mm256_loadu_ps(LUT);
+  auto vLutH = _mm256_loadu_ps(LUT + 8);
+  auto v8 = _mm256_set1_epi32(8);
   int constexpr VLoop = N / 8;
+  float tmp[8];
   for (int iv = 0; iv < VLoop; iv++) {
     auto idx = _mm_loadl_epi64(reinterpret_cast<__m128i*>(srcptr + iv * 8));
     auto pad_idx = _mm256_cvtepu8_epi32(idx);
-    auto fp32_dq_v = _mm256_i32gather_ps(LUT, pad_idx, 4);
+#if 0
+     auto fp32_dq_v = _mm256_i32gather_ps(LUT, pad_idx, 4);
+#else
+    auto mskgt8 = _mm256_cmpgt_epi32(pad_idx, v8);
+    auto fp32_dq_v0 = _mm256_permutevar8x32_ps(vLutL, pad_idx);
+    pad_idx = _mm256_sub_epi32(pad_idx, v8);
+    auto fp32_dq_v1 = _mm256_permutevar8x32_ps(vLutH, pad_idx);
+    auto fp32_dq_v = _mm256_blendv_ps(vLutL, vLutH, _mm256_castsi256_ps(mskgt8));
+#endif
     if constexpr (std::is_same_v<_DST_T, float>) {
       _mm256_storeu_ps(dstptr + iv * 8, fp32_dq_v);
     } else if constexpr (std::is_same_v<_DST_T, utils::bf16>) {
@@ -643,7 +655,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _
   auto dequantize = [&](_DST_T* dstptr, int8_t* srcptr, __m256* vscales, __m256i* vzps = nullptr) {
     if constexpr (QT_T == BTLA_DTYPE::S4_CLIP) {
       dequant_s8_N_avx2<_NCOL, _IS_SYM>(dstptr, srcptr, vscales, vzps);
-    } else {                                 
+    } else {
       dequant_f4_N<_NCOL, _DST_T, QT_T>(dstptr, srcptr, vscales, vzps);
     }
   };
