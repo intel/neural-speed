@@ -40,7 +40,11 @@ class UT_DecompressKBlockS4FP {
     kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::NoSIMD, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
+    DST_T thres = DST_T(0.01f);
+    if constexpr (std::is_same_v<DST_T, utils::bf16>) {
+      thres = DST_T(BF16_ERR);
+    }
+    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), thres);
   }
 
   template <BTLA_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
@@ -68,7 +72,11 @@ class UT_DecompressKBlockS4FP {
     kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::AVX2, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
+    DST_T thres = DST_T(0.01f);
+    if constexpr (std::is_same_v<DST_T,utils::bf16>) {
+      thres = DST_T(BF16_ERR);
+    }
+    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), thres);
   }
 };
 #ifdef BTLA_UT_KERNEL_WRAPPER

@@ -1023,7 +1023,7 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
         auto internal_n_offset = n_offset + i;
         auto internal_k_offset = k_offset / _GemmCore_T::PACK_ROW;
         auto internal_kblock = wptr->mBlockSize / _GemmCore_T::PACK_ROW;
-        auto dq_offset_idx = wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1;
+        auto dq_offset_idx = static_cast<int>(wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1);
         if (wptr->mDType == BTLA_DTYPE::F4_NF4) {
           kernel::wrapper::DecompressDqKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
                                                                                                    BTLA_DTYPE::F4_NF4>(
