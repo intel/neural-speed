@@ -282,6 +282,7 @@ function main() {
     elif [[ "${model}" == "mixtral-gptq" ]]; then
         infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
         precision_list+=("default")
+        requirements_file="$working_dir/neural_speed/models/requirements/mixtral-gptq.txt"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1
