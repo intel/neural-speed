@@ -149,7 +149,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
     lctx.use_buf(ctx0, 0);
 
     // self-attention
-    cur = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+    cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
     cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
     {
       // compute QKV
@@ -297,7 +297,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
     struct ne_tensor* hidden_states = ne_add(ctx0, inpL, cur);
 
     // mlp.forward
-    struct ne_tensor* mlp_output = ne_rms_norm(ctx0, hidden_states, hparams.rms_norm_eps);
+    struct ne_tensor* mlp_output = ne_rms_norm(ctx0, hidden_states, hparams.norm_eps);
     mlp_output = ne_mul(ctx0, mlp_output, model.layers[il].norm[1]);
 
     if (model.layers[il].ffn_fusion &&
@@ -332,7 +332,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+    inpL = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
     inpL = ne_mul(ctx0, inpL, model.others[1]);
   }
 

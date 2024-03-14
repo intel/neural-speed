@@ -82,7 +82,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                                  low_cpu_mem_usage=True,
                                                  trust_remote_code=True)
     print("Model loaded: ", dir_model)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = config.to_dict()
 
     list_vars = model.state_dict()
@@ -117,7 +117,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
+    fout.write(struct.pack("f", hparams.get("layer_norm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
 

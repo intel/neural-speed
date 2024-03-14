@@ -1,33 +1,49 @@
 # Neural Speed
 
-Neural Speed is an innovation library designed to provide the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization and sparsity powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor) and [llama.cpp](https://github.com/ggerganov/llama.cpp). Highlights of this project:
+Neural Speed is an innovative library designed to support the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor). The work is inspired by [llama.cpp](https://github.com/ggerganov/llama.cpp) and further optimized for Intel platforms with our innovations in [NeurIPS' 2023](https://arxiv.org/abs/2311.00502)
 
-- Support LLAMA, LLAMA2, NeuralChat series, GPT-J, GPT-NEOX, Dolly-v2, MPT, Falcon, BLOOM, OPT, ChatGLM, ChatGLM2, Baichuan, Baichuan2, Qwen, Mistral, Whisper, CodeLlama, MagicCoder and StarCoder
-- [Highly optimized low precision kernels](neural_speed/core/README.md), utilize AMX, VNNI, AVX512F, AVX_VNNI and AVX2 instruction set
-- Up to 40x compared with [llama.cpp](https://github.com/ggerganov/llama.cpp), performance details: [blog](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
-- NeurIPS' 2023: [Efficient LLM Inference on CPUs](https://arxiv.org/abs/2311.00502)
-- Support 4bits and 8bits quantization
-- Tensor Parallelism across sockets/nodes: [tensor_parallelism.md](./docs/tensor_parallelism.md)
+## Key Features
+- Highly optimized low-precision kernels on CPUs with ISAs (AMX, VNNI, AVX512F, AVX_VNNI and AVX2). See [details](neural_speed/core/README.md)
+- Up to 40x performance speedup on popular LLMs compared with llama.cpp. See [details](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
+- Tensor parallelism across sockets/nodes on CPUs. See [details](./docs/tensor_parallelism.md)
 
 > Neural Speed is under active development so APIs are subject to change.
 
+## Supported Hardware
+| Hardware | Supported |
+|-------------|:-------------:|
+|Intel Xeon Scalable Processors | ✔ |
+|Intel Xeon CPU Max Series | ✔ |
+|Intel Core Processors | ✔ |
+
+## Supported Models
+Support almost all the LLMs in PyTorch format from Hugging Face such as Llama2, ChatGLM2, Baichuan2, Qwen, Mistral, Whisper, etc. File an [issue](https://github.com/intel/neural-speed/issues) if your favorite LLM does not work.
+
+Support typical LLMs in GGUF format such as Llama2, Falcon, MPT, Bloom etc. More are coming. Check out the [details](./docs/supported_models.md).
+
 ## Installation
 
-### Build Python package (Recommended way)
+### Install from binary
+```shell
+pip install neural-speed
+```
+
+### Build from Source
 ```shell
 pip install -r requirements.txt
 pip install .
 ```
 
->**Note**: Please make sure GCC version is higher than GCC 10.
+>**Note**: GCC requires version 10+
 
 
-## Quick Start
-There are two approaches for utilizing the Neural Speed: 1. Transformer-like usage, you need to install [ITREX(intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers) 2. llama.cpp-like usage
+## Quick Start (Transformer-like usage)
 
-### 1. Transformer-like usage
+Install [Intel Extension for Transformers](https://github.com/intel/intel-extension-for-transformers) to use Transformer-like APIs.
 
-Pytorch format HF model
+
+### PyTorch Model from Hugging Face
+
 ```python
 from transformers import AutoTokenizer, TextStreamer
 from intel_extension_for_transformers.transformers import AutoModelForCausalLM
@@ -41,7 +57,9 @@ streamer = TextStreamer(tokenizer)
 model = AutoModelForCausalLM.from_pretrained(model_name, load_in_4bit=True)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
-GGUF format HF model
+
+### GGUF Model from Hugging Face
+
 ```python
 from transformers import AutoTokenizer, TextStreamer
 from intel_extension_for_transformers.transformers import AutoModelForCausalLM
@@ -60,7 +78,8 @@ streamer = TextStreamer(tokenizer)
 model = AutoModelForCausalLM.from_pretrained(model_name, model_file = model_file)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
-Pytorch format modelscpoe model
+
+### PyTorch Model from Modelscope
 ```python
 import sys
 from modelscope import AutoTokenizer
@@ -76,83 +95,47 @@ model = Model()
 model.init(model_name, weight_dtype="int4", compute_dtype="int8", model_hub="modelscope")
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
-Please refer [this link](./docs/supported_models.md) to check supported models.
 
-If you want to use [Transformer-based API](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/weightonlyquant.md#llm-runtime-example-code) in [ITREX(Intel extension for transformers)](https://github.com/intel/intel-extension-for-transformers). Please refer to [ITREX Installation Page](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md).
+## Quick Start (llama.cpp-like usage)
 
-### 2. llama.cpp-like usage:
+### Single (One-click) Step
 
-#### One-click Python scripts
-Run LLM with one-click python script including conversion, quantization and inference.
 ```
 python scripts/run.py model-path --weight_dtype int4 -p "She opened the door and see"
 ```
 
-#### Quantize and Inference Step By Step
-Neural Speed supports 1. GGUF models generated by [llama.cpp](https://github.com/ggerganov/llama.cpp) 2. GGUF models from HuggingFace 3. PyTorch model from HuggingFace, but quantized by Neural Speed
-Neural Speed offers the scripts: 1) convert and quantize, and 2) inference for converting the model by yourself.
-If the GGUF model is from HuggingFace or generated by llama.cpp, you can inference it directly.
+### Multiple Steps
 
-
-##### 1. Convert and Quantize LLM
-converting the model by following the below steps:
+#### Convert and Quantize
 
 ```bash
-# convert the model directly use model id in Hugging Face. (recommended)
+# skip the step if GGUF model is from Hugging Face or generated by llama.cpp
 python scripts/convert.py --outtype f32 --outfile ne-f32.bin EleutherAI/gpt-j-6b
 ```
-##### 2. Inference
 
-Linux and WSL
+#### Inference
 
 ```bash
+# Linux and WSL
 OMP_NUM_THREADS=<physic_cores> numactl -m 0 -C 0-<physic_cores-1> python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores> --color -p "She opened the door and see"
 ```
 
-Windows
 ```bash
+# Windows
 python scripts/inference.py --model_name llama -m ne-q4_j.bin -c 512 -b 1024 -n 256 -t <physic_cores|P-cores> --color -p "She opened the door and see"
 ```
 
-> For details please refer to [Advanced Usage](./docs/advanced_usage.md).
+> Please refer to [Advanced Usage](./docs/advanced_usage.md) for more details.
 
-## Supported Hardware
-| Hardware | Optimization |
-|-------------|:-------------:|
-|Intel Xeon Scalable Processors | ✔ |
-|Intel Xeon CPU Max Series | ✔ |
-|Intel Core Processors | ✔ |
+## Advanced Topics
 
-## Supported Models
-LLAMA, LLAMA2, NeuralChat series, GPT-J, GPT-NEOX, Dolly-v2, MPT, Falcon, BLOOM, OPT, ChatGLM, ChatGLM2, Baichuan, Baichuan2, Qwen, Mistral, Whisper, CodeLlama, MagicCoder and StarCoder.
+### New model enabling
+You can consider adding your own models, please follow the document: [graph developer document](./developer_document.md).
 
-Neural Speed also supports GGUF models generated by [llama.cpp](https://github.com/ggerganov/llama.cpp), you need to download the model and use llama.cpp to create it. Validated models: [llama2-7b-chat-hf](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf), [falcon-7b](https://huggingface.co/tiiuae/falcon-7b), [falcon-40b](https://huggingface.co/tiiuae/falcon-40b), [mpt-7b](https://huggingface.co/mosaicml/mpt-7b), [mpt-40b](https://huggingface.co/mosaicml/mpt-40b) and [bloom-7b1](https://huggingface.co/bigscience/bloomz-7b1).
-
-Please check more validated GGUF models from HuggingFace in [list](./docs/supported_models.md).
-
-## Advanced Usage
-
-### 1. Quantization and inferenece
-More parameters in llama.cpp-like usage: [Advanced Usage](./docs/advanced_usage.md).
-
-### 2. Tensor Parallelism cross nodes/sockets
-
-We support tensor parallelism strategy for distributed inference/training on multi-node and multi-socket. You can refer to [tensor_parallelism.md](./docs/tensor_parallelism.md) to enable this feature.
-
-### 3. Custom Stopping Criteria
-
-You can customize the stopping criteria according to your own needs by processing the input_ids to determine if text generation needs to be stopped.
-Here is the document of Custom Stopping Criteria: [simple example with minimum generation length of 80 tokens](./docs/customized_stop.md)
-
-### 4. Verbose Mode
-
-Enable verbose mode and control tracing information using the `NEURAL_SPEED_VERBOSE` environment variable.
+### Performance profiling
+Enable `NEURAL_SPEED_VERBOSE` environment variable for performance profiling.
 
 Available modes:
-- 0: Print all tracing information. Comprehensive output, including: evaluation time and operator profiling. (need to set `NS_PROFILING` to ON and recompile)
+- 0: Print full information: evaluation time and operator profiling. Need to set `NS_PROFILING` to ON and recompile.
 - 1: Print evaluation time. Time taken for each evaluation.
-- 2: Profile individual operator. Identify performance bottleneck within the model. (need to set `NS_PROFILING` to ON and recompile)
-
-
-## Enable New Model
-You can consider adding your own models, please follow the document: [graph developer document](./developer_document.md).
+- 2: Profile individual operator. Identify performance bottleneck within the model. Need to set `NS_PROFILING` to ON and recompile.
