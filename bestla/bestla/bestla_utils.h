@@ -324,8 +324,6 @@ inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
       return "unsigned_int8";
     case BTLA_DTYPE::S4_CLIP:
       return "int4_clip";
-    case BTLA_DTYPE::S4_FULLRANGE:
-      return "int4_fullrange";
     case BTLA_DTYPE::F4_E2M1:
       return "fp4_e2m1";
     case BTLA_DTYPE::F4_BNB:

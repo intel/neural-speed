@@ -249,17 +249,8 @@ static inline BTLA_CODE decompress_s4_f32(utils::int4x2* srcptr, float* dstptr, 
 
 template <BTLA_DTYPE S4_T>
 inline int8_t get_s8(int8_t v) {
-  switch (S4_T) {
-    case BTLA_DTYPE::S4_CLIP:
-      return v << 4;
-    case BTLA_DTYPE::S4_FULLRANGE:
-      v &= 0x0f;
-      return v - 8;
-    default:
-      assert(false);
-      break;
-  }
-  return static_cast<int8_t>(0);
+  static_assert(S4_T == BTLA_DTYPE::S4_CLIP);
+  return v << 4;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -304,14 +295,6 @@ inline void convert_s4_s8_8_lowbits(int8_t* dstptr, int8_t* srcptr) {
 }
 
 template <>
-inline void convert_s4_s8_8<BTLA_DTYPE::S4_FULLRANGE>(int8_t* dstptr, int8_t* srcptr) {
-  convert_s4_s8_8_lowbits(dstptr, srcptr);
-  for (size_t i = 0; i < 8; i++) {
-    dstptr[i] -= 8;
-  }
-}
-
-template <>
 inline void convert_s4_s8_8<BTLA_DTYPE::F4_BNB>(int8_t* dstptr, int8_t* srcptr) {
   convert_s4_s8_8_lowbits(dstptr, srcptr);
 }
@@ -328,6 +311,7 @@ inline void convert_s4_s8_8<BTLA_DTYPE::F4_E2M1>(int8_t* dstptr, int8_t* srcptr)
 
 template <BTLA_DTYPE S4_T>
 inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst) {
+  static_assert(S4_T == BTLA_DTYPE::S4_CLIP);
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
@@ -896,24 +880,6 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
         dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
       }
     };
-    auto s4_fullrange_calc_store_scale_and_quantv_sym = [&](int blocksize) {
-      float amax = 0.f, max = 0.f;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        auto v = srcptr[(j + ij) * ld_src + i];
-        if (amax < std::abs(v)) {
-          amax = std::abs(v);
-          max = v;
-        }
-      }
-      float scale = max / -8.f;
-      float rscale = scale != 0.f ? 1.f / scale : 0.f;
-      scales[j / raw_blocksize * ld_dst + i] = scale;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        auto quant_v = srcptr[(j + ij) * ld_src + i] * rscale;
-        int8_t x = std::min(static_cast<int8_t>(15), static_cast<int8_t>(quant_v + 8.5f));
-        dstptr[(j + ij) * ld_dst + i] = x << 4;
-      }
-    };
     auto s8_calc_store_scale_and_quantv_asym = [&](int blocksize) {
       float maxval = 0.f;
       float minval = 0.f;
@@ -929,28 +895,6 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       zero_points[j / raw_blocksize * ld_dst + i] = bzp;
       for (size_t ij = 0; ij < blocksize; ij++) {
         dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i] - fmedium) * rscale);
-      }
-    };
-    auto s4_fullrange_calc_store_scale_and_quantv_asym = [&](int blocksize) {
-      float maxval = 0.f;
-      float minval = 0.f;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        auto v = srcptr[(j + ij) * ld_src + i];
-        maxval = std::max(maxval, v);
-        minval = std::min(minval, v);
-      }
-      float max = std::abs(maxval) < std::abs(minval) ? minval - maxval : maxval - minval;
-      float scale = max / -16.f;
-      float rscale = scale != 0.f ? 1.f / scale : 0.f;
-      scales[j / raw_blocksize * ld_dst + i] = scale;
-      float fmedium = (maxval + minval) / 2;
-      ;
-      int8_t bzp = utils::cast<float, int8_t>((0.f - fmedium) * rscale);
-      zero_points[j / raw_blocksize * ld_dst + i] = bzp;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        auto quant_v = (srcptr[(j + ij) * ld_src + i] - fmedium) * rscale;
-        int8_t x = std::min(static_cast<int8_t>(15), static_cast<int8_t>(quant_v + 8.5f));
-        dstptr[(j + ij) * ld_dst + i] = x << 4;
       }
     };
     auto sNauto_calc_store_scale_and_quantv_sym = [&](int blocksize) {
@@ -994,13 +938,6 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
             sNauto_calc_store_scale_and_quantv_sym(blocksize);
           } else {
             s8_calc_store_scale_and_quantv_asym(blocksize);
-          }
-          break;
-        case BTLA_DTYPE::S4_FULLRANGE:
-          if (zero_points == nullptr) {
-            s4_fullrange_calc_store_scale_and_quantv_sym(blocksize);
-          } else {
-            s4_fullrange_calc_store_scale_and_quantv_asym(blocksize);
           }
           break;
         default:

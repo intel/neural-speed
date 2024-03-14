@@ -415,11 +415,9 @@ class UT_BlockQuantize_INT4 {
     CheckISA(AVX2);
     CheckISA(AVX512F);
     ut_2(4096, 4096, 128, BTLA_DTYPE::S4_CLIP, false);
-    ut_2(4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE, false);
     CheckISA(AVX512F);
     ut_512vnni(4096, 4096, 128, BTLA_DTYPE::S4_CLIP, false);
     ut_512vnni(4096, 4096, 128, BTLA_DTYPE::S4_CLIP, true);
-    ut_512vnni(4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE, false);
   }
   void ut_2(int n, int k, int blocksize, BTLA_DTYPE qtype, bool asym = false) {
     printf("Test Case: %d %d %d %s\n", n, k, blocksize, asym ? "asym" : "sym");
@@ -516,7 +514,6 @@ class UT_StorageMemCheck {
     UT_START();
     CheckISA(AVX512F);
     ut_s4(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-    ut_s4(4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, true);
     ut_f4(4096, 4096, 32, BTLA_DTYPE::F4_BNB);
     ut_f4(4096, 4096, 32, BTLA_DTYPE::F4_E2M1);
   }
@@ -565,7 +562,6 @@ class UT_ShuffleIndices {
     UT_START();
     CheckISA(AVX2);
     // ut_file();
-    ut_s4(4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, true);
     ut_s4(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
   }
 
@@ -685,15 +681,7 @@ class UT_CompFp32 {
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                           false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::F32,
-                                                          false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE, BTLA_DTYPE::BF16,
                                                           false);
 
     CheckISA(AVX512F);
@@ -703,16 +691,8 @@ class UT_CompFp32 {
                                                              false);
     ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                              false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE,
-                                                             BTLA_DTYPE::F32, false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE,
-                                                             BTLA_DTYPE::F32, false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE,
-                                                             BTLA_DTYPE::F32, false);
     ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16,
                                                              false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE,
-                                                             BTLA_DTYPE::BF16, false);
   }
 
   void ut_s8() {
@@ -865,11 +845,7 @@ class UT_CompInt8 {
       ut<sAVX_VNNI, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
       ut<sAVX_VNNI, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
       ut<sAVX_VNNI, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP);
-      ut<sAVX_VNNI, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
-      ut<sAVX_VNNI, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
-      ut<sAVX_VNNI, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
       ut<sAVX_VNNI, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-      ut<sAVX_VNNI, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
     }
 
     if (_cd->AVX512_VNNI()) {
@@ -880,11 +856,7 @@ class UT_CompInt8 {
       ut<sAVX512_VNNI, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
       ut<sAVX512_VNNI, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
       ut<sAVX512_VNNI, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP);
-      ut<sAVX512_VNNI, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
-      ut<sAVX512_VNNI, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
-      ut<sAVX512_VNNI, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
       ut<sAVX512_VNNI, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-      ut<sAVX512_VNNI, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
       ut<sAVX512_VNNI, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, true);
     }
 
@@ -892,11 +864,7 @@ class UT_CompInt8 {
       request_perm_xtile_data();
       ut<sAMX_INT8_US, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
       ut<sAMX_INT8_US, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP);
-      ut<sAMX_INT8_US, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
-      ut<sAMX_INT8_US, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
-      ut<sAMX_INT8_US, float>(16, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
       ut<sAMX_INT8_US, utils::bf16>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
-      ut<sAMX_INT8_US, utils::bf16>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
       ut<sAMX_INT8_US, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, true);
       ut_s8s8<sAMX_INT8_SS, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
       ut_s8s8<sAMX_INT8_SS, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP);
@@ -1234,11 +1202,7 @@ class UT_CompBf16 {
     ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
     ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
     ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
   }
 
   void ut_s8() {
@@ -1522,11 +1486,7 @@ class UT_CompFp16 {
     ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
     ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP);
-    ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
-    ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, 128, BTLA_DTYPE::S4_FULLRANGE);
-    ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, float>(2, 4096, 4096, -1, BTLA_DTYPE::S4_FULLRANGE);
     ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<sAVX512_FP16, prologue_b::gemm::WeightKBlockS4, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::S4_FULLRANGE);
   }
 
   void ut_s8() {

@@ -301,8 +301,7 @@ class QuantizeSignIntRowBlock {
   static inline BTLA_CODE forward(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
                                   float* scales, int8_t* zero_points, int blocksize) {
 #if CompileAVX512F()
-    if constexpr (utils::isa_base<ISA_T>::avx512f &&
-                  QDT_T != BTLA_DTYPE::S4_FULLRANGE) {  // TODO(zhe): support simd version s4_fullrange quantization.
+    if constexpr (utils::isa_base<ISA_T>::avx512f) { 
       return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
                                                             zero_points, blocksize);
     }

@@ -43,7 +43,7 @@ static inline __m128i unpack_4bits_sse(void* srcptr) {
   auto xmm2 = _mm_unpacklo_epi8(xmm0, xmm1);
   auto xmm3 = _mm_unpackhi_epi8(xmm0, xmm1);
   xmm2 = _mm_unpacklo_epi64(xmm2, xmm3);
-  if constexpr (S4_T != BTLA_DTYPE::S4_FULLRANGE) xmm2 = _mm_slli_epi32(xmm2, 4);
+  if constexpr (S4_T != BTLA_DTYPE::F4_NF4) xmm2 = _mm_slli_epi32(xmm2, 4);
   return xmm2;
 }
 
@@ -88,7 +88,7 @@ inline __m128i ymm_cvt_fp32_bf16(__m256 vfp32) {
 template <BTLA_DTYPE S4_T>
 static inline void convert_s4_s8_16_sse(int8_t* dstptr, int8_t* srcptr) {
   auto dst0 = unpack_4bits_sse<S4_T>(srcptr);
-  if constexpr (S4_T == BTLA_DTYPE::S4_FULLRANGE) {
+  if constexpr (S4_T == BTLA_DTYPE::F4_NF4) {
     auto s8 = _mm_set1_epi8(8);
     dst0 = _mm_sub_epi8(dst0, s8);
   }
@@ -109,7 +109,7 @@ static inline void convert_s8_fp_v8(T* dstptr, int8_t* srcptr) {
 }
 
 static inline void fp4_pad_4bit(int8_t* dstptr, int8_t* srcptr) {
-  auto dst0 = unpack_4bits_sse<BTLA_DTYPE::S4_FULLRANGE>(srcptr);
+  auto dst0 = unpack_4bits_sse<BTLA_DTYPE::F4_NF4>(srcptr);
   _mm_storeu_si128(reinterpret_cast<__m128i*>(dstptr), dst0);
 }
 
