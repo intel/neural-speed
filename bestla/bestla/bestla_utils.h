@@ -157,12 +157,16 @@ struct f8 {
   }
 
   inline float tofloat() const {
-    uint32_t tmp = x;
+    int32_t r = x + 127;
+    uint32_t tmp = bit_cast<uint32_t, int32_t>(r & 0xff);
     tmp <<= 23;
-    return *(float*)&tmp;
+    return bit_cast<float, uint32_t>(tmp);
   }
 
-  inline float mul(float src) const { return src * tofloat(); }
+  inline float mul(float src) const {
+    auto scale = tofloat();
+    return src * scale;
+  }
 };
 
 struct fp16 {
