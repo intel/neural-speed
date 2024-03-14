@@ -382,19 +382,12 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   if (col == ld_src) {
     size_t elesize = static_cast<size_t>(row) * col;
-#if 0
-    size_t ele16 = utils::padto_le(elesize, 16);
-    size_t i = 0;
-    for (; i < ele16; i += 16) {
-      convert_s4_s8_16_sse<S4_T>(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2));
-    }
-#else
     size_t velt = utils::padto_le(elesize, 32);
+    size_t velt2 = utils::padto_le(elesize, 16);
     size_t i = 0;
     for (; i < velt; i += 32) {
       convert_s4_s8_32_avx2(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
     }
-#endif
     for (; i < elesize; i += 2) {
       auto tmp = srcptr[i / 2];
       dstptr[i + 0] = kernel::ref::get_s8<S4_T>(tmp.x);
@@ -752,6 +745,42 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
                                                         void (*pad_bit4)(int8_t*, int8_t*), int8_t* tmp,
                                                         size_t tmpsize) {
   return BTLA_CODE::NotSupport;
+}
+
+template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
+                                                int ld_dst, _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                int NPad, int8_t* tmp, size_t tmpsize) {
+  auto ret = BTLA_CODE::NotSupport;
+  if constexpr (_PACK_ROW == 1 && std::is_same_v<_DST_T, float> && std::is_same_v<_ST, float>) {
+    if (zero_points == nullptr) {
+      if (col == 24) {
+        ret = avx2::decompress_kblock_bit4_packrow1<true, 24>(
+            srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
+            &avx2::dequant_s8_N_avx2<24, true>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
+            reinterpret_cast<int8_t*>(tmp), tmpsize);
+      } else if (col == 48) {
+        ret = avx2::decompress_kblock_bit4_packrow1<true, 48>(
+            srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
+            &avx2::dequant_s8_N_avx2<48, true>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
+            reinterpret_cast<int8_t*>(tmp), tmpsize);
+      }
+
+    } else {
+      if (col == 24) {
+        ret = avx2::decompress_kblock_bit4_packrow1<false, 24>(
+            srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
+            &avx2::dequant_s8_N_avx2<24, false>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
+            reinterpret_cast<int8_t*>(tmp), tmpsize);
+      } else if (col == 48) {
+        ret = avx2::decompress_kblock_bit4_packrow1<false, 48>(
+            srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
+            &avx2::dequant_s8_N_avx2<48, false>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
+            reinterpret_cast<int8_t*>(tmp), tmpsize);
+      }
+    }
+  }
+  return ret;
 }
 
 template <BTLA_DTYPE _F4_T, typename _DST_T, int _PACK_ROW, typename _ST>
