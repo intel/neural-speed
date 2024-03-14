@@ -538,20 +538,21 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
   return BTLA_CODE::Success;
 }
 
-template <int N, typename _DST_T, BTLA_DTYPE F4_T, bool BS_T>
-static inline void dequant_f4_N(_DST_T* dstptr, int8_t* srcptr, __m256* vscales, __m256 vLutL, __m256 vLutH,
-                                __m256i v8) {
+template <int N, typename _DST_T, BTLA_DTYPE F4_T, bool MULS_T>
+static inline void dequant_f4_N(_DST_T* dstptr, int8_t* srcptr, __m256* vscales, __m256 vLutL, __m256 vLutH) {
   static_assert(N % 8 == 0);
   int constexpr VLoop = N / 8;
+  auto v7 = _mm256_set1_epi32(7);
+  auto v8 = _mm256_set1_epi32(8);
   for (int iv = 0; iv < VLoop; iv++) {
     auto idx = _mm_loadl_epi64(reinterpret_cast<__m128i*>(srcptr + iv * 8));
     auto pad_idx = _mm256_cvtepu8_epi32(idx);
-    auto mskgt8 = _mm256_cmpgt_epi32(pad_idx, v8);
+    auto mskgt8 = _mm256_cmpgt_epi32(pad_idx, v7);
     auto fp32_dq_v0 = _mm256_permutevar8x32_ps(vLutL, pad_idx);
     pad_idx = _mm256_sub_epi32(pad_idx, v8);
     auto fp32_dq_v1 = _mm256_permutevar8x32_ps(vLutH, pad_idx);
     auto fp32_dq_v = _mm256_blendv_ps(fp32_dq_v0, fp32_dq_v1, _mm256_castsi256_ps(mskgt8));
-    if constexpr (BS_T) {
+    if constexpr (MULS_T) {
       fp32_dq_v = _mm256_mul_ps(fp32_dq_v, vscales[iv]);
     }
     if constexpr (std::is_same_v<_DST_T, float>) {
@@ -580,7 +581,6 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
   }
   auto vLutL = _mm256_loadu_ps(LUT);
   auto vLutH = _mm256_loadu_ps(LUT + 8);
-  auto v8 = _mm256_set1_epi32(8);
   if (col == ld_src) {
     size_t elesize = static_cast<size_t>(row) * col;
     size_t velt = utils::padto_le(elesize, 32);
@@ -588,7 +588,7 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
     assert(tmpsize >= 32);
     for (; i < velt; i += 32) {
       convert_s4_s8_N_avx2<32, F4_T>(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
-      dequant_f4_N<32, DST_T, F4_T, false>(dstptr + i, tmp, nullptr, vLutL, vLutH, v8);
+      dequant_f4_N<32, DST_T, F4_T, false>(dstptr + i, tmp, nullptr, vLutL, vLutH);
     }
     for (; i < elesize; i += 2) {
       auto tmp = srcptr[i / 2];
@@ -620,7 +620,6 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _
     vLutL = _mm256_loadu_ps(LUT);
     vLutH = _mm256_loadu_ps(LUT + 8);
   }
-  auto v8 = _mm256_set1_epi32(8);
   int constexpr NReg = _NCOL / 8;
   assert(col == _NCOL);
   assert(ld_src == _NCOL);
@@ -641,7 +640,7 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _
     if constexpr (QT_T == BTLA_DTYPE::S4_CLIP) {
       dequant_s8_N_avx2<_NCOL, _IS_SYM>(dstptr, srcptr, vscales, vzps);
     } else {
-      dequant_f4_N<_NCOL, _DST_T, QT_T, true>(dstptr, srcptr, vscales, vLutL, vLutH, v8);
+      dequant_f4_N<_NCOL, _DST_T, QT_T, true>(dstptr, srcptr, vscales, vLutL, vLutH);
     }
   };
   if (row0) {
