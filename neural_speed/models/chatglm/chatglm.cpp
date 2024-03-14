@@ -118,7 +118,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
 
     lctx.use_buf(ctx0, 0);
 
-    cur = ne_norm(ctx0, inpL);
+    cur = ne_norm(ctx0, inpL, hparams.norm_eps);
 
     ne_set_name(cur, "cur");
     cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
@@ -238,7 +238,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
     attn_input = ne_scale_inplace(ctx0, attn_input, alpha);
     inpL = ne_add_inplace(ctx0, attn_input, cur);
 
-    struct ne_tensor* mlp_input = ne_norm(ctx0, inpL);
+    struct ne_tensor* mlp_input = ne_norm(ctx0, inpL, hparams.norm_eps);
 
     ne_set_name(mlp_input, "mlp_input");
     mlp_input = ne_mul(ctx0, mlp_input, model.layers[il].norm[2]);
@@ -270,7 +270,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
 
     ne_set_name(inpL, "inpL");
     inpL = ne_mul(ctx0, inpL, model.others[1]);

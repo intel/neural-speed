@@ -86,7 +86,7 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
         toktypes: list[int] = []
 
         from transformers import AutoTokenizer  # type: ignore[attr-defined]
-        tokenizer = AutoTokenizer.from_pretrained(dir_model)
+        tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
         vocab_size = hparams.get("vocab_size", len(tokenizer.vocab))
         assert max(tokenizer.vocab.values()) < vocab_size
 
@@ -199,7 +199,7 @@ def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
+    fout.write(struct.pack("f", hparams.get("layer_norm_eps", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
     fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
