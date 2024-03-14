@@ -489,7 +489,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
       auto fp_v = ref::f8_to_fp32(srcptr[i * ld_src + j], src_f8_type);
       if constexpr (WITH_SCALE) {
         if constexpr (std::is_same_v<_S_T, utils::f8>) {
-          dstptr[i * ld_dst + j] = fp_v * std::pow(2, sptr[j / _PACK_ROW].x);
+          dstptr[i * ld_dst + j] = sptr[j / _PACK_ROW].mul(fp_v);
         } else if constexpr (std::is_same_v<_S_T, float>) {
           dstptr[i * ld_dst + j] = fp_v * sptr[j / _PACK_ROW];
         }
@@ -553,7 +553,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
       if constexpr (!std::is_same_v<SCA_T, utils::f8>) {
         dstptr[i * dststep + j] += alpha[j] * srcptr[i * srcstep + j];
       } else {
-        dstptr[i * dststep + j] += std::powf(2, alpha[j].x) * srcptr[i * srcstep + j];
+        dstptr[i * dststep + j] += alpha[j].mul(srcptr[i * srcstep + j]);
       }
     }
   }

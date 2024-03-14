@@ -1528,7 +1528,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
       if constexpr (!std::is_same_v<SCA_T, utils::f8>) {
         dstptr[i * dststep + j] += static_cast<float>(alpha[j]) * srcptr[i * srcstep + j];
       } else {
-        dstptr[i * dststep + j] += std::pow(2, alpha[j].x) * srcptr[i * srcstep + j];
+        dstptr[i * dststep + j] += alpha[j].mul(srcptr[i * srcstep + j]);
       }
     }
   }

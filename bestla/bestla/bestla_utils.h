@@ -155,6 +155,14 @@ struct f8 {
     x = v;
     return *this;
   }
+
+  inline float tofloat() const {
+    uint32_t tmp = x;
+    tmp <<= 23;
+    return *(float*)&tmp;
+  }
+
+  inline float mul(float src) const { return src * tofloat(); }
 };
 
 struct fp16 {
