@@ -63,14 +63,13 @@ void BAICHUAN::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
-  n_ff = 4 * hparams.n_embd;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
   fprintf(stderr, "%s: n_layer    = %u\n", __func__, hparams.n_layer);
   fprintf(stderr, "%s: n_rot      = %u\n", __func__, hparams.n_rot);
-  fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
+  fprintf(stderr, "%s: n_ff       = %u\n", __func__, hparams.ffn_hidden_size);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
@@ -118,7 +117,7 @@ void BAICHUAN::load(model_context* ctx, model_progress_callback progress_callbac
   ml->ne_ctx = ne_ctx;
   size_t vram_total = 0;
 
-  if (ml->verify_tensor("token_embd.weight")) {
+  if (ml->verify_tensor("token_embd.weight")) {  // for gguf
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -139,10 +138,13 @@ void BAICHUAN::load(model_context* ctx, model_progress_callback progress_callbac
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
 
       // ffn GEMM
-      layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, uint32_t(13696)}, backend);
+      layer.ffn[0] =
+          ml->get_tensor(layers_i + ".ffn_gate.weight", {n_embd, uint32_t(model.hparams.ffn_hidden_size)}, backend);
 
-      layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_down.weight", {uint32_t(13696), n_embd}, backend);
-      layer.ffn[2] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, uint32_t(13696)}, backend);
+      layer.ffn[1] =
+          ml->get_tensor(layers_i + ".ffn_down.weight", {uint32_t(model.hparams.ffn_hidden_size), n_embd}, backend);
+      layer.ffn[2] =
+          ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, uint32_t(model.hparams.ffn_hidden_size)}, backend);
 
       layer.v_cache = nullptr;
       layer.k_cache = nullptr;
