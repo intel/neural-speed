@@ -52,7 +52,7 @@ static inline __m256i unpack_4bits_avx2(void* srcptr, __m256i mask) {
   auto ymm0 = _mm256_cvtepu8_epi16(raw_data);
   auto ymm1 = _mm256_slli_epi16(ymm0, 8);
   ymm0 = _mm256_slli_epi16(ymm0, 4);
-  ymm0 = _mm256_or_epi32(ymm0, ymm1);
+  ymm0 = _mm256_or_si256(ymm0, ymm1);
   ymm0 = _mm256_and_si256(ymm0, mask);
   return ymm0;
 }
