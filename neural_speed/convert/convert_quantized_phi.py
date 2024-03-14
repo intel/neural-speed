@@ -125,7 +125,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
         # header
         # write_header(fout, shape, dst_name, ftype_cur)
-        str = src_name.encode('utf-8')
+        str = dst_name.encode('utf-8')
         fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
         for i in range(n_dims):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
@@ -146,17 +146,21 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     for i in range(hparams["n_layer"]):
         prefix = "transformer.h." + str(i)
+        renamed_prefix = "model.layers." + str(i)
 
-        convert_qwen_to_fp32_tensor(f"{prefix}.ln.weight", f"{prefix}.ln.weight", list_vars, fout)
-        convert_qwen_to_fp32_tensor(f"{prefix}.ln.bias", f"{prefix}.ln.bias", list_vars, fout)
+        convert_qwen_to_fp32_tensor(f"{prefix}.ln.weight", f"{renamed_prefix}.input_layernorm.weight", list_vars, fout)
+        convert_qwen_to_fp32_tensor(f"{prefix}.ln.bias", f"{renamed_prefix}.input_layernorm.bias", list_vars, fout)
 
         # qkv GEMM
-        convert_to_qx_bestla_tensor(f"{prefix}.mixer.Wqkv.weight", f"{prefix}.mixer.Wqkv.weight", list_vars, fout,
-                                    quantize_config)
-        convert_qwen_to_fp32_tensor(f"{prefix}.mixer.Wqkv.bias", f"{prefix}.mixer.Wqkv.bias", list_vars, fout)
-        convert_to_qx_bestla_tensor(f"{prefix}.mixer.out_proj.weight", f"{prefix}.mixer.out_proj.weight", list_vars,
+        convert_to_qx_bestla_tensor(f"{prefix}.mixer.Wqkv.weight", f"{renamed_prefix}.mixer.Wqkv.weight", list_vars,
                                     fout, quantize_config)
-        convert_qwen_to_fp32_tensor(f"{prefix}.mixer.out_proj.bias", f"{prefix}.mixer.out_proj.bias", list_vars, fout)
+        convert_qwen_to_fp32_tensor(f"{prefix}.mixer.Wqkv.bias", f"{renamed_prefix}.mixer.Wqkv.bias", list_vars, fout)
+
+        convert_to_qx_bestla_tensor(f"{prefix}.mixer.out_proj.weight", f"{renamed_prefix}.mixer.out_proj.weight",
+                                    list_vars, fout, quantize_config)
+        convert_qwen_to_fp32_tensor(f"{prefix}.mixer.out_proj.bias", f"{renamed_prefix}.mixer.out_proj.bias", list_vars,
+                                    fout)
+
         # convert_to_qx_bestla_tensor(f"{prefix}.self_attn.q_proj.weight",
         #                             f"{prefix}.self_attn.q_proj.weight", list_vars, fout, quantize_config)
         # convert_to_qx_bestla_tensor(f"{prefix}.self_attn.k_proj.weight",
@@ -178,13 +182,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         #                             f"{prefix}.self_attn.dense.bias", list_vars, fout)
 
         # ffn GEMM
-        convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc1.weight", f"{prefix}.mlp.fc1.weight", list_vars, fout,
+        convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc1.weight", f"{renamed_prefix}.mlp.fc1.weight", list_vars, fout,
                                     quantize_config)
-        convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc2.weight", f"{prefix}.mlp.fc2.weight", list_vars, fout,
+        convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc2.weight", f"{renamed_prefix}.mlp.fc2.weight", list_vars, fout,
                                     quantize_config)
 
-        convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc1.bias", f"{prefix}.mlp.fc1.bias", list_vars, fout)
-        convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc2.bias", f"{prefix}.mlp.fc2.bias", list_vars, fout)
+        convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc1.bias", f"{renamed_prefix}.mlp.fc1.bias", list_vars, fout)
+        convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc2.bias", f"{renamed_prefix}.mlp.fc2.bias", list_vars, fout)
 
     fout.close()
     print(f"Success! saved as {out_path}")
