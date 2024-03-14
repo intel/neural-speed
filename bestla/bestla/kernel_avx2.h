@@ -426,7 +426,7 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
     size_t i = 0;
     assert(tmpsize >= 32);
     for (; i < velt; i += 32) {
-      convert_s4_s8_32_avx2(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2));
+      convert_s4_s8_32_avx2(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
       convert_s8_fp_v8(dstptr + i, tmp);
       convert_s8_fp_v8(dstptr + i + 8, tmp + 8);
       convert_s8_fp_v8(dstptr + i + 16, tmp + 16);
