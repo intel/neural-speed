@@ -235,13 +235,13 @@ Neural Speed supports the following models:
     <td><a href="https://huggingface.co/baichuan-inc/Baichuan-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan-13B-Chat</a>,
     <a href="https://huggingface.co/baichuan-inc/Baichuan2-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan2-13B-Chat</a></td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>4.33.1</td>
     <td>4096</td>
   </tr>

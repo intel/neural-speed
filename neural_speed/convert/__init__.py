@@ -18,7 +18,15 @@
 from pathlib import Path
 import subprocess
 
-model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper", "qwen2": "qwen"}
+model_maps = {
+    "gpt_neox": "gptneox",
+    "gpt_bigcode": "starcoder",
+    "whisper": "whisper",
+    "qwen2": "qwen",
+    "RefinedWebModel": "falcon",
+    "RefinedWeb": "falcon",
+    "phi-msft": "phi"
+}
 
 
 def convert_model(model, outfile, outtype="f32", format="NE", model_hub="huggingface", use_quantized_model=False):
