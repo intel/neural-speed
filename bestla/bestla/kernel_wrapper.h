@@ -241,21 +241,21 @@ class Dq8GetScale {
  public:
   template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk, int dq_offset_idx,
-                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding) {
+                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding, int mN) {
 #if CompileAVX512F()
     if (ISA_T >= BTLA_ISA::AVX512F) {
       return kernel::avx512f::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
-                                               src_stride, dst_stride, zeropadding);
+                                               src_stride, dst_stride, zeropadding, mN);
     }
 #endif
 #if CompileAVX2()
     if (ISA_T >= BTLA_ISA::AVX2) {
       return kernel::avx2::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
-                                            src_stride, dst_stride, zeropadding);
+                                            src_stride, dst_stride, zeropadding, mN);
     }
 #endif
     return kernel::ref::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale, src_stride,
-                                         dst_stride, zeropadding);
+                                         dst_stride, zeropadding, mN);
   }
 };
 

@@ -117,8 +117,8 @@ static inline void dequant_s8_N_avx2(float* dstptr, int8_t* srcptr, __m256* vsca
 }
 
 inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
-                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
-                                  bool zeropadding) {
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride, bool zeropadding,
+                                  int mN) {
   auto head_proc_num = utils::updiv(scale_offset, 8) * 8 - scale_offset;
   auto ymm_dq_offset = _mm256_set1_ps(dq_scale[dq_offset_idx]);
 
@@ -140,10 +140,10 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
 
   for (int i = 0; i < row; i++) {
     if (head_proc_num > col) {
-      get_fp_scale_ref(col, scale_offset, src + i * src_stride, dst + i * dst_stride);
+      get_fp_scale_ref(col, scale_offset + i * mN, src + i * src_stride, dst + i * dst_stride);
     } else {
-      get_fp_scale_ref(head_proc_num, scale_offset, src + i * src_stride, dst + i * dst_stride);
-      auto scale_offset_iter = scale_offset + head_proc_num;
+      get_fp_scale_ref(head_proc_num, scale_offset + i * mN, src + i * src_stride, dst + i * dst_stride);
+      auto scale_offset_iter = scale_offset + i * mN + head_proc_num;
       uint8_t* src_iter_ptr = src + head_proc_num;
       float* dst_iter_ptr = dst + head_proc_num;
       auto body_loop = (col - head_proc_num) / 8;

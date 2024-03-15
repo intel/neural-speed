@@ -1233,11 +1233,11 @@ inline BTLA_CODE dq8_bnb_double_quant(float* scale, size_t scale_size, int dq_bl
 }
 
 inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
-                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
-                                  bool zeropadding) {
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride, bool zeropadding,
+                                  int mN) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
-      auto dq_s_idx = (scale_offset + j) / dq_blk;
+      auto dq_s_idx = (i * mN + scale_offset + j) / dq_blk;
       dst[i * dst_stride + j] = dq8_bnb_LUT[src[i * src_stride + j]] * dq_scale[dq_s_idx] + dq_scale[dq_offset_idx];
     }
   }

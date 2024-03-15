@@ -1356,8 +1356,8 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
 }
 
 inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
-                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
-                                  bool zeropadding) {
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride, bool zeropadding,
+                                  int mN) {
   auto head_proc_num = utils::updiv(scale_offset, 16) * 16 - scale_offset;
   auto zmm_dq_offset = _mm512_set1_ps(dq_scale[dq_offset_idx]);
 
@@ -1375,13 +1375,13 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
   for (int i = 0; i < row; i++) {
     if (head_proc_num > col) {
       auto mask = _cvtu32_mask16(0xffff >> (16 - col));
-      get_fp_scale(col, mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
+      get_fp_scale(col, mask, scale_offset + i * mN, src + i * src_stride, dst + i * dst_stride);
     } else {
       // TODO(zhe): consider head_proc_num==0 case.
       auto head_mask = _cvtu32_mask16(0xffff >> (16 - head_proc_num));
       auto body_mask = _cvtu32_mask16(0xffff);
-      get_fp_scale(head_proc_num, head_mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
-      auto scale_offset_iter = scale_offset + head_proc_num;
+      get_fp_scale(head_proc_num, head_mask, scale_offset + i * mN, src + i * src_stride, dst + i * dst_stride);
+      auto scale_offset_iter = scale_offset + i * mN + head_proc_num;
       uint8_t* src_iter_ptr = src + head_proc_num;
       float* dst_iter_ptr = dst + head_proc_num;
       auto body_loop = (col - head_proc_num) / 16;

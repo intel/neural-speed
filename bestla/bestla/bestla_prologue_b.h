@@ -674,7 +674,7 @@ class WeightKBlockNInteger {
       kernel::wrapper::Dq8GetScale::template forward<ISA_T>(
           aptr + internal_k_offset * wptr->CStep() + n_offset, *dstptr, utils::updiv(k_size, wptr->mBlockSize), n_size,
           internal_k_offset * wptr->mN + n_offset, wptr->mDqBlockSize, dq_offset_idx, wptr->DQPtr<float>(),
-          wptr->CStep(), n_size, false);
+          wptr->CStep(), n_size, false, wptr->mN);
     }
     return BTLA_CODE::Success;
   }
