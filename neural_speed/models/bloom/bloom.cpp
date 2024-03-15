@@ -100,7 +100,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
 
   // word embeddings norm
   {
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
     inpL = ne_mul(ctx0, ne_repeat(ctx0, model.others[1], inpL), inpL);
     inpL = ne_add(ctx0, ne_repeat(ctx0, model.others[2], inpL), inpL);
   }
@@ -112,7 +112,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
     lctx.use_buf(ctx0, 0);
     // norm
     {
-      cur = ne_norm(ctx0, inpL);
+      cur = ne_norm(ctx0, inpL, hparams.norm_eps);
 
       // cur = attention_norm*cur
       cur = ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].norm[0], cur), cur);
@@ -205,7 +205,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
     {
       // norm
       {
-        cur = ne_norm(ctx0, inpFF);
+        cur = ne_norm(ctx0, inpFF, hparams.norm_eps);
 
         // cur = ffn_norm*cur + ffn_norm_b
         cur = ne_mul(ctx0, ne_repeat(ctx0, model.layers[il].ffn[0], cur), cur);
@@ -242,7 +242,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
   lctx.use_buf(ctx0, -1);
   // norm
   {
-    inpL = ne_norm(ctx0, inpL);
+    inpL = ne_norm(ctx0, inpL, hparams.norm_eps);
 
     // inpL = norm*inpL
     inpL = ne_mul(ctx0, ne_repeat(ctx0, model.others[3], inpL), inpL);

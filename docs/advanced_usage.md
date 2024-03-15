@@ -13,6 +13,7 @@ Argument description of run.py ([supported MatMul combinations](#supported-matri
 | --compute_dtype             | Data type of Gemm computation: int8/bf16/fp16/fp32 (default: fp32)                                                 |
 | --use_ggml                  | Enable ggml for quantization and inference                                                                    |
 | -p / --prompt               | Prompt to start generation with: String (default: empty)                                                      |
+| -f / --file                 | Path to a text file containing the prompt (for large prompts)                                                  |
 | -n / --n_predict            | Number of tokens to predict: Int (default: -1, -1 = infinity)                                                 |
 | -t / --threads              | Number of threads to use during computation: Int (default: 56)                                                |
 | -b / --batch_size_truncate  | Batch size for prompt processing: Int (default: 512)                                                          |
@@ -22,6 +23,7 @@ Argument description of run.py ([supported MatMul combinations](#supported-matri
 | --color                     | Colorise output to distinguish prompt and user input from generations                                         |
 | --keep                      | Number of tokens to keep from the initial prompt: Int (default: 0, -1 = all)                                  |
 | --shift-roped-k             | Use [ring-buffer](./docs/infinite_inference.md#shift-rope-k-and-ring-buffer) and thus do not re-computing after reaching ctx_size (default: False) |
+| --token                     | Access token ID for models that require it (e.g: LLaMa2, etc..)                                                |
 
 
 ### 1. Conversion and Quantization
@@ -108,6 +110,7 @@ Argument description of inference.py:
 | -m / --model                                      | Path to the executed model: String                                                                                                                                                      |
 | --build_dir                                       | Path to the build file: String                                                                                                                                                          |
 | -p / --prompt                                     | Prompt to start generation with: String (default: empty)                                                                                                                                |
+| -f / --file                                       | Path to a text file containing the prompt (for large prompts)                                                                                                                            |
 | -n / --n_predict                                  | Number of tokens to predict: Int (default: -1, -1 = infinity)                                                                                                                           |
 | -t / --threads                                    | Number of threads to use during computation: Int (default: 56)                                                                                                                          |
 | -b / --batch_size                                 | Batch size for prompt processing: Int (default: 512)                                                                                                                                    |

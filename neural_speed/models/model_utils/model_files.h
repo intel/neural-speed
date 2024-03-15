@@ -914,7 +914,7 @@ struct gguf_loader {
     GGUF_GET_KEY(ctx_gguf, hparams.n_layer, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_BLOCK_COUNT));
     GGUF_GET_KEY(ctx_gguf, hparams.n_rot, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_ROPE_DIMENSION_COUNT));
 
-    GGUF_GET_KEY(ctx_gguf, hparams.rms_norm_eps, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false,
+    GGUF_GET_KEY(ctx_gguf, hparams.norm_eps, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false,
                  kv(LLM_KV_ATTENTION_LAYERNORM_RMS_EPS));
     GGUF_GET_KEY(ctx_gguf, hparams.freq_base, gguf_get_val_f32, GGUF_TYPE_FLOAT32, false, kv(LLM_KV_ROPE_FREQ_BASE));
 
@@ -1119,8 +1119,7 @@ struct model_file_loader {
     printf("%-16s %d.hparams.n_experts = %-30d\n", __func__, count++, hparams.n_experts);
     printf("%-16s %d.hparams.n_experts_used = %-30d\n", __func__, count++, hparams.n_experts_used);
 
-    // rms related
-    file.read_raw(&hparams.rms_norm_eps, sizeof(float));
+    file.read_raw(&hparams.norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
     printf("%-16s %d.hparams.inner_hidden_size = %-30d\n", __func__, count++, hparams.inner_hidden_size);
@@ -1264,7 +1263,7 @@ struct model_file_saver {
     file.write_u32(hparams.n_experts);
     file.write_u32(hparams.n_experts_used);
 
-    file.write_raw(&hparams.rms_norm_eps, sizeof(float));
+    file.write_raw(&hparams.norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
     file.write_raw(&hparams.freq_scale, sizeof(float));
     file.write_raw(&hparams.rope_scaling_factor, sizeof(float));

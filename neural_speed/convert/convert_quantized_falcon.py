@@ -25,27 +25,6 @@ from sentencepiece import SentencePieceProcessor
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def load_vocab_for_baichuan(path: Path) -> SentencePieceVocab:
-    # Be extra-friendly and accept either a file or a directory.  Also, if it's
-    # a directory, it might be the model directory, and tokenizer.model might
-    # be in the parent of that.
-    if path.is_dir():
-        path2 = path / "tokenizer.model"
-        # Use `.parent` instead of /.. to handle the symlink case better.
-        path3 = path.parent / "tokenizer.model"
-        if path2.exists():
-            path = path2
-        elif path3.exists():
-            path = path3
-        else:
-            raise FileNotFoundError(
-                f"Could not find tokenizer.model in {path} or its parent; if it's in another directory, \
-                pass the directory as --vocab-dir")
-    added_tokens_path = path.parent / "added_tokens.json"
-    print(f"Loading vocab file {path}")
-    return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
-
-
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
@@ -75,30 +54,30 @@ def main(args_in: Optional[List[str]] = None) -> None:
         ftype = 1
 
     # 1. write hparams
-    print(hparams)
-    ne_file_magic = 0x67676d66
-    fout.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
-    fout.write(struct.pack("i", 1))
+    n_head_kv = hparams.get("n_head_kv", 1)
+    n_head = hparams["n_head"]
+    head_dim = hparams["hidden_size"] // n_head
+
+    fout.write(struct.pack("i", 0x67676d6c))  # magic: falcon in hex
 
     fout.write(struct.pack("i", hparams["vocab_size"]))
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", hparams["num_attention_heads"]))
-    fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", hparams["num_hidden_layers"]))
+    fout.write(struct.pack("i", n_head))
+    fout.write(struct.pack("i", n_head_kv))  # multi-query attention
+    fout.write(struct.pack("i", hparams["n_layer"]))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", ftype))
-    fout.write(struct.pack("i", hparams["model_max_length"]))
+    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("f", 0))
     fout.write(struct.pack("f", 0))
     fout.write(struct.pack("i", 0))
-
     fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", hparams["intermediate_size"]))
+    fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
@@ -115,22 +94,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
     # 2. vocab
-    tokenizer_path = Path(tokenizer.vocab_file).parent
-    vocab = load_vocab_for_baichuan(Path(tokenizer_path))
-    counter = 0
-    for text, score in vocab.all_tokens():
+    reverse_vocab = {id: encoded_tok for encoded_tok, id in tokenizer.vocab.items()}
+    byte_encoder = bytes_to_unicode()
+    byte_decoder = {v: k for k, v in byte_encoder.items()}
+
+    for i in range(hparams["vocab_size"]):
+        text = bytearray([byte_decoder[c] for c in reverse_vocab[i]])
         fout.write(struct.pack("i", len(text)))
         fout.write(text)
-        fout.write(struct.pack("f", score))
-        counter += 1
 
-    while counter < hparams["vocab_size"]:
-        fout.write(struct.pack("i", len(text)))
-        fout.write(text)
-        fout.write(struct.pack("f", 0))
-        counter += 1
-
-    def convert_qwen_to_fp32_tensor(src_name, dst_name, model, fout):
+    def convert_to_fp32_tensor(src_name, dst_name, model, fout):
         # qwen-gptq is torch.bfloat16 mostly.
         if model[src_name].dtype == torch.float32:
             data = model[src_name].squeeze().numpy()
@@ -139,7 +112,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         data = data.astype(np.float32)
         shape = data.shape
         n_dims = len(shape)
-        print("convert_qwen_to_fp32_tensor:  %40s" % src_name + "-> %-40s" % dst_name + " shape: ", shape, " type: ",
+        print("convert_to_fp32_tensor:  %45s" % src_name + "-> %-40s" % dst_name + " shape: ", shape, " type: ",
               data.dtype)
 
         #ftype_cur = {torch.float16: 1, torch.float32: 0}[data.dtype]
@@ -163,30 +136,35 @@ def main(args_in: Optional[List[str]] = None) -> None:
         data.tofile(fout)
 
     #3. write tensors
-    convert_qwen_to_fp32_tensor("model.embed_tokens.weight", "model.embed_tokens.weight", list_vars, fout)
-    convert_qwen_to_fp32_tensor("model.norm.weight", "model.norm.weight", list_vars, fout)
-    convert_qwen_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
+    convert_to_fp32_tensor("transformer.word_embeddings.weight", "transformer.word_embeddings.weight", list_vars, fout)
+    convert_to_fp32_tensor("transformer.ln_f.weight", "transformer.ln_f.weight", list_vars, fout)
+    convert_to_fp32_tensor("transformer.ln_f.bias", "transformer.ln_f.bias", list_vars, fout)
+    convert_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
 
-    for i in range(hparams["num_hidden_layers"]):
-        prefix = "model.layers." + str(i)
+    for i in range(hparams["n_layer"]):
+        prefix = "transformer.h." + str(i)
 
-        convert_qwen_to_fp32_tensor(f"{prefix}.input_layernorm.weight", f"{prefix}.input_layernorm.weight", list_vars,
-                                    fout)
-        convert_qwen_to_fp32_tensor(f"{prefix}.post_attention_layernorm.weight",
-                                    f"{prefix}.post_attention_layernorm.weight", list_vars, fout)
+        if n_head_kv == 1:
+            convert_to_fp32_tensor(f"{prefix}.input_layernorm.weight", f"{prefix}.input_layernorm.weight", list_vars,
+                                   fout)
+            convert_to_fp32_tensor(f"{prefix}.input_layernorm.bias", f"{prefix}.input_layernorm.bias", list_vars, fout)
+        elif n_head_kv == 8:
+            convert_to_fp32_tensor(f"{prefix}.ln_mlp.weight", f"{prefix}.ln_mlp.weight", list_vars, fout)
+            convert_to_fp32_tensor(f"{prefix}.ln_mlp.bias", f"{prefix}.ln_mlp.bias", list_vars, fout)
+            convert_to_fp32_tensor(f"{prefix}.ln_attn.weight", f"{prefix}.ln_attn.weight", list_vars, fout)
+            convert_to_fp32_tensor(f"{prefix}.ln_attn.bias", f"{prefix}.ln_attn.bias", list_vars, fout)
+
         # qkv GEMM
-        convert_to_qx_bestla_tensor(f"{prefix}.self_attn.W_pack.weight", f"{prefix}.self_attn.W_pack.weight", list_vars,
-                                    fout, quantize_config)
-        convert_to_qx_bestla_tensor(f"{prefix}.self_attn.o_proj.weight", f"{prefix}.self_attn.o_proj.weight", list_vars,
-                                    fout, quantize_config)
+        convert_to_qx_bestla_tensor(f"{prefix}.self_attention.query_key_value.weight",
+                                    f"{prefix}.self_attention.query_key_value.weight", list_vars, fout, quantize_config)
+        convert_to_qx_bestla_tensor(f"{prefix}.self_attention.dense.weight", f"{prefix}.self_attention.dense.weight",
+                                    list_vars, fout, quantize_config)
 
         # ffn GEMM
-        convert_to_qx_bestla_tensor(f"{prefix}.mlp.gate_proj", f"{prefix}.mlp.gate_proj.weight", list_vars, fout,
-                                    quantize_config)
-        convert_to_qx_bestla_tensor(f"{prefix}.mlp.down_proj", f"{prefix}.mlp.down_proj.weight", list_vars, fout,
-                                    quantize_config)
-        convert_to_qx_bestla_tensor(f"{prefix}.mlp.up_proj", f"{prefix}.mlp.up_proj.weight", list_vars, fout,
-                                    quantize_config)
+        convert_to_qx_bestla_tensor(f"{prefix}.mlp.dense_h_to_4h", f"{prefix}.mlp.dense_h_to_4h.weight", list_vars,
+                                    fout, quantize_config)
+        convert_to_qx_bestla_tensor(f"{prefix}.mlp.dense_4h_to_h", f"{prefix}.mlp.dense_4h_to_h.weight", list_vars,
+                                    fout, quantize_config)
 
     fout.close()
     print(f"Success! saved as {out_path}")

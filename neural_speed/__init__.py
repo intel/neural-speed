@@ -24,7 +24,6 @@ max_request_num_default = 1
 
 
 class Model:
-
     def __init__(self):
         self.module = None
         self.model = None
@@ -83,6 +82,15 @@ class Model:
         model_type = model_maps.get(model_config.model_type, model_config.model_type)
         if model_type == "chatglm" and "chatglm2" in model_config._name_or_path:
             model_type = "chatglm2"
+
+        # for TheBloke/falcon-40b-instruct-GPTQ & TheBloke/Falcon-7B-Instruct-GPTQ
+        if model_type == "RefinedWebModel" or model_type == "RefinedWeb":
+            model_type = "falcon"
+
+        # for TheBloke/phi-2-GPTQ
+        if model_type == "phi-msft":
+            model_type = "phi"
+
         return model_type
 
     def init(self,
