@@ -5,7 +5,7 @@
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
 
-#ifdef BTLA_UT_PROLOGUE_B
+#ifdef BTLA_UT_DEBUG
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -177,22 +177,27 @@ class UT_BlockQunatize_S3S4 {
  public:
   UT_BlockQunatize_S3S4() {
     UT_START();
+    CheckISA(AVX2);
+    ut<BTLA_ISA::AVX2>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<BTLA_ISA::AVX2>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<BTLA_ISA::AVX2>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<BTLA_ISA::AVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<BTLA_ISA::AVX2>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     CheckISA(AVX512F);
-    ut(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut(4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    ut(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    ut<BTLA_ISA::AVX512F>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<BTLA_ISA::AVX512F>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<BTLA_ISA::AVX512F>(4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    ut<BTLA_ISA::AVX512F>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<BTLA_ISA::AVX512F>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<BTLA_ISA::AVX512F>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
   }
-
+  template <BTLA_ISA RuntimeISA>
   void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
-    printf("%s DType %s: %d %d %d\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), n, k, blocksize);
+    printf("%s DType %s %d: %d %d %d\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), int(RuntimeISA), n, k,
+           blocksize);
     int ldb = n;
     utils::aligned_vector<float> raw(n * k);
     ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 0.5f);
-
-    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
     auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
@@ -206,8 +211,8 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-// static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
+static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 
 class UT_S3_WOQ {
  public:
