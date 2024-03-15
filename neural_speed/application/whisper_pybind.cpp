@@ -454,7 +454,7 @@ void Model::inference(const std::string& fname_inp) {
   return;
 }
 
-#if MODEL_NAME_ID == 17
+#if MODEL_NAME_ID == 18
 
 PYBIND11_MODULE(whisper_cpp, m)
 #endif

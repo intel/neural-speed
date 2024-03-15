@@ -32,9 +32,30 @@ def main(args_in: Optional[List[str]] = None) -> None:
         type=str,
         help="Access token ID for models that require it (LLaMa2, etc..)",
     )
-    parser.add_argument("--outfile", type=Path, required=True, help="path to write to")
-    parser.add_argument("model", type=Path, help="directory containing model file or model id")
-    parser.add_argument("--use_quantized_model", action="store_true", help="use quantized model: awq/gptq/autoround")
+    parser.add_argument(
+        "--outfile",
+        type=Path,
+        required=True,
+        help="path to write to"
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        default="NE",
+        choices=["NE", "GGUF"],
+        help="Convert to the GGUF or NE format"
+    )
+    parser.add_argument(
+        "--use_quantized_model",
+        action="store_true",
+        help="use quantized model: awq/gptq/autoround"
+    )
+    parser.add_argument(
+        "model",
+        type=Path,
+        help="directory containing model file or model id"
+    )
+
     args = parser.parse_args(args_in)
 
     if args.model.exists():
@@ -47,7 +68,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 print("You are required to input an access token ID for {}, please add it in option --token or download model weights locally".format(args.model))
             sys.exit(f"{e}")
 
-    convert_model(dir_model, args.outfile, args.outtype, use_quantized_model=args.use_quantized_model)
+    convert_model(dir_model, args.outfile, args.outtype, format=args.format, use_quantized_model=args.use_quantized_model)
 
 
 if __name__ == "__main__":
