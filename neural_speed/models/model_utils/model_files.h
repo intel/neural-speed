@@ -1122,7 +1122,7 @@ struct model_file_loader {
     file.read_raw(&hparams.norm_eps, sizeof(float));
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
-    printf("%-16s %d.hparams.norm_eps = %-30d\n", __func__, count++, hparams.norm_eps);
+    printf("%-16s %d.hparams.norm_eps = %-30f\n", __func__, count++, hparams.norm_eps);
     printf("%-16s %d.hparams.freq_base = %-30.3f\n", __func__, count++, hparams.freq_base);
     printf("%-16s %d.hparams.freq_scale = %-30.3f\n", __func__, count++, hparams.freq_scale);
 
