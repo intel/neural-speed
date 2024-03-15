@@ -145,8 +145,8 @@ class UT_ActivationU8KBlockQuantize {
         }
       }
       buffer_error(redref.data(), reduce.data(), reduce.size(), INT8_ERR);
-      buffer_error(redqref.data(), reduce.data(), reduce.size(), FP32_ERR);
-      buffer_error(reduce.data(), quanAct.template RPtr<float>(), reduce.size(), FP32_ERR);
+      buffer_error(redqref.data(), reduce.data(), reduce.size(), 0.01f);
+      buffer_error(reduce.data(), quanAct.template RPtr<float>(), reduce.size(), 0.01f);
     }
   }
 };

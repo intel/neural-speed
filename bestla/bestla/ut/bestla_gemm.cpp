@@ -604,7 +604,7 @@ class UT_GEMM_AVX512FP16 {
     ref_fp16<Core::NTILE>(matAbf16.data(), matBbf16.data(), refC.data(), m, n, k, k * 2, reordered_bstride, n * 2, 0);
     gemm.forward(matAbf16.data(), matBbf16.data(), matC.data(), m, n, k, k * sizeof(fp16), k * sizeof(fp16),
                  n * sizeof(fp16), 0, cache, CacheSize);
-    ut::buffer_error(refC.data(), matC.data(), refC.size(), fp16(0.00001f * k));
+    ut::buffer_error(refC.data(), matC.data(), refC.size(), FP16_ERR);
   }
 };
 #ifdef BTLA_UT_GEMM
