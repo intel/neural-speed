@@ -160,7 +160,7 @@ model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
 model_name_map["mixtral-gptq"]="Mixtral-8x7B-Instruct-v0.1-GPTQ"
 model_name_map["qwen1.5-gptq"]="Qwen/Qwen1.5-7B-Chat-GPTQ"
 model_name_map["qwen-gptq"]="TheBloke/Qwen-7B-Chat-GPTQ"
-
+model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
 
 function main() {
     conda_env="$1"
