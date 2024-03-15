@@ -338,6 +338,8 @@ inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
       return "int4_clip";
     case BTLA_DTYPE::S3_CLIP:
       return "int3_clip";
+    case BTLA_DTYPE::S2_CLIP:
+      return "int2_clip";
     case BTLA_DTYPE::F4_E2M1:
       return "fp4_e2m1";
     case BTLA_DTYPE::F4_BNB:
