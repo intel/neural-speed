@@ -668,8 +668,9 @@ public:
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;
         height_in_elems = mem_tdesc.shape.y;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)mem_tdesc.base.base;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -688,8 +689,9 @@ public:
         base_y = surface_offset_y;
         width_in_elems = surface_width;
         height_in_elems = surface_height;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)p;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -707,8 +709,9 @@ public:
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;
         height_in_elems = mem_tdesc.shape.y;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)mem_tdesc.base.base;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -727,8 +730,9 @@ public:
         base_y = surface_offset_y;
         width_in_elems = surface_width;
         height_in_elems = surface_height;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)p;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -776,10 +780,10 @@ public:
     __XETLA_API void update_tdesc(int offset) {
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
             base_offset += int64_t(offset) * sizeof(dtype);
-            trans ? base_y += offset : base_x += offset;
+            mem_transpose ? base_y += offset : base_x += offset;
         } else {
             base_offset += int64_t(offset) * pitch_in_bytes;
-            trans ? base_x += offset : base_y += offset;
+            mem_transpose ? base_x += offset : base_y += offset;
         }
     }
 };
@@ -798,7 +802,7 @@ template <typename dtype_, typename tile_desc_, mem_layout mem_layout_,
 struct mem_payload_t<
         mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
         tile_desc_, msg_type::block_2d, arch_tag_,
-        std::enable_if_t<(arch_tag_ == gpu_arch::Dg2)>> {
+        std::enable_if_t<(arch_tag_ <= gpu_arch::Dg2)>> {
     using dtype = dtype_;
     using mem_desc_t
             = mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -822,12 +826,11 @@ private:
             : block_size_x * sizeof(dtype);
 
     using this_payload_t = mem_payload_t<mem_desc_t, tile_desc,
-            msg_type::unaligned_2d, arch_tag_>;
+            msg_type::block_2d, arch_tag_>;
 
 public:
     static constexpr bool mem_transpose
             = memory_layout == mem_layout::col_major;
-
     static constexpr reg_layout register_layout = tile_desc::register_layout;
     static constexpr bool reg_transpose
             = register_layout == reg_layout::transpose_tiled;
@@ -842,18 +845,20 @@ public:
     static constexpr uint32_t block_bytes
             = block_size_x * block_size_y * sizeof(dtype);
 
+    //     using mem_dtype = uint32_t;
     using mem_dtype = typename std::conditional<
             (block_per_row_bytes % sizeof(uint64_t) == 0), uint64_t,
             typename std::conditional<(block_per_row_bytes % sizeof(uint32_t)
                                               == 0),
                     uint32_t, dtype>::type>::type;
-    static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
+    static constexpr uint32_t pack_factor = sizeof(mem_dtype) / sizeof(dtype);
     // for pvc, we can use simd16 or simd32
     static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
     static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
     static constexpr uint32_t num_channel = block_size_y;
 
-    static constexpr uint32_t simd_exec_size = block_size_x / scale_factor;
+    static constexpr uint32_t simd_exec_size
+            = block_size_x >= pack_factor ? block_size_x / pack_factor : 1;
 
     xetla_vector<uint32_t, num_channel> channel_offset;
     xetla_vector<uint32_t, num_channel> step_x;
@@ -874,8 +879,9 @@ public:
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;
         height_in_elems = mem_tdesc.shape.y;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)mem_tdesc.base.base;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -890,8 +896,9 @@ public:
         base_y = surface_offset_y;
         width_in_elems = surface_width;
         height_in_elems = surface_height;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)p;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -905,8 +912,9 @@ public:
         base_y = mem_tdesc.coord.y;
         width_in_elems = mem_tdesc.shape.x;
         height_in_elems = mem_tdesc.shape.y;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)mem_tdesc.base.base;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -921,8 +929,9 @@ public:
         base_y = surface_offset_y;
         width_in_elems = surface_width;
         height_in_elems = surface_height;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = (mem_dtype *)p;
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -966,10 +975,10 @@ public:
     __XETLA_API void update_tdesc(int offset) {
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
             base_offset += int64_t(offset) * sizeof(dtype);
-            trans ? base_y += offset : base_x += offset;
+            mem_transpose ? base_y += offset : base_x += offset;
         } else {
             base_offset += int64_t(offset) * pitch_in_bytes;
-            trans ? base_x += offset : base_y += offset;
+            mem_transpose ? base_x += offset : base_y += offset;
         }
     }
 };
@@ -1441,8 +1450,9 @@ public:
         base_y = mem_desc.coord.y + coop_id_y * tile_size_h;
         width_in_elems = mem_desc.shape.x;
         height_in_elems = mem_desc.shape.y;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = reinterpret_cast<prefetch_dtype *>(mem_desc.base.base);
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -1461,8 +1471,9 @@ public:
         base_y = surface_offset_y + coop_id_y * tile_size_h;
         width_in_elems = surface_width;
         height_in_elems = surface_height;
-        base_offset = trans ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
-                            : base_y * pitch_in_bytes + base_x * sizeof(dtype);
+        base_offset = mem_transpose
+                ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
+                : base_y * pitch_in_bytes + base_x * sizeof(dtype);
         base_ptr = reinterpret_cast<prefetch_dtype *>(p);
 
         xetla_vector<uint32_t, num_channel> channel_index
@@ -1477,10 +1488,10 @@ public:
     __XETLA_API void update_tdesc(int offset) {
         if constexpr (update_dir == tdesc_update_dir::x_dir) {
             base_offset += int64_t(offset) * sizeof(dtype);
-            trans ? base_y += offset : base_x += offset;
+            mem_transpose ? base_y += offset : base_x += offset;
         } else {
             base_offset += int64_t(offset) * pitch_in_bytes;
-            trans ? base_x += offset : base_y += offset;
+            mem_transpose ? base_x += offset : base_y += offset;
         }
     }
 };

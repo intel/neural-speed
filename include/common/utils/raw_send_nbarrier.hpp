@@ -128,6 +128,42 @@ struct xetla_nbarrier_t<num_producers, num_consumers, arch_tag,
         wait();
     }
 };
+template <uint8_t num_producers, uint8_t num_consumers>
+struct xetla_nbarrier_t<num_producers, num_consumers, gpu_arch::Igpu> {
+    ///
+    /// @brief Description of named barrier objection.
+    /// Structure is defined in
+    /// [here](https://gfxspecs.intel.com/Predator/Home/Index/57499).
+    ///
+    // xetla_vector<uint32_t, 16> nbar;
+    // uint32_t barrier_id;
+
+    /// @param role is the role of subgroup when participating the barrier.
+    /// @param nbarrier_id [in] is the id of the barrier.
+    /// note:  all subgroups participating the barrier should have the same
+    /// barrier_id. Here is the bspec link
+    /// https://gfxspecs.intel.com/Predator/Home/Index/54006
+    __XETLA_API void init_nbarrier(uint8_t, nbarrier_role) {}
+
+    /// @brief Generic work-group split barrier.
+    ///
+    __XETLA_API void arrive() {
+        __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::signal>();
+    }
+
+    /// @brief named barrier wait within subgroup.
+    ///
+    __XETLA_API void wait() {
+        __ESIMD_ENS::split_barrier<__ESIMD_ENS::split_barrier_action::wait>();
+    }
+
+    /// @brief named barrier signal from subgroup.
+    ///
+    __XETLA_API void arrive_wait() {
+        arrive();
+        wait();
+    }
+};
 
 /// @} xetla_util_named_barrier
 

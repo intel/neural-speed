@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <utils/utils.hpp>
 #include "xetla.hpp"
+#include <utils/utils.hpp>
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 //The number of times the kernel is executed
@@ -369,7 +369,7 @@ void dequantize_gemm_run(int iter) {
             prefetch_distance, periodic_sync_interval>;
 
     using compute_policy
-            = xetla::group::compute_policy_int4_dequantize_xmx<compute_attr,
+            = xetla::group::compute_policy_int4_dequantize<compute_attr,
                     perf_tuning_knob, data_type_scale, data_type_zero_pt,
                     gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
                     dequant_s, gpu_arch::Xe>;

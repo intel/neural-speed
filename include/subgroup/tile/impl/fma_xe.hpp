@@ -28,7 +28,7 @@ template <typename matAcc_dst_t_, typename matAcc_src_t_, typename matB_t_,
         typename matA_t_, gpu_arch arch_tag_>
 struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
         mma_engine::fpu, arch_tag_,
-        std::enable_if_t<(arch_tag_ == gpu_arch::Xe)>> {
+        std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
     using matA_t = matA_t_;
     using matB_t = matB_t_;
     using matSrc_t = matAcc_src_t_;
@@ -96,8 +96,8 @@ struct tile_mma_t<matAcc_dst_t_, matAcc_src_t_, matB_t_, matA_t_,
             xetla_vector_ref<dtype_b, blk_k * blk_n> __REF__ b_block,
             xetla_vector_ref<dtype_a, blk_m * blk_k> __REF__ a_block) {
         auto dst_blk_2d = dst.xetla_format<dtype_dst, blk_m, blk_n>();
-        auto b_blk_2d = b_block.xetla_format<dtype_dst, blk_k, blk_n>();
         auto src_blk_2d = src.xetla_format<dtype_src, blk_m, blk_n>();
+        auto b_blk_2d = b_block.xetla_format<dtype_b, blk_k, blk_n>();
 #pragma unroll
         for (uint32_t i = 0; i < blk_m / mma_m; i++) {
             xetla_vector<dtype_dst, mma_m * blk_n> dst_tmp;

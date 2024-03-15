@@ -31,23 +31,29 @@ enum quant_mode { S4_ASYM, S4_FULLRANGE_NO_ZP };
 /// @tparam arch_tag_ Is the HW architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
         typename dtype_scale_, typename dtype_zero_pt_, quant_mode quant_type_,
-        int dequant_s_, gpu_arch arch_tag_ = gpu_arch::Xe,
-        typename enable = void>
-struct compute_policy_int4_dequantize_xmx {};
+        int dequant_s_, mma_engine mma_engine_ = mma_engine::xmx,
+        gpu_arch arch_tag_ = gpu_arch::Xe, typename enable = void>
+struct compute_policy_int4_dequantize {};
 
 /// @brief Specialized for Xe and Dg2 architecture.
 template <typename compute_attr_, typename perf_tuning_knob_,
         typename dtype_scale_, typename dtype_zero_pt_, quant_mode quant_type_,
-        int dequant_s_, gpu_arch arch_tag_>
-struct compute_policy_int4_dequantize_xmx<compute_attr_, perf_tuning_knob_,
-        dtype_scale_, dtype_zero_pt_, quant_type_, dequant_s_, arch_tag_,
-        std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+        int dequant_s_, mma_engine mma_engine_, gpu_arch arch_tag_>
+struct compute_policy_int4_dequantize<compute_attr_, perf_tuning_knob_,
+        dtype_scale_, dtype_zero_pt_, quant_type_, dequant_s_, mma_engine_,
+        arch_tag_, std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
     using compute_attr = compute_attr_;
     using perf_tuning_knob = perf_tuning_knob_;
     static constexpr int k_stride = perf_tuning_knob::k_stride;
     static constexpr int stages = perf_tuning_knob::stages;
     static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+    static constexpr mma_engine mma_engine = mma_engine_;
     static constexpr gpu_arch arch_tag = arch_tag_;
+
+    static_assert(
+            !(mma_engine == mma_engine::xmx && arch_tag == gpu_arch::Igpu),
+            "Igpu does not support xmx");
+
     using dtype_mma_acc = typename compute_attr::dtype_acc;
     using dtype_mma_a = typename compute_attr::dtype_a;
     using dtype_mma_b = typename compute_attr::dtype_b;

@@ -88,7 +88,7 @@ template <cache_hint L1 = cache_hint::cached,
         cache_hint L2 = cache_hint::cached, typename payload_t>
 __XETLA_API typename std::enable_if_t<
         detail::check_prefetch_type<payload_t>::is_global_2d
-        && payload_t::arch_tag == gpu_arch::Dg2>
+        && payload_t::arch_tag <= gpu_arch::Dg2>
 tile_prefetch(payload_t &payload) {
     using dtype = typename payload_t::dtype;
     using tile_desc = typename payload_t::tile_desc;

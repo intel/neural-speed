@@ -429,6 +429,7 @@ public:
         gemm_args_t gemm_args(mem_desc_a, mem_desc_b, inner_loop_count);
         matAcc_t matAcc;
         matAcc.init(0);
+
         gemm_t gemm;
         gemm(g, matAcc, gemm_args, gemm_slm_base, gemm_nbarr_base);
 
@@ -491,7 +492,5 @@ public:
         }
     }
 };
-
-/// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

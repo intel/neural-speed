@@ -553,7 +553,6 @@ public:
         }
     }
 };
-
 /// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

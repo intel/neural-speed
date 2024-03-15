@@ -408,7 +408,7 @@ template <cache_hint L1 = cache_hint::write_back,
         typename payload_t>
 __XETLA_API typename std::enable_if_t<
         detail::check_store_type<tile_t, payload_t>::is_global_block_2d
-        && payload_t::arch_tag == gpu_arch::Dg2>
+        && payload_t::arch_tag <= gpu_arch::Dg2>
 tile_store(tile_t &tile, payload_t &payload) {
     using dtype = typename payload_t::dtype;
     using tile_desc = typename payload_t::tile_desc;
@@ -416,7 +416,7 @@ tile_store(tile_t &tile, payload_t &payload) {
 
     constexpr uint32_t num_channel = payload_t::num_channel;
     constexpr uint32_t load_elems = num_channel * payload_t::simd_exec_size;
-    constexpr uint32_t scale_factor = payload_t::scale_factor;
+    constexpr uint32_t pack_factor = payload_t::pack_factor;
 
 #pragma unroll
     for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
@@ -438,8 +438,8 @@ tile_store(tile_t &tile, payload_t &payload) {
 
                 if constexpr (payload_t::simd_exec_size > 1) {
                     xetla_vector<store_dtype, load_elems> reg_sub_before_trans
-                            = reg_sub.xetla_select<load_elems * scale_factor,
-                                             1>(sub_block_y
+                            = reg_sub.xetla_select<load_elems * pack_factor, 1>(
+                                             sub_block_y
                                              * tile_desc::block_size_x)
                                       .xetla_format<store_dtype>();
 #pragma unroll
@@ -452,8 +452,8 @@ tile_store(tile_t &tile, payload_t &payload) {
                                         iii * payload_t::simd_exec_size);
                     }
                 } else {
-                    reg_tmp = reg_sub.xetla_select<load_elems * scale_factor,
-                                             1>(sub_block_y
+                    reg_tmp = reg_sub.xetla_select<load_elems * pack_factor, 1>(
+                                             sub_block_y
                                              * tile_desc::block_size_x)
                                       .xetla_format<store_dtype>();
                 }
