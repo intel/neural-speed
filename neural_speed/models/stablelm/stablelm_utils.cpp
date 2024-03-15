@@ -210,3 +210,4 @@ class stablelm_quant_layer : public quant_layer_base {
   }
 };
 REGISTER_QUANT_LAYER_CLASS(stablelm);
+  
