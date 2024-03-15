@@ -203,7 +203,7 @@ class UT_BlockQunatize_S3S4 {
     ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 0.5f);
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
+    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, true);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
@@ -214,8 +214,8 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
+static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 
 class UT_S3_WOQ {
  public:
@@ -774,6 +774,10 @@ class UT_CompFp32 {
   }
   void ut_s2() {
     CheckISA(AVX2);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
+                                                          true);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
@@ -888,6 +892,9 @@ class UT_CompFp32 {
 
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
+    auto reduceA = launcher.mProA.createStorage(m, k, blocksize);
+    utils::avector<int8_t> bufferA(packedw.mSize);
+    reduceA.assign(bufferA.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
     fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
@@ -895,12 +902,16 @@ class UT_CompFp32 {
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
+
+    launcher.mProA.reduce({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k, blocksize);
-    typename Launcher::Param args{gp,
-                                  {matAf32.data(), k},
-                                  {&packedw},
-                                  {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
-                                  {matC.data(), n}};
+    typename Launcher::Param args{
+        gp,
+        {matAf32.data(), k, &reduceA},
+        {&packedw},
+        {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep(),
+         isAsym ? packedw.template ZPtr<int8_t>() : nullptr, reduceA.template RPtr<float>(), reduceA.lda},
+        {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = INT8_ERR;
     auto dbits = bestla_dtype_bits(qtype);
