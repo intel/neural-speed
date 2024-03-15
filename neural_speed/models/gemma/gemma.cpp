@@ -77,7 +77,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
   // static batching for now
   const int N = inputs->n_tokens;
-  // const int N = 2;
+  // const int N = 7;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
@@ -100,7 +100,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   const int n_keep = lctx.n_keep;
   const int n_head = hparams.n_head;
   const int n_vocab = hparams.n_vocab;
-  const int n_rot = hparams.n_rot;
+  const int n_rot = hparams.n_embd_head_k;
   const int head_dim = hparams.n_embd_head_k;
   const int n_gqa_embd = head_dim*n_head;
 
@@ -119,7 +119,6 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
-
   const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
   if (run_mha_reordered) {
@@ -144,7 +143,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
   ne_set_name(embd, "embd");
-  // int tokens_id[2] = {2, 1};
+  // int tokens_id[7] = {2, 7701, 2174,  573, 4444,  578, 1443};
 
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
@@ -163,9 +162,11 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       // RMS
       {
         cur = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+        cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
 
         // cur = cur*attention_norm(broadcasted)
-        cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
+        // struct ne_tensor* cur1 = ne_mul(ctx0, cur, model.layers[il].norm[0]);
+        // cur = ne_add(ctx0,cur, cur1);
         ne_set_name(cur, "input_norm");
       }
 
@@ -184,7 +185,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       
       Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_set_name(Kcur, "kcur");
-      const float attn_scale = 1.0f / sqrtf(static_cast<float>(1));
+      const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
       // store key and value to memory
       if (!run_mha_reordered) {
         {
@@ -236,10 +237,10 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
         // KQ_scaled = KQ / sqrt(n_gqa_embd/n_head)
         struct ne_tensor* KQ_scaled =
-            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f ));
+            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f));
 
         // KQ_masked = mask_past(KQ_scaled)
-        struct ne_tensor* KQ_masked = ne_diag_mask_inf(ctx0, KQ_scaled, n_past);
+        struct ne_tensor* KQ_masked = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
 
         // KQ = soft_max(KQ_masked)
         struct ne_tensor* KQ_soft_max = ne_soft_max(ctx0, KQ_masked);
@@ -312,8 +313,10 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     // note here we pass inpL instead of cur
     {
       cur = ne_rms_norm(ctx0, cur, hparams.rms_norm_eps);
-
       cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
+
+      // struct ne_tensor* cur2 = ne_mul(ctx0, cur, model.layers[il].norm[1]);
+      // cur = ne_add(ctx0,cur, cur2);
     }
     cur = gemma_ff(model.layers[il], N, batch_size, ctx0, cur);
 
@@ -328,10 +331,13 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   {
     inpL = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
     inpL = ne_mul(ctx0, inpL, model.others[1]);
+    // struct ne_tensor* inpL1 = ne_mul(ctx0, inpL, model.others[1]);
+    
+    // inpL = ne_add(ctx0,inpL, inpL1);
   }
   lctx.use_buf(ctx0, -1);
   // hidden_states = self.ln_f(hidden_states)&lm_head
-  { inpL = ne_mul_mat(ctx0, model.others[0], inpL); }
+  { inpL = ne_mul_mat(ctx0, model.others[2], inpL); }
 
   // logits -> probs
   // inpL = ne_soft_max_inplace(ctx0, inpL);

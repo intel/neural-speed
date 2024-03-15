@@ -78,7 +78,7 @@ void Gemma::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
-  n_head_kv = hparams.n_head_kv;
+  n_head_kv = hparams.n_head;
   n_embd_head_k = hparams.n_embd_head_k;
   n_head = hparams.n_head;
   n_expert = hparams.n_experts;
@@ -123,6 +123,7 @@ void Gemma::load(model_context* ctx, model_progress_callback progress_callback, 
   if (ml->verify_tensor("token_embd.weight")) {
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = model.others[0];
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
@@ -156,39 +157,33 @@ void Gemma::load(model_context* ctx, model_progress_callback progress_callback, 
       }
     }
   } else {
-    model.others[0] = ml->get_tensor("tok_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-    model.others[1] = ml->get_tensor("norm.weight", {n_embd}, NE_BACKEND_CPU);
-    model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
-                                     n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+    model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
       auto& layer = model.layers[i];
-      std::string layers_i = "layers." + std::to_string(i);
+      std::string layers_i = "model.layers." + std::to_string(i);
 
       // attention norm
-      layer.norm[0] = ml->get_tensor(layers_i + ".attention_norm.weight", {n_embd}, backend);
+      layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
 
       // qkv GEMM
-      layer.attn[0] = ml->get_tensor(layers_i + ".attention.wq.weight", {n_embd, n_embd}, backend);
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
       layer.attn[1] =
-          ml->get_tensor(layers_i + ".attention.wk.weight", {n_embd, n_embd / (n_head / n_head_kv)}, backend);
+          ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
       layer.attn[2] =
-          ml->get_tensor(layers_i + ".attention.wv.weight", {n_embd, n_embd / (n_head / n_head_kv)}, backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".attention.wo.weight", {n_embd, n_embd}, backend);
+          ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd_head_k*n_head_kv, n_embd}, backend);
 
       // ffn norm
-      layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
+      layer.norm[1] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
 
       // ffn GEMM
-
-      if (ml->verify_tensor(layers_i + ".feed_forward.w1.weight")) {
-        NE_ASSERT(n_expert == 0);
-        NE_ASSERT(n_expert_used == 0);
-        layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, backend);
-        layer.ffn[1] = ml->get_tensor(layers_i + ".feed_forward.w2.weight", {n_ff, n_embd}, backend);
-        layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, backend);
-      } 
+      layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.gate_proj.weight", {n_embd, n_ff}, backend);
+      layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.down_proj.weight", {n_ff, n_embd}, backend);
+      layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
       if (backend != NE_BACKEND_CPU) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.norm[1]) +
