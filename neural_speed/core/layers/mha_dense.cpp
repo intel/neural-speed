@@ -74,7 +74,7 @@ bool bestla_reordered_attn_fp32_support(const attn_shape_t* params) {
 #endif
   // use avx2 and f16c on avx2 platforms
   // todo: check avx2 mha on sever
-  return !_cd->AVX512F() && _cd->AVX2();
+  return false;
 }
 // kv cache sizes in bytes per layer per batch per beam for;
 void bestla_reordered_attn_fp32_batch_kv_info(const kv_shape_t* params, kv_cache_info_t* out) {
