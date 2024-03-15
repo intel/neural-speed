@@ -1514,6 +1514,80 @@ inline float exp_ps_0_1(float x) {
   // same as a * std::pow(2, z) but more precise
   return ldexpf(coeff[0] * f * f + coeff[1] * f + coeff[2], static_cast<int>(z));
 }
+
+template <BTLA_DTYPE S3_T, typename _DST_T>
+inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
+                                           int interleave_n_offset, int unpack_elt, int8_t* tmp, size_t tmpsize) {
+  auto head_ignore_num = interleave_n_offset % 128;
+  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+    auto b2ptr = reinterpret_cast<uint8_t*>(src1);
+    for (size_t i = 0; i < 128; i += 8) {
+      auto bit1off = i >> 3;
+      auto bit2off = (i >> 5) << 1;
+      auto byteoff = i % 32;
+      uint8_t bit1 = *(uint8_t*)(src2 + bit1off);
+      for (size_t j = 0; j < 8; j++) {
+        uint8_t bit2 = *(b2ptr + byteoff + j);
+        bit2 >>= bit2off;
+        uint8_t dst8 = ((bit2 & 0x3) << 5) | ((bit1 & 0x1) << 7);
+        bit1 >>= 1;
+        dst[i + j] = *(int8_t*)&dst8;
+      }
+    }
+  };
+
+  assert(head_ignore_num % 8 == 0);
+
+  auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
+  auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
+  int compress_wei_ptr_offset = 0;
+  int8_t* s8_ptr = reinterpret_cast<int8_t*>(tmp);
+  auto head_write_num = 128 - head_ignore_num;
+  if (head_ignore_num != 0) {
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    for (int i = 0; i < head_write_num; i++) dstptr[i] = s8_ptr[head_ignore_num + i];
+    compress_wei_ptr_offset += head_write_num;
+  }
+
+  auto body_loop = (unpack_elt - head_write_num % 128) / 128;
+  auto tail_proc_num = (unpack_elt - head_write_num % 128) % 128;
+  for (size_t i = 0; i < body_loop; i++) {
+    bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4 + i * 32,
+                                       bit1ptr + compress_wei_ptr_offset / 8 + i * 16, tmp);
+    for (int j = 0; j < 128; j++) dstptr[compress_wei_ptr_offset + i * 128 + j] = tmp[j];
+  }
+  compress_wei_ptr_offset += body_loop * 128;
+  if (tail_proc_num > 0) {
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
+                                       tmp);
+    for (int i = 0; i < tail_proc_num; i++) dstptr[compress_wei_ptr_offset + i] = s8_ptr[i];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                                          _DST_T* dstptr, int interleave_n_offset, int row, int col,
+                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                          int NPad, void* tmp, size_t tmpsize) {
+  auto unpack_elt = row * col;
+  decompress_kblock_s3_s8fp<_S3_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                   reinterpret_cast<int8_t*>(tmp), tmpsize);
+  // TODO(zhe): simd version
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = scales + kpos * NPad;
+    for (int j = 0; j < col; j++) {
+      float tmp = static_cast<float>(dstptr[i * col + j]);
+      if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
+      dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
+    }
+  }
+
+  return BTLA_CODE::Success;
+}
+
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla
