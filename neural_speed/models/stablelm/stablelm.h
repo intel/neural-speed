@@ -49,5 +49,6 @@ class stablelm : public IModel {
             bool vocab_only_) override;
   void load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) override;
 };
+  
 
 #endif  // STABLELM_H
