@@ -73,7 +73,7 @@ class UT_DecompressKBlockS4FP {
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
     DST_T thres = DST_T(0.01f);
-    if constexpr (std::is_same_v<DST_T,utils::bf16>) {
+    if constexpr (std::is_same_v<DST_T, utils::bf16>) {
       thres = DST_T(BF16_ERR);
     }
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), thres);
