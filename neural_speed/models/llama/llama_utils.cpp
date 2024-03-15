@@ -258,8 +258,20 @@ class llama_quant_layer : public quant_layer_base {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
     }
+
     quantize &= (ne.size() == 2);
     if (quantize) {
+      if (mGCfg.bits == quant_bits::q2) {
+        auto q4cfg = mGCfg;
+        q4cfg.bits = quant_bits::q4;
+        if (layername.find("attention.wv") != std::string::npos) {
+          return q4cfg;
+        }
+        if (layername.find("feed_forward.w2") != std::string::npos) {
+          return q4cfg;
+        }
+      }
+
       return mGCfg;  // use global quant config
     } else {
       return quant_params_internal{quant_bits::count};  // non-quant

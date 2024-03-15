@@ -510,9 +510,13 @@ class DecompressKBlockS3S8Fp {
                                   int interleave_n_offset, int unpack_elt, void* tmp, size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
 #if CompileAVX512F()
-    ret = avx512f::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
-                                                           reinterpret_cast<int8_t*>(tmp), tmpsize);
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      ret = avx512f::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                                             reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
 #endif
+    ret = ref::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                                           reinterpret_cast<int8_t*>(tmp), tmpsize);
     assert(ret == BTLA_CODE::Success);
     return ret;
   }

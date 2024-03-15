@@ -414,9 +414,10 @@ class UT_S2_WOQ {
     buffer_error(matC.data(), refC.data(), matC.size(), 0.001f);
   }
 };
-static UT_S2_WOQ sUT_S2_WOQ;
 #ifdef BTLA_UT_PROLOGUE_B
+static UT_S2_WOQ sUT_S2_WOQ;
 #endif
+
 class UT_TransposeBlockQuantize_F4 {
  public:
   UT_TransposeBlockQuantize_F4() {
@@ -764,10 +765,31 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
+    ut_s2();
+    ut_s3();
     ut_s4();
     ut_s8();
     ut_f4();
     ut_f8();
+  }
+  void ut_s2() {
+    CheckISA(AVX2);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+  }
+
+  void ut_s3() {
+    CheckISA(AVX2);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                          false);
   }
 
   void ut_f8() {
@@ -936,8 +958,8 @@ class UT_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompFp32 sUT_CompFp32;
 #endif
+static UT_CompFp32 sUT_CompFp32;
 
 class UT_CompInt8 {
  public:
