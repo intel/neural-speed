@@ -12,43 +12,35 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#ifndef MPT_H
-#define MPT_H
+#ifndef STABLELM_H
+#define STABLELM_H
 
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
 
-enum mpt_model {
-  MPT_UNKNOWN,
-  MPT_7B,
-  MPT_30B,
+enum stablelm_model {
+  STABLELM_UNKNOWN,
+  STABLELM_1_6B,
+  STABLELM_3B,
 };
 
-static const model_scratch mpt_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
+static const model_scratch stablelm_mem_req(int n_layers) {
   switch (n_layers) {
+    case 24:
+      return {512ull * MB, 512ull * MB, 1026ull * MB};  // StableLM2-1.6B & StableLM2-Zephyr-1.6B
     case 32:
-      return {
-          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
-      };
-    case 48:
-      return {
-          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
-      };
+      return {1024ull * MB, 1024ull * MB, 1026ull * MB};  // StableLM-3B
     default:
       MODEL_ASSERT(false);
   }
 }
 
-class MPT : public IModel {
+class stablelm : public IModel {
  private:
-  model_archs arch = MODEL_MPT;
+  model_archs name = MODEL_STABLELM;
   std::unique_ptr<model_model_loader> ml;
   uint32_t n_layer, n_embd, n_ff, n_vocab;
-  int n_gpu_layer;
+  int n_ctx, n_gpu_layer;
   bool use_mmap, use_mlock, vocab_only;
   model_scratch scratch;
 
@@ -58,4 +50,4 @@ class MPT : public IModel {
   void load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) override;
 };
 
-#endif  // MPT_H
+#endif  // STABLELM_H

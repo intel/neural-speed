@@ -26,37 +26,37 @@ enum llama_model {
   LLAMA_65B,
 };
 
-static const model_scratch llama_mem_req(int n_layers, float enlarge_scale = 1.0f) {
+static const model_scratch llama_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 32:
       return {
-          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     case 40:
       return {
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     case 48:
       return {
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 2366) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     case 60:
       return {
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 3124) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     case 80:
       return {
-          static_cast<unsigned long long>(enlarge_scale * 2048) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 2048) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 10240) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072 * 3) * MB,
       };
     default:
       MODEL_ASSERT(false);

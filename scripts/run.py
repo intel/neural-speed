@@ -11,8 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import os
-import sys
 from pathlib import Path
 import argparse
 from typing import List, Optional
@@ -77,6 +75,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         default="int8",
     )
     parser.add_argument(
+        "--format",
+        type=str,
+        default="NE",
+        choices=["NE", "GGUF"],
+        help="Convert to the GGUF or NE format"
+    )
+    parser.add_argument(
         "--use_ggml",
         action="store_true",
         help="enable ggml for quantization and inference",
@@ -88,6 +93,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
         type=str,
         help="Prompt to start generation with: String (default: empty)",
         default="Once upon a time, there existed a ",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        help="Path to a text file containing the prompt (for large prompts)",
+        default=None,
     )
     parser.add_argument(
         "-n",
@@ -175,8 +187,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 1. convert
     path = Path(parent_path, "convert.py")
+    outfile = f"gguf_{model_type}_f32" if str(args.format) == "GGUF" else f"ne_{model_type}_f32.bin"
     convert_cmd = ["python", path]
-    convert_cmd.extend(["--outfile", Path(work_path, "ne_{}_f32.bin".format(model_type))])
+    convert_cmd.extend(["--format", str(args.format)])
+    convert_cmd.extend(["--outfile", Path(work_path, outfile)])
     convert_cmd.extend(["--outtype", "f32"])
     convert_cmd.append(dir_model)
     print("Convert model ...")
@@ -184,12 +198,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 2. quantize
     path = Path(parent_path, "quantize.py")
+    quant_file = f"gguf_{model_type}_{args.weight_dtype}.gguf" if str(args.format) == "GGUF" else f"ne_{model_type}_{args.weight_dtype}.bin"
     quant_cmd = ["python", path]
     quant_cmd.extend(["--model_name", model_type])
-    quant_cmd.extend(["--model_file", Path(work_path, "ne_{}_f32.bin".format(model_type))])
-    quant_cmd.extend(
-        ["--out_file",
-         Path(work_path, "ne_{}_{}.bin".format(model_type, args.weight_dtype, args.group_size))])
+    quant_cmd.extend(["--model_file", Path(work_path, outfile + ".gguf" if str(args.format) == "GGUF" else outfile)])
+    quant_cmd.extend(["--out_file", Path(work_path, quant_file)])
     quant_cmd.extend(["--weight_dtype", args.weight_dtype])
     quant_cmd.extend(["--group_size", str(args.group_size)])
     quant_cmd.extend(["--scale_dtype", args.scale_dtype])
@@ -205,8 +218,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     path = Path(parent_path, "inference.py")
     infer_cmd = ["python", path]
     infer_cmd.extend(["--model_name", model_type])
-    infer_cmd.extend(["-m", Path(work_path, "ne_{}_{}.bin".format(model_type, args.weight_dtype, args.group_size))])
+    infer_cmd.extend(["-m", Path(work_path, quant_file)])
     infer_cmd.extend(["--prompt", args.prompt])
+    infer_cmd.extend(["--file", args.file])
     infer_cmd.extend(["--n_predict", str(args.n_predict)])
     infer_cmd.extend(["--threads", str(args.threads)])
     infer_cmd.extend(["--batch_size_truncate", str(args.batch_size_truncate)])

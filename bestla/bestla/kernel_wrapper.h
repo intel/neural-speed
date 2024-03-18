@@ -241,21 +241,21 @@ class Dq8GetScale {
  public:
   template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk, int dq_offset_idx,
-                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding) {
+                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding, int mN) {
 #if CompileAVX512F()
     if (ISA_T >= BTLA_ISA::AVX512F) {
       return kernel::avx512f::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
-                                               src_stride, dst_stride, zeropadding);
+                                               src_stride, dst_stride, zeropadding, mN);
     }
 #endif
 #if CompileAVX2()
     if (ISA_T >= BTLA_ISA::AVX2) {
       return kernel::avx2::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
-                                            src_stride, dst_stride, zeropadding);
+                                            src_stride, dst_stride, zeropadding, mN);
     }
 #endif
     return kernel::ref::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale, src_stride,
-                                         dst_stride, zeropadding);
+                                         dst_stride, zeropadding, mN);
   }
 };
 
@@ -297,18 +297,17 @@ class Transpose2D {
 
 class QuantizeSignIntRowBlock {
  public:
-  template <BTLA_ISA ISA_T, BTLA_DTYPE S4_T>
+  template <BTLA_ISA ISA_T, BTLA_DTYPE QDT_T>
   static inline BTLA_CODE forward(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
                                   float* scales, int8_t* zero_points, int blocksize) {
 #if CompileAVX512F()
-    if constexpr (utils::isa_base<ISA_T>::avx512f &&
-                  S4_T != BTLA_DTYPE::S4_FULLRANGE) {  // TODO(zhe): support simd version s4_fullrange quantization.
-      return avx512f::quantize_f32_sign_int_rowblock<S4_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
-                                                           zero_points, blocksize);
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+                                                            zero_points, blocksize);
     }
 #endif
-    return ref::quantize_f32_sign_int_rowblock<S4_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
-                                                     blocksize);
+    return ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
+                                                      blocksize);
   }
 };
 
@@ -422,35 +421,10 @@ class DecompressKBlockS4Fp {
 #endif
 #if CompileAVX2()
     // AVX2 device only focus on fp32 data and layout
-    if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<_SCA_T, float> && std::is_same_v<_DST_T, float> &&
-                  _PACK_ROW == 1) {
-      if (zero_points == nullptr) {
-        if (col == 24) {
-          ret = avx2::decompress_kblock_bit4_packrow1<true, 24>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<24, true>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        } else if (col == 48) {
-          ret = avx2::decompress_kblock_bit4_packrow1<true, 48>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<48, true>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        }
-
-      } else {
-        if (col == 24) {
-          ret = avx2::decompress_kblock_bit4_packrow1<false, 24>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<24, false>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        } else if (col == 48) {
-          ret = avx2::decompress_kblock_bit4_packrow1<false, 48>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<48, false>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        }
-      }
-
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_s4_fp<S4_T, _DST_T, _PACK_ROW, _SCA_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                           scales, zero_points, k_offset, kblock, NPad,
+                                                                           reinterpret_cast<int8_t*>(tmp), tmpsize);
       if (ret == BTLA_CODE::Success) return ret;
     }
 #endif

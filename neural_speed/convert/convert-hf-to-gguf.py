@@ -64,6 +64,7 @@ class HfVocab:
             fname_tokenizer,
             cache_dir=fname_tokenizer,
             local_files_only=True,
+            trust_remote_code=True
         )
 
         # Initialize lists and dictionaries for added tokens
@@ -402,7 +403,7 @@ class Model:
         toktypes: list[int] = []
 
         from transformers import AutoTokenizer
-        tokenizer = AutoTokenizer.from_pretrained(dir_model)
+        tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
         vocab_size = hparams.get("vocab_size", len(tokenizer.vocab))
         assert max(tokenizer.vocab.values()) < vocab_size
 

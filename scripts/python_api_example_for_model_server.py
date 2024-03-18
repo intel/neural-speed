@@ -34,7 +34,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         help="maximum number of running requests (or queries) for model inference: Int",
                         required=False, default=8)
     parser.add_argument("--print_log", action="store_true", help="print server running logs")
-    parser.add_argument("--model_scratch_enlarge_scale", type=float,
+    parser.add_argument("--scratch_size_ratio", type=float,
                         help="scale for enlarge memory for model inference: Float",
                         required=False, default=1.0)
     parser.add_argument("--memory_dtype", type=str, help="KV cache memory dtype: String",
@@ -86,7 +86,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         threads=args.threads,
                         max_request_num=args.max_request_num,
                         print_log=args.print_log,
-                        model_scratch_enlarge_scale = args.model_scratch_enlarge_scale,
+                        scratch_size_ratio = args.scratch_size_ratio,
                         memory_dtype= args.memory_dtype,
                     )
     for i in range(len(prompts)):

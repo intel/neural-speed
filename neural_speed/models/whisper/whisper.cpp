@@ -458,7 +458,7 @@ struct whisper_state {
   whisper_kv_cache_t kv_cross;
   whisper_mel_t mel;
 
-  whisper_decoder_t decoders[WHISPER_MAX_DECODERS] = {};
+  whisper_decoder_t decoders[WHISPER_MAX_DECODERS];
 
   // memory buffers used by encode / decode contexts
   model_ctx_buffer buf_compute;
@@ -1249,6 +1249,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
 
   const int n_mels = hparams.n_mels;
   assert(mel_inp.n_mel == n_mels);
+  const float norm_eps = 1e-05;
 
   struct ne_init_params params = {
       /*.mem_size   =*/wstate->buf_compute.size,
@@ -1334,7 +1335,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
       {
         wstate->use_buf(ctx0, 0);
 
-        cur = ne_norm(ctx0, inpL);
+        cur = ne_norm(ctx0, inpL, norm_eps);
 
         // cur = ln_0_w*cur + ln_0_b
         cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.attn_ln_0_w, cur), cur),
@@ -1436,7 +1437,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
         {
           wstate->use_buf(ctx0, 0);
 
-          cur = ne_norm(ctx0, inpFF);
+          cur = ne_norm(ctx0, inpFF, norm_eps);
 
           wstate->use_buf(ctx0, 1);
 
@@ -1487,7 +1488,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
     {
       wstate->use_buf(ctx0, 0);
 
-      cur = ne_norm(ctx0, cur);
+      cur = ne_norm(ctx0, cur, norm_eps);
 
       wstate->use_buf(ctx0, 1);
 
@@ -1611,6 +1612,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
   const int n_state = hparams.n_text_state;
   const int n_head = hparams.n_text_head;
   const int n_layer = hparams.n_text_layer;
+  const float norm_eps = 1e-05;
 
   const int N = n_tokens;
   const int M = wstate->exp_n_audio_ctx > 0 ? wstate->exp_n_audio_ctx : hparams.n_audio_ctx;
@@ -1650,7 +1652,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
     {
       wstate->use_buf(ctx0, 0);
 
-      cur = ne_norm(ctx0, inpL);
+      cur = ne_norm(ctx0, inpL, norm_eps);
 
       // cur = ln_0_w*cur + ln_0_b
       cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.attn_ln_0_w, cur), cur),
@@ -1749,7 +1751,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
     {
       wstate->use_buf(ctx0, 0);
 
-      cur = ne_norm(ctx0, inpCA);  // note: we use inpCA here
+      cur = ne_norm(ctx0, inpCA, norm_eps);  // note: we use inpCA here
 
       // cur = ln_0_w*cur + ln_0_b
       cur = ne_add(ctx0, ne_mul(ctx0, ne_repeat(ctx0, layer.cross_attn_ln_0_w, cur), cur),
@@ -1842,7 +1844,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       {
         wstate->use_buf(ctx0, 0);
 
-        cur = ne_norm(ctx0, inpFF);
+        cur = ne_norm(ctx0, inpFF, norm_eps);
 
         wstate->use_buf(ctx0, 1);
 
@@ -1886,7 +1888,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
   {
     wstate->use_buf(ctx0, 0);
 
-    cur = ne_norm(ctx0, cur);
+    cur = ne_norm(ctx0, cur, norm_eps);
 
     wstate->use_buf(ctx0, 1);
 

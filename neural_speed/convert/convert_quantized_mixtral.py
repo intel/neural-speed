@@ -112,6 +112,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
+                        default="huggingface", help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -231,6 +233,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 3. write tensors
     list_vars = model
+    quant_moe_gate = False
+    for name in list_vars.keys():
+        if name.endswith("gate.scales") or name.endswith("gate.qscales"):
+            quant_moe_gate = True
+            break
     convert_mixtral_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
     convert_mixtral_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
     convert_mixtral_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
@@ -257,8 +264,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
         convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.o_proj", f"layers.{i}.attention.wo.weight", list_vars,
                                     f, quantize_config, n_head)
 
-        convert_mixtral_to_fp32_tensor(f"model.layers.{i}.block_sparse_moe.gate.weight",
-                                       f"layers.{i}.ffn_gate_inp.weight", list_vars, f)
+        if quant_moe_gate:
+            convert_to_q4_bestla_tensor(f"model.layers.{i}.block_sparse_moe.gate.weight",
+                                        f"layers.{i}.ffn_gate_inp.weight", list_vars, f, quantize_config, n_head)
+        else:
+            convert_mixtral_to_fp32_tensor(f"model.layers.{i}.block_sparse_moe.gate.weight",
+                                           f"layers.{i}.ffn_gate_inp.weight", list_vars, f)
 
         for j in range(8):
             convert_to_q4_bestla_tensor(f"model.layers.{i}.block_sparse_moe.experts.{j}.w1",

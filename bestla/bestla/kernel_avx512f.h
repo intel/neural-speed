@@ -64,28 +64,16 @@ static inline __m512i unpack_4bits(__m256i v4bits, __m512i vmask) {
   return zmm1;
 }
 
-template <BTLA_DTYPE S4_T>
-static inline void convert_s4_s8(int8_t* dstptr, int8_t* srcptr, __m512i vmask, int LoadMask) {
+static inline void convert_s4_s8_highbits(int8_t* dstptr, int8_t* srcptr, __m512i vmask, int LoadMask) {
   auto ymm = _mm256_maskz_loadu_epi32(__mmask8(LoadMask), reinterpret_cast<const __m256i*>(srcptr));
   auto zmm = unpack_4bits(ymm, vmask);
-  if constexpr (S4_T == BTLA_DTYPE::S4_FULLRANGE) {
-    zmm = _mm512_srli_epi32(zmm, 4);
-    auto s8 = _mm512_set1_epi8(8);
-    zmm = _mm512_sub_epi8(zmm, s8);
-  }
   _mm512_mask_storeu_epi64(dstptr, __mmask8(LoadMask), zmm);
 }
 
-template <BTLA_DTYPE S4_T>
-static inline void convert_s4_s8_v32(int8_t* dstptr, int8_t* srcptr, __m512i vmask, int LoadMask) {
+static inline void convert_s4_s8_highbits_v32(int8_t* dstptr, int8_t* srcptr, __m512i vmask, int LoadMask) {
   auto xmm = _mm_maskz_loadu_epi32(__mmask8(LoadMask), reinterpret_cast<const __m256i*>(srcptr));
   auto ymm = _mm256_castsi128_si256(xmm);
   auto zmm = unpack_4bits(ymm, vmask);
-  if constexpr (S4_T == BTLA_DTYPE::S4_FULLRANGE) {
-    zmm = _mm512_srli_epi32(zmm, 4);
-    auto s8 = _mm512_set1_epi8(8);
-    zmm = _mm512_sub_epi8(zmm, s8);
-  }
   auto ymm_out = _mm512_castsi512_si256(zmm);
   _mm256_mask_storeu_epi64(dstptr, __mmask8(LoadMask), ymm_out);
 }
@@ -103,7 +91,7 @@ static inline void convert_s8_fp_v16(T* dstptr, int8_t* srcptr) {
   }
 }
 
-constexpr void (*pad_fp4)(int8_t* dstptr, int8_t* srcptr, __m512i vmask, int) = &convert_s4_s8<BTLA_DTYPE::S4_CLIP>;
+constexpr void (*pad_fp4)(int8_t* dstptr, int8_t* srcptr, __m512i vmask, int) = &convert_s4_s8_highbits;
 
 template <int N, typename _DST_T, bool _IS_SYM>
 static inline void dequant_s8_N(_DST_T* dstptr, int8_t* srcptr, __m512* vscales, __m512i* vzps = nullptr) {
@@ -390,13 +378,11 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
 
         for (; irow < row0; irow++) {
+          convert_s4_s8_highbits(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
+                                 LoadMask64);
           if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
-                                               zmm_mask, LoadMask64);
             dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
           } else {
-            convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
-                                 LoadMask64);
             dequant_s8_N<ColTile, _DT, _IS_SYM>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
           }
         }
@@ -416,13 +402,11 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
 
         for (int irr = 0; irr < kblock; irr += 1) {
+          convert_s4_s8_highbits(tmpbuf, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2),
+                                 zmm_mask, LoadMask64);
           if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(
-                tmpbuf, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2), zmm_mask, LoadMask64);
             dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + (irow + irr) * ld_dst + icol, tmpbuf, vscales, vzps);
           } else {
-            convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2),
-                                 zmm_mask, LoadMask64);
             dequant_s8_N<ColTile, _DT, _IS_SYM>(dstptr + (irow + irr) * ld_dst + icol, tmpbuf, vscales, vzps);
           }
         }
@@ -440,13 +424,11 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
       }
       for (; irow < row; irow++) {
+        convert_s4_s8_highbits(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
+                               LoadMask64);
         if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-          convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
-                                             zmm_mask, LoadMask64);
           dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
         } else {
-          convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
-                               LoadMask64);
           dequant_s8_N<ColTile, _DT, _IS_SYM>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
         }
       }
@@ -479,18 +461,13 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
 
         for (; irow < row0; irow++) {
+          convert_s4_s8_highbits(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
+                                 LoadMask64);
+          convert_s4_s8_highbits_v32(tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32),
+                                     zmm_mask, LoadMask64);
           if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
-                                               zmm_mask, LoadMask64);
-            convert_s4_s8_v32<BTLA_DTYPE::S4_CLIP>(
-                tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32), zmm_mask,
-                LoadMask64);
             dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
           } else {
-            convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
-                                 LoadMask64);
-            convert_s4_s8_v32<_SRCT>(tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32),
-                                     zmm_mask, LoadMask64);
             dequant_s8_N<ColTile, _DT, _IS_SYM>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
           }
         }
@@ -510,19 +487,14 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
 
         for (int irr = 0; irr < kblock; irr += 1) {
-          if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-            convert_s4_s8<BTLA_DTYPE::S4_CLIP>(
-                tmpbuf, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2), zmm_mask, LoadMask64);
-            convert_s4_s8_v32<BTLA_DTYPE::S4_CLIP>(
-                tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2 + 32), zmm_mask,
-                LoadMask64);
-            dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + (irow + irr) * ld_dst + icol, tmpbuf, vscales, vzps);
-          } else {
-            convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2),
+          convert_s4_s8_highbits(tmpbuf, reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2),
                                  zmm_mask, LoadMask64);
-            convert_s4_s8_v32<_SRCT>(tmpbuf + 64,
+          convert_s4_s8_highbits_v32(tmpbuf + 64,
                                      reinterpret_cast<int8_t*>(srcptr + (irow + irr) * ld_src / 2 + icol / 2 + 32),
                                      zmm_mask, LoadMask64);
+          if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
+            dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + (irow + irr) * ld_dst + icol, tmpbuf, vscales, vzps);
+          } else {
             dequant_s8_N<ColTile, _DT, _IS_SYM>(dstptr + (irow + irr) * ld_dst + icol, tmpbuf, vscales, vzps);
           }
         }
@@ -540,17 +512,13 @@ static inline BTLA_CODE decompress_kblock_bit4_packrow2(utils::bit4x2* srcptr, _
         }
       }
       for (; irow < row; irow++) {
+        convert_s4_s8_highbits(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
+                               LoadMask64);
+        convert_s4_s8_highbits_v32(tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32),
+                                   zmm_mask, LoadMask64);
         if constexpr (SRC_TYPE == BTLA_DTYPE::TypeFloat) {
-          convert_s4_s8<BTLA_DTYPE::S4_CLIP>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2),
-                                             zmm_mask, LoadMask64);
-          convert_s4_s8_v32<BTLA_DTYPE::S4_CLIP>(
-              tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32), zmm_mask, LoadMask64);
           dequant_f4_N<ColTile, _DT, _SRCT>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
         } else {
-          convert_s4_s8<_SRCT>(tmpbuf, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2), zmm_mask,
-                               LoadMask64);
-          convert_s4_s8_v32<_SRCT>(tmpbuf + 64, reinterpret_cast<int8_t*>(srcptr + irow * ld_src / 2 + icol / 2 + 32),
-                                   zmm_mask, LoadMask64);
           dequant_s8_N<ColTile, _DT, _IS_SYM>(dstptr + irow * ld_dst + icol, tmpbuf, vscales, vzps);
         }
       }
@@ -627,11 +595,11 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* d
     if (zero_points == nullptr) {
       return decompress_kblock_bit4_packrow1<_ST, _DST_T, true>(
           srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-          &dequant_s8_N<48, _DST_T, true>, &convert_s4_s8<S4_T>, tmp, tmpsize);
+          &dequant_s8_N<48, _DST_T, true>, &convert_s4_s8_highbits, tmp, tmpsize);
     } else {
       return decompress_kblock_bit4_packrow1<_ST, _DST_T, false>(
           srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-          &dequant_s8_N<48, _DST_T, false>, &convert_s4_s8<S4_T>, tmp, tmpsize);
+          &dequant_s8_N<48, _DST_T, false>, &convert_s4_s8_highbits, tmp, tmpsize);
     }
   } else if constexpr (_PACK_ROW == 2) {
     if (zero_points == nullptr) {
@@ -673,8 +641,8 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     zmm1 = _mm512_sllv_epi32(zmm1, zmm_shift);  // int3_clip => int8
     zmm2 = _mm512_sllv_epi32(zmm2, zmm_shift);  // int3_clip => int8
 
-    _mm512_storeu_epi8((__m512i*)dst, zmm1);
-    _mm512_storeu_epi8((__m512i*)(dst + 64), zmm2);
+    _mm512_storeu_si512((__m512i*)dst, zmm1);
+    _mm512_storeu_si512((__m512i*)(dst + 64), zmm2);
   };
 
   assert(head_ignore_num % 8 == 0);
@@ -792,14 +760,14 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
     size_t i = 0;
     constexpr int LoadMask64 = (1 << (64 / 8)) - 1;
     for (; i < ele256; i += 256) {
-      convert_s4_s8<S4_T>(dstptr + i + 0, reinterpret_cast<int8_t*>(srcptr + i / 2 + 0), zmm_mask, LoadMask64);
-      convert_s4_s8<S4_T>(dstptr + i + 64, reinterpret_cast<int8_t*>(srcptr + i / 2 + 32), zmm_mask, LoadMask64);
-      convert_s4_s8<S4_T>(dstptr + i + 128, reinterpret_cast<int8_t*>(srcptr + i / 2 + 64), zmm_mask, LoadMask64);
-      convert_s4_s8<S4_T>(dstptr + i + 192, reinterpret_cast<int8_t*>(srcptr + i / 2 + 96), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(dstptr + i + 0, reinterpret_cast<int8_t*>(srcptr + i / 2 + 0), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(dstptr + i + 64, reinterpret_cast<int8_t*>(srcptr + i / 2 + 32), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(dstptr + i + 128, reinterpret_cast<int8_t*>(srcptr + i / 2 + 64), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(dstptr + i + 192, reinterpret_cast<int8_t*>(srcptr + i / 2 + 96), zmm_mask, LoadMask64);
     }
     if (i + 64 <= ele64) {
       for (; i < ele64; i += 64) {
-        convert_s4_s8<S4_T>(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
+        convert_s4_s8_highbits(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
       }
     }
     for (; i < elesize; i += 2) {
@@ -860,6 +828,64 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, 
     for (; j < align_row; j += blocksize) scalar_process_block(blocksize);
     if (j < row) scalar_process_block(row - align_row);
   }
+  return BTLA_CODE::Success;
+}
+template <BTLA_DTYPE QDT_T>
+static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* srcptr, int8_t* dstptr, int row, int col,
+                                                                int ld_src, int ld_dst, float* scales, int blocksize) {
+  int constexpr VLen = 16;
+  int col16 = utils::padto_le(col, VLen);
+  int i = 0;
+  auto align_row = row / blocksize * blocksize;
+  for (; i < col16; i += VLen) {
+    int j = 0;
+    float tmp_min[VLen];
+    float tmp_max[VLen];
+    float tmp_abs[VLen];
+    auto simd_process_block = [&](int size) {
+      __m512 vscale;
+      __m512 vmaxval = _mm512_set1_ps(std::numeric_limits<float>::min());
+      __m512 vminval = _mm512_set1_ps(std::numeric_limits<float>::max());
+      __m512 vabsval = _mm512_set1_ps(0.f);
+      for (size_t ij = 0; ij < size; ij++) {
+        auto vsrc = _mm512_loadu_ps(&srcptr[(j + ij) * ld_src + i]);
+        vmaxval = _mm512_max_ps(vmaxval, vsrc);
+        vminval = _mm512_min_ps(vminval, vsrc);
+        vsrc = _mm512_abs_ps(vsrc);
+        vabsval = _mm512_max_ps(vabsval, vsrc);
+      }
+      _mm512_storeu_ps(tmp_min, vminval);
+      _mm512_storeu_ps(tmp_max, vmaxval);
+      _mm512_storeu_ps(tmp_abs, vabsval);
+      auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
+      int constexpr FullValue = 1 << (NBits - 1);
+      int constexpr GenValue = FullValue - 1;
+      for (int iv = 0; iv < VLen; iv++) {
+        int NVal = GenValue;
+        auto sum = tmp_max[iv] + tmp_min[iv];
+        if (abs(sum) >= tmp_abs[iv] / FullValue) {
+          NVal = sum > 0.f ? -FullValue : FullValue;
+        }
+        NVal = NVal << (8 - NBits);
+        tmp_abs[iv] = NVal;
+      }
+      auto vmag = _mm512_loadu_ps(tmp_abs);
+      vscale = _mm512_div_ps(vabsval, vmag);
+      auto vrscale = _mm512_div_ps(vmag, vabsval);
+      _mm512_storeu_ps(&scales[j / blocksize * ld_dst + i], vscale);
+      for (size_t ij = 0; ij < size; ij++) {
+        auto vsrc = _mm512_loadu_ps(&srcptr[(j + ij) * ld_src + i]);
+        vsrc = _mm512_mul_ps(vsrc, vrscale);
+        auto vdsrc = _mm512_cvtps_epi32(vsrc);
+        auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) * ld_dst + i]), vbsrc);
+      }
+    };
+    for (; j < align_row; j += blocksize) simd_process_block(blocksize);
+    if (j < row) simd_process_block(row - align_row);
+  }
+  kernel::ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst, scales + i,
+                                                     nullptr, blocksize);
   return BTLA_CODE::Success;
 }
 
@@ -930,12 +956,17 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr,
   return BTLA_CODE::Success;
 }
 
-template <BTLA_DTYPE S4_T>
+template <BTLA_DTYPE QDT_T>
 static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col,
                                                        int ld_src, int ld_dst, float* scales, int8_t* zero_points,
                                                        int blocksize) {
   if (zero_points == nullptr)
-    return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
+    if constexpr (QDT_T == BTLA_DTYPE::S4_CLIP || QDT_T == BTLA_DTYPE::S3_CLIP) {
+      return quantize_f32_sign_int_rowblock_sym_auto<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+                                                            blocksize);
+    } else {
+      return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
+    }
   else
     return quantize_f32_sign_int_rowblock_asym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
                                                blocksize);
@@ -1325,8 +1356,8 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
 }
 
 inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
-                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
-                                  bool zeropadding) {
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride, bool zeropadding,
+                                  int mN) {
   auto head_proc_num = utils::updiv(scale_offset, 16) * 16 - scale_offset;
   auto zmm_dq_offset = _mm512_set1_ps(dq_scale[dq_offset_idx]);
 
@@ -1344,13 +1375,13 @@ inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, in
   for (int i = 0; i < row; i++) {
     if (head_proc_num > col) {
       auto mask = _cvtu32_mask16(0xffff >> (16 - col));
-      get_fp_scale(col, mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
+      get_fp_scale(col, mask, scale_offset + i * mN, src + i * src_stride, dst + i * dst_stride);
     } else {
       // TODO(zhe): consider head_proc_num==0 case.
       auto head_mask = _cvtu32_mask16(0xffff >> (16 - head_proc_num));
       auto body_mask = _cvtu32_mask16(0xffff);
-      get_fp_scale(head_proc_num, head_mask, scale_offset, src + i * src_stride, dst + i * dst_stride);
-      auto scale_offset_iter = scale_offset + head_proc_num;
+      get_fp_scale(head_proc_num, head_mask, scale_offset + i * mN, src + i * src_stride, dst + i * dst_stride);
+      auto scale_offset_iter = scale_offset + i * mN + head_proc_num;
       uint8_t* src_iter_ptr = src + head_proc_num;
       float* dst_iter_ptr = dst + head_proc_num;
       auto body_loop = (col - head_proc_num) / 16;
@@ -1419,17 +1450,17 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
     size_t i = 0;
     constexpr int LoadMask64 = (1 << (64 / 8)) - 1;
     for (; i < ele256; i += 256) {
-      convert_s4_s8<S4_T>(tmp + 0, reinterpret_cast<int8_t*>(srcptr + i / 2 + 0), zmm_mask, LoadMask64);
-      convert_s4_s8<S4_T>(tmp + 64, reinterpret_cast<int8_t*>(srcptr + i / 2 + 32), zmm_mask, LoadMask64);
-      convert_s4_s8<S4_T>(tmp + 128, reinterpret_cast<int8_t*>(srcptr + i / 2 + 64), zmm_mask, LoadMask64);
-      convert_s4_s8<S4_T>(tmp + 192, reinterpret_cast<int8_t*>(srcptr + i / 2 + 96), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(tmp + 0, reinterpret_cast<int8_t*>(srcptr + i / 2 + 0), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(tmp + 64, reinterpret_cast<int8_t*>(srcptr + i / 2 + 32), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(tmp + 128, reinterpret_cast<int8_t*>(srcptr + i / 2 + 64), zmm_mask, LoadMask64);
+      convert_s4_s8_highbits(tmp + 192, reinterpret_cast<int8_t*>(srcptr + i / 2 + 96), zmm_mask, LoadMask64);
       for (size_t j = 0; j < 256; j += 16) {
         convert_s8_fp_v16(dstptr + i + j, tmp + j);
       }
     }
     if (i + 64 <= ele64) {
       for (; i < ele64; i += 64) {
-        convert_s4_s8<S4_T>(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
+        convert_s4_s8_highbits(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
         for (size_t j = 0; j < 64; j += 16) {
           convert_s8_fp_v16(dstptr + i + j, tmp + j);
         }
@@ -1497,7 +1528,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
       if constexpr (!std::is_same_v<SCA_T, utils::f8>) {
         dstptr[i * dststep + j] += static_cast<float>(alpha[j]) * srcptr[i * srcstep + j];
       } else {
-        dstptr[i * dststep + j] += std::pow(2, alpha[j].x) * srcptr[i * srcstep + j];
+        dstptr[i * dststep + j] += alpha[j].mul(srcptr[i * srcstep + j]);
       }
     }
   }

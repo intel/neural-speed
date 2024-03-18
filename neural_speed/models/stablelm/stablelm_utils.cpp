@@ -31,7 +31,7 @@
 #include "core/data_types.h"
 #include "core/ne.h"
 #include "core/ne_layers.h"
-#include "models/phi/phi.h"
+#include "models/stablelm/stablelm.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
@@ -41,15 +41,15 @@
 void model_load_internal(const std::string& fname, model_archs arch, model_context* ctx, int n_gpu_layers,
                          bool use_mmap, bool use_mlock, bool vocab_only, model_progress_callback progress_callback,
                          void* progress_callback_user_data) {
-  std::unique_ptr<phi> ms(new phi());
+  std::unique_ptr<stablelm> ms(new stablelm());
   ms->init(fname.c_str(), ctx, n_gpu_layers, use_mmap, use_mlock, vocab_only);
   ms->load(ctx, progress_callback, progress_callback_user_data);
   model_context& lctx = *ctx;
   lctx.support_bestla_kv = true;
 }
 
-void phi::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
-               bool vocab_only_) {
+void stablelm::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
+                    bool vocab_only_) {
   model_context& lctx = *ctx;
   n_gpu_layer = n_gpu_layer_;
   use_mmap = use_mmap_;
@@ -61,7 +61,7 @@ void phi::init(const char* path_model, model_context* ctx, int n_gpu_layer_, boo
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
-  n_ff = 4 * hparams.n_embd;
+  n_ff = hparams.ffn_hidden_size;
   fprintf(stderr, "%s: n_vocab                  = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd                   = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_head                   = %u\n", __func__, hparams.n_head);
@@ -74,12 +74,12 @@ void phi::init(const char* path_model, model_context* ctx, int n_gpu_layer_, boo
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
   n_embd = hparams.n_embd;
-  scratch = phi_mem_req(n_layer, lctx.scratch_size_ratio);
+  scratch = stablelm_mem_req(n_layer);
   model.scratchs = scratch;
 }
 
 #define MODEL_BACKEND_OFFLOAD NE_BACKEND_CPU
-void phi::load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) {
+void stablelm::load(model_context* ctx, model_progress_callback progress_callback, void* progress_callback_user_data) {
   model_context& lctx = *ctx;
   auto& model = lctx.model;
   auto& ne_ctx = model.ctx;
@@ -87,7 +87,7 @@ void phi::load(model_context* ctx, model_progress_callback progress_callback, vo
   size_t ctx_size;
   size_t mmapped_size;
   ml->calc_sizes(&ctx_size, &mmapped_size);
-  fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
+  fprintf(stderr, "%s: ne ctx size = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
 
   // create the ne context
   lctx.model.buf.resize(ctx_size);
@@ -109,49 +109,64 @@ void phi::load(model_context* ctx, model_progress_callback progress_callback, vo
 
   ml->ne_ctx = ne_ctx;
 
-  // PHI is set up so that if padding_idx is specified then offset the embedding ids by 2
-  // and adjust num_embeddings appropriately. Other models don't have this hack
-  const uint32_t pos_offset = 2;
-  model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-  model.others[1] = ml->get_tensor("model.final_layernorm.weight", {n_embd}, NE_BACKEND_CPU);
-  model.others[2] = ml->get_tensor("model.final_layernorm.bias", {n_embd}, NE_BACKEND_CPU);
-  model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-  model.others[4] = ml->get_tensor("lm_head.bias", {n_vocab}, NE_BACKEND_CPU);
   const int i_gpu_start = n_layer - n_gpu_layer;
-
   model.layers.resize(n_layer);
   size_t vram_total = 0;
+
+  // Embedding layer + Normalization layer + lm_head layer
+  model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+  model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
+  model.others[2] = ml->get_tensor("model.norm.bias", {n_embd}, NE_BACKEND_CPU);
+  model.others[3] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab},
+                                   n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+
   for (uint32_t i = 0; i < n_layer; ++i) {
     const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
     auto& layer = model.layers[i];
     std::string layers_i = "model.layers." + std::to_string(i);
 
-    // norm: cur = ln_1_g*cur + ln_1_b
+    // Norm
     layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
     layer.norm[1] = ml->get_tensor(layers_i + ".input_layernorm.bias", {n_embd}, backend);
 
     // qkv GEMM + out proj GEMM
-    layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
-    layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
-    layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
-    layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd}, backend);
-    layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
-    layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
-    layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.dense.weight", {n_embd, n_embd}, backend);
-    layer.attn[7] = ml->get_tensor(layers_i + ".self_attn.dense.bias", {n_embd}, backend);
+    if (ml->verify_tensor(layers_i + ".self_attn.q_proj.bias")) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd}, backend);
+      layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
+      layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+    } else {  // Stablelm 3B
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+    }
+
+    // Post Attention norm
+    layer.norm[2] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
+    layer.norm[3] = ml->get_tensor(layers_i + ".post_attention_layernorm.bias", {n_embd}, backend);
 
     // ffn GEMM
-    layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.fc1.weight", {n_embd, n_ff}, backend);
-    layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.fc1.bias", {n_ff}, backend);
-    layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.fc2.weight", {n_ff, n_embd}, backend);
-    layer.ffn[3] = ml->get_tensor(layers_i + ".mlp.fc2.bias", {n_embd}, backend);
+    layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.gate_proj.weight", {n_embd, n_ff}, backend);
+    layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.down_proj.weight", {n_ff, n_embd}, backend);
+    layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
 
     if (backend != NE_BACKEND_CPU) {
-      vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
-                    ne_nbytes(layer.attn[1]) + ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) +
-                    ne_nbytes(layer.attn[4]) + ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) +
-                    ne_nbytes(layer.attn[7]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]) +
-                    ne_nbytes(layer.ffn[2]) + ne_nbytes(layer.ffn[3]);
+      if (ml->verify_tensor(layers_i + ".self_attn.q_proj.bias")) {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
+                      ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                      ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
+                      ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) + ne_nbytes(layer.ffn[0]) +
+                      ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      } else {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
+                      ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                      ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.ffn[0]) +
+                      ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      }
     }
   }
 
@@ -159,9 +174,6 @@ void phi::load(model_context* ctx, model_progress_callback progress_callback, vo
   // this is the total memory required to run the inference
   const size_t mem_required = ctx_size + mmapped_size - vram_total +  // weights in VRAM not in memory
                               scratch.scratch0 + scratch.scratch1 + scratch.eval;
-  fprintf(stderr, "%s: scratch0   = %7.2f MB\n", __func__, scratch.scratch0 / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: scratch1   = %7.2f MB\n", __func__, scratch.scratch1 / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: scratch2   = %7.2f MB\n", __func__, scratch.eval / 1024.0 / 1024.0);
   fprintf(stderr, "%s: mem required  = %7.2f MB (+ memory per state)\n", __func__, mem_required / 1024.0 / 1024.0);
 
   (void)n_gpu_layer;
@@ -181,7 +193,7 @@ void phi::load(model_context* ctx, model_progress_callback progress_callback, vo
 }
 
 #undef MODEL_BACKEND_OFFLOAD
-class phi_quant_layer : public quant_layer_base {
+class stablelm_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
@@ -197,4 +209,4 @@ class phi_quant_layer : public quant_layer_base {
     }
   }
 };
-REGISTER_QUANT_LAYER_CLASS(phi);
+REGISTER_QUANT_LAYER_CLASS(stablelm);

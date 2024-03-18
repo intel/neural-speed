@@ -12,8 +12,11 @@ Validated GPTQ & AWQ models directly from the HuggingFace:
 * [Mixtral-8x7B-Instruct-v0.1-GPTQ](https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ) & [Mixtral-8x7B-Instruct-v0.1-AWQ](https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-AWQ)
 * [Qwen-7B-Chat-GPTQ](https://huggingface.co/TheBloke/Qwen-7B-Chat-GPTQ) & [Qwen-7B-Chat-AWQ](https://huggingface.co/TheBloke/Qwen-7B-Chat-AWQ) & * [Qwen1.5-7B-Chat-GPTQ-Int4](https://huggingface.co/Qwen/Qwen1.5-7B-Chat-GPTQ-Int4)
 * [SOLAR-10.7B-v1.0-GPTQ](https://huggingface.co/TheBloke/SOLAR-10.7B-v1.0-GPTQ)
+* [Baichuan2-13B-Chat-GPTQ](https://hf-mirror.com/TheBloke/Baichuan2-13B-Chat-GPTQ)
+* [tiiuae/falcon-7b](https://huggingface.co/tiiuae/falcon-7b/tree/main)
+* [onlinex/phi-1_5-gptq-4bit](https://hf-mirror.com/onlinex/phi-1_5-gptq-4bit)
 
-Please check more validated GPTQ & AWQ models in the list of [supported_models](./docs/supported_models.md).
+For more details, please check the list of [supported_models](./supported_models.md).
 
 ## Examples
 

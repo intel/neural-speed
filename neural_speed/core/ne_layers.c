@@ -911,8 +911,10 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
     size_needed += sizeof(struct ne_tensor);
 
     if (cur_end + size_needed + NE_OBJECT_SIZE > ctx->mem_size) {
-      NE_PRINT("%s: not enough space in the context's memory pool (needed %zu, available %zu)\n", __func__,
-               cur_end + size_needed + NE_OBJECT_SIZE, ctx->mem_size);
+      NE_PRINT(
+          "%s: %d Context's memory pool is not enough(current %zu MB, ctx->mem_size available %zu MB), please increase "
+          "the scratch_size_ratio.\n",
+          __func__, __LINE__, (cur_end + size_needed + NE_OBJECT_SIZE) / 1024 / 1024, ctx->mem_size / 1024 / 1024);
       assert(false);
       return NULL;
     }
@@ -924,14 +926,17 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
     };
   } else {
     if (ctx->scratch.offs + size_needed > ctx->scratch.size) {
-      NE_PRINT("%s: not enough space in the scratch memory\n", __func__);
+      NE_PRINT(
+          "%s: %d scratch.size pool is not enough(current %zu MB, ctx->scratch.size available %zu MB), please increase "
+          "the scratch_size_ratio.\n",
+          __func__, __LINE__, (ctx->scratch.offs + size_needed) / 1024 / 1024, ctx->scratch.size / 1024 / 1024);
       assert(false);
       return NULL;
     }
 
     if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
-      NE_PRINT("%s: not enough space in the context's memory pool (needed %zu, available %zu)\n", __func__,
-               cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
+      NE_PRINT("%s: %d not enough space in the context's memory pool (needed %zu, ctx->mem_size available %zu)\n",
+               __func__, __LINE__, cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
       assert(false);
       return NULL;
     }
@@ -2060,7 +2065,7 @@ struct ne_tensor* ne_silu_back(struct ne_context* ctx, struct ne_tensor* a, stru
 
 // ne_norm
 
-struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool inplace) {
+struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool inplace, float eps) {
   bool is_node = false;
 
   if (!inplace && (a->grad)) {
@@ -2070,20 +2075,21 @@ struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool
 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
+  ne_set_op_params(result, &eps, sizeof(eps));
+
   result->op = NE_OP_NORM;
   result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
   result->src0 = a;
-  result->src1 = NULL;  // TODO: maybe store epsilon here?
 
   return result;
 }
 
-struct ne_tensor* ne_norm(struct ne_context* ctx, struct ne_tensor* a) {
-  return ne_norm_impl(ctx, a, false);
+struct ne_tensor* ne_norm(struct ne_context* ctx, struct ne_tensor* a, float eps) {
+  return ne_norm_impl(ctx, a, false, eps);
 }
 
-struct ne_tensor* ne_norm_inplace(struct ne_context* ctx, struct ne_tensor* a) {
-  return ne_norm_impl(ctx, a, true);
+struct ne_tensor* ne_norm_inplace(struct ne_context* ctx, struct ne_tensor* a, float eps) {
+  return ne_norm_impl(ctx, a, true, eps);
 }
 
 struct ne_tensor* ne_rms_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool inplace, float eps) {
@@ -6179,7 +6185,8 @@ static void ne_compute_forward_norm_f32(const struct ne_compute_params* params, 
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
 
-  const float eps = 1e-5f;  // TODO: make this a parameter
+  float eps;
+  memcpy(&eps, dst->op_params, sizeof(float));
 
   if (ne_is_contiguous(src0) && ne_is_contiguous(dst)) {
     bestla_layernormalization(ne03 * ne02 * ne01, ne00, false, eps, (const float*)src0->data, (float*)dst->data);
