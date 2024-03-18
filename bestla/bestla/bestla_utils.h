@@ -90,9 +90,7 @@
 #define CompileAMXINT8() (CompileAMX())
 #endif
 
-#if CompileBF16() || CompileFP16()
 #include <immintrin.h>
-#endif
 
 namespace bestla {
 namespace utils {
@@ -156,6 +154,18 @@ struct f8 {
   f8& operator=(int8_t v) {
     x = v;
     return *this;
+  }
+
+  inline float tofloat() const {
+    int32_t r = x + 127;
+    uint32_t tmp = bit_cast<uint32_t, int32_t>(r & 0xff);
+    tmp <<= 23;
+    return bit_cast<float, uint32_t>(tmp);
+  }
+
+  inline float mul(float src) const {
+    auto scale = tofloat();
+    return src * scale;
   }
 };
 
@@ -326,8 +336,6 @@ inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
       return "unsigned_int8";
     case BTLA_DTYPE::S4_CLIP:
       return "int4_clip";
-    case BTLA_DTYPE::S4_FULLRANGE:
-      return "int4_fullrange";
     case BTLA_DTYPE::F4_E2M1:
       return "fp4_e2m1";
     case BTLA_DTYPE::F4_BNB:
@@ -697,13 +705,13 @@ inline bool isFastExp() {
 }
 }  // namespace utils
 
-static float fp4_bnb_dequant_fp32_LUT[] = {
+static float fp4_bnb_dequant_fp32_LUT alignas(64)[] = {
     0.00000000f,        5.208333333e-03f,   0.66666667f,        1.00000000f,        0.33333333f,
     0.50000000f,        0.16666667f,        0.25000000f,        -1.f * 0.00000000f, -1.f * 5.208333333e-03f,
     -1.f * 0.66666667f, -1.f * 1.00000000f, -1.f * 0.33333333f, -1.f * 0.50000000f, -1.f * 0.16666667f,
     -1.f * 0.25000000f};
 
-static float fp4_e2m1_dequant_fp32_LUT[] = {
+static float fp4_e2m1_dequant_fp32_LUT alignas(64)[] = {
     0.f,
     0.010416666666666666f,
     0.16666666666666666f,
@@ -722,27 +730,27 @@ static float fp4_e2m1_dequant_fp32_LUT[] = {
     -1.f * 1.f,
 };
 
-static float nf4_dequant_fp32_LUT[] = {0.f,
-                                       -0.6961928009986877f,
-                                       -0.5250730514526367f,
-                                       -0.39491748809814453f,
-                                       -0.28444138169288635f,
-                                       -0.18477343022823334f,
-                                       -0.09105003625154495f,
-                                       -1.f,
-                                       0.07958029955625534f,
-                                       0.16093020141124725f,
-                                       0.24611230194568634f,
-                                       0.33791524171829224f,
-                                       0.44070982933044434f,
-                                       0.5626170039176941f,
-                                       0.7229568362236023f,
-                                       1.0f};
+static float nf4_dequant_fp32_LUT alignas(64)[] = {0.f,
+                                                   -0.6961928009986877f,
+                                                   -0.5250730514526367f,
+                                                   -0.39491748809814453f,
+                                                   -0.28444138169288635f,
+                                                   -0.18477343022823334f,
+                                                   -0.09105003625154495f,
+                                                   -1.f,
+                                                   0.07958029955625534f,
+                                                   0.16093020141124725f,
+                                                   0.24611230194568634f,
+                                                   0.33791524171829224f,
+                                                   0.44070982933044434f,
+                                                   0.5626170039176941f,
+                                                   0.7229568362236023f,
+                                                   1.0f};
 
 // 8bit dynamic-tree-quantization map from bitsandbytes double-quant implementation.
 // For more details pls refer
 // (8-Bit Approximations for Parallelism in Deep Learning)[https://arxiv.org/abs/1511.04561]
-static float dq8_bnb_LUT[] = {
+static float dq8_bnb_LUT alignas(64)[] = {
     -0.99297f, -0.97891f, -0.96484f, -0.95078f, -0.93672f, -0.92266f, -0.90859f, -0.89453f, -0.88047f, -0.86641f,
     -0.85234f, -0.83828f, -0.82422f, -0.81016f, -0.79609f, -0.78203f, -0.76797f, -0.75391f, -0.73984f, -0.72578f,
     -0.71172f, -0.69766f, -0.68359f, -0.66953f, -0.65547f, -0.64141f, -0.62734f, -0.61328f, -0.59922f, -0.58516f,

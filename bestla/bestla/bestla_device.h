@@ -328,8 +328,8 @@ class CpuDevice {
           mHybrid = false;
         }
       }
-      numcores = P_core.size() + E_core.size();
-      numthreads = P_core.size() + E_core.size() + SMT_core.size();
+      numcores = static_cast<int>(P_core.size() + E_core.size());
+      numthreads = static_cast<int>(P_core.size() + E_core.size() + SMT_core.size());
 
       {
         // set PE
@@ -515,7 +515,7 @@ class CpuRuntime {
       } else {
         mL1Cache_P = mL1Cache;
         mL2Cache_P = mL2Cache;
-        P_core_num = _cd->getPcoreNum();
+        P_core_num = static_cast<int>(_cd->getPcoreNum());
         E_core_num = thread - P_core_num;
       }
       mL1Cache_E = _cd->getL1CacheSize_E();

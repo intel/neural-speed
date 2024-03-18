@@ -366,7 +366,7 @@ struct UT_GEMMData_Row_u8s8 {
     float _cmax = std::numeric_limits<float>::min();
     matCRef.resize(M * LDC);
     auto tmpsrcscale = alpha * matA.scales[0] * matB.scales[0];
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int j = 0; j < M; j++) {
       for (int i = 0; i < N; i += 1) {
         int tmp = 0;
@@ -385,14 +385,14 @@ struct UT_GEMMData_Row_u8s8 {
     matC.scales[0] = (_cmax - _cmin) / (255.f);
     matC.zeropoints[0] = int((0 - _cmin) / matC.scales[0]);
     auto tmpscale = 1.f / matC.scales[0];
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int j = 0; j < M; j++) {
       for (int i = 0; i < N; i += 1) {
         matC.data()[j * LDC + i] = utils::cast<float, uint8_t>(matCRef[j * LDC + i] * tmpscale + matC.zeropoints[0]);
       }
     }
     matCDequan.resize(matCRef.size());
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int j = 0; j < M; j++) {
       for (int i = 0; i < N; i += 1) {
         matCDequan.data()[j * LDC + i] = ((int)matC.data()[j * LDC + i] - matC.zeropoints[0]) * matC.scales[0];
@@ -412,7 +412,7 @@ struct UT_GEMMData_Row_u8s8 {
 };
 
 static inline void gemmref_u8s8s32(int m, int n, int k, uint8_t* A, int8_t* B, int32_t* C, int lda, int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       int tmp = 0;
@@ -425,7 +425,7 @@ static inline void gemmref_u8s8s32(int m, int n, int k, uint8_t* A, int8_t* B, i
 }
 
 static inline void gemmref_s8s8s32(int m, int n, int k, int8_t* A, int8_t* B, int32_t* C, int lda, int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       int tmp = 0;
@@ -441,7 +441,7 @@ static inline void kblockgemmref_u8zp_s8_f32(int m, int n, int k, int kblock, ui
                                              int8_t* B, float* scaleB, float* C, int lda, int ldsa, int ldb, int ldsb,
                                              int ldc) {
   int kblk = utils::padto_le(k, kblock);
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0.f;
@@ -468,7 +468,7 @@ static inline void kblockgemmref_u8zp_s8_f32(int m, int n, int k, int kblock, ui
 static inline void kblockgemmref_u8zp_s8_f32(int m, int n, int k, int kblock, uint8_t* A, uint8_t* zpA, float* scaleA,
                                              int8_t* B, utils::bf16* scaleB, float* C, int lda, int ldsa, int ldb,
                                              int ldsb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0.f;
@@ -507,7 +507,7 @@ struct UT_GEMMData_Row_bf16 {
   }
 
   void calc_ref(float alpha, float beta) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < N; j++) {
         auto tmp = 0.f;
@@ -527,7 +527,7 @@ struct UT_GEMMData_Row_bf16 {
 };
 
 static inline void gemmref_fp32fp32fp32(int m, int n, int k, float* A, float* B, float* C, int lda, int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0;
@@ -541,7 +541,7 @@ static inline void gemmref_fp32fp32fp32(int m, int n, int k, float* A, float* B,
 
 static inline void gemmref_bf16bf16fp32(int m, int n, int k, utils::bf16* A, utils::bf16* B, float* C, int lda, int ldb,
                                         int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0;
@@ -555,7 +555,7 @@ static inline void gemmref_bf16bf16fp32(int m, int n, int k, utils::bf16* A, uti
 
 static inline void gemmref_fp16fp16fp16(int m, int n, int k, utils::fp16* A, utils::fp16* B, utils::fp16* C, int lda,
                                         int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0;
@@ -586,7 +586,7 @@ struct UT_GEMMData_Row_fp16 {
   }
 
   void calc_ref(float alpha, float beta) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < N; j++) {
         utils::fp16 tmp = utils::fp16(0.f);
@@ -630,7 +630,7 @@ struct UT_GEMMData_Row_f32 {
                          int ldc, int ldd, float alpha, float beta) {
     int NBlock = 128;
 #if 1
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < n; i += NBlock) {
       for (int j = 0; j < m; j++) {
         int remainn = i + NBlock <= n ? NBlock : n - i;
@@ -645,7 +645,7 @@ struct UT_GEMMData_Row_f32 {
       }
     }
 #else
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < n; i += 1) {
       for (int j = 0; j < m; j++) {
         auto tmp = 0.f;
