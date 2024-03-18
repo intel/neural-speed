@@ -684,6 +684,11 @@ bool bestla_fusion_FFN_SiLu_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr
   return ffn_3w::bestla_fusion_ffn_f32f32_support(w1ptr, w2ptr, w3ptr, seq, fin, fmid, fout);
 }
 
+bool bestla_fusion_FFN_Gelu_Mul_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid,
+                                           int fout) {
+  return ffn_3w::bestla_fusion_ffn_f32f32_support(w1ptr, w2ptr, w3ptr, seq, fin, fmid, fout);
+}
+
 void bestla_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
                                            float* tmp2, float* output, int seq, int fin, int fmid, int fout,
                                            void* workspace) {
@@ -691,6 +696,16 @@ void bestla_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void*
   epilogue::gemm::ParamAccumulatorWriteBack<float> epi_args1 = {tmp1, fmid, &silu_alpha};
   epilogue::gemm::ParamAccumulatorWriteBack<float> epi_args2 = {output, fout};
   ffn_3w::bestla_fusion_ffn_f32f32_forward<epilogue::gemm::AccumulatorWriteBackWithSwishFp32,
+                                           epilogue::gemm::AccumulatorWriteBackFp32>(
+      activation, w1ptr, w2ptr, w3ptr, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, epi_args1, epi_args2);
+}
+
+void bestla_fusion_FFN_Gelu_Mul_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
+                                           float* tmp2, float* output, int seq, int fin, int fmid, int fout,
+                                           void* workspace) {
+  epilogue::gemm::ParamAccumulatorWriteBack<float> epi_args1 = {tmp1, fmid};
+  epilogue::gemm::ParamAccumulatorWriteBack<float> epi_args2 = {output, fout};
+  ffn_3w::bestla_fusion_ffn_f32f32_forward<epilogue::gemm::AccumulatorWriteBackWithGeluFp32,
                                            epilogue::gemm::AccumulatorWriteBackFp32>(
       activation, w1ptr, w2ptr, w3ptr, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, epi_args1, epi_args2);
 }

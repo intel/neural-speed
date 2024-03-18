@@ -41,15 +41,15 @@
 struct ne_tensor* gemma_ff(const model_layer& layer, const int batch_size, const int N, ne_context* ctx0,
                           ne_tensor* inp) {
   struct ne_tensor* cur = inp;
-  if (bestla_fusion_FFN_SiLu_f32f32_support(layer.ffn[1]->data, layer.ffn[2]->data, layer.ffn[0]->data, N, cur->ne[0],
-                                            layer.ffn[1]->ne[1], layer.ffn[2]->ne[1])&&false) {
-    cur = ne_ffn_silu(ctx0, layer.ffn[1], layer.ffn[2], layer.ffn[0], cur);
+  if (bestla_fusion_FFN_Gelu_Mul_f32f32_support(layer.ffn[0]->data,layer.ffn[1]->data, layer.ffn[2]->data, N, cur->ne[0],
+                                            layer.ffn[0]->ne[1], layer.ffn[1]->ne[1])){
+    cur = ne_ffn_gelu_mul(ctx0, layer.ffn[0], layer.ffn[1], layer.ffn[2], cur);
   } else {
     struct ne_tensor* cur_1 = ne_mul_mat(ctx0, layer.ffn[0], cur);
 
     struct ne_tensor* cur_2 = ne_mul_mat(ctx0, layer.ffn[2], cur);
 
-    // SILU activation
+    // GELU activation
     cur_1 = ne_gelu(ctx0, cur_1);
 
     // projection
@@ -76,8 +76,8 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   model_context& lctx = *ctx;
 
   // static batching for now
-  // const int N = inputs->n_tokens;
-  const int N = 7;
+  const int N = inputs->n_tokens;
+  // const int N = 7;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
@@ -119,7 +119,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
-  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA&&false;
+  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
   if (run_mha_reordered) {
     NE_ASSERT(("kv cache should be the same dtype", kv_self.v->type == NE_TYPE_BTLA));
@@ -143,11 +143,11 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
   // ne_set_name(embd, "embd");
-  int tokens_id[7] = {2, 7701, 2174,  573, 4444,  578, 1443};
+  // int tokens_id[7] = {2, 7701, 2174,  573, 4444,  578, 1443};
 
   for (int i = 0; i < batch_size; ++i) {
-    // memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
-    memcpy(static_cast<model_token*>(embd->data) + i * N, tokens_id, N * ne_element_size(embd));
+    memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
+    // memcpy(static_cast<model_token*>(embd->data) + i * N, tokens_id, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
@@ -161,7 +161,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     {
       // RMS
       {
-        cur = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+        cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
         cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
 
         // cur = cur*attention_norm(broadcasted)
@@ -185,7 +185,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       
       Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_set_name(Kcur, "kcur");
-      const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
+      const float attn_scale = 1.0f;
       // store key and value to memory
       if (!run_mha_reordered) {
         {
@@ -312,7 +312,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     // this is independent of the self-attention result, so it could be done in parallel to the self-attention
     // note here we pass inpL instead of cur
     {
-      cur = ne_rms_norm(ctx0, cur, hparams.rms_norm_eps);
+      cur = ne_rms_norm(ctx0, cur, hparams.norm_eps);
       cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
 
       // struct ne_tensor* cur2 = ne_mul(ctx0, cur, model.layers[il].norm[1]);
@@ -329,7 +329,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   struct ne_tensor* embeddings = nullptr;
   // norm
   {
-    inpL = ne_rms_norm(ctx0, inpL, hparams.rms_norm_eps);
+    inpL = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
     inpL = ne_mul(ctx0, inpL, model.others[1]);
     // struct ne_tensor* inpL1 = ne_mul(ctx0, inpL, model.others[1]);
     

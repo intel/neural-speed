@@ -83,7 +83,7 @@ void Gemma::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_head = hparams.n_head;
   n_expert = hparams.n_experts;
   n_expert_used = hparams.n_experts_used;
-  scratch = gemma_mem_req(n_layer, lctx.model_scratch_enlarge_scale);
+  scratch = gemma_mem_req(n_layer, lctx.scratch_size_ratio);
   model.scratchs = scratch;
 }
 
@@ -223,7 +223,7 @@ class gemma_quant_layer : public quant_layer_base {
     if ((layername.find("embedding") != std::string::npos) ||
         (layername == "token_embd.weight" || layername == "model.embed_tokens.weight")) {
       // special layer process, can be loaded by config file
-      return quant_params_internal{quant_bits::count};  // return q4_0 to cover the usage of getrow
+      return quant_params_internal({quant_bits::count});  // return q4_0 to cover the usage of getrow
     }
     quantize &= (ne.size() == 2);
     if (quantize) {
