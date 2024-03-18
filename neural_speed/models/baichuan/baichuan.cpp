@@ -157,16 +157,30 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
     cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
     // SelfAttention
     {
-      // Linear::forward compute QKV
-      cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
-      ne_tensor* query_layer = ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
-                                          0);  // [N, hidden]
+      struct ne_tensor* query_layer;
+      struct ne_tensor* key_layer;
+      struct ne_tensor* value_layer;
+      if (model.gguf_format == true) {
+        query_layer = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
+        query_layer = ne_reshape_3d(ctx0, query_layer, head_size, n_head, N);
 
-      ne_tensor* key_layer = ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
-                                        hidden_size * ne_element_size(cur));
+        key_layer = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+        key_layer = ne_reshape_3d(ctx0, key_layer, head_size, n_head, N);
 
-      ne_tensor* value_layer = ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
-                                          2 * hidden_size * ne_element_size(cur));  // [N, heads, head_size]
+        value_layer = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
+        value_layer = ne_reshape_3d(ctx0, value_layer, head_size, n_head, N);
+      } else {
+        // Linear::forward compute QKV
+        cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
+        ne_tensor* query_layer =
+            ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
+                       0);  // [N, hidden]
+        ne_tensor* key_layer = ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
+                                          hidden_size * ne_element_size(cur));
+        ne_tensor* value_layer =
+            ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
+                       2 * hidden_size * ne_element_size(cur));  // [N, heads, head_size]
+      }
 
       // using mode = 2 for neox mode
       if (baichuan_version == 7) {
@@ -221,7 +235,9 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
         context_layer = ne_reshape_2d(ctx0, context_layer, hidden_size, N);
 
         // F32 mul_mat
+
         cur = ne_mul_mat(ctx0, model.layers[il].attn[1], context_layer);
+
       } else {
         const auto k_size = kv_cache_info.k_bytes;
         const auto v_size = kv_cache_info.v_bytes;

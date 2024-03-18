@@ -219,6 +219,7 @@ struct model_struct {
 
   struct ne_tensor* others[MODEL_MAX_OTHERS];
   std::vector<model_layer> layers;
+  bool gguf_format = false;
 
   // context
   struct ne_context* ctx = nullptr;

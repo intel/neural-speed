@@ -115,6 +115,7 @@ void BAICHUAN::load(model_context* ctx, model_progress_callback progress_callbac
   size_t vram_total = 0;
 
   if (ml->verify_tensor("token_embd.weight")) {  // for gguf
+    model.gguf_format = true;
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -129,8 +130,11 @@ void BAICHUAN::load(model_context* ctx, model_progress_callback progress_callbac
 
       // qkv GEMM
       std::string w_pack = "model.layers." + std::to_string(i);
-      layer.attn[0] = ml->get_tensor(w_pack + ".self_attn.W_pack.weight", {n_embd, 3 * n_embd}, backend);
+      layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd}, backend);
+      // just for keep the same index as below NE bin.
       layer.attn[1] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd, n_embd}, backend);
 
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
 
