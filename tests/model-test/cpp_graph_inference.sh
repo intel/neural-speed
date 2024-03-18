@@ -155,6 +155,7 @@ model_name_map["qwen-7b"]="Qwen/Qwen-7B-Chat"
 model_name_map["magicoder"]="ise-uiuc/Magicoder-S-DS-6.7B"
 model_name_map["whisper"]="openai/whisper-tiny"
 model_name_map["phi2"]="microsoft/phi-2"
+model_name_map["stablelm"]="stabilityai/stablelm-2-1_6b"
 model_name_map["qwen-1_5"]="Qwen/Qwen1.5-7B-Chat"
 model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
 model_name_map["mixtral-gptq"]="Mixtral-8x7B-Instruct-v0.1-GPTQ"
@@ -277,6 +278,10 @@ function main() {
         quant_script="./build/bin/quant_phi"
         convert_script="${convert_script}/convert_phi.py"
         infer_cmd="./build/bin/run_phi"
+    elif [[ "${model}" == "stablelm" ]]; then
+        quant_script="./build/bin/quant_stablelm"
+        convert_script="${convert_script}/convert_stablelm.py"
+        infer_cmd="./build/bin/run_stablelm"
     elif [[ "${model}" == "mixtral" ]]; then
         quant_script="./build/bin/quant_mixtral"
         convert_script="${convert_script}/convert_mixtral.py"

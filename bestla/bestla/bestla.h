@@ -67,7 +67,6 @@ enum class BTLA_DTYPE : uint32_t {
   U8 = EleBits8 | TypeInt | SubType1,
   S3_CLIP = EleBits3 | TypeInt,
   S4_CLIP = EleBits4 | TypeInt,
-  S4_FULLRANGE = EleBits4 | TypeInt | SubType1,
   F4_E2M1 = EleBits4 | TypeFloat,
   F4_BNB = EleBits4 | TypeFloat | SubType1,
   F4_NF4 = EleBits4 | TypeFloat | SubType2,

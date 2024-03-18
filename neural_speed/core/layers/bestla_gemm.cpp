@@ -237,12 +237,14 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
                                                                             ScaleDtype, isAsym, shuffle_indice);
         }
       }
+      [[fallthrough]];
     case NE_COMP_F16:
     case NE_COMP_BF16:
       if (_cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
         return BTLABuSize<tLauncher_Int8_F32F32<tAMX_BF16, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType,
                                                                    ScaleDtype, isAsym, shuffle_indice);
       }
+      [[fallthrough]];
     case NE_COMP_F32:
     case NE_COMP_UNDEF:  // currently only f32 activation
       if (_cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
@@ -253,7 +255,7 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
         return BTLABuSize<tLauncher_Fp_F32F32<tAVX2, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType, ScaleDtype,
                                                              isAsym, shuffle_indice);
       }
-      break;
+      [[fallthrough]];
     default:
       return 0;
   }
@@ -262,22 +264,15 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
 
 size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
                          ne_comp_type CompType, int* shuffle_indice) {
-  switch (QuantType) {
-    case BTLA_DTYPE::S4_CLIP:
-    case BTLA_DTYPE::S3_CLIP:
-    case BTLA_DTYPE::S4_FULLRANGE:
-    case BTLA_DTYPE::S8:
-      return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNInteger>(N, K, BlkSize, QuantType, ScaleDtype,
-                                                                            isAsym, CompType, shuffle_indice);
-    case BTLA_DTYPE::F8_E4M3:
-    case BTLA_DTYPE::F8_E5M2:
-    case BTLA_DTYPE::F4_BNB:
-    case BTLA_DTYPE::F4_E2M1:
-    case BTLA_DTYPE::F4_NF4:
-      return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNFloat>(N, K, BlkSize, QuantType, ScaleDtype, isAsym,
+  auto qtype = utils::bestla_dtype_type(QuantType);
+  if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeInt)) {
+    return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNInteger>(N, K, BlkSize, QuantType, ScaleDtype, isAsym,
                                                                           CompType, shuffle_indice);
-    default:
-      return 0;
+  } else if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeFloat)) {
+    return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNFloat>(N, K, BlkSize, QuantType, ScaleDtype, isAsym,
+                                                                        CompType, shuffle_indice);
+  } else {
+    assert(0);
   }
   return 0;
 }
@@ -332,6 +327,7 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
           return true;
         }
       }
+      [[fallthrough]];
     case NE_COMP_F16:
     case NE_COMP_BF16:
       if (_cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
@@ -340,6 +336,7 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
             ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
         return true;
       }
+      [[fallthrough]];
     case NE_COMP_F32:
     case NE_COMP_UNDEF:  // currently only f32 activation
       if (_cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
@@ -354,6 +351,7 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
             ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
         return true;
       }
+      [[fallthrough]];
     default:
       return false;
   }
@@ -363,24 +361,17 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
 bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
                         BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType, bool isTrans,
                         void* ThreadPool) {
-  switch (QuantType) {
-    case BTLA_DTYPE::S4_CLIP:
-    case BTLA_DTYPE::S3_CLIP:
-    case BTLA_DTYPE::S4_FULLRANGE:
-    case BTLA_DTYPE::S8:
-      return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(
-          PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
-    case BTLA_DTYPE::F8_E5M2:
-    case BTLA_DTYPE::F8_E4M3:
-    case BTLA_DTYPE::F4_BNB:
-    case BTLA_DTYPE::F4_E2M1:
-    case BTLA_DTYPE::F4_NF4:
-      return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNFloat>(
-          PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
-    default:
-      return false;
+  auto qtype = utils::bestla_dtype_type(QuantType);
+  if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeInt)) {
+    return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(
+        PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
+  } else if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeFloat)) {
+    return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNFloat>(
+        PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
+  } else {
+    assert(0);
+    return false;
   }
-  return false;
 }
 
 template <typename T>
@@ -441,6 +432,7 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
           return true;
         }
       }
+      [[fallthrough]];
     case NE_COMP_F16:
     case NE_COMP_BF16:
       if (_cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
@@ -449,6 +441,7 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
             QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
         return true;
       }
+      [[fallthrough]];
     case NE_COMP_F32:
     case NE_COMP_UNDEF:  // currently only f32 activation
       if (_cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
@@ -463,6 +456,7 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
             QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
         return true;
       }
+      [[fallthrough]];
     default:
       return false;
   }
@@ -566,23 +560,15 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
 
 size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
                          ne_comp_type CompType, int* shuffle_indice) {
-  switch (QuantType) {
-    case BTLA_DTYPE::S4_CLIP:
-    case BTLA_DTYPE::S3_CLIP:
-    case BTLA_DTYPE::S4_FULLRANGE:
-    case BTLA_DTYPE::S8:
-      return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNInteger>(N, K, BlkSize, QuantType, ScaleDtype,
-                                                                            isAsym, CompType, shuffle_indice);
-    case BTLA_DTYPE::F8_E4M3:
-    case BTLA_DTYPE::F8_E5M2:
-    case BTLA_DTYPE::F4_BNB:
-    case BTLA_DTYPE::F4_E2M1:
-    case BTLA_DTYPE::F4_NF4:
-      return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNFloat>(N, K, BlkSize, QuantType, ScaleDtype, isAsym,
+  auto qtype = utils::bestla_dtype_type(QuantType);
+  if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeInt)) {
+    return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNInteger>(N, K, BlkSize, QuantType, ScaleDtype, isAsym,
                                                                           CompType, shuffle_indice);
-
-    default:
-      return 0;
+  } else if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeFloat)) {
+    return BTLAGemmPackBSizeLocal<prologue_b::gemm::WeightKBlockNFloat>(N, K, BlkSize, QuantType, ScaleDtype, isAsym,
+                                                                        CompType, shuffle_indice);
+  } else {
+    assert(0);
   }
   return 0;
 }
@@ -590,22 +576,15 @@ size_t BTLAGemmPackBSize(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE QuantTyp
 bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K, size_t ldb, size_t BlkSize,
                         BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym, ne_comp_type CompType, bool isTrans,
                         void* ThreadPool) {
-  switch (QuantType) {
-    case BTLA_DTYPE::S4_CLIP:
-    case BTLA_DTYPE::S3_CLIP:
-    case BTLA_DTYPE::S4_FULLRANGE:
-    case BTLA_DTYPE::S8:
-      return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(
-          PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
-    case BTLA_DTYPE::F8_E5M2:
-    case BTLA_DTYPE::F8_E4M3:
-    case BTLA_DTYPE::F4_BNB:
-    case BTLA_DTYPE::F4_E2M1:
-    case BTLA_DTYPE::F4_NF4:
-      return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNFloat>(
-          PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
-    default:
-      return false;
+  auto qtype = utils::bestla_dtype_type(QuantType);
+  if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeInt)) {
+    return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(
+        PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
+  } else if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeFloat)) {
+    return BTLAGemmQuantPackBLocal<prologue_b::gemm::WeightKBlockNFloat>(
+        PackedBuf, FpData, N, K, ldb, BlkSize, QuantType, ScaleDtype, isAsym, CompType, isTrans, ThreadPool);
+  } else {
+    assert(0);
   }
   return false;
 }
@@ -613,17 +592,15 @@ bool BTLAGemmQuantPackB(void* PackedBuf, const float* FpData, size_t N, size_t K
 bool BTLAGemmPackB(void* PackedBuf, const int8_t* QData, const float* Scales, const int8_t* Zp, size_t N, size_t K,
                    size_t ldb, size_t BlkSize, BTLA_DTYPE QuantType, BTLA_DTYPE ScaleDtype, bool isAsym,
                    ne_comp_type CompType, int* shuffle_indice, void* ThreadPool) {
-  // only for integer quant
-  switch (QuantType) {
-    case BTLA_DTYPE::S3_CLIP:
-    case BTLA_DTYPE::S4_CLIP:
-    case BTLA_DTYPE::S4_FULLRANGE:
-    case BTLA_DTYPE::S8:
-      return BTLAGemmPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(PackedBuf, QData, Scales, Zp, N, K, ldb,
-                                                                        BlkSize, QuantType, ScaleDtype, isAsym,
-                                                                        CompType, shuffle_indice, ThreadPool);
-    default:
-      return false;
+  auto qtype = utils::bestla_dtype_type(QuantType);
+  if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeInt)) {
+    return BTLAGemmPackBLocal<prologue_b::gemm::WeightKBlockNInteger>(PackedBuf, QData, Scales, Zp, N, K, ldb, BlkSize,
+                                                                      QuantType, ScaleDtype, isAsym, CompType,
+                                                                      shuffle_indice, ThreadPool);
+  } else if (qtype == utils::bestla_dtype_type(BTLA_DTYPE::TypeFloat)) {
+    assert(0);
+  } else {
+    assert(0);
   }
   return false;
 }

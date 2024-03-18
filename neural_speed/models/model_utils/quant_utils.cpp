@@ -410,7 +410,7 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   if (new_type == NE_TYPE_BTLA) {
     size_t k_ = tensor.ne.at(0);
     size_t n_ = tensor.ne.at(1);
-    printf("JBLAS ");
+    printf("BesTLA ");
     new_size = bestla_quantize(f32_data, work.addr, params, nthread, n_, k_);
   } else if (new_type >= NE_TYPE_Q4_0 && new_type < NE_TYPE_BTLA) {
     printf("GGML ");
