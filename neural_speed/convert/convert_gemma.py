@@ -103,7 +103,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
     fout.write(struct.pack("i", hparams["num_attention_heads"]))
-    fout.write(struct.pack("i", 0))  # multi-query attention
+    fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
     fout.write(
         struct.pack(

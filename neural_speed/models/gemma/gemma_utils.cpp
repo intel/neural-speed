@@ -78,7 +78,7 @@ void Gemma::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
-  n_head_kv = hparams.n_head;
+  n_head_kv = hparams.n_head_kv;
   n_embd_head_k = hparams.n_embd_head_k;
   n_head = hparams.n_head;
   n_expert = hparams.n_experts;
@@ -134,10 +134,10 @@ void Gemma::load(model_context* ctx, model_progress_callback progress_callback, 
       layer.norm[0] = ml->get_tensor(layers_i + ".attn_norm.weight", {n_embd}, backend);
 
       // qkv GEMM
-      layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
+      layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd_head_k*n_head}, backend);
       layer.attn[1] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
       layer.attn[2] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd_head_k*n_head_kv, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd_head_k*n_head, n_embd}, backend);
 
       // ffn norm
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
@@ -170,12 +170,12 @@ void Gemma::load(model_context* ctx, model_progress_callback progress_callback, 
       layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
 
       // qkv GEMM
-      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd_head_k*n_head}, backend);
       layer.attn[1] =
           ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
       layer.attn[2] =
           ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd_head_k*n_head_kv}, backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd_head_k*n_head_kv, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd_head_k*n_head, n_embd}, backend);
 
       // ffn norm
       layer.norm[1] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
