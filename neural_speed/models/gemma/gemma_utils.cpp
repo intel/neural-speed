@@ -221,9 +221,9 @@ class gemma_quant_layer : public quant_layer_base {
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;
     if ((layername.find("embedding") != std::string::npos) ||
-        (layername == "token_embd.weight" || layername == "tok_embeddings.weight")) {
+        (layername == "token_embd.weight" || layername == "model.embed_tokens.weight")) {
       // special layer process, can be loaded by config file
-      return quant_params_internal();  // return q4_0 to cover the usage of getrow
+      return quant_params_internal{quant_bits::count};  // return q4_0 to cover the usage of getrow
     }
     quantize &= (ne.size() == 2);
     if (quantize) {
