@@ -161,6 +161,9 @@ model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
 model_name_map["mixtral-gptq"]="Mixtral-8x7B-Instruct-v0.1-GPTQ"
 model_name_map["qwen1.5-gptq"]="Qwen/Qwen1.5-7B-Chat-GPTQ"
 model_name_map["qwen-gptq"]="TheBloke/Qwen-7B-Chat-GPTQ"
+model_name_map["phi1.5-gptq"]="phi-1_5-gptq-4bit"
+model_name_map["falcon7b-gptq"]="Falcon-7B-Instruct-GPTQ"
+model_name_map["baichuan13b-gptq"]="Baichuan2-13B-Chat-GPTQ"
 model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
 
 function main() {
