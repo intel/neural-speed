@@ -84,6 +84,7 @@ enum model_archs {
   MODEL_QWEN,
   MODEL_PHI,
   MODEL_GEMMA,
+  MODEL_STABLELM,
   MODEL_WHISPER
 };
 
@@ -131,7 +132,7 @@ struct model_hparams {
   int32_t par_res = 1;                // for neox 1 = true, 0 = false
   uint32_t word_embed_proj_dim = 0;   // for opt
   bool do_layer_norm_before = false;  // for opt
-  float rms_norm_eps = 1e-6f;         // rms norm epsilon
+  float norm_eps = 1e-6f;             // rms norm epsilon
   float freq_base = 10000.0f;         // rope theta
   float freq_scale = 1.0f;            // rope scale factor
 
@@ -322,7 +323,7 @@ struct model_context {
 
   size_t mem_per_token = 0;
 
-  float model_scratch_enlarge_scale = 1.0f;  // model memory scratch enlarge scale
+  float scratch_size_ratio = 1.0f;  // model memory scratch enlarge scale
 
   // decode output (3-dimensional array: [batch_size] [n_tokens] [n_vocab])
   std::vector<float> logits;
@@ -443,7 +444,7 @@ struct model_context_params {
   // global generation config
   generation_config gen_conf;
   // model memory scratch enlarge scale
-  float model_scratch_enlarge_scale;
+  float scratch_size_ratio;
 
   // called with a progress value between 0 and 1, pass nullptr to disable
   model_progress_callback progress_callback;
@@ -485,8 +486,8 @@ class model_name_to_arch {
       {"dolly", MODEL_GPTNEOX},   {"polyglot", MODEL_GPTNEOX},  {"starcoder", MODEL_STARCODER},
       {"falcon", MODEL_FALCON},   {"bloom", MODEL_BLOOM},       {"chatglm2", MODEL_CHATGLM2},
       {"chatglm", MODEL_CHATGLM}, {"baichuan", MODEL_BAICHUAN}, {"mistral", MODEL_LLAMA},
-      {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"whisper", MODEL_WHISPER},
-      {"mixtral", MODEL_LLAMA},   {"gemma", MODEL_GEMMA}};
+      {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"stablelm", MODEL_STABLELM},
+      {"whisper", MODEL_WHISPER}, {"mixtral", MODEL_LLAMA},     {"gemma", MODEL_GEMMA}};
 };
 
 #ifdef __cplusplus

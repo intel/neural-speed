@@ -10,6 +10,7 @@ Neural Speed supports the following models:
     <th colspan="4">INT8</th>
     <th colspan="4">INT4</th>
     <th rowspan="2">Transformer Version</th>
+    <th rowspan="2">Max tokens length</th>
   </tr>
   <tr>
     <th>RTN</th>
@@ -36,6 +37,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>4096</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/decapoda-research/llama-7b-hf" target="_blank" rel="noopener noreferrer">LLaMA-7B</a>,
@@ -49,6 +51,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
     <td><a href="https://huggingface.co/codellama/CodeLlama-7b-Instruct-hf" target="_blank" rel="noopener noreferrer">CodeLlama-7b</a></td>
     <td>✅</td>
@@ -60,6 +63,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>16384</td>
   </tr>
   </tr>
     <td><a href="https://huggingface.co/upstage/SOLAR-10.7B-Instruct-v1.0" target="_blank" rel="noopener noreferrer">Solar-10.7B</a></td>
@@ -72,6 +76,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>4096</td>
   </tr>
     <tr>
     <td><a href="https://huggingface.co/Intel/neural-chat-7b-v3-1" target="_blank" rel="noopener noreferrer">Neural-Chat-7B-v3-1</a>,
@@ -85,6 +90,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>32768</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener noreferrer">Mistral-7B</a>,
@@ -98,6 +104,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>4.36.0 or newer</td>
+    <td>32768</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/Qwen/Qwen-7B-Chat" target="_blank" rel="noopener noreferrer">Qwen-7B</a>,
@@ -113,6 +120,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>8192 / 32768</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-j-6b" target="_blank" rel="noopener noreferrer">GPT-J-6B</a></td>
@@ -125,6 +133,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>✅</td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/EleutherAI/gpt-neox-20b" target="_blank" rel="noopener noreferrer">GPT-NeoX-20B</a></td>
@@ -137,6 +146,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/databricks/dolly-v2-3b" target="_blank" rel="noopener noreferrer">Dolly-v2-3B</a></td>
@@ -149,6 +159,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>4.28.1 or newer</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/mosaicml/mpt-7b" target="_blank" rel="noopener noreferrer">MPT-7B</a>,
@@ -162,6 +173,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/tiiuae/falcon-7b" target="_blank" rel="noopener noreferrer">Falcon-7B</a>,
@@ -175,6 +187,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/bigscience/bloomz-7b1" target="_blank" rel="noopener noreferrer">BLOOM-7B</a></td>
@@ -187,6 +200,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/facebook/opt-125m" target="_blank" rel="noopener noreferrer">OPT-125m</a>,
@@ -201,6 +215,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/THUDM/chatglm-6b" target="_blank" rel="noopener noreferrer">ChatGLM-6B</a>,
@@ -214,19 +229,21 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>4.33.1</td>
+    <td>2048 / 32768</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/baichuan-inc/Baichuan-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan-13B-Chat</a>,
     <a href="https://huggingface.co/baichuan-inc/Baichuan2-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan2-13B-Chat</a></td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
     <td>✅</td>
-    <td> </td>
-    <td> </td>
-    <td> </td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
+    <td>✅</td>
     <td>4.33.1</td>
+    <td>4096</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/microsoft/phi-2" target="_blank" rel="noopener noreferrer">phi-2</a>,
@@ -238,6 +255,19 @@ Neural Speed supports the following models:
     <td> </td>
     <td>✅</td>
     <td> </td>
+    <td> </td>
+    <td> </td>
+    <td>Latest</td>
+    <td>2048</td>
+  </tr>
+  <tr>
+    <td><a href="https://huggingface.co/stabilityai/stablelm-3b-4e1t" target="_blank" rel="noopener noreferrer">StableLM-3B</a>,
+    <a href="https://huggingface.co/stabilityai/stablelm-2-1_6b" target="_blank" rel="noopener noreferrer">StableLM2-1_6B</a>
+    <a href="https://huggingface.co/stabilityai/stablelm-2-zephyr-1_6b" target="_blank" rel="noopener noreferrer">StableLM2-Zephyr-1_6B</a></td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td>✅</td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
@@ -257,6 +287,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>448</td>
   </tr>
 </tbody>
 </table>

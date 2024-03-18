@@ -23,10 +23,20 @@ enum baichuan_model {
   BAICHUAN_13B,
 };
 
-static const model_scratch baichuan_mem_req(int n_layers) {
+static const model_scratch baichuan_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 40:
-      return {8192ull * MB, 8192ull * MB, 8192ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
+    case 32:
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }

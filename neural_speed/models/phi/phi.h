@@ -23,12 +23,20 @@ enum new_model {
   PHI,
 };
 
-static const model_scratch phi_mem_req(int n_layers) {
+static const model_scratch phi_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 24:
-      return {512ull * MB, 512ull * MB, 1026ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+      };
     case 32:
-      return {1024ull * MB, 1024ull * MB, 1026ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }

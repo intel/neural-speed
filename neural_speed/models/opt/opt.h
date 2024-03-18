@@ -34,20 +34,44 @@ enum opt_model {
 };
 
 // TODO naive memory buffer size
-static const model_scratch opt_mem_req(int n_layers) {
+static const model_scratch opt_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 12:  // OPT_125M
-      return {512ull * MB, 512ull * MB, 1024ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+      };
     case 24:  // OPT_350M, OPT_1DOT3B
-      return {1024ull * MB, 1024ull * MB, 2048ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+      };
     case 32:  // OPT_2DOT7B OPT_6DOT7B
-      return {2048ull * MB, 2048ull * MB, 4096ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     case 40:
-      return {2560ull * MB, 2560ull * MB, 5120ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 2560) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2560) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 5120) * MB,
+      };
     case 48:
-      return {3072ull * MB, 3072ull * MB, 6144ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3072) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 6144) * MB,
+      };
     case 64:
-      return {4096ull * MB, 4096ull * MB, 8192ull * MB};
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 8192) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }
