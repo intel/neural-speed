@@ -971,19 +971,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # ChatGLM3 shares the same architecture and model config with ChatGLM2, but its tokenizer further supports system prompts,
     # so we can check system token to discriminate ChatGLM3 from ChatGLM2.
-    import pdb
-    pdb.set_trace()
     if "<|system|>" in tokenizer.tokenizer.special_tokens:
-        chatglm3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
-        #chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
-
-    # if hasattr(model.config, "multi_query_attention"):
-    #     if args.format == "GGUF":
-    #         chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
-    #     else:
-    #         chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
-    # else:
-    #     chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+        if args.format == "GGUF":
+            chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
+        else:
+            chatglm3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    elif hasattr(model.config, "multi_query_attention"):
+        if args.format == "GGUF":
+            chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
+        else:
+            chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    else:
+        chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
 
 
 if __name__ == '__main__':

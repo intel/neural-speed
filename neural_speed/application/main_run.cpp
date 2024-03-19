@@ -234,7 +234,7 @@ int main(int argc, char** argv) {  // NOLINT
   }
 
   std::vector<int> embd_inp;
-  if (params.model_arch == MODEL_CHATGLM2) {
+  if (params.model_arch == MODEL_CHATGLM2 || params.model_arch == MODEL_CHATGLM3) {
     std::vector<std::string> prompts;
     prompts.push_back(params.prompt);
     std::string prompt = build_prompt_glm2(prompts);
@@ -646,7 +646,7 @@ int main(int argc, char** argv) {  // NOLINT
 
     // display text
     if (params.model_arch == MODEL_CHATGLM || params.model_arch == MODEL_CHATGLM2 ||
-        params.model_arch == MODEL_BAICHUAN) {
+        params.model_arch == MODEL_BAICHUAN || params.model_arch == MODEL_CHATGLM3) {
       static bool is_prompt = true;
       if (input_echo) {
         if (is_prompt == true) {
