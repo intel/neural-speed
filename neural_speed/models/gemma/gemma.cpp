@@ -100,8 +100,8 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   const int n_head = hparams.n_head;
   const int n_head_kv = hparams.n_head_kv;
   const int n_vocab = hparams.n_vocab;
-  const int n_rot = hparams.n_rot;
-  const int head_dim = hparams.n_rot;
+  const int n_rot = hparams.n_embd_head_k;
+  const int head_dim = hparams.n_embd_head_k;
   const int n_gqa_embd = head_dim * n_head_kv;
 
   auto& mem_per_token = lctx.mem_per_token;
