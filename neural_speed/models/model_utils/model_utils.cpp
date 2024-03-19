@@ -143,7 +143,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
     ne_set_name(cache.cossin, "cossin(-1)");
     float freq_base = hparams.freq_base;
     float theta = -1 * hparams.freq_scale;
-    float theta_scale = (model != nullptr && model->arch == MODEL_CHATGLM2)
+    float theta_scale = (model != nullptr && model->arch == MODEL_CHATGLM2 && model->arch == MODEL_CHATGLM3)
                             ? std::pow(freq_base, -2.0f / (head_size / 2))  // chatglm2 has their DIM_SCALE of 2
                         : hparams.n_rot > 0 ? std::pow(freq_base, -2.0f / hparams.n_rot)
                                             : std::pow(freq_base, -2.0f / head_size);
@@ -929,7 +929,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
     const auto& hparams = ctx->model.hparams;
 
     if (params.shift_roped_k) {
-      const std::array supported{MODEL_LLAMA, MODEL_GPTJ, MODEL_CHATGLM2};
+      const std::array supported{MODEL_LLAMA, MODEL_GPTJ, MODEL_CHATGLM2, MODEL_CHATGLM3};
       NE_ASSERT(("Current model does not support shifting RoPE-ed K cache",
                  std::any_of(supported.cbegin(), supported.cend(), [arch](auto m) { return arch == m; })));
     }
