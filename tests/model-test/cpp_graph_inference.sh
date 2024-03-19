@@ -342,7 +342,7 @@ function main() {
     ## prepare example requirement
     if [[ $requirements_file == *'.txt' ]] && [[ -f $requirements_file ]]; then
         pip install -r "$requirements_file"
-    elif [[ $requirements_file == *'.sh' ]] && [[ -f $requirements_file ]; then
+    elif [[ $requirements_file == *'.sh' ]] && [[ -f $requirements_file ]]; then
         source "$requirements_file"
     else
         echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
