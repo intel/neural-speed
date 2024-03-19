@@ -292,7 +292,7 @@ function main() {
     elif [[ "${model}" == *"-gptq" ]]; then
         infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
         precision_list+=("default")
-        requirements_file="$working_dir/neural_speed/models/requirements/mixtral-gptq.txt"
+        requirements_file="$working_dir/neural_speed/models/requirements/${model}.txt"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1
@@ -340,9 +340,9 @@ function main() {
     pip install -r $working_dir/requirements.txt
     python $working_dir/setup.py install
     ## prepare example requirement
-    if [[ $requirements_file == *'.txt' ]]; then
+    if [[ $requirements_file == *'.txt' ]] && [[ -f $requirements_file ]]; then
         pip install -r "$requirements_file"
-    elif [[ $requirements_file == *'.sh' ]]; then
+    elif [[ $requirements_file == *'.sh' ]] && [[ -f $requirements_file ]; then
         source "$requirements_file"
     else
         echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
