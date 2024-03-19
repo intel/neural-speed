@@ -21,9 +21,6 @@
 enum gemma_model {
   GEMMA_2B,
   GEMMA_7B,
-  GEMMA_13B,
-  GEMMA_30B,
-  GEMMA_65B,
 };
 
 static const model_scratch gemma_mem_req(int n_layers, float enlarge_scale = 1.0f) {
@@ -39,30 +36,6 @@ static const model_scratch gemma_mem_req(int n_layers, float enlarge_scale = 1.0
           static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
           static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
           static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
-      };
-    case 40:
-      return {
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
-      };
-    case 48:
-      return {
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 2366) * MB,
-      };
-    case 60:
-      return {
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 512) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 3124) * MB,
-      };
-    case 80:
-      return {
-          static_cast<unsigned long long>(enlarge_scale * 2048) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 2048) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 10240) * MB,
       };
     default:
       MODEL_ASSERT(false);

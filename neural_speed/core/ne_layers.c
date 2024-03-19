@@ -2398,8 +2398,8 @@ struct ne_tensor* ne_ffn_gelu(struct ne_context* ctx, struct ne_tensor* w1, stru
   return result;
 }
 
-struct ne_tensor* ne_ffn_gelu_mul(struct ne_context* ctx, struct ne_tensor* w1, struct ne_tensor* w2, struct ne_tensor* w3,
-                              struct ne_tensor* src) {
+struct ne_tensor* ne_ffn_gelu_mul(struct ne_context* ctx, struct ne_tensor* w1, struct ne_tensor* w2,
+                                  struct ne_tensor* w3, struct ne_tensor* src) {
   NE_ASSERT(ne_are_same_shape(w1, w3));
   NE_ASSERT(w2->ne[0] == w1->ne[1]);
 
@@ -7783,8 +7783,9 @@ static void ne_compute_forward_ffn_gelu(const struct ne_compute_params* params, 
 }
 
 static void ne_compute_forward_ffn_gelu_mul(const struct ne_compute_params* params, const struct ne_tensor* src,
-                                        const struct ne_tensor* w1, const struct ne_tensor* w2, struct ne_tensor* w3,
-                                        const struct ne_tensor* tmp, struct ne_tensor* tmp1, struct ne_tensor* dst) {
+                                            const struct ne_tensor* w1, const struct ne_tensor* w2,
+                                            struct ne_tensor* w3, const struct ne_tensor* tmp, struct ne_tensor* tmp1,
+                                            struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT) {
     return;
   }
@@ -7797,7 +7798,7 @@ static void ne_compute_forward_ffn_gelu_mul(const struct ne_compute_params* para
   const int fmid = w1->ne[1];
   const int seq = dst->ne[1];
   bestla_fusion_FFN_Gelu_Mul_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
-                                        (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
+                                            (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
 }
 
 // ne_compute_forward_scale
@@ -10442,8 +10443,8 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
       ne_compute_forward_ffn_gelu(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1], tensor);
     } break;
     case NE_OP_MUL_FFN_GELU_MUL: {
-      ne_compute_forward_ffn_gelu_mul(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1], tensor->opt[2],
-                                  tensor->opt[3], tensor);
+      ne_compute_forward_ffn_gelu_mul(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1],
+                                      tensor->opt[2], tensor->opt[3], tensor);
     } break;
     case NE_OP_SCALE: {
       ne_compute_forward_scale(params, tensor->src0, tensor->src1, tensor);

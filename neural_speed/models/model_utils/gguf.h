@@ -237,15 +237,12 @@ enum llm_arch {
 };
 
 static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {
-    {LLM_ARCH_LLAMA, "llama"},         {LLM_ARCH_FALCON, "falcon"},
-    {LLM_ARCH_GPT2, "gpt2"},           {LLM_ARCH_GPTJ, "gptj"},
-    {LLM_ARCH_GPTNEOX, "gptneox"},     {LLM_ARCH_MPT, "mpt"},
-    {LLM_ARCH_BAICHUAN, "baichuan"},   {LLM_ARCH_STARCODER, "starcoder"},
-    {LLM_ARCH_PERSIMMON, "persimmon"}, {LLM_ARCH_REFACT, "refact"},
-    {LLM_ARCH_BLOOM, "bloom"},         {LLM_ARCH_STABLELM, "stablelm"},
-    {LLM_ARCH_QWEN, "qwen"},           {LLM_ARCH_CHATGLM, "chatglm"},
-    {LLM_ARCH_CHATGLM2, "chatglm2"},   {LLM_ARCH_PHI, "phi"}, 
-    {LLM_ARCH_GEMMA, "gemma"},         {LLM_ARCH_QWEN2, "qwen2"}};
+    {LLM_ARCH_LLAMA, "llama"},       {LLM_ARCH_FALCON, "falcon"},       {LLM_ARCH_GPT2, "gpt2"},
+    {LLM_ARCH_GPTJ, "gptj"},         {LLM_ARCH_GPTNEOX, "gptneox"},     {LLM_ARCH_MPT, "mpt"},
+    {LLM_ARCH_BAICHUAN, "baichuan"}, {LLM_ARCH_STARCODER, "starcoder"}, {LLM_ARCH_PERSIMMON, "persimmon"},
+    {LLM_ARCH_REFACT, "refact"},     {LLM_ARCH_BLOOM, "bloom"},         {LLM_ARCH_STABLELM, "stablelm"},
+    {LLM_ARCH_QWEN, "qwen"},         {LLM_ARCH_CHATGLM, "chatglm"},     {LLM_ARCH_CHATGLM2, "chatglm2"},
+    {LLM_ARCH_PHI, "phi"},           {LLM_ARCH_GEMMA, "gemma"},         {LLM_ARCH_QWEN2, "qwen2"}};
 
 struct gguf_tensor_info {
   struct gguf_str name;

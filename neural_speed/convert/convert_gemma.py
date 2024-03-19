@@ -98,17 +98,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     fout.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
     fout.write(struct.pack("i", 1))
-    #import pdb;pdb.set_trace()
     fout.write(struct.pack("i", hparams["vocab_size"]))
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
     fout.write(struct.pack("i", hparams["num_attention_heads"]))
     fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
-    fout.write(
-        struct.pack(
-            "i", hparams["kv_channels"] if "kv_channels" in hparams else int(hparams["hidden_size"] /
-                                                                             hparams["num_attention_heads"])))
+    fout.write(struct.pack("i", hparams["head_dim"]))
     fout.write(struct.pack("i", ftype))
     fout.write(
         struct.pack("i", hparams["seq_length"] if "seq_length" in hparams else hparams["max_position_embeddings"]))
@@ -123,7 +119,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", hparams["head_dim"]))
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
@@ -174,8 +169,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         else:
             print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
             data = data.astype(np.float32)
-
-        # import pdb;pdb.set_trace()
+        # gemma_rms:
+        # output = self._norm(x.float()).type_as(x)
+        # return output * (1 + self.weight)
         if "norm" in name:
             data = data + 1
         str = name.encode('utf-8')

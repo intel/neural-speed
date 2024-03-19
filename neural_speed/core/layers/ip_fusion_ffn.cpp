@@ -685,7 +685,7 @@ bool bestla_fusion_FFN_SiLu_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr
 }
 
 bool bestla_fusion_FFN_Gelu_Mul_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid,
-                                           int fout) {
+                                               int fout) {
   return ffn_3w::bestla_fusion_ffn_f32f32_support(w1ptr, w2ptr, w3ptr, seq, fin, fmid, fout);
 }
 
@@ -701,8 +701,8 @@ void bestla_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void*
 }
 
 void bestla_fusion_FFN_Gelu_Mul_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
-                                           float* tmp2, float* output, int seq, int fin, int fmid, int fout,
-                                           void* workspace) {
+                                               float* tmp2, float* output, int seq, int fin, int fmid, int fout,
+                                               void* workspace) {
   epilogue::gemm::ParamAccumulatorWriteBack<float> epi_args1 = {tmp1, fmid};
   epilogue::gemm::ParamAccumulatorWriteBack<float> epi_args2 = {output, fout};
   ffn_3w::bestla_fusion_ffn_f32f32_forward<epilogue::gemm::AccumulatorWriteBackWithGeluFp32,

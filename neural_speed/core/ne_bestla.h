@@ -49,11 +49,12 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
 unsigned long long bestla_fusion_FFN_f32f32_get_workspace_size(int seq, int fin, int fmid, int fout, void* w1ptr,
                                                                void* w2ptr);
 
-bool bestla_fusion_FFN_Gelu_Mul_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid, int fout);
+bool bestla_fusion_FFN_Gelu_Mul_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid,
+                                               int fout);
 void bestla_fusion_FFN_Gelu_Mul_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
-                                           float* tmp2, float* output, int seq, int fin, int fmid, int fout,
-                                           void* workspace);
-                                           
+                                               float* tmp2, float* output, int seq, int fin, int fmid, int fout,
+                                               void* workspace);
+
 bool bestla_fusion_FFN_SiLu_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid, int fout);
 void bestla_fusion_FFN_SiLu_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
                                            float* tmp2, float* output, int seq, int fin, int fmid, int fout,

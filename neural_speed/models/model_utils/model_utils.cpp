@@ -63,7 +63,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
                           const bool shift_roped_k, model_struct* model) {
   const auto n_layer = hparams.n_layer;
   auto heads_kv = hparams.n_head_kv > 0 ? hparams.n_head_kv : hparams.n_head;
-  const auto head_size = 256;
+  const auto head_size = hparams.n_rot;
 #ifdef NS_TP_MODEL
   // when use TP, cached kv will also have smaller size
   parallel_context* p_ctx = init_parallel_context();
@@ -103,7 +103,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
       auto& k_cache = model->layers[il].k_cache;
       auto& v_cache = model->layers[il].v_cache;
       if (wtype == NE_TYPE_F16) {  // chatglm does not support fp32 kv-cache in original impl of chatglm_util.cpp
-        const int head_size = 256;
+        const int head_size = hparams.n_rot;
         const int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;
         k_cache = d_ne_new_tensor_4d(model->ctx, NE_TYPE_F16, head_size, n_ctx, heads_kv, batch_size * beam_size);
         v_cache = d_ne_new_tensor_4d(model->ctx, NE_TYPE_F16, n_ctx, head_size, heads_kv, batch_size * beam_size);

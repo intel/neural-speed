@@ -1117,11 +1117,9 @@ struct model_file_loader {
     hparams.inner_hidden_size = file.read_u32();
     hparams.n_experts = file.read_u32();
     hparams.n_experts_used = file.read_u32();
-    hparams.n_embd_head_k = file.read_u32();
     printf("%-16s %d.hparams.inner_hidden_size = %-30d\n", __func__, count++, hparams.inner_hidden_size);
     printf("%-16s %d.hparams.n_experts = %-30d\n", __func__, count++, hparams.n_experts);
     printf("%-16s %d.hparams.n_experts_used = %-30d\n", __func__, count++, hparams.n_experts_used);
-
 
     file.read_raw(&hparams.norm_eps, sizeof(float));
 
@@ -1267,7 +1265,6 @@ struct model_file_saver {
     file.write_u32(hparams.inner_hidden_size);
     file.write_u32(hparams.n_experts);
     file.write_u32(hparams.n_experts_used);
-    file.write_u32(hparams.n_embd_head_k);
 
     file.write_raw(&hparams.norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));
@@ -1363,7 +1360,8 @@ struct model_model_loader {
   }
 
   uint32_t guess_n_parts() const {
-    auto it = tensors_map.name_to_idx.find("tok_embeddings.weight");    if (it == tensors_map.name_to_idx.end()) {
+    auto it = tensors_map.name_to_idx.find("tok_embeddings.weight");
+    if (it == tensors_map.name_to_idx.end()) {
       it = tensors_map.name_to_idx.find("transformer.wte.weight");
       if (it == tensors_map.name_to_idx.end()) {
         it = tensors_map.name_to_idx.find("gpt_neox.embed_in.weight");

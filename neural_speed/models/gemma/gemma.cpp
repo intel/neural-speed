@@ -39,10 +39,10 @@
 
 // feed-forward network
 struct ne_tensor* gemma_ff(const model_layer& layer, const int batch_size, const int N, ne_context* ctx0,
-                          ne_tensor* inp) {
+                           ne_tensor* inp) {
   struct ne_tensor* cur = inp;
-  if (bestla_fusion_FFN_Gelu_Mul_f32f32_support(layer.ffn[0]->data,layer.ffn[1]->data, layer.ffn[2]->data, N, cur->ne[0],
-                                            layer.ffn[0]->ne[1], layer.ffn[1]->ne[1])){
+  if (bestla_fusion_FFN_Gelu_Mul_f32f32_support(layer.ffn[0]->data, layer.ffn[1]->data, layer.ffn[2]->data, N,
+                                                cur->ne[0], layer.ffn[0]->ne[1], layer.ffn[1]->ne[1])) {
     cur = ne_ffn_gelu_mul(ctx0, layer.ffn[0], layer.ffn[1], layer.ffn[2], cur);
   } else {
     struct ne_tensor* cur_1 = ne_mul_mat(ctx0, layer.ffn[0], cur);
@@ -71,13 +71,12 @@ struct ne_tensor* gemma_ff(const model_layer& layer, const int batch_size, const
 //   - n_threads: number of threads to use
 //
 static bool gemma_model_eval_internal(model_context* ctx, const model_input* inputs, const int n_input,
-                                     const int n_threads) {
+                                      const int n_threads) {
   const int64_t t_start_us = ne_time_us();
   model_context& lctx = *ctx;
 
   // static batching for now
   const int N = inputs->n_tokens;
-  // const int N = 7;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
@@ -101,9 +100,9 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   const int n_head = hparams.n_head;
   const int n_head_kv = hparams.n_head_kv;
   const int n_vocab = hparams.n_vocab;
-  const int n_rot = hparams.n_embd_head_k;
-  const int head_dim = hparams.n_embd_head_k;
-  const int n_gqa_embd = head_dim*n_head_kv;
+  const int n_rot = hparams.n_rot;
+  const int head_dim = hparams.n_rot;
+  const int n_gqa_embd = head_dim * n_head_kv;
 
   auto& mem_per_token = lctx.mem_per_token;
   auto& buf_compute = lctx.buf_compute;
@@ -143,17 +142,15 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
-  // ne_set_name(embd, "embd");
-  // int tokens_id[7] = {2, 7701, 2174,  573, 4444,  578, 1443};
+  ne_set_name(embd, "embd");
 
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
-    // memcpy(static_cast<model_token*>(embd->data) + i * N, tokens_id, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
-  inpL = ne_scale(ctx0, inpL, ne_new_f32(ctx0, sqrtf(static_cast<float>(n_rot*n_head))));
-  
+  inpL = ne_scale(ctx0, inpL, ne_new_f32(ctx0, sqrtf(static_cast<float>(n_embd))));
+
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
 
@@ -164,26 +161,25 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       {
         cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
         cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
-
-        // cur = cur*attention_norm(broadcasted)
-        // struct ne_tensor* cur1 = ne_mul(ctx0, cur, model.layers[il].norm[0]);
-        // cur = ne_add(ctx0,cur, cur1);
         ne_set_name(cur, "input_norm");
       }
 
       // compute QKV
-        struct ne_tensor* Kcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head_kv, N);
-        ne_set_name(Kcur, "Kcur_matmul");
-        struct ne_tensor* Qcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N);
-        ne_set_name(Qcur, "Qcur_matmul");
-        struct ne_tensor* Vcur = ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head_kv, N);
-        ne_set_name(Vcur, "Vcur_matmul");
+      struct ne_tensor* Kcur =
+          ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head_kv, N);
+      ne_set_name(Kcur, "Kcur_matmul");
+      struct ne_tensor* Qcur =
+          ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N);
+      ne_set_name(Qcur, "Qcur_matmul");
+      struct ne_tensor* Vcur =
+          ne_reshape_3d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head_kv, N);
+      ne_set_name(Vcur, "Vcur_matmul");
 
       // using mode = 2 for GPT-NeoX mode
       Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_set_name(Qcur, "Qcur");
       Qcur = ne_scale_inplace(ctx0, Qcur, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>((n_gqa_embd) / n_head_kv))));
-      
+
       Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_set_name(Kcur, "kcur");
       const float attn_scale = 1.0f;
@@ -196,11 +192,12 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
           std::vector<ne_tensor*> v_bs(batch_size);
           for (int i = 0; i < batch_size; ++i) {
             // batch K
-            Kcur_bs[i] = ne_permute(ctx0,
-                                    ne_view_4d(ctx0, Kcur, head_dim, n_head_kv, N, 1, ne_element_size(Kcur) * head_dim,
-                                               ne_element_size(Kcur) * n_gqa_embd, ne_element_size(Kcur) * n_gqa_embd * N,
-                                               i * ne_element_size(Kcur) * n_gqa_embd * N),
-                                    0, 2, 1, 3);
+            Kcur_bs[i] =
+                ne_permute(ctx0,
+                           ne_view_4d(ctx0, Kcur, head_dim, n_head_kv, N, 1, ne_element_size(Kcur) * head_dim,
+                                      ne_element_size(Kcur) * n_gqa_embd, ne_element_size(Kcur) * n_gqa_embd * N,
+                                      i * ne_element_size(Kcur) * n_gqa_embd * N),
+                           0, 2, 1, 3);
             k_bs[i] = ne_view_4d(
                 ctx0, kv_self.k, head_dim, N, n_head_kv, 1, ne_element_size(kv_self.k) * head_dim,
                 ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_gqa_embd * n_ctx,
@@ -208,37 +205,36 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
                  i * n_ctx * n_gqa_embd * ne_element_size(kv_self.k) + head_dim * n_past * ne_element_size(kv_self.k)));
 
             // batch V
-            Vcur_bs[i] = ne_permute(ctx0,
-                                    ne_reshape_4d(ctx0,
-                                                  ne_view_2d(ctx0, Vcur, n_gqa_embd, N, ne_element_size(Vcur) * n_gqa_embd,
-                                                             i * ne_element_size(Vcur) * n_gqa_embd * N),
-                                                  head_dim, n_head_kv, N, 1),
-                                    1, 2, 0, 3);
-            v_bs[i] =
-                ne_view_4d(ctx0, kv_self.v, N, head_dim, n_head_kv, 1, n_ctx * ne_element_size(kv_self.v),
-                           n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_gqa_embd,
-                           ((il * n_ctx) * ne_element_size(kv_self.v) * n_gqa_embd * kv_n_ctx_block +
-                            i * n_ctx * n_gqa_embd * ne_element_size(kv_self.v) + n_past * ne_element_size(kv_self.v)));
+            Vcur_bs[i] =
+                ne_permute(ctx0,
+                           ne_reshape_4d(ctx0,
+                                         ne_view_2d(ctx0, Vcur, n_gqa_embd, N, ne_element_size(Vcur) * n_gqa_embd,
+                                                    i * ne_element_size(Vcur) * n_gqa_embd * N),
+                                         head_dim, n_head_kv, N, 1),
+                           1, 2, 0, 3);
+            v_bs[i] = ne_view_4d(
+                ctx0, kv_self.v, N, head_dim, n_head_kv, 1, n_ctx * ne_element_size(kv_self.v),
+                n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_gqa_embd,
+                ((il * n_ctx) * ne_element_size(kv_self.v) * n_gqa_embd * kv_n_ctx_block +
+                 i * n_ctx * n_gqa_embd * ne_element_size(kv_self.v) + n_past * ne_element_size(kv_self.v)));
             ne_build_forward_expand(&gf, ne_cpy(ctx0, Kcur_bs[i], k_bs[i]));
             ne_build_forward_expand(&gf, ne_cpy(ctx0, Vcur_bs[i], v_bs[i]));
           }
         }
         // Q = Qcur.contiguous().view(n_gqa_embd/n_head, n_head, N).permute(0, 2, 1, 3)
         struct ne_tensor* Q = ne_permute(ctx0, ne_reshape_4d(ctx0, Qcur, head_dim, n_head, N, batch_size), 0, 2, 1, 3);
-        
 
         // K = Kmem.view(n_gqa_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
-        struct ne_tensor* K =
-            ne_view_4d(ctx0, kv_self.k, head_dim, n_past + N, n_head_kv, batch_size, ne_element_size(kv_self.k) * head_dim,
-                       ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_gqa_embd * n_ctx,
-                       il * n_ctx * ne_element_size(kv_self.k) * n_gqa_embd * kv_n_ctx_block);
+        struct ne_tensor* K = ne_view_4d(
+            ctx0, kv_self.k, head_dim, n_past + N, n_head_kv, batch_size, ne_element_size(kv_self.k) * head_dim,
+            ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_gqa_embd * n_ctx,
+            il * n_ctx * ne_element_size(kv_self.k) * n_gqa_embd * kv_n_ctx_block);
 
         // K * Q
         struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
 
         // KQ_scaled = KQ / sqrt(n_gqa_embd/n_head)
-        struct ne_tensor* KQ_scaled =
-            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f));
+        struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f));
 
         // KQ_masked = mask_past(KQ_scaled)
         struct ne_tensor* KQ_masked = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
@@ -259,7 +255,8 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
         struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
         // cur = KQV_merged.contiguous().view(n_gqa_embd, N)
-        cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_dim*n_head, N * batch_size, NE_SIZE_CALC));
+        cur = ne_cpy(ctx0, KQV_merged,
+                     ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_dim * n_head, N * batch_size, NE_SIZE_CALC));
       } else {
         const auto seq_kv = n_past + N;
         const auto k_size = kv_cache_info.k_bytes;
@@ -267,15 +264,15 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
         // store key and value to memory
         {
-          const auto k_cache = ne_view_3d(ctx0, kv_self.k,          // tensor
+          const auto k_cache = ne_view_3d(ctx0, kv_self.k,             // tensor
                                           head_dim, n_ctx, n_head_kv,  // ne
-                                          0, 0,                     // nb (bestla managed)
-                                          il * k_size);             // offset
+                                          0, 0,                        // nb (bestla managed)
+                                          il * k_size);                // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, false));
-          const auto v_cache = ne_view_3d(ctx0, kv_self.v,          // tensor
+          const auto v_cache = ne_view_3d(ctx0, kv_self.v,             // tensor
                                           head_dim, n_ctx, n_head_kv,  // ne
-                                          0, 0,                     // nb (bestla managed)
-                                          il * v_size);             // offset
+                                          0, 0,                        // nb (bestla managed)
+                                          il * v_size);                // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur, n_past, false));
         }
 
@@ -284,14 +281,14 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
         struct ne_tensor* K =
             ne_view_3d(ctx0, kv_self.k,                                             // tensor
-                       head_dim, seq_kv, n_head_kv,                                    // ne
+                       head_dim, seq_kv, n_head_kv,                                 // ne
                        kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
                        il * k_size);                                                // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
         ne_set_name(K, "K");
         struct ne_tensor* V =
             ne_view_3d(ctx0, kv_self.v,                                                    // tensor
-                       seq_kv, head_dim, n_head_kv,                                           // ne
+                       seq_kv, head_dim, n_head_kv,                                        // ne
                        kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
                        il * v_size);                                                       // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout
@@ -332,9 +329,6 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
   {
     inpL = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
     inpL = ne_mul(ctx0, inpL, model.others[1]);
-    // struct ne_tensor* inpL1 = ne_mul(ctx0, inpL, model.others[1]);
-    
-    // inpL = ne_add(ctx0,inpL, inpL1);
   }
   lctx.use_buf(ctx0, -1);
   // hidden_states = self.ln_f(hidden_states)&lm_head
@@ -375,7 +369,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
       }
     }
   }
-  
+
   // extract embeddings
   if (!lctx.embedding.empty()) {
     auto& embedding_out = lctx.embedding;
@@ -404,7 +398,6 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
   return true;
 }
-
 
 int model_eval(struct model_context* ctx, const model_input* inputs, const int n_input, int n_threads) {
   if (!gemma_model_eval_internal(ctx, inputs, n_input, n_threads)) {
