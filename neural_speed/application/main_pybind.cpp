@@ -921,6 +921,10 @@ PYBIND11_MODULE(whisper_cpp, m)
 
 PYBIND11_MODULE(mixtral_cpp, m)
 
+#elif MODEL_NAME_ID == 20
+
+PYBIND11_MODULE(chatglm3_cpp, m)
+
 #endif
 {
   m.doc() = "cpp model python binding";

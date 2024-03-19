@@ -57,6 +57,8 @@ class Model:
             import neural_speed.chatglm_cpp as cpp_model
         elif model_type == "chatglm2":
             import neural_speed.chatglm2_cpp as cpp_model
+        elif model_type == "chatglm3":
+            import neural_speed.chatglm3_cpp as cpp_model
         elif model_type == "baichuan":
             import neural_speed.baichuan_cpp as cpp_model
         elif model_type == "polyglot":
