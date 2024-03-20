@@ -63,7 +63,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
                           const bool shift_roped_k, model_struct* model) {
   const auto n_layer = hparams.n_layer;
   auto heads_kv = hparams.n_head_kv > 0 ? hparams.n_head_kv : hparams.n_head;
-  auto heads_kv = hparams.n_embd_head_k == 0 ? heads_kv : hparams.n_head;
+  heads_kv = hparams.n_embd_head_k == 0 ? heads_kv : hparams.n_head;
   const auto head_size = hparams.n_embd_head_k == 0 ? hparams.n_embd / hparams.n_head : hparams.n_embd_head_k;
 
 #ifdef NS_TP_MODEL
