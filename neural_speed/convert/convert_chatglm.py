@@ -394,6 +394,7 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
+    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
