@@ -244,7 +244,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     infer_cmd.extend(["--one_click_run", "True"])
     if args.shift_roped_k:
         infer_cmd.extend(["--shift-roped-k"])
-    if (model_type == "baichuan" or model_type == "qwen"):
+    if (model_type == "baichuan" or model_type == "qwen" or model_type == "chatglm3"):
         infer_cmd.extend(["--tokenizer", dir_model])
     print("Inference model ...")
     subprocess.run(infer_cmd)
