@@ -234,13 +234,16 @@ int main(int argc, char** argv) {  // NOLINT
   }
 
   std::vector<int> embd_inp;
-  if (params.model_arch == MODEL_CHATGLM2 || params.model_arch == MODEL_CHATGLM3) {
+  if (params.model_arch == MODEL_CHATGLM2) {
     std::vector<std::string> prompts;
     prompts.push_back(params.prompt);
     std::string prompt = build_prompt_glm2(prompts);
+    std::cout << "prompt = " << prompt << std::endl;
+
     embd_inp = ::model_tokenize(ctx, prompt, false);
     embd_inp.insert(embd_inp.begin(), {64790, 64792});  // special prefix
-  } else if (params.model_arch == MODEL_CHATGLM || params.model_arch == MODEL_BAICHUAN) {
+  } else if (params.model_arch == MODEL_CHATGLM || params.model_arch == MODEL_BAICHUAN ||
+             params.model_arch == MODEL_CHATGLM3) {
     for (auto& i : params.ids) {
       embd_inp.emplace_back(i);
     }

@@ -143,7 +143,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
     ne_set_name(cache.cossin, "cossin(-1)");
     float freq_base = hparams.freq_base;
     float theta = -1 * hparams.freq_scale;
-    float theta_scale = (model != nullptr && model->arch == MODEL_CHATGLM2 && model->arch == MODEL_CHATGLM3)
+    float theta_scale = (model != nullptr && (model->arch == MODEL_CHATGLM2 || model->arch == MODEL_CHATGLM3))
                             ? std::pow(freq_base, -2.0f / (head_size / 2))  // chatglm2 has their DIM_SCALE of 2
                         : hparams.n_rot > 0 ? std::pow(freq_base, -2.0f / hparams.n_rot)
                                             : std::pow(freq_base, -2.0f / head_size);
@@ -951,7 +951,8 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
                                     : NE_TYPE_COUNT;
     NE_ASSERT(memory_type != NE_TYPE_COUNT);
 
-    const bool kv_in_layers = (arch == MODEL_CHATGLM3 || arch == MODEL_CHATGLM2 || arch == MODEL_CHATGLM || arch == MODEL_BAICHUAN);
+    const bool kv_in_layers =
+        (arch == MODEL_CHATGLM3 || arch == MODEL_CHATGLM2 || arch == MODEL_CHATGLM || arch == MODEL_BAICHUAN);
     if (!kv_cache_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->max_request_num,
                        ctx->beam_size, params.shift_roped_k, (kv_in_layers ? &ctx->model : nullptr))) {
       fprintf(stderr, "%s: kv_cache_init() failed for self-attention cache\n", __func__);

@@ -65,7 +65,7 @@ compile_quant(quant_bloom     quant_model.cpp bloom     bloom)
 
 compile_quant(quant_chatglm   quant_model.cpp chatglm   chatglm)
 compile_quant(quant_chatglm2  quant_model.cpp chatglm2  chatglm2)
-compile_quant(quant_chatglm3  quant_model.cpp chatglm3  chatglm3)
+compile_quant(quant_chatglm3  quant_model.cpp chatglm2  chatglm2)
 compile_quant(quant_baichuan  quant_model.cpp baichuan  baichuan)
 compile_quant(quant_mistral   quant_model.cpp mistral   llama)
 compile_quant(quant_mixtral   quant_model.cpp mixtral   llama)
