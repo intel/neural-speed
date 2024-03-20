@@ -1,2 +1,2 @@
 -r common.txt
-transformers==4.33.1
+transformers==4.36.0
