@@ -326,7 +326,7 @@ public:
 	static int constexpr thread_tile_m = 8;
 	static int constexpr thread_tile_n = 4;
 	static int constexpr thread_tile_k = 16;
-	static int constexpr group_m = 32;
+	static int constexpr group_m = 16;
 	static int constexpr group_n = 16;
 	using data_type_a = float;
 	using data_type_b = float;
@@ -464,10 +464,12 @@ void sycl_fpu_fp32_gemm_run(int iter) {
 					for (; i < matrix_k; i += TileK)
 					{
 						if (sgGroupId < TileK)
+							//static_assert(GroupM == TileK);
 						{
-							for (size_t in = 0; in < TileN; in++)
+							for (size_t in = 0; in < TileN; in += 4)
 							{
-								slm_b[sgGroupId * SLM_B_Stride + sgId * TileN + in] = B_d[tn + in + (i + sgGroupId) * matrix_n];
+								*(sycl::float4*)&slm_b[sgGroupId * SLM_B_Stride + sgId * TileN + in] =
+									*(sycl::float4*)&B_d[tn + in + (i + sgGroupId) * matrix_n];
 							}
 						}
 						it.barrier(sycl::access::fence_space::local_space);
@@ -476,16 +478,18 @@ void sycl_fpu_fp32_gemm_run(int iter) {
 						for (size_t ik = 0; ik < TileK; ik += 1)
 						{
 							float tmpB[TileN];
-							for (size_t in = 0; in < TileN; in++)
+							for (size_t in = 0; in < TileN; in += 4)
 							{
-								tmpB[in] = slm_b[sgId * TileN + in + (ik)*SLM_B_Stride];
+								*(sycl::float4*)&tmpB[in] =
+									*(sycl::float4*)&slm_b[sgId * TileN + in + (ik)*SLM_B_Stride];
 							}
 							//static_assert(SubSize == TileM);
 							//auto tmpA = sgId < TileM ? A_d[(tm + sgId) * matrix_k + (i + ik)] : 0.f;
 							for (size_t im = 0; im < TileM; im++)
 							{
 								auto tmpA = A_d[(tm + im) * matrix_k + (i + ik)];
-								//auto tmpA = A_d[(tm+im) + (i + ik) * matrix_m];
+								//auto tmpA = slm_b[sgGroupId * TileK * TileM + im + ik * TileM];
+								//auto tmpA = A_d[im + (i + ik) * TileK + tm * matrix_k];
 								//auto tmpA = slm_a[sgGroupId * TileM + im + (ik)*GroupM * TileM];
 								//auto A = sg.shuffle(tmpA, im);
 								for (size_t in = 0; in < TileN; in++)
@@ -498,9 +502,10 @@ void sycl_fpu_fp32_gemm_run(int iter) {
 
 					}
 					for (size_t im = 0; im < TileM; im++) {
-						for (size_t in = 0; in < TileN; in++)
+						for (size_t in = 0; in < TileN; in += 4)
 						{
-							C_d[(tm + im) * matrix_n + tn + in] = tmp[im * TileN + in];
+							*(sycl::float4*)&C_d[(tm + im) * matrix_n + tn + in] =
+								*(sycl::float4*)&tmp[im * TileN + in];
 						}
 					}
 
@@ -693,7 +698,8 @@ void sycl2d_fpu_fp32_gemm_run(int iter) {
 							}
 							for (size_t im = 0; im < TileM; im++)
 							{
-								auto tmpA = A_d[(tm + im) * matrix_k + i + ik];
+								//auto tmpA = A_d[(tm + im) * matrix_k + i + ik];
+								auto tmpA = slm_b[im + ik * TileM];
 								//auto tmpA = A_d[(tm + im)  + (i + ik) * matrix_m];
 								//auto tmpA = slm_a[(sg_idxm * TileM + im) + ik * GroupMEle];
 								for (size_t in = 0; in < TileN; in++)
