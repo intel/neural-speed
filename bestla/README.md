@@ -19,13 +19,16 @@ BesTLA supports users to configure thread libraries for multi-core parallelism (
 ## Weight-only 
 BesTLA provides weight-only linear computational capabilities for LLM inference. We provide a series of Prologues for quantize/compress/serialize/deserialize fp32 weights in different ways. Specifically, the weight-only-quantization configs we support are given in the table below: 
 
-| Weight dtype           |   Compute dtype    |    Scale dtype    |    algo    |
-| ---------------------- | :----------------: | :---------------: | :--------: |
-| INT8                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
-| INT4 (CLIP, FULLRANGE) | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
-| FP8 (E4M3, E5M2)       |    BF16 / FP32     | FP32 / FP8 (E8M0) |    sym     |
-| FP4 (E2M1)             |    BF16 / FP32     |    BF16 / FP32    |    sym     |
-| NF4                    |    BF16 / FP32     |    BF16 / FP32    |    sym     |
+| Weight dtype     |   Compute dtype    |    Scale dtype    |    algo    |
+| ---------------- | :----------------: | :---------------: | :--------: |
+| INT8             | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT4             | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT3             | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| FP8 (E4M3, E5M2) |    BF16 / FP32     | FP32 / FP8 (E8M0) |    sym     |
+| FP4 (E2M1)       |    BF16 / FP32     |    BF16 / FP32    |    sym     |
+| NF4              |    BF16 / FP32     |    BF16 / FP32    |    sym     |
+
+**NOTE**: INT3/INT4 weight dtype will introduce the autofullrange feature and leverage the bitwidth of the low-bit data type as much as possible during RTN quantization, which will bring higher model accuracy.
 
 Config description of the table:
 | Config        | Description                                         |
