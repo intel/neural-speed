@@ -969,7 +969,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     hparams = config.to_dict()
 
-    # ChatGLM3 shares the same architecture and model config with ChatGLM2, but its tokenizer further supports system prompts,
+    # ChatGLM3 shares the same architecture and model config with ChatGLM2
+    # but its tokenizer further supports system prompts,
     # so we can check system token to discriminate ChatGLM3 from ChatGLM2.
     if "<|system|>" in tokenizer.tokenizer.special_tokens:
         if args.format == "GGUF":
