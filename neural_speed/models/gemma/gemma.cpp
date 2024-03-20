@@ -126,7 +126,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
-        /* .heads_kv = */ n_head_kv,
+        /* .heads_kv = */ n_head,
         /* .head_size = */ head_dim,
         /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_past + N,
