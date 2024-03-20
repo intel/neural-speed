@@ -234,7 +234,13 @@ def unpack_gptq_weight_8bits(qweight, scales, qzeros, q_config):
         zeros = zeros.to(torch.int8 if sym else torch.uint8)
 
     zeros = zeros + 1
-    zeros = zeros.reshape(scales.shape)
+    try:
+        zeros = zeros.reshape(scales.shape)
+    except:
+        # zeros and scales have different iteam numbers.
+        # remove 1 (due to 0 + 1 in line 68)
+        zeros = zeros[zeros !=1]
+        zeros = zeros.reshape(scales.shape)
 
     if not sym and bits == 8:
         zeros = (zeros.to(torch.int32) - 128).to(torch.int8)
