@@ -343,13 +343,23 @@ class Model {
   // deprecated API
   std::vector<std::vector<model_token>> generate_tokens(const std::vector<std::vector<model_token>>& input_ids);
   const std::vector<float>& evaluate_(const std::vector<std::vector<model_token>>& input_ids);
-  py::array_t<float> evaluate(const std::vector<std::vector<model_token>>& input_ids, bool logits_all = false) {
+  std::vector<py::array_t<float>> evaluate(const std::vector<std::vector<model_token>>& input_ids,
+                                           bool logits_all = false) {
     if (logits_all) ctx->logits_all = true;
-    if (!check_input_and_count_padding(input_ids)) return py::array_t<float>();
+    if (!check_input_and_count_padding(input_ids)) {
+      return std::vector<py::array_t<float>>(ctx->batch_size, py::array_t<float>());
+    }
     const auto& logits = evaluate_(input_ids);
+    std::vector<py::array_t<float>> rets(ctx->batch_size);
+    size_t off = 0;
+    for (int i = 0; i < ctx->batch_size; ++i) {
+      auto cur_seq_len = curr_input_ids[i].size();
+      rets[i] = py::array_t<float, py::array::c_style>(cur_seq_len * n_vocab, logits.data() + off)
+                    .reshape({py::ssize_t(-1), static_cast<py::ssize_t>(n_vocab)});
+      off += cur_seq_len * n_vocab;
+    }
     for (auto& input_id : curr_input_ids) input_id.clear();  // clear curr_input_ids after eval
-    return py::array_t<float, py::array::c_style>(logits.size(), logits.data())
-        .reshape({py::ssize_t(-1), static_cast<py::ssize_t>(ctx->model.hparams.n_vocab)});
+    return rets;
   }
   bool is_token_end() { return token_eos; }
   model_token get_eos_id() { return ctx->vocab.eos_token_id; }

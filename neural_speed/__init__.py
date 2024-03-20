@@ -32,6 +32,7 @@ class Model:
         self.bin_file = None
         self.generate_round = 0
         self.max_request_num = -1
+        self.reinit_from_bin = False
 
     def __import_package(self, model_type):
         if self.module:
@@ -287,15 +288,11 @@ class Model:
         batch_size = input_ids.shape[0]
 
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
-        max_request_num = generate_kwargs.pop("max_request_num", max_request_num_default)
-        reinit_from_bin = False
-        if max_request_num > self.max_request_num or batch_size > self.max_request_num:
-            reinit_from_bin = True
-            if self.max_request_num > 0:
-                print("Will start to reinit model from bin due to different max request num.")
-            self.max_request_num = max(batch_size, max_request_num)
+        self.reinit_from_bin = False
+        self._check_max_request_num(batch_size, **generate_kwargs)
+        generate_kwargs.pop("max_request_num", max_request_num_default)
 
-        if self.model is None or reinit_from_bin:
+        if self.model is None or self.reinit_from_bin:
             self.init_from_bin(self.model_type,
                                self.bin_file,
                                batch_size=batch_size,
@@ -325,12 +322,7 @@ class Model:
         if interactive:
             self.model.reset_token_end()
         out_count = 0
-        input_list = None
-        pad_token_id = generate_kwargs.get("pad_token", None)
-        if input_ids.shape[0] > 1 and generate_kwargs.get("continuous_batching", True):
-            input_list = self._cont_batching_input(input_ids, pad_token_id)
-        else:
-            input_list = input_ids.tolist()
+        input_list = self._get_model_input_list(input_ids, **generate_kwargs)
         while True:
             response = self.model.generate(input_ids=input_list)
             input_list = []  # next-token stage will use previous output
@@ -374,13 +366,22 @@ class Model:
                 print("Please input an audio file")
             return
         if isinstance(model_input, torch.Tensor):
-            if self.model is None:
-                self.init_from_bin(self.model_type, self.bin_file, **kwargs)
+            batch_size = model_input.shape[0]
+            self.reinit_from_bin = False
+            self._check_max_request_num(batch_size, **kwargs)
+            kwargs.pop("max_request_num", max_request_num_default)
+            if self.model is None or self.reinit_from_bin:
+                self.init_from_bin(self.model_type,
+                                   self.bin_file,
+                                   batch_size=batch_size,
+                                   max_request_num=self.max_request_num,
+                                   **kwargs)
                 self.generate_round = 0
             elif reinit:
                 self.model.reinit()
                 self.generate_round = 0
-            return self.model.evaluate(model_input.tolist(), logits_all)
+            model_input_list = self._get_model_input_list(model_input, **kwargs)
+            return self.model.evaluate(model_input_list, logits_all)
         else:
             print("Please input torch.Tensor")
         return
@@ -391,10 +392,27 @@ class Model:
         pti = pad_token_id
         if pti == None:
             pti = self.tokenizer.pad_token_id
-        assert pti != None, "Please supply pad token id."
+        assert pti != None, "Please supply pad token id with `pad_token`=token_id."
         for il in range(len(input_list)):
             count = input_list[il].count(pti)
             # padding left
             del input_list[il][0:count]
             assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
+        return input_list
+
+    def _check_max_request_num(self, input_batch_size, **kwargs):
+        max_request_num = kwargs.get("max_request_num", max_request_num_default)
+        if max_request_num > self.max_request_num or input_batch_size > self.max_request_num:
+            self.reinit_from_bin = True
+            if self.max_request_num > 0:
+                print("Will start to reinit model from bin due to different max request num.")
+            self.max_request_num = max(input_batch_size, max_request_num)
+
+    def _get_model_input_list(self, input_ids, **kwargs):
+        input_list = None
+        pad_token_id = kwargs.get("pad_token", None)
+        if input_ids.shape[0] > 1 and kwargs.get("continuous_batching", True):
+            input_list = self._cont_batching_input(input_ids, pad_token_id)
+        else:
+            input_list = input_ids.tolist()
         return input_list

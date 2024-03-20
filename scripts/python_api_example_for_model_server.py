@@ -38,7 +38,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         help="scale for enlarge memory for model inference: Float",
                         required=False, default=1.0)
     parser.add_argument("--memory_dtype", type=str, help="KV cache memory dtype: String",
-                        required=False, default="auto")
+                        required=False, default="auto", choices=["f32", "f16", "auto"])
     parser.add_argument("--ctx_size", type=int, help="Size of the prompt context: "\
                         "Int (default: 512, can not be larger than specific model's context window"\
                         " length)", required=False, default=512)
