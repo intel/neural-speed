@@ -340,13 +340,15 @@ function main() {
     pip install -r $working_dir/requirements.txt
     python $working_dir/setup.py install
     ## prepare example requirement
-    if [[ $requirements_file == *'.txt' ]] && [[ -f $requirements_file ]]; then
-        pip install -r "$requirements_file"
-    elif [[ $requirements_file == *'.sh' ]] && [[ -f $requirements_file ]]; then
-        source "$requirements_file"
-    else
-        echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
-        exit 1
+    if [[ -f $requirements_file ]]; then
+      if [[ $requirements_file == *'.txt' ]]; then
+          pip install -r "$requirements_file"
+      elif [[ $requirements_file == *'.sh' ]]; then
+          source "$requirements_file"
+      else
+          echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
+          exit 1
+      fi
     fi
     if [[ "${model}" != *"gptq" ]]; then
         echo "=======  Convert Start  ======="
