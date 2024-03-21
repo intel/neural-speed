@@ -383,14 +383,16 @@ class Model:
                 self.generate_round = 0
             model_input_list = self._get_model_input_list(model_input, **kwargs)
             raw_logits = self.model.evaluate(model_input_list, logits_all)
-            import numpy as np
-            padding_side = kwargs.get("padding_side", "left")
-            for i in range(len(raw_logits)):
-                padding_row = np.ones((logits_seq_len_dim - raw_logits[i].shape[0], raw_logits[i].shape[1]))
-                if padding_side == "left":
-                    raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
-                else:
-                    raw_logits[i] = np.vstack((raw_logits[i], padding_row * (-np.inf)))
+            ignore_padding = kwargs.get("ignore_padding", False)
+            if not ignore_padding and batch_size > 1:
+                import numpy as np
+                padding_side = kwargs.get("padding_side", "left")
+                for i in range(len(raw_logits)):
+                    padding_row = np.ones((logits_seq_len_dim - raw_logits[i].shape[0], raw_logits[i].shape[1]))
+                    if padding_side == "left":
+                        raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
+                    else:
+                        raw_logits[i] = np.vstack((raw_logits[i], padding_row * (-np.inf)))
             return raw_logits
         else:
             print("Please input torch.Tensor")
