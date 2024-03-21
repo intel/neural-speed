@@ -126,7 +126,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
-        /* .heads_kv = */ n_head,
+        /* .heads_kv = */ n_head_kv,
         /* .head_size = */ head_dim,
         /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_past + N,
@@ -135,7 +135,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
     NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
                bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
-        /* .heads_kv = */ static_cast<uint32_t>(n_head),
+        /* .heads_kv = */ static_cast<uint32_t>(n_head_kv),
         /* .head_size = */ static_cast<uint32_t>(head_dim),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
@@ -297,7 +297,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
         ne_attn_flags_t attn_flags = 0;
         if (n_past == 0) attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
         struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
-        cur = ne_view_2d(ctx0, KQV_Out, head_dim * n_head, N, n_gqa_embd * ne_element_size(KQV_Out), 0);
+        cur = ne_view_2d(ctx0, KQV_Out, head_dim * n_head, N, head_dim * n_head * ne_element_size(KQV_Out), 0);
       }
       // projection
       { cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur); }
