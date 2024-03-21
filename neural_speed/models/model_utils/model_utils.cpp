@@ -1858,7 +1858,7 @@ static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model
       /* .src = */ nullptr,
       /* .dst = */ nullptr,
       /* .heads_kv = */ heads_kv,
-      /* .head_size = */  static_cast<int>(head_size),
+      /* .head_size = */ static_cast<int>(head_size),
       /* .seq_off = */ p0,
       /* .seq_size = */ p1 - p0,
       /* .seq_max = */ n_ctx,
