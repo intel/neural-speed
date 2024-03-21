@@ -102,8 +102,6 @@ set(mymap_gemma 20)
 
 
 
-
-
 function(compile_run TARGET MAIN_CPP MAIN_PY MODEL_NAME MODEL_LIB)
   add_executable_w_warning(${TARGET} ${MAIN_CPP})
   warning_check(${TARGET})

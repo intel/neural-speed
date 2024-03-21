@@ -261,7 +261,7 @@ function main() {
         quant_script="./build/bin/quant_mistral"
         convert_script="${convert_script}/convert_mistral.py"
         infer_cmd="./build/bin/run_mistral"
-        requirements_file="$working_dir/neural_speed/models/requirements/mistral.txt"
+        requirements_file="$working_dir/neural_speed/models/requirements/mistral.sh"
     elif [[ "${model}" == "qwen-7b" ]]; then
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
@@ -299,7 +299,7 @@ function main() {
     elif [[ "${model}" == *"-gptq" ]]; then
         infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
         precision_list+=("default")
-        requirements_file="$working_dir/neural_speed/models/requirements/${model}.txt"
+        requirements_file="$working_dir/neural_speed/models/requirements/${model}.sh"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1
