@@ -441,7 +441,10 @@ class Model:
                       "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
                       "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
                       "scratch_size_ratio"}
+        invalid_args = []
         for k in init_kwargs.keys():
             if k not in valid_args:
-                init_kwargs.pop(k)
+                invalid_args.append(k)
+        for k in invalid_args:
+            init_kwargs.pop(k)
         return init_kwargs
