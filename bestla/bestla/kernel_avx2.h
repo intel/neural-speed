@@ -1174,7 +1174,12 @@ inline __m256 exp_ps_0_1(const __m256 x) {
   static const auto log2e = _mm256_set1_ps(v_log2e);
   static const auto half = _mm256_set1_ps(.5f);
 
-  const auto x1 = _mm256_fmadd_ps(x, log2e, half);  // auto x1 = x * log2e + _mm256_set1_ps(.5f);
+  static const auto upper_bound = _mm256_set1_ps(88.722838);   // log(max_positive_float)
+  static const auto lower_bound = _mm256_set1_ps(-87.336549);  // log(min_positive_float)
+  __m256 x1 = _mm256_min_ps(x, upper_bound);
+  x1 = _mm256_max_ps(x1, lower_bound);
+
+  x1 = _mm256_fmadd_ps(x1, log2e, half);  // auto x1 = x * log2e + _mm256_set1_ps(.5f);
   const auto z = _mm256_floor_ps(x1);
   const auto f = _mm256_sub_ps(x1, z);  // auto f = x1 - z;
 

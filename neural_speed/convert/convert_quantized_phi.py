@@ -311,6 +311,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         choices=["huggingface", "modelscope"],
                         default="huggingface",
                         help="hub to load model")
+    parser.add_argument("--format",
+                        type=str,
+                        default="NE",
+                        choices=["NE", "GGUF"],
+                        help="convert to the GGUF or NE format")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
