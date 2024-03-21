@@ -302,8 +302,7 @@ function main() {
     elif [[ "${model}" == "gemma-2b" ]]; then
         quant_script="./build/bin/quant_gemma"
         convert_script="${convert_script}/convert_gemma.py"
-        infer_cmd="python $working_dir/scripts/inference.py"
-        extension=" --model_name gemma --tokenizer $model_path"
+        infer_cmd="./build/bin/run_gemma"
     elif [[ "${model}" == *"-gptq" ]]; then
         infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
         precision_list+=("default")
