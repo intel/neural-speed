@@ -264,13 +264,16 @@ Neural Speed supports the following models:
     <td><a href="https://huggingface.co/stabilityai/stablelm-3b-4e1t" target="_blank" rel="noopener noreferrer">StableLM-3B</a>,
     <a href="https://huggingface.co/stabilityai/stablelm-2-1_6b" target="_blank" rel="noopener noreferrer">StableLM2-1_6B</a>
     <a href="https://huggingface.co/stabilityai/stablelm-2-zephyr-1_6b" target="_blank" rel="noopener noreferrer">StableLM2-Zephyr-1_6B</a></td>
-    <td>✅</td>
+      <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
+    <td> </td>
     <td> </td>
     <td> </td>
     <td>Latest</td>
+    <td>4096</td>
   </tr>
     <tr>
     <td><a href="https://huggingface.co/google/gemma-2b-it" target="_blank" rel="noopener noreferrer">gemma-2b-it </a>,
@@ -278,10 +281,13 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>Latest</td>
+    <td>8192</td>
   </tr>
     <tr>
     <td><a href="https://huggingface.co/openai/whisper-tiny" target="_blank" rel="noopener noreferrer">Whisper-tiny</a>,
