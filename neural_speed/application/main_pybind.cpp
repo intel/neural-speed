@@ -353,7 +353,7 @@ class Model {
     std::vector<py::array_t<float>> rets(ctx->batch_size);
     size_t off = 0;
     for (int i = 0; i < ctx->batch_size; ++i) {
-      auto cur_seq_len = curr_input_ids[i].size();
+      auto cur_seq_len = logits_all ? curr_input_ids[i].size() : 1;
       rets[i] = py::array_t<float, py::array::c_style>(cur_seq_len * n_vocab, logits.data() + off)
                     .reshape({py::ssize_t(-1), static_cast<py::ssize_t>(n_vocab)});
       off += cur_seq_len * n_vocab;

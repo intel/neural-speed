@@ -367,6 +367,7 @@ class Model:
             return
         if isinstance(model_input, torch.Tensor):
             batch_size = model_input.shape[0]
+            logits_seq_len_dim = model_input.shape[1] if logits_all else 1
             self.reinit_from_bin = False
             self._check_max_request_num(batch_size, **kwargs)
             kwargs.pop("max_request_num", max_request_num_default)
@@ -381,7 +382,12 @@ class Model:
                 self.model.reinit()
                 self.generate_round = 0
             model_input_list = self._get_model_input_list(model_input, **kwargs)
-            return self.model.evaluate(model_input_list, logits_all)
+            raw_logits = self.model.evaluate(model_input_list, logits_all)
+            import numpy as np
+            for i in range(len(raw_logits)):
+                padding_row = np.ones((logits_seq_len_dim - raw_logits[i].shape[0], raw_logits[i].shape[1]))
+                raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
+            return raw_logits
         else:
             print("Please input torch.Tensor")
         return
