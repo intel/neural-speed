@@ -384,25 +384,33 @@ class Model:
             model_input_list = self._get_model_input_list(model_input, **kwargs)
             raw_logits = self.model.evaluate(model_input_list, logits_all)
             import numpy as np
+            padding_side = kwargs.get("padding_side", "left")
             for i in range(len(raw_logits)):
                 padding_row = np.ones((logits_seq_len_dim - raw_logits[i].shape[0], raw_logits[i].shape[1]))
-                raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
+                if padding_side == "left":
+                    raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
+                else:
+                    raw_logits[i] = np.vstack((raw_logits[i], padding_row * (-np.inf)))
             return raw_logits
         else:
             print("Please input torch.Tensor")
         return
 
-    def _cont_batching_input(self, input_ids, pad_token_id=None):
+    def _cont_batching_input(self, input_ids, pad_token_id=None, padding_side="left"):
         assert isinstance(input_ids, torch.Tensor), "Input must be torch.Tensor."
         input_list = input_ids.tolist()
         pti = pad_token_id
         if pti == None:
             pti = self.tokenizer.pad_token_id
-        assert pti != None, "Please supply pad token id with `pad_token`=token_id."
+        assert pti != None, "Please supply pad token id with `pad_token=token_id`."
         for il in range(len(input_list)):
             count = input_list[il].count(pti)
-            # padding left
-            del input_list[il][0:count]
+            if padding_side == "left":
+                del input_list[il][0:count]
+            elif padding_side == "right":
+                del input_list[il][len(input_list[il]) - count :]
+            else:
+                raise ValueError("padding_side must be 'left' or 'right'.")
             assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
         return input_list
 
@@ -416,9 +424,11 @@ class Model:
 
     def _get_model_input_list(self, input_ids, **kwargs):
         input_list = None
-        pad_token_id = kwargs.get("pad_token", None)
-        if input_ids.shape[0] > 1 and kwargs.get("continuous_batching", True):
-            input_list = self._cont_batching_input(input_ids, pad_token_id)
+        ignore_padding = kwargs.get("ignore_padding", False)
+        if input_ids.shape[0] > 1 and kwargs.get("continuous_batching", True) and not ignore_padding:
+            pad_token_id = kwargs.get("pad_token", None)
+            padding_side = kwargs.get("padding_side", "left")
+            input_list = self._cont_batching_input(input_ids, pad_token_id, padding_side)
         else:
             input_list = input_ids.tolist()
         return input_list
