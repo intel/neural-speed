@@ -145,6 +145,173 @@ def load_vocab_for_glm2(path: Path) -> SentencePieceVocab:
     return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
 
 
+def chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
+    print("ChatGLM-3.gguf converting: ")
+    list_vars = model.state_dict()
+    for name in list_vars.keys():
+        print("%-80s" % name, list_vars[name].shape, list_vars[name].dtype)
+
+    print(hparams)
+
+    gguf_file = fname_out
+    gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm3")
+    gguf_writer.add_uint32('magic', 0x67676d66)
+    import pdb
+    pdb.set_trace()
+    gguf_writer.add_uint32('version', 1)
+    gguf_writer.add_uint32('n_vocab', hparams["padded_vocab_size"])
+    gguf_writer.add_embedding_length(hparams["hidden_size"])
+
+    gguf_writer.add_uint32('n_mult', 0)
+    gguf_writer.add_head_count(hparams["num_attention_heads"])
+    gguf_writer.add_head_count_kv(0)
+    gguf_writer.add_block_count(hparams["num_layers"])
+
+    gguf_writer.add_rope_dimension_count(0)
+    gguf_writer.add_uint32('ftype', ftype)
+
+    gguf_writer.add_context_length(hparams["seq_length"])
+
+    gguf_writer.add_max_alibi_bias(0)
+
+    gguf_writer.add_uint32('clip_qkv', 0)
+    gguf_writer.add_uint32('par_res', 0)
+
+    gguf_writer.add_uint32('word_embed_proj_dim', 0)
+    gguf_writer.add_uint32('do_layer_norm_before', 0)
+
+    gguf_writer.add_uint32('multi_query_group_num', hparams["multi_query_group_num"])
+
+    gguf_writer.add_feed_forward_length(hparams["ffn_hidden_size"])
+
+    gguf_writer.add_uint32('inner_hidden_size', 0)
+
+    gguf_writer.add_bos_token_id(tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 0)
+    gguf_writer.add_eos_token_id(tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 0)
+    gguf_writer.add_pad_token_id(tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0)
+    gguf_writer.add_sep_token_id(tokenizer.sep_token_id if tokenizer.sep_token_id is not None else 0)
+
+    def write_vocab_gguf(dir_model):
+        print("gguf: get tokenizer metadata")
+
+        tokens: List[bytes] = []
+        scores: List[float] = []
+        toktypes: List[int] = []
+
+        if Path(dir_model + "/tokenizer.model").is_file():
+            # vocab type sentencepiece
+            print("gguf: get sentencepiece tokenizer vocab, scores and token types")
+
+            vocab = load_vocab_for_glm2(Path(dir_model))
+
+            # NOTE: `all_tokens` returns the base vocabulary and added tokens
+            for text, score in vocab.all_tokens():
+                tokens.append(text)
+                scores.append(score)
+
+            gguf_writer.add_tokenizer_model("chatglm3")
+            gguf_writer.add_token_list(tokens)
+            gguf_writer.add_token_scores(scores)
+
+        print("gguf: get special token ids")
+
+        # If no tokenizer.json: Look for special tokens in config.json
+        if "bos_token_id" in hparams and hparams["bos_token_id"] != None:
+            gguf_writer.add_bos_token_id(hparams["bos_token_id"])
+
+        if "eos_token_id" in hparams and hparams["eos_token_id"] != None:
+            gguf_writer.add_eos_token_id(hparams["eos_token_id"])
+
+        if "unk_token_id" in hparams and hparams["unk_token_id"] != None:
+            gguf_writer.add_unk_token_id(hparams["unk_token_id"])
+
+        if "sep_token_id" in hparams and hparams["sep_token_id"] != None:
+            gguf_writer.add_sep_token_id(hparams["sep_token_id"])
+
+        if "pad_token_id" in hparams and hparams["pad_token_id"] != None:
+            gguf_writer.add_pad_token_id(hparams["pad_token_id"])
+
+    write_vocab_gguf(dir_model)
+
+    # tensor info
+    print("gguf: get tensor metadata")
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        if 'inv_freq' in name:
+            print("Converting: %-75s" % name, " shape: %-15s" % str(data.shape))
+            continue
+
+        print("Converting: %-75s" % name, " shape: %-15s" % str(data.shape), end="      ")
+        n_dims = len(data.shape)
+
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
+        if ftype != 0:
+            if name[-7:] == ".weight" and n_dims == 2:
+                print("  to float16".rjust(15))
+                data = data.astype(np.float16)
+                ftype_cur = 1
+            else:
+                print("  to float32".rjust(15))
+                data = data.astype(np.float32)
+                ftype_cur = 0
+        else:
+            if data.dtype != np.float32:
+                print("  to float32".rjust(15))
+                data = data.astype(np.float32)
+                ftype_cur = 0
+
+        gguf_writer.add_tensor(name, data)
+
+        if "mlp.dense_h_to_4h" in name:
+            name_0 = name.replace("dense_h_to_4h", "dense_h_to_4h_0")
+            name_1 = name.replace("dense_h_to_4h", "dense_h_to_4h_1")
+            shape_0 = data.shape[0]
+            half_shape_0 = int(shape_0 / 2)
+            data_0 = data[0:half_shape_0, :]
+            data_1 = data[half_shape_0:shape_0, :]
+
+            print("Converting: %-75s" % name_0, " shape: %-15s" % str(data_0.shape))
+            print("Converting: %-75s" % name_1, " shape: %-15s" % str(data_1.shape))
+
+            n_dims = len(data_0.shape)
+            assert (len(data_0.shape) == len(data_1.shape))
+            # ftype == 0 -> float32, ftype == 1 -> float16
+            ftype_cur = 0
+            if ftype != 0:
+                if name_0[-7:] == ".weight" and n_dims == 2:
+                    print("  to float16".rjust(15))
+                    data_0 = data_0.astype(np.float16)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 1
+                else:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+            else:
+                if data_0.dtype != np.float32:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+
+            gguf_writer.add_tensor(name_0, data_0)
+            gguf_writer.add_tensor(name_1, data_1)
+
+    print("gguf: write header")
+    gguf_writer.write_header_to_file()
+    print("gguf: write metadata")
+    gguf_writer.write_kv_data_to_file()
+    print("gguf: write tensors")
+    gguf_writer.write_tensors_to_file()
+
+    gguf_writer.close()
+
+    print("Done. Output file: " + fname_out)
+    print("")
+
+
 def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("ChatGLM-2.gguf converting: ")
     list_vars = model.state_dict()
@@ -355,6 +522,156 @@ def chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     gguf_writer.write_tensors_to_file()
 
     gguf_writer.close()
+
+    print("Done. Output file: " + fname_out)
+    print("")
+
+
+def chatglm3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
+    print("ChatGLM-3 converting: ")
+    list_vars = model.state_dict()
+    for name in list_vars.keys():
+        print(name, list_vars[name].shape, list_vars[name].dtype)
+
+    fout = open(fname_out, "wb")
+
+    print(hparams)
+
+    fout.write(struct.pack("i", 0x67676d66))
+    fout.write(struct.pack("i", 1))
+
+    fout.write(struct.pack("i", hparams["padded_vocab_size"]))
+    fout.write(struct.pack("i", hparams["hidden_size"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["num_attention_heads"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["num_layers"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", ftype))
+    fout.write(struct.pack("i", hparams["seq_length"]))
+    fout.write(struct.pack("f", 0))
+    fout.write(struct.pack("f", 0))
+    fout.write(struct.pack("i", 0))
+
+    fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
+    fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
+
+    fout.write(struct.pack("i", hparams["multi_query_group_num"]))
+    fout.write(struct.pack("i", hparams["ffn_hidden_size"]))
+    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", 0))  # n_experts
+    fout.write(struct.pack("i", 0))  # n_expert_used
+    fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
+    fout.write(struct.pack("f", 10000.0))  # freq_base
+    fout.write(struct.pack("f", 1.0))  # rope_factor
+
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
+
+    fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
+    fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
+    fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
+    fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
+
+    tokenizer_path = Path(tokenizer.vocab_file).parent
+    vocab = load_vocab_for_glm2(Path(tokenizer_path))
+
+    counter = 0
+    for text, score in vocab.all_tokens():
+        fout.write(struct.pack("i", len(text)))
+        fout.write(text)
+        fout.write(struct.pack("f", score))
+        counter += 1
+
+    while counter < hparams["padded_vocab_size"]:
+        fout.write(struct.pack("i", len(text)))
+        fout.write(text)
+        fout.write(struct.pack("f", 0))
+        counter += 1
+
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        print("Processing variable: " + name + " with shape: ", data.shape)
+        if 'inv_freq' in name:
+            continue
+
+        n_dims = len(data.shape)
+
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
+        if ftype != 0:
+            if name[-7:] == ".weight" and n_dims == 2:
+                print("  Converting to float16")
+                data = data.astype(np.float16)
+                ftype_cur = 1
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+        else:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+
+        # header
+        str = name.encode("utf-8")
+        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(str)
+        # data
+        data.tofile(fout)
+
+        if "mlp.dense_h_to_4h" in name:
+            name_0 = name.replace("dense_h_to_4h", "dense_h_to_4h_0")
+            name_1 = name.replace("dense_h_to_4h", "dense_h_to_4h_1")
+            shape_0 = data.shape[0]
+            half_shape_0 = int(shape_0 / 2)
+            data_0 = data[0:half_shape_0, :]
+            data_1 = data[half_shape_0:shape_0, :]
+
+            print("Converting: %-75s" % name_0, " shape: ", data_0.shape)
+            print("Converting: %-75s" % name_1, " shape: ", data_1.shape)
+
+            n_dims = len(data_0.shape)
+            assert (len(data_0.shape) == len(data_1.shape))
+            # ftype == 0 -> float32, ftype == 1 -> float16
+            ftype_cur = 0
+            if ftype != 0:
+                if name_0[-7:] == ".weight" and n_dims == 2:
+                    print("  to float16".rjust(15))
+                    data_0 = data_0.astype(np.float16)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 1
+                else:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+            else:
+                if data_0.dtype != np.float32:
+                    print("  to float32".rjust(15))
+                    data_0 = data_0.astype(np.float32)
+                    data_1 = data_1.astype(np.float32)
+                    ftype_cur = 0
+
+            str_0 = name_0.encode("utf-8")
+            fout.write(struct.pack("iii", n_dims, len(str_0), ftype_cur))
+            for i in range(n_dims):
+                fout.write(struct.pack("i", data_0.shape[n_dims - 1 - i]))
+            fout.write(str_0)
+            data_0.tofile(fout)
+
+            str_1 = name_1.encode("utf-8")
+            fout.write(struct.pack("iii", n_dims, len(str_1), ftype_cur))
+            for i in range(n_dims):
+                fout.write(struct.pack("i", data_1.shape[n_dims - 1 - i]))
+            fout.write(str_1)
+            data_1.tofile(fout)
+
+    fout.close()
 
     print("Done. Output file: " + fname_out)
     print("")
@@ -618,10 +935,15 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
-    parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
+    parser.add_argument("--outtype",
+                        choices=["f32", "f16"],
+                        default="f32",
+                        help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     parser.add_argument("--format",
                         type=str,
@@ -649,7 +971,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     hparams = config.to_dict()
 
-    if hasattr(model.config, "multi_query_attention"):
+    # ChatGLM3 shares the same architecture and model config with ChatGLM2
+    # but its tokenizer further supports system prompts,
+    # so we can check system token to discriminate ChatGLM3 from ChatGLM2.
+    if "<|system|>" in tokenizer.tokenizer.special_tokens:
+        if args.format == "GGUF":
+            chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
+        else:
+            chatglm3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    elif hasattr(model.config, "multi_query_attention"):
         if args.format == "GGUF":
             chatglm2_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
         else:

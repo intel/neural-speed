@@ -79,6 +79,7 @@ enum model_archs {
   MODEL_OPT,
   MODEL_BLOOM,
   MODEL_BAICHUAN,
+  MODEL_CHATGLM3,
   MODEL_CHATGLM2,
   MODEL_CHATGLM,
   MODEL_QWEN,
@@ -487,7 +488,8 @@ class model_name_to_arch {
       {"falcon", MODEL_FALCON},   {"bloom", MODEL_BLOOM},       {"chatglm2", MODEL_CHATGLM2},
       {"chatglm", MODEL_CHATGLM}, {"baichuan", MODEL_BAICHUAN}, {"mistral", MODEL_LLAMA},
       {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"stablelm", MODEL_STABLELM},
-      {"whisper", MODEL_WHISPER}, {"mixtral", MODEL_LLAMA},     {"gemma", MODEL_GEMMA}};
+      {"whisper", MODEL_WHISPER}, {"chatglm3", MODEL_CHATGLM3}, {"mixtral", MODEL_LLAMA},
+      {"gemma", MODEL_GEMMA}};
 };
 
 #ifdef __cplusplus
