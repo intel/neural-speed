@@ -925,7 +925,7 @@ PYBIND11_MODULE(mixtral_cpp, m)
 
 PYBIND11_MODULE(chatglm3_cpp, m)
 #elif MODEL_NAME_ID == 21
-  
+
 PYBIND11_MODULE(gemma_cpp, m)
 
 #endif
