@@ -273,7 +273,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
-    <td>4096</td>
+    <td>2048</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/google/gemma-2b-it" target="_blank" rel="noopener noreferrer">gemma-2b-it </a>,
