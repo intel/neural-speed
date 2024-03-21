@@ -443,7 +443,7 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "DEBUG",
 };
 
-static_assert(NE_OP_COUNT == 68, "NE_OP_COUNT != 68");
+static_assert(NE_OP_COUNT == 69, "NE_OP_COUNT != 69");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
