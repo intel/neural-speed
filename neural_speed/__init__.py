@@ -24,6 +24,7 @@ max_request_num_default = 1
 
 
 class Model:
+
     def __init__(self):
         self.module = None
         self.model = None
@@ -55,7 +56,7 @@ class Model:
             import neural_speed.bloom_cpp as cpp_model
         elif model_type == "chatglm":
             import neural_speed.chatglm_cpp as cpp_model
-        elif model_type == "chatglm2":
+        elif model_type == "chatglm2" or model_type == "chatglm3":
             import neural_speed.chatglm2_cpp as cpp_model
         elif model_type == "baichuan":
             import neural_speed.baichuan_cpp as cpp_model
@@ -83,6 +84,11 @@ class Model:
     def get_model_type(model_config):
         model_type = model_maps.get(model_config.model_type, model_config.model_type)
         if model_type == "chatglm" and "chatglm2" in model_config._name_or_path:
+            model_type = "chatglm2"
+
+        # For ChatGLM3
+        if model_type == "chatglm" and "chatglm3" in model_config._name_or_path:
+            # due to the same model architecture.
             model_type = "chatglm2"
 
         # for TheBloke/falcon-40b-instruct-GPTQ & TheBloke/Falcon-7B-Instruct-GPTQ
@@ -200,7 +206,7 @@ class Model:
 
             def get_max_seq_length():
                 config = self.config.to_dict()
-                # chatglm2, bloom
+                # chatglm2, bloom, chatglm3
                 if 'seq_length' in config:
                     return config['seq_length']
                 # qwen2, llama-2, llama, dolly, gptneox, qwen, qwen1.5, opt, phi

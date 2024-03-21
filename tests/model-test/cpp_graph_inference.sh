@@ -146,6 +146,7 @@ model_name_map["starcoder-3b"]="bigcode/starcoder"
 model_name_map["bloom-7b"]="bigscience/bloom-7b1"
 model_name_map["opt-1.3b"]="facebook/opt-1.3b"
 model_name_map["dolly-v2-3b"]="databricks/dolly-v2-3b"
+model_name_map["chatglm3"]="THUDM/chatglm3-6b"
 model_name_map["chatglm2"]="THUDM/chatglm2-6b"
 model_name_map["chatglm-6b"]="THUDM/chatglm-6b"
 model_name_map["baichuan2-13b"]="baichuan-inc/Baichuan2-13B-Chat"
@@ -233,6 +234,13 @@ function main() {
         quant_script="./build/bin/quant_chatglm2"
         convert_script="${convert_script}/convert_chatglm.py --format=GGUF"
         infer_cmd="./build/bin/run_chatglm2"
+        input_list=(32 1024)
+    elif [[ "${model}" == "chatglm3-6b" ]]; then
+        quant_script="./build/bin/quant_chatglm3"
+        convert_script="${convert_script}/convert_chatglm.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
+        extension=" --model_name chatglm3 --tokenizer $model_path"
+        requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
         input_list=(32 1024)
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"

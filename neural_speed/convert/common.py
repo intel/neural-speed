@@ -90,7 +90,56 @@ def quantize_q4_1(tensor: torch.Tensor) -> torch.CharTensor:
     return tensor
 
 
+def quantize_q8_0(tensor: torch.Tensor) -> torch.Tensor:
+    # equivalent to ggml_quantize_q8_0 in ggml.c
+    assert tensor.shape[1] % GGML_QK8_0 == 0
+    tensor = tensor.view(-1, GGML_QK8_0)
+    scale = tensor.abs().max(dim=-1, keepdim=True).values / ((1 << 7) - 1)
+    tensor = (tensor / scale).round().clamp(min=-128, max=127).char()
+    # add scale into each block
+    tensor = torch.cat((scale.half().view(torch.int8), tensor), dim=-1)
+    return tensor
+
+
+def quantize_q5_0(tensor: torch.Tensor) -> torch.Tensor:
+    # equivalent to ggml_quantize_q5_0 in ggml.c
+    assert tensor.shape[1] % GGML_QK5_0 == 0
+    tensor = tensor.view(-1, GGML_QK5_0)
+    abs_max_indices = tensor.abs().max(dim=-1, keepdim=True).indices
+    max_values = torch.take_along_dim(tensor, abs_max_indices, dim=-1)
+    scale = max_values / -16
+    tensor = (tensor / scale + 16).round().clamp(min=0, max=31).char()
+    qs = (tensor[:, :16] & 0x0F) | (tensor[:, 16:] << 4)
+    qh = torch.zeros(tensor.shape[:-1], dtype=torch.int32)
+    for i in range(32):
+        qh |= ((tensor[:, i] & 0x10) >> 4).int() << i
+
+    # add scale into each block
+    tensor = torch.cat((scale.half().view(torch.int8), qh[..., None].view(torch.int8), qs), dim=-1)
+    return tensor
+
+
+def quantize_q5_1(tensor: torch.Tensor) -> torch.Tensor:
+    # equivalent to ggml_quantize_q5_1 in ggml.c
+    assert tensor.shape[1] % GGML_QK5_1 == 0
+    tensor = tensor.view(-1, GGML_QK5_1)
+    min_vals = tensor.min(dim=-1, keepdim=True).values
+    max_vals = tensor.max(dim=-1, keepdim=True).values
+    scale = (max_vals - min_vals) / ((1 << 5) - 1)
+    tensor = ((tensor - min_vals) / scale).round().clamp(min=0, max=31).char()
+    qs = (tensor[:, :16] & 0x0F) | (tensor[:, 16:] << 4)
+    qh = torch.zeros(tensor.shape[:-1], dtype=torch.int32)
+    for i in range(32):
+        qh |= ((tensor[:, i] & 0x10) >> 4).int() << i
+
+    # add scale & min into each block
+    tensor = torch.cat(
+        (scale.half().view(torch.int8), min_vals.half().view(torch.int8), qh[..., None].view(torch.int8), qs), dim=-1)
+    return tensor
+
+
 class SentencePieceVocab:
+
     def __init__(self, fname_tokenizer: Path, fname_added_tokens: Optional[Path]) -> None:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]

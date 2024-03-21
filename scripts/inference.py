@@ -168,6 +168,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
         token_ids_list = map(str, token_ids_list)
         token_ids_str = ', '.join(token_ids_list)
         cmd.extend(["--ids", token_ids_str])
+
+    elif (args.model_name == "chatglm3"):
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, trust_remote_code=True)
+        token_ids_tensor = tokenizer.build_chat_input(prompt_text)['input_ids']
+        token_ids_list = token_ids_tensor.tolist()[0]
+        token_ids_list = map(str, token_ids_list)
+        token_ids_str = ', '.join(token_ids_list)
+        cmd.extend(["--ids", token_ids_str])
+
     elif (args.model_name == "baichuan" or args.model_name == "qwen"):
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, trust_remote_code=True)
 
