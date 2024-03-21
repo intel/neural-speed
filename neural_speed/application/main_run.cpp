@@ -229,7 +229,7 @@ int main(int argc, char** argv) {  // NOLINT
 
   // tokenize the prompt
   bool add_bos = false;
-  if (params.model_arch == MODEL_LLAMA) {
+  if (params.model_arch == MODEL_LLAMA||params.model_arch == MODEL_GEMMA) {
     add_bos = true;
   }
 
