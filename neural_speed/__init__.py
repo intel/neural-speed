@@ -272,7 +272,7 @@ class Model:
                         else:
                             generate_kwargs["scratch_size_ratio"] = 35
 
-        self.model.init_model(model_path, **generate_kwargs)
+        self.model.init_model(model_path, **self._filter_model_init_args(**generate_kwargs))
 
     def quant_model(self, model_type, model_path, out_path, **quant_kwargs):
         self.__import_package(model_type)
@@ -434,3 +434,14 @@ class Model:
         else:
             input_list = input_ids.tolist()
         return input_list
+
+    def _filter_model_init_args(self, **init_kwargs):
+        valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
+                      "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
+                      "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
+                      "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
+                      "scratch_size_ratio"}
+        for k in init_kwargs.keys():
+            if k not in valid_args:
+                init_kwargs.pop(k)
+        return init_kwargs

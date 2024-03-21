@@ -501,8 +501,8 @@ bool Model::check_input_and_count_padding(const std::vector<std::vector<model_to
       fprintf(stderr, "\nERROR: Only gpt-j, gpt-neox, chatglm, llama support multi-batch generation!\n");
       return false;
     }
-    if (ctx->vocab.pad_token_id == -1) {
-      fprintf(stderr, "\nERROR: please set pad_token for static multi-batch generation (tokenizer.pad_token_id)!\n");
+    if (ctx->vocab.pad_token_id == -1 && !ctx->cont_batching) {
+      fprintf(stderr, "\nERROR: please set pad_token for static multi-batch inference (tokenizer.pad_token_id)!\n");
       return false;
     }
     if (!padding_count.empty()) padding_count.clear();
@@ -608,6 +608,11 @@ const std::vector<float>& Model::evaluate_(const std::vector<std::vector<model_t
 std::vector<std::vector<model_token>> Model::generate(const std::vector<std::vector<model_token>>& input_ids) {
   if (!check_input_and_count_padding(input_ids)) return {};
   if (ctx->beam_search) return beam_generate(input_ids);
+
+  if (ctx->vocab.pad_token_id == -1 && input_ids.size() > 1) {
+    fprintf(stderr, "\nERROR: please set pad_token for multi-batch generation (tokenizer.pad_token_id)!\n");
+    return {};
+  }
 
   const auto& logits = evaluate_(input_ids);
   if (logits.empty()) return {};
