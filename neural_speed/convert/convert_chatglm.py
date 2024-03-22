@@ -156,8 +156,6 @@ def chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     gguf_file = fname_out
     gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm3")
     gguf_writer.add_uint32('magic', 0x67676d66)
-    import pdb
-    pdb.set_trace()
     gguf_writer.add_uint32('version', 1)
     gguf_writer.add_uint32('n_vocab', hparams["padded_vocab_size"])
     gguf_writer.add_embedding_length(hparams["hidden_size"])
@@ -972,7 +970,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     # ChatGLM3 shares the same architecture and model config with ChatGLM2
     # but its tokenizer further supports system prompts,
     # so we can check system token to discriminate ChatGLM3 from ChatGLM2.
-    if "<|system|>" in tokenizer.tokenizer.special_tokens:
+    if hasattr(tokenizer, "tokenizer") and "<|system|>" in tokenizer.tokenizer.special_tokens:
         if args.format == "GGUF":
             chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
         else:
