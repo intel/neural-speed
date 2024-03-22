@@ -223,7 +223,7 @@ class gemma_quant_layer : public quant_layer_base {
     if ((layername.find("embedding") != std::string::npos) ||
         (layername == "token_embd.weight" || layername == "model.embed_tokens.weight")) {
       // special layer process, can be loaded by config file
-      return quant_params_internal();  // q40
+      return quant_params_internal{quant_bits::q8};  // q80
     }
     quantize &= (ne.size() == 2);
     if (quantize) {
