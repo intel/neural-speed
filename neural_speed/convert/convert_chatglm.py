@@ -156,8 +156,6 @@ def chatglm3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     gguf_file = fname_out
     gguf_writer = gguf.GGUFWriter(gguf_file, "chatglm3")
     gguf_writer.add_uint32('magic', 0x67676d66)
-    import pdb
-    pdb.set_trace()
     gguf_writer.add_uint32('version', 1)
     gguf_writer.add_uint32('n_vocab', hparams["padded_vocab_size"])
     gguf_writer.add_embedding_length(hparams["hidden_size"])
