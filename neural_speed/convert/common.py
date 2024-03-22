@@ -237,7 +237,7 @@ def unpack_gptq_weight_8bits(qweight, scales, qzeros, q_config):
     try:
         zeros = zeros.reshape(scales.shape)
     except:
-        # zeros and scales have different iteam numbers.
+        # zeros and scales have different item numbers.
         # remove 1 (due to 0 + 1 in line 68)
         zeros = zeros[zeros !=1]
         zeros = zeros.reshape(scales.shape)
