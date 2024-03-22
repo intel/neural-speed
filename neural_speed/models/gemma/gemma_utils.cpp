@@ -83,7 +83,7 @@ void Gemma::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   n_head = hparams.n_head;
   n_expert = hparams.n_experts;
   n_expert_used = hparams.n_experts_used;
-  scratch = gemma_mem_req(n_layer, lctx.scratch_size_ratio);
+  scratch = gemma_mem_req(n_layer, lctx.scratch_size_ratio * 1.5);
   model.scratchs = scratch;
 }
 
