@@ -152,7 +152,6 @@ static inline BTLA_CODE transpose2d(const _T* srcptr, _T* dstptr, int row, int c
   return BTLA_CODE::Success;
 }
 
-template <int NTile>
 static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstptr, int row, int col, int ld_src,
                                        int ld_dst) {
   for (int j = 0; j < row; j++) {
@@ -166,7 +165,6 @@ static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstp
   return BTLA_CODE::Success;
 }
 
-template <int NTile>
 static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, int row, int col, int ld_src,
                                     int ld_dst) {
   for (int j = 0; j < row; j++) {
@@ -175,6 +173,61 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
       tmp.x = srcptr[j * ld_src + ii + 0];
       tmp.y = srcptr[j * ld_src + ii + 1];
       dstptr[j * ld_dst / 2 + ii / 2] = tmp;
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                      int row, int col, int ld_src, int ld_dst) {
+  assert(col % 128 == 0);
+  auto round3bit = [](int8_t src) {
+    int32_t dst = src;
+    dst = dst >= 0 ? dst + 16 : dst - 16;
+    dst = dst / 32;
+    dst = dst > 3 ? 3 : dst;
+    dst = dst < -4 ? -4 : dst;
+    return static_cast<int8_t>(dst);
+  };
+  auto bit2_interleave = [&](int8_t* src, int8_t* dst) {
+    for (int i = 0; i < 128 / 4; i++) {
+      dst[4 * i] = src[i];
+      dst[4 * i + 1] = src[128 / 4 + i];
+      dst[4 * i + 2] = src[128 / 4 * 2 + i];
+      dst[4 * i + 3] = src[128 / 4 * 3 + i];
+    }
+  };
+
+  int8_t round_buf[128];
+  int8_t interleave_buf[128];
+
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j += 128) {
+      for (int k = 0; k < 128; k++) {
+        round_buf[k] = round3bit(const_cast<int8_t*>(srcptr + i * ld_src + j + k)[0]) << 5;
+      }
+      bit2_interleave(round_buf, interleave_buf);
+      for (int k = 0; k < 32; k++) {
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].a = interleave_buf[4 * k] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].b = interleave_buf[4 * k + 1] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].c = interleave_buf[4 * k + 2] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].d = interleave_buf[4 * k + 3] >> 5;
+      }
+      for (int k = j; k < j + 128; k += 8) {
+        bit1ptr[i * ld_dst / 8 + k / 8].a = round_buf[k - j] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].b = round_buf[k - j + 1] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].c = round_buf[k - j + 2] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].d = round_buf[k - j + 3] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].e = round_buf[k - j + 4] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].f = round_buf[k - j + 5] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].g = round_buf[k - j + 6] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].h = round_buf[k - j + 7] >> 7;
+      }
+    }
+  }
+  // store 1 bit without interleave as mask.
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j += 8) {
     }
   }
   return BTLA_CODE::Success;
@@ -196,17 +249,8 @@ static inline BTLA_CODE decompress_s4_f32(utils::int4x2* srcptr, float* dstptr, 
 
 template <BTLA_DTYPE S4_T>
 inline int8_t get_s8(int8_t v) {
-  switch (S4_T) {
-    case BTLA_DTYPE::S4_CLIP:
-      return v << 4;
-    case BTLA_DTYPE::S4_FULLRANGE:
-      v &= 0x0f;
-      return v - 8;
-    default:
-      assert(false);
-      break;
-  }
-  return static_cast<int8_t>(0);
+  static_assert(S4_T == BTLA_DTYPE::S4_CLIP);
+  return v << 4;
 }
 
 template <BTLA_DTYPE S4_T>
@@ -251,14 +295,6 @@ inline void convert_s4_s8_8_lowbits(int8_t* dstptr, int8_t* srcptr) {
 }
 
 template <>
-inline void convert_s4_s8_8<BTLA_DTYPE::S4_FULLRANGE>(int8_t* dstptr, int8_t* srcptr) {
-  convert_s4_s8_8_lowbits(dstptr, srcptr);
-  for (size_t i = 0; i < 8; i++) {
-    dstptr[i] -= 8;
-  }
-}
-
-template <>
 inline void convert_s4_s8_8<BTLA_DTYPE::F4_BNB>(int8_t* dstptr, int8_t* srcptr) {
   convert_s4_s8_8_lowbits(dstptr, srcptr);
 }
@@ -275,6 +311,7 @@ inline void convert_s4_s8_8<BTLA_DTYPE::F4_E2M1>(int8_t* dstptr, int8_t* srcptr)
 
 template <BTLA_DTYPE S4_T>
 inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst) {
+  static_assert(S4_T == BTLA_DTYPE::S4_CLIP);
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
@@ -824,7 +861,7 @@ static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int r
   return BTLA_CODE::Success;
 }
 
-template <BTLA_DTYPE S4_T>
+template <BTLA_DTYPE QDT_T>
 inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
                                                 int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
   int raw_blocksize = blocksize;
@@ -841,24 +878,6 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       scales[j / raw_blocksize * ld_dst + i] = scale;
       for (size_t ij = 0; ij < blocksize; ij++) {
         dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
-      }
-    };
-    auto s4_fullrange_calc_store_scale_and_quantv_sym = [&](int blocksize) {
-      float amax = 0.f, max = 0.f;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        auto v = srcptr[(j + ij) * ld_src + i];
-        if (amax < std::abs(v)) {
-          amax = std::abs(v);
-          max = v;
-        }
-      }
-      float scale = max / -8.f;
-      float rscale = scale != 0.f ? 1.f / scale : 0.f;
-      scales[j / raw_blocksize * ld_dst + i] = scale;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        auto quant_v = srcptr[(j + ij) * ld_src + i] * rscale;
-        int8_t x = std::min(static_cast<int8_t>(15), static_cast<int8_t>(quant_v + 8.5f));
-        dstptr[(j + ij) * ld_dst + i] = x << 4;
       }
     };
     auto s8_calc_store_scale_and_quantv_asym = [&](int blocksize) {
@@ -878,44 +897,47 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
         dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i] - fmedium) * rscale);
       }
     };
-    auto s4_fullrange_calc_store_scale_and_quantv_asym = [&](int blocksize) {
-      float maxval = 0.f;
-      float minval = 0.f;
+    auto sNauto_calc_store_scale_and_quantv_sym = [&](int blocksize) {
+      auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
+      int constexpr FullValue = 1 << (NBits - 1);
+      int constexpr GenValue = FullValue - 1;
+      float maxval = std::numeric_limits<float>::min();
+      float minval = std::numeric_limits<float>::max();
+      float absmax = 0;
       for (size_t ij = 0; ij < blocksize; ij++) {
-        auto v = srcptr[(j + ij) * ld_src + i];
-        maxval = std::max(maxval, v);
-        minval = std::min(minval, v);
+        maxval = std::max(maxval, srcptr[(j + ij) * ld_src + i]);
+        minval = std::min(minval, srcptr[(j + ij) * ld_src + i]);
+        absmax = std::max(absmax, std::abs(srcptr[(j + ij) * ld_src + i]));
       }
-      float max = std::abs(maxval) < std::abs(minval) ? minval - maxval : maxval - minval;
-      float scale = max / -16.f;
-      float rscale = scale != 0.f ? 1.f / scale : 0.f;
+      int NVal = GenValue;
+      auto sum = maxval + minval;
+      if (abs(sum) >= absmax / FullValue) {
+        NVal = sum > 0.f ? -FullValue : FullValue;
+      }
+      NVal = NVal << (8 - NBits);
+      float scale = absmax / NVal;
+      float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
-      float fmedium = (maxval + minval) / 2;
-      ;
-      int8_t bzp = utils::cast<float, int8_t>((0.f - fmedium) * rscale);
-      zero_points[j / raw_blocksize * ld_dst + i] = bzp;
       for (size_t ij = 0; ij < blocksize; ij++) {
-        auto quant_v = (srcptr[(j + ij) * ld_src + i] - fmedium) * rscale;
-        int8_t x = std::min(static_cast<int8_t>(15), static_cast<int8_t>(quant_v + 8.5f));
-        dstptr[(j + ij) * ld_dst + i] = x << 4;
+        dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
       }
     };
 
     auto dispatch_calc = [&](int blocksize) {
-      switch (S4_T) {
+      switch (QDT_T) {
         case BTLA_DTYPE::S8:
-        case BTLA_DTYPE::S4_CLIP:
           if (zero_points == nullptr) {
             s8_calc_store_scale_and_quantv_sym(blocksize);
           } else {
             s8_calc_store_scale_and_quantv_asym(blocksize);
           }
           break;
-        case BTLA_DTYPE::S4_FULLRANGE:
+        case BTLA_DTYPE::S3_CLIP:
+        case BTLA_DTYPE::S4_CLIP:
           if (zero_points == nullptr) {
-            s4_fullrange_calc_store_scale_and_quantv_sym(blocksize);
+            sNauto_calc_store_scale_and_quantv_sym(blocksize);
           } else {
-            s4_fullrange_calc_store_scale_and_quantv_asym(blocksize);
+            s8_calc_store_scale_and_quantv_asym(blocksize);
           }
           break;
         default:
@@ -1211,11 +1233,11 @@ inline BTLA_CODE dq8_bnb_double_quant(float* scale, size_t scale_size, int dq_bl
 }
 
 inline BTLA_CODE dq8_get_fp_scale(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk,
-                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride,
-                                  bool zeropadding) {
+                                  int dq_offset_idx, float* dq_scale, int src_stride, int dst_stride, bool zeropadding,
+                                  int mN) {
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j++) {
-      auto dq_s_idx = (scale_offset + j) / dq_blk;
+      auto dq_s_idx = (i * mN + scale_offset + j) / dq_blk;
       dst[i * dst_stride + j] = dq8_bnb_LUT[src[i * src_stride + j]] * dq_scale[dq_s_idx] + dq_scale[dq_offset_idx];
     }
   }
@@ -1480,6 +1502,17 @@ static inline BTLA_CODE layernorm(const T* srcptr, const T* scaleptr, const T* b
     *mean_square_out = mean_square;
   }
   return BTLA_CODE::Success;
+}
+
+inline float exp_ps_0_1(float x) {
+  static const float log2e = std::log2(std::exp(1.f));
+  static const float ln2 = std::log(2.f);
+  const float x1 = x * log2e + .5f;
+  const float z = std::floor(x1);
+  const float f = x1 - z;
+  constexpr std::array<float, 3> coeff{0.240226507f, 0.452920674f, 0.713483036f};
+  // same as a * std::pow(2, z) but more precise
+  return ldexpf(coeff[0] * f * f + coeff[1] * f + coeff[2], static_cast<int>(z));
 }
 }  // namespace ref
 }  // namespace kernel

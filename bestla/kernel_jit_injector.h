@@ -617,7 +617,11 @@ class eltwise_injector {
   void swish_compute_vector_fwd(const Xbyak::Zmm& zmm_src, int const_p_offset) {
     h->vmovups(zmm_aux0, zmm_src);
     h->vmulps(zmm_aux0, zmm_aux0, h->zword_b[reg_rt_const_p + const_p_offset]);
-    low_precision_exp_compute_vector_fwd(zmm_aux0);
+    if (bestla::utils::isFastExp()) {
+      low_precision_exp_compute_vector_fwd(zmm_aux0);
+    } else {
+      exp_compute_vector_fwd(zmm_aux0);
+    }
     h->vaddps(zmm_aux0, zmm_aux0, table_val(one));
     h->vrcp14ps(zmm_aux0, zmm_aux0);
     h->vmulps(zmm_src, zmm_src, zmm_aux0);

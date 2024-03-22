@@ -12,6 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 #pragma once
+#include <atomic>
 #include <functional>
 #include <thread>
 #include <vector>
@@ -23,17 +24,253 @@
 
 namespace bestla {
 namespace parallel {
+
+using thread_func = std::function<void(int tid)>;
+
+class IThreading {
+ public:
+  explicit IThreading(int nthreads, bool supportPE) : mThreadNum(nthreads), isSupportPE(supportPE) {}
+  virtual void parallel_for(const thread_func& func) = 0;
+  virtual inline void sync(int tidx, int idx = 0) = 0;
+  virtual int num_threads() const { return mThreadNum; };
+  virtual int is_support_PE() const { return isSupportPE; };
+  virtual void set_threads(int nthreads) = 0;
+  virtual std::pair<float, float> get_PEtime() const { return {0.0f, 0.0f}; };
+
+ protected:
+  int mThreadNum;
+  const bool isSupportPE;
+};
+
+#if BTLA_OPENMP
+class OMPThreading : public IThreading {
+ public:
+  explicit OMPThreading(int nthreads) : IThreading(nthreads, false) {
+    // printf("Using OMP\n");
+    omp_set_num_threads(nthreads);
+  }
+  void parallel_for(const thread_func& func) override {
+    if (mThreadNum > 1) {
+#pragma omp parallel
+      {
+        int tidx = omp_get_thread_num();
+        func(tidx);
+      }
+    } else {
+      func(0);
+    }
+  }
+  virtual void set_threads(int nthreads) override {
+    mThreadNum = nthreads;
+    omp_set_num_threads(nthreads);
+  }
+  virtual inline void sync(int tidx, int idx = 0) override {
+    (void)(tidx);
+    (void)(idx);
+#pragma omp barrier
+    (void)(0);  // make msvc happy with c++20
+  }
+};
+#endif
+
+class StdThreading : public IThreading {
+ public:
+  using Timer_T = utils::timer<utils::microseconds>;
+  explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
+    // printf("Using Std\n");
+    cr = &device::CpuRuntime::getInstance(nthreads);
+    create_threads();
+  }
+  void parallel_for(const thread_func& func) override {
+    time_per_p = 0;
+    time_per_e = 0;
+    Timer_T tm;
+    if (mThreadNum > 1) {
+      running.store(mThreadNum - 1);
+      for (int i = 0; i < 10; i++) flag[i].store(mThreadNum);
+      if (cr->mHybrid) {
+        int time_p = 0, time_e = 0;
+
+        for (size_t i = 0; i < mThreadNum - 1; i++) func_[i] = &func;
+        thread_time[0] = 0;
+        tm.start();
+        func(0);
+        thread_time[0] += int(tm.stop());
+        while (true) {
+          if (running.load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
+        for (int i = 0; i < mThreadNum; i++)
+          if (i >= cr->P_core_num && i < cr->P_core_num + cr->E_core_num)
+            time_e += thread_time[i];
+          else
+            time_p += thread_time[i];
+        time_per_p = (time_p) / (1.0 * (mThreadNum - cr->E_core_num));
+        time_per_e = (time_e) / (1.0 * cr->E_core_num);
+        // printf("%d %d %f %f\n", time_p, time_e, time_per_p, time_per_e);
+      } else {
+        for (size_t i = 0; i < mThreadNum - 1; i++) {
+          func_[i] = &func;
+        }
+        func(0);
+        while (true) {
+          if (running.load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
+      }
+    } else {
+      func(0);
+    }
+  }
+
+  void set_threads(int nthreads) override {
+    if (nthreads != mThreadNum) {
+      stop_threads();
+      mThreadNum = nthreads;
+      cr = &device::CpuRuntime::getInstance(nthreads);
+      create_threads();
+    }
+  }
+
+  inline void sync(int tidx, int idx = 0) override {
+    if (mThreadNum > 1) {
+      flag[idx].fetch_sub(1);
+      if (cr->mHybrid) {
+        Timer_T tm;
+        tm.start();
+        while (true) {
+          if (flag[idx].load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
+        thread_time[tidx] -= int(tm.stop());
+      } else {
+        while (true) {
+          if (flag[idx].load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
+      }
+    }
+  }
+
+  std::pair<float, float> get_PEtime() const override { return {time_per_p, time_per_e}; };
+
+  ~StdThreading() { stop_threads(); }
+
+ private:
+  void stop_threads() {
+    stop = true;
+    for (int i = 0; i < mThreadNum - 1; i++) thdset[i].join();
+    thdset.clear();
+    // printf("stop %d\n", mThreadNum);
+  }
+  void create_threads() {
+    // printf("create %d\n", mThreadNum);
+    thdset.resize(mThreadNum - 1);
+    stop = false;
+    GetCPUDevice();
+    std::vector<int> core_order;
+    if (_cd->isHybrid()) {
+      core_order.resize(_cd->getThreads());
+      memcpy(reinterpret_cast<void*>(core_order.data()), reinterpret_cast<void*>(_cd->getPCores()),
+             _cd->getPcoreNum() * sizeof(int));
+      memcpy(reinterpret_cast<void*>(core_order.data() + _cd->getPcoreNum()), reinterpret_cast<void*>(_cd->getECores()),
+             _cd->getEcoreNum() * sizeof(int));
+      memcpy(reinterpret_cast<void*>(core_order.data() + _cd->getPcoreNum() + _cd->getEcoreNum()),
+             reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
+    } else {
+      core_order.resize(mThreadNum);
+      for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+    }
+    _cd->core_bond(core_order[0]);
+    if (cr->mHybrid) {
+      thread_time.resize(mThreadNum);
+      for (size_t i = 0; i < mThreadNum - 1; i++) {
+        thdset[i] = std::thread(
+            [&](int tidx, int core_id) {
+              _cd->core_bond(core_id);
+              Timer_T tm;
+              while (true) {
+                if (stop.load() == true) break;
+                if (func_[tidx] != nullptr) {
+                  thread_time[tidx + 1] = 0;
+                  tm.start();
+                  (*func_[tidx])(tidx + 1);
+                  func_[tidx] = nullptr;
+                  thread_time[tidx + 1] += int(tm.stop());
+                  running.fetch_sub(1);
+                } else {
+                  _mm_pause();
+                }
+              }
+            },
+            int(i), core_order[i + 1]);
+      }
+    } else
+      for (size_t i = 0; i < mThreadNum - 1; i++) {
+        thdset[i] = std::thread(
+            [&](int tidx, int core_id) {
+              _cd->core_bond(core_id);
+              while (true) {
+                if (stop.load() == true) break;
+                if (func_[tidx] != nullptr) {
+                  (*func_[tidx])(tidx + 1);
+                  func_[tidx] = nullptr;
+                  running.fetch_sub(1);
+                } else {
+                  _mm_pause();
+                }
+              }
+            },
+            int(i), core_order[i + 1]);
+      }
+  }
+  device::CpuRuntime* cr;
+  std::vector<int> thread_time;
+  float time_per_p, time_per_e;
+  std::vector<std::thread> thdset;
+  std::atomic_bool stop;
+  std::atomic_int running;
+  std::atomic_int flag[10];
+  const thread_func* func_[100];
+};
+
+class SingleThread : public IThreading {
+ public:
+  SingleThread() : IThreading(1, false) {}
+
+  void set_threads(int nthreads) override {
+    assert(0);
+    (void)(nthreads);
+  }
+
+  inline void parallel_for(const thread_func& func) override { func(0); }
+
+  inline void sync(int tidx, int idx = 0) override {
+    (void)(tidx);
+    (void)(idx);
+  }
+};
+
 struct Config2D {
   int threads;
   int size[2];
   int step[2];
+  int offset[2];
 };
 struct ThreadProblem2D {
   int tid;
-  int tidx[2] = {0, 0};
-  int loc[2] = {0, 0};
-  int size[2] = {0, 0};
-  bool valid{false};
+  int tidx[2];
+  int loc[2];
+  int size[2];
+  bool valid;
   void print() {
     printf("Thread %d indice:(%d,%d)\n", tid, tidx[0], tidx[1]);
     printf("Thread location:(%d,%d)\n", loc[0], loc[1]);
@@ -60,6 +297,8 @@ class Scheduler2D {
     problem.loc[1] = problem.tidx[1] * mThdSize[1];
     problem.size[0] = utils::remainsize(problem.loc[0], mSize[0], mThdSize[0]);
     problem.size[1] = utils::remainsize(problem.loc[1], mSize[1], mThdSize[1]);
+    problem.loc[0] += moffset[0];
+    problem.loc[1] += moffset[1];
     problem.valid = true;
   }
 
@@ -68,9 +307,12 @@ class Scheduler2D {
     for (size_t i = 0; i < 2; i++) {
       mSize[i] = config.size[i];
       mStep[i] = config.step[i];
+      moffset[i] = config.offset[i];
     }
     schedule();
   }
+
+  constexpr static BTLA_ISA gemm_ISA() { return BTLA_ISA::NoSIMD; }
 
   void print() {
     printf("Thread Block:(%d,%d)\n", mThdSize[0], mThdSize[1]);
@@ -111,6 +353,7 @@ class Scheduler2D {
   int mThdPerRow = 0;
   int mThdValid = 0;
   int mThdCount = 0;
+  int moffset[2] = {0, 0};
 
  private:
   int mThdSize[2] = {0, 0};
@@ -123,6 +366,7 @@ namespace gemm {
 struct Config {
   const int threads;
   const utils::GemmProblem problem;
+  const int offset[2];
   const size_t l2cache = 1024ULL * 1024;
   const size_t l1cache = 32ULL * 1024;
 };
@@ -156,6 +400,8 @@ class SchedulerBase : public Scheduler2D {
     mThdCount = config.threads;
     mL2Size = config.l2cache;
     mL1Size = config.l1cache;
+    Scheduler2D::moffset[0] = config.offset[0];
+    Scheduler2D::moffset[1] = config.offset[1];
     if (mSize[0] <= 0 || mSize[1] <= 0 || mSize[2] <= 0) {
       return;
     }
@@ -166,6 +412,8 @@ class SchedulerBase : public Scheduler2D {
     assert(this->mBlock[2] > 0);
   }
 
+  constexpr static BTLA_ISA gemm_ISA() { return _GemmCore_T::ISA; }
+
   constexpr int valid_theads() { return mThdValid; }
 
   virtual void print() {
@@ -174,6 +422,9 @@ class SchedulerBase : public Scheduler2D {
     printf("GEMM MStep:%d NStep:%d KStep:%d\n", mBlock[0], mBlock[1], mBlock[2]);
     printf("Cache Size:%zu used:%zu\n", mL2Size, mL2Use);
   }
+
+  template <class T>
+  friend class SchedulerDispatcher;
 
  protected:
   virtual void schedule() {
@@ -204,7 +455,7 @@ class SchedulerBase : public Scheduler2D {
     mL2Use += static_cast<size_t>(mBlock[1]) * mBlock[2] * mEleSize[1];
     mL2Use += static_cast<size_t>(mStep[0]) * mBlock[2] * mEleSize[0];
   }
-  const float DensityThres = 16;
+  static float constexpr DensityThres = 16;
   static size_t constexpr ReservedSize = 32ULL * 1024ULL;
 
   virtual float calculate_score() {
@@ -279,8 +530,6 @@ class SchedulerBase : public Scheduler2D {
 
   size_t mL2Size = 0, mL1Size = 0, mL2Use = 0;
   float mDensity = 0.f;
-
- protected:
   int mSize[3] = {0, 0, 0};
   int mThdSize[3] = {0, 0, 0};
   static constexpr int mStep[3] = {_GemmCore_T::MTILE, _GemmCore_T::NTILE, _GemmCore_T::KTILE};
@@ -292,7 +541,7 @@ class SchedulerBase : public Scheduler2D {
 
 template <class _GemmCore_T>
 class SchedulerKBlock : public Scheduler2D {
-  // Block[2]: block size of K must be mutiplier of mKBlock
+  // Block[2]: block size of K must be multiplier of mKBlock
   //           or factor of mKBlock
  public:
   using ThreadProblem = ThreadProblemBase;
@@ -315,6 +564,8 @@ class SchedulerKBlock : public Scheduler2D {
     mThdCount = config.threads;
     mL2Size = config.l2cache;
     mL1Size = config.l1cache;
+    moffset[0] = config.offset[0];
+    moffset[1] = config.offset[1];
     mKBlock = config.problem.dims[4];
     if (mSize[0] <= 0 || mSize[1] <= 0 || mSize[2] <= 0) {
       return;
@@ -326,6 +577,8 @@ class SchedulerKBlock : public Scheduler2D {
     assert(this->mBlock[2] > 0);
   }
 
+  constexpr static BTLA_ISA gemm_ISA() { return _GemmCore_T::ISA; }
+
   constexpr int valid_theads() { return mThdValid; }
 
   void print() {
@@ -334,6 +587,9 @@ class SchedulerKBlock : public Scheduler2D {
     printf("GEMM MStep:%d NStep:%d KStep:%d\n", mBlock[0], mBlock[1], mBlock[2]);
     printf("Cache Size:%zu used:%zu\n", mL2Size, mL2Use);
   }
+
+  template <class T>
+  friend class SchedulerDispatcher;
 
  protected:
   void schedule() {
@@ -364,7 +620,7 @@ class SchedulerKBlock : public Scheduler2D {
     mL2Use += static_cast<size_t>(mBlock[1]) * mBlock[2] * mEleSize[1];
     mL2Use += static_cast<size_t>(mStep[0]) * mBlock[2] * mEleSize[0];
   }
-  const float DensityThres = 16;
+  static float constexpr DensityThres = 16;
 
   float calculate_score() {
     int tmpnstep = mThdSize[1] < _GemmCore_T::PREFERRED_N ? mThdSize[1] : _GemmCore_T::PREFERRED_N;
@@ -474,7 +730,7 @@ class SchedulerKBlock : public Scheduler2D {
 
 template <class _GemmCore_T>
 class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
-  // Block[2]: block size of K must be mutiplier of mKBlock
+  // Block[2]: block size of K must be multiplier of mKBlock
   //           or factor of mKBlock
  public:
   using ThreadProblem = ThreadProblemBase;
@@ -495,8 +751,13 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
     assert(this->mBlock[2] % _GemmCore_T::KTILE == 0);
   }
 
+  constexpr static BTLA_ISA gemm_ISA() { return _GemmCore_T::ISA; }
+
+  template <class T>
+  friend class SchedulerDispatcher;
+
  protected:
-  const float DensityThres = 16;
+  static float constexpr DensityThres = 16;
   static size_t constexpr ReservedSize = 32ULL * 1024ULL;
 
   void cache_blocking_compute() override {
@@ -581,84 +842,127 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
   int mKBlock{0};
 };
 
-}  // namespace gemm
-using thread_func = std::function<void(int tid)>;
-
-class IThreading {
+template <class Scheduler>
+class SchedulerDispatcher {
  public:
-  explicit IThreading(int nthreads) : mThreadNum(nthreads) {}
-  virtual void parallel_for(const thread_func& func) const = 0;
-  virtual inline void sync() const { assert(0); };
-  virtual int num_threads() const { return mThreadNum; };
-  virtual void set_threads(int nthreads) = 0;
-
- protected:
-  int mThreadNum;
-};
-#if BTLA_OPENMP
-class OMPThreading : public IThreading {
- public:
-  explicit OMPThreading(int nthreads) : IThreading(nthreads) { omp_set_num_threads(nthreads); }
-  void parallel_for(const thread_func& func) const override {
-    if (mThreadNum > 1) {
-#pragma omp parallel
-      {
-        int tidx = omp_get_thread_num();
-        func(tidx);
-      }
+  using ThreadProblem = ThreadProblemBase;
+  SchedulerDispatcher() = default;
+  ~SchedulerDispatcher() {
+    std::pair<float, float> PEtime = th_->get_PEtime();
+    if (needDispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
+      cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
+  }
+  SchedulerDispatcher(const IThreading* th, const utils::GemmProblem& problem) {
+    th_ = th;
+    cr = &device::CpuRuntime::getInstance(th->num_threads());
+    needDispach = cr->mHybrid && th->is_support_PE();
+    if (!needDispach) {
+      Scheduler_P = std::move(Scheduler({th->num_threads(), problem, {0, 0}, cr->mL2Cache, cr->mL1Cache}));
     } else {
-      func(0);
-    }
-  }
-  virtual void set_threads(int nthreads) override {
-    mThreadNum = nthreads;
-    omp_set_num_threads(nthreads);
-  }
-  virtual inline void sync() const override {
-#pragma omp barrier
-    (void)(0);  // make msvc happy with c++20
-  }
-};
-#endif
-
-class StdThreading : public IThreading {
- public:
-  explicit StdThreading(int nthreads) : IThreading(nthreads) {}
-  void parallel_for(const thread_func& func) const override {
-    if (mThreadNum > 1) {
-      std::vector<std::thread> thdset(mThreadNum - 1);
-      for (size_t i = 0; i < mThreadNum - 1; i++) {
-        thdset[i] = std::thread([&](int tidx) { func(tidx); }, int(i + 1));
-      }
-      func(0);
-      for (size_t i = 0; i < mThreadNum - 1; i++) {
-        thdset[i].join();
-      }
-    } else {
-      func(0);
+      Pcore_num = cr->P_core_num;
+      Ecore_num = cr->E_core_num;
+      utils::GemmProblem problem_P = problem, problem_E = problem;
+      const int N = problem.dims[2];
+      auto PE_Ratio = cr->getPE(Scheduler::gemm_ISA());
+      const int N_offset = utils::padto(N - int(N / (1 + PE_Ratio)), Scheduler::mStep[1]);
+      problem_P.dims[2] = N_offset;
+      Scheduler_P =
+          std::move(Scheduler({th->num_threads() - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P}));
+      problem_E.dims[2] = N - N_offset;
+      Scheduler_E = std::move(Scheduler({cr->E_core_num, problem_E, {0, N_offset}, cr->mL2Cache_E, cr->mL1Cache_E}));
     }
   }
 
-  void set_threads(int nthreads) override { mThreadNum = nthreads; }
+  void getIndex(ThreadProblem& problem) {
+    if (!needDispach) {
+      Scheduler_P.getIndex(problem);
+    } else {
+      if (problem.tid >= Pcore_num + Ecore_num) {
+        problem.tid -= Ecore_num;
+        Scheduler_P.getIndex(problem);
+      } else if (problem.tid >= Pcore_num) {
+        problem.tid -= Pcore_num;
+        Scheduler_E.getIndex(problem);
+      } else {
+        Scheduler_P.getIndex(problem);
+      }
+    }
+  }
 
-  inline void sync() const override { assert(0); }
+  void print() {
+    printf("dispatch to hybrid:%d\n", needDispach);
+    Scheduler_P.print();
+    if (needDispach) Scheduler_E.print();
+  }
 
  private:
+  Scheduler Scheduler_P, Scheduler_E;
+  const IThreading* th_;
+  device::CpuRuntime* cr;
+  bool needDispach = false;
+  int Pcore_num = 0, Ecore_num = 0;
 };
 
-class SingleThread : public StdThreading {
+template <>
+class SchedulerDispatcher<Scheduler2D> {
  public:
-  SingleThread() : StdThreading(1) {}
+  using ThreadProblem = ThreadProblem2D;
+  SchedulerDispatcher() = default;
+  ~SchedulerDispatcher() {}
+  SchedulerDispatcher(const IThreading* th, const Config2D& config) {
+    device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
+    needDispach = cr.mHybrid && th->is_support_PE();
+    if (!needDispach) {
+      Scheduler_P = std::move(Scheduler2D(config));
+    } else {
+      Pcore_num = cr.P_core_num;
+      Ecore_num = cr.E_core_num;
+      Config2D config_P = config, config_E = config;
+      const int N = config.size[1];
+      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(BTLA_ISA::NoSIMD))), config.step[1]);
+      config_P.threads = config.threads - cr.E_core_num;
+      config_P.size[1] = N_offset;
+      Scheduler_P = std::move(Scheduler2D(config_P));
+      config_E.threads = cr.E_core_num;
+      config_E.size[1] = N - N_offset;
+      config_E.offset[1] += N_offset;
+      Scheduler_E = std::move(Scheduler2D(config_E));
+    }
+  }
 
-  void set_threads(int nthreads) override { (void)(nthreads); }
+  void getIndex(ThreadProblem& problem) {
+    if (!needDispach) {
+      Scheduler_P.getIndex(problem);
+    } else {
+      if (problem.tid >= Pcore_num + Ecore_num) {
+        problem.tid -= Ecore_num;
+        Scheduler_P.getIndex(problem);
+      } else if (problem.tid >= Pcore_num) {
+        problem.tid -= Pcore_num;
+        Scheduler_E.getIndex(problem);
+      } else {
+        Scheduler_P.getIndex(problem);
+      }
+    }
+  }
 
-  inline void sync() const override {}
+  void print() {
+    printf("dispatch to hybrid:%d\n", needDispach);
+    Scheduler_P.print();
+    if (needDispach) Scheduler_E.print();
+  }
+
+ private:
+  Scheduler2D Scheduler_P, Scheduler_E;
+  bool needDispach = false;
+  int Pcore_num = 0, Ecore_num = 0;
 };
+
+}  // namespace gemm
 
 template <class Parallel_T, class Launch_T>
 void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para({th->num_threads(), args.problem, cb.mL2Cache, cb.mL1Cache});
+  gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -676,10 +980,9 @@ void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel:
 
 template <class Parallel_T, class Launch_T>
 void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
-  device::CpuBase cb;
-  Parallel_T para({th->num_threads(), args.problem, cb.mL2Cache, cb.mL1Cache});
+  gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
-  auto apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
+  AParall apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -692,7 +995,7 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
     if (thdpA.valid) {
       launcher.mProA.run(args.paramA, thdpA);
     }
-    th->sync();
+    th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {

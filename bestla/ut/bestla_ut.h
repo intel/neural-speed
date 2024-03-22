@@ -1,3 +1,5 @@
+#pragma once
+
 #include <random>
 #include <stdexcept>
 #include "bestla_utils.h"
@@ -24,11 +26,46 @@ using sAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;
 using sAVX2 = gemm::SCoreRowNAvx2<24, 4>;
-#ifdef _OPENMP
-static parallel::OMPThreading DefaultThreading(4);
+
+class UT_Threading {
+ public:
+  static bestla::parallel::IThreading* get() {
+#if BTLA_OPENMP
+    static bestla::parallel::OMPThreading DefaultThreading(4);
 #else
-static parallel::StdThreading DefaultThreading(4);
+    static bestla::parallel::StdThreading DefaultThreading(4);
 #endif  // _OPNEMP
+    return &DefaultThreading;
+  }
+
+  static void set_threads(int n_thread) { get()->set_threads(n_thread); }
+
+  static std::vector<int> get_threads_config() {
+    GetCPUDevice();
+    if (_cd->isHybrid()) {
+      return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+    }
+    if (_cd->getThreads() == 56) {
+      return std::vector<int>{48, 56};
+    }
+    return std::vector<int>{_cd->getThreads()};
+  }
+};
+static inline size_t gemm_memsize(int m, int n, int k, BTLA_DTYPE dtA, BTLA_DTYPE dtB, BTLA_DTYPE dtC) {
+  size_t total = 0;
+  total += size_t(m) * k * utils::bestla_dtype_bits(dtA);
+  total += size_t(n) * k * utils::bestla_dtype_bits(dtB);
+  total += size_t(m) * n * utils::bestla_dtype_bits(dtC);
+  return total / 8;
+}
+
+static inline int auto_batch(size_t memsize) {
+  GetCPUDevice();
+  auto L3 = _cd->getL3CacheSize();
+  size_t constexpr Enlarge = 4;
+  auto batch = L3 * Enlarge / memsize;
+  return batch > 1 ? batch : 2;
+}
 
 constexpr size_t CacheSize = size_t(100) << 10;
 static int8_t cache[CacheSize];
@@ -127,11 +164,11 @@ utils::aligned_vector<_T> readFile2Buffer(const char* filepath) {
   return buf;
 }
 
-#define UT_START()                                       \
-  {                                                      \
-    GetCPUDevice();                                      \
-    ut::DefaultThreading.set_threads(_cd->getThreads()); \
-    printf("Test Class: %s\n", __FUNCTION__);            \
+#define UT_START()                                    \
+  {                                                   \
+    GetCPUDevice();                                   \
+    ut::UT_Threading::set_threads(_cd->getThreads()); \
+    printf("Test Class: %s\n", __FUNCTION__);         \
   }
 template <typename _T>
 static double buffer_error(_T* ref, _T* tar, size_t size, _T thres = _T(0)) {
@@ -329,7 +366,7 @@ struct UT_GEMMData_Row_u8s8 {
     float _cmax = std::numeric_limits<float>::min();
     matCRef.resize(M * LDC);
     auto tmpsrcscale = alpha * matA.scales[0] * matB.scales[0];
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int j = 0; j < M; j++) {
       for (int i = 0; i < N; i += 1) {
         int tmp = 0;
@@ -348,14 +385,14 @@ struct UT_GEMMData_Row_u8s8 {
     matC.scales[0] = (_cmax - _cmin) / (255.f);
     matC.zeropoints[0] = int((0 - _cmin) / matC.scales[0]);
     auto tmpscale = 1.f / matC.scales[0];
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int j = 0; j < M; j++) {
       for (int i = 0; i < N; i += 1) {
         matC.data()[j * LDC + i] = utils::cast<float, uint8_t>(matCRef[j * LDC + i] * tmpscale + matC.zeropoints[0]);
       }
     }
     matCDequan.resize(matCRef.size());
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int j = 0; j < M; j++) {
       for (int i = 0; i < N; i += 1) {
         matCDequan.data()[j * LDC + i] = ((int)matC.data()[j * LDC + i] - matC.zeropoints[0]) * matC.scales[0];
@@ -375,7 +412,7 @@ struct UT_GEMMData_Row_u8s8 {
 };
 
 static inline void gemmref_u8s8s32(int m, int n, int k, uint8_t* A, int8_t* B, int32_t* C, int lda, int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       int tmp = 0;
@@ -388,7 +425,7 @@ static inline void gemmref_u8s8s32(int m, int n, int k, uint8_t* A, int8_t* B, i
 }
 
 static inline void gemmref_s8s8s32(int m, int n, int k, int8_t* A, int8_t* B, int32_t* C, int lda, int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       int tmp = 0;
@@ -404,7 +441,7 @@ static inline void kblockgemmref_u8zp_s8_f32(int m, int n, int k, int kblock, ui
                                              int8_t* B, float* scaleB, float* C, int lda, int ldsa, int ldb, int ldsb,
                                              int ldc) {
   int kblk = utils::padto_le(k, kblock);
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0.f;
@@ -431,7 +468,7 @@ static inline void kblockgemmref_u8zp_s8_f32(int m, int n, int k, int kblock, ui
 static inline void kblockgemmref_u8zp_s8_f32(int m, int n, int k, int kblock, uint8_t* A, uint8_t* zpA, float* scaleA,
                                              int8_t* B, utils::bf16* scaleB, float* C, int lda, int ldsa, int ldb,
                                              int ldsb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0.f;
@@ -470,7 +507,7 @@ struct UT_GEMMData_Row_bf16 {
   }
 
   void calc_ref(float alpha, float beta) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < N; j++) {
         auto tmp = 0.f;
@@ -490,7 +527,7 @@ struct UT_GEMMData_Row_bf16 {
 };
 
 static inline void gemmref_fp32fp32fp32(int m, int n, int k, float* A, float* B, float* C, int lda, int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0;
@@ -504,7 +541,7 @@ static inline void gemmref_fp32fp32fp32(int m, int n, int k, float* A, float* B,
 
 static inline void gemmref_bf16bf16fp32(int m, int n, int k, utils::bf16* A, utils::bf16* B, float* C, int lda, int ldb,
                                         int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0;
@@ -518,7 +555,7 @@ static inline void gemmref_bf16bf16fp32(int m, int n, int k, utils::bf16* A, uti
 
 static inline void gemmref_fp16fp16fp16(int m, int n, int k, utils::fp16* A, utils::fp16* B, utils::fp16* C, int lda,
                                         int ldb, int ldc) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {
       float tmp = 0;
@@ -549,7 +586,7 @@ struct UT_GEMMData_Row_fp16 {
   }
 
   void calc_ref(float alpha, float beta) {
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < M; i++) {
       for (int j = 0; j < N; j++) {
         utils::fp16 tmp = utils::fp16(0.f);
@@ -593,7 +630,7 @@ struct UT_GEMMData_Row_f32 {
                          int ldc, int ldd, float alpha, float beta) {
     int NBlock = 128;
 #if 1
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < n; i += NBlock) {
       for (int j = 0; j < m; j++) {
         int remainn = i + NBlock <= n ? NBlock : n - i;
@@ -608,7 +645,7 @@ struct UT_GEMMData_Row_f32 {
       }
     }
 #else
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for
     for (int i = 0; i < n; i += 1) {
       for (int j = 0; j < m; j++) {
         auto tmp = 0.f;

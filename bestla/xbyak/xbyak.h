@@ -681,7 +681,7 @@ class Operand {
     const int idx = getIdx();
     return AH <= idx && idx <= BH;
   }
-  // any bit is accetable if bit == 0
+  // any bit is acceptable if bit == 0
   XBYAK_CONSTEXPR bool is(int kind, uint32_t bit = 0) const {
     return (kind == 0 || (kind_ & kind)) && (bit == 0 || (bit_ & bit));  // cf. you can set (8|16)
   }

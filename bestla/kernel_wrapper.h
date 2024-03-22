@@ -241,41 +241,48 @@ class Dq8GetScale {
  public:
   template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(uint8_t* src, float* dst, int row, int col, int scale_offset, int dq_blk, int dq_offset_idx,
-                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding) {
+                           float* dq_scale, int src_stride, int dst_stride, bool zeropadding, int mN) {
 #if CompileAVX512F()
-    if constexpr (ISA_T >= BTLA_ISA::AVX512F) {
+    if (ISA_T >= BTLA_ISA::AVX512F) {
       return kernel::avx512f::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
-                                               src_stride, dst_stride, zeropadding);
+                                               src_stride, dst_stride, zeropadding, mN);
     }
 #endif
 #if CompileAVX2()
-    if constexpr (ISA_T >= BTLA_ISA::AVX2) {
+    if (ISA_T >= BTLA_ISA::AVX2) {
       return kernel::avx2::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale,
-                                            src_stride, dst_stride, zeropadding);
+                                            src_stride, dst_stride, zeropadding, mN);
     }
 #endif
     return kernel::ref::dq8_get_fp_scale(src, dst, row, col, scale_offset, dq_blk, dq_offset_idx, dq_scale, src_stride,
-                                         dst_stride, zeropadding);
+                                         dst_stride, zeropadding, mN);
   }
 };
 
-template <int NTILE>
 class CompressS8S4 {
  public:
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::int4x2* dstptr, int row, int col, int ld_src,
                                   int ld_dst) {
-    return ref::compress_s8_s4<NTILE>(srcptr, dstptr, row, col, ld_src, ld_dst);
+    return ref::compress_s8_s4(srcptr, dstptr, row, col, ld_src, ld_dst);
   }
 };
 
-template <int NTILE>
 class CompressFp4 {
  public:
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::f4x2* dstptr, int row, int col, int ld_src,
                                   int ld_dst) {
-    return ref::compress_f4<NTILE>(srcptr, dstptr, row, col, ld_src, ld_dst);
+    return ref::compress_f4(srcptr, dstptr, row, col, ld_src, ld_dst);
+  }
+};
+
+class CompressBit3 {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int row,
+                                  int col, int ld_src, int ld_dst) {
+    return ref::compress_3bit(srcptr, bit2ptr, bit1ptr, row, col, ld_src, ld_dst);
   }
 };
 
@@ -290,18 +297,17 @@ class Transpose2D {
 
 class QuantizeSignIntRowBlock {
  public:
-  template <BTLA_ISA ISA_T, BTLA_DTYPE S4_T>
+  template <BTLA_ISA ISA_T, BTLA_DTYPE QDT_T>
   static inline BTLA_CODE forward(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
                                   float* scales, int8_t* zero_points, int blocksize) {
 #if CompileAVX512F()
-    if constexpr (utils::isa_base<ISA_T>::avx512f &&
-                  S4_T != BTLA_DTYPE::S4_FULLRANGE) {  // TODO(zhe): support simd version s4_fullrange quantization.
-      return avx512f::quantize_f32_sign_int_rowblock<S4_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
-                                                           zero_points, blocksize);
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+                                                            zero_points, blocksize);
     }
 #endif
-    return ref::quantize_f32_sign_int_rowblock<S4_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
-                                                     blocksize);
+    return ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
+                                                      blocksize);
   }
 };
 
@@ -415,41 +421,36 @@ class DecompressKBlockS4Fp {
 #endif
 #if CompileAVX2()
     // AVX2 device only focus on fp32 data and layout
-    if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<_SCA_T, float> && std::is_same_v<_DST_T, float> &&
-                  _PACK_ROW == 1) {
-      if (zero_points == nullptr) {
-        if (col == 24) {
-          ret = avx2::decompress_kblock_bit4_packrow1<true, 24>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<24, true>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        } else if (col == 48) {
-          ret = avx2::decompress_kblock_bit4_packrow1<true, 48>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<48, true>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        }
-
-      } else {
-        if (col == 24) {
-          ret = avx2::decompress_kblock_bit4_packrow1<false, 24>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<24, false>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        } else if (col == 48) {
-          ret = avx2::decompress_kblock_bit4_packrow1<false, 48>(
-              srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
-              &avx2::dequant_s8_N_avx2<48, false>, &avx2::convert_s4_s8_16_sse<S4_T>, &ref::convert_s4_s8_8<S4_T>,
-              reinterpret_cast<int8_t*>(tmp), tmpsize);
-        }
-      }
-
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_s4_fp<S4_T, _DST_T, _PACK_ROW, _SCA_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                           scales, zero_points, k_offset, kblock, NPad,
+                                                                           reinterpret_cast<int8_t*>(tmp), tmpsize);
       if (ret == BTLA_CODE::Success) return ret;
     }
 #endif
     ret = ref::decompress_kblock_s4_fp<S4_T, _DST_T, _PACK_ROW, _SCA_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                                         scales, zero_points, k_offset, kblock, NPad,
                                                                         reinterpret_cast<int8_t*>(tmp), tmpsize);
+    return ret;
+  }
+};
+
+template <typename _DST_T, int _PACK_ROW, typename _Z_T = int8_t>  // zero points always be int8_t, not compressed
+class DecompressKBlockS3Fp {
+ public:
+  template <BTLA_ISA ISA_T, typename _SCA_T, BTLA_DTYPE S3_T>
+  static inline BTLA_CODE forward(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
+                                  int interleave_n_offset, int row, int col, _SCA_T* scales, int8_t* zero_points,
+                                  int k_offset, int kblock, int NPad, void* tmp, size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      ret = avx512f::decompress_kblock_bit3_packrow_fp<S3_T, _DST_T, _PACK_ROW, _SCA_T>(
+          bit2ptr, bit1ptr, dstptr, interleave_n_offset, row, col, scales, zero_points, k_offset, kblock, NPad, tmp,
+          tmpsize);
+    }
+#endif
+    assert(ret == BTLA_CODE::Success);
     return ret;
   }
 };
@@ -473,6 +474,22 @@ class DecompressKBlockS4S8Fp {
     }
     return ref::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                         reinterpret_cast<int8_t*>(tmp), tmpsize);
+  }
+};
+
+template <typename _DST_T>
+class DecompressKBlockS3S8Fp {
+ public:
+  template <BTLA_ISA ISA_T, BTLA_DTYPE S3_T>
+  static inline BTLA_CODE forward(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
+                                  int interleave_n_offset, int unpack_elt, void* tmp, size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+#if CompileAVX512F()
+    ret = avx512f::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                                           reinterpret_cast<int8_t*>(tmp), tmpsize);
+#endif
+    assert(ret == BTLA_CODE::Success);
+    return ret;
   }
 };
 
