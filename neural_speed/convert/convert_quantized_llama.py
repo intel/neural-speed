@@ -106,7 +106,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     out_path = args.outfile.as_posix()
     model_path = args.model.as_posix()
 
-    #model, config, quantize_config = load_quantized_model(model_path)
     model, config, quantize_config = load_quantized_safetensors(model_path)
     f = open(out_path, "wb")
 
