@@ -1064,6 +1064,7 @@ class OutputFile:
 
         self.fout.write(struct.pack("i", 0))  # n_experts
         self.fout.write(struct.pack("i", 0))  # n_expert_used
+        self.fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))

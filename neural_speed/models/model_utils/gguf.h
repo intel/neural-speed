@@ -232,6 +232,7 @@ enum llm_arch {
   LLM_ARCH_CHATGLM2,
   LLM_ARCH_CHATGLM3,
   LLM_ARCH_PHI,
+  LLM_ARCH_GEMMA,
   LLM_ARCH_QWEN2,
   LLM_ARCH_UNKNOWN,
 };
@@ -253,6 +254,7 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {{LLM_ARCH_LLAMA, "llama
                                                          {LLM_ARCH_CHATGLM2, "chatglm2"},
                                                          {LLM_ARCH_CHATGLM3, "chatglm3"},
                                                          {LLM_ARCH_PHI, "phi"},
+                                                         {LLM_ARCH_GEMMA, "gemma"},
                                                          {LLM_ARCH_QWEN2, "qwen2"}};
 
 struct gguf_tensor_info {
@@ -432,6 +434,8 @@ enum llm_kv {
   LLM_KV_ATTENTION_HEAD_COUNT_KV,
   LLM_KV_ATTENTION_MAX_ALIBI_BIAS,
   LLM_KV_ATTENTION_CLAMP_KQV,
+  LLM_KV_ATTENTION_KEY_LENGTH,
+  LLM_KV_ATTENTION_VALUE_LENGTH,
   LLM_KV_ATTENTION_LAYERNORM_EPS,
   LLM_KV_ATTENTION_LAYERNORM_RMS_EPS,
   LLM_KV_NUM_EXPERTS,
@@ -486,6 +490,8 @@ static std::map<llm_kv, std::string> LLM_KV_NAMES = {
     {LLM_KV_ATTENTION_HEAD_COUNT_KV, "%s.attention.head_count_kv"},
     {LLM_KV_ATTENTION_MAX_ALIBI_BIAS, "%s.attention.max_alibi_bias"},
     {LLM_KV_ATTENTION_CLAMP_KQV, "%s.attention.clamp_kqv"},
+    {LLM_KV_ATTENTION_KEY_LENGTH, "%s.attention.key_length"},
+    {LLM_KV_ATTENTION_VALUE_LENGTH, "%s.attention.value_length"},
     {LLM_KV_ATTENTION_LAYERNORM_EPS, "%s.attention.layer_norm_epsilon"},
     {LLM_KV_ATTENTION_LAYERNORM_RMS_EPS, "%s.attention.layer_norm_rms_epsilon"},
 
