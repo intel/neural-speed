@@ -52,6 +52,23 @@ class TestModelServer(unittest.TestCase):
         model = Model()
         # get quantized model
         model.init(model_name, use_quant=True, weight_dtype="int4", compute_dtype="int8")
+        print("=======REFERENCE RESULTS FOR COMPARISON=========", flush=True)
+        print("=======FOR LOOP GREEDY SEARCH GENERATION RESULTS WITH MHA==========", flush=True)
+        for i in range(len(prompts)):
+            p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids
+            output = model.generate(p_token_ids, num_beams=1, max_new_tokens=128, do_sample=False)
+            ans = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+            print(ans, flush=True)
+            print("================================", flush=True)
+        print("=======FOR LOOP BEAM SEARCH GENERATION RESULTS WITH MHA==========", flush=True)
+        for i in range(len(prompts)):
+            p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids
+            output = model.generate(p_token_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30,
+                                    early_stopping=True, do_sample=False, continuous_batching=True,
+                                    max_request_num=4)
+            ans = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+            print(ans, flush=True)
+            print("================================", flush=True)
         del model
         model_path = "./runtime_outs/ne_llama_q_int4_bestla_cint8_g32.bin"
 
@@ -64,14 +81,15 @@ class TestModelServer(unittest.TestCase):
                                         clean_up_tokenization_spaces=False)
             print(f"working_size: {working}, ans:", flush=True)
             for a in ans:
-                print(a)
-                print("=====================================")
+                print(a, flush=True)
+                print("=====================================", flush=True)
 
         log_map = {"auto": "MHA", "f16": "NON-MHA",
                    "greedy": "GREEDY SEARCH", "beam": "BEAM SEARCH"}
         for md in ["auto", "f16"]:
             for policy in ["greedy", "beam"]:
-                print("============={} {} MODEL SERVER TESTING========".format(log_map[md], log_map[policy]))
+                print("============={} {} MODEL SERVER TESTING========".format(log_map[md],
+                                                                        log_map[policy]), flush=True)
                 added_count = 0
                 s = cpp.ModelServer(f_response,
                                     model_path,
@@ -99,7 +117,7 @@ class TestModelServer(unittest.TestCase):
                 while (added_count != len(prompts) or not s.Empty()):
                     time.sleep(1)
                 del s
-                print("should finished")
+                print("should finished", flush=True)
 
 if __name__ == "__main__":
     unittest.main()
