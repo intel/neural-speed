@@ -159,6 +159,7 @@ model_name_map["phi2"]="microsoft/phi-2"
 model_name_map["stablelm"]="stabilityai/stablelm-2-1_6b"
 model_name_map["qwen-1_5"]="Qwen/Qwen1.5-7B-Chat"
 model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
+model_name_map["gemma-2b"]="google/gemma-2b-it"
 model_name_map["mixtral-gptq"]="Mixtral-8x7B-Instruct-v0.1-GPTQ"
 model_name_map["qwen1.5-gptq"]="Qwen/Qwen1.5-7B-Chat-GPTQ"
 model_name_map["qwen-gptq"]="TheBloke/Qwen-7B-Chat-GPTQ"
@@ -166,6 +167,7 @@ model_name_map["phi1.5-gptq"]="phi-1_5-gptq-4bit"
 model_name_map["falcon7b-gptq"]="Falcon-7B-Instruct-GPTQ"
 model_name_map["baichuan13b-gptq"]="Baichuan2-13B-Chat-GPTQ"
 model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
+
 
 function main() {
     conda_env="$1"
@@ -297,6 +299,10 @@ function main() {
         quant_script="./build/bin/quant_mixtral"
         convert_script="${convert_script}/convert_mixtral.py"
         infer_cmd="./build/bin/run_mixtral"
+    elif [[ "${model}" == "gemma-2b" ]]; then
+        quant_script="./build/bin/quant_gemma"
+        convert_script="${convert_script}/convert_gemma.py"
+        infer_cmd="./build/bin/run_gemma"
     elif [[ "${model}" == *"-gptq" ]]; then
         infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
         precision_list+=("default")
@@ -440,7 +446,7 @@ function main() {
                     else
                         real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
                         [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
-                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=1300
+                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=2048
                         if [[ "${model}" == *"gptq" ]]; then
                              NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) $infer_cmd 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
                         else

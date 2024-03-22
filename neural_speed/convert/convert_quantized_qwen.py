@@ -83,6 +83,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))
     f.write(struct.pack("i", 0))  # n_experts
     f.write(struct.pack("i", 0))  # n_expert_used
+    f.write(struct.pack("i", 0)) # n_embd_head_k for gemma
     f.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     f.write(struct.pack("f", 10000.0))  # freq_base
     f.write(struct.pack("f", 1.0))  # rope_factor

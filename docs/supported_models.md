@@ -276,7 +276,21 @@ Neural Speed supports the following models:
     <td>Latest</td>
     <td>2048</td>
   </tr>
-    <tr>
+  <tr>
+    <td><a href="https://huggingface.co/google/gemma-2b-it" target="_blank" rel="noopener noreferrer">gemma-2b-it </a>,
+    <a href="https://huggingface.co/google/gemma-7b" target="_blank" rel="noopener noreferrer">gemma-7b</a></td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td> </td>
+    <td>✅</td>
+    <td> </td>
+    <td> </td>
+    <td> </td>
+    <td>Latest</td>
+    <td>8192</td>
+  </tr>
+  <tr>
     <td><a href="https://huggingface.co/openai/whisper-tiny" target="_blank" rel="noopener noreferrer">Whisper-tiny</a>,
     <a href="https://huggingface.co/openai/whisper-base" target="_blank" rel="noopener noreferrer">Whisper-base</a>
     <a href="https://huggingface.co/openai/whisper-small" target="_blank" rel="noopener noreferrer">Whisper-small</a>

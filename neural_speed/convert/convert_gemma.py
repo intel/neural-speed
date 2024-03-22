@@ -20,15 +20,19 @@
 # This script is similar to "convert-pt-to-ne.py"
 #
 
+import io
+import os
 import sys
 import struct
 import json
+import code
 import torch
 import numpy as np
 from pathlib import Path
 import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
+
 
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
@@ -66,110 +70,117 @@ def main(args_in: Optional[List[str]] = None) -> None:
     dir_model = args.model.as_posix()
     fname_out = args.outfile.as_posix()
 
+    # possible data types
+    #   ftype == 0 -> float32
+    #   ftype == 1 -> float16
     ftype = 0
     if args.outtype == "f16":
         ftype = 1
     if args.model_hub == "modelscope":
-        from modelscope import  AutoModelForCausalLM, AutoTokenizer
+        from modelscope import AutoModelForCausalLM, AutoTokenizer
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer
     print("Loading model: ", dir_model)
-    model = AutoModelForCausalLM.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
-    tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(dir_model)
+    tokenizer = AutoTokenizer.from_pretrained(dir_model)
+    model.eval()
+    for p in model.parameters():
+        p.requires_grad = False
     hparams = model.config.to_dict()
-    list_vars = model.state_dict()
+    print("Model loaded: ", dir_model)
+
     fout = open(fname_out, "wb")
 
-    fout.write(b"ggjt"[::-1])  #0x67676d6c)) # magic: ggml in hex
-    values = [
-        1,  # file version
-        hparams["vocab_size"],
-        hparams["n_embd"],
-        hparams["n_embd"] // hparams["n_head"],
-        hparams["n_head"],
-        hparams.get("n_head_kv", 0),  # multi-query attention
-        hparams["n_layer"],
-        hparams["rotary_dim"],
-        ftype
-    ]
-    fout.write(struct.pack("i" * len(values), *values))
-    fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("f", 0))
-    fout.write(struct.pack("f", 0))
+    # 0x67676d6c is unversioned ne
+    # 0x67676d66 is versioned ggmf (requires token scores)
+    ne_file_magic = 0x67676d66
+    #ne_file_version = 0x00000001 # v1
+
+    fout.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
+    fout.write(struct.pack("i", 1))
+    fout.write(struct.pack("i", hparams["vocab_size"]))
+    fout.write(struct.pack("i", hparams["hidden_size"]))
+    fout.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
+    fout.write(struct.pack("i", hparams["num_attention_heads"]))
+    fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
+    fout.write(struct.pack("i", hparams["num_hidden_layers"]))
+    fout.write(struct.pack("i", hparams["head_dim"]))
+    fout.write(struct.pack("i", ftype))
+    fout.write(
+        struct.pack("i", hparams["seq_length"] if "seq_length" in hparams else hparams["max_position_embeddings"]))
+    fout.write(struct.pack("f", 0.0))
+    fout.write(struct.pack("f", 0.0))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", 0))
+    fout.write(struct.pack("i", hparams["intermediate_size"]))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
-    fout.write(struct.pack("f", hparams.get("layer_norm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
+    fout.write(struct.pack("i", hparams["head_dim"])) # n_embd_head_k
+    fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
 
-    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
-
-    fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else 1))
-    fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else 2))
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
+    fout.write(struct.pack("i", hparams["bos_token_id"]))
+    fout.write(struct.pack("i", hparams["eos_token_id"]))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.sep_token_id if tokenizer.sep_token_id is not None else -1))
 
-    byte_encoder = bytes_to_unicode()
-    byte_decoder = {v: k for k, v in byte_encoder.items()}
-
-    encoder = tokenizer.vocab
-    # Add added_tokens (special tokens) to the encoder
-    encoder_added = tokenizer.get_added_vocab()
-
-    for i, key in enumerate(sorted(encoder, key=encoder.get)):
-        # for key in encoder:
-        text = bytearray([byte_decoder[c] for c in key])
-        fout.write(struct.pack("i", len(text)))
-        fout.write(text)
-        if key not in encoder_added:
+    for i in range(hparams["vocab_size"]):
+        if i < tokenizer.vocab_size:
+            text = tokenizer.decode([i]).encode('utf-8')
+            fout.write(struct.pack("i", len(text)))
+            fout.write(text)
             fout.write(struct.pack("f", 0.0 - i))
         else:
+            text = tokenizer.decode([tokenizer.vocab_size - 1]).encode('utf-8')
+            fout.write(struct.pack("i", len(text)))
+            fout.write(text)
             fout.write(struct.pack("f", -10000))
 
-    for name in list_vars.keys():
-        data = list_vars[name].squeeze().numpy()
-        print("Processing variable: " + name + " with shape: ", data.shape)
+    list_vars = model.state_dict()
 
-        # we don't need these
-        if name.endswith("attn.masked_bias") or name.endswith(".attn.bias"):
-            print("  Skipping variable: " + name)
-            continue
+    print(hparams)
+
+    for name in list_vars.keys():
+        # No gradients for these
+        list_vars[name].requires_grad = False
+        src = name
+        nn = name
+
+        print(src, ' -> ', name)
+        data = list_vars[src].squeeze().numpy()
+        data = data.astype(np.float32)
 
         n_dims = len(data.shape)
+        print(name, n_dims, data.shape)
 
-        # ftype == 0 -> float32, ftype == 1 -> float16
+        # default type is fp32
         ftype_cur = 0
-        if ftype != 0:
-            if name[-7:] == ".weight" and n_dims == 2:
-                print("  Converting to float16")
-                data = data.astype(np.float16)
-                ftype_cur = 1
-            else:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
-                ftype_cur = 0
+        if ftype == 1 and n_dims > 1:
+            print("  Converting to float16", data.shape, data[:3, :3].tolist())
+            data = data.astype(np.float16)
+            ftype_cur = 1
         else:
-            if data.dtype != np.float32:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
-                ftype_cur = 0
-
+            print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
+            data = data.astype(np.float32)
+        # gemma_rms:
+        # output = self._norm(x.float()).type_as(x)
+        # return output * (1 + self.weight)
+        if "norm" in name:
+            data = data + 1
         str = name.encode('utf-8')
-        shape = data.shape
         fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
-        fout.write(struct.pack("i" * n_dims, *shape[::-1]))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        print(str)
         fout.write(str)
-        fout.seek((fout.tell() + 31) & -32)
 
         # data
         data.tofile(fout)
