@@ -27,9 +27,9 @@ class UT_Memcpy2D_AVX512F {
       kernel::jit::JitMemcpy2DAvx512f::forward<float, float>(src.data(), dst.data(), row, col, srcstep, dststep);
     }
     tm.start();
-    parallel::Scheduler2D para({DefaultThreading.num_threads(), row, col, 4, 64});
+    parallel::Scheduler2D para({UT_Threading::get()->num_threads(), row, col, 4, 64, 0, 0});
     for (size_t i = 0; i < TestLoop; i++) {
-      DefaultThreading.parallel_for([&](int tidx) {
+      UT_Threading::get()->parallel_for([&](int tidx) {
         parallel::ThreadProblem2D thdp{tidx};
         para.getIndex(thdp);
         if (thdp.valid) {
@@ -47,7 +47,7 @@ class UT_Memcpy2D_AVX512F {
 
     tm.start();
     for (size_t i = 0; i < TestLoop; i++) {
-      DefaultThreading.parallel_for([&](int tidx) {
+      UT_Threading::get()->parallel_for([&](int tidx) {
         parallel::ThreadProblem2D thdp{tidx};
         para.getIndex(thdp);
         if (thdp.valid) {
@@ -286,7 +286,7 @@ class UT_DecompressS4S8 {
     aligned_vector<int4x2> src(row * col / 2);
     aligned_vector<int8_t> src8(row * col);
     ut::fill_buffer_randn(src8.data(), src8.size(), int8_t(-128), int8_t(127));
-    kernel::ref::compress_s8_s4<48>(src8.data(), src.data(), row, col, col, col);
+    kernel::ref::compress_s8_s4(src8.data(), src.data(), row, col, col, col);
     aligned_vector<int8_t> ref(row * col), tar(row * col);
     kernel::ref::decompress_s4_s8<BTLA_DTYPE::S4_CLIP>(src.data(), ref.data(), row, col, col, col);
     kernel::jit::decompress_s4_s8(src.data(), tar.data(), row, col, col, col);
