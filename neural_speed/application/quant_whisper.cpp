@@ -23,6 +23,7 @@
 #include "models/model_utils/quant_utils.h"
 #include "common.h"
 
+inline bool exists_model(const std::string& name) { return (access(name.c_str(), F_OK) != -1); }
 int main(int argc, char** argv) {
   quant_params q_params;
   if (quant_params_parse(argc, argv, q_params) == false) {
@@ -52,9 +53,13 @@ int main(int argc, char** argv) {
   // load the model
   {
     const int64_t t_start_us = ne_time_us();
-
-    if (!whisper_model_quantize(fname_inp, fname_out, ne_ftype(ftype))) {
-      fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
+    if (exists_model(fname_inp)) {
+      if (!whisper_model_quantize(fname_inp, fname_out, ne_ftype(ftype))) {
+        fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
+        return 1;
+      }
+    } else {
+      fprintf(stderr, "%s: model is not exist '%s'\n", __func__, fname_inp.c_str());
       return 1;
     }
 
