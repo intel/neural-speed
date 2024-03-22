@@ -23,6 +23,8 @@
 #include "models/model_utils/quant_utils.h"
 #include "common.h"
 
+#define F_OK 0
+
 inline bool exists_model(const std::string& name) { return (access(name.c_str(), F_OK) != -1); }
 int main(int argc, char** argv) {
   quant_params q_params;
