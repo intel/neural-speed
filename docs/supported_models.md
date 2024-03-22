@@ -219,7 +219,8 @@ Neural Speed supports the following models:
   </tr>
   <tr>
     <td><a href="https://huggingface.co/THUDM/chatglm-6b" target="_blank" rel="noopener noreferrer">ChatGLM-6B</a>,
-    <a href="https://huggingface.co/THUDM/chatglm2-6b" target="_blank" rel="noopener noreferrer">ChatGLM2-6B</a></td>
+    <a href="https://huggingface.co/THUDM/chatglm2-6b" target="_blank" rel="noopener noreferrer">ChatGLM2-6B</a>,
+    <a href="https://huggingface.co/THUDM/chatglm3-6b" target="_blank" rel="noopener noreferrer">ChatGLM3-6B</a></td>
     <td>✅</td>
     <td> </td>
     <td> </td>
@@ -267,10 +268,13 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>✅</td>
     <td> </td>
     <td> </td>
+    <td> </td>
     <td>Latest</td>
+    <td>2048</td>
   </tr>
     <tr>
     <td><a href="https://huggingface.co/openai/whisper-tiny" target="_blank" rel="noopener noreferrer">Whisper-tiny</a>,
