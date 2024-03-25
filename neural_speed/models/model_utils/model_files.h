@@ -1138,15 +1138,15 @@ struct model_file_loader {
     printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++,
            hparams.original_max_position_embeddings);
     printf("%-16s %d.hparams.use_yarn = %-30d\n", __func__, count++, hparams.use_yarn);
-    unsigned int total = 25;
+    unsigned int total = 26;
     if (count != total) {
-      fprintf(stderr, "The number of ne_parameters is wrong.\n");
+      fprintf(stderr, "The number of ne_parameters is wrong, total = %d, count = %d.\n", total, count);
     }
   }
 
   void load_ne_vocab() {
     unsigned int count = 0;
-    unsigned int ne_hparams_total = 25;
+    unsigned int ne_hparams_total = 26;
     file.read_raw(&vocab.bos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.eos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.pad_token_id, sizeof(model_vocab::id));
