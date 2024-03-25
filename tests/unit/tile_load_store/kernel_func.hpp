@@ -100,9 +100,9 @@ struct tile_load_store_func {
             sycl::ext::intel::esimd::block_load<uint32_t, bwidth>(
                 shuf_idx + col);
         auto shuf_vec = sycl::ext::intel::esimd::gather<dtype, bwidth>(
-            a + row * dst_swidth + bwidth, cur_shuf_idx);
+            a + row * dst_swidth, cur_shuf_idx);
         sycl::ext::intel::esimd::block_store(
-            c + row * dst_spitch + bwidth, shuf_vec);
+            c + row * dst_spitch + col, shuf_vec);
       }
     }
 

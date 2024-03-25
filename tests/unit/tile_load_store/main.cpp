@@ -169,7 +169,16 @@ using namespace std::placeholders;
 TEST(tile_load_store, esimd) {
   cl::sycl::nd_range<1> nd_range({1}, {1});
   auto result_validate = std::bind(
-      tile_load_store_result_validate<fp16>, _1, _2, _3, 128, 64, 32, 32, 0);
+      tile_load_store_result_validate<fp16>,
+      _1,
+      _2,
+      _3,
+      _4,
+      128,
+      64,
+      32,
+      32,
+      0);
   kernel_run<
       fp16,
       tile_load_store_func<

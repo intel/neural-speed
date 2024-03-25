@@ -22,6 +22,7 @@ int tile_load_store_result_validate(
     dtype* A,
     [[maybe_unused]] dtype* B,
     dtype* C,
+    uint32_t* shuf_idx,
     unsigned Sizex,
     unsigned Sizey,
     unsigned Blockx,
@@ -35,7 +36,8 @@ int tile_load_store_result_validate(
     Size = Blockx * Blocky;
     for (unsigned i = 0; i < Blocky; ++i) {
       for (unsigned j = 0; j < Blockx; ++j) {
-        a_index = transpose ? j * Sizey + i : i * Sizex + j;
+        // a_index = transpose ? j * Sizey + i : i * Sizex + j;
+        a_index = i * Sizex + shuf_idx[j] / sizeof(dtype);
         c_index = i / ele_per_dw * Sizex * ele_per_dw + j * ele_per_dw +
             i % ele_per_dw;
 

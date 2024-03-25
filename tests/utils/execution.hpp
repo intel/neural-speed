@@ -246,7 +246,8 @@ void kernel_run(auto nd_range, auto validate_result) {
   auto host_shuf_idx = reinterpret_cast<uint32_t*>(
       malloc(KERNEL::shuf_idx_len * sizeof(uint32_t)));
   for (int i = 0; i < KERNEL::shuf_idx_len; i++) {
-    host_shuf_idx[i] = random_int(0, KERNEL::mem_block_width - 1);
+    host_shuf_idx[i] =
+        random_int(0, KERNEL::mem_block_width - 1) * sizeof(data_type);
   }
 
   auto dev_shuf_idx = malloc_device<uint32_t>(KERNEL::shuf_idx_len, queue);
@@ -274,7 +275,7 @@ void kernel_run(auto nd_range, auto validate_result) {
   auto B_host = alloc_host_and_copy<data_type>(B, Size, queue);
   auto C_host = alloc_host_and_copy<data_type>(C, Size, queue);
 
-  ASSERT_EQ(0, validate_result(A_host, B_host, C_host));
+  ASSERT_EQ(0, validate_result(A_host, B_host, C_host, host_shuf_idx));
 
   free(A, context);
   free(B, context);
