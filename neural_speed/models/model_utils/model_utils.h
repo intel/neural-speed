@@ -341,14 +341,21 @@ struct beam_hypotheses {
 
   int len() { return beams.size(); }
 
-  void add(beam b, const uint32_t& n_prompt_tokens) {
+  void add(beam b, const uint32_t& n_prompt_tokens, const bool penalize_prompt=false) {
     auto comp = [](const beam& a, const beam& b) { return a.score > b.score; };
     uint32_t cur_len = b.eos() ? b.token_ids.size() - 1 : b.token_ids.size();
-    float score = b.score / std::pow(cur_len + n_prompt_tokens, length_penalty);
+    float score;
+    // reference: https://github.com/huggingface/transformers/blob/v4.38.2/src/transformers/generation/beam_search.py#L954-L960
+    if (penalize_prompt) {
+      score = b.score / std::pow(cur_len + n_prompt_tokens, length_penalty);
+    } else {
+      score = b.score / std::pow(cur_len, length_penalty);
+    }
 #ifdef NS_BEAM_SEARCH_VERBOSE_ON
     printf("add beam hypos: \n");
     b.print();
-    printf("origin_score: %12.6f, new_score: %12.6f, sentence_len: %d \n", b.score, score, cur_len + n_prompt_tokens);
+    printf("origin_score: %12.6f, new_score: %12.6f, generated_len: %d, sentence_len: %d \n", b.score, score,
+            cur_len, cur_len + n_prompt_tokens);
     printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n");
 #endif
     b.score = score;
