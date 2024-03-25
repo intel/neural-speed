@@ -94,20 +94,52 @@ struct tile_load_store_func {
     // tile_prefetch(payload_prefetch);
     // tile_load(matA, payload_load);
 
-    for (int row = 0; row < theight; row++) {
-      for (int col = 0; col < twidth; col += bwidth) {
+    // for (int row = 0; row < theight; row++) {
+    //   for (int col = 0; col < twidth; col += bwidth) {
+    //     auto cur_shuf_idx =
+    //         sycl::ext::intel::esimd::block_load<uint32_t, bwidth>(
+    //             shuf_idx + col);
+    //     // matC.reg.xetla_select<bwidth,1>(row*twidth + col) =
+    //     sycl::ext::intel::esimd::gather<dtype, bwidth>(
+    //     //     a + row * dst_swidth, cur_shuf_idx);
+    //     auto shuf_vec = sycl::ext::intel::esimd::gather<dtype, bwidth>(
+    //         a + row * dst_swidth, cur_shuf_idx);
+    //     sycl::ext::intel::esimd::block_store(
+    //         c + row * dst_spitch + col, shuf_vec);
+    //   }
+    // }
+
+    static constexpr int block_y_num = theight / bheight;
+    static constexpr int block_x_num = twidth / bwidth;
+    static constexpr int elt_per_block = bwidth * bheight;
+
+    for (int block_y = 0; block_y < block_y_num; block_y++) {
+      for (int block_x = 0; block_x < block_x_num; block_x++) {
         auto cur_shuf_idx =
             sycl::ext::intel::esimd::block_load<uint32_t, bwidth>(
-                shuf_idx + col);
-        auto shuf_vec = sycl::ext::intel::esimd::gather<dtype, bwidth>(
-            a + row * dst_swidth, cur_shuf_idx);
-        sycl::ext::intel::esimd::block_store(
-            c + row * dst_spitch + col, shuf_vec);
+                shuf_idx + block_x * bwidth);
+        auto block_idx = block_y * block_x_num + block_x;
+        for (int row = 0; row < bheight; row++) {
+          matC.reg.xetla_select<bwidth, 1>(
+              block_idx * elt_per_block + row * bwidth) =
+              sycl::ext::intel::esimd::gather<dtype, bwidth>(
+                  a + block_y * bheight * dst_swidth + row * dst_swidth,
+                  cur_shuf_idx);
+        }
       }
     }
 
     // matC.reg = matA.reg;
-    // tile_store(matC, payload_store);
+
+    // for(int i=0;i<twidth;i++){
+    //     for(int j=0;j<theight;j++){
+    // sycl::ext::oneapi::experimental::printf("%d ",
+    // (int)(half)matC.reg[i*theight+j]);
+    //     }
+    // sycl::ext::oneapi::experimental::printf("\n");
+    // }
+
+    tile_store(matC, payload_store);
   }
   static constexpr int shuf_idx_len = twidth;
   static constexpr int mem_block_width = dst_swidth;
