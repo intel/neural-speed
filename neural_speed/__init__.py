@@ -366,6 +366,7 @@ class Model:
                 print("Please input an audio file")
             return
         if isinstance(model_input, torch.Tensor):
+            import numpy as np
             batch_size = model_input.shape[0]
             logits_seq_len_dim = model_input.shape[1] if logits_all else 1
             self.reinit_from_bin = False
@@ -385,7 +386,6 @@ class Model:
             raw_logits = self.model.evaluate(model_input_list, logits_all)
             ignore_padding = kwargs.get("ignore_padding", False)
             if not ignore_padding and batch_size > 1:
-                import numpy as np
                 padding_side = kwargs.get("padding_side", "left")
                 for i in range(len(raw_logits)):
                     padding_row = np.ones((logits_seq_len_dim - raw_logits[i].shape[0], raw_logits[i].shape[1]))
