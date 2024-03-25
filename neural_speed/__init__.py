@@ -22,21 +22,7 @@ from neural_speed.convert import convert_model
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 max_request_num_default = 1
 
-
-class Model:
-
-    def __init__(self):
-        self.module = None
-        self.model = None
-        self.model_type = None
-        self.bin_file = None
-        self.generate_round = 0
-        self.max_request_num = -1
-        self.reinit_from_bin = False
-
-    def __import_package(self, model_type):
-        if self.module:
-            return
+def _import_package(model_type):
         if model_type == "gptj":
             import neural_speed.gptj_cpp as cpp_model
         elif model_type == "falcon":
@@ -81,28 +67,62 @@ class Model:
             import neural_speed.mixtral_cpp as cpp_model
         else:
             raise TypeError("Unsupported model type {}!".format(model_type))
-        self.module = cpp_model
+        return cpp_model
 
-    @staticmethod
-    def get_model_type(model_config):
-        model_type = model_maps.get(model_config.model_type, model_config.model_type)
-        if model_type == "chatglm" and "chatglm2" in model_config._name_or_path:
-            model_type = "chatglm2"
+def _get_model_config(model_name, model_hub="huggingface"):
+    if model_hub == "modelscope":
+        from modelscope import AutoConfig
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    else:
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    return config
 
-        # For ChatGLM3
-        if model_type == "chatglm" and "chatglm3" in model_config._name_or_path:
-            # due to the same model architecture.
-            model_type = "chatglm2"
+def _get_model_type(model_config):
+    model_type = model_maps.get(model_config.model_type, model_config.model_type)
+    if model_type == "chatglm" and "chatglm2" in model_config._name_or_path:
+        model_type = "chatglm2"
 
-        # for TheBloke/falcon-40b-instruct-GPTQ & TheBloke/Falcon-7B-Instruct-GPTQ
-        if model_type == "RefinedWebModel" or model_type == "RefinedWeb":
-            model_type = "falcon"
+    # For ChatGLM3
+    if model_type == "chatglm" and "chatglm3" in model_config._name_or_path:
+        # due to the same model architecture.
+        model_type = "chatglm2"
 
-        # for TheBloke/phi-2-GPTQ
-        if model_type == "phi-msft":
-            model_type = "phi"
+    # for TheBloke/falcon-40b-instruct-GPTQ & TheBloke/Falcon-7B-Instruct-GPTQ
+    if model_type == "RefinedWebModel" or model_type == "RefinedWeb":
+        model_type = "falcon"
 
-        return model_type
+    # for TheBloke/phi-2-GPTQ
+    if model_type == "phi-msft":
+        model_type = "phi"
+
+    return model_type
+
+def _filter_model_args(valid_args, **input_kwargs):
+        invalid_args = []
+        for k in input_kwargs.keys():
+            if k not in valid_args:
+                invalid_args.append(k)
+        for k in invalid_args:
+            input_kwargs.pop(k)
+        return input_kwargs
+
+def get_cpp_module(model_name, model_hub="huggingface"):
+    model_config = _get_model_config(model_name, model_hub=model_hub)
+    model_type = _get_model_type(model_config)
+    cpp_module = _import_package(model_type)
+    return cpp_module
+
+class Model:
+
+    def __init__(self):
+        self.module = None
+        self.model = None
+        self.model_type = None
+        self.bin_file = None
+        self.generate_round = 0
+        self.max_request_num = -1
+        self.reinit_from_bin = False
 
     def init(self,
              model_name,
@@ -117,15 +137,11 @@ class Model:
              compute_dtype="int8",
              use_ggml=False,
              model_hub="huggingface"):
-        if model_hub == "modelscope":
-            from modelscope import AutoConfig
-            self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        else:
-            from transformers import AutoConfig
-            self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        model_type = Model.get_model_type(self.config)
+        self.config = _get_model_config(model_name, model_hub=model_hub)
+        model_type = _get_model_type(self.config)
         self.model_type = model_type
-        self.__import_package(model_type)
+        if self.module is None:
+            self.module = _import_package(model_type)
 
         # check cache and quantization
         output_path = "runtime_outs"
@@ -182,7 +198,8 @@ class Model:
         os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
-        self.__import_package(model_type)
+        if self.module is None:
+            self.module = _import_package(model_type)
         self.model = self.module.Model()
 
         if self.max_request_num == -1:
@@ -272,10 +289,16 @@ class Model:
                         else:
                             generate_kwargs["scratch_size_ratio"] = 35
 
-        self.model.init_model(model_path, **self._filter_model_init_args(**generate_kwargs))
+        valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
+                      "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
+                      "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
+                      "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
+                      "scratch_size_ratio"}
+        self.model.init_model(model_path, **_filter_model_args(valid_args, **generate_kwargs))
 
     def quant_model(self, model_type, model_path, out_path, **quant_kwargs):
-        self.__import_package(model_type)
+        if self.module is None:
+            self.module = _import_package(model_type)
         self.module.Model.quant_model(model_path=model_path, out_path=out_path, **quant_kwargs)
 
     def generate(self,
@@ -435,16 +458,25 @@ class Model:
             input_list = input_ids.tolist()
         return input_list
 
-    def _filter_model_init_args(self, **init_kwargs):
+
+class ModelServer:
+    def __init__(self, model_name, reponse_function, model_path, **server_kwargs):
+        if not os.path.exists(model_path):
+            raise ValueError("model file {} does not exist.".format(model_path))
+        self.module = get_cpp_module(model_name)
         valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
                       "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
                       "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
                       "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
-                      "scratch_size_ratio"}
-        invalid_args = []
-        for k in init_kwargs.keys():
-            if k not in valid_args:
-                invalid_args.append(k)
-        for k in invalid_args:
-            init_kwargs.pop(k)
-        return init_kwargs
+                      "scratch_size_ratio", "return_prompt", "print_log", "init_cb"}
+        self.cpp_server = self.module.ModelServer(reponse_function,
+                                                  model_path,
+                                                  **_filter_model_args(valid_args, **server_kwargs))
+
+    def issueQuery(self, index, token_ids):
+        self.cpp_server.issueQuery([self.module.Query(index, token_ids)])
+
+    def Empty(self):
+        return self.cpp_server.Empty()
+
+__all__ = ["get_cpp_module", "Model", "ModelServer"]

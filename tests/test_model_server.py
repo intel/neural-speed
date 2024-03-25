@@ -15,8 +15,7 @@
 import time
 import unittest
 import shutil
-from neural_speed import Model
-import neural_speed.llama_cpp as cpp
+from neural_speed import Model, ModelServer
 from transformers import AutoTokenizer
 
 class TestModelServer(unittest.TestCase):
@@ -91,24 +90,25 @@ class TestModelServer(unittest.TestCase):
                 print("============={} {} MODEL SERVER TESTING========".format(log_map[md],
                                                                         log_map[policy]), flush=True)
                 added_count = 0
-                s = cpp.ModelServer(f_response,
-                                    model_path,
-                                    max_new_tokens=128,
-                                    num_beams=4 if policy == "beam" else 1,
-                                    min_new_tokens=30,
-                                    early_stopping=True,
-                                    do_sample=False,
-                                    continuous_batching=True,
-                                    return_prompt=True,
-                                    max_request_num=8,
-                                    threads=56,
-                                    print_log=False,
-                                    scratch_size_ratio = 1.0,
-                                    memory_dtype= md,
+                s = ModelServer(model_name,
+                                f_response,
+                                model_path,
+                                max_new_tokens=128,
+                                num_beams=4 if policy == "beam" else 1,
+                                min_new_tokens=30,
+                                early_stopping=True,
+                                do_sample=False,
+                                continuous_batching=True,
+                                return_prompt=True,
+                                max_request_num=8,
+                                threads=56,
+                                print_log=False,
+                                scratch_size_ratio = 1.0,
+                                memory_dtype= md,
                                 )
                 for i in range(len(prompts)):
                     p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
-                    s.issueQuery([cpp.Query(i, p_token_ids)])
+                    s.issueQuery(i, p_token_ids)
                     added_count += 1
                     time.sleep(2)  # adjust query sending time interval
 

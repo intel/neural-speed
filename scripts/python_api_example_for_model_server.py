@@ -2,7 +2,7 @@ import time
 import argparse
 from pathlib import Path
 from typing import List, Optional
-import neural_speed.llama_cpp as cpp
+from neural_speed import ModelServer
 from transformers import AutoTokenizer
 
 
@@ -92,30 +92,31 @@ def main(args_in: Optional[List[str]] = None) -> None:
             print("=====================================")
 
     added_count = 0
-    s = cpp.ModelServer(f_response,
-                        str(args.model_path),
-                        max_new_tokens=args.max_new_tokens,
-                        num_beams=args.num_beams,
-                        min_new_tokens=args.min_new_tokens,
-                        early_stopping=args.early_stopping,
-                        do_sample=args.do_sample,
-                        continuous_batching=True,
-                        return_prompt=args.return_prompt,
-                        threads=args.threads,
-                        max_request_num=args.max_request_num,
-                        print_log=args.print_log,
-                        scratch_size_ratio = args.scratch_size_ratio,
-                        memory_dtype= args.memory_dtype,
-                        ctx_size=args.ctx_size,
-                        seed=args.seed,
-                        top_k=args.top_k,
-                        top_p=args.top_p,
-                        repetition_penalty=args.repeat_penalty,
-                        temperature=args.temperature,
+    s = ModelServer(args.model_name,
+                    f_response,
+                    str(args.model_path),
+                    max_new_tokens=args.max_new_tokens,
+                    num_beams=args.num_beams,
+                    min_new_tokens=args.min_new_tokens,
+                    early_stopping=args.early_stopping,
+                    do_sample=args.do_sample,
+                    continuous_batching=True,
+                    return_prompt=args.return_prompt,
+                    threads=args.threads,
+                    max_request_num=args.max_request_num,
+                    print_log=args.print_log,
+                    scratch_size_ratio = args.scratch_size_ratio,
+                    memory_dtype= args.memory_dtype,
+                    ctx_size=args.ctx_size,
+                    seed=args.seed,
+                    top_k=args.top_k,
+                    top_p=args.top_p,
+                    repetition_penalty=args.repeat_penalty,
+                    temperature=args.temperature,
                     )
     for i in range(len(prompts)):
         p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
-        s.issueQuery([cpp.Query(i, p_token_ids)])
+        s.issueQuery(i, p_token_ids)
         added_count += 1
         time.sleep(2)  # adjust query sending time interval
 
