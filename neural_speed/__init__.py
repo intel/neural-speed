@@ -393,7 +393,7 @@ class Model:
                         raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
                     else:
                         raw_logits[i] = np.vstack((raw_logits[i], padding_row * (-np.inf)))
-            return raw_logits
+            return np.array(raw_logits)
         else:
             print("Please input torch.Tensor")
         return
