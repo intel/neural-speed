@@ -26,6 +26,10 @@ using namespace cl::sycl;
 using namespace gpu;
 using namespace gpu::xetla;
 
+int random_int(int low, int high) {
+  return low + (rand() % (high - low + 1));
+}
+
 template <
     class Test,
     typename validate_func,
@@ -239,12 +243,25 @@ void kernel_run(auto nd_range, auto validate_result) {
       device,
       context);
 
+  auto host_shuf_idx = reinterpret_cast<uint32_t*>(
+      malloc(KERNEL::shuf_idx_len * sizeof(uint32_t)));
+  for (int i = 0; i < KERNEL::shuf_idx_len; i++) {
+    host_shuf_idx[i] = random_int(0, KERNEL::mem_block_width - 1);
+  }
+
+  auto dev_shuf_idx = malloc_device<uint32_t>(KERNEL::shuf_idx_len, queue);
+
+  queue
+      .memcpy(
+          dev_shuf_idx, host_shuf_idx, KERNEL::shuf_idx_len * sizeof(uint32_t))
+      .wait();
+
   try {
     auto e_esimd = queue.submit([&](handler& cgh) {
       cgh.parallel_for<>(nd_range, [=](nd_item<1> ndi) KERNEL_MAIN {
         gpu::xetla::xetla_local_init<SLMSIZE>();
         gpu::xetla::xetla_nbarrier_init<BARNUM>();
-        KERNEL::run(&ndi, A, B, C);
+        KERNEL::run(&ndi, A, B, C, dev_shuf_idx);
       });
     });
     e_esimd.wait();
@@ -262,10 +279,12 @@ void kernel_run(auto nd_range, auto validate_result) {
   free(A, context);
   free(B, context);
   free(C, context);
+  free(dev_shuf_idx, context);
 
   free(A_host);
   free(B_host);
   free(C_host);
+  free(host_shuf_idx);
 }
 
 /// @brief Using gpu_arch of current machine to run F<arch>::exec

@@ -39,7 +39,8 @@ struct tile_load_store_func {
       [[maybe_unused]] sycl::nd_item<1>* item,
       dtype* a,
       [[maybe_unused]] dtype* b,
-      dtype* c) {
+      dtype* c,
+      uint32_t* shuf_idx) {
     constexpr int ele_per_dw = transform ? sizeof(uint32_t) / sizeof(dtype) : 1;
 
     static constexpr reg_layout a_reg_layout =
@@ -90,11 +91,26 @@ struct tile_load_store_func {
     payload_load_t payload_load(mem_desc_a);
     prefetch_payload_t payload_prefetch(mem_desc_a);
     payload_store_t payload_store(mem_desc_c);
-    tile_prefetch(payload_prefetch);
-    tile_load(matA, payload_load);
-    matC.reg = matA.reg;
-    tile_store(matC, payload_store);
+    // tile_prefetch(payload_prefetch);
+    // tile_load(matA, payload_load);
+
+    for (int row = 0; row < theight; row++) {
+      for (int col = 0; col < twidth; col += bwidth) {
+        auto cur_shuf_idx =
+            sycl::ext::intel::esimd::block_load<uint32_t, bwidth>(
+                shuf_idx + col);
+        auto shuf_vec = sycl::ext::intel::esimd::gather<dtype, bwidth>(
+            a + row * dst_swidth + bwidth, cur_shuf_idx);
+        sycl::ext::intel::esimd::block_store(
+            c + row * dst_spitch + bwidth, shuf_vec);
+      }
+    }
+
+    // matC.reg = matA.reg;
+    // tile_store(matC, payload_store);
   }
+  static constexpr int shuf_idx_len = twidth;
+  static constexpr int mem_block_width = dst_swidth;
 };
 
 template <
