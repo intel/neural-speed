@@ -63,7 +63,7 @@ struct tile_load_store_func {
     using payload_load_t = mem_payload_t<
         mem_desc_t<dtype, a_mem_layout, mem_space::global>,
         tile_desc_a,
-        msg_type::block_2d,
+        msg_type::shuf_block_2d,
         arch_tag>;
     using prefetch_payload_t = prefetch_payload_t<
         mem_desc_t<dtype, a_mem_layout, mem_space::global>,
@@ -88,7 +88,7 @@ struct tile_load_store_func {
          dst_spitch * ele_per_dw},
         {0, 0});
 
-    payload_load_t payload_load(mem_desc_a);
+    payload_load_t payload_load(mem_desc_a, shuf_idx);
     prefetch_payload_t payload_prefetch(mem_desc_a);
     payload_store_t payload_store(mem_desc_c);
     // tile_prefetch(payload_prefetch);
@@ -117,7 +117,7 @@ struct tile_load_store_func {
       for (int block_x = 0; block_x < block_x_num; block_x++) {
         auto cur_shuf_idx =
             sycl::ext::intel::esimd::block_load<uint32_t, bwidth>(
-                shuf_idx + block_x * bwidth);
+                payload_load.shuf_ptr + block_x * bwidth);
         auto block_idx = block_y * block_x_num + block_x;
         for (int row = 0; row < bheight; row++) {
           matC.reg.xetla_select<bwidth, 1>(

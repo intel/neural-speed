@@ -900,20 +900,23 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     uint32_t alignment_,
-    gpu_arch arch_tag_>
+    gpu_arch arch_tag_,
+    msg_type msg_type_>
 struct mem_payload_t<
     mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
     tile_desc_,
-    msg_type::block_2d,
+    msg_type_,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::Dg2)>> {
+  static_assert(
+      msg_type_ == msg_type::block_2d || msg_type_ == msg_type::shuf_block_2d);
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
-  static constexpr msg_type message_type = msg_type::block_2d;
+  static constexpr msg_type message_type = msg_type_;
   static constexpr uint32_t alignment_in_bytes = mem_desc_t::alignment_in_bytes;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
@@ -929,7 +932,7 @@ struct mem_payload_t<
       : block_size_x * sizeof(dtype);
 
   using this_payload_t =
-      mem_payload_t<mem_desc_t, tile_desc, msg_type::block_2d, arch_tag_>;
+      mem_payload_t<mem_desc_t, tile_desc, msg_type_, arch_tag_>;
 
  public:
   static constexpr bool mem_transpose = memory_layout == mem_layout::col_major;
@@ -947,6 +950,7 @@ struct mem_payload_t<
   static constexpr uint32_t block_bytes =
       block_size_x * block_size_y * sizeof(dtype);
 
+  uint32_t* shuf_ptr;
   //     using mem_dtype = uint32_t;
   using mem_dtype = typename std::conditional<
       (block_per_row_bytes % sizeof(uint64_t) == 0),
@@ -991,6 +995,11 @@ struct mem_payload_t<
     xetla_vector<uint32_t, num_channel> channel_index =
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
     channel_offset = channel_index * pitch_in_bytes;
+  }
+
+  inline mem_payload_t(mem_desc_t& mem_tdesc, uint32_t* shuf_idx)
+      : mem_payload_t(mem_tdesc) {
+    shuf_ptr = shuf_idx;
   }
 
   inline mem_payload_t(

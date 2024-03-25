@@ -81,7 +81,8 @@ enum class msg_type : uint8_t {
   block_1d = 1,
   scatter = 2,
   atomic_add = 3,
-  unaligned_2d = 4
+  unaligned_2d = 4,
+  shuf_block_2d = 5
   // prefetch_2d = 4,
   // prefetch_1d = 5
 };
