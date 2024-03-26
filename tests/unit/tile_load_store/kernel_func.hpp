@@ -113,18 +113,25 @@ struct tile_load_store_func {
     static constexpr int block_x_num = twidth / bwidth;
     static constexpr int elt_per_block = bwidth * bheight;
 
+    half LUT[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+
     for (int block_y = 0; block_y < block_y_num; block_y++) {
       for (int block_x = 0; block_x < block_x_num; block_x++) {
         auto cur_shuf_idx =
             sycl::ext::intel::esimd::block_load<uint32_t, bwidth>(
                 payload_load.shuf_ptr + block_x * bwidth);
+        xetla_vector<uint32_t, bwidth> test_shuf_idx;
+        test_shuf_idx.xetla_select<1, 1>(0) = 1 * 2;
+        test_shuf_idx.xetla_select<1, 1>(1) = 2 * 2;
         auto block_idx = block_y * block_x_num + block_x;
         for (int row = 0; row < bheight; row++) {
           matC.reg.xetla_select<bwidth, 1>(
               block_idx * elt_per_block + row * bwidth) =
               sycl::ext::intel::esimd::gather<dtype, bwidth>(
-                  a + block_y * bheight * dst_swidth + row * dst_swidth,
-                  cur_shuf_idx);
+                  //   a + block_y * bheight * dst_swidth + row * dst_swidth,
+                  LUT,
+                  test_shuf_idx);
+          //   cur_shuf_idx);
         }
       }
     }
