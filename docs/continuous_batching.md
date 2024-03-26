@@ -85,6 +85,11 @@ You can refer to [developer_document](../developer_document.md#22-inference-proc
     </tr>
     <tr>
       <td>
+[Magicoder-6.7B](https://huggingface.co/ise-uiuc/Magicoder-S-DS-6.7B)</td>
+      <td align="center">✅</td>
+    </tr>
+    <tr>
+      <td>
 [Mistral-7B](https://huggingface.co/mistralai/Mistral-7B-v0.1), [Mixtral-8x7B](https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1)</td>
       <td align="center">✅</td>
     </tr>
