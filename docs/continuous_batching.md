@@ -3,7 +3,7 @@ Continuous Batching
 
 Continuous batching is a more efficient batching mechanism in LLM server system when compared with static batching input and output. It has two main characteristics:
 - concat input sequences in `seq_len` dimension (omit padding token) for `linear` operation and split it in `multi-head attention` and other seq-level operators (`RoPE`, etc.).
-- Split sequences out immediately if them finish generation and send new sequences into inference engine.
+- Split sequences out immediately if they finish generation and send new sequences into inference engine.
 For more technical details, please refer to [ORCA paper](https://www.usenix.org/system/files/osdi22-yu.pdf).
 
 There is a illustration below of continuous batching from ORCA paper. $x_{ij}$ means it is a j-th token which belong to i-th request (sequence). And this figure only depicts the QKV Linear, Attention, and
@@ -12,7 +12,7 @@ Attention Out Linear operations for simplicity.
 ![ORCA continuous batching inference](./imgs/ORCA_batching.png)
 
 ## Offline
-We only support multi-batch inference in concatenating & splitting input sequences way. Because it can avoid padding mask effect for some operators (`RoPE`, etc.) and save `linear` inference time. You can use `transformers` liked code: padding prompts->giving `Torch.Tensor`->generation. We will remove those padding tokens inside and return the whole generation results in a python list. So all you need to do additionally is provide the right `pad_token_id`.
+We only support multi-batch inference in concatenating & splitting input sequences way. Because it can avoid padding mask effect for some operators (`RoPE`, etc.) and save `linear` inference time. You can use `transformers` liked code (padding prompts->giving `Torch.Tensor`->generation) to try it. We will remove those padding tokens inside and return the whole generation results with a python list. So all you need to do additionally is provide the right `pad_token_id`.
 
 The code example is like:
 ```python
