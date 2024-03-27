@@ -37,6 +37,10 @@ NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
+def fetch_requirements(path):
+    with open(path, "r") as fd:
+        return [r.strip() for r in fd.readlines()]
+
 class CMakeExtension(Extension):
     """CMakeExtension class."""
 
@@ -229,6 +233,25 @@ if __name__ == '__main__':
         ]
     cmdclass={'build_ext': CMakeBuild}
 
+    install_requires = [
+        "accelerate",
+        "cmake",
+        "datasets",
+        "einops",
+        "gguf",
+        "matplotlib",
+        "numpy",
+        "peft",
+        "protobuf<3.20",
+        "py-cpuinfo",
+        "sentencepiece",
+        "setuptools>=61",
+        "tiktoken",
+        "transformers",
+        "transformers_stream_generator",
+    ] # fetch_requirements("requirements.txt")
+    print(f"install_requires: {install_requires}")
+
     setup(
         name="neural-speed",
         author="Intel AISE/AIPC Team",
@@ -247,6 +270,7 @@ if __name__ == '__main__':
         package_data={
             '': ["*.yaml", "*.mat"],
         },
+        install_requires=install_requires,
         cmdclass=cmdclass,
         python_requires='>=3.7.0',
         classifiers=[
