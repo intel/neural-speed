@@ -78,7 +78,7 @@ class TestLLMRUNTIME(unittest.TestCase):
             print(config_type, diff_data)
 
 
-    def test_beam_search(self):
+    def test_multi_batch_inference(self):
         model_name = "/tf_dataset2/models/pytorch/gpt-j-6B"  # or local path to model
         prompts = [
            "she opened the door and see",
@@ -93,13 +93,13 @@ class TestLLMRUNTIME(unittest.TestCase):
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True,
                                                   padding_side="left")
         tokenizer.pad_token = tokenizer.eos_token
-        pad_token = tokenizer(tokenizer.pad_token)['input_ids'][0]
+        pad_token = tokenizer.pad_token_id
         inputs = tokenizer(prompts, padding=True, return_tensors='pt')
 
         # pytorch fp32
         pt_generate_ids = torch.load("/tf_dataset2/inc-ut/nlptoolkit_ut_model/beam_pt_generate_ids.pth").tolist()
 
-        # llm runtime fp32
+        # llm runtime fp32 beam search
         itrex_model = Model()
         itrex_model.init(model_name, use_quant=False)
         itrex_generate_ids_padded = itrex_model.generate(
@@ -114,6 +114,19 @@ class TestLLMRUNTIME(unittest.TestCase):
         for i in range(len(itrex_generate_ids_cont)):
             self.assertListEqual(itrex_generate_ids_cont[i], itrex_generate_ids_cont[i])
 
+        # llm runtime int4 greedy search
+        itrex_model = Model()
+        itrex_model.init(model_name, use_quant=True, weight_dtype="int4", compute_dtype="int8")
+        outputs = itrex_model.generate(inputs.input_ids, num_beams=1, max_new_tokens=128, pad_token=pad_token,
+                                       continuous_batching=True, memory_dtype="f16", do_sample=False)
+        for i in range(len(prompts)):
+            input_ids = tokenizer(prompts[i], return_tensors='pt').input_ids
+            output = itrex_model.generate(input_ids, num_beams=1, max_new_tokens=128, pad_token=pad_token,
+                                          memory_dtype="f16", do_sample=False)
+            # ignore pad token
+            gen_len = len(output[0]) - input_ids.shape[-1]
+            self.assertListEqual(outputs[i][inputs.input_ids.shape[-1]: inputs.input_ids.shape[-1] + gen_len],
+                                 output[0][input_ids.shape[-1]:])
 
 if __name__ == "__main__":
     unittest.main()

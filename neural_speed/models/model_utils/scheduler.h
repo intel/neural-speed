@@ -24,8 +24,9 @@ class Iter_level_worker {
   explicit Iter_level_worker(const gpt_params& params);
   virtual ~Iter_level_worker();
   virtual bool step(std::vector<sequence>* seqs, const int& n_input) = 0;
-  // virtual bool greedy_search_step(sequence seqs, const int& n_input) = 0;
   virtual bool beam_search_step(std::vector<sequence>* seqs, const int& n_input) = 0;
+  virtual bool greedy_search_step(std::vector<sequence>* seqs, const int& n_input) = 0;
+  virtual bool top_k_top_p_sample_step(std::vector<sequence>* seqs, const int& n_input) = 0;
 
   inline void set_threads(const int& n_threads) { threads = n_threads; }
   inline std::vector<int> get_request_done_ids() const { return request_done_ids; }
@@ -38,6 +39,8 @@ class Iter_level_worker {
   model_context* m_ctx = nullptr;
   int threads;
   beam_search_flow* bsf = nullptr;
+  std::vector<model_token> next_tokens;
+  std::vector<std::vector<model_token>> last_n_tokens;
   std::vector<int> request_done_ids;
   std::unordered_map<int, int> reqidx_to_vecid;
 };
@@ -50,8 +53,9 @@ class Cont_batch_gen_worker : public Iter_level_worker {
   ~Cont_batch_gen_worker() = default;
 
   bool step(std::vector<sequence>* seqs, const int& n_input) override;
-  // bool greedy_search_step(sequence seqs, const int& n_input) override;
   bool beam_search_step(std::vector<sequence>*, const int& n_input) override;
+  bool greedy_search_step(std::vector<sequence>* seqs, const int& n_input) override;
+  bool top_k_top_p_sample_step(std::vector<sequence>* seqs, const int& n_input) override;
 
  protected:
   bool prepare_inputs(std::vector<sequence>*, const int& n_input, model_input* inputs) override;

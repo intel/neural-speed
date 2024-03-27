@@ -278,6 +278,12 @@ struct generation_config {
   // `length_penalty` < 0.0 encourages shorter sequences. (default = 1.0)
   float length_penalty = 1.0f;
   bool do_early_stopping = false;
+  // sampling parameters
+  bool do_sample = false;
+  int32_t top_k = 40;            // <= 0 to use vocab size
+  float top_p = 0.95f;           // 1.0 = disabled
+  float temp = 0.80f;            // 1.0 = disabled
+  float repeat_penalty = 1.10f;  // 1.0 = disabled
 };
 
 class beam_search_kv_cache_reorder;  //  forward declaration

@@ -15,8 +15,7 @@
 import time
 import unittest
 import shutil
-from neural_speed import Model
-import neural_speed.llama_cpp as cpp
+from neural_speed import Model, ModelServer
 from transformers import AutoTokenizer
 
 class TestModelServer(unittest.TestCase):
@@ -52,6 +51,23 @@ class TestModelServer(unittest.TestCase):
         model = Model()
         # get quantized model
         model.init(model_name, use_quant=True, weight_dtype="int4", compute_dtype="int8")
+        print("=======REFERENCE RESULTS FOR COMPARISON=========", flush=True)
+        print("=======FOR LOOP GREEDY SEARCH GENERATION RESULTS WITH MHA==========", flush=True)
+        for i in range(len(prompts)):
+            p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids
+            output = model.generate(p_token_ids, num_beams=1, max_new_tokens=128, do_sample=False)
+            ans = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+            print(ans, flush=True)
+            print("================================", flush=True)
+        print("=======FOR LOOP BEAM SEARCH GENERATION RESULTS WITH MHA==========", flush=True)
+        for i in range(len(prompts)):
+            p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids
+            output = model.generate(p_token_ids, num_beams=4, max_new_tokens=128, min_new_tokens=30,
+                                    early_stopping=True, do_sample=False, continuous_batching=True,
+                                    max_request_num=4)
+            ans = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+            print(ans, flush=True)
+            print("================================", flush=True)
         del model
         model_path = "./runtime_outs/ne_llama_q_int4_bestla_cint8_g32.bin"
 
@@ -64,19 +80,21 @@ class TestModelServer(unittest.TestCase):
                                         clean_up_tokenization_spaces=False)
             print(f"working_size: {working}, ans:", flush=True)
             for a in ans:
-                print(a)
-                print("=====================================")
+                print(a, flush=True)
+                print("=====================================", flush=True)
 
+        log_map = {"auto": "MHA", "f16": "NON-MHA",
+                   "greedy": "GREEDY SEARCH", "beam": "BEAM SEARCH"}
         for md in ["auto", "f16"]:
-            if md == "auto":
-                print("=======MHA MODEL SERVER TESTING=========")
-            else:
-                print("=======NON-MHA MODEL SERVER TESTING=========")
-            added_count = 0
-            s = cpp.ModelServer(f_response,
+            for policy in ["greedy", "beam"]:
+                print("============={} {} MODEL SERVER TESTING========".format(log_map[md],
+                                                                        log_map[policy]), flush=True)
+                added_count = 0
+                s = ModelServer(model_name,
+                                f_response,
                                 model_path,
                                 max_new_tokens=128,
-                                num_beams=4,
+                                num_beams=4 if policy == "beam" else 1,
                                 min_new_tokens=30,
                                 early_stopping=True,
                                 do_sample=False,
@@ -87,19 +105,19 @@ class TestModelServer(unittest.TestCase):
                                 print_log=False,
                                 scratch_size_ratio = 1.0,
                                 memory_dtype= md,
-                            )
-            for i in range(len(prompts)):
-                p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
-                s.issueQuery([cpp.Query(i, p_token_ids)])
-                added_count += 1
-                time.sleep(2)  # adjust query sending time interval
+                                )
+                for i in range(len(prompts)):
+                    p_token_ids = tokenizer(prompts[i], return_tensors='pt').input_ids.tolist()
+                    s.issueQuery(i, p_token_ids)
+                    added_count += 1
+                    time.sleep(2)  # adjust query sending time interval
 
-            # recommend to use time.sleep in while loop to exit program
-            # let cpp server owns more resources
-            while (added_count != len(prompts) or not s.Empty()):
-                time.sleep(1)
-            del s
-            print("should finished")
+                # recommend to use time.sleep in while loop to exit program
+                # let cpp server owns more resources
+                while (added_count != len(prompts) or not s.Empty()):
+                    time.sleep(1)
+                del s
+                print("should finished", flush=True)
 
 if __name__ == "__main__":
     unittest.main()
