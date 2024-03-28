@@ -221,6 +221,10 @@ class UT_S3_WOQ {
  public:
   UT_S3_WOQ() {
     UT_START();
+    CheckISA(AVX2);
+    ut<sAVX2, BTLA_ISA::AVX2>(1, 4096, 4096, 32, 8);
+    CheckISA(AVX_VNNI);
+    ut<gemm::ICoreRowNAvxvnniKBlock<24, 2>, BTLA_ISA::AVX_VNNI>(1, 4096, 4096, 128, 8);
     CheckISA(AVX512F);
     ut<sAVX512F, BTLA_ISA::AVX512F>(1, 4096, 4096, 32, 56);
     CheckISA(AVX512_VNNI);
@@ -264,7 +268,7 @@ class UT_S3_WOQ {
 
     Launcher launcher;
     avector<float> matC(m * n), refC(m * n);
-    if constexpr (ISA == BTLA_ISA::AVX512F) {
+    if constexpr (ISA == BTLA_ISA::AVX512F || ISA == BTLA_ISA::AVX2) {
       avector<float> matAf32(m * k);
       fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
       utils::GemmProblem gp(1, m, n, k, blocksize);

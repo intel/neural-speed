@@ -458,6 +458,13 @@ class DecompressKBlockS3Fp {
           tmpsize);
     }
 #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_bit3_packrow_fp<S3_T, _DST_T, _PACK_ROW, _SCA_T>(
+          bit2ptr, bit1ptr, dstptr, interleave_n_offset, row, col, scales, zero_points, k_offset, kblock, NPad, tmp,
+          tmpsize);
+    }
+#endif
     ret = ref::decompress_kblock_bit3_packrow_fp<S3_T, _DST_T, _PACK_ROW, _SCA_T>(
         bit2ptr, bit1ptr, dstptr, interleave_n_offset, row, col, scales, zero_points, k_offset, kblock, NPad, tmp,
         tmpsize);
@@ -513,6 +520,12 @@ class DecompressKBlockS3S8Fp {
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       ret = avx512f::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
                                                              reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
+#endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                                          reinterpret_cast<int8_t*>(tmp), tmpsize);
     }
 #endif
     ret = ref::decompress_kblock_s3_s8fp<S3_T, _DST_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
