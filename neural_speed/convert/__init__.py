@@ -34,7 +34,7 @@ def convert_model(model, outfile, outtype="f32", format="NE", model_hub="hugging
         from modelscope import AutoConfig
     else:
         from transformers import AutoConfig
-        config = AutoConfig.from_pretrained(model, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
     if use_quantized_model:
