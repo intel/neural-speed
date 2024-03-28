@@ -258,7 +258,7 @@ class DecompresssS3 {
     struct params {
       void *bit2ptr, *bit1ptr, *dstptr, *tmpbuf;
       int unpack_elt;
-      const int8_t lowMask=3, highMask=4;
+      const int8_t lowMask = 3, highMask = 4;
       const int32_t bit1Shift2 = (1 << 23) + (1 << 16) + (1 << 9) + (1 << 2);
       const int32_t bit1Shift1[8] = {0, 4, 8, 12, 16, 20, 24, 28};
     };
@@ -302,7 +302,7 @@ class DecompresssS3 {
         Xbyak::Ymm bit2_data = ymm8;
         vmovups(bit2_data, ptr[reg_bit2ptr]);
         for (int i = 0; i < 4; i++) {
-          vpbroadcastd(Xbyak::Ymm(i), dword[reg_bit1ptr  + 4 * i]);
+          vpbroadcastd(Xbyak::Ymm(i), dword[reg_bit1ptr + 4 * i]);
           vpsrlvd(Xbyak::Ymm(i), Xbyak::Ymm(i), bit1Shift1);  // todo : check m256
           vpmulld(Xbyak::Ymm(i), Xbyak::Ymm(i), bit1Shift2);
           vpand(Xbyak::Ymm(i), Xbyak::Ymm(i), highMask);
@@ -361,7 +361,7 @@ class DecompresssS3 {
   template <typename _DST_T>
   static void forward_avx2(void* bit2ptr, void* bit1ptr, _DST_T* dstptr, void* tmpbuf, int unpack_elt) {
     static MicroKernelAVX2<_DST_T> ker;
-    typename MicroKernelAVX2<_DST_T>::params param{bit2ptr, bit1ptr, dstptr, tmpbuf, unpack_elt / 128, 0x03, 0x4, 5};
+    typename MicroKernelAVX2<_DST_T>::params param{bit2ptr, bit1ptr, dstptr, tmpbuf, unpack_elt / 128};
     ker.mKernel(&param);
   }
   template <typename _DST_T>
