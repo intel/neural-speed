@@ -25,6 +25,7 @@ Support typical LLMs in GGUF format such as Llama2, Falcon, MPT, Bloom etc. More
 
 ### Install from binary
 ```shell
+pip install -r requirements.txt
 pip install neural-speed
 ```
 
@@ -39,7 +40,7 @@ pip install .
 
 ## Quick Start (Transformer-like usage)
 
-Install [Intel Extension for Transformers](https://github.com/intel/intel-extension-for-transformers) to use Transformer-like APIs.
+Install [Intel Extension for Transformers](https://github.com/intel/intel-extension-for-transformers/blob/main/docs/installation.md) to use Transformer-like APIs.
 
 
 ### PyTorch Model from Hugging Face
