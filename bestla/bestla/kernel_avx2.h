@@ -14,6 +14,7 @@
 #pragma once
 #include "bestla.h"
 #include "bestla_utils.h"
+#include "bestla_jit.h"
 #include "kernel_ref.h"
 #if CompileAVX2()
 #include <immintrin.h>
@@ -1194,8 +1195,8 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   auto tail_proc_num = unpack_elt % 128;
 
   bestla::kernel::jit::DecompresssS3::forward_avx2(bit2ptr + compress_wei_ptr_offset / 4,
-                                                      bit1ptr + compress_wei_ptr_offset / 8,
-                                                      dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
+                                                   bit1ptr + compress_wei_ptr_offset / 8,
+                                                   dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
   compress_wei_ptr_offset += body_loop * 128;
   if (tail_proc_num > 0) {
     bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
@@ -1226,7 +1227,6 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
 
   return BTLA_CODE::Success;
 }
-
 
 inline __m256 poly_scale_2nd_ps(const __m256i z, const __m256 f, const __m256 c0, const __m256 c1, const __m256 c2) {
   const auto y = _mm256_fmadd_ps(_mm256_fmadd_ps(f, c0, c1), f, c2);  // auto y = (f * c0 + c1) * f + c2;
