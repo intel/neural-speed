@@ -83,6 +83,33 @@
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
       "inherits": "x64-release",
       "cacheVariables": { "BTLA_UT_ALL": "ON" }
+    },
+    {
+      "name": "x64-debug-sycl",
+      "displayName": "x64 Debug SYCL",
+      "description": "x64 Debug SYCL",
+      "inherits": "windows-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_ALL": "OFF",
+        "BTLA_SYCL": "ON",
+        "CMAKE_CXX_COMPILER": "icx",
+        "CMAKE_C_COMPILER": "icx"
+      }
+    },
+    {
+      "name": "x64-release-sycl",
+      "displayName": "x64 Release for SYCL",
+      "description": "x64 SYCL",
+      "inherits": "x64-debug-sycl",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ]
 }

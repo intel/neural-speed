@@ -47,7 +47,10 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
   }
   return BTLA_CODE::Success;
 #endif
+#if CompileAVX512F()
   return avx512f::bf16_cvt_fp32_2D_write_back(src_ptr, dst_ptr, row, col, src_step, dst_step, zeropadding);
+#endif
+  return BTLA_CODE::NotSupport;
 }
 
 static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
@@ -83,7 +86,10 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
   }
   return BTLA_CODE::Success;
 #endif
+#if CompileAVX512F()
   return avx512f::fp32_cvt_bf16_2D_write_back(raw_srcptr, raw_dstptr, row, col, srcstride, dststride, zeropadding);
+#endif
+  return BTLA_CODE::NotSupport;
 }
 #if CompileBF16()
 #pragma GCC pop_options

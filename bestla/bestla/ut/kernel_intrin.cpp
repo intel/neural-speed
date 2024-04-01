@@ -4,6 +4,7 @@
 namespace bestla {
 using namespace utils;
 namespace ut {
+#if CompileAVX512F()
 class UT_Avx512f_decompress_kblock_s4_fp {
  public:
   UT_Avx512f_decompress_kblock_s4_fp() {
@@ -45,6 +46,8 @@ class UT_Avx512f_decompress_kblock_s4_fp {
 #ifdef BTLA_UT_KERNEL_INTRIN
 static UT_Avx512f_decompress_kblock_s4_fp sUT_Avx512f_decompress_kblock_s4_fp;
 #endif
+#endif
+#if CompileAVX2()
 class UT_avx2_decompress_s4_s8 {
  public:
   UT_avx2_decompress_s4_s8() {
@@ -76,6 +79,7 @@ class UT_avx2_decompress_s4_s8 {
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
 static UT_avx2_decompress_s4_s8 sUT_avx2_decompress_s4_s8;
+#endif
 #endif
 }  // namespace ut
 }  // namespace bestla

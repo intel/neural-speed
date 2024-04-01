@@ -23,12 +23,12 @@ namespace bestla {
 namespace kernel {
 namespace avx2 {
 #if CompileAVX2()
-#ifdef __GNUC__
+#if defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx2", "fma", "f16c")
-#else
+#elif defined(ICX)
+#pragma clang attribute push(__attribute__((target("avx,avx2,fma"))), apply_to = function)
 #endif
-
 template <bool LowBits>
 static inline __m256i unpack_4bits_avx2(void* srcptr, __m256i mask) {
   auto raw_data = _mm_loadu_si128(reinterpret_cast<__m128i*>(srcptr));
@@ -74,7 +74,7 @@ inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
 
 inline __m128i ymm_cvtepi32_epi16(__m256i src) {
   __m128i tmp;
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang_major__) 
   for (size_t i = 0; i < 8; i++) {
     (reinterpret_cast<int16_t*>(&tmp))[i] = (reinterpret_cast<int32_t*>(&src))[i];
   }
@@ -443,7 +443,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
       e_revert = _mm256_srli_epi32(e_revert, mantissabit);
       if constexpr (WITH_SCALE && std::is_same_v<_S_T, utils::f8>) {
         auto scale = _mm256_cvtepi8_epi32(_mm_loadu_si128(reinterpret_cast<__m128i*>(sptr + j / _PACK_ROW)));
-        if constexpr (_PACK_ROW == 2) scale = _mm256_permutexvar_epi32(packrow2_permute_idx, scale);
+        if constexpr (_PACK_ROW == 2) scale = _mm256_permutevar8x32_epi32(packrow2_permute_idx, scale);
         e_revert = _mm256_add_epi32(e_revert, scale);
       }
       e_revert = _mm256_sub_epi32(e_revert, e_revert_shift);
