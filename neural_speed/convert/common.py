@@ -397,6 +397,8 @@ def find_quantized_model_file(model_path):
                 warnings.warn(f'Detected {len(found)} {ext} model, use the first one {found[0]}.')
             print(f"Detected model file {found[0]}")
             return str(found[0])
+        else:
+            return None
 
 
 def load_quantized_safetensors(model_path):
@@ -424,7 +426,13 @@ def load_quantized_safetensors(model_path):
 
 
 def load_quantized_model(model_path):
-    input_path = find_quantized_model_file(model_path)
+    local_model_path = model_path
+    if not os.path.exists(local_model_path):
+        from huggingface_hub import snapshot_download
+        local_model_path = snapshot_download(repo_id=model_path,
+                                             allow_patterns=["*.pt", "*.safetensors"],
+                                             ignore_patterns="vocab.json")
+    input_path = find_quantized_model_file(local_model_path)
     model = None
     if input_path.endswith('pt'):
         model = torch.load(input_path, map_location="cpu")
@@ -434,7 +442,7 @@ def load_quantized_model(model_path):
     else:
         print("unknown input model path, only support .safetensors or .pt file.")
 
-    with open(model_path + '/config.json', "r", encoding="utf-8") as f:
+    with open(os.path.join(local_model_path, "/config.json"), "r", encoding="utf-8") as f:
         config = json.load(f)
 
     quantize_config = config["quantization_config"]
