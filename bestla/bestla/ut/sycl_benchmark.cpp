@@ -45,79 +45,37 @@ class Benchmark_Fp32Fp32 {
           sycl::local_accessor<float, 1> slm_a(sycl::range(SGemm_t::SLM_A_Size), cgh);
           cgh.parallel_for(sycl::nd_range<2>(problem, group),
                            [=](sycl::nd_item<2> it) [[intel::reqd_sub_group_size(SGemm_t::SgSize)]] {
-                             int g_idxm = it.get_group(0);
-                             int g_idxn = it.get_group(1);
-                             auto sg = it.get_sub_group();
-                             int sgGroupId = sg.get_group_id()[0];
-                             int sgId = sg.get_local_id()[0];
-                             float tmp[SGemm_t::TileM * SGemm_t::TileN];
-                             for (size_t im = 0; im < SGemm_t::TileM; im++)
-                               for (size_t in = 0; in < SGemm_t::TileN; in++) tmp[im * SGemm_t::TileN + in] = 0.f;
-                             int sg_idxn = sgGroupId % SGemm_t::SgNStride;
-                             int sg_idxm = sgGroupId / SGemm_t::SgNStride;
-                             int gm = g_idxm * SGemm_t::WgM;
-                             int gn = g_idxn * SGemm_t::WgN;
-                             int sgm = gm + sg_idxm;
-                             int sgn = gn + sg_idxn * SGemm_t::SgSize;
-                             int tm = sgm * SGemm_t::TileM;
-                             int tn = (sgn + sgId) * SGemm_t::TileN;
-                             for (int i = 0; i < k; i += SGemm_t::TileK) {
-                               int constexpr Iter_PerWorker = (SGemm_t::TileK + SGemm_t::WgM - 1) / SGemm_t::WgM;
-#pragma unroll
-                               for (int icp = 0; icp < Iter_PerWorker; icp++) {
-                                 {
-                                   for (size_t in = 0; in < SGemm_t::TileN; in++) {
-                                     slm_b[(sg_idxm + icp * SGemm_t::WgM) * SGemm_t::WgNEle +
-                                           (sg_idxn * SGemm_t::SgSize + sgId) * SGemm_t::TileN + in] =
-                                         B_d[tn + in + (i + sg_idxm + icp * SGemm_t::WgM) * n];
-                                   }
-                                 }
-                               }
+                nd_item_helper<SGemm_t> helper(it);
+                float tmp[SGemm_t::TileM * SGemm_t::TileN];
+                for (size_t im = 0; im < SGemm_t::TileM; im++)
+                  for (size_t in = 0; in < SGemm_t::TileN; in++) tmp[im * SGemm_t::TileN + in] = 0.f;
 
-                               it.barrier(sycl::access::fence_space::local_space);
-                               SGemm_t::compute(&A_d[tm * k + i], k, slm_b, sg_idxn * SGemm_t::SgNEle, tmp, sg, sgId);
-                               // #pragma unroll(1)
-                               //               for (int ik = 0; ik < SGemm_t::TileK; ik += SGemm_t::UnrollK) {
-                               //                 float regA[SGemm_t::UnrollK];
-                               //                 if constexpr (SGemm_t::UnrollK == 8) {
-                               //                   *(sycl::vec<float, 4>*)regA = *(sycl::vec<float, 4>*)&A_d[(tm +
-                               //                   sgId) * k + (i + ik)];
-                               //                   *(sycl::vec<float, 4>*)&regA[4] = *(sycl::vec<float, 4>*)&A_d[(tm +
-                               //                   sgId) * k + (i + ik + 4)];
-                               //                 } else {
-                               //                   *(sycl::vec<float, SGemm_t::UnrollK>*)regA =
-                               //                       *(sycl::vec<float, SGemm_t::UnrollK>*)&A_d[(tm + sgId) * k + (i
-                               //                       + ik)];
-                               //                 }
-                               // #pragma unroll
-                               //                 for (int ikk = 0; ikk < SGemm_t::UnrollK; ikk++) {
-                               //                   float tmpB[SGemm_t::TileN];
-                               // #pragma unroll
-                               //                   for (int in = 0; in < SGemm_t::TileN; in++) {
-                               //                     tmpB[in] =
-                               //                         slm_b[sg_idxn * SGemm_t::SgNEle + sgId * SGemm_t::TileN + in +
-                               //                         (ik + ikk) * SGemm_t::WgNEle];
-                               //                   }
-                               //
-                               // #pragma unroll
-                               //                   for (int im = 0; im < SGemm_t::TileM; im++) {
-                               //                     auto tmpA = sg.shuffle(regA[ikk], im);
-                               // #pragma unroll
-                               //                     for (int in = 0; in < SGemm_t::TileN; in++) {
-                               //                       tmp[im * SGemm_t::TileN + in] += tmpA * tmpB[in];
-                               //                     }
-                               //                   }
-                               //                 }
-                               //               }
-                               it.barrier(sycl::access::fence_space::local_space);
-                             }
+                for (int i = 0; i < k; i += SGemm_t::TileK) {
+                  int constexpr Iter_PerWorker = (SGemm_t::TileK + SGemm_t::WgM - 1) / SGemm_t::WgM;
 #pragma unroll
-                             for (int im = 0; im < SGemm_t::TileM; im++) {
+                  for (int icp = 0; icp < Iter_PerWorker; icp++) {
+                    // if (sg_idxm + icp * GroupM < TileK)
+                    {
+                      for (size_t in = 0; in < SGemm_t::TileN; in++) {
+                        slm_b[helper.sg_idx_m() * helper.wg_size_n() + icp * SGemm_t::WgM * SGemm_t::WgNEle +
+                              (helper.sg_idx_n() * SGemm_t::SgSize + helper.sg_id()) * SGemm_t::TileN + in] =
+                            B_d[helper.item_g_n() + in + (i + helper.sg_idx_m() + icp * SGemm_t::WgM) * n];
+                      }
+                    }
+                  }
+
+                  it.barrier(sycl::access::fence_space::local_space);
+                  SGemm_t::compute(&A_d[helper.item_g_m() * k + i], k, slm_b, helper.sg_idx_n() * SGemm_t::SgNEle, tmp,
+                                   helper.sg, helper.sg_id());
+                  it.barrier(sycl::access::fence_space::local_space);
+                }
 #pragma unroll
-                               for (int in = 0; in < SGemm_t::TileN; in++) {
-                                 C_d[(tm + im) * n + tn + in] = tmp[im * SGemm_t::TileN + in];
-                               }
-                             }
+                for (int im = 0; im < SGemm_t::TileM; im++) {
+#pragma unroll
+                  for (int in = 0; in < SGemm_t::TileN; in++) {
+                    C_d[(helper.item_g_m() + im) * n + helper.item_g_n() + in] = tmp[im * SGemm_t::TileN + in];
+                  }
+                }
                            });
         });
         e_esimd.wait();
