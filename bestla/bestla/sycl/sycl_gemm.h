@@ -64,27 +64,27 @@ class SGemmCoreSharedB {
 
   using SLM_B_Acc = sycl::local_accessor<TB, 1>;
 
-  static inline void compute(const TA* aptr, int lda, const SLM_B_Acc& bacc, int boff, TACC* accptr,
-                             const sycl::sub_group& sg, int sgId) {
+  static inline void compute(const TA* aptr, int lda, const SLM_B_Acc& bacc, TACC* accptr,
+                             sycl_utils::nd_item_helper<SGemmCoreSharedB<ConfigT>>& helper) {
 #pragma unroll(1)
     for (int ik = 0; ik < TileK; ik += UnrollK) {
       float regA[UnrollK];
       if constexpr (UnrollK == 8) {
-        *(sycl::vec<float, 4>*)regA = *(sycl::vec<float, 4>*)&aptr[sgId * lda + ik];
-        *(sycl::vec<float, 4>*)&regA[4] = *(sycl::vec<float, 4>*)&aptr[sgId * lda + ik + 4];
+        *(sycl::vec<float, 4>*)regA = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik];
+        *(sycl::vec<float, 4>*)&regA[4] = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik + 4];
       } else {
-        *(sycl::vec<float, UnrollK>*)regA = *(sycl::vec<float, UnrollK>*)&aptr[sgId * lda + ik];
+        *(sycl::vec<float, UnrollK>*)regA = *(sycl::vec<float, UnrollK>*)&aptr[helper.sg_id() * lda + ik];
       }
 #pragma unroll
       for (int ikk = 0; ikk < UnrollK; ikk++) {
         float tmpB[TileN];
 #pragma unroll
         for (int in = 0; in < TileN; in++) {
-          tmpB[in] = bacc[boff + sgId * TileN + in + (ik + ikk) * WgNEle];
+          tmpB[in] = bacc[helper.sg_idx_n() * SgNEle + helper.sg_id() * TileN + in + (ik + ikk) * WgNEle];
         }
 #pragma unroll
         for (size_t im = 0; im < TileM; im++) {
-          auto tmpA = sg.shuffle(regA[ikk], im);
+          auto tmpA = helper.sg.shuffle(regA[ikk], im);
 #pragma unroll
           for (size_t in = 0; in < TileN; in++) {
             accptr[im * TileN + in] += tmpA * tmpB[in];
