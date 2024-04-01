@@ -1161,6 +1161,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   auto head_ignore_num = interleave_n_offset % 128;
   const __m256i lowMask = _mm256_set1_epi8(0x03);
   const __m256i highMask = _mm256_set1_epi8(0x04);
+  const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
   const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
   const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
 
@@ -1170,6 +1171,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     for (int i = 0; i < 4; i++) {
       auto bit1x32 = _mm256_set1_epi32(bit1_ptr[i]);
       bit1x32 = _mm256_srlv_epi32(bit1x32, bit1Shift_1);
+      bit1x32 = _mm256_and_si256(bit1x32, bit1Mask);
       bit1x32 = _mm256_mullo_epi32(bit1x32, bit1Shift_2);
       bit1x32 = _mm256_and_si256(highMask, bit1x32);
 
