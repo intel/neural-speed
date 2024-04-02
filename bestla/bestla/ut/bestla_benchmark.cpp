@@ -1263,7 +1263,7 @@ class UTWOQ_GGML {
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
     for (auto threads : threads_cfg) {
-      for (auto blocksize : {32, 128}) {
+      for (auto blocksize : {32}) {
         if (_cd->AMX_INT8()) {
           benchmark<gemm::ICoreRowNAmxint8KBlock<64, 16>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
