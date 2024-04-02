@@ -418,14 +418,14 @@ def load_quantized_safetensors(model_path):
         local_model_path = snapshot_download(repo_id=model_path,
                                              allow_patterns=["*.safetensors"],
                                              )
-    for file in os.listdir(local_model_path):
-        if file.endswith(".safetensors"):
-            safetensors.append(file)
+    for m_file in os.listdir(local_model_path):
+        if m_file.endswith(".safetensors"):
+            safetensors.append(m_file)
 
     print(f"safetensors list = {safetensors}")
     model = {}
-    for file in safetensors:
-        tmp = load_file(os.path.join(local_model_path, file))
+    for m_file in safetensors:
+        tmp = load_file(os.path.join(local_model_path, m_file))
         if isinstance(tmp, dict):
             model.update(tmp)
 
@@ -450,8 +450,7 @@ def load_quantized_model(model_path):
     if input_path.endswith('pt'):
         model = torch.load(input_path, map_location="cpu")
     elif input_path.endswith('safetensors'):
-        from safetensors.torch import load_file
-        model = load_file(input_path)
+        return load_quantized_safetensors(local_model_path)
     else:
         print("unknown input model path, only support .safetensors or .pt file.")
 
