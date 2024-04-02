@@ -187,7 +187,10 @@ class StdThreading : public IThreading {
              reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
     } else {
       core_order.resize(mThreadNum);
-      for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+      if (_cd->isClient())
+        for (int i = 0; i < mThreadNum; i++) core_order[i] = 2 * i;
+      else
+        for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
     }
     _cd->core_bond(core_order[0]);
     if (cr->mHybrid) {

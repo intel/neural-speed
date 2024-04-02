@@ -259,8 +259,10 @@ class CpuDevice {
       if (tmp[3] & (1U << 15)) mHybrid = true;
       if (p) printf("!!!Hybrid:%d\t%x\t%x\t%x\t%x!!!\n", mHybrid, tmp[0], tmp[1], tmp[2], tmp[3]);
     }
+    int total_cores = numcores * _cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::SmtLevel);
+    if (total_cores <= 16) mClient = true;
     if (mHybrid) {
-      int total_cores = numcores * _cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::SmtLevel);
+      mClient = true;
       std::vector<int> core_type(total_cores), core_id(total_cores), L1(total_cores), L2(total_cores);
       std::map<int, int> core_id_count;
 
@@ -311,21 +313,14 @@ class CpuDevice {
           for (auto& i : SMT_core) printf("%d,", i);
           printf("\n");
         }
-        if (!E_core.empty() && !P_core.empty()) {
+        mHybrid = !(E_core.empty() || P_core.empty()); // in case of bond core by external
+        if (!E_core.empty()) {
           E_L1Cache = L1[E_core[0]];
           E_L2Cache = L2[E_core[0]] / 4;
-          uint32_t scale = SMT_core.empty() ? 1 : 2;
-          L1Cache = E_L1Cache > L1[P_core[0]] / scale ? L1[P_core[0]] / scale : E_L1Cache;
-          L2Cache = E_L2Cache > L2[P_core[0]] / scale ? L2[P_core[0]] / scale : E_L2Cache;
-        } else if (!P_core.empty()) {
-          uint32_t scale = SMT_core.empty() ? 1 : 2;
-          L1Cache = L1[P_core[0]] / scale;
-          L2Cache = L2[P_core[0]] / scale;
-          mHybrid = false;
-        } else {
-          L1Cache = L1[E_core[0]];
-          L2Cache = L2[E_core[0]] / 4;
-          mHybrid = false;
+        };
+        if (!P_core.empty()) {
+          L1Cache = L1[P_core[0]];
+          L2Cache = L2[P_core[0]];
         }
       }
       numcores = static_cast<int>(P_core.size() + E_core.size());
@@ -461,10 +456,11 @@ class CpuDevice {
   }
 
   bool isHybrid() { return mHybrid; }
+  bool isClient() { return mClient; }
 
  protected:
   uint32_t L2Cache, L1Cache, L3Cache;
-  bool mHybrid = false;
+  bool mHybrid = false, mClient = false;
   bool mHasAVX2, mHasAVX_VNNI, mHasAVX, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512F, mHasAVX512_BF16,
       mHasAVX512_FP16;
   int numcores;
@@ -506,7 +502,7 @@ class CpuRuntime {
     mL1Cache = _cd->getL1CacheSize();
     maxThreads = _cd->getThreads();
     mHybrid = false;
-    if (_cd->isHybrid() && thread > _cd->getPcoreNum()) {
+    if (_cd->isClient() && thread > _cd->getPcoreNum()) {
       if (thread > _cd->getPcoreNum() + _cd->getEcoreNum()) {
         mL1Cache_P = mL1Cache / 2;
         mL2Cache_P = mL2Cache / 2;
@@ -518,10 +514,12 @@ class CpuRuntime {
         P_core_num = static_cast<int>(_cd->getPcoreNum());
         E_core_num = thread - P_core_num;
       }
-      mL1Cache_E = _cd->getL1CacheSize_E();
-      mL2Cache_E = _cd->getL2CacheSize_E();
-      mHybrid = true;
-      memcpy(PE, _cd->getPE(), int(BTLA_ISA::ISA_COUNT) * sizeof(float));
+      if (mHybrid) {
+        mL1Cache_E = _cd->getL1CacheSize_E();
+        mL2Cache_E = _cd->getL2CacheSize_E();
+        mHybrid = true;
+        memcpy(PE, _cd->getPE(), int(BTLA_ISA::ISA_COUNT) * sizeof(float));
+      }
     }
   }
   float PE[int(BTLA_ISA::ISA_COUNT)];
