@@ -2,9 +2,7 @@
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
 #include "sycl_ut.h"
-#include "sycl/sycl_utils.h"
-#include "sycl/sycl_gemm.h"
-#include "../sycl/sycl_epilogue.h"
+#include "sycl/sycl_wrapper.h"
 
 namespace bestla {
 using namespace ut;
@@ -24,6 +22,15 @@ class Benchmark_Fp32Fp32 {
   using AType = float;
   using BType = float;
   using CType = float;
+  using SGemmT = xve::DefaultSGemmCore;
+  template <class GCT>
+  using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
+  template <class GCT>
+  using ProBT = sycl_prologue_b::WeightBase<GCT, float>;
+  template <class GCT>
+  using EpiT = sycl_epilogue::OutputBase<GCT, float>;
+  using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemmT>;
+
   template <typename LOG_T>
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems) {
     LOG_T log;
@@ -34,45 +41,73 @@ class Benchmark_Fp32Fp32 {
     auto B_d = B;
     auto C_d = C;
     auto psize = (size_t)m * n * k * 2;
-    using SGemm_t = xve::DefaultSGemmCore;
-    sycl::range<2> group{SGemm_t::WgM, SGemm_t::WgN};
-    sycl::range<2> problem{m / SGemm_t::TileM, n / SGemm_t::TileN};
+    sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
+    sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+    utils::GemmProblem gp(1, m, n, k);
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
         log.start();
+#if 0
         auto e_esimd = q->submit([&](sycl::handler& cgh) {
-          sycl::local_accessor<float, 1> slm_b(sycl::range(SGemm_t::SLM_B_Size), cgh);
-          sycl::local_accessor<float, 1> slm_a(sycl::range(SGemm_t::SLM_A_Size), cgh);
+          sycl::local_accessor<float, 1> slm_b(sycl::range(SGemmT::SLM_B_Size), cgh);
+          sycl::local_accessor<float, 1> slm_a(sycl::range(SGemmT::SLM_A_Size), cgh);
           cgh.parallel_for(
               sycl::nd_range<2>(problem, group),
-              [=](sycl::nd_item<2> it) [[intel::reqd_sub_group_size(SGemm_t::SgSize)]] {
-                nd_item_helper<SGemm_t> helper(it);
-                float tmp[SGemm_t::TileM * SGemm_t::TileN];
-                for (size_t im = 0; im < SGemm_t::TileM; im++)
-                  for (size_t in = 0; in < SGemm_t::TileN; in++) tmp[im * SGemm_t::TileN + in] = 0.f;
+              [=](sycl::nd_item<2> it) [[cl::reqd_work_group_size(
+                  1, SGemmT::WgM,
+                  SGemmT::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(SGemmT::SgSize)]] {
+                nd_item_helper<SGemmT> helper(it);
+                float tmp[SGemmT::TileM * SGemmT::TileN];
+                for (size_t im = 0; im < SGemmT::TileM; im++)
+                  for (size_t in = 0; in < SGemmT::TileN; in++) tmp[im * SGemmT::TileN + in] = 0.f;
 
-                for (int i = 0; i < k; i += SGemm_t::TileK) {
-                  int constexpr Iter_PerWorker = (SGemm_t::TileK + SGemm_t::WgM - 1) / SGemm_t::WgM;
-#pragma unroll
-                  for (int icp = 0; icp < Iter_PerWorker; icp++) {
-                    // if (sg_idxm + icp * GroupM < TileK)
-                    {
-                      for (size_t in = 0; in < SGemm_t::TileN; in++) {
-                        slm_b[helper.sg_idx_m() * helper.wg_size_n() + icp * SGemm_t::WgM * SGemm_t::WgNEle +
-                              (helper.sg_idx_n() * SGemm_t::SgSize + helper.sg_id()) * SGemm_t::TileN + in] =
-                            B_d[helper.item_g_n() + in + (i + helper.sg_idx_m() + icp * SGemm_t::WgM) * n];
-                      }
-                    }
-                  }
-
+                for (int i = 0; i < k; i += SGemmT::TileK) {
+                  sycl_prologue_b::WeightBase<SGemmT, float>::getWeight({B_d, n}, slm_b, i, helper);
                   it.barrier(sycl::access::fence_space::local_space);
-                  SGemm_t::compute(&A_d[helper.item_g_m() * k + i], k, slm_b, tmp, helper);
+                  SGemmT::compute(&A_d[helper.item_g_m() * k + i], k, slm_b, tmp, helper);
                   it.barrier(sycl::access::fence_space::local_space);
                 }
-                sycl_epilogue::OutputBase<SGemm_t, float>::store({C_d, n}, tmp, helper);
+                sycl_epilogue::OutputBase<SGemmT, float>::store({C_d, n}, tmp, helper);
               });
         });
+#else
+        //sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
+        //using PrologueB = sycl_prologue_b::WeightBase<SGemmT, float>;
+        //using Epilogue = sycl_epilogue::OutputBase<SGemmT, float>;
+        //auto A = A_d;
+        //auto B = B_d;
+        //auto C = C_d;
+        //int lda = k;
+        //int ldb = n;
+        //const int ldc = n;
+        //sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+        //auto e_esimd = q->submit([&](sycl::handler& cgh) {
+        //  sycl::local_accessor<float, 1> slm_b(sycl::range(SGemmT::SLM_B_Size), cgh);
+        //  sycl::local_accessor<float, 1> slm_a(sycl::range(SGemmT::SLM_A_Size), cgh);
+        //  cgh.parallel_for(
+        //      sycl::nd_range<2>(problem, group),
+        //      [=](sycl::nd_item<2> it) [[cl::reqd_work_group_size(
+        //          1, SGemmT::WgM,
+        //          SGemmT::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(SGemmT::SgSize)]] {
+        //        nd_item_helper<SGemmT> helper(it);
+        //        float tmp[SGemmT::TileM * SGemmT::TileN];
+        //        for (size_t im = 0; im < SGemmT::TileM; im++)
+        //          for (size_t in = 0; in < SGemmT::TileN; in++) tmp[im * SGemmT::TileN + in] = 0.f;
+
+        //        for (int i = 0; i < k; i += SGemmT::TileK) {
+        //          PrologueB::getWeight({B_d, ldb}, slm_b, i, helper);
+        //          sycl_prologue_b::WeightBase<SGemmT, float>::getWeight({B_d, ldc}, slm_b, i, helper);
+        //          it.barrier(sycl::access::fence_space::local_space);
+        //          SGemmT::compute(&A[helper.item_g_m() * lda + i], lda, slm_b, tmp, helper);
+        //          it.barrier(sycl::access::fence_space::local_space);
+        //        }
+        //        //sycl_epilogue::OutputBase<SGemmT, float>::store({C_d, n}, tmp, helper);
+        //        Epilogue::store({C, ldc}, tmp, helper);
+        //      });
+        //});
+         auto e_esimd = KernelLauncher::compute({m, n, k, {A, k}, {B, n}, {C, n}}, q);
+#endif
         e_esimd.wait();
         log.stop();
         if (tm.stop() >= timems) {

@@ -27,24 +27,23 @@ struct ParamWeightBase {
   const SrcT* B;
   int ldb;
 };
-template <class _GemmCore_T, typename SrcT>
+template <class GemmCoreT, typename SrcT>
 class WeightBase {
  public:
-  using BType = typename _GemmCore_T::TB;
+  using BType = typename GemmCoreT::TB;
   using SRCType = SrcT;
   using Param = ParamWeightBase<SRCType>;
-  template <int UnrollK>
-  BTLA_CODE getWeight(const Param& _param, BType* dstptr, size_t _srcoffset, int sgId) {
-    auto ptr = &_param.B[_srcoffset];
-    auto ld = _param.ldb;
-    int constexpr Iter_PerWorker = (_GemmCore_T::TileK + _GemmCore_T::WgM - 1) / _GemmCore_T::WgM;
+
+  static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
+                      sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+    int constexpr Iter_PerWorker = (GemmCoreT::TileK + GemmCoreT::WgM - 1) / GemmCoreT::WgM;
 #pragma unroll
     for (int icp = 0; icp < Iter_PerWorker; icp++) {
       {
-        for (size_t in = 0; in < _GemmCore_T::TileN; in++) {
-          dstptr[(sg_idxm + icp * _GemmCore_T::WgM) * _GemmCore_T::WgNEle +
-              (sg_idxn * _GemmCore_T::SgSize + sgId) * _GemmCore_T::TileN + in] =
-              ptr[tn + in + (i + sg_idxm + icp * _GemmCore_T::WgM) * n];
+        for (size_t in = 0; in < GemmCoreT::TileN; in++) {
+          dstptr[(helper.sg_idx_m() + icp * GemmCoreT::WgM) * GemmCoreT::WgNEle +
+                 (helper.sg_idx_n() * GemmCoreT::SgSize + helper.sg_id()) * GemmCoreT::TileN + in] =
+              _param.B[helper.item_g_n() + in + (koffset + helper.sg_idx_m() + icp * GemmCoreT::WgM) * _param.ldb];
         }
       }
     }

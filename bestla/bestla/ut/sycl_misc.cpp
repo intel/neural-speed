@@ -13,7 +13,7 @@ class UT_SyclDevice {
     dev->print();
   }
 };
-static UT_SyclDevice sUT_SyclDevice;
+//static UT_SyclDevice sUT_SyclDevice;
 
 class UT_SyclVector {
  public:
@@ -29,6 +29,6 @@ class UT_SyclVector {
     ut::buffer_error(hsrc.data(), hdst.data(), hsrc.size(), 0.f);
   }
 };
-static UT_SyclVector sUT_SyclVector;
+//static UT_SyclVector sUT_SyclVector;
 }  // namespace sycl_ut
 }  // namespace bestla

@@ -27,32 +27,15 @@ struct ParamActivationBase {
   const SrcT* A;
   int lda;
 };
-template <class _GemmCore_T, typename SrcT>
+template <class GemmCoreT, typename SrcT>
 class ActivationBase {
  public:
-  using AType = typename _GemmCore_T::AType;
-  using SRCType = SrcT;
-  using Param = ParamActivationBase<SRCType>;
-  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                          int k_offset, void* tmpcache, size_t cachesize) {
-    auto aptr = const_cast<AType*>(_param.A) + m_offset * _param.lda + k_offset;
-    auto alignedptr = utils::cpu_pointer_align(aptr);
-    bool use_rawptr = k_size % _GemmCore_T::KTILE == 0 && m_size >= _GemmCore_T::MTILE;
-    use_rawptr = use_rawptr && (alignedptr == aptr);
-    if (use_rawptr) {
-      *dstptr = aptr;
-      *dststep = _param.lda;
-      return BTLA_CODE::Success;
-    } else {
-      auto k_pad = utils::padto(k_size, _GemmCore_T::KTILE);
-      *dststep = k_pad;
-      return kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD, AType, AType>(aptr, *dstptr, m_size, k_size,
-                                                                                _param.lda, k_pad);
-    }
+  using AType = typename GemmCoreT::TA;
+  using SrcType = SrcT;
+  using Param = ParamActivationBase<SrcType>;
+  static inline void getActivation(const Param& _param, AType* aptr, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
   }
 };
-
-}  // namespace xve
 
 }  // namespace sycl_gemm
 }  // namespace bestla
