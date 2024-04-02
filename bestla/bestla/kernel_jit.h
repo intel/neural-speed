@@ -331,27 +331,6 @@ class DecompresssS3 {
             vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
             vmovups(ptr[reg_dst + 4 * (32 * i + 16)], Xbyak::Ymm(i));
             vmovups(ptr[reg_dst + 4 * (32 * i + 24)], Xbyak::Ymm(4 + i));
-
-            // vpmovsxbd(Xbyak::Ymm(4 + i), Xbyak::Xmm(i));
-            // vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
-            // vmovups(ptr[reg_dst + 4 * (32 * i + 0)], Xbyak::Ymm(4 + i));
-
-            // vextracti128(Xbyak::Xmm(4 + i), Xbyak::Ymm(i), 1);
-            // vpmovsxbd(Xbyak::Ymm(4 + i), Xbyak::Xmm(4 + i));
-            // vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
-            // vmovups(ptr[reg_dst + 4 * (32 * i + 16)], Xbyak::Ymm(4 + i));
-
-            // vpsrldq(Xbyak::Ymm(i), Xbyak::Ymm(i), 8);
-
-            // vpmovsxbd(Xbyak::Ymm(4 + i), Xbyak::Xmm(i));
-            // vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
-            // vmovups(ptr[reg_dst + 4 * (32 * i + 8)], Xbyak::Ymm(4 + i));
-
-            // vextracti128(Xbyak::Xmm(4 + i), Xbyak::Ymm(i), 1);
-            // vpmovsxbd(Xbyak::Ymm(4 + i), Xbyak::Xmm(4 + i));
-            // vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
-            // vmovups(ptr[reg_dst + 4 * (32 * i + 24)], Xbyak::Ymm(4 + i));
-
           } else {
             assert(0);
           }

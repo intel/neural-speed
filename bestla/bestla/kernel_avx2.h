@@ -14,7 +14,7 @@
 #pragma once
 #include "bestla.h"
 #include "bestla_utils.h"
-#include "bestla_jit.h"
+#include "kernel_jit.h"
 #include "kernel_ref.h"
 #if CompileAVX2()
 #include <immintrin.h>
