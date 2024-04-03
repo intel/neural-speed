@@ -31,7 +31,6 @@ pip install neural-speed
 
 ### Build from Source
 ```shell
-pip install -r requirements.txt
 pip install .
 ```
 
