@@ -136,12 +136,15 @@ void Grok::load(model_context* ctx, model_progress_callback progress_callback, v
 
       // qkv GEMM
       layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd}, backend);
-      layer.attn[1] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, n_embd_head_k * n_head_kv}, backend);
-      layer.attn[2] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd, n_embd_head_k * n_head_kv}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd,  1024}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd,  1024}, backend);
       layer.attn[3] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
 
       // ffn norm
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
+      layer.norm[2] = ml->get_tensor(layers_i + ".attn_output_norm.weight", {n_embd}, backend);
+      layer.norm[3] = ml->get_tensor(layers_i + ".layer_output_norm.weight", {n_embd}, backend);
+
 
       // ffn GEMM
       if (ml->verify_tensor(layers_i + ".ffn_gate_inp.weight")) {

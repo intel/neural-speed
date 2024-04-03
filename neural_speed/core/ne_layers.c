@@ -440,10 +440,11 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "TP_CONCAT",
     "DUMP_TENSOR",
     "CONV_1D",
+    "TANH"
     "DEBUG",
 };
 
-static_assert(NE_OP_COUNT == 69, "NE_OP_COUNT != 69");
+static_assert(NE_OP_COUNT == 70, "NE_OP_COUNT != 70");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
@@ -513,6 +514,7 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "conv_1d(x)",
     "debug(x)",
     "argsort(x)",
+    "tanh(x)",
 };
 
 static_assert(sizeof(struct ne_object) % NE_MEM_ALIGN == 0, "ne_object size must be a multiple of NE_MEM_ALIGN");
@@ -706,6 +708,8 @@ static inline int ne_up(int n, int m) {
   NE_ASSERT((m & (m - 1)) == 0);
   return (n + m - 1) & ~(m - 1);
 }
+
+// static inline  void ne_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = tanhf(x[i]);  }
 
 // assert that pointer is aligned to NE_MEM_ALIGN
 #define ne_assert_aligned(ptr) NE_ASSERT(((uintptr_t)(ptr)) % NE_MEM_ALIGN == 0)
@@ -1644,6 +1648,20 @@ struct ne_tensor* ne_mul_impl(struct ne_context* ctx, struct ne_tensor* a, struc
 
   return result;
 }
+
+struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a) {
+
+  bool is_node = false;
+
+  struct ne_tensor* result =  ne_dup_tensor(ctx, a);
+
+  result->op = NE_OP_TANH;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = a;
+
+  return result;
+}
+
 
 struct ne_tensor* ne_mul(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b) {
   return ne_mul_impl(ctx, a, b, false);
@@ -8168,7 +8186,49 @@ static void ne_compute_forward_get_rows(const struct ne_compute_params* params, 
 }
 
 // ne_compute_forward_get_rows_back
+// ggml_compute_forward_tanh
 
+static void ne_compute_forward_tanh_f32(
+        const struct ne_compute_params * params,
+        struct ne_tensor * src0,
+        struct ne_tensor * dst) {
+
+    assert(params->ith == 0);
+    assert(ne_are_same_shape(src0, dst));
+
+    if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+        return;
+    }
+
+    const int n  = ne_nrows(src0);
+    const int nc = src0->ne[0];
+
+    assert(dst->nb[0]  == sizeof(float));
+    assert(src0->nb[0] == sizeof(float));
+
+    for (int i = 0; i < n; i++) {
+        ne_vec_tanh_f32(nc,
+                (float *) ((char *) dst->data  + i*( dst->nb[1])),
+                (float *) ((char *) src0->data + i*(src0->nb[1])));
+    }
+}
+
+static void ne_compute_forward_tanh(
+        const struct ne_compute_params * params,
+        struct ne_tensor * src0,
+        struct ne_tensor * dst) {
+
+    switch (src0->type) {
+        case NE_TYPE_F32:
+            {
+                ne_compute_forward_tanh_f32(params, src0, dst);
+            } break;
+        default:
+            {
+                NE_ASSERT(false);
+            } break;
+    }
+}
 static void ne_compute_forward_get_rows_back_f32_f16(const struct ne_compute_params* params,
                                                      const struct ne_tensor* src0, const struct ne_tensor* src1,
                                                      const struct ne_tensor* opt0, struct ne_tensor* dst) {
@@ -10422,6 +10482,9 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
     case NE_OP_MUL_MAT_ID: {
       ne_compute_forward_mul_mat_id(params, tensor->src0, tensor->src1, tensor);
     } break;
+    case NE_OP_TANH: {
+      ne_compute_forward_tanh(params, tensor->src0, tensor);
+    } break;
     case NE_OP_ARGSORT: {
       ne_compute_forward_argsort(params, tensor->src0, tensor);
     } break;
@@ -11265,7 +11328,8 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_NEG:
         case NE_OP_STEP:
         case NE_OP_MUL:
-        case NE_OP_RELU: {
+        case NE_OP_RELU:
+        case NE_OP_TANH: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
           } else {

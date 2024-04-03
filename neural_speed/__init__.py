@@ -78,6 +78,8 @@ class Model:
             import neural_speed.whisper_cpp as cpp_model
         elif model_type == "mixtral":
             import neural_speed.mixtral_cpp as cpp_model
+        elif model_type == "grok":
+            import neural_speed.grok_cpp as cpp_model
         else:
             raise TypeError("Unsupported model type {}!".format(model_type))
         self.module = cpp_model

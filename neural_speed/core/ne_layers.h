@@ -355,6 +355,7 @@ NE_API struct ne_tensor* ne_view_4d(struct ne_context* ctx, struct ne_tensor* a,
 
 NE_API struct ne_tensor* ne_permute(struct ne_context* ctx, struct ne_tensor* a, int axis0, int axis1, int axis2,
                                     int axis3);
+NE_API struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a);
 
 // alias for ne_permute(ctx, a, 1, 0, 2, 3)
 NE_API struct ne_tensor* ne_transpose(struct ne_context* ctx, struct ne_tensor* a);

@@ -80,6 +80,8 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
   const int n_rot = hparams.n_rot;
   const int head_dim = n_embd / n_head;
   const int n_gqa_embd = head_dim * n_head_kv;
+  int n_expert = hparams.n_experts;
+  int n_expert_used = hparams.n_experts_used;
 
   auto& mem_per_token = lctx.mem_per_token;
   auto& buf_compute = lctx.buf_compute;
@@ -121,8 +123,10 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
   ne_set_name(embd, "embd");
+  // int input_token[6]={752, 1319,  333, 2892,  360,  855};
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
+    // memcpy(static_cast<model_token*>(embd->data) + i * N, input_token, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
@@ -130,38 +134,32 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
 
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
-
     lctx.use_buf(ctx0, 0);
-
-    {
       // RMS
-      {
-        cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
-
+    cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
         // cur = cur*attention_norm(broadcasted)
-        cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
-      }
+    cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
 
       // compute QKV
-      struct ne_tensor* Qcur;
-      struct ne_tensor* Kcur;
-      struct ne_tensor* Vcur;
+    struct ne_tensor* Qcur;
+    struct ne_tensor* Kcur;
+    struct ne_tensor* Vcur;
 
-        Qcur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
-        Qcur = ne_reshape_3d(ctx0, Qcur, head_dim, n_head, N);
+    Qcur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
+    Qcur = ne_reshape_3d(ctx0, Qcur, head_dim, n_head, N);
 
-        Kcur = ne_mul_mat(ctx0, model.layers[il].attn[1], cur);
-        Kcur = ne_reshape_3d(ctx0, Kcur, head_dim, n_head_kv, N);
+    Kcur = ne_mul_mat(ctx0, model.layers[il].attn[1], cur);
+    Kcur = ne_reshape_3d(ctx0, Kcur, head_dim, n_head_kv, N);
 
-        Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-        Vcur = ne_reshape_3d(ctx0, Vcur, head_dim, n_head_kv, N);
+    Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+    Vcur = ne_reshape_3d(ctx0, Vcur, head_dim, n_head_kv, N);
 
       // using mode = 2 for GPT-NeoX mode
-      Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
-      ne_set_name(Qcur, "Qcur");
-      Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
-      ne_set_name(Kcur, "kcur");
-      const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
+    Qcur = ne_rope_inplace(ctx0, Qcur, n_past, 128, 2, 0, hparams.freq_base, hparams.freq_scale);
+    ne_set_name(Qcur, "Qcur");
+    Kcur = ne_rope_inplace(ctx0, Kcur, n_past, 128, 2, 0, hparams.freq_base, hparams.freq_scale);
+    ne_set_name(Kcur, "kcur");
+    const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
       // store key and value to memory
       if (!run_mha_reordered) {
         {
@@ -210,11 +208,10 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
                        il * n_ctx * ne_element_size(kv_self.k) * n_gqa_embd * kv_n_ctx_block);
 
         // K * Q
-        struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
+        // struct ne_tensor* KQ = ne_scale_inplace(ctx0,ne_mul_mat(ctx0, K, Q),ne_new_f32(ctx0,0.08838834764831845f));
+        struct ne_tensor* KQ = ne_scale_inplace(ctx0,ne_mul_mat(ctx0, K, Q),ne_new_f32(ctx0,0.08838834764831845f/30.0f));
+        struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, ne_tanh(ctx0, KQ), ne_new_f32(ctx0,30.0f));
 
-        // KQ_scaled = KQ / sqrt(n_embd/n_head)
-        struct ne_tensor* KQ_scaled =
-            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>((n_embd) / n_head))));
 
         // KQ_masked = mask_past(KQ_scaled)
         struct ne_tensor* KQ_masked = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
@@ -280,66 +277,70 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
       }
       // projection
      
-        cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
+      cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
 
-    }
-    lctx.use_buf(ctx0, 1);
-
-    cur = ne_add(ctx0, cur, inpL);
-    inpL = cur;
-
-    // this is independent of the self-attention result, so it could be done in parallel to the self-attention
-    // note here we pass inpL instead of cur
-    {
+      
+      lctx.use_buf(ctx0, 1);
       cur = ne_rms_norm(ctx0, cur, hparams.norm_eps);
 
-      cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
-    }
-    ne_tensor* logits = ne_mul_mat(ctx0, model.layers[il].ffn_gate_inp, cur_seq);  // [n_tokens, num_experts]
-    ne_tensor* probs = ne_soft_max_inplace(ctx0, logits);
-    ne_tensor* selected_experts = ne_top_k(ctx0, probs, n_expert_used);
-    ne_tensor* weights = ne_get_rows(ctx0, ne_reshape_3d(ctx0, probs, 1, n_expert, moe_sl), selected_experts);
-    weights = ne_reshape_2d(ctx0, weights, n_expert_used, moe_sl);
-    ne_tensor* weights_sum = ne_sum_rows(ctx0, weights);
-    weights_sum = ne_repeat(ctx0, weights_sum, weights);
-    weights = ne_div(ctx0, weights, weights_sum);
-    ne_tensor* moe_out_i = nullptr;
-    for (int i = 0; i < n_expert_used; ++i) {
-        ne_tensor* cur_expert;
-        ne_tensor* cur_up =
-                ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur_seq);
-              ne_set_name(cur_up, "ffn_moe_up");
+      cur = ne_mul(ctx0, cur, model.layers[il].norm[2]);
+      cur = ne_add(ctx0, cur, inpL);
+      inpL = cur;
 
-              ne_tensor* cur_gate =
-                  ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur_seq);
-              ne_set_name(cur_gate, "ffn_moe_gate");
+      // this is independent of the self-attention result, so it could be done in parallel to the self-attention
+      // note here we pass inpL instead of cur
+      {
+        cur = ne_rms_norm(ctx0, cur, hparams.norm_eps);
 
-              cur_gate = ne_silu(ctx0, cur_gate);
-              ne_set_name(cur_gate, "ffn_moe_silu");
+        cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
+      }
+      ne_tensor* logits = ne_mul_mat(ctx0, model.layers[il].ffn_gate_inp, cur);  // [n_tokens, num_experts]
+      ne_tensor* probs = ne_soft_max_inplace(ctx0, logits);
+      ne_tensor* selected_experts = ne_top_k(ctx0, probs, n_expert_used);
+      ne_tensor* weights = ne_get_rows(ctx0, ne_reshape_3d(ctx0, probs, 1, n_expert, N), selected_experts);
+      weights = ne_reshape_2d(ctx0, weights, n_expert_used, N);
+      // ne_tensor* weights_sum = ne_sum_rows(ctx0, weights);
+      // weights_sum = ne_repeat(ctx0, weights_sum, weights);
+      // weights = ne_div(ctx0, weights, weights_sum);
+      ne_tensor* moe_out = nullptr;
+      for (int i = 0; i < n_expert_used; ++i) {
+          ne_tensor* cur_expert;
+          ne_tensor* cur_up =
+                  ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
+                ne_set_name(cur_up, "ffn_moe_up");
 
-              cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
-              ne_set_name(cur_expert, "ffn_moe_gate_par");
+                ne_tensor* cur_gate =
+                    ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur);
+                ne_set_name(cur_gate, "ffn_moe_gate");
 
-              cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
-                                         cur_expert);  // [n_tokens, n_embd]
-              ne_set_name(cur_expert, "ffn_moe_down");
+                cur_gate = ne_gelu(ctx0, cur_gate);
+                ne_set_name(cur_gate, "ffn_moe_gelu");
 
-            cur_expert = ne_mul(
-                ctx0, cur_expert,
-                ne_repeat(ctx0, ne_view_2d(ctx0, weights, 1, moe_sl, weights->nb[1], i * weights->nb[0]), cur_expert));
-            ne_set_name(cur_expert, "ffn_moe_weighted_");
+                cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
+                ne_set_name(cur_expert, "ffn_moe_gate_par");
 
-            if (i == 0) {
-              moe_out_i = cur_expert;
-            } else {
-              moe_out_i = ne_add(ctx0, moe_out_i, cur_expert);
-              ne_set_name(moe_out_i, ("ffn_moe_out_"));
+                cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
+                                          cur_expert);  // [n_tokens, n_embd]
+                ne_set_name(cur_expert, "ffn_moe_down");
+
+              cur_expert = ne_mul(
+                  ctx0, cur_expert,
+                  ne_repeat(ctx0, ne_view_2d(ctx0, weights, 1, N, weights->nb[1], i * weights->nb[0]), cur_expert));
+              ne_set_name(cur_expert, "ffn_moe_weighted_");
+
+              if (i == 0) {
+                moe_out = cur_expert;
+              } else {
+                moe_out = ne_add(ctx0, moe_out, cur_expert);
+                ne_set_name(moe_out, ("ffn_moe_out"));
+              }
             }
-          }
-    // input for next layer
-    inpL = ne_add(ctx0, cur, inpL);
+      // input for next layer
+      cur = moe_out;
+      cur = ne_rms_norm(ctx0, cur, hparams.norm_eps);
+      cur = ne_mul(ctx0, cur, model.layers[il].norm[3]);
+      inpL = ne_add(ctx0, cur, inpL);
   }
-
   lctx.use_buf(ctx0, 0);
   // used at the end to optionally extract the embeddings
   struct ne_tensor* embeddings = nullptr;
