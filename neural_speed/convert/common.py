@@ -197,21 +197,28 @@ def load_vocab(path: Path) -> SentencePieceVocab:
     # Be extra-friendly and accept either a file or a directory.  Also, if it's
     # a directory, it might be the model directory, and tokenizer.model might
     # be in the parent of that.
-    if path.is_dir():
-        path2 = path / "tokenizer.model"
+    local_path = path
+    if not local_path.exists():
+        from huggingface_hub import snapshot_download
+        local_path = snapshot_download(repo_id=str(path.parent),
+                                             allow_patterns=["*.model"],
+                                             )
+        local_path = Path(local_path)
+    if local_path.is_dir():
+        path2 = local_path / "tokenizer.model"
         # Use `.parent` instead of /.. to handle the symlink case better.
-        path3 = path.parent / "tokenizer.model"
+        path3 = local_path.parent / "tokenizer.model"
         if path2.exists():
-            path = path2
+            local_path = path2
         elif path3.exists():
-            path = path3
+            local_path = path3
         else:
             raise FileNotFoundError(
-                f"Could not find tokenizer.model in {path} or its parent; if it's in another directory, \
+                f"Could not find tokenizer.model in {local_path} or its parent; if it's in another directory, \
                 pass the directory as --vocab-dir")
-    added_tokens_path = path.parent / "added_tokens.json"
-    print(f"Loading vocab file {path}")
-    return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
+    added_tokens_path = local_path.parent / "added_tokens.json"
+    print(f"Loading vocab file {local_path}")
+    return SentencePieceVocab(local_path, added_tokens_path if added_tokens_path.exists() else None)
 
 
 def expandToInt4(qweight):
@@ -397,24 +404,32 @@ def find_quantized_model_file(model_path):
                 warnings.warn(f'Detected {len(found)} {ext} model, use the first one {found[0]}.')
             print(f"Detected model file {found[0]}")
             return str(found[0])
+        else:
+            return None
 
 
 def load_quantized_safetensors(model_path):
     # load GPTQ & AWQ models, only for safetensors
     from safetensors.torch import load_file
     safetensors = []
-    for file in os.listdir(model_path):
-        if file.endswith(".safetensors"):
-            safetensors.append(file)
+    local_model_path = model_path
+    if not os.path.exists(local_model_path):
+        from huggingface_hub import snapshot_download
+        local_model_path = snapshot_download(repo_id=model_path,
+                                             allow_patterns=["*.safetensors"],
+                                             )
+    for m_file in os.listdir(local_model_path):
+        if m_file.endswith(".safetensors"):
+            safetensors.append(m_file)
 
     print(f"safetensors list = {safetensors}")
     model = {}
-    for file in safetensors:
-        tmp = load_file(model_path + "/" + file)
+    for m_file in safetensors:
+        tmp = load_file(os.path.join(local_model_path, m_file))
         if isinstance(tmp, dict):
             model.update(tmp)
 
-    with open(model_path + '/config.json', "r", encoding="utf-8") as f:
+    with open(os.path.join(local_model_path, 'config.json'), "r", encoding="utf-8") as f:
         config = json.load(f)
 
     quantize_config = config["quantization_config"]
@@ -424,17 +439,22 @@ def load_quantized_safetensors(model_path):
 
 
 def load_quantized_model(model_path):
-    input_path = find_quantized_model_file(model_path)
+    local_model_path = model_path
+    if not os.path.exists(local_model_path):
+        from huggingface_hub import snapshot_download
+        local_model_path = snapshot_download(repo_id=model_path,
+                                             allow_patterns=["*.pt", "*.safetensors", "*.json"],
+                                             )
+    input_path = find_quantized_model_file(local_model_path)
     model = None
     if input_path.endswith('pt'):
         model = torch.load(input_path, map_location="cpu")
     elif input_path.endswith('safetensors'):
-        from safetensors.torch import load_file
-        model = load_file(input_path)
+        return load_quantized_safetensors(local_model_path)
     else:
         print("unknown input model path, only support .safetensors or .pt file.")
 
-    with open(model_path + '/config.json', "r", encoding="utf-8") as f:
+    with open(os.path.join(local_model_path, "config.json"), "r", encoding="utf-8") as f:
         config = json.load(f)
 
     quantize_config = config["quantization_config"]

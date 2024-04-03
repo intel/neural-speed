@@ -4,6 +4,7 @@ cmake
 datasets
 einops
 gguf
+huggingface_hub
 matplotlib
 numpy
 peft
