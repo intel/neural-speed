@@ -12,6 +12,8 @@ from cmake import CMAKE_BIN_DIR
 from cpuinfo import get_cpu_info
 cpu_flags = get_cpu_info()['flags']
 
+result = subprocess.Popen("pip install -r requirements.txt", shell=True)
+result.wait()
 
 CMAKE_BUILD_TYPE = os.environ.get("CMAKE_BUILD_TYPE", "Release")
 """ Whether to build with -O0 / -O3 / -g; could be one of Debug / Release / RelWithDebInfo; default to Release """
@@ -36,10 +38,6 @@ NS_WITH_AVX2 = check_env_flag("NS_WITH_AVX2", 'avx512f' not in cpu_flags)
 NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
-
-def fetch_requirements(path):
-    with open(path, "r") as fd:
-        return [r.strip() for r in fd.readlines()]
 
 class CMakeExtension(Extension):
     """CMakeExtension class."""
@@ -233,27 +231,6 @@ if __name__ == '__main__':
         ]
     cmdclass={'build_ext': CMakeBuild}
 
-    install_requires = [
-        "accelerate",
-        "cmake",
-        "datasets",
-        "einops",
-        "gguf",
-        "huggingface_hub",
-        "matplotlib",
-        "numpy",
-        "peft",
-        "protobuf<3.20",
-        "py-cpuinfo",
-        "sentencepiece",
-        "setuptools>=61",
-        "tiktoken",
-        "transformers",
-        "transformers_stream_generator",
-        "zipfile38",
-    ] # fetch_requirements("requirements.txt")
-    print(f"install_requires: {install_requires}")
-
     setup(
         name="neural-speed",
         author="Intel AISE/AIPC Team",
@@ -272,7 +249,6 @@ if __name__ == '__main__':
         package_data={
             '': ["*.yaml", "*.mat"],
         },
-        install_requires=install_requires,
         cmdclass=cmdclass,
         python_requires='>=3.7.0',
         classifiers=[
