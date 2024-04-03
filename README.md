@@ -27,10 +27,9 @@ Support typical LLMs in GGUF format such as Llama2, Falcon, MPT, Bloom etc. More
 ```shell
 # install torch
 # linux
-pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install neural-speed torch --extra-index-url https://download.pytorch.org/whl/cpu
 # windows
-pip install torch
-pip install neural-speed
+pip install neural-speed torch
 ```
 
 ### Build from Source

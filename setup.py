@@ -239,6 +239,7 @@ if __name__ == '__main__':
         "datasets",
         "einops",
         "gguf",
+        "huggingface_hub",
         "matplotlib",
         "numpy",
         "peft",
@@ -249,6 +250,7 @@ if __name__ == '__main__':
         "tiktoken",
         "transformers",
         "transformers_stream_generator",
+        "zipfile38",
     ] # fetch_requirements("requirements.txt")
     print(f"install_requires: {install_requires}")
 
