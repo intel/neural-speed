@@ -1851,7 +1851,7 @@ static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model
                                           const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const auto& kv_self = ctx->model.kv_self;
   const auto& hparams = ctx->model.hparams;
-  uint32_t heads_kv = 0;
+  int heads_kv = 0;
   auto h_n_head_kv = hparams.n_head_kv;
   auto h_multi_query_group_num = hparams.multi_query_group_num;
   if (h_n_head_kv > 0) {
