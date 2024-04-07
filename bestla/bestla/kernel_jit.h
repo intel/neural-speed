@@ -273,7 +273,7 @@ class DecompresssS3 {
     void generate() {
       inLocalLabel();  // use local label for multiple instance
       {
-        Xbyak::util::StackFrame st(this, 1, 13);
+        Xbyak::util::StackFrame st(this, 1, 13, 10 * 16);
         parambase = st.p[0];
         reg_bit1ptr = st.t[0];
         reg_bit2ptr = st.t[1];
@@ -286,6 +286,7 @@ class DecompresssS3 {
         xor_(reg_loop, reg_loop);
         mov(reg_loop.cvt32(), dword[parambase + OFFSET(unpack_elt)]);
         xor_(reg_iter, reg_iter);
+        vreg_push(rsp);
         Xbyak::Ymm lowMask = ymm15;
         Xbyak::Ymm highMask = ymm14;
         Xbyak::Ymm bit1Mask = ymm13;
@@ -343,6 +344,7 @@ class DecompresssS3 {
         cmp(reg_iter, reg_loop);
         jb("loop_label");
         mov(reg_ret, 0);
+        vreg_pop(rsp);
       }
       outLocalLabel();  // end of local label
     }
