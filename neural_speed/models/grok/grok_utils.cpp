@@ -51,7 +51,7 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
 }
 
 void Grok::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
-                 bool vocab_only_) {
+                bool vocab_only_) {
   model_context& lctx = *ctx;
   n_gpu_layer = n_gpu_layer_;
   use_mmap = use_mmap_;
@@ -136,15 +136,14 @@ void Grok::load(model_context* ctx, model_progress_callback progress_callback, v
 
       // qkv GEMM
       layer.attn[0] = ml->get_tensor(layers_i + ".attn_q.weight", {n_embd, n_embd}, backend);
-      layer.attn[1] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd,  1024}, backend);
-      layer.attn[2] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd,  1024}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".attn_k.weight", {n_embd, 1024}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".attn_v.weight", {n_embd, 1024}, backend);
       layer.attn[3] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
 
       // ffn norm
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
       layer.norm[2] = ml->get_tensor(layers_i + ".attn_output_norm.weight", {n_embd}, backend);
       layer.norm[3] = ml->get_tensor(layers_i + ".layer_output_norm.weight", {n_embd}, backend);
-
 
       // ffn GEMM
       if (ml->verify_tensor(layers_i + ".ffn_gate_inp.weight")) {
@@ -167,33 +166,43 @@ void Grok::load(model_context* ctx, model_progress_callback progress_callback, v
       }
     }
   } else {
-    model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-    model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[0] = ml->get_tensor("transformer.in_out_embed.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("transformer.rms_norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
       auto& layer = model.layers[i];
-      std::string layers_i = "model.layers." + std::to_string(i);
+      std::string layers_i = "transformer.decoder_layer." + std::to_string(i);
 
       // attention norm
-      layer.norm[0] = ml->get_tensor(layers_i + ".input_layernorm.weight", {n_embd}, backend);
+      layer.norm[0] = ml->get_tensor(layers_i + ".rms_norm.weight", {n_embd}, backend);
 
       // qkv GEMM
-      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd_head_k * n_head}, backend);
-      layer.attn[1] =
-          ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd_head_k * n_head_kv}, backend);
-      layer.attn[2] =
-          ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd_head_k * n_head_kv}, backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd_head_k * n_head, n_embd}, backend);
+      layer.attn[0] = ml->get_tensor(layers_i + ".multi_head_attention.query.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".multi_head_attention.key.weight", {n_embd, 1024}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".multi_head_attention.value.weight", {n_embd, 1024}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".multi_head_attention.linear.weight", {n_embd, n_embd}, backend);
 
       // ffn norm
-      layer.norm[1] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
+      layer.norm[1] = ml->get_tensor(layers_i + ".rms_norm_2.weight", {n_embd}, backend);
+      layer.norm[2] = ml->get_tensor(layers_i + ".rms_norm_1.weight", {n_embd}, backend);
+      layer.norm[3] = ml->get_tensor(layers_i + ".rms_norm_3.weight", {n_embd}, backend);
 
       // ffn GEMM
-      layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.gate_proj.weight", {n_embd, n_ff}, backend);
-      layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.down_proj.weight", {n_ff, n_embd}, backend);
-      layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
+      if (ml->verify_tensor(layers_i + ".router.weight")) {
+        NE_ASSERT(n_expert > 0);
+        NE_ASSERT(n_expert_used > 0);
+        layer.ffn_gate_inp = ml->get_tensor(layers_i + ".router.weight", {n_embd, n_expert}, backend);
+        for (uint32_t x = 0; x < n_expert; ++x) {
+          layer.ffn_gate_exp[x] =
+              ml->get_tensor(layers_i + ".moe." + std::to_string(x) + ".linear.weight", {n_embd, n_ff}, backend);
+          layer.ffn_down_exp[x] =
+              ml->get_tensor(layers_i + ".moe." + std::to_string(x) + ".linear_1.weight", {n_ff, n_embd}, backend);
+          layer.ffn_up_exp[x] =
+              ml->get_tensor(layers_i + ".moe." + std::to_string(x) + ".linear_v.weight", {n_embd, n_ff}, backend);
+        }
+      }
       if (backend != NE_BACKEND_CPU) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.norm[1]) +
@@ -244,4 +253,3 @@ class grok_quant_layer : public quant_layer_base {
   }
 };
 REGISTER_QUANT_LAYER_CLASS(grok);
-

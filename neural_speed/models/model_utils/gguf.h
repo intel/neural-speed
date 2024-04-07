@@ -257,7 +257,7 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {{LLM_ARCH_LLAMA, "llama
                                                          {LLM_ARCH_PHI, "phi"},
                                                          {LLM_ARCH_GEMMA, "gemma"},
                                                          {LLM_ARCH_QWEN2, "qwen2"},
-							 {LLM_ARCH_GROK, "grok"}};
+                                                         {LLM_ARCH_GROK, "grok"}};
 
 struct gguf_tensor_info {
   struct gguf_str name;

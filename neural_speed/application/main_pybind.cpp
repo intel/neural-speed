@@ -932,7 +932,6 @@ PYBIND11_MODULE(gemma_cpp, m)
 
 PYBIND11_MODULE(grok_cpp, m)
 
-
 #endif
 {
   m.doc() = "cpp model python binding";

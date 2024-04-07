@@ -1380,9 +1380,12 @@ struct model_model_loader {
                   it = tensors_map.name_to_idx.find("transformer.embedding.word_embeddings.weight");  // ChatGLM-2
                   if (it == tensors_map.name_to_idx.end()) {
                     it = tensors_map.name_to_idx.find("model.decoder.embed_tokens.weight");
-                    if (it != tensors_map.name_to_idx.end()) return 1;  // hacky solution for OPT loading
                     if (it == tensors_map.name_to_idx.end()) {
-                      throw std::string("missing tok_embeddings.weight");
+                      it = tensors_map.name_to_idx.find("transformer.in_out_embed.weight");  // GROK
+                      if (it != tensors_map.name_to_idx.end()) return 1;  // hacky solution for OPT loading
+                      if (it == tensors_map.name_to_idx.end()) {
+                        throw std::string("missing tok_embeddings.weight");
+                      }
                     }
                   }
                 }

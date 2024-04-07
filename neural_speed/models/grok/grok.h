@@ -34,7 +34,7 @@ static const model_scratch grok_mem_req(int n_layers, float enlarge_scale = 1.0f
       return {
           static_cast<unsigned long long>(enlarge_scale * 3072) * MB,
           static_cast<unsigned long long>(enlarge_scale * 3072) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 3072*10) * MB,
+          static_cast<unsigned long long>(enlarge_scale * 3072 * 10) * MB,
       };
     default:
       MODEL_ASSERT(false);

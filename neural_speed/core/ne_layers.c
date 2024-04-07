@@ -709,7 +709,8 @@ static inline int ne_up(int n, int m) {
   return (n + m - 1) & ~(m - 1);
 }
 
-// static inline  void ne_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] = tanhf(x[i]);  }
+// static inline  void ne_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] =
+// tanhf(x[i]);  }
 
 // assert that pointer is aligned to NE_MEM_ALIGN
 #define ne_assert_aligned(ptr) NE_ASSERT(((uintptr_t)(ptr)) % NE_MEM_ALIGN == 0)
@@ -1650,10 +1651,9 @@ struct ne_tensor* ne_mul_impl(struct ne_context* ctx, struct ne_tensor* a, struc
 }
 
 struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a) {
-
   bool is_node = false;
 
-  struct ne_tensor* result =  ne_dup_tensor(ctx, a);
+  struct ne_tensor* result = ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_TANH;
   result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
@@ -1661,7 +1661,6 @@ struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a) {
 
   return result;
 }
-
 
 struct ne_tensor* ne_mul(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b) {
   return ne_mul_impl(ctx, a, b, false);
@@ -5445,7 +5444,7 @@ static void ne_compute_forward_mul(const struct ne_compute_params* params, const
 
 static void ne_compute_forward_div_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        const struct ne_tensor* src1, struct ne_tensor* dst) {
-  // assert(params->ith == 0);
+  assert(params->ith == 0);
   assert(ne_are_same_shape(src0, src1) && ne_are_same_shape(src0, dst));
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -5674,7 +5673,7 @@ static void ne_compute_forward_sum(const struct ne_compute_params* params, const
 
 static void ne_compute_forward_sum_rows_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                             struct ne_tensor* dst) {
-  // NE_ASSERT(params->ith == 0);
+  NE_ASSERT(params->ith == 0);
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
@@ -8188,46 +8187,36 @@ static void ne_compute_forward_get_rows(const struct ne_compute_params* params, 
 // ne_compute_forward_get_rows_back
 // ggml_compute_forward_tanh
 
-static void ne_compute_forward_tanh_f32(
-        const struct ne_compute_params * params,
-        struct ne_tensor * src0,
-        struct ne_tensor * dst) {
+static void ne_compute_forward_tanh_f32(const struct ne_compute_params* params, struct ne_tensor* src0,
+                                        struct ne_tensor* dst) {
+  assert(params->ith == 0);
+  assert(ne_are_same_shape(src0, dst));
 
-    assert(params->ith == 0);
-    assert(ne_are_same_shape(src0, dst));
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
 
-    if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
-        return;
-    }
+  const int n = ne_nrows(src0);
+  const int nc = src0->ne[0];
 
-    const int n  = ne_nrows(src0);
-    const int nc = src0->ne[0];
+  assert(dst->nb[0] == sizeof(float));
+  assert(src0->nb[0] == sizeof(float));
 
-    assert(dst->nb[0]  == sizeof(float));
-    assert(src0->nb[0] == sizeof(float));
-
-    for (int i = 0; i < n; i++) {
-        ne_vec_tanh_f32(nc,
-                (float *) ((char *) dst->data  + i*( dst->nb[1])),
-                (float *) ((char *) src0->data + i*(src0->nb[1])));
-    }
+  for (int i = 0; i < n; i++) {
+    ne_vec_tanh_f32(nc, (float*)((char*)dst->data + i * (dst->nb[1])), (float*)((char*)src0->data + i * (src0->nb[1])));
+  }
 }
 
-static void ne_compute_forward_tanh(
-        const struct ne_compute_params * params,
-        struct ne_tensor * src0,
-        struct ne_tensor * dst) {
-
-    switch (src0->type) {
-        case NE_TYPE_F32:
-            {
-                ne_compute_forward_tanh_f32(params, src0, dst);
-            } break;
-        default:
-            {
-                NE_ASSERT(false);
-            } break;
-    }
+static void ne_compute_forward_tanh(const struct ne_compute_params* params, struct ne_tensor* src0,
+                                    struct ne_tensor* dst) {
+  switch (src0->type) {
+    case NE_TYPE_F32: {
+      ne_compute_forward_tanh_f32(params, src0, dst);
+    } break;
+    default: {
+      NE_ASSERT(false);
+    } break;
+  }
 }
 static void ne_compute_forward_get_rows_back_f32_f16(const struct ne_compute_params* params,
                                                      const struct ne_tensor* src0, const struct ne_tensor* src1,
@@ -11315,9 +11304,9 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_SUM:
         case NE_OP_DIV:
         case NE_OP_SUM_ROWS:
-        //  {
-        //   node->n_tasks = 1;
-        // } break;
+        case NE_OP_TANH: {
+          node->n_tasks = 1;
+        } break;
         case NE_OP_SQR:
         case NE_OP_SQRT:
         case NE_OP_LOG:
@@ -11328,8 +11317,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_NEG:
         case NE_OP_STEP:
         case NE_OP_MUL:
-        case NE_OP_RELU:
-        case NE_OP_TANH: {
+        case NE_OP_RELU: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
           } else {
