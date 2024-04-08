@@ -5,7 +5,7 @@
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
 
-#ifdef BTLA_UT_DEBUG
+#ifdef BTLA_UT_PROLOGUE_B
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -214,8 +214,8 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
+// static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
-static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 
 class UT_S3_WOQ {
  public:
@@ -973,8 +973,8 @@ class UT_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompFp32 sUT_CompFp32;
+#endif
 
 class UT_CompInt8 {
  public:
