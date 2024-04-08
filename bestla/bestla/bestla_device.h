@@ -313,7 +313,7 @@ class CpuDevice {
           for (auto& i : SMT_core) printf("%d,", i);
           printf("\n");
         }
-        mHybrid = !(E_core.empty() || P_core.empty()); // in case of bond core by external
+        mHybrid = !(E_core.empty() || P_core.empty());  // in case of bond core by external
         if (!E_core.empty()) {
           E_L1Cache = L1[E_core[0]];
           E_L2Cache = L2[E_core[0]] / 4;

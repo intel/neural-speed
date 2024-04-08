@@ -798,7 +798,7 @@ class UTWOQ_CompInt8 {
   UTWOQ_CompInt8() {
     UT_START();
     ut_s4();
-    //ut_s8();
+    // ut_s8();
   }
 
   void ut_s4() {
