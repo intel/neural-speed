@@ -203,7 +203,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
     }
     ne_tensor *Qcur, *Kcur, *Vcur;
-    if (false && bestla_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
+    if (bestla_fusion_QKV_f32f32_support(model.layers[il].attn[0]->data, model.layers[il].attn[1]->data,
                                          model.layers[il].attn[2]->data, seq_len_sum, model.layers[il].attn[0]->ne[1],
                                          model.layers[il].attn[0]->ne[0]) &&
         n_head == n_head_kv) {  // fused execution of QKV
@@ -500,7 +500,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
       }
       if (n_expert == 0) {
-        if (false && bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
+        if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,
                                                   model.layers[il].ffn[2]->data, seq_len_sum, cur->ne[0],
                                                   model.layers[il].ffn[0]->ne[1], model.layers[il].ffn[1]->ne[1])) {
           cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
