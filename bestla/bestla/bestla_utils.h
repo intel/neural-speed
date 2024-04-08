@@ -592,7 +592,7 @@ using microseconds = std::chrono::microseconds;
 template <typename _DUR = std::chrono::milliseconds>
 class timer {
  public:
-  using sclock_t = std::chrono::high_resolution_clock;
+  using sclock_t = std::chrono::steady_clock;
   using stime_point_t = std::chrono::time_point<sclock_t>;
 
   timer() { clear(); }
@@ -682,9 +682,11 @@ class timer_statistics_logger {
   float min_val, max_val, avg_val;
 
   void record() {
-    min_val = statis.min_val / log_ratio;
-    max_val = statis.max_val / log_ratio;
-    avg_val = statis.avg_val / log_ratio;
+    if (statis.count) {
+      min_val = statis.min_val / log_ratio;
+      max_val = statis.max_val / log_ratio;
+      avg_val = statis.avg_val / log_ratio;
+    }
   }
 
  private:

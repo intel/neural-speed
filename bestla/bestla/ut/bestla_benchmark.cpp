@@ -1259,7 +1259,7 @@ class UTWOQ_GGML {
     for (int i = 1; i < batch; i++) {
       memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(float));
     }
-    using LOG = timer_statistics_logger<TestMs * 2>;
+    using LOG = timer_statistics_logger<TestMs/2>;
     float testtime = float(TestMs);
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
@@ -1285,7 +1285,7 @@ class UTWOQ_GGML {
     }
   }
 };
-static UTWOQ_GGML sUTWOQ_GGML;
+//static UTWOQ_GGML sUTWOQ_GGML;
 
 #include "kernel_avx2.h"
 template <int NTILE, typename SBT>
@@ -1339,7 +1339,7 @@ class UTWOQ_S4_VecDot {
  public:
   UTWOQ_S4_VecDot() {
     UT_START();
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
   }
 
   template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -1377,10 +1377,12 @@ class UTWOQ_S4_VecDot {
     kernel.mProA.quantize({A, k, &As[0]}, m, k, UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(As[i].template APtr<void>(), As[0].template APtr<void>(), As[0].template ASize<char>());
-      memcpy(As[i].template SPtr<void>(), As[0].template SPtr<void>(), As[0].CSize() * sizeof(Scale_T));
+      memcpy(As[i].template SPtr<void>(), As[0].template SPtr<void>(), As[0].CSize() * sizeof(float));
     }
     auto psize = (size_t)m * n * k * 2;
-    auto memsize = (size_t)packBs[0].mSize + As[0].mSize + (m * n) * sizeof(float);
+    auto blks = updiv(k, blocksize);
+    auto memsize = (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * blks * sizeof(float)) +
+                   (m * n) * sizeof(float);
     assert(m == 1);
     parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
 
@@ -1392,7 +1394,7 @@ class UTWOQ_S4_VecDot {
         auto awptr = As[i].template APtr<uint8_t>();
         auto asptr = As[i].template SPtr<float>();
         auto bwptr = packBs[i].template WPtr<uint8_t>();
-        auto bsptr = packBs[i].template SPtr<utils::bf16>();
+        auto bsptr = packBs[i].template SPtr<Scale_T>();
         UT_Threading::get()->parallel_for([&](int idx) {
           parallel::ThreadProblem2D thp{idx};
           sch.getIndex(thp);
@@ -1419,7 +1421,9 @@ class UTWOQ_S4_VecDot {
     avector<float> revB(n * k);
     kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
-    buffer_error(refC.data(), C, m * n, 0.01f);*/
+    for (size_t i = 0; i < batch; i++) {
+      buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
+    }*/
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -1436,7 +1440,7 @@ class UTWOQ_S4_VecDot {
     for (int i = 1; i < batch; i++) {
       memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(float));
     }
-    using LOG = timer_statistics_logger<TestMs * 2>;
+    using LOG = timer_statistics_logger<TestMs/2>;
     float testtime = float(TestMs);
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
