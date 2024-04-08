@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '13.1.0' }}
+  INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '12.1.0' }}
   WORKING_DIR: ${{ github.workspace }}
 
 jobs:
@@ -39,9 +39,7 @@ jobs:
           echo "do not need conda env"
           bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "unit-test-bestla" "3.10"
           conda activate unit-test-bestla || source activate unit-test-bestla
-          if [[ "${{ env.INPUT_COMPILER_VERSION }}" != "12.1.0" ]]; then
-            conda install --update-deps -c conda-forge gxx==${{ env.INPUT_COMPILER_VERSION }} gcc==${{ env.INPUT_COMPILER_VERSION }} gxx_linux-64==${{ env.INPUT_COMPILER_VERSION }} libstdcxx-ng sysroot_linux-64 -y
-          fi
+          conda install --update-deps -c conda-forge gxx==${{ env.INPUT_COMPILER_VERSION }} gcc==${{ env.INPUT_COMPILER_VERSION }} gxx_linux-64==${{ env.INPUT_COMPILER_VERSION }} libstdcxx-ng sysroot_linux-64 -y
 
       - name: Run UT
         run: |
