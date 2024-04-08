@@ -1,6 +1,7 @@
 #include "bestla_ut.h"
 #include "sycl_ut.h"
 #include "../sycl/sycl_wrapper.h"
+#include "bestla_prologue_b.h"
 
 namespace bestla {
 using namespace ut;
@@ -39,34 +40,94 @@ class UT_SyclSGemm {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    /*auto e_esimd = q->submit([&](sycl::handler& cgh) {
-      sycl::local_accessor<float, 1> slm_b(sycl::range(SGemm_t::SLM_B_Size), cgh);
-      sycl::local_accessor<float, 1> slm_a(sycl::range(SGemm_t::SLM_A_Size), cgh);
-      cgh.parallel_for(sycl::nd_range<2>(problem, group),
-                       [=](sycl::nd_item<2> it) [[intel::reqd_sub_group_size(SGemm_t::SgSize)]] {
-                         nd_item_helper<SGemm_t> helper(it);
-                         float tmp[SGemm_t::TileM * SGemm_t::TileN];
-                         for (size_t im = 0; im < SGemm_t::TileM; im++)
-                           for (size_t in = 0; in < SGemm_t::TileN; in++) tmp[im * SGemm_t::TileN + in] = 0.f;
-
-                         for (int i = 0; i < k; i += SGemm_t::TileK) {
-                           sycl_prologue_b::WeightBase<SGemm_t, float>::getWeight({B_d, n}, slm_b, i, helper);
-                           it.barrier(sycl::access::fence_space::local_space);
-                           SGemm_t::compute(&A_d[helper.item_g_m() * k + i], k, slm_b, tmp, helper);
-                           it.barrier(sycl::access::fence_space::local_space);
-                         }
-                         sycl_epilogue::OutputBase<SGemm_t, float>::store({C_d, n}, tmp, helper);
-                       });
-    });*/
     utils::GemmProblem gp(1, m, n, k);
     auto e_esimd = KernelLauncher::compute({m, n, k, {A_d, k}, {B_d, n}, {C_d, n}}, q);
-
     e_esimd.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 4).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-static UT_SyclSGemm sUT_SyclSGemm;
+// static UT_SyclSGemm sUT_SyclSGemm;
 
+class UT_SyclInt4Dequant {
+ public:
+  UT_SyclInt4Dequant() {
+    UT_START();
+    ut(1024, 1024, 32);
+  }
+  using SGemm_t = xve::DefaultSGemmCore;
+  template <class GCT>
+  using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
+  template <class GCT>
+  using ProBT = sycl_prologue_b::WeightBase<GCT, float>;
+  template <class GCT>
+  using EpiT = sycl_epilogue::OutputBase<GCT, float>;
+  using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemm_t>;
+
+  void ut(int n, int k, int blocksize) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case: %d %d %d Device:%s\n", n, k, blocksize, dev->getName().c_str());
+    avector<uint8_t> rawB(k * n / 2);
+    int blks = updiv(k, blocksize);
+    avector<float> scale(blks * n), dequant(n * k), ref(n * k);
+    fill_buffer_randn(scale.data(), scale.size(), 0.01f, 0.03f);
+    fill_buffer_randn(rawB.data(), rawB.size(), uint8_t(0), uint8_t(255));
+    auto srcptr = (utils::int4x2*)rawB.data();
+    for (int i = 0; i < k; i++) {
+      for (int j = 0; j < n; j += 2) {
+        auto tmp = srcptr[i * n / 2 + j / 2];
+        auto noffset = i / blocksize * n + j;
+        ref[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset + 0];
+        ref[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset + 1];
+      }
+    }
+    sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);
+    sycl_vector<uint8_t> dB(rawB.size(), q);
+    q->memcpy(dS.data(), scale.data(), scale.size() * 4).wait();
+    q->memcpy(dB.data(), rawB.data(), rawB.size() * 1).wait();
+    int constexpr SgSize = 16;
+    int constexpr TileN = 2;
+    int constexpr GroupN = SgSize * TileN;
+    sycl::range<1> group{SgSize};
+    sycl::range<1> problem{n / TileN * blks};
+    auto S_d = dS.data();
+    auto B_d = dB.data();
+    auto DB_d = dequantB.data();
+    auto n_blks = updiv(n / TileN, SgSize);
+    auto e_esimd = q->submit([&](sycl::handler& cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(problem, group),
+                       [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+                         int g_idx = it.get_group(0);
+                         auto sg = it.get_sub_group();
+                         int sg_id = sg.get_local_id()[0];
+                         int g_idx_n = g_idx % n_blks;
+                         int g_idx_k = g_idx / n_blks;
+                         int g_n = g_idx_n * GroupN;
+                         int g_k = g_idx_k * blocksize;
+                         auto sptr = S_d + g_idx_k * n + g_n;
+                         auto bptr = B_d + (g_k * n + g_n) / 2;
+                         auto dbptr = DB_d + g_k * n + g_n;
+                         float scale[TileN];
+                         for (int in = 0; in < TileN; in++) {
+                           scale[in] = *(sptr + sg_id * TileN + in);
+                         }
+                         for (int ik = 0; ik < blocksize; ik++) {
+                           uint8_t tmp = *(bptr + ik * n / 2 + sg_id);
+                           float tmpf[TileN];
+                           tmpf[0] = static_cast<int8_t>((tmp & 0x0f) << 4) * scale[0];
+                           tmpf[1] = static_cast<int8_t>((tmp & 0xf0)) * scale[1];
+                           for (int in = 0; in < TileN; in++) {
+                             dbptr[in + sg_id * TileN + ik * n] = tmpf[in];
+                           }
+                         }
+                       });
+    });
+    e_esimd.wait();
+    q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
+    buffer_error(ref.data(), dequant.data(), dequant.size(), 0.001f);
+  }
+};
+static UT_SyclInt4Dequant sUT_SyclInt4Dequant;
 }  // namespace sycl_ut
 }  // namespace bestla
