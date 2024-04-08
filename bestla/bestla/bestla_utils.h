@@ -592,7 +592,7 @@ using microseconds = std::chrono::microseconds;
 template <typename _DUR = std::chrono::milliseconds>
 class timer {
  public:
-  using sclock_t = std::chrono::steady_clock;
+  using sclock_t = std::chrono::high_resolution_clock;
   using stime_point_t = std::chrono::time_point<sclock_t>;
 
   timer() { clear(); }
