@@ -1805,7 +1805,17 @@ std::vector<std::pair<std::string, struct ne_tensor*>>& model_internal_get_tenso
 static void ne_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
                                       const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const uint32_t kv_n_ctx_block = ctx->kv_n_ctx_block;
-  const uint32_t n_head = ctx->model.hparams.n_head_kv > 0 ? ctx->model.hparams.n_head_kv : ctx->model.hparams.n_head;
+  uint32_t n_head = 0;
+  auto h_n_head_kv = ctx->model.hparams.n_head_kv;
+  auto h_multi_query_group_num = ctx->model.hparams.multi_query_group_num;
+  if (h_n_head_kv > 0) {
+    n_head = h_n_head_kv;
+    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!h_multi_query_group_num > 0)));
+  } else if (h_multi_query_group_num > 0) {
+    n_head = h_multi_query_group_num;
+  } else {
+    n_head = ctx->model.hparams.n_head;
+  }
   const uint32_t head_dim = ctx->model.hparams.n_embd / ctx->model.hparams.n_head;
   const uint32_t n_embd = n_head * head_dim;
   const uint32_t n_ctx = ctx->n_ctx;
@@ -1841,7 +1851,17 @@ static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model
                                           const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const auto& kv_self = ctx->model.kv_self;
   const auto& hparams = ctx->model.hparams;
-  int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;
+  int heads_kv = 0;
+  auto h_n_head_kv = hparams.n_head_kv;
+  auto h_multi_query_group_num = hparams.multi_query_group_num;
+  if (h_n_head_kv > 0) {
+    heads_kv = h_n_head_kv;
+    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!h_multi_query_group_num > 0)));
+  } else if (h_multi_query_group_num > 0) {
+    heads_kv = h_multi_query_group_num;
+  } else {
+    heads_kv = hparams.n_head;
+  }
   const auto head_size = hparams.n_embd_head_k == 0 ? hparams.n_embd / hparams.n_head : hparams.n_embd_head_k;
 #ifdef NS_TP_MODEL
   // when use TP, cached kv will also have smaller size
