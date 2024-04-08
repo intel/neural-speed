@@ -1213,10 +1213,10 @@ class UTWOQ_GGML {
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
     auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
-    std::vector<block_q4_0> QB(batch * n * k / 32);
-    std::vector<block_q8_0> QA(batch * m * k / 32);
-    int dr = updiv(n, threads);
     int blks = updiv(k, blocksize);
+    std::vector<block_q4_0> QB(batch * n * blks);
+    std::vector<block_q8_0> QA(batch * m * blks);
+    int dr = updiv(n, threads);
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
