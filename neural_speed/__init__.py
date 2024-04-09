@@ -160,7 +160,7 @@ class Model:
             quant_desc = "gptq"
         if use_awq:
             quant_desc = "awq"
-        if use_awq:
+        if use_autoround:
             quant_desc = "autoround"
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
