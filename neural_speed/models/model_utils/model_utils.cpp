@@ -177,6 +177,7 @@ struct model_context_params model_context_default_params() {
       /*.gpu_layers                  =*/0,
       /*.seed                        =*/-1,
       /*.kv_type                     =*/KV_MEM_TYPE_AUTO,
+      /*.mha_perfer_f32              =*/false,
       /*.logits_all                  =*/false,
       /*.vocab_only                  =*/false,
       /*.use_mmap                    =*/true,
@@ -189,7 +190,7 @@ struct model_context_params model_context_default_params() {
       /*cont_batching                =*/true,
       /*.max_request_num             =*/1,
       /*.gen_conf                    =*/generation_config(),
-      /*scratch_size_ratio  =*/1.0f,
+      /*scratch_size_ratio           =*/1.0f,
       /*.progress_callback           =*/nullptr,
       /*.progress_callback_user_data =*/nullptr,
   };
@@ -976,6 +977,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
     } else {
       NE_ASSERT(("KV-cache not allocated!", false));
     }
+    ctx->model.hparams.mha_perfer_f32 = params.mha_perfer_f32;
 
     // resized during inference
     if (params.logits_all) {
@@ -1272,6 +1274,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.n_gpu_layers = params.n_gpu_layers;
   lparams.seed = params.seed;
   lparams.kv_type = params.memory_type;
+  lparams.mha_perfer_f32 = params.mha_perfer_f32;
 
   // TODO(Yi): MHA FOR LONG TOKENS
   int32_t long_tokens = 6144;
