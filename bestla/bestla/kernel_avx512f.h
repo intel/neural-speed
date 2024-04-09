@@ -660,8 +660,8 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   auto tail_proc_num = unpack_elt % 128;
 
   bestla::kernel::jit::DecompressS3::forward_avx512f(bit2ptr + compress_wei_ptr_offset / 4,
-                                                      bit1ptr + compress_wei_ptr_offset / 8,
-                                                      dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
+                                                     bit1ptr + compress_wei_ptr_offset / 8,
+                                                     dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
   compress_wei_ptr_offset += body_loop * 128;
   if (tail_proc_num > 0) {
     bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,

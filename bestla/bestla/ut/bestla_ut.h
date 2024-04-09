@@ -97,8 +97,7 @@ static inline float get_ut_err(BTLA_DTYPE qtype) {
       err = INT3_ERR;
     } else if (dbits == 2) {
       err = INT2_ERR;
-    }
-    else {
+    } else {
       err = INT4_ERR;
     }
   } else {
