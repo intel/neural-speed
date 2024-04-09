@@ -1288,6 +1288,7 @@ class UTWOQ_GGML {
 // static UTWOQ_GGML sUTWOQ_GGML;
 
 #include "kernel_avx2.h"
+#define AVX_VNNI_ 0
 template <int NTILE, typename SBT>
 static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, float* out, const uint8_t* a_ptr,
                                      const float* a_scale, const uint8_t* b_ptr, const SBT* b_scale, int b_step) {
@@ -1300,7 +1301,7 @@ static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, fl
   }
   uint32_t mask = 0xf0f0f0f0;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
-
+  const __m256i ones = _mm256_set1_epi16(1);
   // Main loop
   for (int ib = 0; ib < k_blks; ++ib) {
     /* Compute combined scale for the block */
@@ -1313,7 +1314,13 @@ static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, fl
       for (int i = 0; i < NReg; i++) {
         auto vb =
             kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+#if AVX_VNNI_
         iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+#else
+        const __m256i dot = _mm256_maddubs_epi16(va, vb);
+        const __m256i summed_pairs = _mm256_madd_epi16(ones, dot);
+        iacc[i] = _mm256_add_epi32(summed_pairs, iacc[i]);
+#endif
       }
     }
     const __m256 v_a_scale = _mm256_set1_ps(*(a_scale + ib));
