@@ -1968,15 +1968,16 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
     const attn_fwd_args_t<float, bf16, bf16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
-  if (_cd->AVX512F() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) {
+  if (_cd->AVX512F() &&
+      ((_cd->AMX_BF16() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) || !_cd->AMX_BF16())) {
     using GemmKernelBF16TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AMX_BF16,                                      //
+        BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
         prologue_a::gemm::ActivationBase,                        //
         mha::weight_cvt_bf16_ntile48_t,                          //
         mha::ScaleTrackMaxFp32Fp32>;                             //
     using GemmKernelBF16 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AMX_BF16,                                      //
+        BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
         mha::activation_identity_t,                              // pretty sure we have enough paddings for P-matrix
         mha::weight_cvt_bf16_ntile48_t,                          //
