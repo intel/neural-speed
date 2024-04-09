@@ -250,7 +250,7 @@ class DequanS8FP {
     }
   }
 };
-class DecompresssS3 {
+class DecompressS3 {
  public:
   template <typename _DST_T>
   class MicroKernelAVX2 : protected xbyak::JitAvx2 {

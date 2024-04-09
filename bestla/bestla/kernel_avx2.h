@@ -1196,7 +1196,7 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
   auto body_loop = unpack_elt / 128;
   auto tail_proc_num = unpack_elt % 128;
 
-  bestla::kernel::jit::DecompresssS3::forward_avx2(bit2ptr + compress_wei_ptr_offset / 4,
+  bestla::kernel::jit::DecompressS3::forward_avx2(bit2ptr + compress_wei_ptr_offset / 4,
                                                    bit1ptr + compress_wei_ptr_offset / 8,
                                                    dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
   compress_wei_ptr_offset += body_loop * 128;
