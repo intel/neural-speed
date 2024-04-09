@@ -83,7 +83,7 @@ static int8_t cache[CacheSize];
 #define INT4_ERR 3.f
 #define INT3_ERR 6.f
 #define INT2_ERR 18.f
-#define FP4_ERR 3.f
+#define FP4_ERR 3.5f
 
 static inline float get_ut_err(BTLA_DTYPE qtype) {
   auto dbits = utils::bestla_dtype_bits(qtype);

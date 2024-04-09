@@ -955,10 +955,7 @@ class UT_CompFp32 {
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
-    auto err = FP4_ERR;
-
-    if (qtype == BTLA_DTYPE::F8_E5M2 || qtype == BTLA_DTYPE::F8_E4M3) err = F8_ERR;
-
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
