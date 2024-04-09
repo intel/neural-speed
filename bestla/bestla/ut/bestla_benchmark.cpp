@@ -1259,7 +1259,7 @@ class UTWOQ_GGML {
     for (int i = 1; i < batch; i++) {
       memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(float));
     }
-    using LOG = timer_statistics_logger<TestMs/2>;
+    using LOG = timer_statistics_logger<TestMs / 2>;
     float testtime = float(TestMs);
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
@@ -1285,7 +1285,7 @@ class UTWOQ_GGML {
     }
   }
 };
-//static UTWOQ_GGML sUTWOQ_GGML;
+// static UTWOQ_GGML sUTWOQ_GGML;
 
 #include "kernel_avx2.h"
 template <int NTILE, typename SBT>
@@ -1335,11 +1335,97 @@ static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, fl
   }
 }
 
+template <int NTILE, typename SBT>
+static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, float* out, const float* a_ptr,
+                                    const uint8_t* b_ptr, const SBT* b_scale, int b_step) {
+  const int k_blks = k_reduce / blocksize;
+  int constexpr NReg = NTILE / 8;
+  // Initialize accumulator with zeros
+  __m256 acc[NReg];
+  for (int i = 0; i < NReg; i++) {
+    acc[i] = _mm256_setzero_ps();
+  }
+  uint32_t mask = 0xf0f0f0f0;
+  auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  // Main loop
+  for (int ib = 0; ib < k_blks; ++ib) {
+#if 0
+    __m256 v_b_scale[NReg];
+    for (int i = 0; i < NReg; i++) {
+      if constexpr (std::is_same_v<SBT, float>) {
+        v_b_scale[i] = _mm256_loadu_ps(b_scale + ib * b_step + i * 8);
+      } else if constexpr (std::is_same_v<SBT, utils::bf16>) {
+        auto tmp = _mm_loadu_si128((const __m128i*)(b_scale + ib * b_step + i * 8));
+        v_b_scale[i] = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+      }
+    }
+    int constexpr Unroll = 4;
+    int8_t tmpbuf[NTILE * Unroll];
+    for (int ik = 0; ik < blocksize; ik += Unroll) {
+      for (int i = 0; i < NReg; i++) {
+        auto vb =
+            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        _mm256_storeu_si256((__m256i*)(tmpbuf + 32 * i), vb);
+      }
+      for (int ikk = 0; ikk < Unroll; ikk++) {
+        auto va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + ikk));
+        for (int i = 0; i < NReg; i++) {
+          auto tmp = _mm_loadl_epi64((const __m128i*)(tmpbuf + i * 8 + ikk * NTILE));
+          auto s32tmp = _mm256_cvtepi8_epi32(tmp);
+          auto ftmp = _mm256_cvtepi32_ps(s32tmp);
+          ftmp = _mm256_mul_ps(ftmp, v_b_scale[i]);
+          acc[i] = _mm256_fmadd_ps(va, ftmp, acc[i]);
+        }
+      }
+    }
+#else
+    __m256 acc_local[NReg];
+    for (int i = 0; i < NReg; i++) {
+      acc_local[i] = _mm256_setzero_ps();
+    }
+    int constexpr Unroll = 4;
+    int8_t tmpbuf[NTILE * Unroll];
+    for (int ik = 0; ik < blocksize; ik += Unroll) {
+      for (int i = 0; i < NReg; i++) {
+        auto vb =
+            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        _mm256_storeu_si256((__m256i*)(tmpbuf + 32 * i), vb);
+      }
+      for (int ikk = 0; ikk < Unroll; ikk++) {
+        auto va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + ikk));
+        for (int i = 0; i < NReg; i++) {
+          auto tmp = _mm_loadl_epi64((const __m128i*)(tmpbuf + i * 8 + ikk * NTILE));
+          auto s32tmp = _mm256_cvtepi8_epi32(tmp);
+          auto ftmp = _mm256_cvtepi32_ps(s32tmp);
+          acc_local[i] = _mm256_fmadd_ps(va, ftmp, acc_local[i]);
+        }
+      }
+    }
+    for (int i = 0; i < NReg; i++) {
+      __m256 v_b_scale;
+      if constexpr (std::is_same_v<SBT, float>) {
+        v_b_scale = _mm256_loadu_ps(b_scale + ib * b_step + i * 8);
+      } else if constexpr (std::is_same_v<SBT, utils::bf16>) {
+        auto tmp = _mm_loadu_si128((const __m128i*)(b_scale + ib * b_step + i * 8));
+        v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+      }
+      acc[i] = _mm256_fmadd_ps(acc_local[i], v_b_scale, acc[i]);
+    }
+#endif
+  }
+  for (int i = 0; i < NReg; i++) {
+    _mm256_storeu_ps(out + i * 8, acc[i]);
+  }
+}
+
 class UTWOQ_S4_VecDot {
  public:
   UTWOQ_S4_VecDot() {
     UT_START();
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
   }
 
   template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -1381,8 +1467,8 @@ class UTWOQ_S4_VecDot {
     }
     auto psize = (size_t)m * n * k * 2;
     auto blks = updiv(k, blocksize);
-    auto memsize = (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * blks * sizeof(float)) +
-                   (m * n) * sizeof(float);
+    auto memsize =
+        (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * blks * sizeof(float)) + (m * n) * sizeof(float);
     assert(m == 1);
     parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
 
@@ -1440,7 +1526,7 @@ class UTWOQ_S4_VecDot {
     for (int i = 1; i < batch; i++) {
       memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(float));
     }
-    using LOG = timer_statistics_logger<TestMs/2>;
+    using LOG = timer_statistics_logger<TestMs / 2>;
     float testtime = float(TestMs);
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
@@ -1461,6 +1547,103 @@ class UTWOQ_S4_VecDot {
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
           // benchmark<gemm::ICoreRowNAvxvnniKBlock<48, 1>, LOG, Wei, Scale_T>(
           //     m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
+        }
+      }
+    }
+  }
+
+  template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  void benchmark_fp32(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems,
+                      int threads, BTLA_DTYPE qtype) {
+    LOG_T log;
+    using Parallel = parallel::gemm::SchedulerKBlockS<Core_T>;
+    using Launcher = wrapper::gemm::LauncherIntKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
+                                                      epilogue::gemm::AccumulatorWriteBackFp32>;
+    Launcher kernel;
+    UT_Threading::set_threads(threads);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
+    utils::timer<std::chrono::milliseconds> tm;
+    using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
+    WType tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+    std::vector<WType> packBs(batch, 0);
+    avector<int8_t> bufB(tmpB.mSize * batch);
+    for (size_t i = 0; i < batch; i++) {
+      packBs[i] = tmpB;
+      packBs[i].assign(bufB.data() + i * tmpB.mSize);
+    }
+    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
+    for (size_t i = 1; i < batch; i++) {
+      memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
+      memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
+    }
+
+    auto psize = (size_t)m * n * k * 2;
+    auto blks = updiv(k, blocksize);
+    auto memsize = (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k * sizeof(float)) + (m * n) * sizeof(float);
+    assert(m == 1);
+    parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
+
+    tm.start();
+    while (tm.stop() < timems) {
+      for (int i = 0; i < batch; i++) {
+        log.start();
+        auto cbptr = C + i * m * n;
+        auto aptr = A + i * m * k;
+        auto bwptr = packBs[i].template WPtr<uint8_t>();
+        auto bsptr = packBs[i].template SPtr<Scale_T>();
+        UT_Threading::get()->parallel_for([&](int idx) {
+          parallel::ThreadProblem2D thp{idx};
+          sch.getIndex(thp);
+          if (thp.valid) {
+            for (int in = 0; in < thp.size[1]; in += Core_T::NTILE) {
+              bestla_vec_dot_q4_0_f32<Core_T::NTILE>(k, blocksize, cbptr + thp.loc[1] + in, aptr,
+                                                     bwptr + (thp.loc[1] + in) * k / 2, bsptr + thp.loc[1] + in, n);
+            }
+          }
+        });
+        log.stop();
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    double band = double(memsize) / log.min_val / 1e6;
+    printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
+           corestr, log.get_log_str(), flops, flops / threads, band);
+
+    /* avector<float> refC(m * n);
+     avector<float> revB(n * k);
+     kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
+     gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
+     for (size_t i = 0; i < batch; i++) {
+       buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
+     }*/
+  }
+  template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  void benchmark_all_fp32(int m, int n, int k, BTLA_DTYPE qtype) {
+    auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, qtype, BTLA_DTYPE::F32);
+    int batch = auto_batch(memsize);
+    printf("%d %d %d %d %s %s %s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F32), bestla_dtype_str(qtype),
+           bestla_dtype_str(BTLA_DTYPE::F32));
+    avector<float> A(size_t(m) * k * batch);
+    avector<float> B(size_t(k) * n);
+    avector<float> C(size_t(m) * n * batch);
+    fill_buffer_randn(A.data(), k * m, (0.01f), (0.5f));
+    fill_buffer_randn(B.data(), k * n, (-0.5f), (0.5f));
+    for (int i = 1; i < batch; i++) {
+      memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(float));
+    }
+    using LOG = timer_statistics_logger<TestMs / 2>;
+    float testtime = float(TestMs);
+    GetCPUDevice();
+    auto threads_cfg = UT_Threading::get_threads_config();
+    for (auto threads : threads_cfg) {
+      for (auto blocksize : {32, 128}) {
+        if (_cd->AVX2()) {
+          benchmark_fp32<gemm::SCoreRowNAvx2<24, 4>, LOG, Wei, Scale_T>(m, n, k, batch, blocksize, A.data(), B.data(),
+                                                                        C.data(), testtime, threads, qtype);
         }
       }
     }
