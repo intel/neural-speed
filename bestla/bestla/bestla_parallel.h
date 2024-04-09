@@ -887,14 +887,14 @@ class SchedulerDispatcher {
   SchedulerDispatcher() = default;
   ~SchedulerDispatcher() {
     std::pair<float, float> PEtime = th_->get_PEtime();
-    if (needDispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
+    if (needDneedDispatchispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
       cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
   }
   SchedulerDispatcher(const IThreading* th, const utils::GemmProblem& problem) {
     th_ = th;
     cr = &device::CpuRuntime::getInstance(th->num_threads());
-    needDispach = cr->mHybrid && th->is_support_PE();
-    if (!needDispach) {
+    needDispatch = cr->mHybrid && th->is_support_PE();
+    if (!needDispatch) {
       Scheduler_P = std::move(Scheduler({th->num_threads(), problem, {0, 0}, cr->mL2Cache, cr->mL1Cache}));
     } else {
       Pcore_num = cr->P_core_num;
@@ -912,7 +912,7 @@ class SchedulerDispatcher {
   }
 
   void getIndex(ThreadProblem& problem) {
-    if (!needDispach) {
+    if (!needDispatch) {
       Scheduler_P.getIndex(problem);
     } else {
       if (problem.tid >= Pcore_num + Ecore_num) {
@@ -928,16 +928,16 @@ class SchedulerDispatcher {
   }
 
   void print() {
-    printf("dispatch to hybrid:%d\n", needDispach);
+    printf("dispatch to hybrid:%d\n", needDispatch);
     Scheduler_P.print();
-    if (needDispach) Scheduler_E.print();
+    if (needDispatch) Scheduler_E.print();
   }
 
  private:
   Scheduler Scheduler_P, Scheduler_E;
   const IThreading* th_;
   device::CpuRuntime* cr;
-  bool needDispach = false;
+  bool needDispatch = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
 
@@ -949,16 +949,15 @@ class SchedulerDispatcher<Scheduler2D> {
   ~SchedulerDispatcher() {}
   SchedulerDispatcher(const IThreading* th, const Config2D& config) {
     device::CpuRuntime& cr = device::CpuRuntime::getInstance(config.threads);
-    needDispach = cr.mHybrid && th->is_support_PE();
-    if (!needDispach) {
+    needDispatch = cr.mHybrid && th->is_support_PE();
+    if (!needDispatch) {
       Scheduler_P = std::move(Scheduler2D(config));
     } else {
       Pcore_num = cr.P_core_num;
       Ecore_num = cr.E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
-      const auto pe = 2.f;
-      // cr.getPE(BTLA_ISA::NoSIMD);
+      const auto pe = cr.getPE(BTLA_ISA::NoSIMD);
       const int N_offset = utils::padto(N - int(N / (1 + pe)), config.step[1]);
       config_P.threads = config.threads - cr.E_core_num;
       config_P.size[1] = N_offset;
@@ -971,7 +970,7 @@ class SchedulerDispatcher<Scheduler2D> {
   }
 
   void getIndex(ThreadProblem& problem) {
-    if (!needDispach) {
+    if (!needDispatch) {
       Scheduler_P.getIndex(problem);
     } else {
       if (problem.tid >= Pcore_num + Ecore_num) {
@@ -987,14 +986,14 @@ class SchedulerDispatcher<Scheduler2D> {
   }
 
   void print() {
-    printf("dispatch to hybrid:%d\n", needDispach);
+    printf("dispatch to hybrid:%d\n", needDispatch);
     Scheduler_P.print();
-    if (needDispach) Scheduler_E.print();
+    if (needDispatch) Scheduler_E.print();
   }
 
  private:
   Scheduler2D Scheduler_P, Scheduler_E;
-  bool needDispach = false;
+  bool needDispatch = false;
   int Pcore_num = 0, Ecore_num = 0;
 };
 

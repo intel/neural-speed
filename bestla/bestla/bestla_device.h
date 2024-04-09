@@ -340,14 +340,17 @@ class CpuDevice {
               case 9:  // ALD
                 PE[int(BTLA_ISA::AVX2)] = 3.0f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 5.0f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.0f;
                 break;
               case 10:  // MTL
                 PE[int(BTLA_ISA::AVX2)] = 2.2f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 3.0f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.0f;
                 break;
               case 11:  // RPL
                 PE[int(BTLA_ISA::AVX2)] = 1.8f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 2.6f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.0f;
                 break;
             }
         }
