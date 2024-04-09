@@ -74,12 +74,15 @@ static int8_t cache[CacheSize];
 // UT Error definitions
 // Activation uniform distribution range [-0.5f,0.5f]
 // Weight uniform distribution range [-0.5f,0.5f]
+// reduce dim: 4096
 #define FP32_ERR 0.0001f
 #define FP16_ERR 0.001f
 #define BF16_ERR 0.02f
 #define INT8_ERR 0.2f
 #define F8_ERR 1.5f
 #define INT4_ERR 3.f
+#define INT3_ERR 6.f
+#define INT2_ERR 18.f
 #define FP4_ERR 3.f
 
 static inline float get_ut_err(BTLA_DTYPE qtype) {
@@ -90,7 +93,12 @@ static inline float get_ut_err(BTLA_DTYPE qtype) {
   if (type == dtype_int) {
     if (dbits == 8) {
       err = INT8_ERR;
-    } else {
+    } else if (dbits == 3) {
+      err = INT3_ERR;
+    } else if (dbits == 2) {
+      err = INT2_ERR;
+    }
+    else {
       err = INT4_ERR;
     }
   } else {

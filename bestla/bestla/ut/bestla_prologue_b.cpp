@@ -917,19 +917,10 @@ class UT_CompFp32 {
          isAsym ? packedw.template ZPtr<int8_t>() : nullptr, reduceA.template RPtr<float>(), reduceA.lda},
         {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
-    auto err = INT8_ERR;
+    auto err = get_ut_err(qtype);
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
     auto constexpr dtype_int = bestla_dtype_type(BTLA_DTYPE::TypeInt);
-    if (type == dtype_int) {
-      if (dbits == 8) {
-        err = INT8_ERR;
-      } else {
-        err = INT4_ERR;
-      }
-    } else {
-      err = FP4_ERR;
-    }
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
@@ -1107,17 +1098,7 @@ class UT_CompInt8 {
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &quanA}, {&packedw}, {matC.data(), n}};
     parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
-    auto err = INT8_ERR;
-    auto dbits = bestla_dtype_bits(qtype);
-    auto type = bestla_dtype_type(qtype);
-    auto dtype_int = bestla_dtype_type(BTLA_DTYPE::TypeInt);
-    if (type == dtype_int) {
-      if (dbits == 8) {
-        err = INT8_ERR;
-      } else {
-        err = INT4_ERR;
-      }
-    }
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     if (stype != BTLA_DTYPE::DQ8_BNB) {
       buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);  // dynamic quant error
@@ -1176,19 +1157,9 @@ class UT_CompInt8 {
          isAsym ? reduceAf32.data() : nullptr, blocksize},
         {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
-    auto err = INT8_ERR;
-    auto dbits = bestla_dtype_bits(qtype);
-    auto type = bestla_dtype_type(qtype);
-    auto dtype_int = bestla_dtype_type(BTLA_DTYPE::TypeInt);
-    if (type == dtype_int) {
-      if (dbits == 8) {
-        err = INT8_ERR;
-      } else {
-        err = INT4_ERR;
-      }
-    }
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
-    buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
+    buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);
   }
 
   template <class GemmCore_T, typename Scale_T>
@@ -1244,18 +1215,7 @@ class UT_CompInt8 {
          packedw.template ZPtr<int8_t>(), quanA.template RPtr<float>(), blocksize},
         {matC.data(), n}};
     parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
-    auto err = INT8_ERR;
-    auto dbits = bestla_dtype_bits(qtype);
-    auto type = bestla_dtype_type(qtype);
-    auto dtype_int = bestla_dtype_type(BTLA_DTYPE::TypeInt);
-    if (type == dtype_int) {
-      if (dbits == 8) {
-        err = INT8_ERR;
-      } else {
-        err = INT4_ERR;
-      }
-    }
-
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);  // dynamic quant error
   }
@@ -1305,20 +1265,9 @@ class UT_CompInt8 {
          bestla_dtype<float>, packedw.template ZPtr<int8_t>(), reduceAf32.data(), blocksize},
         {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
-    auto err = INT8_ERR;
-    auto dbits = bestla_dtype_bits(qtype);
-    auto type = bestla_dtype_type(qtype);
-    auto dtype_int = bestla_dtype_type(BTLA_DTYPE::TypeInt);
-    if (type == dtype_int) {
-      if (dbits == 8) {
-        err = INT8_ERR;
-      } else {
-        err = INT4_ERR;
-      }
-    }
-
+    auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
-    buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
+    buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
