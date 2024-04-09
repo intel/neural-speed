@@ -887,7 +887,7 @@ class SchedulerDispatcher {
   SchedulerDispatcher() = default;
   ~SchedulerDispatcher() {
     std::pair<float, float> PEtime = th_->get_PEtime();
-    if (needDneedDispatchispach && int(PEtime.first) > 0 && int(PEtime.second) > 0)
+    if (needDispatch && int(PEtime.first) > 0 && int(PEtime.second) > 0)
       cr->adjustPE(Scheduler::gemm_ISA(), PEtime.second / PEtime.first);
   }
   SchedulerDispatcher(const IThreading* th, const utils::GemmProblem& problem) {
