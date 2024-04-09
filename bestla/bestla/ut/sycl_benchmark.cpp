@@ -85,7 +85,92 @@ class Benchmark_Fp32Fp32 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
- static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+//static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+
+class Benchmark_S4Fp32Fp32 {
+ public:
+  Benchmark_S4Fp32Fp32() {
+    UT_START();
+    benchmark_all(1024, 4096, 4096);
+    benchmark_all(4096, 4096, 4096);
+  }
+
+  using AType = float;
+  using BType = float;
+  using CType = float;
+  using SGemmT = xve::DefaultSGemmCore;
+  template <class GCT>
+  using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
+  template <class GCT>
+  using ProBT = sycl_prologue_b::WeightS4<GCT, float>;
+  template <class GCT>
+  using EpiT = sycl_epilogue::OutputBase<GCT, float>;
+  using KernelLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBT, EpiT, SGemmT>;
+
+  template <typename LOG_T>
+  void benchmark(int m, int n, int k, int batch, AType* A, uint8_t* B, float* B_scale, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = A;
+    auto B_d = B;
+    auto C_d = C;
+    auto psize = (size_t)m * n * k * 2;
+    sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
+    sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+    utils::GemmProblem gp(1, m, n, k);
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        auto e_esimd = KernelLauncher::compute({m, n, k, 32, {A, k}, {B, B_scale, n}, {C, n}}, q);
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+
+  void benchmark_all(int m, int n, int k) {
+    auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, BTLA_DTYPE::F32, BTLA_DTYPE::F32);
+    auto batch = auto_batch(memsize);
+    printf("%d %d %d %d %s %s %s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F32),
+           bestla_dtype_str(BTLA_DTYPE::F32), bestla_dtype_str(BTLA_DTYPE::F32));
+    avector<AType> A(size_t(m) * k * batch);
+    avector<BType> B(size_t(k) * n * batch);
+    avector<float> B_scale(size_t(k) * n * batch);
+    avector<CType> C(size_t(m) * n * batch, 0);
+    fill_buffer_randn(A.data(), m * k, -0.5f, 0.5f);
+    fill_buffer_randn(B.data(), n * k, -0.5f, 0.5f);
+    fill_buffer_randn(B_scale.data(), n * k, -0.5f, 0.5f);
+    avector<uint8_t> B_s8(k * n * batch / 2);
+    fill_buffer_randn(B_s8.data(), B_s8.size(), uint8_t(0), uint8_t(255));
+    for (size_t i = 0; i < batch - 1; i++) {
+      memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(AType));
+      memcpy(B.data() + i * n * k, B.data(), n * k * sizeof(BType));
+      memcpy(B_s8.data() + i * n * k, B_s8.data(), n * k * sizeof(uint8_t) / 2);
+      memcpy(B_scale.data() + i * n * k, B_scale.data(), n * k * sizeof(float));
+    }
+    using LOG = timer_statistics_logger<TestMs * 2>;
+    float testtime = float(TestMs);
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    sycl_vector<float> dA(A.size(), q), dB(B.size(), q), dC(C.size(), q), dB_scale(B_scale.size(), q);
+    sycl_vector<uint8_t> dBs8(B_s8.size(), q);
+    q->memcpy(dA.data(), A.data(), A.size() * 4).wait();
+    q->memcpy(dB.data(), B.data(), B.size() * 4).wait();
+
+    benchmark<LOG>(m, n, k, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
+  }
+};
+static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
 
 class Benchmark_DequantS4 {
  public:
@@ -293,9 +378,9 @@ class Benchmark_DequantS4 {
     tm.start();
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
-        auto e= q->memcpy(dequantB1.data(), dequantB0.data(), dequantB0.size() * 4);
+        auto e = q->memcpy(dequantB1.data(), dequantB0.data(), dequantB0.size() * 4);
         e.wait();
-        log.add(event_helper::execute_time(e)*1000);
+        log.add(event_helper::execute_time(e) * 1000);
         if (tm.stop() >= TestMs) {
           break;
         }
@@ -308,6 +393,6 @@ class Benchmark_DequantS4 {
     printf(" %s Memory Bandwidth:%.3f\n", log.get_log_str(), flops);
   }
 };
-static Benchmark_DequantS4 sBenchmark_DequantS4;
+//static Benchmark_DequantS4 sBenchmark_DequantS4;
 }  // namespace sycl_ut
 }  // namespace bestla

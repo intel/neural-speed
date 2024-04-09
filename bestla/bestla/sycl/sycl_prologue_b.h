@@ -35,7 +35,7 @@ class WeightBase {
   using Param = ParamWeightBase<SRCType>;
 
   static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
-                      sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+                               sycl_utils::nd_item_helper<GemmCoreT>& helper) {
     int constexpr Iter_PerWorker = (GemmCoreT::TileK + GemmCoreT::WgM - 1) / GemmCoreT::WgM;
 #pragma unroll
     for (int icp = 0; icp < Iter_PerWorker; icp++) {
@@ -44,6 +44,43 @@ class WeightBase {
           dstptr[(helper.sg_idx_m() + icp * GemmCoreT::WgM) * GemmCoreT::WgNEle +
                  (helper.sg_idx_n() * GemmCoreT::SgSize + helper.sg_id()) * GemmCoreT::TileN + in] =
               _param.B[helper.item_g_n() + in + (koffset + helper.sg_idx_m() + icp * GemmCoreT::WgM) * _param.ldb];
+        }
+      }
+    }
+  }
+};
+
+template <typename ScaleT>
+struct ParamWeightS4 {
+  const uint8_t* B;
+  const ScaleT* scale;
+  int ldb;
+};
+template <class GemmCoreT, typename ScaleT>
+class WeightS4 {
+ public:
+  using BType = typename GemmCoreT::TB;
+  using Param = ParamWeightS4<ScaleT>;
+
+  static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
+                               int blocksize, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+    int constexpr Iter_PerWorker = (GemmCoreT::TileK + GemmCoreT::WgM - 1) / GemmCoreT::WgM;
+    float scale[GemmCoreT::TileN];
+    for (size_t in = 0; in < GemmCoreT::TileN; in += 1)
+      scale[in] = _param.scale[helper.item_g_n() + in + koffset / blocksize * _param.ldb];
+#pragma unroll
+    for (int icp = 0; icp < Iter_PerWorker; icp++) {
+      {
+        for (size_t in = 0; in < GemmCoreT::TileN; in += 2) {
+          auto tmps8 =
+              _param
+                  .B[(helper.item_g_n() + in + (koffset + helper.sg_idx_m() + icp * GemmCoreT::WgM) * _param.ldb) / 2];
+          dstptr[(helper.sg_idx_m() + icp * GemmCoreT::WgM) * GemmCoreT::WgNEle +
+                 (helper.sg_idx_n() * GemmCoreT::SgSize + helper.sg_id()) * GemmCoreT::TileN + in] =
+              static_cast<int8_t>((tmps8 & 0x0f) << 4) * scale[in];
+          dstptr[(helper.sg_idx_m() + icp * GemmCoreT::WgM) * GemmCoreT::WgNEle +
+                 (helper.sg_idx_n() * GemmCoreT::SgSize + helper.sg_id()) * GemmCoreT::TileN + in + 1] =
+              static_cast<int8_t>((tmps8 & 0xf0)) * scale[in + 1];
         }
       }
     }
