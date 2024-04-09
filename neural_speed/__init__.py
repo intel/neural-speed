@@ -156,12 +156,9 @@ class Model:
                 quant_desc += "_pc"
             else:
                 quant_desc += "_g{}".format(group_size)
-        if use_gptq:
-            quant_desc = "gptq"
-        if use_awq:
-            quant_desc = "awq"
-        if use_autoround:
-            quant_desc = "autoround"
+
+        if use_gptq or use_awq or use_autoround:
+            quant_desc = config['quantation_config'].quant_method.value
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
