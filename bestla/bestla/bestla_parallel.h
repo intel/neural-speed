@@ -957,7 +957,7 @@ class SchedulerDispatcher<Scheduler2D> {
       Ecore_num = cr.E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
-      const auto pe = 3.f;
+      const auto pe = 2.f;
       // cr.getPE(BTLA_ISA::NoSIMD);
       const int N_offset = utils::padto(N - int(N / (1 + pe)), config.step[1]);
       config_P.threads = config.threads - cr.E_core_num;

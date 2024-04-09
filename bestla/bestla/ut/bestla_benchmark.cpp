@@ -1218,6 +1218,8 @@ class UTWOQ_GGML {
     std::vector<block_q8_0> QA(batch * m * blks);
     auto memsize = sizeof(block_q4_0) * blks * n + sizeof(block_q8_0) * blks * m + m * n * sizeof(float);
     int dr = updiv(n, threads);
+    parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D> sch(
+        UT_Threading::get(), {UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
@@ -1226,9 +1228,9 @@ class UTWOQ_GGML {
         auto qa = QA.data() + i * m * blks;
         auto cptr = C + i * m * n;
         UT_Threading::get()->parallel_for([&](int idx) {
-          const int ir10 = dr * idx;
-          const int ir11 = std::min(ir10 + dr, n);
-          for (int ir = ir10; ir < ir11; ir++) {
+          parallel::ThreadProblem2D thp{idx};
+          sch.getIndex(thp);
+          for (int ir = thp.loc[1]; ir < thp.loc[1] + thp.size[1]; ir++) {
             ne_vec_dot_q4_0_q8_0(k, cptr + ir, qb + ir * blks, qa);
           }
         });
@@ -1285,7 +1287,7 @@ class UTWOQ_GGML {
     }
   }
 };
-// static UTWOQ_GGML sUTWOQ_GGML;
+static UTWOQ_GGML sUTWOQ_GGML;
 
 #include "kernel_avx2.h"
 #define AVX_VNNI_ 1
@@ -1317,9 +1319,9 @@ static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, fl
 #if AVX_VNNI_
         iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
 #else
-        const __m256i dot = _mm256_maddubs_epi16(va, vb);
-        const __m256i summed_pairs = _mm256_madd_epi16(ones, dot);
-        iacc[i] = _mm256_add_epi32(summed_pairs, iacc[i]);
+        __m256i dot = _mm256_maddubs_epi16(va, vb);
+        __m256i summed_pairs = _mm256_madd_epi16(ones, dot);
+        iacc[i] = _mm256_add_epi32(iacc[i], summed_pairs);
 #endif
       }
     }
@@ -1477,7 +1479,7 @@ class UTWOQ_S4_VecDot {
     auto memsize =
         (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * blks * sizeof(float)) + (m * n) * sizeof(float);
     assert(m == 1);
-     //parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
+    // parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
     parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D> sch(
         UT_Threading::get(), {UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
     int bcount = 0;
@@ -1592,8 +1594,9 @@ class UTWOQ_S4_VecDot {
     auto blks = updiv(k, blocksize);
     auto memsize = (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k * sizeof(float)) + (m * n) * sizeof(float);
     assert(m == 1);
-    parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
-
+    // parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
+    parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D> sch(
+        UT_Threading::get(), {UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
