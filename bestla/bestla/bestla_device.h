@@ -514,7 +514,7 @@ class CpuRuntime {
         P_core_num = static_cast<int>(_cd->getPcoreNum());
         E_core_num = thread - P_core_num;
       }
-      if (mHybrid) {
+      if (_cd->isHybrid()) {
         mL1Cache_E = _cd->getL1CacheSize_E();
         mL2Cache_E = _cd->getL2CacheSize_E();
         mHybrid = true;

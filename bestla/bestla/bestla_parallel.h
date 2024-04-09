@@ -957,7 +957,9 @@ class SchedulerDispatcher<Scheduler2D> {
       Ecore_num = cr.E_core_num;
       Config2D config_P = config, config_E = config;
       const int N = config.size[1];
-      const int N_offset = utils::padto(N - int(N / (1 + cr.getPE(BTLA_ISA::NoSIMD))), config.step[1]);
+      const auto pe = 3.f;
+      // cr.getPE(BTLA_ISA::NoSIMD);
+      const int N_offset = utils::padto(N - int(N / (1 + pe)), config.step[1]);
       config_P.threads = config.threads - cr.E_core_num;
       config_P.size[1] = N_offset;
       Scheduler_P = std::move(Scheduler2D(config_P));

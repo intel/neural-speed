@@ -1288,7 +1288,7 @@ class UTWOQ_GGML {
 // static UTWOQ_GGML sUTWOQ_GGML;
 
 #include "kernel_avx2.h"
-#define AVX_VNNI_ 0
+#define AVX_VNNI_ 1
 template <int NTILE, typename SBT>
 static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, float* out, const uint8_t* a_ptr,
                                      const float* a_scale, const uint8_t* b_ptr, const SBT* b_scale, int b_step) {
@@ -1477,8 +1477,10 @@ class UTWOQ_S4_VecDot {
     auto memsize =
         (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * blks * sizeof(float)) + (m * n) * sizeof(float);
     assert(m == 1);
-    parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
-
+     //parallel::Scheduler2D sch({UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
+    parallel::gemm::SchedulerDispatcher<parallel::Scheduler2D> sch(
+        UT_Threading::get(), {UT_Threading::get()->num_threads(), 1, n, 1, Core_T::NTILE, 0, 0});
+    int bcount = 0;
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
@@ -1499,6 +1501,7 @@ class UTWOQ_S4_VecDot {
           }
         });
         log.stop();
+        bcount += 1;
         if (tm.stop() >= timems) {
           break;
         }
@@ -1514,7 +1517,8 @@ class UTWOQ_S4_VecDot {
     avector<float> revB(n * k);
     kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
-    for (size_t i = 0; i < batch; i++) {
+    bcount = std::min(bcount, batch);
+    for (size_t i = 0; i < bcount; i++) {
       buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
     }*/
   }
