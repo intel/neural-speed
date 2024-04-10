@@ -158,13 +158,14 @@ class Model:
                 quant_desc += "_g{}".format(group_size)
 
         if use_gptq or use_awq or use_autoround:
-            if 'quantization_config' not in config:
+            model_config = self.config.to_dict()
+            if 'quantization_config' not in model_config:
                 print("Error: no quantization_config in low-bits model...")
                 exit(0)
 
-            quant_desc = config['quantation_config'].get("quant_method", None)
+            quant_desc = model_config['quantization_config'].get("quant_method", None)
             if quant_desc is None:
-               print("Error: No quant_method info...")
+               print("Error: No quant_method info in model config...")
                exit(0)
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
