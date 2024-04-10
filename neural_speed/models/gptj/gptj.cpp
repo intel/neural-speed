@@ -30,10 +30,11 @@
 #include <vector>
 
 #include "core/data_types.h"
+#include "core/layers/bestla_common.hpp"
 #include "core/layers/mha_dense.h"
 #include "core/ne.h"
-#include "core/ne_layers.h"
 #include "core/ne_bestla.h"
+#include "core/ne_layers.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
@@ -438,7 +439,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       struct ne_tensor* KQV_merged_gi;
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
       ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
-      if (hparams.mha_perfer_f32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
+      if (hparams.mha_prefer_f32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
       if (attn_n_total == 0 || !shift_roped_k)
         attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
       if (run_mha_reordered) {                 // reordered kv-cache bf16 mha must be used if run_mha_reordered

@@ -127,7 +127,7 @@ struct model_hparams {
   uint32_t n_layer = 32;
   uint32_t n_rot = 64;
   enum ne_ftype ftype = NE_FTYPE_MOSTLY_F16;
-  bool mha_perfer_f32 = false;
+  bool mha_prefer_f32 = false;
   int32_t max_seq_len = 0;            // for mpt
   float alibi_bias_max = 0;           // for mpt
   float clip_qkv = 0;                 // for mpt
@@ -438,7 +438,7 @@ struct model_context_params {
   int n_gpu_layers;     // number of layers to store in VRAM
   int seed;             // RNG seed, -1 for random
   KV_MEM_TYPE kv_type;  // KV cache type specification
-  bool mha_perfer_f32;  // whether mha use f32 as compute_dtype
+  bool mha_prefer_f32;  // whether mha use f32 as compute_dtype
   bool logits_all;      // the model_eval() call computes all logits, not just the last one
   bool vocab_only;      // only load the vocabulary, no weights
   bool use_mmap;        // use mmap if possible

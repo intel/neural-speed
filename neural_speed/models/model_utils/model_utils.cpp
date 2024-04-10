@@ -177,7 +177,7 @@ struct model_context_params model_context_default_params() {
       /*.gpu_layers                  =*/0,
       /*.seed                        =*/-1,
       /*.kv_type                     =*/KV_MEM_TYPE_AUTO,
-      /*.mha_perfer_f32              =*/false,
+      /*.mha_prefer_f32              =*/false,
       /*.logits_all                  =*/false,
       /*.vocab_only                  =*/false,
       /*.use_mmap                    =*/true,
@@ -977,7 +977,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
     } else {
       NE_ASSERT(("KV-cache not allocated!", false));
     }
-    ctx->model.hparams.mha_perfer_f32 = params.mha_perfer_f32;
+    ctx->model.hparams.mha_prefer_f32 = params.mha_prefer_f32;
 
     // resized during inference
     if (params.logits_all) {
@@ -1274,7 +1274,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.n_gpu_layers = params.n_gpu_layers;
   lparams.seed = params.seed;
   lparams.kv_type = params.memory_type;
-  lparams.mha_perfer_f32 = params.mha_perfer_f32;
+  lparams.mha_prefer_f32 = params.mha_prefer_f32;
 
   // TODO(Yi): MHA FOR LONG TOKENS
   int32_t long_tokens = 6144;
@@ -1824,30 +1824,26 @@ static void ne_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq
   const uint32_t n_ctx = ctx->n_ctx;
   const size_t k_elem_size = ne_element_size(ctx->model.kv_self.k);
   const size_t v_elem_size = ne_element_size(ctx->model.kv_self.v);
-#pragma omp parallel for collapse(2)
-  for (int i = 0; i < ctx->model.layers.size(); ++i) {  // K
-    // [head_dim, N, n_head]
-    for (int nh = 0; nh < n_head; ++nh) {
-      memcpy(static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_dst * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
-                 p0 * k_elem_size * head_dim,
-             static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_src * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
-                 p0 * k_elem_size * head_dim,
-             k_elem_size * head_dim * (p1 - p0 + 1));
-    }
-  }
-#pragma omp parallel for collapse(2)
-  for (int i = 0; i < ctx->model.layers.size(); ++i) {  // V
-    // [N, head_dim, n_head] or [N, n_embd]
-    for (int nm = 0; nm < n_embd; ++nm) {
-      memcpy(static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_dst * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
-             static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_src * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
-             v_elem_size * (p1 - p0 + 1));
-    }
-  }
+  ne_bestla::ne_threading::get()->parallel_for_collapse(
+      0, ctx->model.layers.size(), 1, 0, n_head, 1, [&](int i, int nh) {
+        // [head_dim, N, n_head]
+        memcpy(static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_dst * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
+                   p0 * k_elem_size * head_dim,
+               static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_src * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
+                   p0 * k_elem_size * head_dim,
+               k_elem_size * head_dim * (p1 - p0 + 1));
+      });
+  ne_bestla::ne_threading::get()->parallel_for_collapse(
+      0, ctx->model.layers.size(), 1, 0, n_embd, 1, [&](int i, int nm) {
+        // [N, head_dim, n_head] or [N, n_embd]
+        memcpy(static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_dst * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
+               static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_src * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
+               v_elem_size * (p1 - p0 + 1));
+      });
 }
 
 static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
@@ -2019,12 +2015,11 @@ struct logits_info {
     normalizers.resize(lctx->batch_size);
     MODEL_ASSERT(lctx->logits.size() % lctx->batch_size == 0);
     // batch
-#pragma omp parallel for
-    for (int i = 0; i < batch_size; ++i) {
+    ne_bestla::ne_threading::get()->parallel_for_collapse(0, batch_size, 1, [&](int i) {
       max_ls[i] = *std::max_element(logits + i * bs_stride + offset, logits + i * bs_stride + offset + n_vocab);
       normalizers[i] = 1.0f / std::accumulate(logits + i * bs_stride + offset,
                                               logits + i * bs_stride + offset + n_vocab, 0.0f, sum_exp_t{max_ls[i]});
-    }
+    });
   }
 
   beam_next_token get_token_data(const int& batch_idx, const int32_t& token_idx) const {
@@ -2184,11 +2179,10 @@ std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_cont
   MODEL_ASSERT(raw_top_k[0].size() == raw_k);
   MODEL_ASSERT(beams_score.size() == ctx->batch_size);
   // compute score: log_softmax + prev_score
-#pragma omp parallel for
-  for (int i = 0; i < ctx->batch_size; ++i) {
+  ne_bestla::ne_threading::get()->parallel_for_collapse(0, ctx->batch_size, 1, [&](int i) {
     std::for_each(raw_top_k[i].begin(), raw_top_k[i].end(),
                   [&](beam_next_token& r) { r.score = li.log_probability_from_logit(i, r.score) + beams_score[i]; });
-  }
+  });
   MODEL_ASSERT(num_beams.size() == request_running_bs);
   std::vector<beam_next_token> res;
   res.reserve(sample_scale * beam_size * num_beams.size());
@@ -2822,17 +2816,15 @@ std::vector<model_token> model_post_greedy_search(const float* logits, model_con
   int num_segments = (n_vocab + n_vocab_segment - 1) / n_vocab_segment;
   std::vector<model_token> candidate_tokens(ctx->batch_size * num_segments);
   std::vector<float> candidate_logits(ctx->batch_size * num_segments);
-#pragma omp parallel for collapse(2)
-  for (int bs = 0; bs < ctx->batch_size; ++bs) {
-    for (int vocab = 0; vocab < n_vocab; vocab += n_vocab_segment) {
-      auto max_e =
-          std::max_element(logits + bs * n_vocab + vocab, vocab + n_vocab_segment > n_vocab
-                                                              ? logits + bs * n_vocab + n_vocab
-                                                              : logits + bs * n_vocab + vocab + n_vocab_segment);
-      candidate_tokens[bs * num_segments + vocab / n_vocab_segment] = max_e - (logits + bs * n_vocab);
-      candidate_logits[bs * num_segments + vocab / n_vocab_segment] = *max_e;
-    }
-  }
+  ne_bestla::ne_threading::get()->parallel_for_collapse(
+      0, ctx->batch_size, 1, 0, n_vocab, n_vocab_segment, [&](int bs, int vocab) {
+        auto max_e =
+            std::max_element(logits + bs * n_vocab + vocab, vocab + n_vocab_segment > n_vocab
+                                                                ? logits + bs * n_vocab + n_vocab
+                                                                : logits + bs * n_vocab + vocab + n_vocab_segment);
+        candidate_tokens[bs * num_segments + vocab / n_vocab_segment] = max_e - (logits + bs * n_vocab);
+        candidate_logits[bs * num_segments + vocab / n_vocab_segment] = *max_e;
+      });
   for (int bs = 0; bs < ctx->batch_size; ++bs) {
     ids[bs] = candidate_tokens[std::distance(candidate_logits.begin(),
                                              std::max_element(candidate_logits.begin() + bs * num_segments,
