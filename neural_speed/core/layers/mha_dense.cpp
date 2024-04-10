@@ -187,35 +187,32 @@ void bestla_reordered_attn_fp32_update_k_48x2(const bestla_fusion_attn_fp32_upda
   GetCPUDevice();
   const bool use_jit = _cd->AVX512_BF16() && (p.seq_off == 0) && zero_padding;
 
-#pragma omp parallel for collapse(2)
-  for (int ibs = 0; ibs < p.batch_size; ++ibs) {
-    for (int ihn = 0; ihn < p.heads_kv; ++ihn) {
-      const auto dst = reinterpret_cast<bf16*>(p.cache) + ibs * cache_step_bs + ihn * cache_step_head_num;
-      const auto src = p.src + ibs * p.step_bs + ihn * p.step_head_num;
+  ne_threading::get()->parallel_for_collapse(0, p.batch_size, 1, 0, p.heads_kv, 1, [&](int ibs, int ihn) {
+    const auto dst = reinterpret_cast<bf16*>(p.cache) + ibs * cache_step_bs + ihn * cache_step_head_num;
+    const auto src = p.src + ibs * p.step_bs + ihn * p.step_head_num;
 
-      if (use_jit) {
-        kernel::jit::PaddingTransInterleaveCvt::forward<48>(  //
-            src, dst, p.seq_size, p.head_size, padto(p.seq_size, 48), padto(p.head_size, 32), p.step_seq, pad_headsize);
-      } else {
-        for (int i = 0; i < p.seq_size; ++i) {      // QK_GEMM should not require 0-padding on seq_kv (i.e. N-dim)
-          for (int j = 0; j < pad_headsize; ++j) {  // K-dim padding for QK_GEMM
-            const auto i_dst = p.seq_off + i;
-            const auto ii = i_dst % 48;
-            const auto i_blk = i_dst - ii;
-            const auto jj = j % 2;
-            const auto j_blk = j - jj;
-            if constexpr (zero_padding) {
-              dst[i_blk * pad_headsize + ii * 2 + j_blk * 48 + jj] =
-                  j < p.head_size ? static_cast<bf16>(src[i * p.step_seq + j]) : bf16(0);
-            } else {
-              if (j < p.head_size)
-                dst[i_blk * pad_headsize + ii * 2 + j_blk * 48 + jj] = static_cast<bf16>(src[i * p.step_seq + j]);
-            }
+    if (use_jit) {
+      kernel::jit::PaddingTransInterleaveCvt::forward<48>(  //
+          src, dst, p.seq_size, p.head_size, padto(p.seq_size, 48), padto(p.head_size, 32), p.step_seq, pad_headsize);
+    } else {
+      for (int i = 0; i < p.seq_size; ++i) {      // QK_GEMM should not require 0-padding on seq_kv (i.e. N-dim)
+        for (int j = 0; j < pad_headsize; ++j) {  // K-dim padding for QK_GEMM
+          const auto i_dst = p.seq_off + i;
+          const auto ii = i_dst % 48;
+          const auto i_blk = i_dst - ii;
+          const auto jj = j % 2;
+          const auto j_blk = j - jj;
+          if constexpr (zero_padding) {
+            dst[i_blk * pad_headsize + ii * 2 + j_blk * 48 + jj] =
+                j < p.head_size ? static_cast<bf16>(src[i * p.step_seq + j]) : bf16(0);
+          } else {
+            if (j < p.head_size)
+              dst[i_blk * pad_headsize + ii * 2 + j_blk * 48 + jj] = static_cast<bf16>(src[i * p.step_seq + j]);
           }
         }
       }
     }
-  }
+  });
 }
 
 template <bool zero_padding>
@@ -228,8 +225,7 @@ void bestla_reordered_attn_fp32_update_k_24x1(const bestla_fusion_attn_fp32_upda
   const auto cache_step_bs = p.heads_kv * cache_step_head_num;
 
   const int n_para = p.batch_size * p.heads_kv;
-  // #pragma omp parallel
-  for (int i_para = 0; i_para < n_para; ++i_para) {
+  ne_threading::get()->parallel_for_collapse(0, n_para, 1, [&](int i_para) {
     const int ibs = i_para / p.heads_kv;
     const int ihn = i_para % p.heads_kv;
 
@@ -276,7 +272,7 @@ void bestla_reordered_attn_fp32_update_k_24x1(const bestla_fusion_attn_fp32_upda
         }
       }
     }
-  }
+  });
 }
 
 template <bool zero_padding>
@@ -309,34 +305,31 @@ void bestla_reordered_attn_fp32_update_v_48x2(const bestla_fusion_attn_fp32_upda
   GetCPUDevice();
   const bool use_jit = _cd->AVX512_BF16() && (p.seq_off == 0) && zero_padding;
 
-#pragma omp parallel for collapse(2)
-  for (int ibs = 0; ibs < p.batch_size; ++ibs) {
-    for (int ihn = 0; ihn < p.heads_kv; ++ihn) {
-      const auto dst = reinterpret_cast<bf16*>(p.cache) + ibs * step_cache_bs + ihn * step_cache_head_num;
-      const auto src = p.src + ibs * p.step_bs + ihn * p.step_head_num;
-      if (use_jit) {
-        kernel::jit::PaddingInterleaveCvt::forward<48>(  //
-            src, dst, p.seq_size, p.head_size, padto(p.seq_size, 32), padto(p.head_size, 48), p.step_seq, pad_seq_max);
-      } else {
-        for (int i = 0; i < padto(p.seq_off + p.seq_size, 32) - p.seq_off; ++i) {  // K-dim padding for PV_GEMM
-          for (int j = 0; j < p.head_size; ++j) {  // PV_GEMM shouldn't require 0-padding on head_size (i.e. N-dim)
-            const auto i_dst = p.seq_off + i;
-            const auto ii = i_dst % 2;
-            const auto i_blk = i_dst - ii;
-            const auto jj = j % 48;
-            const auto j_blk = j - jj;
-            if constexpr (zero_padding) {
-              dst[i_blk * 48 + ii + j_blk * pad_seq_max + jj * 2] =
-                  i < p.seq_size ? static_cast<bf16>(src[i * p.step_seq + j]) : bf16(0);
-            } else {
-              if (i < p.seq_size)
-                dst[i_blk * 48 + ii + j_blk * pad_seq_max + jj * 2] = static_cast<bf16>(src[i * p.step_seq + j]);
-            }
+  ne_threading::get()->parallel_for_collapse(0, p.batch_size, 1, 0, p.heads_kv, 1, [&](int ibs, int ihn) {
+    const auto dst = reinterpret_cast<bf16*>(p.cache) + ibs * step_cache_bs + ihn * step_cache_head_num;
+    const auto src = p.src + ibs * p.step_bs + ihn * p.step_head_num;
+    if (use_jit) {
+      kernel::jit::PaddingInterleaveCvt::forward<48>(  //
+          src, dst, p.seq_size, p.head_size, padto(p.seq_size, 32), padto(p.head_size, 48), p.step_seq, pad_seq_max);
+    } else {
+      for (int i = 0; i < padto(p.seq_off + p.seq_size, 32) - p.seq_off; ++i) {  // K-dim padding for PV_GEMM
+        for (int j = 0; j < p.head_size; ++j) {  // PV_GEMM shouldn't require 0-padding on head_size (i.e. N-dim)
+          const auto i_dst = p.seq_off + i;
+          const auto ii = i_dst % 2;
+          const auto i_blk = i_dst - ii;
+          const auto jj = j % 48;
+          const auto j_blk = j - jj;
+          if constexpr (zero_padding) {
+            dst[i_blk * 48 + ii + j_blk * pad_seq_max + jj * 2] =
+                i < p.seq_size ? static_cast<bf16>(src[i * p.step_seq + j]) : bf16(0);
+          } else {
+            if (i < p.seq_size)
+              dst[i_blk * 48 + ii + j_blk * pad_seq_max + jj * 2] = static_cast<bf16>(src[i * p.step_seq + j]);
           }
         }
       }
     }
-  }
+  });
 }
 template <bool zero_padding>
 void bestla_reordered_attn_fp32_update_v_24x1(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
@@ -348,8 +341,7 @@ void bestla_reordered_attn_fp32_update_v_24x1(const bestla_fusion_attn_fp32_upda
   const auto step_cache_bs = p.heads_kv * step_cache_head_num;
 
   const int n_para = p.batch_size * p.heads_kv;
-#pragma omp parallel
-  for (int i_para = 0; i_para < n_para; ++i_para) {
+  ne_threading::get()->parallel_for_collapse(0, n_para, 1, [&](int i_para) {
     const int ibs = i_para / p.heads_kv;
     const int ihn = i_para % p.heads_kv;
     const auto dst = reinterpret_cast<fp16*>(p.cache) + ibs * step_cache_bs + ihn * step_cache_head_num;
@@ -380,7 +372,7 @@ void bestla_reordered_attn_fp32_update_v_24x1(const bestla_fusion_attn_fp32_upda
         }
       }
     }
-  }
+  });
 }
 template <bool zero_padding>
 void bestla_reordered_attn_fp32_update_v_(const bestla_fusion_attn_fp32_update_kv_args_t* params) {
@@ -407,13 +399,11 @@ void bestla_reordered_attn_fp32_shift_rope_k(char* cache, const ne_fp16_t* cossi
   const auto cache_step_head_num = pad_headsize * pad_seq_max;
   const auto cache_step_bs = heads_kv * cache_step_head_num;
 
-#pragma omp parallel for collapse(2)
-  for (int ibs = 0; ibs < batch_size; ++ibs)
-    for (int ihn = 0; ihn < heads_kv; ++ihn) {
-      const auto src = reinterpret_cast<bf16*>(cache) + ibs * cache_step_bs + ihn * cache_step_head_num;
-      kernel::jit::CScaleInterleavedBF16FP16::forward<48>(  // NOLINT [build/include_what_you_use]
-          src, reinterpret_cast<const fp16*>(cossin), head_size, pad_seq_max, pad_headsize, seq_keep);
-    }
+  ne_threading::get()->parallel_for_collapse(0, batch_size, 1, 0, heads_kv, 1, [&](int ibs, int ihn) {
+    const auto src = reinterpret_cast<bf16*>(cache) + ibs * cache_step_bs + ihn * cache_step_head_num;
+    kernel::jit::CScaleInterleavedBF16FP16::forward<48>(  // NOLINT [build/include_what_you_use]
+        src, reinterpret_cast<const fp16*>(cossin), head_size, pad_seq_max, pad_headsize, seq_keep);
+  });
 }
 
 template <bool zero_padding>
@@ -430,8 +420,7 @@ void bestla_fusion_attn_fp32_batch_cpy_k_(const bestla_fusion_attn_fp32_batch_cp
 
   const auto seq_unaligned = std::min(padto(p.seq_off, N_TILE) - p.seq_off, p.seq_size);
   const auto size_aligned_cpy = pad_headsize * (padto(p.seq_off + p.seq_size, N_TILE) - padto(p.seq_off, N_TILE));
-#pragma omp parallel for
-  for (int ihn = 0; ihn < p.heads_kv; ++ihn) {
+  ne_threading::get()->parallel_for_collapse(0, p.heads_kv, 1, [&](int ihn) {
     const auto dst = reinterpret_cast<bf16*>(p.dst) + ihn * step_head_num;
     const auto src = reinterpret_cast<bf16*>(p.src) + ihn * step_head_num;
 
@@ -451,7 +440,7 @@ void bestla_fusion_attn_fp32_batch_cpy_k_(const bestla_fusion_attn_fp32_batch_cp
     } else {
       assert(("Unimplemented!", false));
     }
-  }
+  });
 }
 void bestla_fusion_attn_fp32_batch_cpy_k(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params) {
   return params->no_zeroing ? bestla_fusion_attn_fp32_batch_cpy_k_<false>(params)
@@ -473,25 +462,22 @@ void bestla_fusion_attn_fp32_batch_cpy_v_(const bestla_fusion_attn_fp32_batch_cp
   const auto seq_off_aligned = padto(p.seq_off, K_PACK);
   const auto seq_end_aligned = padto(p.seq_off + p.seq_size, K_TILE);
   const auto seq_size_aligned = seq_end_aligned - seq_off_aligned;
-#pragma omp parallel for collapse(2)
-  for (int ihn = 0; ihn < p.heads_kv; ++ihn) {
-    for (int j = 0; j < p.head_size; j += N_TILE) {
-      const auto dst = reinterpret_cast<bf16*>(p.dst) + ihn * step_head_num + pad_seq_max * j;
-      const auto src = reinterpret_cast<bf16*>(p.src) + ihn * step_head_num + pad_seq_max * j;
-      if (p.seq_off != seq_off_aligned) {  // seq_size_unaligen must be 0 or 1 as K_PACK = 2
-        const auto off = (seq_off_aligned - K_PACK) * N_TILE + 1;
-        for (int jj = 0; jj < N_TILE; ++jj) dst[off + jj * K_PACK] = src[off + jj * K_PACK];
-      }
-      if constexpr (zero_padding) {
-        if (seq_off_aligned != seq_end_aligned) {
-          const auto off = seq_off_aligned * N_TILE;
-          memcpy(dst + off, src + off, sizeof(bf16) * N_TILE * seq_size_aligned);
-        }
-      } else {
-        assert(("Unimplemented!", false));
-      }
+  ne_threading::get()->parallel_for_collapse(0, p.heads_kv, 1, 0, p.head_size, 1, [&](int ihn, int j) {
+    const auto dst = reinterpret_cast<bf16*>(p.dst) + ihn * step_head_num + pad_seq_max * j;
+    const auto src = reinterpret_cast<bf16*>(p.src) + ihn * step_head_num + pad_seq_max * j;
+    if (p.seq_off != seq_off_aligned) {  // seq_size_unaligen must be 0 or 1 as K_PACK = 2
+      const auto off = (seq_off_aligned - K_PACK) * N_TILE + 1;
+      for (int jj = 0; jj < N_TILE; ++jj) dst[off + jj * K_PACK] = src[off + jj * K_PACK];
     }
-  }
+    if constexpr (zero_padding) {
+      if (seq_off_aligned != seq_end_aligned) {
+        const auto off = seq_off_aligned * N_TILE;
+        memcpy(dst + off, src + off, sizeof(bf16) * N_TILE * seq_size_aligned);
+      }
+    } else {
+      assert(("Unimplemented!", false));
+    }
+  });
 }
 void bestla_fusion_attn_fp32_batch_cpy_v(const bestla_fusion_attn_fp32_batch_cpy_kv_args_t* params) {
   return params->no_zeroing ? bestla_fusion_attn_fp32_batch_cpy_v_<false>(params)
