@@ -63,7 +63,8 @@ void bestla_fusion_attn_int8_forward(const attn_int8_fwd_args_t* params) {
 }
 size_t bestla_fusion_attn_workspace_size(const attn_shape_t* params) {
   const auto& p = *params;  // TODO(Yi): Better way to get tmp size?
-  return size_t(ne_threading::get()->num_threads() * sizeof(float) * 16) * padto(padto(p.sl_kv, 48), 64);
+  GetCPUDevice();
+  return size_t(_cd->getThreads() * sizeof(float) * 16) * padto(padto(p.sl_kv, 48), 64);
 }
 
 bool bestla_reordered_attn_fp32_support(const attn_shape_t* params) {
