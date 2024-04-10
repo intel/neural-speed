@@ -153,7 +153,7 @@ class CMakeBuild(build_ext):
 
             if not single_config and not contains_arch:
                 if sys.platform == "win32" and sys.maxsize.bit_length() > 31:
-                    cmake_args += ["-A", "x64]
+                    cmake_args += ["-A", "x64"]
                 else:
                     cmake_args += ["-A", PLAT_TO_CMAKE[self.plat_name]]
 
