@@ -184,7 +184,6 @@ class Params:
         if "rope_scaling" in config and config["rope_scaling"] is not None:
             rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
 
-
         return Params(
             n_vocab=n_vocab,
             n_embd=n_embd,
@@ -246,6 +245,7 @@ class Params:
 
 
 class SentencePieceVocab:
+
     def __init__(self, fname_tokenizer: Path, fname_added_tokens: Optional[Path]) -> None:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
@@ -300,6 +300,7 @@ class SentencePieceVocab:
 
 
 class NEVocab:
+
     def __init__(self, tokens: List[Tuple[bytes, float]]):
         self.tokens = tokens
         self.vocab_size = len(tokens)
@@ -384,6 +385,7 @@ def bf16_to_fp32(bf16_arr: np.ndarray) -> np.ndarray:
 
 
 class UnquantizedTensor(Tensor):
+
     def __init__(self, ndarray: NDArray) -> None:
         assert isinstance(ndarray, np.ndarray)
         self.ndarray = ndarray
@@ -455,6 +457,7 @@ NECompatibleTensor = Union[UnquantizedTensor, NEQuantizedTensor]
 
 
 class DeferredPermutedTensor(Tensor):
+
     def __init__(self, base: Tensor, n_head: int, kv_head: int) -> None:
         self.base = base
         self.n_head = n_head
@@ -472,6 +475,7 @@ class DeferredPermutedTensor(Tensor):
 
 
 class GPTQForLLaMaQuantizedTensor(Tensor):
+
     def __init__(self, model: 'LazyModel', namebase: str) -> None:
         qweight = load_unquantized(model[f"{namebase}.qweight"], np.int32)
         scales = load_unquantized(model[f"{namebase}.scales"], np.float32, convert=True)
@@ -619,8 +623,7 @@ class LazyTensor:
                 sys.stderr.write(
                     "Error: Input uses the newer GPTQ-for-LLaMa format (using g_idx), which is not yet natively \
                     supported by NE.  For now you can still convert this model by passing `--outtype f16` to \
-                    dequantize, but that will result in a much larger output file for no quality benefit.\n"
-                )
+                    dequantize, but that will result in a much larger output file for no quality benefit.\n")
                 sys.exit(1)
             assert not data_type.have_g_idx and self.data_type.have_addends and data_type.have_addends
 
@@ -696,6 +699,7 @@ def merge_multifile_models(models_plus: List[ModelPlus]) -> ModelPlus:
 
 
 def permute_lazy(lazy_tensor: LazyTensor, n_head: int, n_head_kv: int) -> LazyTensor:
+
     def load() -> Tensor:
         return lazy_tensor.load().permute(n_head, n_head_kv)
 
@@ -733,6 +737,7 @@ def handle_quantization(model: LazyModel) -> LazyModel:
     (which resolve to UnquantizedTensors with the raw data) to one with entries
     for 'foo.weight' (which resolve to QuantizedTensors).
     '''
+
     def convert(name: str) -> Tuple[str, LazyTensor]:
         if name.endswith(".qweight"):
             namebase = name.rsplit('.', 1)[0]
@@ -783,6 +788,7 @@ class LazyStorage:
 
 
 class LazyUnpickler(pickle.Unpickler):
+
     def __init__(self, fp: IO[bytes], data_base_path: str, zip_file: zipfile.ZipFile):
         super().__init__(fp)
         self.data_base_path = data_base_path
@@ -809,6 +815,7 @@ class LazyUnpickler(pickle.Unpickler):
 
         description = f'storage data_type={data_type} path-in-zip={filename} path={self.zip_file.filename}'
         return LazyStorage(load=load, kind=pid[1], description=description)
+
 
 # @staticmethod
 
@@ -861,8 +868,14 @@ def lazy_load_torch_file(outer_fp: IO[bytes], path: Path) -> ModelPlus:
     return ModelPlus(model=as_dict, paths=[path], format='torch', vocab=None)
 
 
-SAFETENSORS_DATA_TYPES: Dict[str, DataType] = {'F16': DT_F16, 'F32': DT_F32, 'I32': DT_I32, 'BOOL': DT_BOOL,
-                                               'BF16': DT_BF16}
+SAFETENSORS_DATA_TYPES: Dict[str, DataType] = {
+    'F16': DT_F16,
+    'F32': DT_F32,
+    'I32': DT_I32,
+    'BOOL': DT_BOOL,
+    'BF16': DT_BF16
+}
+
 
 def lazy_load_safetensors_file(fp: IO[bytes], path: Path) -> ModelPlus:
     header_size, = struct.unpack('<Q', fp.read(8))
@@ -1034,6 +1047,7 @@ def check_vocab_size(params: Params, vocab: Vocab) -> None:
 
 
 class OutputFile:
+
     def __init__(self, fname_out: Path) -> None:
         self.fout = open(fname_out, "wb")
 
@@ -1064,18 +1078,16 @@ class OutputFile:
 
         self.fout.write(struct.pack("i", 0))  # n_experts
         self.fout.write(struct.pack("i", 0))  # n_expert_used
-        self.fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+        self.fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
-        self.fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-        self.fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-        self.fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+        self.fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+        self.fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+        self.fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
-        self.fout.write(
-            struct.pack("i", 1)
-        )
+        self.fout.write(struct.pack("i", 1))
         # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
         self.fout.write(struct.pack("i", 2))
@@ -1121,10 +1133,8 @@ class OutputFile:
         for i, ((name, lazy_tensor), ndarray) in enumerate(zip(model.items(), ndarrays)):
             size = ' x '.join(f"{dim:6d}" for dim in lazy_tensor.shape)
             padi = len(str(len(model)))
-            print(
-                f"[{i+1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} |\
-                type {lazy_tensor.data_type}"
-            )
+            print(f"[{i+1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} |\
+                type {lazy_tensor.data_type}")
             of.write_tensor_header(name, lazy_tensor.shape, lazy_tensor.data_type)
             ndarray.tofile(of.fout)
         of.fout.close()
@@ -1251,8 +1261,7 @@ def load_vocab(path: Path) -> SentencePieceVocab:
         else:
             raise FileNotFoundError(
                 f"Could not find tokenizer.model in {path} or its parent; if it's in another directory,\
-                pass the directory as --vocab-dir"
-            )
+                pass the directory as --vocab-dir")
     added_tokens_path = path.parent / "added_tokens.json"
     print(f"Loading vocab file {path}")
     return SentencePieceVocab(path, added_tokens_path if added_tokens_path.exists() else None)
@@ -1268,10 +1277,8 @@ def default_outfile(model_paths: List[Path], params: Params) -> Path:
     }[params.file_type]
     ret = model_paths[0].parent / f"ne-model-{namestr}.bin"
     if ret in model_paths:
-        sys.stderr.write(
-            f"Error: Default output path ({ret}) would overwrite the input.  Please explicitly specify \
-            a path using --outfile.\n"
-        )
+        sys.stderr.write(f"Error: Default output path ({ret}) would overwrite the input.  Please explicitly specify \
+            a path using --outfile.\n")
         sys.exit(1)
     return ret
 
@@ -1298,8 +1305,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
@@ -1323,7 +1332,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 from modelscope import AutoConfig, AutoModel, AutoTokenizer
             else:
                 from transformers import AutoConfig, AutoModel, AutoTokenizer
-            model = AutoModel.from_pretrained(str(args.model), low_cpu_mem_usage=True, trust_remote_code=True)
+            model = AutoModel.from_pretrained(str(args.model), trust_remote_code=True)
             tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
             args.model = cache_path

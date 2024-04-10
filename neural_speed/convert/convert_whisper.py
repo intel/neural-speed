@@ -42,7 +42,6 @@ import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
 
-
 conv_map = {
     'self_attn.k_proj': 'attn.key',
     'self_attn.q_proj': 'attn.query',
@@ -97,14 +96,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="fp32",
                         help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
     dir_model = args.model
     dir_out = args.outfile
     out_type = args.outtype
-
 
     encoder = json.load((dir_model / "vocab.json").open("r", encoding="utf8"))
     encoder_added = json.load((dir_model / "added_tokens.json").open("r", encoding="utf8"))
@@ -117,11 +117,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     #code.interact(local=locals())
     path = os.getcwd()
-    path = path+'/whisper'
-    if os.path.exists(path)== False:
+    path = path + '/whisper'
+    if os.path.exists(path) == False:
         os.system('git clone https://github.com/openai/whisper.git')
     n_mels = hparams["num_mel_bins"]
-    mel_path = path+'/whisper/assets/mel_filters.npz'
+    mel_path = path + '/whisper/assets/mel_filters.npz'
     with np.load(mel_path) as f:
         filters = torch.from_numpy(f[f"mel_{n_mels}"])
 
@@ -238,8 +238,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     print("Done. Output file: ", fname_out)
     print("")
-
-
 
 
 if __name__ == "__main__":

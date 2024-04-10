@@ -34,7 +34,6 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
                     Union)
 
 
-
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
     """
@@ -62,8 +61,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -119,7 +120,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", hparams["head_dim"])) # n_embd_head_k
+    fout.write(struct.pack("i", hparams["head_dim"]))  # n_embd_head_k
     fout.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor

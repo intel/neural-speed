@@ -200,9 +200,10 @@ def load_vocab(path: Path) -> SentencePieceVocab:
     local_path = path
     if not local_path.exists():
         from huggingface_hub import snapshot_download
-        local_path = snapshot_download(repo_id=str(path.parent),
-                                             allow_patterns=["*.model"],
-                                             )
+        local_path = snapshot_download(
+            repo_id=str(path.parent),
+            allow_patterns=["*.model"],
+        )
         local_path = Path(local_path)
     if local_path.is_dir():
         path2 = local_path / "tokenizer.model"
@@ -295,7 +296,7 @@ def unpack_gptq_weight_8bits(qweight, scales, qzeros, q_config):
     except:
         # zeros and scales have different item numbers.
         # remove 1 (due to 0 + 1 in line 68)
-        zeros = zeros[zeros !=1]
+        zeros = zeros[zeros != 1]
         zeros = zeros.reshape(scales.shape)
 
     if not sym and bits == 8:
@@ -415,9 +416,10 @@ def load_quantized_safetensors(model_path):
     local_model_path = model_path
     if not os.path.exists(local_model_path):
         from huggingface_hub import snapshot_download
-        local_model_path = snapshot_download(repo_id=model_path,
-                                             allow_patterns=["*.safetensors"],
-                                             )
+        local_model_path = snapshot_download(
+            repo_id=model_path,
+            allow_patterns=["*.safetensors"],
+        )
     for m_file in os.listdir(local_model_path):
         if m_file.endswith(".safetensors"):
             safetensors.append(m_file)
@@ -442,9 +444,10 @@ def load_quantized_model(model_path):
     local_model_path = model_path
     if not os.path.exists(local_model_path):
         from huggingface_hub import snapshot_download
-        local_model_path = snapshot_download(repo_id=model_path,
-                                             allow_patterns=["*.pt", "*.safetensors", "*.json"],
-                                             )
+        local_model_path = snapshot_download(
+            repo_id=model_path,
+            allow_patterns=["*.pt", "*.safetensors", "*.json"],
+        )
     input_path = find_quantized_model_file(local_model_path)
     model = None
     if input_path.endswith('pt'):

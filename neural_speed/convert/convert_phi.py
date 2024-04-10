@@ -29,6 +29,7 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import gguf
 
+
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
     """
@@ -51,10 +52,11 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
+
 def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("phi.gguf converting: ")
     list_vars = model.state_dict()
-    n_rot = int(hparams["partial_rotary_factor"]*hparams["hidden_size"]/hparams["num_attention_heads"])
+    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     for name in list_vars.keys():
         print(name, list_vars[name].shape, list_vars[name].dtype)
 
@@ -162,8 +164,9 @@ def phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("Done. Output file: " + fname_out)
     print("")
 
+
 def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
-    n_rot = int(hparams["partial_rotary_factor"]*hparams["hidden_size"]/hparams["num_attention_heads"])
+    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     model.eval()
     for p in model.parameters():
         p.requires_grad = False
@@ -199,13 +202,13 @@ def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layer_norm_eps", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
-    fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-    fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-    fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+    fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+    fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+    fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
     fout.write(struct.pack("i", tokenizer.bos_token_id if tokenizer.bos_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.eos_token_id if tokenizer.eos_token_id is not None else -1))
     fout.write(struct.pack("i", tokenizer.pad_token_id if tokenizer.pad_token_id is not None else -1))
@@ -264,11 +267,14 @@ def phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("Done. Output file: " + fname_out)
     print("")
 
+
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to a NE compatible file")
     parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"], default="huggingface",
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
                         help="hub to load model")
     parser.add_argument("model", type=Path, help="directory containing model file")
     parser.add_argument("--format",
@@ -299,7 +305,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         phi_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
     else:
         phi_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
-
 
 
 if __name__ == '__main__':

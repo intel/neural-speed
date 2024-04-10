@@ -29,6 +29,7 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import gguf
 
+
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
     """
@@ -50,6 +51,7 @@ def bytes_to_unicode():
             n += 1
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
+
 
 def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("stablelm.gguf converting: ")
@@ -158,6 +160,7 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("Done. Output file: " + gguf_file)
     print("")
 
+
 def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     model.eval()
@@ -191,13 +194,13 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
     fout.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
-    fout.write(struct.pack("i", 0)) # multi_query_group_num
-    fout.write(struct.pack("i", hparams["intermediate_size"])) # ffn_hidden_size
-    fout.write(struct.pack("i", 0)) # inner_hidden_size for ChatGLM2
+    fout.write(struct.pack("i", 0))  # multi_query_group_num
+    fout.write(struct.pack("i", hparams["intermediate_size"]))  # ffn_hidden_size
+    fout.write(struct.pack("i", 0))  # inner_hidden_size for ChatGLM2
 
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layer_norm_eps", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
     fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
@@ -264,36 +267,21 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("Done. Output file: " + fname_out)
     print("")
 
+
 def main(args_in: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Convert a model to an NE or GGUF compatible file")
-    parser.add_argument(
-        "--outtype",
-        choices=["f32", "f16"],
-        help="output format (default: based on input)"
-    )
-    parser.add_argument(
-        "--outfile",
-        type=Path,
-        help="path to write to; default: based on input"
-    )
-    parser.add_argument(
-        "--model_hub",
-        choices=["huggingface","modelscope"],
-        default="huggingface",
-        help="hub to load model"
-    )
-    parser.add_argument(
-        "--format",
-        type=str,
-        default="NE",
-        choices=["NE", "GGUF"],
-        help="convert to the GGUF or NE format"
-    )
-    parser.add_argument(
-        "model",
-        type=Path,
-        help="directory containing model file"
-    )
+    parser.add_argument("--outtype", choices=["f32", "f16"], help="output format (default: based on input)")
+    parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
+    parser.add_argument("--format",
+                        type=str,
+                        default="NE",
+                        choices=["NE", "GGUF"],
+                        help="convert to the GGUF or NE format")
+    parser.add_argument("model", type=Path, help="directory containing model file")
 
     args = parser.parse_args(args_in)
 
@@ -319,7 +307,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
     else:
         stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
-
 
 
 if __name__ == '__main__':

@@ -559,7 +559,7 @@ def chatglm3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
@@ -710,7 +710,7 @@ def chatglm2_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
     fout.write(struct.pack("f", 1.0))  # rope_factor
@@ -862,7 +862,7 @@ def chatglm1_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
 
     fout.write(struct.pack("f", 10000.0))  # freq_base
@@ -964,7 +964,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         from modelscope import AutoConfig, AutoModel, AutoTokenizer
     else:
         from transformers import AutoConfig, AutoModel, AutoTokenizer
-    model = AutoModel.from_pretrained(dir_model, low_cpu_mem_usage=True, trust_remote_code=True)
+    model = AutoModel.from_pretrained(dir_model, trust_remote_code=True)
     config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
 

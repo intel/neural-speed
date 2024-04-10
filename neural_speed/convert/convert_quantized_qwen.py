@@ -76,14 +76,14 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
 
     f.write(struct.pack("i", 0))
-    if hparams['model_type']=='qwen2':
+    if hparams['model_type'] == 'qwen2':
         f.write(struct.pack("i", hparams["intermediate_size"]))
     else:
-        f.write(struct.pack("i", int(hparams["intermediate_size"]/2)))
+        f.write(struct.pack("i", int(hparams["intermediate_size"] / 2)))
     f.write(struct.pack("i", 0))
     f.write(struct.pack("i", 0))  # n_experts
     f.write(struct.pack("i", 0))  # n_expert_used
-    f.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    f.write(struct.pack("i", 0))  # n_embd_head_k for gemma
     f.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
     f.write(struct.pack("f", 10000.0))  # freq_base
     f.write(struct.pack("f", 1.0))  # rope_factor

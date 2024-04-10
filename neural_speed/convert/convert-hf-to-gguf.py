@@ -34,7 +34,6 @@ if 'NO_LOCAL_GGUF' not in os.environ:
     sys.path.insert(1, str(Path(__file__).parent / 'gguf-py'))
 import gguf
 
-
 ###### MODEL DEFINITIONS ######
 
 
@@ -48,34 +47,29 @@ class SentencePieceTokenTypes(IntEnum):
 
 
 class HfVocab:
+
     def __init__(self, fname_tokenizer: Path, fname_added_tokens: Path | None = None) -> None:
         try:
             from transformers import AutoTokenizer
         except ImportError as e:
-            raise ImportError(
-                "To use HfVocab, please install the `transformers` package. "
-                "You can install it with `pip install transformers`."
-            ) from e
+            raise ImportError("To use HfVocab, please install the `transformers` package. "
+                              "You can install it with `pip install transformers`.") from e
 
         print("fname_tokenizer:", fname_tokenizer)
         # Allow the tokenizer to default to slow or fast versions.
         # Explicitly set tokenizer to use local paths.
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            fname_tokenizer,
-            cache_dir=fname_tokenizer,
-            local_files_only=True,
-            trust_remote_code=True
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(fname_tokenizer,
+                                                       cache_dir=fname_tokenizer,
+                                                       local_files_only=True,
+                                                       trust_remote_code=True)
 
         # Initialize lists and dictionaries for added tokens
         self.added_tokens_list = []
         self.added_tokens_dict = dict()
-        self.added_tokens_ids  = set()
+        self.added_tokens_ids = set()
 
         # Process added tokens
-        for tok, tokidx in sorted(
-            self.tokenizer.get_added_vocab().items(), key=lambda x: x[1]
-        ):
+        for tok, tokidx in sorted(self.tokenizer.get_added_vocab().items(), key=lambda x: x[1]):
             # Only consider added tokens that are not in the base vocabulary
             if tokidx >= self.tokenizer.vocab_size:
                 self.added_tokens_list.append(tok)
@@ -83,23 +77,18 @@ class HfVocab:
                 self.added_tokens_ids.add(tokidx)
 
         # Store special tokens and their IDs
-        self.specials = {
-            tok: self.tokenizer.get_vocab()[tok]
-            for tok in self.tokenizer.all_special_tokens
-        }
+        self.specials = {tok: self.tokenizer.get_vocab()[tok] for tok in self.tokenizer.all_special_tokens}
         self.special_ids = set(self.tokenizer.all_special_ids)
 
         # Set vocabulary sizes
         self.vocab_size_base = self.tokenizer.vocab_size
-        self.vocab_size      = self.vocab_size_base + len(self.added_tokens_list)
+        self.vocab_size = self.vocab_size_base + len(self.added_tokens_list)
 
-        self.fname_tokenizer    = fname_tokenizer
+        self.fname_tokenizer = fname_tokenizer
         self.fname_added_tokens = fname_added_tokens
 
     def hf_tokens(self) -> Iterable[tuple[bytes, float, gguf.TokenType]]:
-        reverse_vocab = {
-            id: encoded_tok for encoded_tok, id in self.tokenizer.get_vocab().items()
-        }
+        reverse_vocab = {id: encoded_tok for encoded_tok, id in self.tokenizer.get_vocab().items()}
 
         for token_id in range(self.vocab_size_base):
             # Skip processing added tokens here
@@ -111,7 +100,9 @@ class HfVocab:
 
             # Yield token text, score, and type
             yield token_text, self.get_token_score(token_id), self.get_token_type(
-                token_id, token_text, self.special_ids  # Reuse already stored special IDs
+                token_id,
+                token_text,
+                self.special_ids  # Reuse already stored special IDs
             )
 
     def get_token_type(self, token_id: int, token_text: bytes, special_ids: set[int]) -> gguf.TokenType:
@@ -148,7 +139,9 @@ class HfVocab:
     def __repr__(self) -> str:
         return f"<HfVocab with {self.vocab_size_base} base tokens and {len(self.added_tokens_list)} added tokens>"
 
+
 class Model:
+
     def __init__(self, dir_model: Path, ftype: int, fname_out: Path, is_big_endian: bool):
         self.dir_model = dir_model
         self.ftype = ftype
@@ -562,6 +555,7 @@ class Model:
 
 
 class GPTNeoXModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams["num_hidden_layers"]
 
@@ -578,6 +572,7 @@ class GPTNeoXModel(Model):
 
 
 class BloomModel(Model):
+
     def set_gguf_parameters(self):
         self.gguf_writer.add_name("Bloom")
         n_embed = self.hparams.get("hidden_size", self.hparams.get("n_embed"))
@@ -672,6 +667,7 @@ class BloomModel(Model):
 
 
 class MPTModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams["n_layers"]
         self.gguf_writer.add_name(self.dir_model.name)
@@ -740,6 +736,7 @@ class MPTModel(Model):
 
 
 class OrionModel(Model):
+
     def set_vocab(self):
         self._set_vocab_sentencepiece()
 
@@ -817,6 +814,7 @@ class OrionModel(Model):
 
 
 class BaichuanModel(Model):
+
     def set_vocab(self):
         self._set_vocab_sentencepiece()
 
@@ -933,6 +931,7 @@ class BaichuanModel(Model):
 
 
 class FalconModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams.get("num_hidden_layers")
         if block_count is None:
@@ -1026,6 +1025,7 @@ class FalconModel(Model):
 
 
 class StarCoderModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams["n_layer"]
 
@@ -1041,6 +1041,7 @@ class StarCoderModel(Model):
 
 
 class RefactModel(Model):
+
     def set_gguf_parameters(self):
         hidden_dim = self.hparams["n_embd"]
         inner_dim = 4 * hidden_dim
@@ -1125,6 +1126,7 @@ class RefactModel(Model):
 
 
 class PersimmonModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams.get("num_layers", self.hparams.get("num_hidden_layers"))
         head_count = self.hparams["num_attention_heads"]
@@ -1174,6 +1176,7 @@ class PersimmonModel(Model):
 
 
 class StableLMModel(Model):
+
     def set_vocab(self):
         if (self.dir_model / "tokenizer.json").is_file():
             self._set_vocab_gpt2()
@@ -1199,11 +1202,13 @@ class StableLMModel(Model):
 
 
 class MixtralModel(Model):
+
     def set_vocab(self):
         self._set_vocab_sentencepiece()
 
 
 class MiniCPMModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams["num_hidden_layers"]
         self.gguf_writer.add_name("MiniCPM")
@@ -1278,6 +1283,7 @@ class MiniCPMModel(Model):
 
 
 class QwenModel(Model):
+
     @staticmethod
     def token_bytes_to_string(b):
         from transformers.models.gpt2.tokenization_gpt2 import bytes_to_unicode
@@ -1358,6 +1364,7 @@ class QwenModel(Model):
 
 
 class GPT2Model(Model):
+
     def set_gguf_parameters(self):
         self.gguf_writer.add_name(self.dir_model.name)
         self.gguf_writer.add_block_count(self.hparams["n_layer"])
@@ -1421,6 +1428,7 @@ class GPT2Model(Model):
 
 
 class Phi2Model(Model):
+
     def set_gguf_parameters(self):
         block_count = self.find_hparam(["num_hidden_layers", "n_layer"])
 
@@ -1443,6 +1451,7 @@ class Phi2Model(Model):
 
 
 class PlamoModel(Model):
+
     def set_vocab(self):
         self._set_vocab_sentencepiece()
 
@@ -1522,6 +1531,7 @@ class PlamoModel(Model):
 
 
 class CodeShellModel(Model):
+
     def set_gguf_parameters(self):
         block_count = self.hparams["n_layer"]
 
@@ -1587,6 +1597,7 @@ class CodeShellModel(Model):
 
 
 class InternLM2Model(Model):
+
     def set_vocab(self):
         # (TODO): Is there a better way?
         # Copy from _set_vocab_sentencepiece, The only difference is that we will treat the character
@@ -1759,6 +1770,7 @@ in chat mode so that the conversation can end normally.")
 
 
 class BertModel(Model):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.vocab_size = None
@@ -1865,6 +1877,7 @@ class BertModel(Model):
 
 
 class NomicBertModel(BertModel):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
