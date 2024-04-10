@@ -83,7 +83,7 @@ class Launcher {
     return ev;
   }
 };
-
+ 
 template <template <class GCT> class ProAT, template <class GCT> class ProBT, template <class GCT> class EpiT,
           class GemmCoreT>
 class LauncherWOQ {
@@ -143,6 +143,7 @@ class LauncherWOQ {
     return ev;
   }
 };
+
 }  // namespace sycl_wrapper
 }  // namespace bestla
 #endif

@@ -85,12 +85,15 @@ class Benchmark_Fp32Fp32 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
-//static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+// static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 
 class Benchmark_S4Fp32Fp32 {
  public:
   Benchmark_S4Fp32Fp32() {
     UT_START();
+    benchmark_all(1, 4096, 4096);
+    benchmark_all(1, 4096, 4096 * 4);
+    benchmark_all(1, 4096 * 4, 4096);
     benchmark_all(1024, 4096, 4096);
     benchmark_all(4096, 4096, 4096);
   }
@@ -134,7 +137,406 @@ class Benchmark_S4Fp32Fp32 {
     log.record();
     double flops = double(psize) / log.min_val / 1e6;
     printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+
+  template <typename LOG_T>
+  void benchmark_gemv(int m, int n, int k, int batch, AType* A, uint8_t* B, float* B_scale, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = A;
+    auto B_d = B;
+    auto C_d = C;
+    auto S_d = B_scale;
+    auto psize = (size_t)m * n * k * 2;
+    int constexpr blocksize = 32;
+    sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
+    sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+    utils::GemmProblem gp(1, m, n, k);
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        int constexpr SgSize = 16;
+        int constexpr KSlicing = 16;
+        int constexpr TileN = 2;
+        int constexpr GroupN = SgSize * TileN;
+        sycl::range<1> group{KSlicing * SgSize};
+        sycl::range<1> problem{KSlicing * n / TileN};
+        auto n_blks = updiv(n / TileN, SgSize);
+        int sg_ksize = k / KSlicing;
+        auto e_esimd = q->submit([&](sycl::handler& cgh) {
+          sycl::local_accessor<float, 1> slm(sycl::range(GroupN * (KSlicing - 1)), cgh);
+          cgh.parallel_for(sycl::nd_range<1>(problem, group),
+                           [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+                             int g_idx = it.get_group(0);
+                             auto sg = it.get_sub_group();
+                             int sg_group_id = sg.get_group_id()[0];
+                             int sg_id = sg.get_local_id()[0];
+                             int g_n = g_idx * GroupN;
+                             int sg_k = sg_group_id * sg_ksize;
+                             auto sptr = S_d + sg_k / blocksize * n + g_n;
+                             auto bptr = B_d + (sg_k * n + g_n) / 2;
+                             auto aptr = A_d + sg_k;
+                             auto cptr = C_d + g_n;
+                             float tmpAcc[TileN];
+#pragma unroll
+                             for (int i = 0; i < TileN; i++) {
+                               tmpAcc[i] = 0.f;
+                             }
+                             for (int i = 0; i < sg_ksize; i += blocksize) {
+                               float localAcc[TileN];
+                               for (int i = 0; i < TileN; i++) {
+                                 localAcc[i] = 0.f;
+                               }
+#pragma unroll
+                               for (int ik = 0; ik < blocksize; ik++) {
+                                 uint8_t tmp = *(bptr + ik * n / 2 + sg_id);
+                                 float tmpf[TileN];
+                                 tmpf[0] = static_cast<int8_t>((tmp & 0x0f) << 4);
+                                 tmpf[1] = static_cast<int8_t>((tmp & 0xf0));
+                                 auto tmpA = aptr[ik];
+#pragma unroll
+                                 for (int in = 0; in < TileN; in++) {
+                                   localAcc[in] += tmpf[in] * tmpA;
+                                 }
+                               }
+                               for (int in = 0; in < TileN; in++) {
+                                 tmpAcc[in] += localAcc[in] * *(sptr + sg_id * TileN + in);
+                               }
+                               sptr += n;
+                               aptr += blocksize;
+                               bptr += blocksize * n / 2;
+                             }
+                             int slm_idx = sg_group_id - 1;
+                             if (slm_idx >= 0) {
+#pragma unroll
+                               for (int in = 0; in < TileN; in++) {
+                                 slm[slm_idx * GroupN + sg_id * TileN + in] = tmpAcc[in];
+                               }
+                             }
+                             it.barrier(sycl::access::fence_space::local_space);
+                             if (sg_group_id == 0) {
+#pragma unroll
+                               for (int is = 0; is < KSlicing - 1; is++) {
+#pragma unroll
+                                 for (int in = 0; in < TileN; in++) {
+                                   tmpAcc[in] += slm[is * GroupN + sg_id * TileN + in];
+                                 }
+                               }
+#pragma unroll
+                               for (int in = 0; in < TileN; in++) {
+                                 cptr[sg_id * TileN + in] = tmpAcc[in];
+                               }
+                             }
+                           });
+        });
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
     printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+
+  template <typename LOG_T>
+  void benchmark_gemv_T(int m, int n, int k, int batch, AType* A, uint8_t* B, float* B_scale, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = A;
+    auto B_d = B;
+    auto C_d = C;
+    auto S_d = B_scale;
+    auto psize = (size_t)m * n * k * 2;
+    int constexpr blocksize = 32;
+    int blks = k / blocksize;
+    sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
+    sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+    utils::GemmProblem gp(1, m, n, k);
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        int constexpr SgSize = 16;
+        int constexpr TileK = 2;
+        int constexpr GroupK = SgSize * TileK;
+        sycl::range<1> group{SgSize};
+        sycl::range<1> problem{n * SgSize};
+        auto e_esimd = q->submit([&](sycl::handler& cgh) {
+          cgh.parallel_for(sycl::nd_range<1>(problem, group),
+                           [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+                             int g_idx = it.get_group(0);
+                             auto sg = it.get_sub_group();
+                             int sg_id = sg.get_local_id()[0];
+                             int g_n = g_idx;
+                             auto sptr = S_d + g_n * blks;
+                             auto bptr = B_d + g_n * k / 2;
+                             auto aptr = A_d;
+                             auto cptr = C_d + g_n;
+                             float tmpAcc[TileK];
+#pragma unroll
+                             for (int i = 0; i < TileK; i++) {
+                               tmpAcc[i] = 0.f;
+                             }
+                             for (int i = 0; i < k; i += blocksize) {
+                               float localAcc[TileK];
+                               for (int i = 0; i < TileK; i++) {
+                                 localAcc[i] = 0.f;
+                               }
+                               auto scale = *sptr;
+                               for (int ik = 0; ik < blocksize; ik += GroupK) {
+                                 uint8_t tmp = *(bptr + ik / 2 + sg_id);
+                                 float tmpf[TileK];
+                                 tmpf[0] = static_cast<int8_t>((tmp & 0x0f) << 4);
+                                 tmpf[1] = static_cast<int8_t>((tmp & 0xf0));
+#pragma unroll
+                                 for (int in = 0; in < TileK; in++) {
+                                   localAcc[in] += tmpf[in] * aptr[sg_id * TileK + in];
+                                 }
+                               }
+                               for (int in = 0; in < TileK; in++) {
+                                 tmpAcc[in] += localAcc[in] * scale;
+                               }
+                               sptr += 1;
+                               aptr += blocksize;
+                               bptr += blocksize / 2;
+                             }
+                             tmpAcc[0] += tmpAcc[1];
+                             auto sum = 0.f;
+                             for (int i = 0; i < SgSize; i++) {
+                               sum += sg.shuffle(tmpAcc[0], i);
+                             }
+                             if (sg_id == 0) {
+                               *cptr = sum;
+                             }
+                           });
+        });
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+
+  template <typename LOG_T>
+  void benchmark_gemv_T2(int m, int n, int k, int batch, AType* A, uint8_t* B, float* B_scale, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = (const AType*)A;
+    auto B_d = B;
+    auto C_d = C;
+    auto S_d = B_scale;
+    auto psize = (size_t)m * n * k * 2;
+    int constexpr blocksize = 32;
+    int blks = k / blocksize;
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        int constexpr SgSize = 16;
+        int constexpr TileK = 32;
+        int constexpr GroupK = SgSize * TileK;
+        sycl::range<1> group{SgSize};
+        sycl::range<1> problem{n * SgSize};
+        auto e_esimd = q->submit([&](sycl::handler& cgh) {
+          cgh.parallel_for(
+              sycl::nd_range<1>(problem, group), [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+                int g_idx = it.get_group(0);
+                auto sg = it.get_sub_group();
+                int sg_id = sg.get_local_id()[0];
+                int g_n = g_idx;
+                auto sptr = S_d + g_n * blks;
+                auto bptr = B_d + g_n * k / 2;
+                auto aptr = A_d;
+                auto cptr = C_d + g_n;
+                float tmpAcc[TileK];
+#pragma unroll
+                for (int i = 0; i < TileK; i++) {
+                  tmpAcc[i] = 0.f;
+                }
+                for (int i = 0; i < k; i += GroupK) {
+                  float tmpf[TileK];
+                  uint8_t tmps8[TileK / 2];
+                  *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
+                  auto scale = *(sptr + sg_id * TileK / blocksize);
+                  for (int ikk = 0; ikk < TileK; ikk += 2) {
+                    tmpf[ikk] = static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
+                    tmpf[ikk + 1] = static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
+                  }
+                  for (int ikk = 0; ikk < TileK; ikk += 1) {
+                    tmpAcc[ikk] += aptr[sg_id * TileK + ikk] * tmpf[ikk];
+                  }
+                  sptr += GroupK / blocksize;
+                  aptr += GroupK;
+                  bptr += GroupK / 2;
+                }
+                if constexpr (TileK >= 2) {
+                  for (int i = 0; i < TileK / 2; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 2];
+                  }
+                }
+                if constexpr (TileK >= 4) {
+                  for (int i = 0; i < TileK / 4; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 4];
+                  }
+                }
+                if constexpr (TileK >= 8) {
+                  for (int i = 0; i < TileK / 8; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 8];
+                  }
+                }
+                if constexpr (TileK >= 16) {
+                  for (int i = 0; i < TileK / 16; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 16];
+                  }
+                }
+                if constexpr (TileK >= 32) {
+                  for (int i = 0; i < TileK / 32; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 32];
+                  }
+                }
+                auto sum = 0.f;
+                for (int i = 0; i < SgSize; i++) {
+                  sum += sg.shuffle(tmpAcc[0], i);
+                }
+                if (sg_id == 0) {
+                  *cptr = sum;
+                }
+              });
+        });
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+
+  template <typename LOG_T>
+  void benchmark_gemv_T3(int m, int n, int k, int batch, AType* A, uint8_t* B, float* B_scale, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = A;
+    auto B_d = B;
+    auto C_d = C;
+    auto S_d = B_scale;
+    auto psize = (size_t)m * n * k * 2;
+    int constexpr blocksize = 32;
+    int blks = k / blocksize;
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        int constexpr SgSize = 16;
+        int constexpr TileK = 32;
+        int constexpr KSlicing = 4;
+        int constexpr GroupK = SgSize * TileK;
+        int sg_ksize = k / KSlicing;
+        sycl::range<1> group{KSlicing * SgSize};
+        sycl::range<1> problem{n * KSlicing * SgSize};
+        auto e_esimd = q->submit([&](sycl::handler& cgh) {
+          sycl::local_accessor<float, 1> slm(KSlicing - 1, cgh);
+          cgh.parallel_for(
+              sycl::nd_range<1>(problem, group), [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+                int g_idx = it.get_group(0);
+                auto sg = it.get_sub_group();
+                int sg_id = sg.get_local_id()[0];
+                int sg_group_id = sg.get_group_id()[0];
+                int g_n = g_idx;
+                int g_k = sg_group_id * sg_ksize;
+                auto sptr = S_d + g_n * blks + g_k / blocksize;
+                auto bptr = B_d + g_n * k / 2 + g_k / 2;
+                auto aptr = A_d + g_k;
+                auto cptr = C_d + g_n;
+                float tmpAcc[TileK];
+#pragma unroll
+                for (int i = 0; i < TileK; i++) {
+                  tmpAcc[i] = 0.f;
+                }
+                for (int i = 0; i < sg_ksize; i += GroupK) {
+                  float tmpf[TileK];
+                  uint8_t tmps8[TileK / 2];
+                  *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
+                  auto scale = *(sptr + sg_id * TileK / blocksize);
+                  for (int ikk = 0; ikk < TileK; ikk += 2) {
+                    tmpf[ikk] = static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
+                    tmpf[ikk + 1] = static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
+                  }
+                  for (int ikk = 0; ikk < TileK; ikk += 1) {
+                    tmpAcc[ikk] += aptr[sg_id * TileK + ikk] * tmpf[ikk];
+                  }
+                  sptr += GroupK / blocksize;
+                  aptr += GroupK;
+                  bptr += GroupK / 2;
+                }
+                if constexpr (TileK >= 2) {
+                  for (int i = 0; i < TileK / 2; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 2];
+                  }
+                }
+                if constexpr (TileK >= 4) {
+                  for (int i = 0; i < TileK / 4; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 4];
+                  }
+                }
+                if constexpr (TileK >= 8) {
+                  for (int i = 0; i < TileK / 8; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 8];
+                  }
+                }
+                if constexpr (TileK >= 16) {
+                  for (int i = 0; i < TileK / 16; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 16];
+                  }
+                }
+                if constexpr (TileK >= 32) {
+                  for (int i = 0; i < TileK / 32; i++) {
+                    tmpAcc[i] += tmpAcc[i + TileK / 32];
+                  }
+                }
+                auto sum = 0.f;
+                for (int i = 0; i < SgSize; i++) {
+                  sum += sg.shuffle(tmpAcc[0], i);
+                }
+                if (sg_group_id != 0) {
+                  slm[sg_group_id - 1] = sum;
+                }
+                it.barrier(sycl::access::fence_space::local_space);
+                if (sg_group_id == 0) {
+                  for (int i = 0; i < KSlicing - 1; i++) {
+                    sum += slm[i];
+                  }
+                  if (sg_id == 0) {
+                    *cptr = sum;
+                  }
+                }
+              });
+        });
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
     printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
   }
 
@@ -166,8 +568,11 @@ class Benchmark_S4Fp32Fp32 {
     sycl_vector<uint8_t> dBs8(B_s8.size(), q);
     q->memcpy(dA.data(), A.data(), A.size() * 4).wait();
     q->memcpy(dB.data(), B.data(), B.size() * 4).wait();
-
-    benchmark<LOG>(m, n, k, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
+    if (m == 1) {
+      benchmark_gemv_T2<LOG>(m, n, k, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
+    } else {
+      benchmark<LOG>(m, n, k, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
+    }
   }
 };
 static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
@@ -319,7 +724,7 @@ class Benchmark_DequantS4 {
                          for (int in = 0; in < TileN; in++) {
                            scale[in] = *(sptr + sg_id * TileN + in);
                          }
-                         int constexpr UnrollK = 16;
+                         int constexpr UnrollK = 8;
                          for (int ik = 0; ik < blocksize; ik += UnrollK) {
 #pragma unroll
                            for (int ikk = 0; ikk < UnrollK; ikk++) {
@@ -393,6 +798,6 @@ class Benchmark_DequantS4 {
     printf(" %s Memory Bandwidth:%.3f\n", log.get_log_str(), flops);
   }
 };
-//static Benchmark_DequantS4 sBenchmark_DequantS4;
+// static Benchmark_DequantS4 sBenchmark_DequantS4;
 }  // namespace sycl_ut
 }  // namespace bestla
