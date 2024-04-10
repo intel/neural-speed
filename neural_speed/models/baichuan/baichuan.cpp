@@ -76,12 +76,6 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
   const int head_size = n_embd / n_head;
   const float attn_scale = 1.f / std::sqrt(head_size);
   const int n_rot = hparams.n_rot;
-  int baichuan_version = 0;
-  if (hparams.n_embd == 4096) {
-    baichuan_version = 7;
-  } else {
-    baichuan_version = 13;
-  }
 
   bool enable_tp = false;
 #ifdef NS_TP_MODEL
@@ -172,18 +166,18 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
       } else {
         // Linear::forward compute QKV
         cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
-        ne_tensor* query_layer =
+        query_layer =
             ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
                        0);  // [N, hidden]
-        ne_tensor* key_layer = ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
+        key_layer = ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
                                           hidden_size * ne_element_size(cur));
-        ne_tensor* value_layer =
+        value_layer =
             ne_view_3d(ctx0, cur, head_size, n_head, N, head_size * ne_element_size(cur), cur->nb[1],
                        2 * hidden_size * ne_element_size(cur));  // [N, heads, head_size]
       }
 
       // using mode = 2 for neox mode
-      if (baichuan_version == 7) {
+      if (hparams.n_embd == 4096) {
         query_layer = ne_rope_inplace(ctx0, query_layer, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
         key_layer = ne_rope_inplace(ctx0, key_layer, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       }
@@ -220,7 +214,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
         struct ne_tensor* attn_scores = ne_mul_mat(ctx0, key_layer, query_layer);  // [heads, N, klen]
         attn_scores = ne_scale_inplace(ctx0, attn_scores, ne_new_f32(ctx0, attn_scale));
 
-        if (baichuan_version == 13) {
+        if (hparams.n_embd == 5120) {
           attn_scores = ne_alibi(ctx0, attn_scores, n_past, n_head, 8);
         }
 
