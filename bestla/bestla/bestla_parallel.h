@@ -30,6 +30,38 @@ using thread_func = std::function<void(int tid)>;
 class IThreading {
  public:
   explicit IThreading(int nthreads, bool supportPE) : mThreadNum(nthreads), isSupportPE(supportPE) {}
+
+  // equal to "for(int i=begin1;i<end1;i+=step1)"
+  void parallel_for_collapse(const std::function<void(int)>& func, const int& begin1, const int& end1,
+                             const int& step1) {
+    assert(end1 >= begin1 && step1 > 0);
+    parallel_for([&](int tidx) {
+      const int length = (end1 - begin1 + step1 - 1) / step1;
+      const int block_size = length / mThreadNum;
+      const int block_remain = length % mThreadNum;
+      const int offset = block_remain + ((tidx - block_remain) & ((tidx - block_remain) >> 31)) +
+                         tidx * block_size;  // same as "std::min(tidx, block_remain)+tidx*block_size"
+      for (int i = begin1 + offset * step1; i < begin1 + (offset + block_size - ((tidx - block_remain) >> 31)) * step1;
+           i += step1)
+        func(i);
+    });
+  }
+
+  // equal to "for(int i=begin1;i<end1;i+=step1)for(int j=begin2;i<end2;i+=step2)"
+  void parallel_for_collapse(const std::function<void(int, int)>& func, const int& begin1, const int& end1,
+                             const int& step1, const int& begin2, const int& end2, const int& step2) {
+    assert(end1 >= begin1 && step1 > 0 && end2 >= begin2 && step2 > 0);
+    parallel_for([&](int tidx) {
+      const int length1 = (end1 - begin1 + step1 - 1) / step1;
+      const int length2 = (end2 - begin2 + step2 - 1) / step2;
+      const int block_size = (length1 * length2) / mThreadNum;
+      const int block_remain = (length1 * length2) % mThreadNum;
+      const int offset = block_remain + ((tidx - block_remain) & ((tidx - block_remain) >> 31)) +
+                         tidx * block_size;  // same as "std::min(tidx, block_remain)+tidx*block_size"
+      for (int i = 0; i < block_size - ((tidx - block_remain) >> 31); ++i)
+        func(begin1 + (i / length1) * step1, begin2 + (i % length1) * step2);
+    });
+  }
   virtual void parallel_for(const thread_func& func) = 0;
   virtual inline void sync(int tidx, int idx = 0) = 0;
   virtual int num_threads() const { return mThreadNum; };
