@@ -40,7 +40,7 @@ class IThreading {
       const int block_size = length / mThreadNum;
       const int block_remain = length % mThreadNum;
       const int offset = std::min(tidx, block_remain) + tidx * block_size;
-      for (int i = begin1 + offset * step1; i < begin1 + (offset + block_size - (tidx < block_remain)) * step1;
+      for (int i = begin1 + offset * step1; i < begin1 + (offset + block_size + (tidx < block_remain)) * step1;
            i += step1)
         func(i);
     });
