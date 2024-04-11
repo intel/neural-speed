@@ -131,6 +131,10 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
   }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
+  // struct ne_tensor *position_ids = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
+  // for (int i = 0; i < N; i++) {
+  //     ((int *)position_ids->data)[i] = n_past + i;
+  // }
 
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
@@ -177,8 +181,10 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
       }
 
       if (hparams.n_embd == 4096) {
-        query_layer = ne_rope_inplace(ctx0, query_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
-        key_layer = ne_rope_inplace(ctx0, key_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+        // query_layer = ne_rope_inplace(ctx0, query_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+        // key_layer = ne_rope_inplace(ctx0, key_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+        query_layer = ggml_rope_inplace(ctx0, query_layer, n_past, n_rot, 2, 0);
+        key_layer = ggml_rope_inplace(ctx0, key_layer, n_past, n_rot, 2, 0);
       }
 
       if (!run_mha_reordered) {

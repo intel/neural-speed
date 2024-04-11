@@ -403,6 +403,13 @@ NE_API struct ne_tensor* ne_soft_max_inplace(struct ne_context* ctx, struct ne_t
 NE_API struct ne_tensor* ne_rope(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                  int prompt_size, float freq_base, float freq_scale);
 
+struct ne_tensor * ggml_rope_inplace(
+        struct ne_context * ctx,
+        struct ne_tensor  * a,
+        int                   n_past,
+        int                   n_dims,
+        int                   mode,
+        int                   n_ctx);
 // in-place, returns view(a)
 NE_API struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                          int prompt_size, float freq_base, float freq_scale);
