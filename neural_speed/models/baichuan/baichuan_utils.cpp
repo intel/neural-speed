@@ -63,6 +63,12 @@ void BAICHUAN::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   model.hparams = ml->file_loaders.at(0)->hparams;
   model_file_version file_version = ml->file_loaders.at(0)->file_version;
   auto& hparams = model.hparams;
+  n_embd = hparams.n_embd;
+  n_vocab = hparams.n_vocab;
+  n_layer = hparams.n_layer;
+  scratch = baichuan_mem_req(n_layer, lctx.scratch_size_ratio);
+  model.scratchs = scratch;
+
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
@@ -79,12 +85,9 @@ void BAICHUAN::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   if (hparams.n_embd == 5120) {
     fprintf(stderr, "%s: baichuan_version = %s\n", __func__, "13B");
   }
-  
-  n_embd = hparams.n_embd;
-  n_vocab = hparams.n_vocab;
-  n_layer = hparams.n_layer;
-  scratch = baichuan_mem_req(n_layer, lctx.scratch_size_ratio);
-  model.scratchs = scratch;
+
+  fprintf(stderr, "%s: head_size       = %d\n", __func__, hparams.n_embd / hparams.n_head);
+  fprintf(stderr, "%s: norm_eps       = %f\n", __func__, hparams.norm_eps);
 }
 
 #define MODEL_BACKEND_OFFLOAD NE_BACKEND_CPU

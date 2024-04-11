@@ -1277,6 +1277,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
     lparams.kv_type = KV_MEM_TYPE_F16;
   }
 
+  lparams.kv_type = KV_MEM_TYPE_F16;
   lparams.use_mmap = params.use_mmap;
   lparams.use_mlock = params.use_mlock;
   lparams.logits_all = params.perplexity;

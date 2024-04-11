@@ -63,14 +63,14 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
 
   MODEL_ASSERT(!!kv_self.ctx);
 
-  const int n_embd = hparams.n_embd;
-  const int n_layer = hparams.n_layer;
   const int n_ctx = lctx.n_ctx;  // max number fo tokens to keep in the kv-cache
   const int n_keep = lctx.n_keep;
   const bool shift_roped_k = lctx.shift_roped_k;
   const bool is_ring_full = shift_roped_k && n_total > n_past;
   NE_ASSERT(("Shift-RoPE-K to be implemented for AliBi!", !is_ring_full));
 
+  const int n_embd = hparams.n_embd;
+  const int n_layer = hparams.n_layer;
   int n_head = hparams.n_head;
   const int n_vocab = hparams.n_vocab;
   const int head_size = n_embd / n_head;
@@ -176,10 +176,9 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
                        2 * hidden_size * ne_element_size(cur));  // [N, heads, head_size]
       }
 
-      // using mode = 2 for neox mode
       if (hparams.n_embd == 4096) {
-        query_layer = ne_rope_inplace(ctx0, query_layer, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
-        key_layer = ne_rope_inplace(ctx0, key_layer, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
+        query_layer = ne_rope_inplace(ctx0, query_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+        key_layer = ne_rope_inplace(ctx0, key_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
       }
 
       if (!run_mha_reordered) {
