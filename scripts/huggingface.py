@@ -788,7 +788,7 @@ class AutoCausalLM(HuggingFaceAutoLM):
             bos = torch.tensor([64790, 64792]).repeat(input_bs, 1)
             inputs = torch.cat((bos, inputs), 1)
         if self.model_format == "runtime":
-            output = self.runtime_model(inputs.to("xpu"))#, reinit=True, logits_all=True)
+            output = self.runtime_model(inputs.to("cuda"))#, reinit=True, logits_all=True)
             # output = {"logits": torch.tensor(out).unsqueeze(0)}
         elif self.model_format != "onnx":
             output = self.model(inputs)
