@@ -437,7 +437,7 @@ class CpuDevice {
     CPU_ZERO(&cpuset);
     CPU_SET(core, &cpuset);
     int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
-    if (s != 0) printf("ERROR\n");
+    if (s != 0) printf("Bond Core ERROR:%d\n", core);
 #endif
   }
 
@@ -451,7 +451,7 @@ class CpuDevice {
     CPU_SET(core, &cpuset);
     pthread_t pt = thread.native_handle();
     int s = pthread_setaffinity_np(pt, sizeof(cpuset), &cpuset);
-    if (s != 0) printf("ERROR\n");
+    if (s != 0) printf("Bond Core ERROR:%d\n", core);
 #endif
   }
 
