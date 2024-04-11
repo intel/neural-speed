@@ -624,26 +624,36 @@ class AutoCausalLM(HuggingFaceAutoLM):
             # from neural_speed import Model
             # self.runtime_model = Model()
             # self.runtime_model.init(pretrained, weight_dtype="int4", compute_dtype="int8")
-            import intel_extension_for_pytorch as ipex
-            from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
-            from transformers import AutoTokenizer
-            from intel_extension_for_transformers.transformers import WeightOnlyQuantConfig
-            import torch
+            # import intel_extension_for_pytorch as ipex
+            # from intel_extension_for_transformers.transformers.modeling import AutoModelForCausalLM
+            # from transformers import AutoTokenizer
+            # from intel_extension_for_transformers.transformers import WeightOnlyQuantConfig
+            # import torch
 
-            device = "xpu"
-            model_name = pretrained
-            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-            prompt = "Once upon a time, a little girl"
-            inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+            # device = "xpu"
+            # model_name = pretrained
+            # tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            # prompt = "Once upon a time, a little girl"
+            # inputs = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
 
-            woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=32)
-            self.runtime_model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_quantization_config, device_map="xpu", trust_remote_code=True, use_llm_runtime=False, torch_dtype=torch.float16)
+            # woq_quantization_config = WeightOnlyQuantConfig(compute_dtype="fp16", weight_dtype="int4_fullrange", scale_dtype="fp16", group_size=32)
+            # self.runtime_model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=woq_quantization_config, device_map="xpu", trust_remote_code=True, use_llm_runtime=False, torch_dtype=torch.float16)
             # import pdb; pdb.set_trace()
-            # qmodel.save_pretrained("llama_int4_saved_dir")
-            #self.runtime_model = AutoModelForCausalLM.from_pretrained("llama_int4_saved_dir", trust_remote_code=True)
+            # # qmodel.save_pretrained("llama_int4_saved_dir")
+            # self.runtime_model = AutoModelForCausalLM.from_pretrained("llama_int4_saved_dir", trust_remote_code=True)
 
-            # optimize the model with ipex, it will improve performance.
-            self.runtime_model = ipex.optimize_transformers(self.runtime_model, inplace=True, dtype=torch.float16, quantization_config=True, device="xpu")
+            # # optimize the model with ipex, it will improve performance.
+            # self.runtime_model = ipex.optimize_transformers(self.runtime_model, inplace=True, dtype=torch.float16, woq=True, device="xpu")
+
+            model_name_or_path = "TheBloke/Llama-2-7b-Chat-GPTQ"
+            # To use a different branch, change revision
+            # For example: revision="gptq-4bit-64g-actorder_True"
+            from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+            self.runtime_model = AutoModelForCausalLM.from_pretrained(model_name_or_path,
+                                                        device_map="auto",
+                                                        trust_remote_code=False,
+                                                        revision="main")
 
             # output = qmodel.generate(inputs, max_new_tokens=100, do_sample=True)
             # print(tokenizer.batch_decode(output, skip_special_tokens=True))
