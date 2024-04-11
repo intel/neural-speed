@@ -50,15 +50,27 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     gguf_path = args.model.as_posix()
 
-    prompt = "Once upon a time"
+    # prompt = args.prompt
+    # tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    # inputs = tokenizer(prompt, return_tensors="pt").input_ids
+    # import pdb;pdb.set_trace()
+    # streamer = TextStreamer(tokenizer)
+
+    # model = Model()
+    # model.init_from_bin(args.model_name, gguf_path)
+    # outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)
+
+    # prompt = args.prompt
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
-    inputs = tokenizer(prompt, return_tensors="pt").input_ids
-    streamer = TextStreamer(tokenizer)
+    import torch
+    inputs = torch.tensor([[ 195, 16829, 92361,   196]])
+    # streamer = TextStreamer(tokenizer)
 
     model = Model()
     model.init_from_bin(args.model_name, gguf_path)
-    outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300, do_sample=True)
-
-
+    outputs = model.generate(inputs, max_new_tokens=300, do_sample=True)
+    words = tokenizer.decode(outputs[0])
+    print(words)
+    
 if __name__ == "__main__":
     main()
