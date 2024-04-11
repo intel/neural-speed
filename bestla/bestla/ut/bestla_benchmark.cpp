@@ -1287,7 +1287,7 @@ class UTWOQ_GGML {
     }
   }
 };
-static UTWOQ_GGML sUTWOQ_GGML;
+// static UTWOQ_GGML sUTWOQ_GGML;
 
 #include "kernel_avx2.h"
 #define AVX_VNNI_ 1
@@ -1319,7 +1319,7 @@ static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, fl
 #if AVX_VNNI_
         iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
 #else
-        __m256i dot = _mm256_maddubs_epi16(va, vb);
+        __m256i dot = _mm256_maddubs_epi16(va, vb);  // overflow of int16
         __m256i summed_pairs = _mm256_madd_epi16(ones, dot);
         iacc[i] = _mm256_add_epi32(iacc[i], summed_pairs);
 #endif
@@ -1515,14 +1515,14 @@ class UTWOQ_S4_VecDot {
     printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
            corestr, log.get_log_str(), flops, flops / threads, band);
 
-    /*avector<float> refC(m * n);
+    avector<float> refC(m * n);
     avector<float> revB(n * k);
     kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
     bcount = std::min(bcount, batch);
     for (size_t i = 0; i < bcount; i++) {
       buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
-    }*/
+    }
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
