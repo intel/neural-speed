@@ -77,7 +77,7 @@ const std::vector<std::string> k_colors = {
 
 void Model::init_model(const std::string& model_path) {
   params.model = model_path;
-  ctx = whisper_init_from_file(params.model.c_str());
+  ctx = whisper_init_from_file(params);
 
   if (ctx == nullptr) {
     fprintf(stderr, "error: failed to initialize whisper context\n");

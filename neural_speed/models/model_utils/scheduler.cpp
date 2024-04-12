@@ -275,8 +275,7 @@ Cont_batch_gen_scheduler::Cont_batch_gen_scheduler(gpt_params& params)
       free_req_idx(max_requests, true),
       waiting_free_req_idx_seqs_num(0) {}
 
-Cont_batch_gen_scheduler::Cont_batch_gen_scheduler(gpt_params& params, const std::string& policy,
-                                                   const int& log_level)
+Cont_batch_gen_scheduler::Cont_batch_gen_scheduler(gpt_params& params, const std::string& policy, const int& log_level)
     : Iter_level_scheduler(params, policy, log_level),
       max_requests(params.max_request_num),
       wr(params),
