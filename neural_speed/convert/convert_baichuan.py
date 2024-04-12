@@ -320,6 +320,12 @@ def baichuan7B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
         fout.write(str)
 
+        if 'lm_head' in name:
+            import torch
+            import torch.nn.functional as F
+            data = torch.from_numpy(data)
+            data = F.normalize(data)
+            data = data.numpy()
         # data
         data.tofile(fout)
 
