@@ -131,10 +131,6 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
   }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
-  // struct ne_tensor *position_ids = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
-  // for (int i = 0; i < N; i++) {
-  //     ((int *)position_ids->data)[i] = n_past + i;
-  // }
 
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
@@ -183,12 +179,15 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
       if (hparams.n_embd == 4096) {
         // query_layer = ne_rope_inplace(ctx0, query_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
         // key_layer = ne_rope_inplace(ctx0, key_layer, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
-        query_layer = ggml_rope_inplace(ctx0, query_layer, n_past, n_rot, 2, 0);
-        key_layer = ggml_rope_inplace(ctx0, key_layer, n_past, n_rot, 2, 0);
+        ne_set_name(key_layer, "key_layer_0");
+        ne_set_name(query_layer, "query_layer_0");
+        // 4 == n_ctx
+        query_layer = ggml_rope_inplace(ctx0, query_layer, n_past, n_rot, 2, 4);
+        key_layer = ggml_rope_inplace(ctx0, key_layer, n_past, n_rot, 2, 4);
       }
 
       if (!run_mha_reordered) {
-        query_layer = ne_permute(ctx0, query_layer, 0, 2, 1, 3);  // [heads, N, head_size]
+        query_layer = ne_cont(ctx0, ne_permute(ctx0, query_layer, 0, 2, 1, 3));  // [heads, N, head_size]
         key_layer = ne_permute(ctx0, key_layer, 0, 2, 1, 3);      // [heads, N, head_size]
         value_layer = ne_permute(ctx0, value_layer, 1, 2, 0, 3);  // [heads, head_size, N]
 
@@ -198,7 +197,6 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
               ne_view_3d(ctx0, model.layers[il].k_cache, head_size, N, n_head, model.layers[il].k_cache->nb[1],
                          model.layers[il].k_cache->nb[2],
                          n_past * head_size * ne_element_size(model.layers[il].k_cache));  // [kv_heads, N, head_size]
-
           struct ne_tensor* v_cache_view =
               ne_view_3d(ctx0, model.layers[il].v_cache, N, head_size, n_head, model.layers[il].v_cache->nb[1],
                          model.layers[il].v_cache->nb[2],
@@ -216,7 +214,10 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
                                  0);  // [kv_heads, head_size, klen]
 
         // attention
+        ne_set_name(key_layer, "key_layer_special");
+        ne_set_name(query_layer, "query_layer_special");
         struct ne_tensor* attn_scores = ne_mul_mat(ctx0, key_layer, query_layer);  // [heads, N, klen]
+        ne_set_name(attn_scores, "attn_scores");
         attn_scores = ne_scale_inplace(ctx0, attn_scores, ne_new_f32(ctx0, attn_scale));
 
         if (hparams.n_embd == 5120) {
