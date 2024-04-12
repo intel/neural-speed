@@ -145,7 +145,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   // for big prompts, if BLAS is enabled, it is better to use only one thread
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
-  gf.n_threads = bestla_set_threads(n_threads);
+  gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
   const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {0, 0};
