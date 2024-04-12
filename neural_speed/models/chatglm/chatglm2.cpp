@@ -31,9 +31,9 @@
 #include <vector>
 
 #include "core/data_types.h"
+#include "core/layers/mha_dense.h"
 #include "core/ne.h"
 #include "core/ne_layers.h"
-#include "core/layers/mha_dense.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
@@ -110,7 +110,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
   // for big prochatglms, if BLAS is enabled, it is better to use only one thread
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
-  gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
+  gf.n_threads = bestla_set_threads(n_threads);
 
   const bool run_mha_reordered = model.layers[0].k_cache->type == NE_TYPE_BTLA;
   kv_cache_info_t kv_cache_info = {};
