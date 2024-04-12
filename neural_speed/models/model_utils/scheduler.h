@@ -21,7 +21,7 @@
 // iteration-level worker
 class Iter_level_worker {
  public:
-  explicit Iter_level_worker(const gpt_params& params);
+  explicit Iter_level_worker(gpt_params& params);
   virtual ~Iter_level_worker();
   virtual bool step(std::vector<sequence>* seqs, const int& n_input) = 0;
   virtual bool beam_search_step(std::vector<sequence>* seqs, const int& n_input) = 0;
@@ -48,7 +48,7 @@ class Iter_level_worker {
 // continuous batching generation worker
 class Cont_batch_gen_worker : public Iter_level_worker {
  public:
-  explicit Cont_batch_gen_worker(const gpt_params& params);
+  explicit Cont_batch_gen_worker(gpt_params& params);
   Cont_batch_gen_worker(const gpt_params& params, const int& n_threads);
   ~Cont_batch_gen_worker() = default;
 
@@ -91,8 +91,8 @@ class Iter_level_scheduler {
 // continuous batching generation scheduler
 class Cont_batch_gen_scheduler : public Iter_level_scheduler {
  public:
-  explicit Cont_batch_gen_scheduler(const gpt_params& params);
-  Cont_batch_gen_scheduler(const gpt_params& params, const std::string& policy, const int& log_level);
+  explicit Cont_batch_gen_scheduler(gpt_params& params);
+  Cont_batch_gen_scheduler(gpt_params& params, const std::string& policy, const int& log_level);
   ~Cont_batch_gen_scheduler() = default;
 
   bool add_request(sequence seq) override;

@@ -183,7 +183,7 @@ typedef struct whisper_model_loader {
 // Various functions for loading a ggml whisper model.
 // Allocate (almost) all memory needed for the model.
 // Return nullptr on failure
-MODEL_API struct whisper_context* whisper_init_from_file(const char* path_model);
+MODEL_API struct whisper_context* whisper_init_from_file(whisper_params& path_model);
 MODEL_API struct whisper_context* whisper_init_from_buffer(void* buffer, size_t buffer_size);
 MODEL_API struct whisper_context* whisper_init(struct whisper_model_loader* loader);
 

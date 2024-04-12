@@ -2373,12 +2373,12 @@ struct whisper_context* whisper_init_no_state(struct whisper_model_loader* loade
   return ctx;
 }
 
-struct whisper_context* whisper_init_from_file(const char* path_model) {
-  whisper_context* ctx = whisper_init_from_file_no_state(path_model);
+struct whisper_context* whisper_init_from_file(whisper_params& params) {
+  whisper_context* ctx = whisper_init_from_file_no_state(params.model.c_str());
   if (!ctx) {
     return nullptr;
   }
-
+  params.n_threads = bestla_set_threads(params.n_threads);
   ctx->state = whisper_init_state(ctx);
   if (!ctx->state) {
     whisper_free(ctx);
