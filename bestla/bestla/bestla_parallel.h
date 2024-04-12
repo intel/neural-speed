@@ -783,9 +783,9 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
     this->mL2Use += static_cast<size_t>(blks) * (this->mBlock[1] + this->mStep[0]) *
                     (sizeof(float) + sizeof(int8_t) + sizeof(float));  // scale+zp+reduce
     assert(this->mL2Use <= this->mL2Size - ReservedSize);
-    assert(this->mBlock[0] > 0);
-    assert(this->mBlock[1] > 0);
-    assert(this->mBlock[2] > 0);
+    assert(this->mBlock[0] >= 0);
+    assert(this->mBlock[1] >= 0);
+    assert(this->mBlock[2] >= 0);
     assert(this->mBlock[2] % _GemmCore_T::KTILE == 0);
   }
 

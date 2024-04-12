@@ -22,6 +22,7 @@
 
 namespace bestla {
 namespace wrapper {
+
 namespace gemm {
 template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
           template <class _T, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
@@ -309,7 +310,64 @@ class LauncherIntKBlock {
   PrologueB mProB;
   Epilogue mEpilogue;
 
+  class GEMVWrapper {
+   public:
+    static constexpr bool support() {
+      if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T, _RT_ISA_T>>) {
+        return false;
+      }
+      if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T, _RT_ISA_T>>) {
+        return false;
+      }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX_VNNI) {
+        static_assert(GemmCore::PACK_ROW == 4);
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    static bool implemented(const Param& _param) {
+      bool impl = true;
+      impl &= _param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP;
+      impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32;
+      impl &= _param.problem.dims[1] == 1;  // m==1
+      return impl;
+    }
+
+    static void gemv(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+      utils::SGemvParamB paramB{_param.paramB.packedW->template WPtr<uint8_t>(), nullptr, nullptr,
+                                _param.paramB.packedW->template SPtr<float>(), nullptr};
+      utils::GemvParamA paramA{_param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
+                               _param.paramA.quan->template ZPtr<uint8_t>()};
+      int m = _param.problem.dims[1];
+      int n = _param.problem.dims[2];
+      int k = _param.problem.dims[3];
+      int kblocksize = _param.problem.dims[4];
+      auto Cptr = _param.paramC.C + _config.loc[1];
+      paramB.b4ptr += _config.loc[1] * _param.paramB.packedW->mKPad / 2;
+      paramB.sptr += _config.loc[1];
+      for (int in = 0; in < _config.size[1]; in += GemmCore::NTILE) {
+        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, float, GemmCore::NTILE>(paramA, paramB, Cptr, k, n,
+                                                                                         kblocksize);
+        Cptr += GemmCore::NTILE;
+        paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
+        paramB.sptr += GemmCore::NTILE;
+      }
+    }
+  };
+
   void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+    if (GEMVWrapper::support() && GEMVWrapper::implemented(_param)) {
+      GEMVWrapper::gemv(_param, _config);
+    } else {
+      gemm(_param, _config);
+    }
+  }
+
+ protected:
+  void gemm(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
     mGemmCore.configure(_config.size[0], _config.size[1], _param.problem.dims[3]);
     auto StackTmp = alloca(_config.stacksize);
     auto tmpB = reinterpret_cast<BType*>(StackTmp);
@@ -334,7 +392,6 @@ class LauncherIntKBlock {
     }
   }
 
- protected:
   // _config.block[2]%kblock==0
   // _config.block[2]>=kblock
   void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,

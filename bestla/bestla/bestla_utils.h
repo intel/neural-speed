@@ -292,6 +292,21 @@ struct GemmProblem {
   }
 };
 
+template <typename ScaleT>
+struct GemvParamB {
+  uint8_t *b4ptr = 0, *b2ptr = 0, *b1ptr = 0;
+  ScaleT* sptr = 0;
+  int8_t* zpptr = 0;
+};
+
+struct GemvParamA {
+  uint8_t* aptr = 0;
+  float* sptr = 0;
+  uint8_t* zpptr = 0;
+};
+
+using SGemvParamB = GemvParamB<float>;
+
 template <typename T>
 inline constexpr BTLA_DTYPE bestla_dtype = std::is_same_v<T, double>        ? BTLA_DTYPE::F64
                                            : std::is_same_v<T, float>       ? BTLA_DTYPE::F32

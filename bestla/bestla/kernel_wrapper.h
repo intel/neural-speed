@@ -951,6 +951,15 @@ class LayerNormalization {
                                         simplified);
   }
 };
+
+class GEMV_4Bit {
+ public:
+  template <BTLA_ISA ISA_T, typename ScaleT, int NTILE>
+  static inline BTLA_CODE forward_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int k, int n, int blocksize) {
+    return ref::gemv_4bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, n, blocksize);
+  }
+};
 }  // namespace wrapper
 }  // namespace kernel
 }  // namespace bestla
