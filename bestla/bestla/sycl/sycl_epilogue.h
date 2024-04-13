@@ -28,17 +28,15 @@ struct ParamOutputBase {
 template <class GemmCoreT, typename DstT>
 class OutputBase {
  public:
-  using CType = typename GemmCoreT::TC;
+  using CType = typename GemmCoreT::TACC;
   using DstType = DstT;
   using Param = ParamOutputBase<DstType>;
   static inline void store(const Param& _param, CType* tmpAcc, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
-    if constexpr (std::is_same_v<CType, DstType>) {
 #pragma unroll
-      for (int im = 0; im < GemmCoreT::TileM; im++) {
+    for (int im = 0; im < GemmCoreT::TileM; im++) {
 #pragma unroll
-        for (int in = 0; in < GemmCoreT::TileN; in++) {
-          _param.C[(helper.item_g_m() + im) * _param.ldc + helper.item_g_n() + in] = tmpAcc[im * GemmCoreT::TileN + in];
-        }
+      for (int in = 0; in < GemmCoreT::TileN; in++) {
+        _param.C[(helper.item_g_m() + im) * _param.ldc + helper.item_g_n() + in] = tmpAcc[im * GemmCoreT::TileN + in];
       }
     }
   }

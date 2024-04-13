@@ -21,8 +21,6 @@ class UT_SyclSGemm {
   template <class GCT>
   using ProBT = sycl_prologue_b::WeightBase<GCT, float>;
   template <class GCT>
-  using ProBTransT = sycl_prologue_b::WeightS4Trans<GCT, float>;
-  template <class GCT>
   using EpiT = sycl_epilogue::OutputBase<GCT, float>;
   using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemmT>;
 
@@ -46,7 +44,45 @@ class UT_SyclSGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-//static UT_SyclSGemm sUT_SyclSGemm;
+// static UT_SyclSGemm sUT_SyclSGemm;
+
+class UT_SyclHGemm {
+ public:
+  UT_SyclHGemm() {
+    UT_START();
+    ut(1024, 1024, 1024);
+  }
+  using SGemmT = xve::DefaultHGemmCore;
+  template <class GCT>
+  using ProAT = sycl_prologue_a::ActivationBase<GCT, sycl::half>;
+  template <class GCT>
+  using ProBT = sycl_prologue_b::WeightBase<GCT, sycl::half>;
+  template <class GCT>
+  using EpiT = sycl_epilogue::OutputBase<GCT, sycl::half>;
+  using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemmT>;
+
+  void ut(int m, int n, int k) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case: %d %d %d Device:%s\n", m, n, k, dev->getName().c_str());
+    avector<utils::fp16> matA(m * k), matB(k * n), matC(m * n), ref(m * n);
+    fill_buffer_randn(matA.data(), matA.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
+    fill_buffer_randn(matB.data(), matB.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
+    gemmref_fp16fp16fp16(m, n, k, matA.data(), matB.data(), ref.data(), k, n, n);
+
+    sycl_vector<sycl::half> dA(matA.size(), q), dB(matB.size(), q), dC(matC.size(), q);
+    q->memcpy(dA.data(), matA.data(), matA.size() * 2).wait();
+    q->memcpy(dB.data(), matB.data(), matB.size() * 2).wait();
+    auto A_d = dA.data();
+    auto B_d = dB.data();
+    auto C_d = dC.data();
+    auto e_esimd = KernelLauncher::compute({m, n, k, {A_d, k}, {B_d, n}, {C_d, n}}, q);
+    e_esimd.wait();
+    q->memcpy(matC.data(), C_d, matC.size() * 2).wait();
+    buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
+  }
+};
+static UT_SyclHGemm sUT_SyclHGemm;
 
 class UT_SyclS4SGemm {
  public:
@@ -147,7 +183,7 @@ class UT_SyclS4SGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-static UT_SyclS4SGemm sUT_SyclS4SGemm;
+//static UT_SyclS4SGemm sUT_SyclS4SGemm;
 
 class UT_SyclInt4Dequant {
  public:
@@ -785,6 +821,6 @@ class UT_SyclS4Gemv {
     buffer_error(refC.data(), C.data(), C.size(), 0.001f);
   }
 };
-//static UT_SyclS4Gemv sUT_SyclS4Gemv;
+// static UT_SyclS4Gemv sUT_SyclS4Gemv;
 }  // namespace sycl_ut
 }  // namespace bestla

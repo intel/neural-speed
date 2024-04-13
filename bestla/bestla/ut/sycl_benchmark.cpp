@@ -87,6 +87,71 @@ class Benchmark_Fp32Fp32 {
 };
 // static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 
+class Benchmark_Fp16Fp16 {
+ public:
+  Benchmark_Fp16Fp16() {
+    UT_START();
+    benchmark_all(1024, 4096, 4096);
+    benchmark_all(4096, 4096, 4096);
+  }
+
+  using AType = sycl::half;
+  using BType = sycl::half;
+  using CType = sycl::half;
+  using SGemmT = xve::DefaultHGemmCore;
+  template <class GCT>
+  using ProAT = sycl_prologue_a::ActivationBase<GCT, sycl::half>;
+  template <class GCT>
+  using ProBT = sycl_prologue_b::WeightBase<GCT, sycl::half>;
+  template <class GCT>
+  using EpiT = sycl_epilogue::OutputBase<GCT, sycl::half>;
+  using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemmT>;
+
+  template <typename LOG_T>
+  void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = A;
+    auto B_d = B;
+    auto C_d = C;
+    auto psize = (size_t)m * n * k * 2;
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        auto e_esimd = KernelLauncher::compute({m, n, k, {A, k}, {B, n}, {C, n}}, q);
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+
+  void benchmark_all(int m, int n, int k) {
+    auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, BTLA_DTYPE::F32, BTLA_DTYPE::F32);
+    auto batch = auto_batch(memsize);
+    printf("%d %d %d %d %s %s %s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F32),
+           bestla_dtype_str(BTLA_DTYPE::F32), bestla_dtype_str(BTLA_DTYPE::F32));
+    using LOG = timer_statistics_logger<TestMs * 2>;
+    float testtime = float(TestMs);
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    sycl_vector<AType> dA(size_t(m) * k * batch, q);
+    sycl_vector<BType> dB(size_t(k) * n * batch, q);
+    sycl_vector<CType> dC(size_t(m) * n * batch, q);
+
+    benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
+  }
+};
+static Benchmark_Fp16Fp16 sBenchmark_Fp16Fp16;
+
+
 class Benchmark_S4Fp32Fp32 {
  public:
   Benchmark_S4Fp32Fp32() {
@@ -726,7 +791,7 @@ class Benchmark_S4Fp32Fp32 {
     }
   }
 };
-static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
+//static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
 
 class Benchmark_S4Fp16Fp16 {
  public:

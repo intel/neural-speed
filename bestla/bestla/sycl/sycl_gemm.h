@@ -68,7 +68,7 @@ class SGemmCoreSharedB {
                              sycl_utils::nd_item_helper<SGemmCoreSharedB<ConfigT>>& helper) {
 #pragma unroll(1)
     for (int ik = 0; ik < TileK; ik += UnrollK) {
-      float regA[UnrollK];
+      TA regA[UnrollK];
       if constexpr (UnrollK == 8) {
         *(sycl::vec<float, 4>*)regA = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik];
         *(sycl::vec<float, 4>*)&regA[4] = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik + 4];
@@ -77,7 +77,7 @@ class SGemmCoreSharedB {
       }
 #pragma unroll
       for (int ikk = 0; ikk < UnrollK; ikk++) {
-        float tmpB[TileN];
+        TB tmpB[TileN];
 #pragma unroll
         for (int in = 0; in < TileN; in++) {
           tmpB[in] = bacc[helper.sg_idx_n() * SgNEle + helper.sg_id() * TileN + in + (ik + ikk) * WgNEle];
@@ -96,6 +96,79 @@ class SGemmCoreSharedB {
 };
 
 using DefaultSGemmCore = SGemmCoreSharedB<Config_Fp32Fp32Fp32>;
+
+class Config_Fp16Fp16Fp16 {
+ public:
+  static int constexpr sg_size = 16;
+  static int constexpr sg_m = 16;
+  static int constexpr sg_n = 4;
+  static int constexpr sg_k = 32;
+  static int constexpr unroll_k = 4;
+  static int constexpr wg_m = 16;
+  static int constexpr wg_n = 32;
+
+  using data_type_a = sycl::half;
+  using data_type_b = sycl::half;
+  using data_type_c = sycl::half;
+  using data_type_acc = sycl::half;
+};
+
+template <class ConfigT>
+class HGemmCoreSharedB {
+ public:
+  static int constexpr SgSize = ConfigT::sg_size;
+  static int constexpr WgM = ConfigT::wg_m;
+  static int constexpr WgN = ConfigT::wg_n;
+  static int constexpr SgNStride = WgN / SgSize;
+  static int constexpr WgWorkers = WgM * WgN;
+  static int constexpr SgCount = WgWorkers / SgSize;
+  static int constexpr TileM = ConfigT::sg_m;
+  static int constexpr TileN = ConfigT::sg_n;
+  static int constexpr TileK = ConfigT::sg_k;
+  static int constexpr UnrollK = ConfigT::unroll_k;
+  static int constexpr WgNEle = WgN * TileN;
+  static int constexpr WgMEle = WgM * TileM;
+  static int constexpr SgNEle = SgSize * TileN;
+  static int constexpr SLM_B_Size = WgNEle * TileK;
+  static int constexpr SLM_A_Size = 0;
+
+  using TA = typename ConfigT::data_type_a;
+  using TB = typename ConfigT::data_type_b;
+  using TC = typename ConfigT::data_type_c;
+  using TACC = typename ConfigT::data_type_acc;
+
+  using SLM_B_Acc = sycl::local_accessor<TB, 1>;
+
+  static inline void compute(const TA* aptr, int lda, const SLM_B_Acc& bacc, TACC* accptr,
+                             sycl_utils::nd_item_helper<HGemmCoreSharedB<ConfigT>>& helper) {
+#pragma unroll(1)
+    for (int ik = 0; ik < TileK; ik += UnrollK) {
+      TA regA[UnrollK];
+      static_assert((UnrollK * sizeof(TA)) % sizeof(float) == 0);
+      int constexpr CpVec = (UnrollK * sizeof(TA)) / sizeof(float);
+      *(sycl::vec<float, CpVec>*)regA = *(sycl::vec<float, CpVec>*)&aptr[helper.sg_id() * lda + ik];
+      
+#pragma unroll
+      for (int ikk = 0; ikk < UnrollK; ikk++) {
+        TB tmpB[TileN];
+#pragma unroll
+        for (int in = 0; in < TileN; in++) {
+          tmpB[in] = bacc[helper.sg_idx_n() * SgNEle + helper.sg_id() * TileN + in + (ik + ikk) * WgNEle];
+        }
+#pragma unroll
+        for (size_t im = 0; im < TileM; im++) {
+          auto tmpA = helper.sg.shuffle(regA[ikk], im);
+#pragma unroll
+          for (size_t in = 0; in < TileN; in++) {
+            accptr[im * TileN + in] += tmpA * tmpB[in];
+          }
+        }
+      }
+    }
+  }
+};
+
+using DefaultHGemmCore = HGemmCoreSharedB<Config_Fp16Fp16Fp16>;
 }  // namespace xve
 
 }  // namespace sycl_gemm
