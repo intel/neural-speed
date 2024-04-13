@@ -65,7 +65,7 @@ class WeightS4 {
   static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
                                int blocksize, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
     int constexpr Iter_PerWorker = (GemmCoreT::TileK + GemmCoreT::WgM - 1) / GemmCoreT::WgM;
-    float scale[GemmCoreT::TileN];
+    ScaleT scale[GemmCoreT::TileN];
     for (size_t in = 0; in < GemmCoreT::TileN; in += 1)
       scale[in] = _param.scale[helper.item_g_n() + in + koffset / blocksize * _param.ldb];
 #pragma unroll
