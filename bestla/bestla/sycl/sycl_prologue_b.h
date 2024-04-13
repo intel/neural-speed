@@ -87,6 +87,33 @@ class WeightS4 {
   }
 };
 
+template <class GemmCoreT, typename ScaleT>
+class WeightS4Trans {
+ public:
+  using BType = typename GemmCoreT::TB;
+  using Param = ParamWeightS4<ScaleT>;
+
+  static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
+                               int blocksize, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+    int constexpr LoadTileK = 2;
+    static_assert(GemmCoreT::TileK == (LoadTileK * GemmCoreT::SgSize));
+    int constexpr Iter_PerWorker = GemmCoreT::WgNEle / GemmCoreT::SgCount;
+    auto wldb = _param.ldb * blocksize;
+    int sgn = helper.wg_g_n() + helper.sg_group_id();
+    int sg_off = helper.sg_id() * LoadTileK * GemmCoreT::WgNEle;
+#pragma unroll
+    for (int icp = 0; icp < Iter_PerWorker; icp++) {
+      {
+        auto scale = _param.scale[(sgn + icp * GemmCoreT::SgCount) * _param.ldb + koffset / blocksize];
+        auto tmps8 = _param.B[((sgn + icp * GemmCoreT::SgCount) * wldb + (koffset + helper.sg_id() * LoadTileK)) / 2];
+        dstptr[sg_off + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
+            static_cast<int8_t>((tmps8 & 0x0f) << 4) * scale;
+        dstptr[sg_off + GemmCoreT::WgNEle + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
+            static_cast<int8_t>((tmps8 & 0xf0)) * scale;
+      }
+    }
+  }
+};
 }  // namespace sycl_prologue_b
 }  // namespace bestla
 #endif
