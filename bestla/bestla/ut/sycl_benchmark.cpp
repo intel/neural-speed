@@ -85,14 +85,14 @@ class Benchmark_Fp32Fp32 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
-// static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 
 class Benchmark_Fp16Fp16 {
  public:
   Benchmark_Fp16Fp16() {
     UT_START();
     benchmark_all(1024, 4096, 4096);
-    benchmark_all(4096, 4096, 4096);
+    benchmark_all(4096, 4096 * 3, 4096);
   }
 
   using AType = sycl::half;
@@ -149,7 +149,7 @@ class Benchmark_Fp16Fp16 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
-// static Benchmark_Fp16Fp16 sBenchmark_Fp16Fp16;
+static Benchmark_Fp16Fp16 sBenchmark_Fp16Fp16;
 
 class Benchmark_S4Fp32Fp32 {
  public:
@@ -790,7 +790,7 @@ class Benchmark_S4Fp32Fp32 {
     }
   }
 };
-// static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
+static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
 
 class Benchmark_S4Fp16Fp16 {
  public:
@@ -800,7 +800,7 @@ class Benchmark_S4Fp16Fp16 {
     benchmark_all(1, 4096, 4096 * 4, 32);
     benchmark_all(1, 4096 * 3, 4096, 32);
     benchmark_all(1024, 4096, 4096, 32);
-    benchmark_all(2048, 4096, 4096, 32);
+    benchmark_all(2048, 4096 * 3, 4096, 32);
   }
 
   using AType = sycl::half;
@@ -997,7 +997,7 @@ class Benchmark_S4Fp16Fp16 {
     }
   }
 };
-// static Benchmark_S4Fp16Fp16 sBenchmark_S4Fp16Fp16;
+static Benchmark_S4Fp16Fp16 sBenchmark_S4Fp16Fp16;
 
 class Benchmark_DequantS4 {
  public:
@@ -1045,7 +1045,8 @@ class Benchmark_DequantS4 {
     tm.start();
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
-        auto e_esimd = ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+        auto e_esimd =
+            ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
         log.add(event_helper::execute_time(e_esimd) * 1000);
         if (tm.stop() >= TestMs) {
           break;
