@@ -44,7 +44,7 @@ class UT_SyclSGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-static UT_SyclSGemm sUT_SyclSGemm;
+// static UT_SyclSGemm sUT_SyclSGemm;
 
 class UT_SyclHGemm {
  public:
@@ -82,7 +82,7 @@ class UT_SyclHGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
 };
-static UT_SyclHGemm sUT_SyclHGemm;
+// static UT_SyclHGemm sUT_SyclHGemm;
 
 class UT_SyclS4SGemm {
  public:
@@ -183,7 +183,7 @@ class UT_SyclS4SGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-static UT_SyclS4SGemm sUT_SyclS4SGemm;
+// static UT_SyclS4SGemm sUT_SyclS4SGemm;
 
 class UT_SyclS4HGemm {
  public:
@@ -278,22 +278,16 @@ class UT_SyclS4HGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
 };
-static UT_SyclS4HGemm sUT_SyclS4HGemm;
+// static UT_SyclS4HGemm sUT_SyclS4HGemm;
 
 class UT_SyclInt4Dequant {
  public:
   UT_SyclInt4Dequant() {
     UT_START();
     ut(1024, 1024, 32);
+    ut_fp32(1024, 1024, 32);
+    ut_fp32_T(1024, 1024, 32);
   }
-  using SGemm_t = xve::DefaultSGemmCore;
-  template <class GCT>
-  using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
-  template <class GCT>
-  using ProBT = sycl_prologue_b::WeightBase<GCT, float>;
-  template <class GCT>
-  using EpiT = sycl_epilogue::OutputBase<GCT, float>;
-  using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemm_t>;
 
   void ut(int n, int k, int blocksize) {
     auto dev = UT_Device::get();
@@ -357,6 +351,77 @@ class UT_SyclInt4Dequant {
     e_esimd.wait();
     q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
     buffer_error(ref.data(), dequant.data(), dequant.size(), 0.001f);
+  }
+
+  void ut_fp32(int n, int k, int blocksize) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case: %d %d %d Device:%s\n", n, k, blocksize, dev->getName().c_str());
+    avector<uint8_t> rawB(k * n / 2);
+    int blks = updiv(k, blocksize);
+    avector<float> scale(blks * n), dequant(n * k), ref(n * k);
+    fill_buffer_randn(scale.data(), scale.size(), 0.01f, 0.03f);
+    fill_buffer_randn(rawB.data(), rawB.size(), uint8_t(0), uint8_t(255));
+    auto srcptr = (utils::int4x2*)rawB.data();
+    for (int i = 0; i < k; i++) {
+      for (int j = 0; j < n; j += 2) {
+        auto tmp = srcptr[i * n / 2 + j / 2];
+        auto noffset = i / blocksize * n + j;
+        ref[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset + 0];
+        ref[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset + 1];
+      }
+    }
+    using ProB = sycl_prologue_b::WeightS4<sycl_gemm::xve::DefaultSGemmCore, float>;
+    sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);
+    sycl_vector<uint8_t> dB(rawB.size(), q);
+    q->memcpy(dS.data(), scale.data(), scale.size() * 4).wait();
+    q->memcpy(dB.data(), rawB.data(), rawB.size() * 1).wait();
+    auto S_d = dS.data();
+    auto B_d = dB.data();
+    auto DB_d = dequantB.data();
+    auto e_esimd = ProB::dequant_s4<sycl_prologue_b::KernelConfigBase>(n, k, blocksize, {B_d, S_d, n}, DB_d, q);
+    e_esimd.wait();
+    q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
+    buffer_error(ref.data(), dequant.data(), dequant.size(), 0.001f);
+  }
+
+  void ut_fp32_T(int n, int k, int blocksize) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case: %d %d %d Device:%s\n", n, k, blocksize, dev->getName().c_str());
+    avector<uint8_t> rawB(k * n / 2);
+    int blks = updiv(k, blocksize);
+    avector<float> scale(blks * n), dequant(n * k), ref(n * k);
+    fill_buffer_randn(scale.data(), scale.size(), 0.01f, 0.03f);
+    fill_buffer_randn(rawB.data(), rawB.size(), uint8_t(0), uint8_t(255));
+    auto srcptr = (utils::int4x2*)rawB.data();
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < k; j += 2) {
+        auto tmp = srcptr[i * k / 2 + j / 2];
+        auto noffset = i * blks + j / blocksize;
+        ref[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset];
+        ref[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset];
+      }
+    }
+    using ProB = sycl_prologue_b::WeightS4Trans<sycl_gemm::xve::DefaultSGemmCore, float>;
+    sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);
+    sycl_vector<uint8_t> dB(rawB.size(), q);
+    q->memcpy(dS.data(), scale.data(), scale.size() * 4).wait();
+    q->memcpy(dB.data(), rawB.data(), rawB.size() * 1).wait();
+    auto S_d = dS.data();
+    auto B_d = dB.data();
+    auto DB_d = dequantB.data();
+    auto e_esimd = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+    e_esimd.wait();
+    q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
+    buffer_error(ref.data(), dequant.data(), dequant.size(), 0.001f);
+
+    avector<float> refNT(k * n);
+    kernel::wrapper::Transpose2D<float>::forward<BTLA_ISA::NoSIMD>(ref.data(), refNT.data(), n, k, k, n);
+    e_esimd = ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+    e_esimd.wait();
+    q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
+    buffer_error(refNT.data(), dequant.data(), dequant.size(), 0.001f);
   }
 };
 static UT_SyclInt4Dequant sUT_SyclInt4Dequant;
@@ -916,6 +981,6 @@ class UT_SyclS4Gemv {
     buffer_error(refC.data(), C.data(), C.size(), 0.001f);
   }
 };
-static UT_SyclS4Gemv sUT_SyclS4Gemv;
+// static UT_SyclS4Gemv sUT_SyclS4Gemv;
 }  // namespace sycl_ut
 }  // namespace bestla
