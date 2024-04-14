@@ -229,6 +229,69 @@ class WeightS4Trans {
     return q->submit(deq_kernel);
   }
 
+#if 0
+  template <class NOTVALID>
+  static inline sycl::event dequant_s4_trans(int n, int k, int blocksize, const Param& in, BType* outptr,
+                                             sycl::queue* q) {
+    int constexpr SgSize = 16;
+    int constexpr TileK = 2;
+    int constexpr TileN = 16;
+    int constexpr GroupN = TileN;
+    int constexpr GroupK = SgSize * TileK;
+    assert(blocksize % TileK == 0);
+    static_assert(TileN == SgSize);
+    int nsg_k = k / GroupK;
+    int nsg_n = n / GroupN;
+    sycl::range<1> group{SgSize};
+    sycl::range<1> problem{nsg_n * nsg_k * SgSize};
+    auto B_d = in.B;
+    auto S_d = in.scale;
+    int ldb = in.ldb;
+    int ldbn = in.ldb * blocksize;
+    auto deq_kernel = [&](sycl::handler& cgh) {
+      cgh.parallel_for(sycl::nd_range<1>(problem, group),
+                       [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+                         int g_idx = it.get_group(0);
+                         auto sg = it.get_sub_group();
+                         int sg_id = sg.get_local_id()[0];
+                         int g_idx_n = g_idx / nsg_k;
+                         int g_idx_k = g_idx % nsg_k;
+                         int g_n = g_idx_n * GroupN;
+                         int g_k = g_idx_k * GroupK;
+                         auto sptr = S_d + g_k / blocksize + g_n * ldb;
+                         auto bptr = B_d + (g_k + g_n * ldbn) / 2;
+                         auto dbptr = outptr + g_k * n + g_n;
+                         float tmp[TileN * TileK];
+                         for (int in = 0; in < TileN; in++) {
+                           float scale = sptr[sg_id * TileK / blocksize + in * ldb];
+                           for (int ik = 0; ik < TileK; ik += 2) {
+                             uint8_t srcu8 = *(bptr + (sg_id * TileK + ik + in * ldbn) / 2);
+                             tmp[in * TileK + ik] = static_cast<int8_t>((srcu8 & 0x0f) << 4) * scale;
+                             tmp[in * TileK + ik + 1] = static_cast<int8_t>((srcu8 & 0xf0)) * scale;
+                           }
+                         }
+
+                         float tmpT[TileN * TileK];
+                         for (int ik = 0; ik < TileK; ik++) {
+                           for (int in = 0; in < TileN; in++) {
+                             for (int is = 0; is < SgSize; is++) {
+                               auto shlv = sg.shuffle(tmp[in * TileK + ik], is);
+                               if (sg_id == in) {
+                                 tmpT[ik * TileN + is] = shlv;
+                               }
+                             }
+                           }
+                         }
+                         for (int in = 0; in < TileN; in++) {
+                           for (int ik = 0; ik < TileK; ik++) {
+                             dbptr[sg_id + (in * TileK + ik) * n] = tmpT[ik * TileN + in];
+                           }
+                         }
+                       });
+    };
+    return q->submit(deq_kernel);
+  }
+#else
   template <class NOTVALID>
   static inline sycl::event dequant_s4_trans(int n, int k, int blocksize, const Param& in, BType* outptr,
                                              sycl::queue* q) {
@@ -286,6 +349,7 @@ class WeightS4Trans {
     };
     return q->submit(deq_kernel);
   }
+#endif
 };
 }  // namespace sycl_prologue_b
 }  // namespace bestla
