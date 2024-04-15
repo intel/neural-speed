@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     model_args=f'pretrained={args.model_name},dtype=float32,trust_remote_code=True'
     # model_args += f'use_gptq={args.use_gptq},use_awq={args.use_awq},use_autoround={args.use_autoround}'
-    eval_args = LMEvalParser(model="hf", 
+    eval_args = LMEvalParser(model="hf",
                         model_args=model_args,
                         tasks=f"{args.tasks}",
                         device="cpu",
