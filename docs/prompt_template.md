@@ -79,3 +79,72 @@ while True:
     inputs = tokenizer([prompt], return_tensors="pt").input_ids
     outputs = model.generate(inputs, streamer=streamer, interactive=True, ignore_prompt=True, do_sample=True)
 ```
+
+## Chat with Baichuan2-7B:
+```python
+import argparse
+from pathlib import Path
+from typing import List, Optional
+from transformers import AutoTokenizer, TextStreamer, AutoModelForCausalLM
+from neural_speed import Model
+import torch
+
+def build_chat_input(model, tokenizer, messages: List[dict], max_new_tokens: int=0):
+    def _parse_messages(messages, split_role="user"):
+        system, rounds = "", []
+        round = []
+        for i, message in enumerate(messages):
+            if message["role"] == "system":
+                assert i == 0
+                system = message["content"]
+                continue
+            if message["role"] == split_role and round:
+                rounds.append(round)
+                round = []
+            round.append(message)
+        if round:
+            rounds.append(round)
+        return system, rounds
+
+    max_new_tokens = max_new_tokens or model.generation_config.max_new_tokens
+    max_input_tokens = model.config.model_max_length - max_new_tokens
+    system, rounds = _parse_messages(messages, split_role="user")
+    system_tokens = tokenizer.encode(system)
+    max_history_tokens = max_input_tokens - len(system_tokens)
+
+    history_tokens = []
+    for round in rounds[::-1]:
+        round_tokens = []
+        for message in round:
+            if message["role"] == "user":
+                round_tokens.append(model.generation_config.user_token_id)
+            else:
+                round_tokens.append(model.generation_config.assistant_token_id)
+            round_tokens.extend(tokenizer.encode(message["content"]))
+        if len(history_tokens) == 0 or len(history_tokens) + len(round_tokens) <= max_history_tokens:
+            history_tokens = round_tokens + history_tokens  # concat left
+            if len(history_tokens) < max_history_tokens:
+                continue
+        break
+
+    input_tokens = system_tokens + history_tokens
+    if messages[-1]["role"] != "assistant":
+        input_tokens.append(model.generation_config.assistant_token_id)
+    input_tokens = input_tokens[-max_input_tokens:]  # truncate left
+    return torch.LongTensor([input_tokens]).to(model.device)
+
+prompt = "你好"
+bin_path = "neural_speed/convert/ne-f32.bin"
+
+tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+transformer_model = AutoModelForCausalLM.from_pretrained(args.model_path, device_map="auto", torch_dtype=torch.bfloat16, trust_remote_code=True)
+messages = []
+messages.append({"role": "user", "content": prompt})
+inputs_ids = build_chat_input(transformer_model, tokenizer, messages, max_new_tokens = 300)
+
+model = Model()
+model.init_from_bin(args.model_name, bin_path)
+outputs = model.generate(inputs_ids, max_new_tokens=300, do_sample=True)
+words = tokenizer.decode(outputs[0])
+print(words)
+```
