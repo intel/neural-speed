@@ -863,17 +863,6 @@ class BaichuanModel(Model):
         tensor_map = gguf.get_tensor_name_map(self.model_arch, block_count)
         head_count_kv = self.hparams.get("num_key_value_heads", head_count)
 
-        # for i in range(block_count):
-        #     if (w := model_kv.get(f"model.layers.{i}.self_attn.W_pack.weight")) is not None:
-        #         print(f"Unpacking and permuting layer {i}")
-        #         model_kv[f"model.layers.{i}.self_attn.q_proj.weight"] = \
-        #             self._reverse_hf_permute_part(w, 0, head_count, head_count)
-        #         model_kv[f"model.layers.{i}.self_attn.k_proj.weight"] = \
-        #             self._reverse_hf_permute_part(w, 1, head_count, head_count_kv)
-        #         model_kv[f"model.layers.{i}.self_attn.v_proj.weight"] = \
-        #             self._reverse_hf_part(w, 2)
-        #         del model_kv[f"model.layers.{i}.self_attn.W_pack.weight"]
-
         for name, data_torch in model_kv.items():
             # we don't need these
             if name.endswith(".rotary_emb.inv_freq"):
@@ -887,30 +876,6 @@ class BaichuanModel(Model):
 
             data = data_torch.squeeze().numpy()
 
-            # map tensor names
-            # new_name = tensor_map.get_name(name, try_suffixes=(".weight", ".bias"))
-            # if new_name is None:
-            #     print(f"Can not map tensor {name!r}")
-            #     sys.exit()
-
-            # n_dims = len(data.shape)
-            # data_dtype = data.dtype
-
-            # # if f32 desired, convert any float16 to float32
-            # if self.ftype == 0 and data_dtype == np.float16:
-            #     data = data.astype(np.float32)
-
-            # # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
-            # if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
-            #     data = data.astype(np.float32)
-
-            # # if f16 desired, convert any float32 2-dim weight tensors to float16
-            # if self.ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and n_dims == 2:
-            #     data = data.astype(np.float16)
-
-            # print(f"{name} -> {new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype}, shape = {data.shape}")
-            # self.gguf_writer.add_tensor(new_name, data)
-
             if "W_pack" in name:
                 print(name)
                 n_dims = len(data.shape)
@@ -920,7 +885,7 @@ class BaichuanModel(Model):
                 if self.ftype == 0 and data_dtype == np.float16:
                     data = data.astype(np.float32)
 
-                # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
+                # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
                 if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                     data = data.astype(np.float32)
 
@@ -944,7 +909,7 @@ class BaichuanModel(Model):
                 if self.ftype == 0 and data_dtype == np.float16:
                     data = data.astype(np.float32)
 
-                # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
+                # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
                 if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                     data = data.astype(np.float32)
 
