@@ -133,18 +133,43 @@ def build_chat_input(model, tokenizer, messages: List[dict], max_new_tokens: int
     input_tokens = input_tokens[-max_input_tokens:]  # truncate left
     return torch.LongTensor([input_tokens]).to(model.device)
 
-prompt = "你好"
-bin_path = "neural_speed/convert/ne-f32.bin"
 
-tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
-transformer_model = AutoModelForCausalLM.from_pretrained(args.model_path, device_map="auto", torch_dtype=torch.bfloat16, trust_remote_code=True)
-messages = []
-messages.append({"role": "user", "content": prompt})
-inputs_ids = build_chat_input(transformer_model, tokenizer, messages, max_new_tokens = 300)
+def main(args_in: Optional[List[str]] = None) -> None:
+    parser = argparse.ArgumentParser(description="main program llm running")
+    parser.add_argument("--model_name", type=str, help="Model name: String", required=True)
+    parser.add_argument("--model_path", type=Path, help="Path to the model: String", required=True)
+    parser.add_argument("-m", "--model", type=Path, help="Path to the executed model: String", required=True)
+    parser.add_argument("--format",
+                        type=str,
+                        default="GGUF",
+                        choices=["NE", "GGUF"],
+                        help="convert to the GGUF or NE format")
+    parser.add_argument(
+        "-p",
+        "--prompt",
+        type=str,
+        help="Prompt to start generation with: String (default: empty)",
+        default="Once upon a time",
+    )
 
-model = Model()
-model.init_from_bin(args.model_name, bin_path)
-outputs = model.generate(inputs_ids, max_new_tokens=300, do_sample=True)
-words = tokenizer.decode(outputs[0])
-print(words)
+    args = parser.parse_args(args_in)
+    print(args)
+
+    gguf_path = args.model.as_posix()
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    transformer_model = AutoModelForCausalLM.from_pretrained(args.model_path, device_map="auto", torch_dtype=torch.bfloat16, trust_remote_code=True)
+    messages = []
+    prompt = args.prompt
+    messages.append({"role": "user", "content": prompt})
+    inputs_ids = build_chat_input(transformer_model, tokenizer, messages, max_new_tokens = 300)
+    print(inputs_ids)
+    model = Model()
+    model.init_from_bin(args.model_name, gguf_path)
+    outputs = model.generate(inputs_ids, max_new_tokens=300, do_sample=True)
+    words = tokenizer.decode(outputs[0])
+    print(words)
+
+if __name__ == "__main__":
+    main()
 ```
