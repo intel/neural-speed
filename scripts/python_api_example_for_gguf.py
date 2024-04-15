@@ -111,7 +111,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     transformer_model = AutoModelForCausalLM.from_pretrained(args.model_path, device_map="auto", torch_dtype=torch.bfloat16, trust_remote_code=True)
     # generation_config = GenerationConfig.from_pretrained(args.model_path)
-    
+
     ## inputs = torch.tensor([[ 195, 16829, 92361,   196]])
     messages = []
     messages.append({"role": "user", "content": "你好”"})
@@ -124,6 +124,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     outputs = model.generate(inputs_ids, max_new_tokens=300, do_sample=True)
     words = tokenizer.decode(outputs[0])
     print(words)
-    
+
 if __name__ == "__main__":
     main()
