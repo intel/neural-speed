@@ -2,7 +2,6 @@
 #include "bestla_utils.h"
 #include "bestla_ut.h"
 
-#ifdef BTLA_UT_GEMM
 namespace bestla {
 using namespace utils;
 
@@ -153,6 +152,37 @@ void ref_kblock_int8(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, flo
           }
           tmpf += tmp * scaleA[i * _ldsa + k / _kblock] * float(scaleB[j + ij + k / _kblock * _ldsb]);
           tmpf -= zpval * scaleA[i * _ldsa + k / _kblock] * reduceB[j + ij + k / _kblock * _ldsb];
+        }
+        matC[i * ldc + j + ij] = tmpf;
+      }
+    }
+  }
+}
+
+template <int NTILE, typename T_SB_>
+void ref_kblock_int8_ss(int8_t* matA, int8_t* matB, float* matC, float* scaleA, int _ldsa, T_SB_* scaleB, int _ldsb,
+                        int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride, int kpos) {
+  int lda = _astride / sizeof(matA[0]);
+  int ldb = _bstride / sizeof(matB[0]);
+  int ldc = _cstride / sizeof(matC[0]);
+  for (int i = 0; i < _m; i++) {
+    for (int j = 0; j < _n; j += NTILE) {
+      for (int ij = 0; ij < NTILE; ij++) {
+        if (j + ij >= _n) {
+          break;
+        }
+        float tmpf = 0.f;
+        for (int k = 0; k < _k; k += _kblock) {
+          int tmp = 0;
+          for (int ik = 0; ik < _kblock; ik += 4) {
+            if (k + ik >= _k) {
+              break;
+            }
+            for (int ikk = 0; ikk < 4; ikk++) {
+              tmp += (int(matA[i * lda + k + ik + ikk])) * int(matB[(k + ik) * NTILE + ij * 4 + ikk + j * ldb]);
+            }
+          }
+          tmpf += tmp * scaleA[i * _ldsa + k / _kblock] * float(scaleB[j + ij + k / _kblock * _ldsb]);
         }
         matC[i * ldc + j + ij] = tmpf;
       }
@@ -424,6 +454,8 @@ class UT_GEMM_AVXVNNI_KBLOCK {
   UT_GEMM_AVXVNNI_KBLOCK() {
     UT_START();
     CheckISA(AVX_VNNI);
+    ut_ss<24, 1>(1, 96, 36, 36);
+    ut_ss<48, 1>(1, 96, 36, 36);
     ut<48, 1>(1, 96, 36, 36);
     ut<48, 1>(1, 144, 128, 32);
     ut<48, 1>(1, 144, 128, 128);
@@ -475,8 +507,37 @@ class UT_GEMM_AVXVNNI_KBLOCK {
                  n, k, kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, 1.f, cache, CacheSize);
     ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
   }
+
+  template <int NTile, int MTile>
+  void ut_ss(int m, int n, int k, int kblock) {
+    printf("Test Case SS: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvxvnniKBlockSS<NTile, MTile>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<int8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<float> C(m * n, 0), RefC(m * n, 0);
+    int blk_num = utils::updiv(k, kblock);
+    avector<float> scaleA(blk_num * m), scaleB(blk_num * n);
+    fill_buffer_randn(A.data(), A.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(scaleA.data(), scaleA.size(), 0.003f, 0.005f);
+    fill_buffer_randn(scaleB.data(), scaleB.size(), 0.003f, 0.005f);
+
+    ref_kblock_int8_ss<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), scaleA.data(), blk_num, scaleB.data(), n, m,
+                                          n, k, kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), nullptr, scaleA.data(), blk_num, scaleB.data(), nullptr, n, m, n, k,
+                 kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, 1.f, cache, CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
+  }
 };
-#ifdef BTLA_UT_GEMM
+#ifdef BTLA_UT_DEBUG
 static UT_GEMM_AVXVNNI_KBLOCK sUT_GEMM_AVXVNNI_KBLOCK;
 #endif
 
@@ -544,8 +605,10 @@ class UT_GEMM_AVXVNNI {
     UT_START();
     CheckISA(AVX_VNNI);
     ut<24>(4, 48, 12);
-
     ut<48>(2, 96, 12);
+
+    ut_ss<24>(4, 48, 12);
+    ut_ss<48>(2, 96, 12);
   }
 
   template <int NTile>
@@ -563,6 +626,30 @@ class UT_GEMM_AVXVNNI {
     avector<int8_t> B(k * n);
     avector<int> C(m * n, 0), RefC(m * n, 0);
     fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)255);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    ref_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]),
+                                n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, cache,
+                 CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 1);
+  }
+
+  template <int NTile>
+  void ut_ss(int m, int n, int k) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvxvnniSS<NTile>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<int8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<int> C(m * n, 0), RefC(m * n, 0);
+    fill_buffer_randn(A.data(), A.size(), (int8_t)-127, (int8_t)127);
     fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
     ref_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]),
                                 n * sizeof(C[0]), 0);
@@ -731,4 +818,3 @@ static UT_GEMM_AMXINT8 sUT_GEMM_AMXINT8;
 #endif
 }  // namespace ut
 }  // namespace bestla
-#endif

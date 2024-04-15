@@ -1222,19 +1222,21 @@ class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
   }
 };
 
-template <int _NTILE, int _MTILE = 0>
+template <typename AT, int _NTILE, int _MTILE = 0>
 class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
  public:
   static int constexpr RegLen = 8, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
   static int constexpr NRegs = _NTILE / RegLen;
-  static int constexpr MRegs = _MTILE == 0 ? (RegCount - 1) / NRegs : _MTILE;
-  static_assert(NRegs * MRegs <= RegCount - 1);
+  static int constexpr KeepRegs = std::is_same_v<AT, uint8_t> ? 1 : 3;
+  static int constexpr MRegs = _MTILE == 0 ? (RegCount - KeepRegs) / NRegs : _MTILE;
+  static_assert(NRegs * MRegs <= RegCount - KeepRegs);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
   static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
-  static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
-  typedef uint8_t AType;
+  static auto constexpr COMPUTE =
+      std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_INT32 : CompType::COMP_INT8_SS_INT32;
+  using AType = AT;
   typedef int8_t BType;
   typedef int32_t CType;
   struct params {
@@ -1285,7 +1287,10 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   void assign_regs() {
     CRegCount = MRegs * NRegs;
     ARegCount = 1;
-    BRegCount = RegCount - ARegCount - CRegCount;
+    if (std::is_same_v<AT, int8_t>) {
+      TmpRegCount = 2;
+    }
+    BRegCount = RegCount - ARegCount - CRegCount - TmpRegCount;
     if (BRegCount < NRegs) {
       BRegCount = 0;
       ARegCount = BRegCount + 1;
@@ -1297,8 +1302,7 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
     BReg = CReg + CRegCount;
     AReg = BReg + BRegCount;
     TmpReg = AReg + ARegCount;
-    assert(TmpReg <= RegCount);
-    TmpRegCount = RegCount - TmpReg;
+    assert(TmpReg + TmpRegCount <= RegCount);
   }
 
   void generate_mtile(int _mtile) {
@@ -1379,9 +1383,17 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
         }
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
+          if constexpr (std::is_same_v<AType, int8_t>) {
+            vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
+          }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
-            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), vreg_t(BReg + i));
+            if constexpr (std::is_same_v<AType, uint8_t>) {
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), vreg_t(BReg + i));
+            } else {
+              vpsignb(vreg_t(TmpReg), vreg_t(BReg + i), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg));
+            }
           }
         }
       } else if (BRegCount == 0) {
@@ -1391,8 +1403,15 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
             vpbroadcastd(vreg_t(AReg + imm), ptr[reg_tmp1]);
             add(reg_tmp1, reg_astride);
             for (int i = 0; i < NRegs; i++) {
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg + imm),
-                         ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+              if constexpr (std::is_same_v<AType, uint8_t>) {
+                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg + imm),
+                           ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+              } else {
+                vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg + imm), vreg_t(AReg + imm));
+                vmovups(vreg_t(TmpReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+                vpsignb(vreg_t(TmpReg), vreg_t(TmpReg), vreg_t(AReg + imm));
+                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg));
+              }
             }
           }
         }
@@ -1441,6 +1460,12 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
     outLocalLabel();
   }
 };
+
+template <int N, int M>
+using AvxvnniN8P4U8 = AvxvnniN8P4<uint8_t, N, M>;
+
+template <int N, int M>
+using AvxvnniN8P4S8 = AvxvnniN8P4<int8_t, N, M>;
 
 template <int _NTILE, int _MTILE = 0>
 class Amxbf16N16P2 : protected bestla::xbyak::JitAmxbf16 {
@@ -2520,7 +2545,7 @@ class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
   }
 };
 
-template <int _NTILE, int _MTILE = 0>
+template <typename AT, int _NTILE, int _MTILE = 0>
 class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
  public:
   static int constexpr RegLen = 8, PackRow = 4;
@@ -2531,8 +2556,9 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
   static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
-  static auto constexpr COMPUTE = CompType::COMP_INT8_US_FP32;
-  typedef uint8_t AType;
+  static auto constexpr COMPUTE =
+      std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_FP32 : CompType::COMP_INT8_SS_FP32;
+  using AType = AT;
   typedef int8_t BType;
   typedef float CType;
 
@@ -2705,7 +2731,15 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
-            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+            if constexpr (std::is_same_v<AType, uint8_t>) {
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg),
+                         ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+            } else {
+              vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
+              vmovups(vreg_t(TmpReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+              vpsignb(vreg_t(TmpReg), vreg_t(TmpReg), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg));
+            }
           }
         }
       } else {
@@ -2714,9 +2748,17 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
         }
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
+          if constexpr (std::is_same_v<AType, int8_t>) {
+            vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
+          }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
-            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), vreg_t(BReg + i));
+            if constexpr (std::is_same_v<AType, uint8_t>) {
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), vreg_t(BReg + i));
+            } else {
+              vpsignb(vreg_t(TmpReg), vreg_t(BReg + i), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg));
+            }
           }
         }
       }
@@ -2863,6 +2905,10 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
     outLocalLabel();
   }
 };
+template <int N, int M>
+using AvxvnniN8P4U8 = kblock::AvxvnniN8P4<uint8_t, N, M>;
+template <int N, int M>
+using AvxvnniN8P4S8 = kblock::AvxvnniN8P4<int8_t, N, M>;
 
 template <typename AT, typename BT, int _NTILE, int _MTILE = 0>
 class Amxint8N16P4 : protected bestla::xbyak::JitAmxint8 {
@@ -3404,9 +3450,9 @@ class ICoreRowNAvx512vnniKBlock : public CoreCodeBase<code::kblock::Avx512vnniN1
 };
 
 template <int _NTILE, int _MTILE = 0>
-class ICoreRowNAvxvnni : public CoreCodeBase<code::AvxvnniN8P4, _NTILE, _MTILE> {
+class ICoreRowNAvxvnni : public CoreCodeBase<code::AvxvnniN8P4U8, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::AvxvnniN8P4, _NTILE, _MTILE>::Code;
+  using Code = typename CoreCodeBase<code::AvxvnniN8P4U8, _NTILE, _MTILE>::Code;
 
   void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
                int _cstride, int kpos, void* tmpcache, size_t cachesize) {
@@ -3420,15 +3466,49 @@ class ICoreRowNAvxvnni : public CoreCodeBase<code::AvxvnniN8P4, _NTILE, _MTILE> 
 };
 
 template <int _NTILE, int _MTILE = 0>
-class ICoreRowNAvxvnniKBlock : public CoreCodeBase<code::kblock::AvxvnniN8P4, _NTILE, _MTILE> {
+class ICoreRowNAvxvnniSS : public CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::kblock::AvxvnniN8P4, _NTILE, _MTILE>::Code;
+  using Code = typename CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE>::Code;
+
+  void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+    auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
+    if (_m <= Code::MTILE) {
+      this->mCodes[_m - 1].mKernel(&param);
+    } else {
+      assert(0);
+    }
+  }
+};
+
+template <int _NTILE, int _MTILE = 0>
+class ICoreRowNAvxvnniKBlock : public CoreCodeBase<code::kblock::AvxvnniN8P4U8, _NTILE, _MTILE> {
+ public:
+  using Code = typename CoreCodeBase<code::kblock::AvxvnniN8P4U8, _NTILE, _MTILE>::Code;
   void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
                float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
                int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA,  _astride, matB,    _bstride, matC, _cstride, zpA,     scaleA,
                                        _ldsa, scaleB,   reduceB, _ldsb,    _k,   _n,       _kblock, kpos == 0 ? 1 : 0,
                                        kscale};
+    if (_m <= Code::MTILE) {
+      this->mCodes[_m - 1].mKernel(&param);
+    } else {
+      assert(0);
+    }
+  }
+};
+
+template <int _NTILE, int _MTILE = 0>
+class ICoreRowNAvxvnniKBlockSS : public CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE> {
+ public:
+  using Code = typename CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE>::Code;
+  void forward(int8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
+               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+    auto param =
+        typename Code::params{matA,   _astride, matB,  _bstride, matC, _cstride, nullptr,           scaleA, _ldsa,
+                              scaleB, reduceB,  _ldsb, _k,       _n,   _kblock,  kpos == 0 ? 1 : 0, kscale};
     if (_m <= Code::MTILE) {
       this->mCodes[_m - 1].mKernel(&param);
     } else {
