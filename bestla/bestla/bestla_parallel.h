@@ -902,7 +902,8 @@ class SchedulerDispatcher {
       utils::GemmProblem problem_P = problem, problem_E = problem;
       const int N = problem.dims[2];
       auto PE_Ratio = cr->getPE(Scheduler::gemm_ISA());
-      const int N_offset = utils::padto(N - int(N / (1 + PE_Ratio)), Scheduler::mStep[1]);
+      int N_offset = utils::padto(N - int(N / (1 + PE_Ratio)), Scheduler::mStep[1]);
+      N_offset = N_offset <= N ? N_offset : N;
       problem_P.dims[2] = N_offset;
       Scheduler_P =
           std::move(Scheduler({th->num_threads() - cr->E_core_num, problem_P, {0, 0}, cr->mL2Cache_P, cr->mL1Cache_P}));

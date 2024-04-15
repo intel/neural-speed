@@ -1637,9 +1637,10 @@ static inline BTLA_CODE decompress_kblock_bit2_packrow_fp(utils::bit2x4* bit2ptr
 
   return BTLA_CODE::Success;
 }
+
 template <typename ScaleT, int NTILE>
 static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
-                                            int k, int n, int blocksize) {
+                                            int k, int ld_scaleb, int blocksize) {
   int blks = k / blocksize;
   float accf[NTILE];
   std::memset(accf, 0, sizeof(accf));
@@ -1648,7 +1649,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   auto asptr = A.sptr;
   auto azptr = A.zpptr;
   for (int ib = 0; ib < blks; ib += 1) {
-    auto bsptr = B.sptr + ib * n;
+    auto bsptr = B.sptr + ib * ld_scaleb;
     int acci[NTILE];
     std::memset(acci, 0, sizeof(acci));
     if (A.zpptr) {
@@ -1697,7 +1698,46 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         accf[in] += tmp;
       }
     }
-    
+  }
+  for (int in = 0; in < NTILE; in++) {
+    C[in] = accf[in];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE>
+static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int k, int ld_scaleb, int blocksize) {
+  int blks = k / blocksize;
+  float accf[NTILE];
+  std::memset(accf, 0, sizeof(accf));
+  assert(A.zpptr == NULL); // not necessary to support s8 with zp and u8 with zp
+  auto a8ptr = reinterpret_cast<int8_t*>(A.aptr);
+  auto b4ptr = B.b4ptr;
+  auto asptr = A.sptr;
+  auto azptr = A.zpptr;
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    int acci[NTILE];
+    std::memset(acci, 0, sizeof(acci));
+    for (int ik = 0; ik < blocksize; ik += 4) {
+      for (int in = 0; in < NTILE; in++) {
+        auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
+        auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
+        acci[in] += int(a8ptr[0]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.x);
+        acci[in] += int(a8ptr[1]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.y);
+        acci[in] += int(a8ptr[2]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.x);
+        acci[in] += int(a8ptr[3]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.y);
+      }
+      a8ptr += 4;
+      b4ptr += NTILE * 2;
+    }
+    float scale = asptr[ib];
+    for (int in = 0; in < NTILE; in++) {
+      auto tmp = float(acci[in]);
+      tmp = tmp * (scale * bsptr[in]);
+      accf[in] += tmp;
+    }
   }
   for (int in = 0; in < NTILE; in++) {
     C[in] = accf[in];

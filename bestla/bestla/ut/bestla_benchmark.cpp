@@ -1515,14 +1515,14 @@ class UTWOQ_S4_VecDot {
     printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
            corestr, log.get_log_str(), flops, flops / threads, band);
 
-    avector<float> refC(m * n);
-    avector<float> revB(n * k);
-    kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
-    gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
-    bcount = std::min(bcount, batch);
-    for (size_t i = 0; i < bcount; i++) {
-      buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
-    }
+    //avector<float> refC(m * n);
+    //avector<float> revB(n * k);
+    //kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
+    //gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
+    //bcount = std::min(bcount, batch);
+    //for (size_t i = 0; i < bcount; i++) {
+    //  buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
+    //}
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>

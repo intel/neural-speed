@@ -348,12 +348,21 @@ class LauncherIntKBlock {
       auto Cptr = _param.paramC.C + _config.loc[1];
       paramB.b4ptr += _config.loc[1] * _param.paramB.packedW->mKPad / 2;
       paramB.sptr += _config.loc[1];
-      for (int in = 0; in < _config.size[1]; in += GemmCore::NTILE) {
-        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, float, GemmCore::NTILE>(paramA, paramB, Cptr, k, n,
-                                                                                         kblocksize);
+      int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
+      int in = 0;
+      int ld_scaleb = _param.paramB.packedW->CStep();
+      for (; in < size_padded; in += GemmCore::NTILE) {
+        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, float, GemmCore::NTILE>(paramA, paramB, Cptr, k,
+                                                                                         ld_scaleb, kblocksize);
         Cptr += GemmCore::NTILE;
         paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
         paramB.sptr += GemmCore::NTILE;
+      }
+      if (size_padded != _config.size[1]) {
+        CType tmp[GemmCore::NTILE];
+        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, float, GemmCore::NTILE>(paramA, paramB, tmp, k,
+                                                                                         ld_scaleb, kblocksize);
+        memcpy(Cptr, tmp, (_config.size[1] - in) * sizeof(CType));
       }
     }
   };
