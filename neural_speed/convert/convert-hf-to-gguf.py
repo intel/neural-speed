@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, ContextManager, Iterator, Sequence, cast
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -862,16 +863,16 @@ class BaichuanModel(Model):
         tensor_map = gguf.get_tensor_name_map(self.model_arch, block_count)
         head_count_kv = self.hparams.get("num_key_value_heads", head_count)
 
-        for i in range(block_count):
-            if (w := model_kv.get(f"model.layers.{i}.self_attn.W_pack.weight")) is not None:
-                print(f"Unpacking and permuting layer {i}")
-                model_kv[f"model.layers.{i}.self_attn.q_proj.weight"] = \
-                    self._reverse_hf_permute_part(w, 0, head_count, head_count)
-                model_kv[f"model.layers.{i}.self_attn.k_proj.weight"] = \
-                    self._reverse_hf_permute_part(w, 1, head_count, head_count_kv)
-                model_kv[f"model.layers.{i}.self_attn.v_proj.weight"] = \
-                    self._reverse_hf_part(w, 2)
-                del model_kv[f"model.layers.{i}.self_attn.W_pack.weight"]
+        # for i in range(block_count):
+        #     if (w := model_kv.get(f"model.layers.{i}.self_attn.W_pack.weight")) is not None:
+        #         print(f"Unpacking and permuting layer {i}")
+        #         model_kv[f"model.layers.{i}.self_attn.q_proj.weight"] = \
+        #             self._reverse_hf_permute_part(w, 0, head_count, head_count)
+        #         model_kv[f"model.layers.{i}.self_attn.k_proj.weight"] = \
+        #             self._reverse_hf_permute_part(w, 1, head_count, head_count_kv)
+        #         model_kv[f"model.layers.{i}.self_attn.v_proj.weight"] = \
+        #             self._reverse_hf_part(w, 2)
+        #         del model_kv[f"model.layers.{i}.self_attn.W_pack.weight"]
 
         for name, data_torch in model_kv.items():
             # we don't need these
@@ -887,28 +888,77 @@ class BaichuanModel(Model):
             data = data_torch.squeeze().numpy()
 
             # map tensor names
-            new_name = tensor_map.get_name(name, try_suffixes=(".weight", ".bias"))
-            if new_name is None:
-                print(f"Can not map tensor {name!r}")
-                sys.exit()
+            # new_name = tensor_map.get_name(name, try_suffixes=(".weight", ".bias"))
+            # if new_name is None:
+            #     print(f"Can not map tensor {name!r}")
+            #     sys.exit()
 
-            n_dims = len(data.shape)
-            data_dtype = data.dtype
+            # n_dims = len(data.shape)
+            # data_dtype = data.dtype
 
-            # if f32 desired, convert any float16 to float32
-            if self.ftype == 0 and data_dtype == np.float16:
-                data = data.astype(np.float32)
+            # # if f32 desired, convert any float16 to float32
+            # if self.ftype == 0 and data_dtype == np.float16:
+            #     data = data.astype(np.float32)
 
-            # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
-            if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
-                data = data.astype(np.float32)
+            # # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
+            # if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
+            #     data = data.astype(np.float32)
 
-            # if f16 desired, convert any float32 2-dim weight tensors to float16
-            if self.ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and n_dims == 2:
-                data = data.astype(np.float16)
+            # # if f16 desired, convert any float32 2-dim weight tensors to float16
+            # if self.ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and n_dims == 2:
+            #     data = data.astype(np.float16)
 
-            print(f"{name} -> {new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype}")
-            self.gguf_writer.add_tensor(new_name, data)
+            # print(f"{name} -> {new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype}, shape = {data.shape}")
+            # self.gguf_writer.add_tensor(new_name, data)
+            
+            if "W_pack" in name:
+                print(name)
+                n_dims = len(data.shape)
+                data_dtype = data.dtype
+
+                # if f32 desired, convert any float16 to float32
+                if self.ftype == 0 and data_dtype == np.float16:
+                    data = data.astype(np.float32)
+
+                # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+                if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
+                    data = data.astype(np.float32)
+
+                # if f16 desired, convert any float32 2-dim weight tensors to float16
+                if self.ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and n_dims == 2:
+                    data = data.astype(np.float16)
+
+                print(f"{name} -> {name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype},  shape = {data.shape}")
+                self.gguf_writer.add_tensor(name, data)
+            else:
+                # map tensor names
+                new_name = tensor_map.get_name(name, try_suffixes=(".weight", ".bias"))
+                if new_name is None:
+                    print(f"Can not map tensor {name!r}")
+                    sys.exit()
+
+                n_dims = len(data.shape)
+                data_dtype = data.dtype
+
+                # if f32 desired, convert any float16 to float32
+                if self.ftype == 0 and data_dtype == np.float16:
+                    data = data.astype(np.float32)
+
+                # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+                if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
+                    data = data.astype(np.float32)
+
+                # if f16 desired, convert any float32 2-dim weight tensors to float16
+                if self.ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and n_dims == 2:
+                    data = data.astype(np.float16)
+
+                if 'lm_head' in name:
+                    data = torch.from_numpy(data)
+                    data = F.normalize(data)
+                    data = data.numpy()
+
+                print(f"{name} -> {new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype},  shape = {data.shape}")
+                self.gguf_writer.add_tensor(new_name, data)
 
     def _reverse_hf_permute(self, weights: Tensor, n_head: int, n_kv_head: int | None = None) -> Tensor:
         if n_kv_head is not None and n_head != n_kv_head:
