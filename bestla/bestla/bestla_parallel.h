@@ -85,9 +85,12 @@ class OMPThreading : public IThreading {
       {
         int tidx = omp_get_thread_num();
         func(tidx);
+        (void)(tidx);
+        (void)(0);
       }
     } else {
       func(0);
+      void(0);
     }
   }
   virtual void set_threads(int nthreads) override {
@@ -168,7 +171,7 @@ class StdThreading : public IThreading {
 
   inline void sync(int tidx, int idx = 0) override {
     if (mThreadNum > 1) {
-      flag[idx].fetch_sub(1);
+      flag[idx]--;
       if (cr->mHybrid) {
         Timer_T tm;
         tm.start();
@@ -233,7 +236,7 @@ class StdThreading : public IThreading {
               _cd->core_bond(core_id);
               Timer_T tm;
               while (true) {
-                if (stop.load() == true) break;
+                if (stop) break;
                 if (func_[tidx] != nullptr) {
                   thread_time[tidx + 1] = 0;
                   tm.start();
@@ -254,11 +257,11 @@ class StdThreading : public IThreading {
             [&](int tidx, int core_id) {
               _cd->core_bond(core_id);
               while (true) {
-                if (stop.load() == true) break;
+                if (stop) break;
                 if (func_[tidx] != nullptr) {
                   (*func_[tidx])(tidx + 1);
                   func_[tidx] = nullptr;
-                  running.fetch_sub(1);
+                  running--;
                 } else {
                   _mm_pause();
                 }
@@ -271,7 +274,7 @@ class StdThreading : public IThreading {
   std::vector<int> thread_time;
   float time_per_p, time_per_e;
   std::vector<std::thread> thdset;
-  std::atomic_bool stop;
+  bool stop;
   std::atomic_int running;
   std::atomic_int flag[10];
   const thread_func* func_[100];
