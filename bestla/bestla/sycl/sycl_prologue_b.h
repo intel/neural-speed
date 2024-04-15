@@ -150,7 +150,7 @@ class WeightS4 {
 class KernelConfigTrans {
  public:
   static int constexpr SgSize = 16;
-  static int constexpr TileK = 16;
+  static int constexpr TileK = 32;
   static int constexpr TileN = 1;
 };
 
@@ -187,6 +187,7 @@ class WeightS4Trans {
     int constexpr TileK = KernelConfigBase::TileK;
     int constexpr TileN = KernelConfigBase::TileN;
     int constexpr GroupN = TileN;
+    int constexpr SubGroupK = SgSize * TileK;
     int constexpr GroupK = SgSize * TileK;
     static_assert(TileN == 1);
     assert(blocksize % TileK == 0);
@@ -200,31 +201,34 @@ class WeightS4Trans {
     int ldb = in.ldb;
     int ldbn = in.ldb * blocksize;
     auto deq_kernel = [&](sycl::handler& cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(problem, group),
-                       [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
-                         int g_idx = it.get_group(0);
-                         auto sg = it.get_sub_group();
-                         int sg_id = sg.get_local_id()[0];
-                         int g_idx_n = g_idx / nsg_k;
-                         int g_idx_k = g_idx % nsg_k;
-                         int g_n = g_idx_n * GroupN;
-                         int g_k = g_idx_k * GroupK;
-                         auto sptr = S_d + g_k / blocksize + g_n * ldb;
-                         auto bptr = B_d + (g_k + g_n * ldbn) / 2;
-                         auto dbptr = outptr + g_k + g_n * k;
-                         float tmp[TileK];
-                         float scale = sptr[sg_id * TileK / blocksize];
-
-                         for (int ik = 0; ik < TileK; ik += 2) {
-                           uint8_t srcu8 = *(bptr + (ik + sg_id * TileK) / 2);
-                           tmp[ik] = static_cast<int8_t>((srcu8 & 0x0f) << 4) * scale;
-                           tmp[ik + 1] = static_cast<int8_t>((srcu8 & 0xf0)) * scale;
-                         }
-
-                         for (int ik = 0; ik < TileK; ik += 1) {
-                           dbptr[ik + sg_id * TileK] = tmp[ik];
-                         }
-                       });
+      cgh.parallel_for(
+          sycl::nd_range<1>(problem, group), [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+            int g_idx = it.get_group(0);
+            auto sg = it.get_sub_group();
+            int sg_id = sg.get_local_id()[0];
+            int sg_group_id = sg.get_group_id()[0];
+            int g_idx_n = g_idx / nsg_k;
+            int g_idx_k = g_idx % nsg_k;
+            int g_n = g_idx_n * GroupN;
+            int g_k = g_idx_k * GroupK;
+            int sg_k = g_k + sg_group_id * SubGroupK;
+            auto sptr = S_d + sg_k / blocksize + g_n * ldb;
+            auto bptr = B_d + (sg_k + g_n * ldbn) / 2;
+            auto dbptr = outptr + sg_k + g_n * k;
+            float tmp[TileK];
+            int constexpr Unroll = 4;
+#pragma unroll
+            for (int ik = 0; ik < TileK; ik += Unroll) {
+              float dst[Unroll];
+              float scale = sptr[(ik * SgSize + sg_id * Unroll) / blocksize];
+              for (int ir = 0; ir < Unroll; ir += 2) {
+                uint8_t srcu8 = *(bptr + (ik * SgSize + sg_id * Unroll + ir) / 2);
+                dst[ir] = static_cast<int8_t>((srcu8 & 0x0f) << 4) * scale;
+                dst[ir + 1] = static_cast<int8_t>((srcu8 & 0xf0)) * scale;
+              }
+              *(sycl::vec<float, Unroll>*)&dbptr[ik * SgSize + sg_id * Unroll] = *(sycl::vec<float, Unroll>*)dst;
+            }
+          });
     };
     return q->submit(deq_kernel);
   }
