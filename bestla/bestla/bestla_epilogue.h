@@ -37,8 +37,8 @@ class AccumulatorWriteBack {
   using DType = _DST_T;
   using Param = ParamAccumulatorWriteBack<DType>;
 
-  BTLA_CODE forward(const _SRC_T* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const _SRC_T* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
     return kernel::wrapper::Memcpy2D::template forward<ISA_T, SType, DType>(cacheptr, cptr, M, N, cachestep, _param.ldc,
@@ -50,8 +50,8 @@ template <BTLA_ISA ISA_T, typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP _OP>
 class CustomAccumulatorWriteBackWithEltop {
  public:
   using Param = ParamAccumulatorWriteBack<_DST_T>;
-  BTLA_CODE forward(const _SRC_T* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const _SRC_T* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
     if constexpr (std::is_same<_SRC_T, float>::value && std::is_same<_DST_T, float>::value) {
@@ -95,8 +95,8 @@ class AlphaBetaProcessFp32 {
  public:
   using Param = ParamAlphaBetaProcess<float>;
 
-  BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
@@ -118,9 +118,9 @@ template <BTLA_ISA ISA_T>
 class CompFp32BlockEpilogue {
  public:
   using Param = ParamCompFp32BlockEpilogue;
-  BTLA_CODE forward(const float* srcptr, float* dstptr, const int cachestep, const int M_offset, const int N_offset,
-                    const int K_offset, const int M, const int N, const Param& _param, void* tmpcache,
-                    size_t cachesize) {
+  static BTLA_CODE forward(const float* srcptr, float* dstptr, const int cachestep, const int M_offset,
+                           const int N_offset, const int K_offset, const int M, const int N, const Param& _param,
+                           void* tmpcache, size_t cachesize) {
     auto ret = BTLA_CODE::NotSupport;
     if (_param.scaledtype == BTLA_DTYPE::F32) {
       ret = kernel::wrapper::CompFp32BlockScale::template forward<ISA_T>(
@@ -169,8 +169,8 @@ template <BTLA_ISA ISA_T>
 class DequantInt32ToFp32 {
  public:
   using Param = ParamDequantInt32ToFp32;
-  BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
     return kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(cacheptr, cachestep, cptr, _param.ldc, M, N,
@@ -198,9 +198,9 @@ template <BTLA_ISA ISA_T>
 class CompInt8BlockEpilogue {
  public:
   using Param = ParamCompInt8BlockEpilogue;
-  BTLA_CODE forward(const int32_t* srcptr, float* dstptr, const int cachestep, const int M_offset, const int N_offset,
-                    const int K_offset, const int M, const int N, const Param& _param, void* tmpcache,
-                    size_t cachesize) {
+  static BTLA_CODE forward(const int32_t* srcptr, float* dstptr, const int cachestep, const int M_offset,
+                           const int N_offset, const int K_offset, const int M, const int N, const Param& _param,
+                           void* tmpcache, size_t cachesize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
     float* scab = nullptr;
     size_t ScaleBTmpSize = N * sizeof(float);
@@ -280,8 +280,8 @@ template <BTLA_ISA ISA_T>
 class ZpDequantInt32ToFp32 {
  public:
   using Param = ParamZpDequantInt32ToFp32;
-  BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
     auto ret = kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(cacheptr, cachestep, cptr, _param.ldc, M, N,
@@ -321,8 +321,8 @@ template <BTLA_ISA ISA_T>
 class AlphaBetaProcessS32U8 {
  public:
   using Param = ParamAlphaBetaProcessS32U8;
-  BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
     return kernel::wrapper::QuanOutS32U32::template forward<ISA_T>(_param.alpha, cacheptr, cachestep, cptr, _param.ldc,

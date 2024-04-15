@@ -331,16 +331,19 @@ class LauncherIntKBlock {
     static bool implemented(const Param& _param) {
       bool impl = true;
       impl &= _param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP;
-      impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32;
+      impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32 ||
+              _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::BF16;
       impl &= _param.problem.dims[1] == 1;  // m==1
       return impl;
     }
-
-    static void gemv(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      utils::SGemvParamB paramB{_param.paramB.packedW->template WPtr<uint8_t>(), nullptr, nullptr,
-                                _param.paramB.packedW->template SPtr<float>(), nullptr};
+    template <typename ScaleT>
+    static void gemv_s4(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+      utils::GemvParamB<ScaleT> paramB{_param.paramB.packedW->template WPtr<uint8_t>(), nullptr, nullptr,
+                                       _param.paramB.packedW->template SPtr<ScaleT>(), nullptr};
       utils::GemvParamA paramA{_param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
                                _param.paramA.quan->template ZPtr<uint8_t>()};
+      auto constexpr TmpSize = 4 * 1024LL;
+      auto StackTmp = alloca(TmpSize);
       int m = _param.problem.dims[1];
       int n = _param.problem.dims[2];
       int k = _param.problem.dims[3];
@@ -352,17 +355,30 @@ class LauncherIntKBlock {
       int in = 0;
       int ld_scaleb = _param.paramB.packedW->CStep();
       for (; in < size_padded; in += GemmCore::NTILE) {
-        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, float, GemmCore::NTILE>(paramA, paramB, Cptr, k,
-                                                                                         ld_scaleb, kblocksize);
+        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, Cptr, k,
+                                                                                          ld_scaleb, kblocksize);
         Cptr += GemmCore::NTILE;
         paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
         paramB.sptr += GemmCore::NTILE;
       }
       if (size_padded != _config.size[1]) {
-        CType tmp[GemmCore::NTILE];
-        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, float, GemmCore::NTILE>(paramA, paramB, tmp, k,
-                                                                                         ld_scaleb, kblocksize);
-        memcpy(Cptr, tmp, (_config.size[1] - in) * sizeof(CType));
+        auto tmpptr = reinterpret_cast<CType*>(StackTmp);
+        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, tmpptr, k,
+                                                                                          ld_scaleb, kblocksize);
+        memcpy(Cptr, tmpptr, (_config.size[1] - in) * sizeof(CType));
+      }
+      Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,
+                        StackTmp, TmpSize);
+    }
+
+    static void gemv(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+      if (_param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP) {
+        if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
+          gemv_s4<float>(_param, _config);
+        } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
+          gemv_s4<utils::bf16>(_param, _config);
+        }
+        return;
       }
     }
   };

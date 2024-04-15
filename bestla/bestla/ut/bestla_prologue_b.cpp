@@ -1009,6 +1009,7 @@ class UT_CompInt8 {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::DQ8_BNB);
     }
@@ -1267,8 +1268,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompInt8 sUT_CompInt8;
 #endif
+static UT_CompInt8 sUT_CompInt8;
 
 class UT_CompBf16 {
  public:

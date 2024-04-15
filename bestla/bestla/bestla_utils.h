@@ -305,8 +305,6 @@ struct GemvParamA {
   uint8_t* zpptr = 0;
 };
 
-using SGemvParamB = GemvParamB<float>;
-
 template <typename T>
 inline constexpr BTLA_DTYPE bestla_dtype = std::is_same_v<T, double>        ? BTLA_DTYPE::F64
                                            : std::is_same_v<T, float>       ? BTLA_DTYPE::F32

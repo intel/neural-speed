@@ -1320,6 +1320,98 @@ constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_
     load_maskz_fp32_fp16_tr_x8_word<1>, load_maskz_fp32_fp16_tr_x8_word<1>, load_maskz_fp32_fp16_tr_x8_word<2>,
     load_maskz_fp32_fp16_tr_x8_word<3>, load_maskz_fp32_fp16_tr_x8_word<4>, load_maskz_fp32_fp16_tr_x8_word<5>,
     load_maskz_fp32_fp16_tr_x8_word<6>, load_maskz_fp32_fp16_tr_x8_word<7>, load_maskz_fp32_fp16_tr_x8_word<8>};
+
+template <typename ScaleT, int NTILE>
+static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int k, int ld_scaleb, int blocksize) {
+  auto& a8ptr = A.aptr;
+  auto& b4ptr = B.b4ptr;
+  auto& asptr = A.sptr;
+  auto& azptr = A.zpptr;
+
+  int blks = k / blocksize;
+  int constexpr NReg = NTILE / 8;
+  // Initialize accumulator with zeros
+  __m256 acc[NReg];
+  for (int i = 0; i < NReg; i++) {
+    acc[i] = _mm256_setzero_ps();
+  }
+  uint32_t mask = 0xf0f0f0f0;
+  auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  const __m256i onesu8 = _mm256_set1_epi8(1);
+
+  if (azptr) {
+    for (int ib = 0; ib < blks; ib += 1) {
+      __m256i iacc[NReg];
+      __m256i bacc[NReg];
+      for (int i = 0; i < NReg; i++) {
+        iacc[i] = _mm256_setzero_si256();
+        bacc[i] = _mm256_setzero_si256();
+      }
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2),
+                                                           vmask);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+        }
+      }
+      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
+      auto zp = int(azptr[ib]);
+      const __m256i v_a_zp = _mm256_set1_epi32(zp);
+      auto bsptr = B.sptr + ib * ld_scaleb;
+      for (int i = 0; i < NReg; i++) {
+        bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
+        iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
+        __m256 v_b_scale;
+        if constexpr (std::is_same_v<ScaleT, float>) {
+          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
+        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
+          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
+          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+        }
+        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
+        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
+        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
+      }
+    }
+  } else {
+    for (int ib = 0; ib < blks; ib += 1) {
+      __m256i iacc[NReg];
+      for (int i = 0; i < NReg; i++) {
+        iacc[i] = _mm256_setzero_si256();
+      }
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2),
+                                                           vmask);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+        }
+      }
+      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
+      auto bsptr = B.sptr + ib * ld_scaleb;
+      for (int i = 0; i < NReg; i++) {
+        __m256 v_b_scale;
+        if constexpr (std::is_same_v<ScaleT, float>) {
+          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
+        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
+          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
+          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+        }
+        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
+        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
+        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
+      }
+    }
+  }
+
+  for (int i = 0; i < NReg; i++) {
+    _mm256_storeu_ps(C + i * 8, acc[i]);
+  }
+  return BTLA_CODE::Success;
+}
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif

@@ -179,8 +179,8 @@ class Benchmark_U8S8S32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-#endif
 static Benchmark_U8S8S32 sBenchmark_U8S8S32;
+#endif
 
 class Benchmark_S8S8S32 {
  public:
@@ -254,9 +254,9 @@ class Benchmark_S8S8S32 {
     for (auto threads : threads_cfg) {
       if (_cd->AVX_VNNI()) {
         benchmark<gemm::ICoreRowNAvxvnniSS<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                         threads);
+                                                        threads);
         benchmark<gemm::ICoreRowNAvxvnniSS<24, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                         threads);
+                                                        threads);
       }
       if (_cd->AMX_INT8()) {
         benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
@@ -270,8 +270,8 @@ class Benchmark_S8S8S32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-#endif
 static Benchmark_S8S8S32 sBenchmark_S8S8S32;
+#endif
 
 class Benchmark_Bf16Bf16Fp32 {
  public:
@@ -808,7 +808,8 @@ class UTWOQ_CompInt8 {
   }
 
   void ut_s4() {
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S4_CLIP);*/
   }
@@ -848,7 +849,8 @@ class UTWOQ_CompInt8 {
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
-    auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
+    int blks = k / blocksize;
+    auto memsize = (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
@@ -883,7 +885,7 @@ class UTWOQ_CompInt8 {
     for (int i = 1; i < batch; i++) {
       memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(float));
     }
-    using LOG = timer_statistics_logger<TestMs * 2>;
+    using LOG = timer_statistics_logger<TestMs / 2>;
     float testtime = float(TestMs);
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
@@ -896,13 +898,9 @@ class UTWOQ_CompInt8 {
         if (_cd->AVX512_VNNI()) {
           benchmark<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
-          benchmark<gemm::ICoreRowNAvx512vnniKBlock<96, 2>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
         }
         if (_cd->AVX_VNNI()) {
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
-          benchmark<gemm::ICoreRowNAvxvnniKBlock<48, 1>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
         }
       }
@@ -910,8 +908,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 #endif
+static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 
 typedef struct {
   float d;             // delta
@@ -1521,14 +1519,14 @@ class UTWOQ_S4_VecDot {
     printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
            corestr, log.get_log_str(), flops, flops / threads, band);
 
-    //avector<float> refC(m * n);
-    //avector<float> revB(n * k);
-    //kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
-    //gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
-    //bcount = std::min(bcount, batch);
-    //for (size_t i = 0; i < bcount; i++) {
-    //  buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
-    //}
+    // avector<float> refC(m * n);
+    // avector<float> revB(n * k);
+    // kernel.mProB.unpackWeight(n, k, &packBs[0], revB.data(), n, UT_Threading::get());
+    // gemmref_fp32fp32fp32(m, n, k, A, revB.data(), refC.data(), k, n, n);
+    // bcount = std::min(bcount, batch);
+    // for (size_t i = 0; i < bcount; i++) {
+    //   buffer_error(refC.data(), C + i * m * n, m * n, 0.1f);
+    // }
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>

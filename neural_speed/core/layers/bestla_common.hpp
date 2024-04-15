@@ -121,8 +121,8 @@ class Add {
  public:
   using Param = ParamAdd<_T>;
 
-  BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
@@ -150,7 +150,8 @@ template <BTLA_ISA ISA_T, typename _T>
 class Mul {
  public:
   using Param = ParamMul<_T>;
-  BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
+  static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M,
                     const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
@@ -176,7 +177,7 @@ template <BTLA_ISA ISA_T, typename _T>
 class Add_Gelu {
  public:
   using Param = ParamAdd_Gelu<_T>;
-  BTLA_CODE forward(  // NOLINT [build/include_what_you_use]
+  static BTLA_CODE forward(  // NOLINT [build/include_what_you_use]
       const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M, const int N,
       const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
