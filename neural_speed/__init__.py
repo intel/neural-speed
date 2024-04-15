@@ -206,6 +206,10 @@ class Model:
         if self.module is None:
             self.module = _import_package(model_type)
         self.model = self.module.Model()
+        if model_type=="whisper":
+            self.model.init_model(model_path)
+            self.model_type="whisper"
+            return
 
         if self.max_request_num == -1:
             self.max_request_num = max(generate_kwargs.get("max_request_num", max_request_num_default),
