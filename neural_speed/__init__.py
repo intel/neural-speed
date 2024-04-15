@@ -22,20 +22,7 @@ from neural_speed.convert import convert_model
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
 max_request_num_default = 1
 
-
-class Model:
-
-    def __init__(self):
-        self.module = None
-        self.model = None
-        self.model_type = None
-        self.bin_file = None
-        self.generate_round = 0
-        self.max_request_num = -1
-
-    def __import_package(self, model_type):
-        if self.module:
-            return
+def _import_package(model_type):
         if model_type == "gptj":
             import neural_speed.gptj_cpp as cpp_model
         elif model_type == "falcon":
@@ -56,7 +43,7 @@ class Model:
             import neural_speed.bloom_cpp as cpp_model
         elif model_type == "chatglm":
             import neural_speed.chatglm_cpp as cpp_model
-        elif model_type == "chatglm2":
+        elif model_type == "chatglm2" or model_type == "chatglm3":
             import neural_speed.chatglm2_cpp as cpp_model
         elif model_type == "baichuan":
             import neural_speed.baichuan_cpp as cpp_model
@@ -70,20 +57,72 @@ class Model:
             import neural_speed.qwen_cpp as cpp_model
         elif model_type == "phi":
             import neural_speed.phi_cpp as cpp_model
+        elif model_type == "gemma":
+            import neural_speed.gemma_cpp as cpp_model
+        elif model_type == "stablelm":
+            import neural_speed.stablelm_cpp as cpp_model
         elif model_type == "whisper":
             import neural_speed.whisper_cpp as cpp_model
         elif model_type == "mixtral":
             import neural_speed.mixtral_cpp as cpp_model
         else:
             raise TypeError("Unsupported model type {}!".format(model_type))
-        self.module = cpp_model
+        return cpp_model
 
-    @staticmethod
-    def get_model_type(model_config):
-        model_type = model_maps.get(model_config.model_type, model_config.model_type)
-        if model_type == "chatglm" and "chatglm2" in model_config._name_or_path:
-            model_type = "chatglm2"
-        return model_type
+def _get_model_config(model_name, model_hub="huggingface"):
+    if model_hub == "modelscope":
+        from modelscope import AutoConfig
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    else:
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    return config
+
+def _get_model_type(model_config):
+    model_type = model_maps.get(model_config.model_type, model_config.model_type)
+    if model_type == "chatglm" and "chatglm2" in model_config._name_or_path:
+        model_type = "chatglm2"
+
+    # For ChatGLM3
+    if model_type == "chatglm" and "chatglm3" in model_config._name_or_path:
+        # due to the same model architecture.
+        model_type = "chatglm2"
+
+    # for TheBloke/falcon-40b-instruct-GPTQ & TheBloke/Falcon-7B-Instruct-GPTQ
+    if model_type == "RefinedWebModel" or model_type == "RefinedWeb":
+        model_type = "falcon"
+
+    # for TheBloke/phi-2-GPTQ
+    if model_type == "phi-msft":
+        model_type = "phi"
+
+    return model_type
+
+def _filter_model_args(valid_args, **input_kwargs):
+        invalid_args = []
+        for k in input_kwargs.keys():
+            if k not in valid_args:
+                invalid_args.append(k)
+        for k in invalid_args:
+            input_kwargs.pop(k)
+        return input_kwargs
+
+def get_cpp_module(model_name, model_hub="huggingface"):
+    model_config = _get_model_config(model_name, model_hub=model_hub)
+    model_type = _get_model_type(model_config)
+    cpp_module = _import_package(model_type)
+    return cpp_module
+
+class Model:
+
+    def __init__(self):
+        self.module = None
+        self.model = None
+        self.model_type = None
+        self.bin_file = None
+        self.generate_round = 0
+        self.max_request_num = -1
+        self.reinit_from_bin = False
 
     def init(self,
              model_name,
@@ -98,15 +137,11 @@ class Model:
              compute_dtype="int8",
              use_ggml=False,
              model_hub="huggingface"):
-        if model_hub == "modelscope":
-            from modelscope import AutoConfig
-            self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        else:
-            from transformers import AutoConfig
-            self.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        model_type = Model.get_model_type(self.config)
+        self.config = _get_model_config(model_name, model_hub=model_hub)
+        model_type = _get_model_type(self.config)
         self.model_type = model_type
-        self.__import_package(model_type)
+        if self.module is None:
+            self.module = _import_package(model_type)
 
         # check cache and quantization
         output_path = "runtime_outs"
@@ -121,12 +156,17 @@ class Model:
                 quant_desc += "_pc"
             else:
                 quant_desc += "_g{}".format(group_size)
-        if use_gptq:
-            quant_desc = "gptq"
-        if use_awq:
-            quant_desc = "awq"
-        if use_awq:
-            quant_desc = "autoround"
+
+        if use_gptq or use_awq or use_autoround:
+            model_config = self.config.to_dict()
+            if 'quantization_config' not in model_config:
+                print("Error: no quantization_config in low-bits model...")
+                exit(0)
+
+            quant_desc = model_config['quantization_config'].get("quant_method", None)
+            if quant_desc is None:
+               print("Error: No quant_method info in model config...")
+               exit(0)
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
@@ -163,7 +203,8 @@ class Model:
         os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
-        self.__import_package(model_type)
+        if self.module is None:
+            self.module = _import_package(model_type)
         self.model = self.module.Model()
 
         if self.max_request_num == -1:
@@ -190,7 +231,7 @@ class Model:
 
             def get_max_seq_length():
                 config = self.config.to_dict()
-                # chatglm2, bloom
+                # chatglm2, bloom, chatglm3
                 if 'seq_length' in config:
                     return config['seq_length']
                 # qwen2, llama-2, llama, dolly, gptneox, qwen, qwen1.5, opt, phi
@@ -253,10 +294,16 @@ class Model:
                         else:
                             generate_kwargs["scratch_size_ratio"] = 35
 
-        self.model.init_model(model_path, **generate_kwargs)
+        valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
+                      "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
+                      "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
+                      "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
+                      "scratch_size_ratio"}
+        self.model.init_model(model_path, **_filter_model_args(valid_args, **generate_kwargs))
 
     def quant_model(self, model_type, model_path, out_path, **quant_kwargs):
-        self.__import_package(model_type)
+        if self.module is None:
+            self.module = _import_package(model_type)
         self.module.Model.quant_model(model_path=model_path, out_path=out_path, **quant_kwargs)
 
     def generate(self,
@@ -269,15 +316,11 @@ class Model:
         batch_size = input_ids.shape[0]
 
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
-        max_request_num = generate_kwargs.pop("max_request_num", max_request_num_default)
-        reinit_from_bin = False
-        if max_request_num > self.max_request_num or batch_size > self.max_request_num:
-            reinit_from_bin = True
-            if self.max_request_num > 0:
-                print("Will start to reinit model from bin due to different max request num.")
-            self.max_request_num = max(batch_size, max_request_num)
+        self.reinit_from_bin = False
+        self._check_max_request_num(batch_size, **generate_kwargs)
+        generate_kwargs.pop("max_request_num", max_request_num_default)
 
-        if self.model is None or reinit_from_bin:
+        if self.model is None or self.reinit_from_bin:
             self.init_from_bin(self.model_type,
                                self.bin_file,
                                batch_size=batch_size,
@@ -295,9 +338,6 @@ class Model:
         beam_search = False
         if (generate_kwargs.get("num_beams", 1) > 1) and not generate_kwargs.get("do_sample", False):
             beam_search = True
-        if not beam_search:
-            # TODO support multi batch
-            assert input_ids.shape[0] == 1, "Unsupported multi-batch input ids."
 
         if streamer:
             assert input_ids.shape[0] == 1, "Streamer only supports batch size 1."
@@ -310,12 +350,7 @@ class Model:
         if interactive:
             self.model.reset_token_end()
         out_count = 0
-        input_list = None
-        pad_token_id = generate_kwargs.get("pad_token", None)
-        if input_ids.shape[0] > 1 and generate_kwargs.get("continuous_batching", True):
-            input_list = self._cont_batching_input(input_ids, pad_token_id)
-        else:
-            input_list = input_ids.tolist()
+        input_list = self._get_model_input_list(input_ids, **generate_kwargs)
         while True:
             response = self.model.generate(input_ids=input_list)
             input_list = []  # next-token stage will use previous output
@@ -327,13 +362,13 @@ class Model:
                 ret[i].extend(response[i])
             if beam_search:
                 break
+            out_count += 1
             if stopping_criteria is not None:
                 if stopping_criteria(torch.tensor(ret), None):
                     break
             elif ret[0][-1] == self.__get_eos_id() or \
-                    (max_new_tokens != -1 and out_count > max_new_tokens):
+                    (max_new_tokens != -1 and out_count >= max_new_tokens):
                 break
-            out_count += 1
         if streamer:
             streamer.end()
 
@@ -359,27 +394,94 @@ class Model:
                 print("Please input an audio file")
             return
         if isinstance(model_input, torch.Tensor):
-            if self.model is None:
-                self.init_from_bin(self.model_type, self.bin_file, **kwargs)
+            import numpy as np
+            batch_size = model_input.shape[0]
+            logits_seq_len_dim = model_input.shape[1] if logits_all else 1
+            self.reinit_from_bin = False
+            self._check_max_request_num(batch_size, **kwargs)
+            kwargs.pop("max_request_num", max_request_num_default)
+            if self.model is None or self.reinit_from_bin:
+                self.init_from_bin(self.model_type,
+                                   self.bin_file,
+                                   batch_size=batch_size,
+                                   max_request_num=self.max_request_num,
+                                   **kwargs)
                 self.generate_round = 0
             elif reinit:
                 self.model.reinit()
                 self.generate_round = 0
-            return self.model.evaluate(model_input.tolist(), logits_all)
+            model_input_list = self._get_model_input_list(model_input, **kwargs)
+            raw_logits = self.model.evaluate(model_input_list, logits_all)
+            ignore_padding = kwargs.get("ignore_padding", False)
+            if not ignore_padding and batch_size > 1:
+                padding_side = kwargs.get("padding_side", "left")
+                for i in range(len(raw_logits)):
+                    padding_row = np.ones((logits_seq_len_dim - raw_logits[i].shape[0], raw_logits[i].shape[1]))
+                    if padding_side == "left":
+                        raw_logits[i] = np.vstack((padding_row * (-np.inf), raw_logits[i]))
+                    else:
+                        raw_logits[i] = np.vstack((raw_logits[i], padding_row * (-np.inf)))
+            return np.array(raw_logits)
         else:
             print("Please input torch.Tensor")
         return
 
-    def _cont_batching_input(self, input_ids, pad_token_id=None):
+    def _cont_batching_input(self, input_ids, pad_token_id=None, padding_side="left"):
         assert isinstance(input_ids, torch.Tensor), "Input must be torch.Tensor."
         input_list = input_ids.tolist()
         pti = pad_token_id
         if pti == None:
             pti = self.tokenizer.pad_token_id
-        assert pti != None, "Please supply pad token id."
+        assert pti != None, "Please supply pad token id with `pad_token=token_id`."
         for il in range(len(input_list)):
             count = input_list[il].count(pti)
-            # padding left
-            del input_list[il][0:count]
+            if padding_side == "left":
+                del input_list[il][0:count]
+            elif padding_side == "right":
+                del input_list[il][len(input_list[il]) - count :]
+            else:
+                raise ValueError("padding_side must be 'left' or 'right'.")
             assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
         return input_list
+
+    def _check_max_request_num(self, input_batch_size, **kwargs):
+        max_request_num = kwargs.get("max_request_num", max_request_num_default)
+        if max_request_num > self.max_request_num or input_batch_size > self.max_request_num:
+            self.reinit_from_bin = True
+            if self.max_request_num > 0:
+                print("Will start to reinit model from bin due to different max request num.")
+            self.max_request_num = max(input_batch_size, max_request_num)
+
+    def _get_model_input_list(self, input_ids, **kwargs):
+        input_list = None
+        ignore_padding = kwargs.get("ignore_padding", False)
+        if input_ids.shape[0] > 1 and kwargs.get("continuous_batching", True) and not ignore_padding:
+            pad_token_id = kwargs.get("pad_token", None)
+            padding_side = kwargs.get("padding_side", "left")
+            input_list = self._cont_batching_input(input_ids, pad_token_id, padding_side)
+        else:
+            input_list = input_ids.tolist()
+        return input_list
+
+
+class ModelServer:
+    def __init__(self, model_name, reponse_function, model_path, **server_kwargs):
+        if not os.path.exists(model_path):
+            raise ValueError("model file {} does not exist.".format(model_path))
+        self.module = get_cpp_module(model_name)
+        valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
+                      "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
+                      "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
+                      "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
+                      "scratch_size_ratio", "return_prompt", "print_log", "init_cb"}
+        self.cpp_server = self.module.ModelServer(reponse_function,
+                                                  model_path,
+                                                  **_filter_model_args(valid_args, **server_kwargs))
+
+    def issueQuery(self, index, token_ids):
+        self.cpp_server.issueQuery([self.module.Query(index, token_ids)])
+
+    def Empty(self):
+        return self.cpp_server.Empty()
+
+__all__ = ["get_cpp_module", "Model", "ModelServer"]

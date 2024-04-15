@@ -237,6 +237,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
     quant_type = BTLA_DTYPE::S8;
   }
   if (params.bits == quant_bits::q3) quant_type = BTLA_DTYPE::S3_CLIP;
+  if (params.bits == quant_bits::q2) quant_type = BTLA_DTYPE::S2_CLIP;
   auto dtype_type = static_cast<BTLA_DTYPE>(
       bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
   if (dtype_type == BTLA_DTYPE::TypeFloat) {
@@ -279,6 +280,9 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q3) {
     quant_type = BTLA_DTYPE::S3_CLIP;
+  }
+  if (params.bits == quant_bits::q2) {
+    quant_type = BTLA_DTYPE::S2_CLIP;
   }
   if (params.bits == quant_bits::q8) {
     quant_type = BTLA_DTYPE::S8;
@@ -410,7 +414,7 @@ void ne_common_quantize(const int nthread, const quant_params_internal& params, 
   if (new_type == NE_TYPE_BTLA) {
     size_t k_ = tensor.ne.at(0);
     size_t n_ = tensor.ne.at(1);
-    printf("JBLAS ");
+    printf("BesTLA ");
     new_size = bestla_quantize(f32_data, work.addr, params, nthread, n_, k_);
   } else if (new_type >= NE_TYPE_Q4_0 && new_type < NE_TYPE_BTLA) {
     printf("GGML ");

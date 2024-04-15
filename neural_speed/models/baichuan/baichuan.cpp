@@ -197,6 +197,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
               ne_view_3d(ctx0, model.layers[il].k_cache, head_size, N, n_head, model.layers[il].k_cache->nb[1],
                          model.layers[il].k_cache->nb[2],
                          n_past * head_size * ne_element_size(model.layers[il].k_cache));  // [kv_heads, N, head_size]
+
           struct ne_tensor* v_cache_view =
               ne_view_3d(ctx0, model.layers[il].v_cache, N, head_size, n_head, model.layers[il].v_cache->nb[1],
                          model.layers[il].v_cache->nb[2],
@@ -214,10 +215,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
                                  0);  // [kv_heads, head_size, klen]
 
         // attention
-        ne_set_name(key_layer, "key_layer_special");
-        ne_set_name(query_layer, "query_layer_special");
         struct ne_tensor* attn_scores = ne_mul_mat(ctx0, key_layer, query_layer);  // [heads, N, klen]
-        ne_set_name(attn_scores, "attn_scores");
         attn_scores = ne_scale_inplace(ctx0, attn_scores, ne_new_f32(ctx0, attn_scale));
 
         if (hparams.n_embd == 5120) {

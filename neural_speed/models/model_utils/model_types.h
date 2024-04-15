@@ -79,10 +79,13 @@ enum model_archs {
   MODEL_OPT,
   MODEL_BLOOM,
   MODEL_BAICHUAN,
+  MODEL_CHATGLM3,
   MODEL_CHATGLM2,
   MODEL_CHATGLM,
   MODEL_QWEN,
   MODEL_PHI,
+  MODEL_GEMMA,
+  MODEL_STABLELM,
   MODEL_WHISPER
 };
 
@@ -142,6 +145,7 @@ struct model_hparams {
   int32_t inner_hidden_size = 0;
   uint32_t n_experts = 0;
   uint32_t n_experts_used = 0;
+  uint32_t n_embd_head_k = 0;
 
   float rope_scaling_factor = 0.0f;
   int32_t original_max_position_embeddings = 0;
@@ -275,6 +279,12 @@ struct generation_config {
   // `length_penalty` < 0.0 encourages shorter sequences. (default = 1.0)
   float length_penalty = 1.0f;
   bool do_early_stopping = false;
+  // sampling parameters
+  bool do_sample = false;
+  int32_t top_k = 40;            // <= 0 to use vocab size
+  float top_p = 0.95f;           // 1.0 = disabled
+  float temp = 0.80f;            // 1.0 = disabled
+  float repeat_penalty = 1.10f;  // 1.0 = disabled
 };
 
 class beam_search_kv_cache_reorder;  //  forward declaration
@@ -484,8 +494,9 @@ class model_name_to_arch {
       {"dolly", MODEL_GPTNEOX},   {"polyglot", MODEL_GPTNEOX},  {"starcoder", MODEL_STARCODER},
       {"falcon", MODEL_FALCON},   {"bloom", MODEL_BLOOM},       {"chatglm2", MODEL_CHATGLM2},
       {"chatglm", MODEL_CHATGLM}, {"baichuan", MODEL_BAICHUAN}, {"mistral", MODEL_LLAMA},
-      {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"whisper", MODEL_WHISPER},
-      {"mixtral", MODEL_LLAMA}};
+      {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"stablelm", MODEL_STABLELM},
+      {"whisper", MODEL_WHISPER}, {"chatglm3", MODEL_CHATGLM3}, {"mixtral", MODEL_LLAMA},
+      {"gemma", MODEL_GEMMA}};
 };
 
 #ifdef __cplusplus

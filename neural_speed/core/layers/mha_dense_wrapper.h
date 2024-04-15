@@ -1190,7 +1190,7 @@ class weight_cvt_bf16_ntile48_t {
         for (int j = 0; j < n_size; j += 16) {
           const auto cur_src = src + i * 48 + j * 2;
           const auto cur_dst = dst + i * 48 + j;
-          const auto src_lo = _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_loadu_epi16(cur_src), 16U));
+          const auto src_lo = _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_loadu_si512(cur_src), 16U));
           const auto src_hi = _mm512_castsi512_ps(_mm512_maskz_loadu_epi16(mask_hi, cur_src));
           _mm512_store_ps(cur_dst + 0, src_lo);
           _mm512_store_ps(cur_dst + 48, src_hi);

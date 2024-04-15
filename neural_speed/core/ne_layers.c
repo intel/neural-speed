@@ -427,6 +427,7 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "MUL_QKV",
     "FFN_SILU",
     "FFN_GeLU",
+    "FFN_GeLU_MUL",
     "FFN_ADD_GeLU",
     "FFN_ID_SILU",
     "FLASH_ATTN",
@@ -442,7 +443,7 @@ static const char* NE_OP_LABEL[NE_OP_COUNT] = {
     "DEBUG",
 };
 
-static_assert(NE_OP_COUNT == 67, "NE_OP_COUNT != 67");
+static_assert(NE_OP_COUNT == 69, "NE_OP_COUNT != 69");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
@@ -502,6 +503,7 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "ffn_silu(x)",
     "ffn_id_silu(x)",
     "ffn_gelu(x)",
+    "ffn_gelu_mul(x)",
     "ffn_gelu_with_bias(x)",
     "flash_attn(x)",
     "flash_attn_kv_update(x)",
@@ -2396,6 +2398,33 @@ struct ne_tensor* ne_ffn_gelu(struct ne_context* ctx, struct ne_tensor* w1, stru
   return result;
 }
 
+struct ne_tensor* ne_ffn_gelu_mul(struct ne_context* ctx, struct ne_tensor* w1, struct ne_tensor* w2,
+                                  struct ne_tensor* w3, struct ne_tensor* src) {
+  NE_ASSERT(ne_are_same_shape(w1, w3));
+  NE_ASSERT(w2->ne[0] == w1->ne[1]);
+
+  bool is_node = false;
+
+  if (src->grad || w1->grad || w2->grad || w3->grad) {
+    is_node = true;
+  }
+
+  const int64_t ne[4] = {w2->ne[1], src->ne[1], src->ne[2], src->ne[3]};
+  struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, ne, NE_SIZE_CALC);
+  const int64_t tne[4] = {w1->ne[1], src->ne[1], src->ne[2], src->ne[3]};
+  struct ne_tensor* tmp = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC);
+  struct ne_tensor* tmp1 = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC);
+
+  result->op = NE_OP_MUL_FFN_GELU_MUL;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = src;
+  result->src1 = w1;
+  result->opt[0] = w2;
+  result->opt[1] = w3;
+  result->opt[2] = tmp;
+  result->opt[3] = tmp1;
+  return result;
+}
 // ne_scale
 
 struct ne_tensor* ne_scale_impl(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b, bool inplace) {
@@ -7800,6 +7829,25 @@ static void ne_compute_forward_ffn_gelu(const struct ne_compute_params* params, 
                                         seq, fin, fmid, fout, params->wdata);
 }
 
+static void ne_compute_forward_ffn_gelu_mul(const struct ne_compute_params* params, const struct ne_tensor* src,
+                                            const struct ne_tensor* w1, const struct ne_tensor* w2,
+                                            struct ne_tensor* w3, const struct ne_tensor* tmp, struct ne_tensor* tmp1,
+                                            struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT) {
+    return;
+  }
+
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  const int fin = src->ne[0];
+  const int fout = dst->ne[0];
+  const int fmid = w1->ne[1];
+  const int seq = dst->ne[1];
+  bestla_fusion_FFN_Gelu_Mul_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
+                                            (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
+}
+
 // ne_compute_forward_scale
 
 static void ne_compute_forward_scale_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
@@ -10610,6 +10658,10 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
     case NE_OP_MUL_FFN_GELU: {
       ne_compute_forward_ffn_gelu(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1], tensor);
     } break;
+    case NE_OP_MUL_FFN_GELU_MUL: {
+      ne_compute_forward_ffn_gelu_mul(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1],
+                                      tensor->opt[2], tensor->opt[3], tensor);
+    } break;
     case NE_OP_SCALE: {
       ne_compute_forward_scale(params, tensor->src0, tensor->src1, tensor);
     } break;
@@ -11492,6 +11544,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         } break;
         case NE_OP_MUL_FFN_SILU:
         case NE_OP_MUL_FFN_GELU:
+        case NE_OP_MUL_FFN_GELU_MUL:
         case NE_OP_MUL_FFN_ADD_GELU: {
           size_t cur = 0;
           cur = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->src1->ne[1],

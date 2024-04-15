@@ -5,13 +5,17 @@ import sys
 import time
 from io import open
 from pathlib import Path
+
+# install requirements first
+result = subprocess.Popen("pip install -r requirements.txt", shell=True)
+result.wait()
+
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 from cmake import CMAKE_BIN_DIR
 from cpuinfo import get_cpu_info
 cpu_flags = get_cpu_info()['flags']
-
 
 CMAKE_BUILD_TYPE = os.environ.get("CMAKE_BUILD_TYPE", "Release")
 """ Whether to build with -O0 / -O3 / -g; could be one of Debug / Release / RelWithDebInfo; default to Release """
@@ -146,8 +150,12 @@ class CMakeBuild(build_ext):
                 "win32": "Win32",
                 "win-amd64": "x64",
             }
+
             if not single_config and not contains_arch:
-                cmake_args += ["-A", PLAT_TO_CMAKE[self.plat_name]]
+                if sys.platform == "win32" and sys.maxsize.bit_length() > 31:
+                    cmake_args += ["-A", "x64"]
+                else:
+                    cmake_args += ["-A", PLAT_TO_CMAKE[self.plat_name]]
 
             if generator == "Ninja":
                 # temporary solution based on that of pytorch

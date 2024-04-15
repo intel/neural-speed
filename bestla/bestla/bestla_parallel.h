@@ -137,23 +137,25 @@ class StdThreading : public IThreading {
   }
 
   inline void sync(int tidx, int idx = 0) override {
-    flag[idx].fetch_sub(1);
-    if (cr->mHybrid) {
-      Timer_T tm;
-      tm.start();
-      while (true) {
-        if (flag[idx].load() == 0)
-          break;
-        else
-          _mm_pause();
-      }
-      thread_time[tidx] -= int(tm.stop());
-    } else {
-      while (true) {
-        if (flag[idx].load() == 0)
-          break;
-        else
-          _mm_pause();
+    if (mThreadNum > 1) {
+      flag[idx].fetch_sub(1);
+      if (cr->mHybrid) {
+        Timer_T tm;
+        tm.start();
+        while (true) {
+          if (flag[idx].load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
+        thread_time[tidx] -= int(tm.stop());
+      } else {
+        while (true) {
+          if (flag[idx].load() == 0)
+            break;
+          else
+            _mm_pause();
+        }
       }
     }
   }
@@ -185,7 +187,10 @@ class StdThreading : public IThreading {
              reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
     } else {
       core_order.resize(mThreadNum);
-      for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+      if (_cd->isClient())
+        for (int i = 0; i < mThreadNum; i++) core_order[i] = 2 * i;
+      else
+        for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
     }
     _cd->core_bond(core_order[0]);
     if (cr->mHybrid) {

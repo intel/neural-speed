@@ -27,7 +27,7 @@ import re
 import signal
 import struct
 import sys
-import zipfile
+import zipfile38 as zipfile
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -1090,6 +1090,7 @@ class OutputFile:
 
         self.fout.write(struct.pack("i", 0))   # n_experts
         self.fout.write(struct.pack("i", 0))   # n_expert_used
+        self.fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))

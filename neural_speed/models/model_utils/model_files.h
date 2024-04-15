@@ -911,6 +911,8 @@ struct gguf_loader {
     GGUF_GET_KEY(ctx_gguf, hparams.n_experts, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_NUM_EXPERTS));
     GGUF_GET_KEY(ctx_gguf, hparams.n_experts_used, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
                  kv(LLM_KV_NUM_EXPERTS_USED));
+    GGUF_GET_KEY(ctx_gguf, hparams.n_embd_head_k, gguf_get_val_u32, GGUF_TYPE_UINT32, false,
+                 kv(LLM_KV_ATTENTION_KEY_LENGTH));
     GGUF_GET_KEY(ctx_gguf, hparams.n_layer, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_BLOCK_COUNT));
     GGUF_GET_KEY(ctx_gguf, hparams.n_rot, gguf_get_val_u32, GGUF_TYPE_UINT32, false, kv(LLM_KV_ROPE_DIMENSION_COUNT));
 
@@ -1115,11 +1117,14 @@ struct model_file_loader {
     hparams.inner_hidden_size = file.read_u32();
     hparams.n_experts = file.read_u32();
     hparams.n_experts_used = file.read_u32();
+    hparams.n_embd_head_k = file.read_u32();
     printf("%-16s %d.hparams.inner_hidden_size = %-30d\n", __func__, count++, hparams.inner_hidden_size);
     printf("%-16s %d.hparams.n_experts = %-30d\n", __func__, count++, hparams.n_experts);
     printf("%-16s %d.hparams.n_experts_used = %-30d\n", __func__, count++, hparams.n_experts_used);
+    printf("%-16s %d.hparams.n_embd_head_k = %-30d\n", __func__, count++, hparams.n_embd_head_k);
 
     file.read_raw(&hparams.norm_eps, sizeof(float));
+
     file.read_raw(&hparams.freq_base, sizeof(float));
     file.read_raw(&hparams.freq_scale, sizeof(float));
     printf("%-16s %d.hparams.norm_eps = %-30f\n", __func__, count++, hparams.norm_eps);
@@ -1133,15 +1138,15 @@ struct model_file_loader {
     printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++,
            hparams.original_max_position_embeddings);
     printf("%-16s %d.hparams.use_yarn = %-30d\n", __func__, count++, hparams.use_yarn);
-    unsigned int total = 25;
+    unsigned int total = 26;
     if (count != total) {
-      fprintf(stderr, "The number of ne_parameters is wrong.\n");
+      fprintf(stderr, "The number of ne_parameters is wrong, total = %d, count = %d.\n", total, count);
     }
   }
 
   void load_ne_vocab() {
     unsigned int count = 0;
-    unsigned int ne_hparams_total = 25;
+    unsigned int ne_hparams_total = 26;
     file.read_raw(&vocab.bos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.eos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.pad_token_id, sizeof(model_vocab::id));
@@ -1262,6 +1267,7 @@ struct model_file_saver {
     file.write_u32(hparams.inner_hidden_size);
     file.write_u32(hparams.n_experts);
     file.write_u32(hparams.n_experts_used);
+    file.write_u32(hparams.n_embd_head_k);
 
     file.write_raw(&hparams.norm_eps, sizeof(float));
     file.write_raw(&hparams.freq_base, sizeof(float));

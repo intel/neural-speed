@@ -146,6 +146,7 @@ model_name_map["starcoder-3b"]="bigcode/starcoder"
 model_name_map["bloom-7b"]="bigscience/bloom-7b1"
 model_name_map["opt-1.3b"]="facebook/opt-1.3b"
 model_name_map["dolly-v2-3b"]="databricks/dolly-v2-3b"
+model_name_map["chatglm3"]="THUDM/chatglm3-6b"
 model_name_map["chatglm2"]="THUDM/chatglm2-6b"
 model_name_map["chatglm-6b"]="THUDM/chatglm-6b"
 model_name_map["baichuan2-13b"]="baichuan-inc/Baichuan2-13B-Chat"
@@ -155,8 +156,17 @@ model_name_map["qwen-7b"]="Qwen/Qwen-7B-Chat"
 model_name_map["magicoder"]="ise-uiuc/Magicoder-S-DS-6.7B"
 model_name_map["whisper"]="openai/whisper-tiny"
 model_name_map["phi2"]="microsoft/phi-2"
+model_name_map["stablelm"]="stabilityai/stablelm-2-1_6b"
 model_name_map["qwen-1_5"]="Qwen/Qwen1.5-7B-Chat"
 model_name_map["mixtral"]="mistralai/Mixtral-8x7B-Instruct-v0.1"
+model_name_map["gemma-2b"]="google/gemma-2b-it"
+model_name_map["mixtral-gptq"]="Mixtral-8x7B-Instruct-v0.1-GPTQ"
+model_name_map["qwen1.5-gptq"]="Qwen/Qwen1.5-7B-Chat-GPTQ"
+model_name_map["qwen-gptq"]="TheBloke/Qwen-7B-Chat-GPTQ"
+model_name_map["phi1.5-gptq"]="phi-1_5-gptq-4bit"
+model_name_map["falcon7b-gptq"]="Falcon-7B-Instruct-GPTQ"
+model_name_map["baichuan13b-gptq"]="Baichuan2-13B-Chat-GPTQ"
+model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
 
 
 function main() {
@@ -226,29 +236,40 @@ function main() {
         quant_script="./build/bin/quant_chatglm2"
         convert_script="${convert_script}/convert_chatglm.py --format=GGUF"
         infer_cmd="./build/bin/run_chatglm2"
+        input_list=(32 1024)
+    elif [[ "${model}" == "chatglm3-6b" ]]; then
+        quant_script="./build/bin/quant_chatglm3"
+        convert_script="${convert_script}/convert_chatglm.py"
+        infer_cmd="python $working_dir/scripts/inference.py"
+        extension=" --model_name chatglm3 --tokenizer $model_path"
+        requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
+        input_list=(32 1024)
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"
         convert_script="${convert_script}/convert_chatglm.py"
         infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name chatglm --tokenizer $model_path"
         requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
+        input_list=(32 1024)
     elif [[ "${model}" == "baichuan2-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
         infer_cmd="python $working_dir/scripts/inference.py"
         requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
         extension=" --model_name baichuan --tokenizer $model_path"
+        input_list=(32 1024)
     elif [[ "${model}" == "baichuan-13b" ]]; then
         quant_script="./build/bin/quant_baichuan"
         convert_script="${convert_script}/convert_baichuan.py"
         infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name baichuan --tokenizer $model_path"
         requirements_file="$working_dir/neural_speed/models/requirements/baichuan.sh"
+        input_list=(32 1024)
     elif [[ "${model}" == "mistral-7b" ]]; then
         quant_script="./build/bin/quant_mistral"
         convert_script="${convert_script}/convert_mistral.py"
         infer_cmd="./build/bin/run_mistral"
-        requirements_file="$working_dir/neural_speed/models/requirements/mistral.txt"
+        requirements_file="$working_dir/neural_speed/models/requirements/mistral.sh"
     elif [[ "${model}" == "qwen-7b" ]]; then
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
@@ -270,10 +291,22 @@ function main() {
         quant_script="./build/bin/quant_phi"
         convert_script="${convert_script}/convert_phi.py"
         infer_cmd="./build/bin/run_phi"
+    elif [[ "${model}" == "stablelm" ]]; then
+        quant_script="./build/bin/quant_stablelm"
+        convert_script="${convert_script}/convert_stablelm.py"
+        infer_cmd="./build/bin/run_stablelm"
     elif [[ "${model}" == "mixtral" ]]; then
         quant_script="./build/bin/quant_mixtral"
         convert_script="${convert_script}/convert_mixtral.py"
         infer_cmd="./build/bin/run_mixtral"
+    elif [[ "${model}" == "gemma-2b" ]]; then
+        quant_script="./build/bin/quant_gemma"
+        convert_script="${convert_script}/convert_gemma.py"
+        infer_cmd="./build/bin/run_gemma"
+    elif [[ "${model}" == *"-gptq" ]]; then
+        infer_cmd="python $working_dir/scripts/python_api_example_for_gptq.py ${model_path}"
+        precision_list+=("default")
+        requirements_file="$working_dir/neural_speed/models/requirements/${model}.sh"
     else
         echo "Error: Unexpedted model: $model" 1>&2
         exit 1
@@ -290,7 +323,7 @@ function main() {
     for p in "${precision_list[@]}"; do
         precisions_seen[$p]=x
     done
-    if [[ "${model}" != "whisper" ]]; then
+    if [[ "${model}" != "whisper" ]] && [[ "${model}" != *"gptq" ]]; then
         for p in "${extra_precision_list[@]}"; do
             [[ ${precisions_seen[$p]} ]] && continue
             precision_list+=("$p")
@@ -321,19 +354,22 @@ function main() {
     pip install -r $working_dir/requirements.txt
     python $working_dir/setup.py install
     ## prepare example requirement
-    if [[ $requirements_file == *'.txt' ]]; then
-        pip install -r "$requirements_file"
-    elif [[ $requirements_file == *'.sh' ]]; then
-        source "$requirements_file"
-    else
-        echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
-        exit 1
+    if [[ -f $requirements_file ]]; then
+      if [[ $requirements_file == *'.txt' ]]; then
+          pip install -r "$requirements_file"
+      elif [[ $requirements_file == *'.sh' ]]; then
+          source "$requirements_file"
+      else
+          echo "Error: Unexpedted requirements_file: $requirements_file" 1>&2
+          exit 1
+      fi
     fi
-    echo "=======  Convert Start  ======="
-    ## prepare fp32 bin
-    python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${model_path}
-    echo "=======  Convert End  ======="
-
+    if [[ "${model}" != *"gptq" ]]; then
+        echo "=======  Convert Start  ======="
+        ## prepare fp32 bin
+        python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${model_path}
+        echo "=======  Convert End  ======="
+    fi
     # launch benchmark
     for cores_per_instance_idx in "${!cores_list[@]}"; do
         cores_per_instance=${cores_list[cores_per_instance_idx]}
@@ -361,7 +397,7 @@ function main() {
                     task_name="${model}-${precision}-${cores_per_instance}-${batch_size}-${input}-${output}"
                     logs_file="${task_name}.log"
                     ## prepare model.bin
-                    if [[ ! -f ${working_dir}/${model}-${precision}.bin ]]; then
+                    if [[ ! -f ${working_dir}/${model}-${precision}.bin ]] && [[ "${model}" != *"gptq" ]]; then
                         echo "=======  Quantization Start  ======="
                         local quant_script_prologue="'$quant_script' --model_file '$working_dir/$model-fp32.bin' --out_file '$working_dir/$model-$precision.bin' --nthread $quant_nthr" # in case there are space in the path
                         if [[ ${precision} == "q4_j_i8_g128" ]]; then
@@ -410,9 +446,13 @@ function main() {
                     else
                         real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
                         [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
-                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=1300
-                        NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
+                            "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=2048
+                        if [[ "${model}" == *"gptq" ]]; then
+                             NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) $infer_cmd 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
+                        else
+                            NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) \
                             $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $real_ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
+                        fi
                         monitor
 
                         echo "=======  Inference End  ======="

@@ -18,16 +18,23 @@
 from pathlib import Path
 import subprocess
 
-model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "whisper": "whisper", "qwen2": "qwen"}
+model_maps = {
+    "gpt_neox": "gptneox",
+    "gpt_bigcode": "starcoder",
+    "whisper": "whisper",
+    "qwen2": "qwen",
+    "RefinedWebModel": "falcon",
+    "RefinedWeb": "falcon",
+    "phi-msft": "phi"
+}
 
 
-def convert_model(model, outfile, outtype="f32", model_hub="huggingface", use_quantized_model=False):
+def convert_model(model, outfile, outtype="f32", format="NE", model_hub="huggingface", use_quantized_model=False):
     if model_hub == "modelscope":
         from modelscope import AutoConfig
-        config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     else:
         from transformers import AutoConfig
-        config = AutoConfig.from_pretrained(model, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(model, trust_remote_code=True)
     model_type = model_maps.get(config.model_type, config.model_type)
 
     if use_quantized_model:
@@ -38,6 +45,8 @@ def convert_model(model, outfile, outtype="f32", model_hub="huggingface", use_qu
     cmd.extend(["python", path])
     cmd.extend(["--outfile", outfile])
     cmd.extend(["--outtype", outtype])
+    if model_type in {"phi", "stablelm"}:
+        cmd.extend(["--format", format])
     cmd.extend(["--model_hub", model_hub])
     cmd.extend([model])
 

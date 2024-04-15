@@ -458,7 +458,7 @@ struct whisper_state {
   whisper_kv_cache_t kv_cross;
   whisper_mel_t mel;
 
-  whisper_decoder_t decoders[WHISPER_MAX_DECODERS] = {};
+  whisper_decoder_t decoders[WHISPER_MAX_DECODERS];
 
   // memory buffers used by encode / decode contexts
   model_ctx_buffer buf_compute;

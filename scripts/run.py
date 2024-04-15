@@ -41,10 +41,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
     # quantization related arguments.
     parser.add_argument(
         "--weight_dtype",
-        choices=["int4", "int8", "fp8", "fp8_e5m2", "fp8_e4m3",
-                 "fp4", "fp4_e2m1", "nf4"],
+        choices=["int4", "int8", "fp8", "fp8_e5m2", "fp8_e4m3", "fp4", "fp4_e2m1", "nf4"],
         help="Data type of quantized weight: int4/int8 (default int4)",
         default="int4",
+    )
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        help="Setting the model_type manually)",
+        default=None,
     )
     parser.add_argument(
         "--alg",
@@ -74,6 +79,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
         help="Data type of Gemm computation: int8/bf16/fp32 (default: int8)",
         default="int8",
     )
+    parser.add_argument("--format",
+                        type=str,
+                        default="NE",
+                        choices=["NE", "GGUF"],
+                        help="Convert to the GGUF or NE format")
     parser.add_argument(
         "--use_ggml",
         action="store_true",
@@ -168,20 +178,29 @@ def main(args_in: Optional[List[str]] = None) -> None:
         # Handles Missing token ID for gated models
         except Exception as e:
             if e.response.status_code == 401:
-                print("You are required to input an access token ID for {}, please add it in option --token or download model weights locally".format(args.model))
+                print(
+                    "You are required to input an access token ID for {}, please add it in option --token or download model weights locally"
+                    .format(args.model))
             sys.exit(f"{e}")
 
     parent_path = Path(__file__).parent.absolute()
-    config = AutoConfig.from_pretrained(dir_model)
-    model_type = model_maps.get(config.model_type, config.model_type)
+    config = AutoConfig.from_pretrained(dir_model, trust_remote_code=True)
+
+    if args.model_type == None:
+        model_type = model_maps.get(config.model_type, config.model_type)
+    else:
+        model_type = args.model_type
+
     work_path = Path(model_type + "_files")
     if not work_path.exists():
         Path.mkdir(work_path)
 
     # 1. convert
     path = Path(parent_path, "convert.py")
+    outfile = f"gguf_{model_type}_f32" if str(args.format) == "GGUF" else f"ne_{model_type}_f32.bin"
     convert_cmd = ["python", path]
-    convert_cmd.extend(["--outfile", Path(work_path, "ne_{}_f32.bin".format(model_type))])
+    convert_cmd.extend(["--format", str(args.format)])
+    convert_cmd.extend(["--outfile", Path(work_path, outfile)])
     convert_cmd.extend(["--outtype", "f32"])
     convert_cmd.append(dir_model)
     print("Convert model ...")
@@ -189,12 +208,12 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
     # 2. quantize
     path = Path(parent_path, "quantize.py")
+    quant_file = f"gguf_{model_type}_{args.weight_dtype}.gguf" if str(
+        args.format) == "GGUF" else f"ne_{model_type}_{args.weight_dtype}.bin"
     quant_cmd = ["python", path]
     quant_cmd.extend(["--model_name", model_type])
-    quant_cmd.extend(["--model_file", Path(work_path, "ne_{}_f32.bin".format(model_type))])
-    quant_cmd.extend(
-        ["--out_file",
-         Path(work_path, "ne_{}_{}.bin".format(model_type, args.weight_dtype, args.group_size))])
+    quant_cmd.extend(["--model_file", Path(work_path, outfile + ".gguf" if str(args.format) == "GGUF" else outfile)])
+    quant_cmd.extend(["--out_file", Path(work_path, quant_file)])
     quant_cmd.extend(["--weight_dtype", args.weight_dtype])
     quant_cmd.extend(["--group_size", str(args.group_size)])
     quant_cmd.extend(["--scale_dtype", args.scale_dtype])
@@ -210,9 +229,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     path = Path(parent_path, "inference.py")
     infer_cmd = ["python", path]
     infer_cmd.extend(["--model_name", model_type])
-    infer_cmd.extend(["-m", Path(work_path, "ne_{}_{}.bin".format(model_type, args.weight_dtype, args.group_size))])
+    infer_cmd.extend(["-m", Path(work_path, quant_file)])
     infer_cmd.extend(["--prompt", args.prompt])
-    infer_cmd.extend(["--file", args.file])
+    if args.file != None:
+        infer_cmd.extend(["--file", args.file])
     infer_cmd.extend(["--n_predict", str(args.n_predict)])
     infer_cmd.extend(["--threads", str(args.threads)])
     infer_cmd.extend(["--batch_size_truncate", str(args.batch_size_truncate)])
@@ -224,7 +244,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     infer_cmd.extend(["--one_click_run", "True"])
     if args.shift_roped_k:
         infer_cmd.extend(["--shift-roped-k"])
-    if (model_type == "baichuan" or model_type == "qwen"):
+    if (model_type == "baichuan" or model_type == "qwen" or model_type == "chatglm3"):
         infer_cmd.extend(["--tokenizer", dir_model])
     print("Inference model ...")
     subprocess.run(infer_cmd)

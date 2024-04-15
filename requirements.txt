@@ -4,6 +4,7 @@ cmake
 datasets
 einops
 gguf
+huggingface_hub
 matplotlib
 numpy
 peft
@@ -12,7 +13,7 @@ py-cpuinfo
 sentencepiece
 setuptools>=61
 tiktoken
-torch==2.1.0+cpu; sys_platform == "linux"
-torch == 2.*;     sys_platform != "linux"
+torch
 transformers
 transformers_stream_generator
+zipfile38

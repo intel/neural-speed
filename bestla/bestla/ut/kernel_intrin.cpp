@@ -42,8 +42,40 @@ class UT_Avx512f_decompress_kblock_s4_fp {
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(BF16_ERR));
   }
 };
-#ifdef BTLA_KERNEL_INTRIN
+#ifdef BTLA_UT_KERNEL_INTRIN
 static UT_Avx512f_decompress_kblock_s4_fp sUT_Avx512f_decompress_kblock_s4_fp;
+#endif
+class UT_avx2_decompress_s4_s8 {
+ public:
+  UT_avx2_decompress_s4_s8() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<BTLA_DTYPE::S4_CLIP>(32, 128);
+    ut<BTLA_DTYPE::S4_CLIP>(32, 96);
+    ut<BTLA_DTYPE::S4_CLIP>(32, 48);
+  }
+
+  template <BTLA_DTYPE S4_T>
+  void ut(int row, int col) {
+    printf("Test Case %s_%s: %d %d\n", __FUNCTION__, bestla_dtype_str(S4_T), row, col);
+    std::vector<utils::int4x2> s4_wei(row * col / 2);
+    std::vector<int8_t> s8_wei(col * row);
+    std::vector<int8_t> rev(col * row);
+    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-128), int8_t(127));
+
+    for (int i = 0; i < col * row; i += 2) {
+      s8_wei[i] = s8_wei[i] & 0xf0;
+      s8_wei[i + 1] = s8_wei[i + 1] & 0xf0;
+      s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
+      s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
+    }
+    kernel::avx2::decompress_s4_s8<S4_T>(s4_wei.data(), rev.data(), row, col, col, col);
+
+    ut::buffer_error(s8_wei.data(), rev.data(), rev.size(), int8_t(0));
+  }
+};
+#ifdef BTLA_UT_KERNEL_INTRIN
+static UT_avx2_decompress_s4_s8 sUT_avx2_decompress_s4_s8;
 #endif
 }  // namespace ut
 }  // namespace bestla
