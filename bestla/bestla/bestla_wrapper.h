@@ -316,7 +316,9 @@ class LauncherIntKBlock {
       if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T, _RT_ISA_T>>) {
         return false;
       }
-      if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T, _RT_ISA_T>>) {
+      if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T, _RT_ISA_T>> &&
+                    !std::is_same_v<PrologueA,
+                                    prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T, _RT_ISA_T>>) {
         return false;
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX_VNNI) {
