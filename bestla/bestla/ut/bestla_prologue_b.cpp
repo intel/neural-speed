@@ -1266,7 +1266,7 @@ class UT_CompInt8 {
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);
   }
 };
-#ifdef BTLA_UT_DEBUG
+#ifdef BTLA_UT_PROLOGUE_B
 static UT_CompInt8 sUT_CompInt8;
 #endif
 

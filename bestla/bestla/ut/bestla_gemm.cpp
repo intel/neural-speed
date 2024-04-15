@@ -537,7 +537,7 @@ class UT_GEMM_AVXVNNI_KBLOCK {
     ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
   }
 };
-#ifdef BTLA_UT_DEBUG
+#ifdef BTLA_UT_GEMM
 static UT_GEMM_AVXVNNI_KBLOCK sUT_GEMM_AVXVNNI_KBLOCK;
 #endif
 

@@ -179,8 +179,8 @@ class Benchmark_U8S8S32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-static Benchmark_U8S8S32 sBenchmark_U8S8S32;
 #endif
+static Benchmark_U8S8S32 sBenchmark_U8S8S32;
 
 class Benchmark_S8S8S32 {
  public:
@@ -252,6 +252,12 @@ class Benchmark_S8S8S32 {
     GetCPUDevice();
     auto threads_cfg = UT_Threading::get_threads_config();
     for (auto threads : threads_cfg) {
+      if (_cd->AVX_VNNI()) {
+        benchmark<gemm::ICoreRowNAvxvnniSS<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                         threads);
+        benchmark<gemm::ICoreRowNAvxvnniSS<24, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
+                                                         threads);
+      }
       if (_cd->AMX_INT8()) {
         benchmark<gemm::ICoreRowNAmxint8SS<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                          threads);
@@ -264,8 +270,8 @@ class Benchmark_S8S8S32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-static Benchmark_S8S8S32 sBenchmark_S8S8S32;
 #endif
+static Benchmark_S8S8S32 sBenchmark_S8S8S32;
 
 class Benchmark_Bf16Bf16Fp32 {
  public:
