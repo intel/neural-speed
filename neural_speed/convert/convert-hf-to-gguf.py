@@ -910,7 +910,7 @@ class BaichuanModel(Model):
 
             # print(f"{name} -> {new_name}, n_dims = {n_dims}, {old_dtype} --> {data.dtype}, shape = {data.shape}")
             # self.gguf_writer.add_tensor(new_name, data)
-            
+
             if "W_pack" in name:
                 print(name)
                 n_dims = len(data.shape)
@@ -920,7 +920,7 @@ class BaichuanModel(Model):
                 if self.ftype == 0 and data_dtype == np.float16:
                     data = data.astype(np.float32)
 
-                # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+                # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
                 if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                     data = data.astype(np.float32)
 
@@ -944,7 +944,7 @@ class BaichuanModel(Model):
                 if self.ftype == 0 and data_dtype == np.float16:
                     data = data.astype(np.float32)
 
-                # TODO: Why cant we use these float16 as-is? There should be not reason to store float16 as float32
+                # TODO: Why can't we use these float16 as-is? There should be not reason to store float16 as float32
                 if self.ftype == 1 and data_dtype == np.float16 and n_dims == 1:
                     data = data.astype(np.float32)
 
