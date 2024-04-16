@@ -1793,16 +1793,18 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       }
     } else {
       for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr + ik * NTILE / 4, b1ptr + ik * NTILE / 8,
-                                                               UnpackBuf, ik * NTILE, NTILE * KTILE * UnpackElt, tmp,
-                                                               tmpsize);
+        decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
+                                                               NTILE * KTILE * UnpackElt, tmp, tmpsize);
         for (int iu = 0; iu < UnpackElt; iu++) {
           for (int in = 0; in < NTILE; in++) {
             for (int ikt = 0; ikt < KTILE; ikt++) {
-              acci[in] += int(a8ptr[iu * KTILE + ikt]) * UnpackBuf[iu * NTILE * KTILE + in * KTILE + ikt];
+              auto bval = UnpackBuf[iu * NTILE * KTILE + in * KTILE + ikt];
+              acci[in] += int(a8ptr[iu * KTILE + ikt]) * bval;
             }
           }
         }
+        b2ptr += KTILE * UnpackElt * NTILE / 4;
+        b1ptr += KTILE * UnpackElt * NTILE / 8;
         a8ptr += KTILE * UnpackElt;
       }
 
@@ -1812,6 +1814,54 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         tmp = tmp * (scale * bsptr[in]);
         accf[in] += tmp;
       }
+    }
+  }
+  for (int in = 0; in < NTILE; in++) {
+    C[in] = accf[in];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE>
+static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
+  int blks = k / blocksize;
+  float accf[NTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto a8ptr = reinterpret_cast<int8_t*>(A.aptr);
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+  auto asptr = A.sptr;
+  int constexpr EltPadding = 128;
+  static_assert(NTILE % 8 == 0);
+  int constexpr KTILE = 4;
+  int constexpr UnpackElt = EltPadding / 8 / KTILE;
+  int8_t UnpackBuf[UnpackElt * NTILE * KTILE];
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    int acci[NTILE];
+    std::memset(acci, 0, sizeof(acci));
+    for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
+      decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
+                                                             NTILE * KTILE * UnpackElt, tmp, tmpsize);
+      for (int iu = 0; iu < UnpackElt; iu++) {
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = UnpackBuf[iu * NTILE * KTILE + in * KTILE + ikt];
+            acci[in] += int(a8ptr[iu * KTILE + ikt]) * bval;
+          }
+        }
+      }
+      b2ptr += KTILE * UnpackElt * NTILE / 4;
+      b1ptr += KTILE * UnpackElt * NTILE / 8;
+      a8ptr += KTILE * UnpackElt;
+    }
+
+    float scale = asptr[ib];
+    for (int in = 0; in < NTILE; in++) {
+      auto tmp = float(acci[in]);
+      tmp = tmp * (scale * bsptr[in]);
+      accf[in] += tmp;
     }
   }
   for (int in = 0; in < NTILE; in++) {

@@ -964,6 +964,9 @@ class GEMVWoqNBits {
       return ref::gemv_4bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
     if (B.nbits == 3) {
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_3bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+      }
       return ref::gemv_3bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
@@ -977,6 +980,12 @@ class GEMVWoqNBits {
         return avx2::gemv_4bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
       }
       return ref::gemv_4bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    if (B.nbits == 3) {
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_3bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+      }
+      return ref::gemv_3bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
   }
