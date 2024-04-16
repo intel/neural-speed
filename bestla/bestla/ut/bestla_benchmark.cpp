@@ -930,8 +930,10 @@ typedef struct {
   float d;         // delta
   uint8_t qs[32];  // nibbles / quants
 } block_q8_0;
-#define __AVX2__
-#define __AVXVNNI__ 1
+#ifdef __GNUC__
+#pragma GCC push_options
+#pragma GCC target("avx2", "fma", "f16c", "avxvnni")
+#endif
 // Unpack 32 4-bit fields into 32 bytes
 // The output vector contains 32 bytes, each one in [ 0 .. 15 ] interval
 static inline __m256i bytes_from_nibbles_32(const uint8_t* rsi) {
