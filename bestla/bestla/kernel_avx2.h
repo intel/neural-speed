@@ -1323,7 +1323,7 @@ constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_
 
 template <typename ScaleT, int NTILE>
 static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
-                                            int k, int ld_scaleb, int blocksize) {
+                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
   auto& a8ptr = A.aptr;
   auto& b4ptr = B.b4ptr;
   auto& asptr = A.sptr;
@@ -1415,7 +1415,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
 
 template <typename ScaleT, int NTILE>
 static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
-                                            int k, int ld_scaleb, int blocksize) {
+                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
   int blks = k / blocksize;
   auto a8ptr = reinterpret_cast<int8_t*>(A.aptr);
   auto b4ptr = B.b4ptr;
@@ -1429,7 +1429,6 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   }
   uint32_t mask = 0xf0f0f0f0;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
-  const __m256i onesu8 = _mm256_set1_epi8(1);
 
   for (int ib = 0; ib < blks; ib += 1) {
     __m256i iacc[NReg];

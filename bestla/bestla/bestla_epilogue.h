@@ -41,6 +41,12 @@ class AccumulatorWriteBack {
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
+    if constexpr (std::is_same_v<_SRC_T, DType>) {
+      if (cacheptr == _param.C) {
+        return BTLA_CODE::Success;
+      }
+    }
+
     return kernel::wrapper::Memcpy2D::template forward<ISA_T, SType, DType>(cacheptr, cptr, M, N, cachestep, _param.ldc,
                                                                             _param.elt_const_v);
   }

@@ -967,9 +967,17 @@ class UT_CompInt8 {
  public:
   UT_CompInt8() {
     UT_START();
+    ut_s3();
     ut_s4_newkblock();
     ut_s4();
     ut_s8();
+  }
+  void ut_s3() {
+    GetCPUDevice();
+    if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+    }
   }
 
   void ut_s4() {
@@ -1008,10 +1016,10 @@ class UT_CompInt8 {
   void ut_s4_newkblock() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 1>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::DQ8_BNB);
     }
 
     if (_cd->AVX512_VNNI()) {

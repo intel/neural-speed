@@ -297,6 +297,7 @@ struct GemvParamB {
   uint8_t *b4ptr = 0, *b2ptr = 0, *b1ptr = 0;
   ScaleT* sptr = 0;
   int8_t* zpptr = 0;
+  int nbits = 0;
 };
 
 struct GemvParamA {
