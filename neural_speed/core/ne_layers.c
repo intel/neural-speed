@@ -11369,13 +11369,11 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_DIAG_MASK_INF:
         case NE_OP_PADDING_MASK_INF:
         case NE_OP_ROPE:
-          if (node->type == NE_TYPE_BTLA) {
-            node->n_tasks = 1;
-          } else if (node->src0->ne[1] > 4) {
+          // only first token use parrallel
+          if (node->type != NE_TYPE_BTLA && node->src0->ne[2] > 1)
             node->n_tasks = n_threads;
-          } else {
+          else
             node->n_tasks = 1;
-          }
           break;
         case NE_OP_SOFT_MAX: {
           size_t rows = ne_nrows(node->src0);
