@@ -1261,12 +1261,11 @@ int model_apply_lora_from_file(struct model_context* ctx, const char* path_lora,
   }
 }
 
-struct model_context* model_init_from_gpt_params(gpt_params& params) {
+struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   if (params.model_arch == MODEL_UNKNOWN) {
     fprintf(stderr, "error, please set model_name \n");
     exit(0);
   }
-  params.n_threads = bestla_set_threads(params.n_threads);
   auto lparams = model_context_default_params();
 
   lparams.arch = params.model_arch;

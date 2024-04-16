@@ -121,7 +121,7 @@ std::vector<model_token> model_tokenize(struct model_context* ctx, const std::st
 // Model utils
 //
 
-struct model_context* model_init_from_gpt_params(gpt_params& params);
+struct model_context* model_init_from_gpt_params(const gpt_params& params);
 
 // KV cache elements per layer per batch per beam
 void get_batch_kv_elements_from_gpt_params(int heads_kv, int head_size, int n_ctx, ne_type wtype, int32_t* k_size,

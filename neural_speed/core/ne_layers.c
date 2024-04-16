@@ -11193,6 +11193,7 @@ struct ne_cgraph ne_build_backward(struct ne_context* ctx, struct ne_cgraph* gf,
 void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
   int n_threads = cgraph->n_threads;
 
+  n_threads = bestla_set_threads(n_threads);
   // initialize tasks + work buffer
   {
     size_t work_size = 0;
