@@ -11369,7 +11369,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_DIAG_MASK_INF:
         case NE_OP_PADDING_MASK_INF:
         case NE_OP_ROPE:
-          // only first token use parrallel
+          // only first token use parallel
           if (node->type != NE_TYPE_BTLA && node->src0->ne[2] > 1)
             node->n_tasks = n_threads;
           else
