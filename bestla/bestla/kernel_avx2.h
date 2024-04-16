@@ -1490,7 +1490,6 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   uint32_t mask = 0xf0f0f0f0;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   const __m256i onesu8 = _mm256_set1_epi8(1);
-
   if (azptr) {
     for (int ib = 0; ib < blks; ib += 1) {
       __m256i iacc[NReg];
@@ -1500,8 +1499,7 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         bacc[i] = _mm256_setzero_si256();
       }
       for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
-                                                               NTILE * KTILE * UnpackElt, tmp, tmpsize);
+        jit::DecompressS3::forward_avx2(b2ptr, b1ptr, UnpackBuf, tmp, NTILE * KTILE * UnpackElt);
         for (int iu = 0; iu < UnpackElt; iu++) {
           auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
           for (int i = 0; i < NReg; i++) {
@@ -1540,8 +1538,7 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         iacc[i] = _mm256_setzero_si256();
       }
       for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
-                                                               NTILE * KTILE * UnpackElt, tmp, tmpsize);
+        jit::DecompressS3::forward_avx2(b2ptr, b1ptr, UnpackBuf, tmp, NTILE * KTILE * UnpackElt);
         for (int iu = 0; iu < UnpackElt; iu++) {
           auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
           for (int i = 0; i < NReg; i++) {
@@ -1607,8 +1604,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
       iacc[i] = _mm256_setzero_si256();
     }
     for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-      decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
-                                                             NTILE * KTILE * UnpackElt, tmp, tmpsize);
+      jit::DecompressS3::forward_avx2(b2ptr, b1ptr, UnpackBuf, tmp, NTILE * KTILE * UnpackElt);
       for (int iu = 0; iu < UnpackElt; iu++) {
         auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
         for (int i = 0; i < NReg; i++) {
