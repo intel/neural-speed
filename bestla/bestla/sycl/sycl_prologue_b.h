@@ -157,7 +157,9 @@ class KernelConfigTrans {
 template <class GemmCoreT, typename ScaleT>
 class WeightS4Trans {
  public:
+  using AType = typename GemmCoreT::TA;
   using BType = typename GemmCoreT::TB;
+  using CType = typename GemmCoreT::TC;
   using Param = ParamWeightS4<ScaleT>;
 
   static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
@@ -354,6 +356,61 @@ class WeightS4Trans {
     return q->submit(deq_kernel);
   }
 #endif
+
+  static inline sycl::event gemv(const AType* A, const Param& paramB, CType* C, int n, int k, int blocksize,
+                                 sycl::queue* q) {
+    auto B = paramB.B;
+    auto B_scale = paramB.scale;
+    int ldb = paramB.ldb;
+    int constexpr SgSize = 16;
+    int constexpr TileK = 32;
+    int constexpr GroupK = SgSize * TileK;
+    sycl::range<1> group{SgSize};
+    sycl::range<1> problem{n * SgSize};
+
+    auto ev = q->submit([&](sycl::handler& cgh) {
+      cgh.parallel_for(
+          sycl::nd_range<1>(problem, group),
+          [=](sycl::nd_item<1> it) [[cl::reqd_work_group_size(
+              1, 1, SgSize)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(SgSize)]] {
+            int g_idx = it.get_group(0);
+            auto sg = it.get_sub_group();
+            int sg_id = sg.get_local_id()[0];
+            int g_n = g_idx;
+            auto sptr = B_scale + g_n * ldb;
+            auto bptr = B + g_n * k / 2;
+            auto aptr = A;
+            auto cptr = C + g_n;
+            float tmpAcc = 0.f;
+            int constexpr Unroll = 1;
+            for (int i = 0; i < k; i += GroupK * Unroll) {
+#pragma unroll
+              for (int iu = 0; iu < Unroll; iu++) {
+                uint8_t tmps8[TileK / 2];
+                *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
+                float scale = *(sptr + sg_id * TileK / blocksize);
+#pragma unroll
+                for (int ikk = 0; ikk < TileK; ikk += 2) {
+                  tmpAcc +=
+                      float(aptr[sg_id * TileK + ikk]) * static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
+                  tmpAcc += float(aptr[sg_id * TileK + ikk + 1]) * static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
+                }
+                sptr += GroupK / blocksize;
+                aptr += GroupK;
+                bptr += GroupK / 2;
+              }
+            }
+            float sum = 0.f;
+            for (int i = 0; i < SgSize; i += 1) {
+              sum += sg.shuffle(tmpAcc, i);
+            }
+            if (sg_id == 0) {
+              *cptr = sum;
+            }
+          });
+    });
+    return ev;
+  }
 };
 }  // namespace sycl_prologue_b
 }  // namespace bestla

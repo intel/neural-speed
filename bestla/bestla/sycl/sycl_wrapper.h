@@ -108,6 +108,7 @@ class LauncherWOQ {
     const BParam paramB;
     const EpiParam paramC;
   };
+
   static inline sycl::event compute(const Param& _param, sycl::queue* q) {
     sycl::range<2> group{GemmCore::WgM, GemmCore::WgN};
     int k = _param.k;

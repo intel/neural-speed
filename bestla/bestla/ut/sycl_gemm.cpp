@@ -44,7 +44,7 @@ class UT_SyclSGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-static UT_SyclSGemm sUT_SyclSGemm;
+// static UT_SyclSGemm sUT_SyclSGemm;
 
 class UT_SyclHGemm {
  public:
@@ -82,7 +82,7 @@ class UT_SyclHGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
 };
-static UT_SyclHGemm sUT_SyclHGemm;
+// static UT_SyclHGemm sUT_SyclHGemm;
 
 class UT_SyclS4SGemm {
  public:
@@ -183,7 +183,7 @@ class UT_SyclS4SGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-static UT_SyclS4SGemm sUT_SyclS4SGemm;
+// static UT_SyclS4SGemm sUT_SyclS4SGemm;
 
 class UT_SyclS4HGemm {
  public:
@@ -278,7 +278,7 @@ class UT_SyclS4HGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
 };
-static UT_SyclS4HGemm sUT_SyclS4HGemm;
+// static UT_SyclS4HGemm sUT_SyclS4HGemm;
 
 class UT_SyclInt4Dequant {
  public:
@@ -424,7 +424,7 @@ class UT_SyclInt4Dequant {
     buffer_error(refNT.data(), dequant.data(), dequant.size(), 0.001f);
   }
 };
-static UT_SyclInt4Dequant sUT_SyclInt4Dequant;
+// static UT_SyclInt4Dequant sUT_SyclInt4Dequant;
 
 class UT_SyclS4Gemv {
  public:
@@ -432,7 +432,9 @@ class UT_SyclS4Gemv {
     UT_START();
     ut(1024, 1024, 32);
     ut_T(1024, 1024, 32);
+    ut_half(1024, 1024, 32);
     ut_T2(1024, 1024, 32);
+    ut_T2(1024, 1024, 128);
     ut_T3(1024, 1024, 32);
     ut_T4(1024, 1024, 32);
   }
@@ -441,6 +443,8 @@ class UT_SyclS4Gemv {
   using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
   template <class GCT>
   using ProBT = sycl_prologue_b::WeightBase<GCT, float>;
+  template <class GCT>
+  using ProBTransT = sycl_prologue_b::WeightS4Trans<GCT, float>;
   template <class GCT>
   using EpiT = sycl_epilogue::OutputBase<GCT, float>;
   using KernelLauncher = sycl_wrapper::Launcher<ProAT, ProBT, EpiT, SGemm_t>;
@@ -587,55 +591,7 @@ class UT_SyclS4Gemv {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    auto e_esimd = q->submit([&](sycl::handler& cgh) {
-      cgh.parallel_for(sycl::nd_range<1>(problem, group),
-                       [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
-                         int g_idx = it.get_group(0);
-                         auto sg = it.get_sub_group();
-                         int sg_id = sg.get_local_id()[0];
-                         int g_n = g_idx;
-                         auto sptr = S_d + g_n * blks;
-                         auto bptr = B_d + g_n * k / 2;
-                         auto aptr = A_d;
-                         auto cptr = C_d + g_n;
-                         float tmpAcc[TileK];
-#pragma unroll
-                         for (int i = 0; i < TileK; i++) {
-                           tmpAcc[i] = 0.f;
-                         }
-                         for (int i = 0; i < k; i += blocksize) {
-                           float localAcc[TileK];
-                           for (int i = 0; i < TileK; i++) {
-                             localAcc[i] = 0.f;
-                           }
-                           auto scale = *sptr;
-                           for (int ik = 0; ik < blocksize; ik += GroupK) {
-                             uint8_t tmp = *(bptr + ik / 2 + sg_id);
-                             float tmpf[TileK];
-                             tmpf[0] = static_cast<int8_t>((tmp & 0x0f) << 4);
-                             tmpf[1] = static_cast<int8_t>((tmp & 0xf0));
-#pragma unroll
-                             for (int in = 0; in < TileK; in++) {
-                               localAcc[in] += tmpf[in] * aptr[sg_id * TileK + in];
-                             }
-                           }
-                           for (int in = 0; in < TileK; in++) {
-                             tmpAcc[in] += localAcc[in] * scale;
-                           }
-                           sptr += 1;
-                           aptr += blocksize;
-                           bptr += blocksize / 2;
-                         }
-                         tmpAcc[0] += tmpAcc[1];
-                         auto sum = 0.f;
-                         for (int i = 0; i < SgSize; i++) {
-                           sum += sg.shuffle(tmpAcc[0], i);
-                         }
-                         if (sg_id == 0) {
-                           *cptr = sum;
-                         }
-                       });
-    });
+    auto e_esimd = ProBTransT<SGemm_t>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
     e_esimd.wait();
     q->memcpy(C.data(), C_d, C.size() * 4).wait();
     buffer_error(refC.data(), C.data(), C.size(), 0.001f);
@@ -677,7 +633,8 @@ class UT_SyclS4Gemv {
     auto C_d = dC.data();
     auto e_esimd = q->submit([&](sycl::handler& cgh) {
       cgh.parallel_for(
-          sycl::nd_range<1>(problem, group), [=](sycl::nd_item<1> it) [[intel::reqd_sub_group_size(SgSize)]] {
+          sycl::nd_range<1>(problem, group),
+          [=](sycl::nd_item<1> it) [[cl::reqd_work_group_size(1, 1, SgSize)]] [[intel::reqd_sub_group_size(SgSize)]] {
             int g_idx = it.get_group(0);
             auto sg = it.get_sub_group();
             int sg_id = sg.get_local_id()[0];
@@ -686,56 +643,29 @@ class UT_SyclS4Gemv {
             auto bptr = B_d + g_n * k / 2;
             auto aptr = A_d;
             auto cptr = C_d + g_n;
-            float tmpAcc[TileK];
+            float tmpAcc = 0.f;
+            int constexpr Unroll = 1;
+            for (int i = 0; i < k; i += GroupK * Unroll) {
 #pragma unroll
-            for (int i = 0; i < TileK; i++) {
-              tmpAcc[i] = 0.f;
-            }
-            for (int i = 0; i < k; i += GroupK) {
-              float tmpf[TileK];
-              uint8_t tmps8[TileK / 2];
-              *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
-              auto scale = *(sptr + sg_id * TileK / blocksize);
+              for (int iu = 0; iu < Unroll; iu++) {
+                uint8_t tmps8[TileK / 2];
+                *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
+                auto scale = *(sptr + sg_id * TileK / blocksize);
+                float localacc = 0.f;
 #pragma unroll
-              for (int ikk = 0; ikk < TileK; ikk += 2) {
-                tmpf[ikk] = static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
-                tmpf[ikk + 1] = static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
-              }
-              for (int ikk = 0; ikk < TileK; ikk += 1) {
-                tmpAcc[ikk] += aptr[sg_id * TileK + ikk] * tmpf[ikk];
-              }
-              sptr += GroupK / blocksize;
-              aptr += GroupK;
-              bptr += GroupK / 2;
-            }
-            if constexpr (TileK >= 2) {
-              for (int i = 0; i < TileK / 2; i++) {
-                tmpAcc[i] += tmpAcc[i + TileK / 2];
-              }
-            }
-            if constexpr (TileK >= 4) {
-              for (int i = 0; i < TileK / 4; i++) {
-                tmpAcc[i] += tmpAcc[i + TileK / 4];
-              }
-            }
-            if constexpr (TileK >= 8) {
-              for (int i = 0; i < TileK / 8; i++) {
-                tmpAcc[i] += tmpAcc[i + TileK / 8];
-              }
-            }
-            if constexpr (TileK >= 16) {
-              for (int i = 0; i < TileK / 16; i++) {
-                tmpAcc[i] += tmpAcc[i + TileK / 16];
-              }
-            }
-            if constexpr (TileK >= 32) {
-              for (int i = 0; i < TileK / 32; i++) {
-                tmpAcc[i] += tmpAcc[i + TileK / 32];
+                for (int ikk = 0; ikk < TileK; ikk += 2) {
+                  localacc += aptr[sg_id * TileK + ikk] * static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4);
+                  localacc += aptr[sg_id * TileK + ikk + 1] * static_cast<int8_t>((tmps8[ikk / 2] & 0xf0));
+                }
+                tmpAcc += localacc * scale;
+                sptr += GroupK / blocksize;
+                aptr += GroupK;
+                bptr += GroupK / 2;
               }
             }
             auto sum = 0.f;
-            for (int i = 0; i < SgSize; i++) {
-              sum += sg.shuffle(tmpAcc[0], i);
+            for (int i = 0; i < SgSize; i += 1) {
+              sum += sg.shuffle(tmpAcc, i);
             }
             if (sg_id == 0) {
               *cptr = sum;
@@ -747,6 +677,47 @@ class UT_SyclS4Gemv {
     buffer_error(refC.data(), C.data(), C.size(), 0.001f);
   }
 
+  void ut_half(int n, int k, int blocksize) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case %s: %d %d %d Device:%s\n", __FUNCTION__, n, k, blocksize, dev->getName().c_str());
+    avector<uint8_t> rawB(k * n / 2);
+    int blks = updiv(k, blocksize);
+    avector<utils::fp16> scale(blks * n), C(n), dqB(n * k), A(k), refC(n);
+    fill_buffer_randn(scale.data(), scale.size(), utils::fp16(0.01f), utils::fp16(0.03f));
+    fill_buffer_randn(A.data(), A.size(), utils::fp16(-0.1f), utils::fp16(0.3f));
+    fill_buffer_randn(rawB.data(), rawB.size(), uint8_t(0), uint8_t(255));
+    auto srcptr = (utils::int4x2*)rawB.data();
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < k; j += 2) {
+        auto tmp = srcptr[i * k / 2 + j / 2];
+        auto noffset = i * blks + j / blocksize;
+        float fscale = float(scale[noffset]);
+        dqB[i + (j + 0) * n] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * fscale;
+        dqB[i + (j + 1) * n] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * fscale;
+      }
+    }
+    gemmref_fp16fp16fp16(1, n, k, A.data(), dqB.data(), refC.data(), k, n, n);
+    sycl_vector<sycl::half> dS(scale.size(), q), dC(n, q), dA(k, q);
+    sycl_vector<uint8_t> dB(rawB.size(), q);
+    q->memcpy(dB.data(), rawB.data(), rawB.size() * 1).wait();
+    q->memcpy(dS.data(), scale.data(), scale.size() * 2).wait();
+    q->memcpy(dA.data(), A.data(), A.size() * 2).wait();
+    int constexpr SgSize = 16;
+    int constexpr TileK = 32;
+    int constexpr GroupK = SgSize * TileK;
+    sycl::range<1> group{SgSize};
+    sycl::range<1> problem{n * SgSize};
+    auto S_d = dS.data();
+    auto A_d = dA.data();
+    auto B_d = dB.data();
+    auto C_d = dC.data();
+    auto e_esimd = sycl_prologue_b::WeightS4Trans<xve::DefaultHGemmCore, sycl::half>::gemv(A_d, {B_d, S_d, blks}, C_d,
+                                                                                           n, k, blocksize, q);
+    e_esimd.wait();
+    q->memcpy(C.data(), C_d, C.size() * 2).wait();
+    buffer_error(refC.data(), C.data(), C.size(), utils::fp16(0.1f));
+  }
   void ut_T3(int n, int k, int blocksize) {
     auto dev = UT_Device::get();
     auto q = dev->getQueue();
