@@ -326,6 +326,9 @@ class LauncherIntKBlock {
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
           return true;
         }
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_SS_FP32) {
+          return true;
+        }
       }
       return false;
     }
@@ -357,16 +360,27 @@ class LauncherIntKBlock {
       int in = 0;
       int ld_scaleb = _param.paramB.packedW->CStep();
       for (; in < size_padded; in += GemmCore::NTILE) {
-        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, Cptr, k,
-                                                                                          ld_scaleb, kblocksize);
+        if constexpr (std::is_same_v<AType, uint8_t>) {
+          kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, Cptr, k,
+                                                                                            ld_scaleb, kblocksize);
+        } else {
+          kernel::wrapper::GEMV_4Bit::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, Cptr, k,
+                                                                                            ld_scaleb, kblocksize);
+        }
+
         Cptr += GemmCore::NTILE;
         paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
         paramB.sptr += GemmCore::NTILE;
       }
       if (size_padded != _config.size[1]) {
         auto tmpptr = reinterpret_cast<CType*>(StackTmp);
-        kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, tmpptr, k,
-                                                                                          ld_scaleb, kblocksize);
+        if constexpr (std::is_same_v<AType, uint8_t>) {
+          kernel::wrapper::GEMV_4Bit::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, tmpptr, k,
+                                                                                            ld_scaleb, kblocksize);
+        } else {
+          kernel::wrapper::GEMV_4Bit::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(paramA, paramB, tmpptr, k,
+                                                                                            ld_scaleb, kblocksize);
+        }
         memcpy(Cptr, tmpptr, (_config.size[1] - in) * sizeof(CType));
       }
       Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,

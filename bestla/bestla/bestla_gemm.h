@@ -3503,7 +3503,7 @@ template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvxvnniKBlockSS : public CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE> {
  public:
   using Code = typename CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE>::Code;
-  void forward(int8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+  void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
                float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
                int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param =

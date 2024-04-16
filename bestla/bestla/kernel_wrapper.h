@@ -966,6 +966,9 @@ class GEMV_4Bit {
   template <BTLA_ISA ISA_T, typename ScaleT, int NTILE>
   static inline BTLA_CODE forward_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int k, int ld_scaleb, int blocksize) {
+    if (ISA_T >= BTLA_ISA::AVX2) {
+      return avx2::gemv_4bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize);
+    }
     return ref::gemv_4bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize);
   }
 };
