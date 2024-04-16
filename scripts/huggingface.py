@@ -141,7 +141,6 @@ class HFLM(TemplateLM):
     ) -> None:
         super().__init__()
         self.model_format = model_format
-        import pdb;pdb.set_trace()
         if self.model_format == "neural_speed":
             self.use_quant = kwargs.pop("use_quant", True)
         # optionally: take in an already-initialized transformers.PreTrainedModel
@@ -536,7 +535,6 @@ class HFLM(TemplateLM):
         """
 
         model_kwargs = kwargs if kwargs else {}
-        import pdb;pdb.set_trace()
         if parallelize:
             model_kwargs.update(
                 _get_accelerate_args(
@@ -576,7 +574,6 @@ class HFLM(TemplateLM):
             if self.model_format == "neural_speed":
                 from neural_speed import Model
                 self._model = Model()
-                import pdb;pdb.set_trace()
                 self._model.init(pretrained, weight_dtype="int4", compute_dtype="int8",
                                     use_quant=self.use_quant,
                                     use_gptq=use_gptq,
