@@ -199,7 +199,7 @@ class StdThreading : public IThreading {
 
  private:
   void stop_threads() {
-    stop = true;
+    stop = 1;
     for (int i = 0; i < mThreadNum - 1; i++) thdset[i].join();
     thdset.clear();
     // printf("stop %d\n", mThreadNum);
@@ -207,7 +207,7 @@ class StdThreading : public IThreading {
   void create_threads() {
     // printf("create %d\n", mThreadNum);
     thdset.resize(mThreadNum - 1);
-    stop = false;
+    stop = 0;
     GetCPUDevice();
     std::vector<int> core_order;
     if (_cd->isHybrid()) {
@@ -271,13 +271,13 @@ class StdThreading : public IThreading {
       }
   }
   device::CpuRuntime* cr;
-  std::vector<int> thread_time;
-  float time_per_p, time_per_e;
-  std::vector<std::thread> thdset;
-  bool stop;
-  std::atomic_int running;
-  std::atomic_int flag[10];
+  std::atomic_int64_t running;
+  std::atomic_int64_t flag[10];
   const thread_func* func_[100];
+  bool stop;
+  std::vector<std::thread> thdset;
+  std::vector<int64_t> thread_time;
+  float time_per_p, time_per_e;
 };
 
 class SingleThread : public IThreading {
