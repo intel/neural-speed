@@ -321,6 +321,7 @@ class LauncherIntKBlock {
                                     prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T, _RT_ISA_T>>) {
         return false;
       }
+      return false;
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX_VNNI) {
         static_assert(GemmCore::PACK_ROW == 4);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {

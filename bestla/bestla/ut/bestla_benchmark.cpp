@@ -803,8 +803,16 @@ class UTWOQ_CompInt8 {
  public:
   UTWOQ_CompInt8() {
     UT_START();
+    ut_s3();
     ut_s4();
     // ut_s8();
+  }
+
+  void ut_s3() {
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S3_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S3_CLIP);
+    /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S4_CLIP);*/
   }
 
   void ut_s4() {
@@ -850,7 +858,8 @@ class UTWOQ_CompInt8 {
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
     int blks = k / blocksize;
-    auto memsize = (size_t)(n * k / 2 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
+    int nbits = utils::bestla_dtype_bits(qtype);
+    auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
