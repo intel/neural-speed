@@ -382,7 +382,9 @@ static bool gptneox_model_eval_internal(model_context* ctx, const model_input* i
     } else {
       // return result for just the last token
       logits_out.resize(n_vocab * batch_size);
-      ne_bestla::ne_threading::get()->parallel_for_collapse(0, batch_size, 1, [&](int i) {
+      bestla::parallel::IThreading* threading =
+          reinterpret_cast<bestla::parallel::IThreading*>(bestla_get_thread_handle());
+      threading->parallel_for_collapse(0, batch_size, 1, [&](int i) {
         memcpy(logits_out.data() + (i * n_vocab),
                reinterpret_cast<float*>(ne_get_data(inpL)) + (i * bs_stride) + (n_vocab * (N - 1)),
                sizeof(float) * n_vocab);

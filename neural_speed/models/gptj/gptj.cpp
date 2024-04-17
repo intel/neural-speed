@@ -30,12 +30,12 @@
 #include <vector>
 
 #include "core/data_types.h"
-#include "core/layers/bestla_common.hpp"
 #include "core/layers/mha_dense.h"
 #include "core/ne.h"
 #include "core/ne_bestla.h"
 #include "core/ne_layers.h"
 #include "models/model_utils/model_config.h"
+#include "models/model_utils/model_files.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
 
@@ -600,7 +600,9 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     } else {
       // return result for just the last token
       logits_out.resize(n_vocab * batch_size);
-      ne_bestla::ne_threading::get()->parallel_for_collapse(0, batch_size, 1, [&](int i) {
+      bestla::parallel::IThreading* threading =
+          reinterpret_cast<bestla::parallel::IThreading*>(bestla_get_thread_handle());
+      threading->parallel_for_collapse(0, batch_size, 1, [&](int i) {
         size_t bs_off = std::accumulate(n_tokens.begin(), n_tokens.begin() + i, 0) * n_vocab;
         memcpy(logits_out.data() + (i * n_vocab),
                reinterpret_cast<float*>(ne_get_data(inpL)) + bs_off + (n_vocab * (n_tokens[i] - 1)),

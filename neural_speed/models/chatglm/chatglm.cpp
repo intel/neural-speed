@@ -29,12 +29,12 @@
 #include <vector>
 
 #include "core/data_types.h"
-#include "core/ne.h"
-#include "core/ne_layers.h"
-#include "core/ne_bestla.h"
-#include "core/layers/bestla_common.hpp"
 #include "core/layers/mha_dense.h"
+#include "core/ne.h"
+#include "core/ne_bestla.h"
+#include "core/ne_layers.h"
 #include "models/model_utils/model_config.h"
+#include "models/model_utils/model_files.h"
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
 
@@ -315,7 +315,9 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
     auto& embedding_out = lctx.embedding;
 
     embedding_out.resize(n_embd * batch_size);
-    ne_bestla::ne_threading::get()->parallel_for_collapse(0, batch_size, 1, [&](int i) {
+    bestla::parallel::IThreading* threading =
+        reinterpret_cast<bestla::parallel::IThreading*>(bestla_get_thread_handle());
+    threading->parallel_for_collapse(0, batch_size, 1, [&](int i) {
       memcpy(embedding_out.data() + (i * n_embd),
              reinterpret_cast<float*>(ne_get_data(embeddings)) + (i * n_embd * N) + (n_embd * (N - 1)),
              sizeof(float) * n_embd);
