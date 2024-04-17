@@ -28,13 +28,13 @@ namespace gpu::xetla::group {
 
 template <typename dtype_in_, typename dtype_acc_, typename tile_shape_>
 class softmax_t<
-    softmax_policy_bwd<dtype_in_, dtype_acc_, gpu_arch::Xe>,
+    softmax_policy_bwd<dtype_in_, dtype_acc_, gpu_arch::XeHpc>,
     tile_shape_> {
  public:
   using tile_shape = tile_shape_;
   using dtype_in = dtype_in_;
   using dtype_acc = dtype_acc_;
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
 
  private:
   using mem_desc_in_t =
@@ -55,7 +55,7 @@ class softmax_t<
       reduce_op::sum,
       wg_size_x,
       true,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
  public:
   struct arguments_t {
@@ -106,7 +106,7 @@ class softmax_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
         subgroup::msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     int32_t sg_idx = g.get_id() % wg_size_x;
     int32_t sg_idy = g.get_id() / wg_size_x;

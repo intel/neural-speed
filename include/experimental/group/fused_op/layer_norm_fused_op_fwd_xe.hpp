@@ -64,7 +64,7 @@ struct ln_fwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_fwd_fused_kind fused_op_kind = ln_fused_op_kind_;
   using dtype_acc = dtype_acc_;
   using dtype_in = dtype_in_;
@@ -129,7 +129,7 @@ struct ln_fwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_fwd_fused_kind fused_op_kind =
       ln_fwd_fused_kind::bias_dropout_resAdd_ln;
   using dtype_acc = dtype_acc_;
@@ -161,26 +161,26 @@ struct ln_fwd_fused_op_t<
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using res_in_t = subgroup::tile_t<dtype_in, ln_fwd_tile_desc_t>;
   using res_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using mask_in_t = subgroup::tile_t<dtype_mask, ln_fwd_tile_desc_t>;
   using mask_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using bias_dropout_res_out_t =
       subgroup::tile_t<dtype_out, ln_fwd_tile_desc_t>;
   using bias_dropout_res_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   bias_in_t bias_in;
   bias_in_payload_t bias_in_payload;
   bias_dropout_res_out_t bias_dropout_res_out;
@@ -311,7 +311,7 @@ struct ln_fwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_fwd_fused_kind fused_op_kind =
       ln_fwd_fused_kind::ln_dropout;
   using dtype_acc = dtype_acc_;
@@ -343,7 +343,7 @@ struct ln_fwd_fused_op_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   mask_in_t mask_in;
   mask_in_payload_t mask_in_payload;
   uint32_t mask_ld;
@@ -421,7 +421,7 @@ struct ln_fwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_fwd_fused_kind fused_op_kind =
       ln_fwd_fused_kind::bias_rng_dropout_resAdd_ln;
   using dtype_acc = dtype_acc_;
@@ -449,26 +449,26 @@ struct ln_fwd_fused_op_t<
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using res_in_t = subgroup::tile_t<dtype_in, ln_fwd_tile_desc_t>;
   using res_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using mask_out_t = subgroup::tile_t<dtype_mask, ln_fwd_tile_desc_t>;
   using mask_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using bias_dropout_res_out_t =
       subgroup::tile_t<dtype_out, ln_fwd_tile_desc_t>;
   using bias_dropout_res_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   bias_in_t bias_in;
   bias_in_payload_t bias_in_payload;
@@ -613,7 +613,7 @@ struct ln_fwd_fused_op_t<
     dtype_out_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr ln_fwd_fused_kind fused_op_kind =
       ln_fwd_fused_kind::ln_rng_dropout;
   using dtype_acc = dtype_acc_;
@@ -644,7 +644,7 @@ struct ln_fwd_fused_op_t<
       mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
       mask_out_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   mask_out_t mask_out;
   mask_out_payload_t mask_out_payload;
   dropout_fwd_t<chunk_size> dropout_fwd;

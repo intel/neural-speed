@@ -223,8 +223,8 @@ template <
     cache_hint L2H = cache_hint::none,
     bool transpose = false,
     bool transform = false,
-    gpu_arch arch_tag = gpu_arch::Xe>
-__XETLA_API std::enable_if_t<arch_tag == gpu_arch::Xe, xetla_vector<Ty, N>>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
+__XETLA_API std::enable_if_t<arch_tag == gpu_arch::XeHpc, xetla_vector<Ty, N>>
 xetla_tload_global(xetla_tdescriptor tdesc) {
   DEBUG_INVOKE(
       dbg_level::core,
@@ -275,10 +275,9 @@ template <
     uint32_t N,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none,
-    gpu_arch arch_tag = gpu_arch::Xe>
-__XETLA_API std::enable_if_t<arch_tag == gpu_arch::Xe, void> xetla_tstore_global(
-    xetla_tdescriptor tdesc,
-    xetla_vector<Ty, N> data) {
+    gpu_arch arch_tag = gpu_arch::XeHpc>
+__XETLA_API std::enable_if_t<arch_tag == gpu_arch::XeHpc, void>
+xetla_tstore_global(xetla_tdescriptor tdesc, xetla_vector<Ty, N> data) {
   DEBUG_INVOKE(
       dbg_level::core, core::block_2d<arch_tag, Ty>::check_store(tdesc));
 
@@ -313,8 +312,8 @@ template <
     typename Ty,
     cache_hint L1H = cache_hint::cached,
     cache_hint L2H = cache_hint::cached,
-    gpu_arch arch_tag = gpu_arch::Xe>
-__XETLA_API std::enable_if_t<arch_tag == gpu_arch::Xe, void>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
+__XETLA_API std::enable_if_t<arch_tag == gpu_arch::XeHpc, void>
 xetla_tprefetch_global(xetla_tdescriptor tdesc) {
   uint32_t msg_desc = 3;
   msg_desc |= 0 << 7;
@@ -354,9 +353,9 @@ template <
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none,
     atomic_op Op,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename Toffset = uint32_t>
-__XETLA_API std::enable_if_t<arch_tag == gpu_arch::Xe, void>
+__XETLA_API std::enable_if_t<arch_tag == gpu_arch::XeHpc, void>
 xetla_tatomic_store_global(
     uint64_t base_address,
     xetla_vector<Toffset, N> offset,

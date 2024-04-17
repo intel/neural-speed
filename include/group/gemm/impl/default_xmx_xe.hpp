@@ -42,7 +42,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<arch_has_xmx(arch_tag_)>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
@@ -72,7 +72,7 @@ class gemm_t<
   using dtype_mma_a = typename compute_policy::dtype_mma_a;
   using dtype_mma_b = typename compute_policy::dtype_mma_b;
 
-  using check_dtype = group::gemm<gpu_arch::Xe>::default_xmx::
+  using check_dtype = group::gemm<gpu_arch::XeHpc>::default_xmx::
       check_dtype_default<dtype_a, dtype_b, dtype_mma_a, dtype_mma_b>;
 
   /******** set memory attribute **********/
@@ -87,7 +87,7 @@ class gemm_t<
       is_col_major_b ? tdesc_update_dir::x_dir : tdesc_update_dir::y_dir;
 
   using check_memory =
-      group::gemm<gpu_arch::Xe>::default_xmx::check_memory_default<
+      group::gemm<gpu_arch::XeHpc>::default_xmx::check_memory_default<
           mem_layout_a,
           mem_layout_b,
           mem_space_a,
@@ -112,7 +112,7 @@ class gemm_t<
   static constexpr uint32_t block_size_y_b = compute_policy::block_size_y_b;
 
   using check_tile_size =
-      group::gemm<gpu_arch::Xe>::default_xmx::check_tile_size_default<
+      group::gemm<gpu_arch::XeHpc>::default_xmx::check_tile_size_default<
           dtype_mma_a,
           tile_size_x_a,
           tile_size_y_a,
@@ -135,7 +135,7 @@ class gemm_t<
   using matA_payload_t = subgroup::mem_payload_t<
       mem_desc_a_t,
       matA_tile_desc_t,
-      is_local_a ? msg_type::scatter : msg_type::block_2d,
+      subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>,
       arch_tag>;
   using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
   using matA_prefetch_payload_t = subgroup::prefetch_payload_t<
@@ -156,7 +156,7 @@ class gemm_t<
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
       matB_tile_desc_t,
-      is_local_b ? msg_type::scatter : msg_type::block_2d,
+      subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
       arch_tag>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_tile_desc_t>;
   using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
@@ -364,7 +364,7 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.arrive();
           }
-          if constexpr (arch_tag >= gpu_arch::Xe)
+          if constexpr (arch_tag >= gpu_arch::XeHpc)
             if constexpr (wg_size_y > 1) {
               nbarrier_b.arrive();
             }
@@ -403,7 +403,7 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.wait();
           }
-          if constexpr (arch_tag >= gpu_arch::Xe)
+          if constexpr (arch_tag >= gpu_arch::XeHpc)
             if constexpr (wg_size_y > 1) {
               nbarrier_b.wait();
             }

@@ -35,7 +35,7 @@ template <
     typename mem_desc_d_t_,
     typename mem_desc_atomic_sync_t_>
 struct epilogue_stream_k_t {
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   using epilogue_t = epilogue_t_;
   using mem_desc_d_t = mem_desc_d_t_;
   using mem_desc_c_t = typename epilogue_t::mem_desc_c_t;

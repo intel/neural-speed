@@ -461,6 +461,33 @@ vnni_transform(T_dst& dst, T_src& src) {
   dst.reg = reg_dst;
 }
 
+/// @brief  Converts tiled layout to transpose_tiled layout.
+///
+/// @tparam T Is the tile data type.
+/// @param mat_Acc Is the reference of the tile object.
+/// @return No return, update the data in-place.
+template <typename T>
+__XETLA_API void tile_transpose(T& mat_Acc) {
+  constexpr uint32_t tile_size_y = T::tile_size_y;
+  constexpr uint32_t tile_size_x = T::tile_size_x;
+  constexpr uint32_t block_size_y = T::block_size_y;
+  constexpr uint32_t block_size_x = T::block_size_x;
+  constexpr uint32_t block_elems = block_size_y * block_size_x;
+  constexpr int32_t num_block_x = tile_size_x / block_size_x;
+  constexpr int32_t num_block_y = tile_size_y / block_size_y;
+  using dtype = typename T::dtype;
+#pragma unroll
+  for (uint32_t i = 0; i < num_block_y * num_block_x; i++) {
+    auto dst_blk = mat_Acc.reg.xetla_select<block_elems, 1>(i * block_elems);
+    xetla_vector<dtype, block_elems> trans_blk;
+#pragma unroll
+    for (uint32_t j = 0; j < block_size_y; j++) {
+      trans_blk.xetla_select<block_size_x, block_size_y>(j) =
+          dst_blk.xetla_select<block_size_x, 1>(j * block_size_x);
+    }
+    dst_blk = trans_blk;
+  }
+}
 /// @brief Broadcasts 1d src tile to the entire 2d tile, as well as do the data
 /// conversion.
 ///

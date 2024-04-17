@@ -37,7 +37,7 @@ class gemm_universal_t<
     dispatch_policy_default<group_swizzle_>,
     gemm_t_,
     epilogue_t_,
-    std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::Xe)>> {
+    std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::XeHpc)>> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
@@ -253,40 +253,43 @@ class gemm_universal_t<
     bool implementable = true;
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_a == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_a>::check_tensor(
-            (uint64_t)(args.matA_base.base),
-            gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
-            gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
-            args.matA_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_a>::check_tensor(
+                (uint64_t)(args.matA_base.base),
+                gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
+                gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
+                args.matA_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_a>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_a>::check_alignment(
                 args.matA_base.base, args.matA_ld);
       }
     }
     if (gemm_t::msg_type_b != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_b == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_b>::check_tensor(
-            (uint64_t)(args.matB_base.base),
-            gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
-            gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
-            args.matB_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_b>::check_tensor(
+                (uint64_t)(args.matB_base.base),
+                gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
+                gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
+                args.matB_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_b>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_b>::check_alignment(
                 args.matB_base.base, args.matB_ld);
       }
     }
     if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
       if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &= kernel::block_2d<gpu_arch::Xe, dtype_c>::check_tensor(
-            (uint64_t)(args.matC_base.base),
-            args.matrix_n,
-            args.matrix_m,
-            args.matC_ld);
+        implementable &=
+            kernel::block_2d<gpu_arch::XeHpc, dtype_c>::check_tensor(
+                (uint64_t)(args.matC_base.base),
+                args.matrix_n,
+                args.matrix_m,
+                args.matC_ld);
       } else {
         implementable &=
-            kernel::general_1d<gpu_arch::Xe, dtype_c>::check_alignment(
+            kernel::general_1d<gpu_arch::XeHpc, dtype_c>::check_alignment(
                 args.matC_base.base, args.matC_ld);
       }
     }

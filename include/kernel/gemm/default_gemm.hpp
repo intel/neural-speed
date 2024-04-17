@@ -37,7 +37,7 @@ template <
     mem_layout mem_layout_c,
     uint32_t alignment_c,
     typename dtype_acc,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename tune_option = dict_t<>>
 struct default_gemm_config_t
     : param_adaptor<
@@ -69,7 +69,7 @@ template <
     mem_layout mem_layout_c,
     uint32_t alignment_c,
     typename dtype_acc,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename tune_option = dict_t<>>
 using default_gemm_t = typename default_gemm_config_t<
     dtype_a,
@@ -97,7 +97,7 @@ struct param_optimizer<param_optimizer_tag::kernel, dict_t_> {
       (dict_t_::impl::template find_elem_index<tune_key::gpu_arch> !=
        dict_t_::impl::key_not_found)
       ? dict_t_::template find_elem_v<tune_key::gpu_arch>
-      : gpu_arch::Xe;
+      : gpu_arch::XeHpc;
   static constexpr auto optimizer_level =
       dict_t_::template find_elem_v<tune_key::param_optimizer_level>;
   using type = typename std::conditional<
@@ -170,7 +170,7 @@ template <
     typename dtype_acc,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename tune_option = dict_t<>>
 struct default_gemm_selector_config_t
     : param_adaptor<
@@ -204,7 +204,7 @@ template <
     typename dtype_acc,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename tune_option = dict_t<>>
 using default_gemm_selector_t = typename default_gemm_selector_config_t<
     dtype_a,
@@ -228,7 +228,7 @@ template <
     mem_space mem_space_c,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename tune_option = dict_t<>>
 struct default_epilogue_selector_config_t
     : param_adaptor<
@@ -252,7 +252,7 @@ template <
     mem_space mem_space_c,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::Xe,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
     typename tune_option = dict_t<>>
 using default_epilogue_selector_t = typename default_epilogue_selector_config_t<
     dtype_c,
@@ -278,7 +278,7 @@ struct param_optimizer<param_optimizer_tag::work_group, dict_t_> {
       (dict_t_::impl::template find_elem_index<tune_key::gpu_arch> !=
        dict_t_::impl::key_not_found)
       ? dict_t_::template find_elem_v<tune_key::gpu_arch>
-      : gpu_arch::Xe;
+      : gpu_arch::XeHpc;
   using type = typename std::conditional<
       use_rule,
       decision_tree_optimizer<

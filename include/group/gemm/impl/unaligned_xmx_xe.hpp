@@ -43,7 +43,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
@@ -142,7 +142,7 @@ class gemm_t<
       matA_t,
       mem_layout_a,
       tile_shape::wg_size_x,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using cooperative_tile_desc_A_t =
       typename cooperative_helper_A_t::co_tile_desc_t;
   using partial_matA_t = subgroup::tile_t<dtype_a, cooperative_tile_desc_A_t>;
@@ -184,7 +184,7 @@ class gemm_t<
       matB_t,
       mem_layout_b,
       tile_shape::wg_size_y,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using cooperative_tile_desc_B_t =
       typename cooperative_helper_B_t::co_tile_desc_t;
 
@@ -445,7 +445,7 @@ class gemm_t<
     matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
     xetla_fence<memory_kind::shared_local>();
     nbarrier_a.arrive();
-    if (arch_tag >= gpu_arch::Xe)
+    if (arch_tag >= gpu_arch::XeHpc)
       nbarrier_b.arrive();
 #pragma unroll
     for (uint32_t i = 1; i < num_cyclic - 1; i++) {
@@ -496,7 +496,7 @@ class gemm_t<
       }
 
       nbarrier_a.wait();
-      if (arch_tag >= gpu_arch::Xe)
+      if (arch_tag >= gpu_arch::XeHpc)
         nbarrier_b.wait();
 
       tile_load(matA, matA_local_ld_payload);
@@ -525,7 +525,7 @@ class gemm_t<
       }
 
       nbarrier_a.arrive();
-      if (arch_tag >= gpu_arch::Xe)
+      if (arch_tag >= gpu_arch::XeHpc)
         nbarrier_b.arrive();
       SW_BARRIER();
       matA_acc_t matA_acc;
@@ -555,7 +555,7 @@ class gemm_t<
     }
     SW_BARRIER();
     nbarrier_a.wait();
-    if (arch_tag >= gpu_arch::Xe)
+    if (arch_tag >= gpu_arch::XeHpc)
       nbarrier_b.wait();
   }
 
