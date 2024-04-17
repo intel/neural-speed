@@ -234,8 +234,7 @@ Neural Speed supports the following models:
     <td>2048 / 32768</td>
   </tr>
   <tr>
-    <td><a href="https://huggingface.co/baichuan-inc/Baichuan-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan-13B-Chat</a>,
-    <a href="https://huggingface.co/baichuan-inc/Baichuan2-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan2-13B-Chat</a></td>
+    <td><a href="https://huggingface.co/baichuan-inc/Baichuan-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan-13B-Chat</a>,<a href="https://huggingface.co/baichuan-inc/Baichuan2-13B-Chat" target="_blank" rel="noopener noreferrer">Baichuan2-13B-Chat</a>,<a href="https://huggingface.co/baichuan-inc/Baichuan2-7B-Chat" target="_blank" rel="noopener noreferrer">Baichuan2-7B-Chat</a></td>
     <td>✅</td>
     <td>✅</td>
     <td>✅</td>
