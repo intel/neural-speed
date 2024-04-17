@@ -81,7 +81,6 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
       queue,
       device,
       context);
-
   size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
   size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
   auto Acc = alloc_device_and_init<data_type_acc>(

@@ -37,7 +37,7 @@ struct dropout_func_t {
   using mem_desc_out_t =
       mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>;
 
-  using tile_shape = group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
+  using tile_shape = xetla::group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
   using work_group_t = typename tile_shape::work_group_t;
   static constexpr uint32_t wg_size_x = tile_shape::wg_size_x;
   static constexpr uint32_t wg_size_y = tile_shape::wg_size_y;
@@ -74,8 +74,8 @@ struct dropout_func_t {
       subgroup::dropout_op_t<uint8_t, gpu_arch::XeHpc>,
       subgroup::rng_dropout_op_t<uint8_t, gpu_arch::XeHpc>>::type;
 
-  using epilogue_t = group::epilogue_t<
-      group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>,
+  using epilogue_t = xetla::group::epilogue_t<
+      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_out_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;
