@@ -213,6 +213,7 @@ class baichuan_quant_layer : public quant_layer_base {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
     }
+    // The bias of layernorm & rmsnorm will be ignored.
     quantize &= (ne.size() == 2);
     if (quantize) {
       return mGCfg;  // use global quant config
