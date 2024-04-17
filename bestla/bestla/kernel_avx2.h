@@ -1487,13 +1487,37 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   static_assert(NTILE % 8 == 0);
   int constexpr KTILE = 4;
   int constexpr UnpackElt = EltPadding / 8 / KTILE;
-  int8_t UnpackBuf[UnpackElt * NTILE * KTILE];
+  int constexpr TotalElt = UnpackElt * NTILE * KTILE;
+  int constexpr Loop128 = TotalElt / 128;
+  int8_t alignas(32) UnpackBuf[TotalElt];
   for (int i = 0; i < NReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
+
   uint32_t mask = 0xf0f0f0f0;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   const __m256i onesu8 = _mm256_set1_epi8(1);
+  const __m256i lowMask = _mm256_set1_epi8(0x03);
+  const __m256i highMask = _mm256_set1_epi8(0x04);
+  const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
+  const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
+  const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
+  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+    __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src1);
+    int32_t* bit1_ptr = reinterpret_cast<int32_t*>(src2);
+    for (int i = 0; i < 4; i++) {
+      auto bit1x32 = _mm256_set1_epi32(bit1_ptr[i]);
+      bit1x32 = _mm256_srlv_epi32(bit1x32, bit1Shift_1);
+      bit1x32 = _mm256_and_si256(bit1x32, bit1Mask);
+      bit1x32 = _mm256_mullo_epi32(bit1x32, bit1Shift_2);
+      bit1x32 = _mm256_and_si256(highMask, bit1x32);
+
+      auto bit2x32 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2 * i));
+      auto res = _mm256_add_epi8(bit1x32, bit2x32);
+      res = _mm256_slli_epi32(res, 5);
+      _mm256_storeu_si256((__m256i*)(dst + 32 * i), res);
+    }
+  };
   if (azptr) {
     for (int ib = 0; ib < blks; ib += 1) {
       __m256i iacc[NReg];
@@ -1503,7 +1527,11 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         bacc[i] = _mm256_setzero_si256();
       }
       for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        jit::DecompressS3::forward_avx2(b2ptr, b1ptr, UnpackBuf, tmp, NTILE * KTILE * UnpackElt);
+        for (int il = 0; il < Loop128; il++) {
+          bit3_interleave_decompress_pack128(b2ptr, b1ptr, UnpackBuf + il * 128);
+          b2ptr += 128 / 4;
+          b1ptr += 128 / 8;
+        }
         for (int iu = 0; iu < UnpackElt; iu++) {
           auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
           for (int i = 0; i < NReg; i++) {
@@ -1512,8 +1540,6 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
             bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
           }
         }
-        b2ptr += KTILE * UnpackElt * NTILE / 4;
-        b1ptr += KTILE * UnpackElt * NTILE / 8;
         a8ptr += KTILE * UnpackElt;
       }
       const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
@@ -1542,7 +1568,11 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         iacc[i] = _mm256_setzero_si256();
       }
       for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        jit::DecompressS3::forward_avx2(b2ptr, b1ptr, UnpackBuf, tmp, NTILE * KTILE * UnpackElt);
+        for (int il = 0; il < Loop128; il++) {
+          bit3_interleave_decompress_pack128(b2ptr, b1ptr, UnpackBuf + il * 128);
+          b2ptr += 128 / 4;
+          b1ptr += 128 / 8;
+        }
         for (int iu = 0; iu < UnpackElt; iu++) {
           auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
           for (int i = 0; i < NReg; i++) {
@@ -1550,8 +1580,6 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
             iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
           }
         }
-        b2ptr += KTILE * UnpackElt * NTILE / 4;
-        b1ptr += KTILE * UnpackElt * NTILE / 8;
         a8ptr += KTILE * UnpackElt;
       }
       const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
@@ -1594,21 +1622,46 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   static_assert(NTILE % 8 == 0);
   int constexpr KTILE = 4;
   int constexpr UnpackElt = EltPadding / 8 / KTILE;
-  int8_t UnpackBuf[UnpackElt * NTILE * KTILE];
+  int constexpr TotalElt = UnpackElt * NTILE * KTILE;
+  int constexpr Loop128 = TotalElt / 128;
+  int8_t alignas(32) UnpackBuf[TotalElt];
   for (int i = 0; i < NReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
   uint32_t mask = 0xf0f0f0f0;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
-  const __m256i onesu8 = _mm256_set1_epi8(1);
+  const __m256i lowMask = _mm256_set1_epi8(0x03);
+  const __m256i highMask = _mm256_set1_epi8(0x04);
+  const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
+  const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
+  const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
+  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+    __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src1);
+    int32_t* bit1_ptr = reinterpret_cast<int32_t*>(src2);
+    for (int i = 0; i < 4; i++) {
+      auto bit1x32 = _mm256_set1_epi32(bit1_ptr[i]);
+      bit1x32 = _mm256_srlv_epi32(bit1x32, bit1Shift_1);
+      bit1x32 = _mm256_and_si256(bit1x32, bit1Mask);
+      bit1x32 = _mm256_mullo_epi32(bit1x32, bit1Shift_2);
+      bit1x32 = _mm256_and_si256(highMask, bit1x32);
 
+      auto bit2x32 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2 * i));
+      auto res = _mm256_add_epi8(bit1x32, bit2x32);
+      res = _mm256_slli_epi32(res, 5);
+      _mm256_storeu_si256((__m256i*)(dst + 32 * i), res);
+    }
+  };
   for (int ib = 0; ib < blks; ib += 1) {
     __m256i iacc[NReg];
     for (int i = 0; i < NReg; i++) {
       iacc[i] = _mm256_setzero_si256();
     }
     for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-      jit::DecompressS3::forward_avx2(b2ptr, b1ptr, UnpackBuf, tmp, NTILE * KTILE * UnpackElt);
+      for (int il = 0; il < Loop128; il++) {
+        bit3_interleave_decompress_pack128(b2ptr, b1ptr, UnpackBuf + il * 128);
+        b2ptr += 128 / 4;
+        b1ptr += 128 / 8;
+      }
       for (int iu = 0; iu < UnpackElt; iu++) {
         auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
         for (int i = 0; i < NReg; i++) {
@@ -1618,8 +1671,6 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
         }
       }
-      b2ptr += KTILE * UnpackElt * NTILE / 4;
-      b1ptr += KTILE * UnpackElt * NTILE / 8;
       a8ptr += KTILE * UnpackElt;
     }
     const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
