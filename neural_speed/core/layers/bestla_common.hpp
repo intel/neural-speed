@@ -26,12 +26,15 @@ namespace ne_bestla {
 class ne_threading {
  public:
   static bestla::parallel::IThreading* get() {
+    GetCPUDevice();
+    static bestla::parallel::StdThreading OptmizedThreading(4);
 #ifdef NS_USE_OMP
     static bestla::parallel::OMPThreading DefaultThreading(4);
-#else
-    static bestla::parallel::StdThreading DefaultThreading(4);
+    if (!_cd->isHybrid()) {
+      return &DefaultThreading;
+    }
 #endif  // _OPNEMP
-    return &DefaultThreading;
+    return &OptmizedThreading;
   }
 
   static void set_threads(int n_thread) { get()->set_threads(n_thread); }
