@@ -154,8 +154,7 @@ class Mul {
  public:
   using Param = ParamMul<_T>;
   static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
-                           const int M,
-                    const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
