@@ -114,8 +114,10 @@ struct gru_layer {
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
 
   using compute_attr = group::compute_attr_t<T, T, Act_T>;
-  using compute_policy =
-      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch::Xe>;
+  using compute_policy = compute_policy_default_xmx<
+      compute_attr,
+      perf_tuning_knob,
+      gpu_arch::XeHpc>;
   using mem_desc_a_t = mem_desc_t<T, layout_input, mem_loc_input>;
   using mem_desc_b_t = mem_desc_t<T, layout_weight, mem_loc_weight>;
   // Org the compute shape for sub-matrix
@@ -138,7 +140,7 @@ struct gru_layer {
   // define arguments for each epilogue_tile_op in chained_tile_op_t<>
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_default<gpu_arch::Xe>,
+      epilogue_policy_default<gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_c_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -155,12 +157,12 @@ struct gru_layer {
       mem_desc_a_t,
       matC_tile_desc_t,
       msg_type_v<matC_tile_desc_t, mem_loc_input>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using matC_payload_t = mem_payload_t<
       mem_desc_c_t,
       matC_tile_desc_t,
       msg_type::block_2d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using sigmoid_t = typename subgroup::sigmoid_op_t;
   using tanh_t = typename subgroup::tanh_op_t;
   static void inline call(sycl::nd_item<3>& item, fused_config_t<T>* args) {

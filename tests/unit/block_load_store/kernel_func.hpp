@@ -29,7 +29,7 @@ template <
     int bheight,
     bool transform = false,
     bool transpose = false,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct block_load_store_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,

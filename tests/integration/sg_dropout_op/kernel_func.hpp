@@ -46,7 +46,7 @@ struct dropout_func_t {
       dtype_in,
       sg_n,
       sg_m,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       mem_layout::row_major,
       reg_layout::tiled>;
   static constexpr uint32_t tile_size_x = sg_n;
@@ -67,15 +67,15 @@ struct dropout_func_t {
       mem_desc_in_t,
       tile_desc_t,
       subgroup::msg_type_v<tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using tile_op_t = typename std::conditional<
       dropout_kind == dropout_op::normal,
-      subgroup::dropout_op_t<uint8_t, gpu_arch::Xe>,
-      subgroup::rng_dropout_op_t<uint8_t, gpu_arch::Xe>>::type;
+      subgroup::dropout_op_t<uint8_t, gpu_arch::XeHpc>,
+      subgroup::rng_dropout_op_t<uint8_t, gpu_arch::XeHpc>>::type;
 
   using epilogue_t = group::epilogue_t<
-      group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>,
+      group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_out_t>;
   using epilogue_args_t = typename epilogue_t::arguments_t;

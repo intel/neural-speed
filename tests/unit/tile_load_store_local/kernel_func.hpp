@@ -46,12 +46,12 @@ struct tile_load_store_local_func {
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         tile_desc,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using payload_local_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         tile_desc,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     payload_global_t global_ld_payload(a, swidth, sheight, spitch, 0, 0);
     payload_global_t global_st_payload(c, swidth, sheight, spitch, 0, 0);
@@ -95,22 +95,22 @@ struct tile_load_store_vnni_local_func {
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         tile_desc,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using vnni_payload_global_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         vnni_tile_desc,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using payload_local_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         tile_desc,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using vnni_payload_local_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         vnni_tile_desc,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     payload_global_t global_ld_payload(a, swidth, sheight, spitch, 0, 0);
     vnni_payload_global_t vnni_global_ld_payload(
@@ -177,12 +177,12 @@ struct tile_transpose_store_local_func {
         mem_desc_t<dtype, mem_layout::col_major, mem_space::global>,
         tile_desc,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using payload_global_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         tile_desc,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using tile_config_store = tile_desc_t<
         twidth,
         theight,
@@ -194,13 +194,13 @@ struct tile_transpose_store_local_func {
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         tile_config_store,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using tile_config_load = tile_desc_t<twidth, theight, bwidth, bheight>;
     using slm_load_payload_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         tile_config_load,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mat_t mat;
     payload_matA_t payload_matA(a, swidth, sheight, spitch, 0, 0);
@@ -243,17 +243,17 @@ struct tile_load_store_1d_local_func {
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         tile_desc,
         theight == 1 ? msg_type::block_1d : msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using payload_local = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         tile_desc,
         msg_type::block_1d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using payload_local_ld = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::local>,
         tile_desc,
         msg_type::scatter,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     mat_t mat;
     payload_local local_block((uint32_t)0, twidth, theight, twidth, 0, 0);

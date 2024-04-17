@@ -24,7 +24,7 @@ template <
     typename dtype,
     int SIMD,
     int BLOCK_SIZE,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 KERNEL_FUNC inline void vector_add_func(
     [[maybe_unused]] sycl::nd_item<1>* item,
     dtype* a,

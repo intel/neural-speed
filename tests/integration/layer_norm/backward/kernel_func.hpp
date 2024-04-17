@@ -41,14 +41,14 @@ struct ln_bwd_func_t {
       dtype_x,
       dtype_acc,
       layer_norm_attr,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using layer_norm_bwd = gpu::xetla::kernel::layer_norm_bwd_t<
       dtype_x,
       dtype_y,
       dtype_weight,
       dtype_acc,
       layer_norm_attr,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       ln_fused_op>;
   static constexpr uint32_t slm_size = layer_norm_bwd::get_slm_size::size;
   static constexpr uint32_t barrier_count =
@@ -123,19 +123,19 @@ struct ln_bwd_final_func_t {
       dtype_weight,
       dtype_acc,
       reduction_attr,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using row_reduction1 = gpu::xetla::kernel::xetla_row_reduction_t<
       dtype_acc,
       dtype_weight,
       dtype_acc,
       reduction_attr,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using row_reduction2 = gpu::xetla::kernel::xetla_row_reduction_t<
       dtype_acc,
       dtype_x,
       dtype_acc,
       reduction_attr,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   static constexpr uint32_t slm_size = row_reduction0::get_slm_size::size;
   static constexpr uint32_t barrier_count =
       row_reduction0::get_barrier_count::count;

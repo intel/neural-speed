@@ -234,15 +234,15 @@ void dequantize_gemm_run(uint32_t iter) {
       data_type_zero_pt,
       gpu::xetla::group::quant_mode::S4_ASYM,
       dequant_s,
-      gpu_arch::Dg2>;
+      gpu_arch::XeHpg>;
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_default<gpu_arch::Dg2>,
+      xetla::group::epilogue_policy_default<gpu_arch::XeHpg>,
       tile_shape,
       mem_desc_c_t>;
-  using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
+  using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::XeHpg>;
   using gemm_op_t = xetla::kernel::gemm_universal_t<
       gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
           group_swizzle,

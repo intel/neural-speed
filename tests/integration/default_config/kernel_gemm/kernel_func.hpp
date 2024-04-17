@@ -62,7 +62,7 @@ struct default_config_kernel_gemm_test_func {
       mem_layout::row_major, // memory layout for C
       8, // leading dimension alignment for C, in unit of element
       dtype_acc, // accumulator data type for intermediate results
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       tune_option>;
 
   static const char* func_name() {

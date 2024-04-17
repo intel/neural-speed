@@ -118,7 +118,7 @@ void batch_gemm_run(uint32_t iter) {
       data_type_acc, // accumulator data type for intermediate results
       wg_shape, // computation tile shape
       wg_tile_k, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       tune_option>;
 
   using epilogue_t = xetla::group::default_epilogue_selector_t<
@@ -128,11 +128,11 @@ void batch_gemm_run(uint32_t iter) {
       mem_space::global, // memory writing to global mem for C
       wg_shape, // computation tile shape
       wg_tile_k, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       tune_option>;
 
   using batch_gemm_op_t =
-      xetla::kernel::batch_gemm_t<gemm_t, epilogue_t, gpu_arch::Xe>;
+      xetla::kernel::batch_gemm_t<gemm_t, epilogue_t, gpu_arch::XeHpc>;
 
   // set up gemm_universal arguments
   typename batch_gemm_op_t::arguments_t gemm_arg(

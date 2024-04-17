@@ -107,16 +107,16 @@ void stream_k_gemm_run(uint32_t iter) {
       tile_shape, // computation tile shape
       sg_tile_k, // elements in each iteration
       mma_engine::xmx, // compute engine
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       3,
       4> // GPU arch, prefetch stages, periodic sync frequency
       ::gemm;
 
   using dispatch_stream_k =
-      gpu::xetla::kernel::dispatch_policy_stream_k<gpu_arch::Xe>;
+      gpu::xetla::kernel::dispatch_policy_stream_k<gpu_arch::XeHpc>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_default<gpu_arch::Xe>,
+      xetla::group::epilogue_policy_default<gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_t<data_type_c, mem_layout::row_major, mem_space::global>>;
 
@@ -383,7 +383,7 @@ void stream_k_gemm_relu_biasadd_run(uint32_t iter) {
       tile_shape, // computation tile shape
       sg_tile_k, // elements in each iteration
       mma_engine::xmx, // compute engine
-      gpu_arch::Xe> // GPU arch
+      gpu_arch::XeHpc> // GPU arch
       ::gemm;
 
   // [ReLuBias] Chain multiple elementwise op in chained_tile_op_t<>: relu_op_t,
@@ -391,7 +391,7 @@ void stream_k_gemm_relu_biasadd_run(uint32_t iter) {
   using mem_desc_bias_t = xetla::
       mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>;
   using bias_op_t =
-      xetla::subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::Xe>;
+      xetla::subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::XeHpc>;
   using tile_op_t = xetla::subgroup::chained_tile_op_t<
       xetla::subgroup::relu_op_t, // apply elementwise ReLU
       bias_op_t // apply elementwise BiasAdd
@@ -405,12 +405,12 @@ void stream_k_gemm_relu_biasadd_run(uint32_t iter) {
   using mem_desc_output_t =
       mem_desc_t<data_type_c, mem_layout::row_major, mem_space::global>;
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>,
+      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_output_t>;
 
   using dispatch_stream_k =
-      gpu::xetla::kernel::dispatch_policy_stream_k<gpu_arch::Xe>;
+      gpu::xetla::kernel::dispatch_policy_stream_k<gpu_arch::XeHpc>;
 
   using gemm_op_t = xetla::kernel::
       gemm_universal_t<dispatch_stream_k, gemm_config, epilogue_t>;

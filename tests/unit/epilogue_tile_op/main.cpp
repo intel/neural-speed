@@ -81,7 +81,7 @@ TEST(tile_elemwise_op_gelu_fwd_w, esimd) {
           24,
           16,
           16,
-          gelu_fwd_w_op_t<float, gpu_arch::Xe>>>(nd_range, result_validate);
+          gelu_fwd_w_op_t<float, gpu_arch::XeHpc>>>(nd_range, result_validate);
 }
 
 TEST(tile_elemwise_op_gelu_bwd, esimd) {
@@ -99,7 +99,7 @@ TEST(tile_elemwise_op_gelu_bwd, esimd) {
           24,
           16,
           16,
-          gelu_bwd_op_t<float, gpu_arch::Xe>>>(nd_range, result_validate);
+          gelu_bwd_op_t<float, gpu_arch::XeHpc>>>(nd_range, result_validate);
 }
 
 TEST(tile_elemwise_op_bias_add, esimd) {
@@ -119,7 +119,7 @@ TEST(tile_elemwise_op_bias_add, esimd) {
           16,
           bias_add_op_t<
               mem_desc_t<float, mem_layout::row_major, mem_space::global>,
-              gpu_arch::Xe>>>(nd_range, result_validate);
+              gpu_arch::XeHpc>>>(nd_range, result_validate);
 }
 
 TEST(tile_elemwise_op_res_add, esimd) {
@@ -137,7 +137,7 @@ TEST(tile_elemwise_op_res_add, esimd) {
           24,
           16,
           16,
-          elemwise_reduce_op_t<reduce_op::sum, float, gpu_arch::Xe>>>(
+          elemwise_reduce_op_t<reduce_op::sum, float, gpu_arch::XeHpc>>>(
       nd_range, result_validate);
 }
 
@@ -156,7 +156,7 @@ TEST(tile_elemwise_op_linear_op, esimd) {
           32,
           16,
           16,
-          linear_op_t<float, gpu_arch::Xe>>>(nd_range, result_validate);
+          linear_op_t<float, gpu_arch::XeHpc>>>(nd_range, result_validate);
 }
 
 TEST(tile_elemwise_op_linear_op_2, esimd) {
@@ -174,5 +174,5 @@ TEST(tile_elemwise_op_linear_op_2, esimd) {
           24,
           16,
           16,
-          linear_op_t<float, gpu_arch::Xe>>>(nd_range, result_validate);
+          linear_op_t<float, gpu_arch::XeHpc>>>(nd_range, result_validate);
 }

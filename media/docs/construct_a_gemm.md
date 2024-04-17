@@ -68,7 +68,7 @@ For kernel level API, we can set two parameters in dispatch policy of `gemm_univ
 
 ```c++
  using dispatch_policy
-            = gpu::xetla::kernel::dispatch_policy_kslicing<num_global_splitk, num_local_splitk, gpu_arch::Xe>;
+            = gpu::xetla::kernel::dispatch_policy_kslicing<num_global_splitk, num_local_splitk, gpu_arch::XeHpc>;
 ```
 For group level API, the developer can leverage `group::cooperative_reduce_t` to add the final results by themselves.
 
@@ -91,7 +91,7 @@ decide the location of input and output matrix which is either from global or sh
             tile_shape, // computation tile shape
             sg_tile_k, // elements in each iteration
             mma_engine::xmx, // compute engine
-            gpu_arch::Xe, // GPU arch
+            gpu_arch::XeHpc, // GPU arch
             stages, // number of prefetch pipe stage
             sync_freq> // frequency of periodic sync, in unit of inner loop
             ::gemm;
@@ -113,7 +113,7 @@ The fusion of post-operations, such as `bias add`, `relu`, `gelu`,  after GEMM c
 
 ```c++
   using epilogue_t = xetla::group::epilogue_t<
-            xetla::group::epilogue_policy_default<gpu_arch::Xe>, tile_shape,
+            xetla::group::epilogue_policy_default<gpu_arch::XeHpc>, tile_shape,
             mem_desc_t<data_type_c, mem_layout::row_major, mem_space::global>>;
 class epilogue_t {};
 ```

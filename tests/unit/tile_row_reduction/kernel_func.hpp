@@ -49,12 +49,12 @@ struct tile_row_reduction_func {
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         matA_tile_desc_t,
         msg_type_v<matA_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matC_payload_t = mem_payload_t<
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         matC_tile_desc_t,
         msg_type_v<matC_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     matA_t matA;
     matC_t matC;
     matA_payload_t matA_payload(a, swidth, sheight, spitch, 0, 0);

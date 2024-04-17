@@ -93,7 +93,7 @@ void gemm_large_n_run(uint32_t iter) {
 
   // Micro-kernel configuration
   using group_swizzle =
-      xetla::kernel::group_swizzle_snake<wg_num_n, gpu_arch::Xe>;
+      xetla::kernel::group_swizzle_snake<wg_num_n, gpu_arch::XeHpc>;
 
   using tune_option = dict_t<
       elem_v_t<
@@ -116,7 +116,7 @@ void gemm_large_n_run(uint32_t iter) {
       mem_layout::row_major, // memory layout for C
       8, // leading dimension alignment for C, in unit of element
       data_type_acc, // accumulator data type for intermediate results
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       tune_option>;
 
   // set up gemm arguments
