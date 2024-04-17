@@ -24,7 +24,7 @@
 namespace gpu::xetla {
 
 ///@brief Host side utility function to compute number of leading zeros in the
-///binary representation
+/// binary representation
 inline int clz(int x) {
   for (int i = 31; i >= 0; i--) {
     if ((1 << i) & x) {

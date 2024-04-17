@@ -170,7 +170,7 @@ void sdp_fwd_run(uint32_t iter, uint32_t warmup = 10) {
 
   constexpr double slm_ratio_to_pvc =
       static_cast<double>(arch_attr_t<arch_tag>::local_mem_size) /
-      arch_attr_t<gpu_arch::Xe>::local_mem_size;
+      arch_attr_t<gpu_arch::XeHpc>::local_mem_size;
 
   constexpr uint32_t wg_tile_m_qksv = 64 * slm_ratio_to_pvc;
 

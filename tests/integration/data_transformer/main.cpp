@@ -115,7 +115,7 @@ static void data_transformer_run() {
             data_transformer_attr,
             Test::layout_in,
             need_fp8_op,
-            gpu_arch::Xe>;
+            gpu_arch::XeHpc>;
 
         constexpr uint32_t barrier_count =
             data_transformer::get_barrier_count::count;

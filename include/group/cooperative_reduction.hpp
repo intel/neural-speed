@@ -54,7 +54,7 @@ class cooperative_reduce_t<
     matAcc_t,
     num_cooperative_wg,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape = tile_shape_;
@@ -221,7 +221,7 @@ class cooperative_reduce_t<
     matAcc_t,
     1,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
  public:
   static constexpr gpu_arch arch_tag = arch_tag_;
   using tile_shape = tile_shape_;

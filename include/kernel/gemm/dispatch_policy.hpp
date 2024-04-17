@@ -148,7 +148,7 @@ struct dispatch_policy_kslicing {
 /// and performs inter-group reduction. Implementation loosely based on this
 /// paper - https://arxiv.org/pdf/2301.03598.pdf
 /// @tparam arch_tag_ Is the HW architecture.
-template <gpu_arch arch_tag_ = gpu_arch::Xe>
+template <gpu_arch arch_tag_ = gpu_arch::XeHpc>
 struct dispatch_policy_stream_k {
   static constexpr gpu_arch arch_tag = arch_tag_;
 
@@ -437,7 +437,7 @@ struct dispatch_policy_stream_k {
   }
 
   ///@brief Kernel helper function to return number of K-iters for normal sk
-  ///groups
+  /// groups
   __XETLA_API KERNEL_FUNC int get_sk_iters_per_normal_group() const {
     return static_cast<int>(div_mod_sk_iters_per_normal_group);
   }
@@ -501,7 +501,7 @@ struct dispatch_policy_stream_k {
   }
 
   ///@brief kernel function to get the first sk group index writing the sliced
-  ///output tile;
+  /// output tile;
   __XETLA_API KERNEL_FUNC int get_first_group_idx(int tile_idx, int group_idx)
       const {
     uint32_t current_tile_idx = tile_idx;

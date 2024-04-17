@@ -75,7 +75,7 @@ struct default_config_group_gemm_test_func {
       dtype_acc, // accumulator data type for intermediate results
       wg_shape, // computation tile shape
       k_stride, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       gemm_tune_option>;
 
   // Step 2: epilogue function to overwrite the result
@@ -97,10 +97,11 @@ struct default_config_group_gemm_test_func {
       mem_space::global, // memory writing to global mem for C
       wg_shape, // computation tile shape
       k_stride, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       epilogue_tune_option>;
 
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
 
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, global_kslicing, local_kslicing>;

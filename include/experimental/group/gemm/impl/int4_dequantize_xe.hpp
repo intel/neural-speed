@@ -38,16 +38,18 @@ template <
     typename dtype_zero_pt_,
     int dequant_s_,
     quant_mode quant_type_,
+    mma_engine mma_engine_,
     typename pre_processing_t_,
     gpu_arch arch_tag_>
 class gemm_t<
-    compute_policy_int4_dequantize_xmx<
+    compute_policy_int4_dequantize<
         compute_attr_,
         perf_tuning_knob_,
         dtype_scale_,
         dtype_zero_pt_,
         quant_type_,
         dequant_s_,
+        mma_engine_,
         arch_tag_>,
     tile_shape_, // tile shape of workgroup-level gemm
     mem_desc_a_t_, // memory attribute of matA
@@ -59,13 +61,14 @@ class gemm_t<
   using mem_desc_b_t = mem_desc_b_t_;
   using tile_shape = tile_shape_;
   using pre_processing_t = pre_processing_t_;
-  using compute_policy = compute_policy_int4_dequantize_xmx<
+  using compute_policy = compute_policy_int4_dequantize<
       compute_attr_,
       perf_tuning_knob_,
       dtype_scale_,
       dtype_zero_pt_,
       quant_type_,
       dequant_s_,
+      mma_engine_,
       arch_tag_>;
   static constexpr uint32_t k_stride = compute_policy::k_stride;
 
@@ -140,9 +143,14 @@ class gemm_t<
 
   /******** set tile  **********/
   static constexpr bool is_vnni_tiled_a =
-      (sizeof(dtype_a) < sizeof(uint32_t)) && is_col_major_a;
+      compute_policy::mma_engine == mma_engine::xmx
+      ? ((sizeof(dtype_a) < sizeof(uint32_t)) && is_col_major_a)
+      : false;
   static constexpr reg_layout reg_layout_a =
-      is_vnni_tiled_a ? reg_layout::vnni_tiled : reg_layout::tiled;
+      compute_policy::mma_engine == mma_engine::xmx
+      ? (is_vnni_tiled_a ? reg_layout::vnni_tiled : reg_layout::tiled)
+      : reg_layout::transpose_tiled;
+
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
       tile_size_y_a,
@@ -181,7 +189,7 @@ class gemm_t<
       tile_size_y_b,
       block_size_x_b,
       block_size_y_b,
-      reg_layout::vnni_tiled>;
+      reg_layout::tiled>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_acc_tile_desc_t>;
 
  public:
@@ -260,8 +268,9 @@ class gemm_t<
       matAcc_t,
       matB_acc_t,
       matA_acc_t,
-      mma_engine::xmx,
+      compute_policy::mma_engine,
       arch_tag>;
+
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
   static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
@@ -428,8 +437,8 @@ class gemm_t<
         sg_idx + barrier_count_y + nbarrier_base,
         nbarrier_role::producer_consumer);
 
-    int scale_prefetch_addr_i = 0;
-    int scale_load_addr_i = 0;
+    int scale_prefetch_addr_i = args.matB_base_desc.coord.y;
+    int scale_load_addr_i = args.matB_base_desc.coord.y;
     SW_BARRIER();
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
@@ -446,12 +455,12 @@ class gemm_t<
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             zero_pt_prefetch_payload);
       }
-      scale_prefetch_addr_i++;
+      scale_prefetch_addr_i += dequant_s;
       matA_prefetch_payload.template update_tdesc<update_dir_a>(
           matA_t::tile_size_x);
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
           matB_t::tile_size_y);
-      if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
+      if ((scale_prefetch_addr_i % dequant_s) == 0) {
         scale_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             scale_t::tile_size_y);
         zero_pt_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
@@ -465,7 +474,7 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.arrive();
           }
-          if constexpr (arch_tag >= gpu_arch::Xe) {
+          if constexpr (arch_tag >= gpu_arch::XeHpc) {
             if constexpr (wg_size_y > 1) {
               nbarrier_b.arrive();
             }
@@ -483,7 +492,7 @@ class gemm_t<
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
-      scale_load_addr_i++;
+      scale_load_addr_i += matB_t::tile_size_y;
       SW_BARRIER();
       if constexpr (stages != 0) {
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -499,12 +508,12 @@ class gemm_t<
           subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
               zero_pt_prefetch_payload);
         }
-        scale_prefetch_addr_i++;
+        scale_prefetch_addr_i += dequant_s;
       }
       SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
-      if ((scale_load_addr_i % scale_addr_update_freq) == 0) {
+      if ((scale_load_addr_i % dequant_s) == 0) {
         scale_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             scale_t::tile_size_y);
         zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
@@ -539,7 +548,7 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.wait();
           }
-          if constexpr (arch_tag >= gpu_arch::Xe) {
+          if constexpr (arch_tag >= gpu_arch::XeHpc) {
             if constexpr (wg_size_y > 1) {
               nbarrier_b.wait();
             }
@@ -551,6 +560,20 @@ class gemm_t<
   }
 
  private:
+  template <typename T>
+  void dump_mat(T mat, size_t tile_x, size_t tile_y) {
+#pragma unroll
+    for (size_t row = 0; row < tile_x; row++) {
+#pragma unroll
+      for (size_t col = 0; col < tile_y; col++) {
+        sycl::ext::oneapi::experimental::printf(
+            "%0.1f ", (float)(sycl::half)mat.reg[row * tile_y + col]);
+      }
+      sycl::ext::oneapi::experimental::printf("\n ");
+    }
+    sycl::ext::oneapi::experimental::printf("\n ");
+  }
+
   inline void dequantize(
       matB_acc_t& matB_acc,
       matB_t& matB,
@@ -559,7 +582,7 @@ class gemm_t<
     // no tail, because this is matB
     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
-    constexpr uint32_t vnni_rows = sizeof(uint32_t) / sizeof(dtype_mma_b);
+
     constexpr uint32_t block_b_y_per_scale = dequant_s / block_size_y_b;
 #pragma unroll
     for (uint32_t i = 0; i < num_block_y; ++i) {
@@ -569,7 +592,7 @@ class gemm_t<
         auto matB_blk = matB.reg
                             .xetla_select<matB_t::block_elems, 1>(
                                 block_id * matB_t::block_elems)
-                            .xetla_format<uint8_t>();
+                            .xetla_format<int8_t>();
         int scale_block_id = (i / block_b_y_per_scale * num_block_x + j);
         auto scale_vec = scale.reg.xetla_select<scale_t::block_size_x, 1>(
             scale_block_id * scale_t::block_size_x);
@@ -579,8 +602,6 @@ class gemm_t<
 
         // 2: int8 includes 2 4bits data.
         xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
-        cvt_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
-        cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
 
         xetla_vector<int32_t, block_size_x_b * block_size_y_b> cvt_blk_i32;
         if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
@@ -588,6 +609,8 @@ class gemm_t<
                                  .xetla_select<zero_pt_t::block_size_x, 1>(
                                      scale_block_id * zero_pt_t::block_size_x)
                                  .xetla_format<uint8_t>();
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
           xetla_vector<uint8_t, block_size_x_b> zero_pt_sub;
           zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(0) =
               zero_pt_vec & 0x0f;
@@ -605,39 +628,56 @@ class gemm_t<
         }
         if constexpr (
             compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-          xetla_vector<int8_t, block_size_x_b* block_size_y_b> cvt_blk_i8 =
-              (cvt_blk.xetla_format<int8_t>()) - int8_t(8);
+          xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk_i8;
+          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
+          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
+              cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) << 4;
+          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
+              cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) >> 4;
+          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1) =
+              matB_blk.xetla_format<int8_t>() >> 4;
           cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
         }
-
-        xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows> temp_blk;
-        temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
-            cvt_blk_i32;
+        if constexpr (compute_policy::mma_engine == mma_engine::xmx) {
+          constexpr uint32_t vnni_rows = sizeof(uint32_t) / sizeof(dtype_mma_b);
+          xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
+              temp_blk;
+          temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
+              cvt_blk_i32;
 
 #pragma unroll
-        for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+          for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+#pragma unroll
+            for (uint32_t row = 0; row < vnni_rows; row++) {
+              temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                  row + block_size_x_b * k * vnni_rows) =
+                  temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                      (k + row) * block_size_x_b * vnni_rows);
+            }
+          }
+
+          xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
 #pragma unroll
           for (uint32_t row = 0; row < vnni_rows; row++) {
-            temp_blk.xetla_select<block_size_x_b, vnni_rows>(
-                row + block_size_x_b * k * vnni_rows) =
-                temp_blk.xetla_select<block_size_x_b, vnni_rows>(
-                    (k + row) * block_size_x_b * vnni_rows);
+            scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) = scale_vec;
           }
-        }
-
-        xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
-#pragma unroll
-        for (uint32_t row = 0; row < vnni_rows; row++) {
-          scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) = scale_vec;
-        }
 
 #pragma unroll
-        for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
-          dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
-              k * block_size_x_b) =
-              temp_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
-                  k * block_size_x_b * vnni_rows) *
-              scale_blk;
+          for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+            dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                k * block_size_x_b) =
+                temp_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                    k * block_size_x_b * vnni_rows) *
+                scale_blk;
+          }
+        } else {
+#pragma unroll
+          for (uint32_t k = 0; k < block_size_y_b; k++) {
+            dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
+                cvt_blk_i32.xetla_select<block_size_x_b, 1>(
+                    k * block_size_x_b) *
+                scale_vec;
+          }
         }
       }
     }

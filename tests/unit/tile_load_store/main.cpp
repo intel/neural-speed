@@ -175,7 +175,7 @@ TEST(tile_load_store, esimd) {
           false,
           false,
           128,
-          gpu_arch::Dg2>>(nd_range, result_validate);
+          gpu_arch::XeHpg>>(nd_range, result_validate);
 }
 
 TEST(tile_load_transpose_store_1, esimd) {

@@ -148,7 +148,7 @@ void gemm_relu_bias_run(uint32_t iter) {
       xetla::mem_desc_t<float, mem_layout::row_major, mem_space::global>;
 
   using bias_op_t =
-      xetla::subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::Xe>;
+      xetla::subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::XeHpc>;
   using tile_op_t = xetla::subgroup::chained_tile_op_t<
       xetla::subgroup::relu_op_t, // apply elementwise ReLU
       bias_op_t // apply elementwise BiasAdd
@@ -160,7 +160,7 @@ void gemm_relu_bias_run(uint32_t iter) {
   // Mathematically epilogue_t is a map that applies to each element:
   //   epilogue_t: [m, n] -> [m, n], C_acc |-> tile_op_t(C_acc)
   using epilogue_policy =
-      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>;
+      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>;
 
   // Micro-kernel configuration
   using tune_option = dict_t<
@@ -180,7 +180,7 @@ void gemm_relu_bias_run(uint32_t iter) {
       mem_layout::row_major, // memory layout for C
       8, // leading dimension alignment for C, in unit of element
       data_type_acc, // accumulator data type for intermediate results
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       tune_option>;
   using gemm_op_t = typename default_config_t::type;
 

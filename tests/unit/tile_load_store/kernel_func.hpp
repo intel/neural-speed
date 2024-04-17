@@ -33,7 +33,7 @@ template <
     bool transform = false,
     bool transpose = false,
     int src_spitch = dst_spitch,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_load_store_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,
@@ -109,7 +109,7 @@ template <
     bool transform = false,
     bool transpose = false,
     int src_spitch = dst_spitch,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_load_store_unaligned_2d_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,
@@ -194,7 +194,7 @@ template <
     bool check_oob = true,
     bool transform = false,
     bool transpose = false,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_load_store_atomic_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,
@@ -258,7 +258,7 @@ template <
     int bheight,
     bool transform = false,
     bool transpose = false,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_load_broadcast_store_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,
@@ -309,7 +309,7 @@ template <
     bool check_boundary = false,
     bool transform = false,
     bool transpose = false,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_load_store_1d_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,
@@ -361,7 +361,7 @@ template <
     int offset_y,
     bool transpose = true,
     int src_spitch = dst_spitch,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_load_store_oob_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,
@@ -426,7 +426,7 @@ template <
     int offset_x,
     int offset_y,
     int src_spitch = dst_spitch,
-    gpu_arch arch_tag = gpu_arch::Xe>
+    gpu_arch arch_tag = gpu_arch::XeHpc>
 struct tile_padding_load_store_func {
   static KERNEL_FUNC inline void run(
       [[maybe_unused]] sycl::nd_item<1>* item,

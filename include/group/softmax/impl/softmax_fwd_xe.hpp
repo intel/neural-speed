@@ -27,11 +27,11 @@
 namespace gpu::xetla::group {
 
 template <typename dtype_acc_, typename tile_shape_>
-class softmax_t<softmax_policy_fwd<dtype_acc_, gpu_arch::Xe>, tile_shape_> {
+class softmax_t<softmax_policy_fwd<dtype_acc_, gpu_arch::XeHpc>, tile_shape_> {
  public:
   using tile_shape = tile_shape_;
   using dtype_acc = dtype_acc_;
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   struct arguments_t {
     dtype_acc sqrt_dk_inv;
     inline arguments_t() = default;
@@ -53,7 +53,7 @@ class softmax_t<softmax_policy_fwd<dtype_acc_, gpu_arch::Xe>, tile_shape_> {
       reduce_op::max,
       wg_size_x,
       true,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using wg_reduce_sum_t = group_reduce_t<
       dtype_acc,
       1,
@@ -61,7 +61,7 @@ class softmax_t<softmax_policy_fwd<dtype_acc_, gpu_arch::Xe>, tile_shape_> {
       reduce_op::sum,
       wg_size_x,
       true,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
  public:
   struct get_barrier_count {

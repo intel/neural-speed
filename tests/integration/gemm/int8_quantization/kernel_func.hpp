@@ -52,23 +52,24 @@ struct igemm_quantize_func {
       tile_shape,
       sg_k,
       mma_engine::xmx,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       prefetch_distance,
       periodic_sync_interval>::gemm;
   using dequant_op_t = subgroup::dequant_op_t<
-      scale_v_offset_v_op_t<dtype_param, dtype_param, gpu_arch::Xe>,
-      gpu_arch::Xe>;
-  using quant_op_t = subgroup::quant_op_t<none_op_t, gpu_arch::Xe>;
+      scale_v_offset_v_op_t<dtype_param, dtype_param, gpu_arch::XeHpc>,
+      gpu_arch::XeHpc>;
+  using quant_op_t = subgroup::quant_op_t<none_op_t, gpu_arch::XeHpc>;
   using epilogue_t = gpu::xetla::group::epilogue_t<
       gpu::xetla::group::epilogue_policy_quant_op<
           dequant_op_t,
           none_op_t,
           quant_op_t,
-          gpu_arch::Xe>,
+          gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global>>;
 
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
 
   using dispatch_policy =
       gpu::xetla::kernel::dispatch_policy_default<group_swizzle>;

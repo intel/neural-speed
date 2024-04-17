@@ -51,11 +51,14 @@ struct fp16_gemm_test_func {
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
   using compute_policy = typename std::conditional<
       (engine == mma_engine::fpu),
-      compute_policy_default_fpu<compute_attr, perf_tuning_knob, gpu_arch::Xe>,
+      compute_policy_default_fpu<
+          compute_attr,
+          perf_tuning_knob,
+          gpu_arch::XeHpc>,
       compute_policy_default_xmx<
           compute_attr,
           perf_tuning_knob,
-          gpu_arch::Xe>>::type;
+          gpu_arch::XeHpc>>::type;
 
   using mem_desc_input_a = mem_desc_t<dtype_a, layout_a, mem_space::global>;
   using mem_desc_input_b = mem_desc_t<dtype_b, layout_b, mem_space::global>;
@@ -66,11 +69,12 @@ struct fp16_gemm_test_func {
       gemm_t<compute_policy, tile_shape, mem_desc_input_a, mem_desc_input_b>;
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_default<gpu_arch::Xe>,
+      epilogue_policy_default<gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_output_c>;
 
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
 
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, global_kslicing, local_kslicing>;

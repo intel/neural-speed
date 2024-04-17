@@ -33,14 +33,14 @@ namespace gpu::xetla::kernel {
 /// @tparam epilogue_t_ Is the epilogue functor to compose a GEMM_UNIVERSAL.
 template <typename gemm_t_, typename epilogue_t_>
 class gemm_universal_t<
-    dispatch_policy_stream_k<gpu_arch::Xe>,
+    dispatch_policy_stream_k<gpu_arch::XeHpc>,
     gemm_t_,
     epilogue_t_> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
-  using dispatch_stream_k = dispatch_policy_stream_k<gpu_arch::Xe>;
+  using dispatch_stream_k = dispatch_policy_stream_k<gpu_arch::XeHpc>;
 
   // Scratchspace to accumulate partials
   using mem_desc_d_t =
@@ -63,7 +63,7 @@ class gemm_universal_t<
 
   using work_group_t = typename gemm_t::work_group_t;
 
-  static constexpr gpu_arch arch_tag = gpu_arch::Xe;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static_assert(arch_tag == gemm_t::arch_tag, "arch_tag should be the same");
 
   using mem_desc_a_t = typename gemm_t::mem_desc_a_t;
@@ -625,7 +625,6 @@ class gemm_universal_t<
     }
   }
 };
-
 /// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

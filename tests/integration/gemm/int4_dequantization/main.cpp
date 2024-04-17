@@ -227,22 +227,23 @@ void dequantize_gemm_run(uint32_t iter) {
       compute_attr_t<data_type_acc_in, data_type_acc_in, data_type_acc>;
   using perf_tuning_knob = xetla::group::
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
-  using compute_policy = xetla::group::compute_policy_int4_dequantize_xmx<
+  using compute_policy = xetla::group::compute_policy_int4_dequantize<
       compute_attr,
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
       gpu::xetla::group::quant_mode::S4_ASYM,
       dequant_s,
-      gpu_arch::Dg2>;
+      mma_engine::xmx,
+      gpu_arch::XeHpg>;
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_default<gpu_arch::Dg2>,
+      xetla::group::epilogue_policy_default<gpu_arch::XeHpg>,
       tile_shape,
       mem_desc_c_t>;
-  using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::Dg2>;
+  using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::XeHpg>;
   using gemm_op_t = xetla::kernel::gemm_universal_t<
       gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
           group_swizzle,

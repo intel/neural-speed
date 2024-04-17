@@ -227,7 +227,7 @@ void gemm_softmax_run(uint32_t iter) {
               data_type_sfx, // accumulator data type for intermediate results
               wg_shape, // computation tile shape
               k_iter_num, // elements in each iteration
-              gpu_arch::Xe, // GPU arch
+              gpu_arch::XeHpc, // GPU arch
               tune_option>;
 
           using gemm_args_t = gemm_op_t::arguments_t;
@@ -239,14 +239,14 @@ void gemm_softmax_run(uint32_t iter) {
               mem_space::global, // memory writing to global mem for C
               wg_shape, // computation tile shape
               k_iter_num, // elements in each iteration
-              gpu_arch::Xe, // GPU arch
+              gpu_arch::XeHpc, // GPU arch
               tune_option>;
 
           // using experimental::group::softmax
           // define softmax forward op
           using tile_shape = typename gemm_op_t::tile_shape;
           using softmax_fwd_t = softmax_t<
-              softmax_policy_fwd<data_type_sfx, gpu_arch::Xe>,
+              softmax_policy_fwd<data_type_sfx, gpu_arch::XeHpc>,
               tile_shape>;
           using softmax_fwd_args_t = typename softmax_fwd_t::arguments_t;
 

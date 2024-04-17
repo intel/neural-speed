@@ -42,10 +42,10 @@ struct tile_elemwise_op_func {
       mem_desc_c_t,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using tile_shape = tile_shape_t<twidth, theight, twidth, theight>;
 
-  using epilogue_policy = epilogue_policy_tile_op<tile_op_t, gpu_arch::Xe>;
+  using epilogue_policy = epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>;
   using epilogue_t = epilogue_t<epilogue_policy, tile_shape, mem_desc_c_t>;
   using work_group_t = typename tile_shape::work_group_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -86,7 +86,7 @@ struct tile_elemwise_op_func<
     theight,
     bwidth,
     bheight,
-    gelu_fwd_w_op_t<dtype, gpu_arch::Xe>> {
+    gelu_fwd_w_op_t<dtype, gpu_arch::XeHpc>> {
   using mem_desc_b_t =
       mem_desc_t<dtype, mem_layout::row_major, mem_space::global>;
   using matA_tile_desc_t =
@@ -96,11 +96,11 @@ struct tile_elemwise_op_func<
       mem_desc_b_t,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using tile_shape = tile_shape_t<twidth, theight, twidth, theight>;
   using epilogue_policy = epilogue_policy_tile_op<
-      gelu_fwd_w_op_t<dtype, gpu_arch::Xe>,
-      gpu_arch::Xe>;
+      gelu_fwd_w_op_t<dtype, gpu_arch::XeHpc>,
+      gpu_arch::XeHpc>;
   using epilogue_t = epilogue_t<epilogue_policy, tile_shape, mem_desc_b_t>;
   using work_group_t = typename tile_shape::work_group_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -141,7 +141,7 @@ struct tile_elemwise_op_func<
     theight,
     bwidth,
     bheight,
-    gelu_bwd_op_t<dtype, gpu_arch::Xe>> {
+    gelu_bwd_op_t<dtype, gpu_arch::XeHpc>> {
   using mem_desc_c_t =
       mem_desc_t<dtype, mem_layout::row_major, mem_space::global>;
   using matA_tile_desc_t =
@@ -151,10 +151,11 @@ struct tile_elemwise_op_func<
       mem_desc_c_t,
       matA_tile_desc_t,
       msg_type_v<matA_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using tile_shape = tile_shape_t<twidth, theight, twidth, theight>;
-  using epilogue_policy =
-      epilogue_policy_tile_op<gelu_bwd_op_t<dtype, gpu_arch::Xe>, gpu_arch::Xe>;
+  using epilogue_policy = epilogue_policy_tile_op<
+      gelu_bwd_op_t<dtype, gpu_arch::XeHpc>,
+      gpu_arch::XeHpc>;
   using epilogue_t = epilogue_t<epilogue_policy, tile_shape, mem_desc_c_t>;
   using work_group_t = typename tile_shape::work_group_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -197,7 +198,7 @@ struct tile_elemwise_op_func<
     bheight,
     bias_add_op_t<
         gpu::xetla::mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
-        gpu_arch::Xe>> {
+        gpu_arch::XeHpc>> {
   using matAcc_t = tile_t<
       dtype,
       tile_desc_t<twidth, theight, bwidth, bheight, reg_layout::tiled>>;
@@ -205,8 +206,8 @@ struct tile_elemwise_op_func<
   using mem_desc_c_t =
       mem_desc_t<dtype, mem_layout::row_major, mem_space::global>;
   using epilogue_policy = epilogue_policy_tile_op<
-      bias_add_op_t<mem_desc_c_t, gpu_arch::Xe>,
-      gpu_arch::Xe>;
+      bias_add_op_t<mem_desc_c_t, gpu_arch::XeHpc>,
+      gpu_arch::XeHpc>;
   using epilogue_t = epilogue_t<epilogue_policy, tile_shape, mem_desc_c_t>;
   using work_group_t = typename tile_shape::work_group_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -245,7 +246,7 @@ struct tile_elemwise_op_func<
     theight,
     bwidth,
     bheight,
-    elemwise_reduce_op_t<reduce_kind, dtype, gpu_arch::Xe>> {
+    elemwise_reduce_op_t<reduce_kind, dtype, gpu_arch::XeHpc>> {
   using matAcc_t = tile_t<
       dtype,
       tile_desc_t<twidth, theight, bwidth, bheight, reg_layout::tiled>>;
@@ -253,8 +254,8 @@ struct tile_elemwise_op_func<
   using mem_desc_c_t =
       mem_desc_t<dtype, mem_layout::row_major, mem_space::global>;
   using epilogue_policy = epilogue_policy_tile_op<
-      elemwise_reduce_op_t<reduce_kind, dtype, gpu_arch::Xe>,
-      gpu_arch::Xe>;
+      elemwise_reduce_op_t<reduce_kind, dtype, gpu_arch::XeHpc>,
+      gpu_arch::XeHpc>;
   using epilogue_t = epilogue_t<epilogue_policy, tile_shape, mem_desc_c_t>;
   using work_group_t = typename tile_shape::work_group_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;
@@ -292,7 +293,7 @@ struct tile_elemwise_op_func<
     theight,
     bwidth,
     bheight,
-    linear_op_t<dtype, gpu_arch::Xe>> {
+    linear_op_t<dtype, gpu_arch::XeHpc>> {
   using matAcc_t = tile_t<
       dtype,
       tile_desc_t<twidth, theight, bwidth, bheight, reg_layout::tiled>>;
@@ -300,8 +301,9 @@ struct tile_elemwise_op_func<
   using mem_desc_c_t =
       mem_desc_t<dtype, mem_layout::row_major, mem_space::global>;
 
-  using epilogue_policy =
-      epilogue_policy_tile_op<linear_op_t<dtype, gpu_arch::Xe>, gpu_arch::Xe>;
+  using epilogue_policy = epilogue_policy_tile_op<
+      linear_op_t<dtype, gpu_arch::XeHpc>,
+      gpu_arch::XeHpc>;
   using epilogue_t = epilogue_t<epilogue_policy, tile_shape, mem_desc_c_t>;
   using work_group_t = typename tile_shape::work_group_t;
   using epilogue_args_t = typename epilogue_t::arguments_t;

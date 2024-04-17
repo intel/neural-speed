@@ -26,7 +26,7 @@ Level</p></b></td>
   to <b>table 1-1</b></i><span style='mso-spacerun:yes'> </span></td>
   <td class=xl152 width=440 style='border-top:none;border-left:none;width:330pt'>template
   <typename T><br>
-    class general_1d<gpu_arch::Xe, T>::check_alignment(T *base, uint32_t pitch)</td>
+    class general_1d<gpu_arch::XeHpc, T>::check_alignment(T *base, uint32_t pitch)</td>
  </tr>
  <tr height=43 style='height:32.5pt'>
   <td class=xl152 width=118 style='border-top:none;border-left:none;width:89pt'>block
@@ -35,7 +35,7 @@ Level</p></b></td>
   to <b>table 1-2</b></i><span style='mso-spacerun:yes'> </span></td>
   <td class=xl152 width=440 style='border-top:none;border-left:none;width:330pt'>template
   <typename T><br>
-    class block_2d<gpu_arch::Xe, T>::check_tensor(
+    class block_2d<gpu_arch::XeHpc, T>::check_tensor(
             uint64_t base, uint32_t width, uint32_t height, uint32_t pitch)</td>
  </tr>
  <tr height=86 style='height:64.5pt'>
@@ -190,7 +190,7 @@ Level</p></b></td>
   <td rowspan=2 class=xl152 width=440 style='border-top:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_load<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_load<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>template <bool mem_transform,
   size_t block_size_x><br>
     <span style='mso-spacerun:yes'>    </span>struct global_2d</td>
@@ -207,7 +207,7 @@ Level</p></b></td>
   <td class=xl152 width=440 style='border-top:none;border-left:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_load<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_load<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>
     <span style='mso-spacerun:yes'>    </span>struct global_1d</td>
  </tr>
@@ -220,7 +220,7 @@ Level</p></b></td>
   <td rowspan=5 class=xl152 width=440 style='border-top:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_load<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_load<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>template <mem_layout memory_layout, size_t block_size_x, size_t tile_bytes,
             size_t min_bytes, size_t block_bytes, size_t num_channel_x,
             size_t num_channel><br>
@@ -251,7 +251,7 @@ Level</p></b></td>
   <td class=xl152 width=440 style='border-top:none;border-left:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_load<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_load<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>
     <span style='mso-spacerun:yes'>    </span>struct local_1d</td>
  </tr>
@@ -266,7 +266,7 @@ Level</p></b></td>
   <td class=xl152 width=440 style='border-top:none;border-left:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_store<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_store<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>template <size_t
   block_size_x><br>
     <span style='mso-spacerun:yes'>    </span>struct global_2d</td>
@@ -280,7 +280,7 @@ Level</p></b></td>
   <td class=xl152 width=440 style='border-top:none;border-left:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_store<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_store<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>
     <span style='mso-spacerun:yes'>    </span>struct global_1d</td>
  </tr>
@@ -293,7 +293,7 @@ Level</p></b></td>
   <td rowspan=4 class=xl152 width=440 style='border-top:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_store<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_store<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>template <size_t tile_bytes, size_t min_store_bytes, size_t block_bytes,
             size_t num_channel_x, size_t num_channel><br>
     <span style='mso-spacerun:yes'>    </span>struct global_atomic</td>
@@ -319,7 +319,7 @@ Level</p></b></td>
   <td rowspan=2 class=xl152 width=440 style='border-top:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_store<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_store<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>template <size_t tile_bytes, size_t min_bytes, size_t block_bytes,
             size_t num_channel_x, size_t num_channel><br>
     <span style='mso-spacerun:yes'>    </span>struct local_scatter</td>
@@ -337,7 +337,7 @@ Level</p></b></td>
   <td rowspan=2 class=xl152 width=440 style='border-top:none;width:330pt;
   box-sizing: border-box;border:var(--borderColor-default, var(--color-border-default))'>template
   <typename dtype, typename mem_dtype><br>
-    struct check_store<gpu_arch::Xe, dtype, mem_dtype> {<br>
+    struct check_store<gpu_arch::XeHpc, dtype, mem_dtype> {<br>
     <span style='mso-spacerun:yes'>    </span>template <size_t tile_bytes, size_t min_store_bytes, size_t block_bytes,
             size_t num_channel_x, size_t num_channel><br>
     <span style='mso-spacerun:yes'>    </span>struct local_scatter_vnni_col</td>

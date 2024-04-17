@@ -22,6 +22,7 @@
 #include <common/core/base_ops.hpp>
 #include <common/core/base_types.hpp>
 #include <common/core/common.hpp>
+#include <common/core/explicit_conv.hpp>
 #include <common/utils/limitation.hpp>
 
 namespace gpu::xetla {
@@ -322,8 +323,8 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts, N>(
-          offsets, (uint64_t)p));
+      core::general_1d<gpu_arch::XeHpc, Ty>::
+          template check_restriction<NElts, N>(offsets, (uint64_t)p));
 
   return __ESIMD_ENS::lsc_gather<
       T,
@@ -364,7 +365,7 @@ __XETLA_API xetla_vector<Ty, NElts> xetla_load_global(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts>(
+      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
           offset, (uint64_t)p));
 
   return __ESIMD_ENS::lsc_block_load<
@@ -607,8 +608,8 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts, N>(
-          offsets));
+      core::general_1d<gpu_arch::XeHpc, Ty>::
+          template check_restriction<NElts, N>(offsets));
 
   return __ESIMD_ENS::
       lsc_slm_gather<T, NElts, gpu::xetla::detail::get_data_size(DS), N>(
@@ -638,7 +639,7 @@ __XETLA_API xetla_vector<Ty, NElts> xetla_load_local(uint32_t offset) {
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts>(
+      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
           (uint64_t)offset));
 
   return __ESIMD_ENS::
@@ -674,7 +675,7 @@ __XETLA_API void xetla_store_local(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::
+      core::general_1d<gpu_arch::XeHpc, Ty>::
           template check_restriction<NElts, N, uint32_t>(offsets));
 
   __ESIMD_ENS::
@@ -706,7 +707,7 @@ __XETLA_API void xetla_store_local(
   using T = native_type_t<Ty>;
   DEBUG_INVOKE(
       dbg_level::core,
-      core::general_1d<gpu_arch::Xe, Ty>::template check_restriction<NElts>(
+      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
           offset));
 
   __ESIMD_ENS::

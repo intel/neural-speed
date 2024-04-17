@@ -55,16 +55,17 @@ struct unaligned_gemm_test_func {
       tile_shape,
       sg_k,
       engine,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       prefetch_distance,
       periodic_sync_interval>::gemm;
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_unaligned<gpu_arch::Xe>,
+      epilogue_policy_unaligned<gpu_arch::XeHpc>,
       tile_shape,
       mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global, 1>>;
 
-  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<gpu_arch::Xe>;
+  using group_swizzle =
+      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, global_kslicing, local_kslicing>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;

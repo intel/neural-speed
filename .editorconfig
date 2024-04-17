@@ -12,4 +12,4 @@ trim_trailing_whitespace = true
 # C/C++ follows clang-format
 [*.{c,cpp,h,hpp}]
 indent_style = space
-indent_size = 4
+indent_size = 2

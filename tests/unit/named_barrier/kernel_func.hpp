@@ -20,7 +20,7 @@
 
 using namespace gpu::xetla;
 
-template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::Xe>
+template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::XeHpc>
 struct named_barrier_func {
   static KERNEL_FUNC inline void run(
       sycl::nd_item<1>* item,
@@ -48,7 +48,7 @@ struct named_barrier_func {
     }
   }
 };
-template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::Xe>
+template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::XeHpc>
 struct named_barrier_producer_consumer_1_func {
   // 2 producer and 2 consumer threads
   // only one named barrier used
@@ -85,7 +85,7 @@ struct named_barrier_producer_consumer_1_func {
   }
 };
 
-template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::Xe>
+template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::XeHpc>
 struct named_barrier_producer_consumer_2_func {
   // 32 threads in workgroup
   // 16 producer threads, 16 consumer threads
@@ -124,7 +124,7 @@ struct named_barrier_producer_consumer_2_func {
   }
 };
 
-template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::Xe>
+template <typename dtype, int SIMD, gpu_arch arch_tag = gpu_arch::XeHpc>
 struct named_barrier_producer_consumer_3_func {
   // 16 threads in workgroup
   // 8 producer threads, 8 consumer threads

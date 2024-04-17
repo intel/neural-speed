@@ -67,7 +67,7 @@ KERNEL_FUNC inline void data_transformer_func(
       data_transformer_attr,
       mem_layout_in,
       need_fp8_op,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   typename data_transformer::arguments_t args;
   args.mat_in_ptr = buffer_in;

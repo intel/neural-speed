@@ -192,7 +192,7 @@ void mlp_run(uint32_t iter) {
   // Micro-kernel configuration
   using epilogue_policy_layer1 = xetla::group::epilogue_policy_tile_op<
       xetla::subgroup::chained_tile_op_t<gpu::xetla::subgroup::relu_op_t>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using layer1_tune_option = dict_t<
       elem_v_t<
           tune_key::param_optimizer_type,
@@ -213,7 +213,7 @@ void mlp_run(uint32_t iter) {
       data_type_acc, // accumulator data type for intermediate results
       wg_shape_layer1, // computation tile shape
       wg_tile_k, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       layer1_tune_option>;
 
   using epilogue_layer1_t = xetla::group::default_epilogue_selector_t<
@@ -223,7 +223,7 @@ void mlp_run(uint32_t iter) {
       mem_space::global, // memory writing to global mem for B
       wg_shape_layer1, // computation tile shape
       wg_tile_k, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       layer1_tune_option>;
 
   using wg_shape_layer2 = shape<wg_tile_n_layer2, wg_tile_m_layer2>;
@@ -249,7 +249,7 @@ void mlp_run(uint32_t iter) {
       data_type_acc, // accumulator data type for intermediate results
       wg_shape_layer2, // computation tile shape
       wg_tile_k, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       layer2_tune_option>;
 
   using epilogue_layer2_t = xetla::group::default_epilogue_selector_t<
@@ -259,7 +259,7 @@ void mlp_run(uint32_t iter) {
       mem_space::global, // memory writing to global mem for C
       wg_shape_layer2, // computation tile shape
       wg_tile_k, // elements in each iteration
-      gpu_arch::Xe, // GPU arch
+      gpu_arch::XeHpc, // GPU arch
       layer2_tune_option>;
 
   using mlp_op_t = xetla::kernel::multi_layer_perceptron_t<
@@ -267,7 +267,7 @@ void mlp_run(uint32_t iter) {
       epilogue_layer1_t,
       gemm_layer2_t,
       epilogue_layer2_t,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   // set up mlp arguments
   // for relu we don't need to set arguments

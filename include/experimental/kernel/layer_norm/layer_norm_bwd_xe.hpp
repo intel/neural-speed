@@ -47,7 +47,7 @@ struct layer_norm_bwd_t<
     dtype_weight_,
     dtype_acc_,
     layer_norm_attr_,
-    gpu_arch::Xe,
+    gpu_arch::XeHpc,
     ln_bwd_fused_op_> {
   using dtype_x = dtype_x_;
   using dtype_y = dtype_y_;
@@ -96,22 +96,22 @@ struct layer_norm_bwd_t<
       mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using x_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using gamma_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using dx_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   using ln_group_row_reduce_store_t = group::group_row_reduce_store_t<
       dtype_acc,
@@ -120,7 +120,7 @@ struct layer_norm_bwd_t<
       wg_size_x,
       wg_size_y,
       32,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
   /// @brief
   ///
@@ -162,7 +162,7 @@ struct layer_norm_bwd_t<
       reduce_op Op,
       uint32_t wg_size_x,
       uint32_t wg_size_y,
-      gpu_arch arch_ = gpu_arch::Xe>
+      gpu_arch arch_ = gpu_arch::XeHpc>
   struct ln_group_all_reduce_t {
     uint32_t itr_count;
     uint32_t slm_base_0;
@@ -266,7 +266,7 @@ struct layer_norm_bwd_t<
       reduce_op::sum,
       wg_size_x,
       wg_size_y,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
 
  public:
   __XETLA_API static void call(

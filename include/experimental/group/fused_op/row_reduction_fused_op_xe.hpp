@@ -61,7 +61,7 @@ struct row_reduction_fused_op_t<
     dtype_out_,
     dtype_acc_,
     reduction_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr reduction_fused_kind fused_op_kind = fused_op_kind_;
   using dtype_in = dtype_in_;
   using dtype_out = dtype_out_;
@@ -90,7 +90,7 @@ struct row_reduction_fused_op_t<
     dtype_out_,
     dtype_acc_,
     reduction_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr reduction_fused_kind fused_op_kind =
       reduction_fused_kind::bias_gelu_w_bwd;
   using dtype_in = dtype_in_;
@@ -143,13 +143,13 @@ struct row_reduction_fused_op_t<
         mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
         dgelu_tile_desc_t,
         subgroup::msg_type_v<dgelu_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using dgelu_x_out_t = subgroup::tile_t<dtype_out, dgelu_tile_desc_t>;
     using dgelu_x_out_payload_t = subgroup::mem_payload_t<
         mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
         dgelu_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     dgelu_w_in_t dgelu_w_in;
     dgelu_w_in_payload_t dgelu_w_in_payload(w_load_base_desc);
     subgroup::tile_load(dgelu_w_in, dgelu_w_in_payload);
@@ -185,7 +185,7 @@ struct row_reduction_fused_op_t<
     dtype_out_,
     dtype_acc_,
     reduction_attr_,
-    gpu_arch::Xe> {
+    gpu_arch::XeHpc> {
   static constexpr reduction_fused_kind fused_op_kind =
       reduction_fused_kind::bias_dropout_bwd;
   using dtype_in = dtype_in_;
@@ -238,14 +238,14 @@ struct row_reduction_fused_op_t<
         mem_desc_t<dtype_mask, mem_layout::row_major, mem_space::global>,
         reduction_tile_desc_t,
         subgroup::msg_type_v<reduction_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using dropout_bwd_out_t =
         subgroup::tile_t<dtype_out, reduction_tile_desc_t>;
     using dropout_bwd_out_payload_t = subgroup::mem_payload_t<
         mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>,
         reduction_tile_desc_t,
         subgroup::msg_type_v<reduction_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     if (dropout_prob != 0) {
       mask_in_t mask_in;
       mask_in_payload_t mask_in_payload(mask_load_base_desc);

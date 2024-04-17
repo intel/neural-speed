@@ -41,13 +41,13 @@ struct row_reduction_func_t {
       dtype_x,
       dtype_acc,
       reduction_attr,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using row_reduction = gpu::xetla::kernel::xetla_row_reduction_t<
       dtype_in,
       dtype_out,
       dtype_acc,
       reduction_attr,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       fused_op_t>;
 
   static constexpr uint32_t slm_size = row_reduction::get_slm_size::size;

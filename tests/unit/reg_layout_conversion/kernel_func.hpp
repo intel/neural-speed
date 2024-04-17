@@ -52,7 +52,7 @@ struct conversion_func {
         mem_desc_t<dtype, mem_layout::row_major, mem_space::global>,
         tiled_desc,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     tiled_tile_t data_tile;
     linear_tile_t linear_data_tile;

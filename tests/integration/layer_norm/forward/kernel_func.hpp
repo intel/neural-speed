@@ -43,7 +43,7 @@ struct ln_fwd_func_t {
       dtype_x,
       dtype_acc,
       layer_norm_attr,
-      gpu_arch::Xe>;
+      gpu_arch::XeHpc>;
   using layer_norm_fwd = gpu::xetla::kernel::layer_norm_fwd_t<
       dtype_x,
       dtype_y,
@@ -51,7 +51,7 @@ struct ln_fwd_func_t {
       dtype_acc,
       layer_norm_attr,
       store_for_bwd,
-      gpu_arch::Xe,
+      gpu_arch::XeHpc,
       ln_fused_op>;
 
   static constexpr uint32_t slm_size = layer_norm_fwd::get_slm_size::size;

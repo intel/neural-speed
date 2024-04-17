@@ -81,7 +81,6 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
       queue,
       device,
       context);
-
   size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
   size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
   auto Acc = alloc_device_and_init<data_type_acc>(
@@ -275,7 +274,7 @@ void kernel_run(auto nd_range, auto validate_result) {
 /// @example example usage in /examples/01 or /examples/02
 template <template <gpu_arch> class F>
 class dispatch_arch {
-  using T_RET = std::invoke_result_t<decltype(F<gpu_arch::Xe>::exec)>;
+  using T_RET = std::invoke_result_t<decltype(F<gpu_arch::XeHpc>::exec)>;
 
  public:
   template <typename... Args>
@@ -300,12 +299,12 @@ class dispatch_arch {
     auto deviceArch = device.get_info<ENS::info::device::architecture>();
     switch (deviceArch) {
       case ENS::architecture::intel_gpu_pvc:
-        return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
+        return F<gpu_arch::XeHpc>::exec(std::forward<Args>(args)...);
         return;
       case ENS::architecture::intel_gpu_dg2_g10:
       case ENS::architecture::intel_gpu_dg2_g11:
       case ENS::architecture::intel_gpu_dg2_g12:
-        return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
+        return F<gpu_arch::XeHpg>::exec(std::forward<Args>(args)...);
       default:
         break;
     }
@@ -320,10 +319,10 @@ class dispatch_arch {
       case 0x5690: // Intel® Arc ™ A770M Graphics
       case 0x5691: // Intel® Arc ™ A730M Graphics
       case 0x5692: // Intel® Arc ™ A550M Graphics
-        return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
+        return F<gpu_arch::XeHpg>::exec(std::forward<Args>(args)...);
       // PVC devices
       case 0x0bda: //
-        return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
+        return F<gpu_arch::XeHpc>::exec(std::forward<Args>(args)...);
       default:
         std::cout << "Unknown device ID \n";
         break;
@@ -334,9 +333,9 @@ class dispatch_arch {
     auto eu_simd_width =
         device.get_info<ext::intel::info::device::gpu_eu_simd_width>();
     if (eu_simd_width == 8) {
-      return F<gpu_arch::Dg2>::exec(std::forward<Args>(args)...);
+      return F<gpu_arch::XeHpg>::exec(std::forward<Args>(args)...);
     } else if (eu_simd_width == 16) {
-      return F<gpu_arch::Xe>::exec(std::forward<Args>(args)...);
+      return F<gpu_arch::XeHpc>::exec(std::forward<Args>(args)...);
     } else {
       throw std::runtime_error("Can not get device ID");
     }

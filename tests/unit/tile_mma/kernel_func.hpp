@@ -60,17 +60,17 @@ struct tile_mma_func {
         mem_desc_t<dtypeA, mem_layout::row_major, mem_space::global>,
         matA_tile_desc_t,
         msg_type_v<matA_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matB_payload_t = mem_payload_t<
         mem_desc_t<dtypeB, mem_layout::row_major, mem_space::global>,
         matB_tile_desc_t,
         msg_type_v<matB_tile_desc_t, mem_space::global>,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matC_payload_t = mem_payload_t<
         mem_desc_t<dtypeC, mem_layout::row_major, mem_space::global>,
         matC_tile_desc_t,
         msg_type::block_2d,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
     using matAcc_t =
         tile_t<dtypeAcc, tile_desc_t<n, m, 16, 8, reg_layout::tiled>>;
 
@@ -80,7 +80,7 @@ struct tile_mma_func {
         matB_t,
         matA_t,
         mma_engine::xmx,
-        gpu_arch::Xe>;
+        gpu_arch::XeHpc>;
 
     matA_t matA;
     matB_t matB;

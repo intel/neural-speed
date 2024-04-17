@@ -23,7 +23,7 @@
 
 namespace gpu::xetla::group {
 
-enum quant_mode { S4_ASYM, S4_FULLRANGE_NO_ZP };
+enum quant_mode : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP };
 
 /// @brief Compute policy for unaligned shape and xmx engine.
 /// @tparam compute_attr_ Is compute-related attributes.
@@ -36,11 +36,12 @@ template <
     typename dtype_zero_pt_,
     quant_mode quant_type_,
     int dequant_s_,
-    gpu_arch arch_tag_ = gpu_arch::Xe,
+    mma_engine mma_engine_ = mma_engine::xmx,
+    gpu_arch arch_tag_ = gpu_arch::XeHpc,
     typename enable = void>
-struct compute_policy_int4_dequantize_xmx {};
+struct compute_policy_int4_dequantize {};
 
-/// @brief Specialized for Xe and Dg2 architecture.
+/// @brief Specialized for XeHpc and XeHpg architecture.
 template <
     typename compute_attr_,
     typename perf_tuning_knob_,
@@ -48,22 +49,30 @@ template <
     typename dtype_zero_pt_,
     quant_mode quant_type_,
     int dequant_s_,
+    mma_engine mma_engine_,
     gpu_arch arch_tag_>
-struct compute_policy_int4_dequantize_xmx<
+struct compute_policy_int4_dequantize<
     compute_attr_,
     perf_tuning_knob_,
     dtype_scale_,
     dtype_zero_pt_,
     quant_type_,
     dequant_s_,
+    mma_engine_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::Xe)>> {
+    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
   using compute_attr = compute_attr_;
   using perf_tuning_knob = perf_tuning_knob_;
   static constexpr int k_stride = perf_tuning_knob::k_stride;
   static constexpr int stages = perf_tuning_knob::stages;
   static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+  static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
+
+  static_assert(
+      !(mma_engine == mma_engine::xmx && arch_tag == gpu_arch::XeLpg),
+      "XeLpg does not support xmx");
+
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
   using dtype_mma_b = typename compute_attr::dtype_b;
