@@ -340,7 +340,7 @@ class CpuDevice {
               case 9:  // ALD
                 PE[int(BTLA_ISA::AVX2)] = 3.0f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 5.0f;
-                PE[int(BTLA_ISA::NoSIMD)] = 3.0f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.5f;
                 break;
               case 10:  // MTL
                 PE[int(BTLA_ISA::AVX2)] = 2.2f;
@@ -491,7 +491,7 @@ class CpuRuntime {
 
   inline void adjustPE(const BTLA_ISA isa, const float PE_) {
     // printf("Adjust:%d,%f\n",int(isa),PE_);
-    PE[int(isa)] *= PE_;
+    PE[int(isa)] = PE[int(isa)] * PE_ * 0.2f + PE[int(isa)] * 0.8f;
   }
 
   size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
