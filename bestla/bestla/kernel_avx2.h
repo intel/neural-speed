@@ -1489,7 +1489,7 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   int constexpr UnpackElt = EltPadding / 8 / KTILE;
   int constexpr TotalElt = UnpackElt * NTILE * KTILE;
   int constexpr Loop128 = TotalElt / 128;
-  int8_t alignas(32) UnpackBuf[TotalElt];
+  int8_t UnpackBuf[TotalElt];
   for (int i = 0; i < NReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
@@ -1624,7 +1624,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   int constexpr UnpackElt = EltPadding / 8 / KTILE;
   int constexpr TotalElt = UnpackElt * NTILE * KTILE;
   int constexpr Loop128 = TotalElt / 128;
-  int8_t alignas(32) UnpackBuf[TotalElt];
+  int8_t UnpackBuf[TotalElt];
   for (int i = 0; i < NReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
