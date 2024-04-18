@@ -36,7 +36,7 @@ REGISTER_TYPED_TEST_SUITE_P(fp32_gemm_test, esimd);
 using tests = ::testing::Types<
     Test1,
     Test2,
-    // Test3, // TODO(Yi): Fix this case
+    Test3,
     Test4,
     Test5,
     Test6,

@@ -37,7 +37,8 @@ template <
     typename dtype_scale_,
     typename dtype_zero_pt_,
     int dequant_s_,
-    quant_mode quant_type_,
+    bool act_shuf_,
+    weight_dtype weight_type_,
     mma_engine mma_engine_,
     typename pre_processing_t_,
     gpu_arch arch_tag_>
@@ -47,8 +48,9 @@ class gemm_t<
         perf_tuning_knob_,
         dtype_scale_,
         dtype_zero_pt_,
-        quant_type_,
+        weight_type_,
         dequant_s_,
+        act_shuf_,
         mma_engine_,
         arch_tag_>,
     tile_shape_, // tile shape of workgroup-level gemm
@@ -66,8 +68,9 @@ class gemm_t<
       perf_tuning_knob_,
       dtype_scale_,
       dtype_zero_pt_,
-      quant_type_,
+      weight_type_,
       dequant_s_,
+      act_shuf_,
       mma_engine_,
       arch_tag_>;
   static constexpr uint32_t k_stride = compute_policy::k_stride;
@@ -224,6 +227,11 @@ class gemm_t<
       mem_layout::row_major,
       mem_space::global,
       mem_desc_b_t::alignment>;
+  using mem_desc_gidx_t = mem_desc_t<
+      uint32_t,
+      mem_layout::row_major,
+      mem_space::global,
+      mem_desc_b_t::alignment>;
 
   using matAcc_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_c,
@@ -262,6 +270,14 @@ class gemm_t<
       prefetch_payload_t<mem_desc_scale_t, scale_tile_desc_t, 1, arch_tag>;
   using zero_pt_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_zero_pt_t, zero_pt_tile_desc_t, 1, arch_tag>;
+  using gidx_tile_desc_t = subgroup::
+      tile_desc_t<tile_size_x_a, 1, block_size_x_a, 1, reg_layout::tiled>;
+  using gidx_t = subgroup::tile_t<uint32_t, gidx_tile_desc_t>;
+  using gidx_payload_t = subgroup::mem_payload_t<
+      mem_desc_gidx_t,
+      gidx_tile_desc_t,
+      subgroup::msg_type_v<gidx_tile_desc_t, mem_space::global>,
+      arch_tag>;
 
   using tile_mma = subgroup::tile_mma_t<
       matAcc_t,
@@ -303,6 +319,8 @@ class gemm_t<
     /// @brief Is the memory description of zero_pt buffer. Zero_pt size:
     /// (matrix_k/dequant_s)x(matrix_n/pack_ratio)
     mem_desc_zero_pt_t zero_pt_base_desc;
+    /// @brief Is the memory description of g_idx buffer. gidx size: 1xmatrix_n
+    mem_desc_gidx_t gidx_base_desc;
 
     /// @brief Default construct.
     inline arguments_t() = default;
@@ -312,22 +330,15 @@ class gemm_t<
         mem_desc_b_t matB_desc,
         uint32_t loop_count,
         mem_desc_scale_t scale_desc,
-        mem_desc_zero_pt_t zero_pt_desc)
+        mem_desc_zero_pt_t zero_pt_desc,
+        mem_desc_gidx_t gidx_desc)
         : matA_base_desc(matA_desc),
           matB_base_desc(matB_desc),
           inner_loop_count(loop_count),
           scale_base_desc(scale_desc),
-          zero_pt_base_desc(zero_pt_desc) {}
+          zero_pt_base_desc(zero_pt_desc),
+          gidx_base_desc(gidx_desc) {}
 
-    inline arguments_t(
-        mem_desc_a_t matA_desc,
-        mem_desc_b_t matB_desc,
-        uint32_t loop_count,
-        mem_desc_scale_t scale_desc)
-        : matA_base_desc(matA_desc),
-          matB_base_desc(matB_desc),
-          inner_loop_count(loop_count),
-          scale_base_desc(scale_desc) {}
     // Be aware of the risks: Rule of three (copy constructor, copy assignment,
     // destructor) Please check if you need to add self-define destructor inline
     // ~arguments_t(){}
@@ -336,13 +347,15 @@ class gemm_t<
           matB_base_desc(args.matB_base_desc),
           inner_loop_count(args.inner_loop_count),
           scale_base_desc(args.scale_base_desc),
-          zero_pt_base_desc(args.zero_pt_base_desc) {}
+          zero_pt_base_desc(args.zero_pt_base_desc),
+          gidx_base_desc(args.gidx_base_desc) {}
     inline arguments_t& operator=(const arguments_t& args) {
       this->matA_base_desc = args.matA_base_desc;
       this->matB_base_desc = args.matB_base_desc;
       this->inner_loop_count = args.inner_loop_count;
       this->scale_base_desc = args.scale_base_desc;
       this->zero_pt_base_desc = args.zero_pt_base_desc;
+      this->gidx_base_desc = args.gidx_base_desc;
       return *this;
     }
     inline void init(
@@ -350,12 +363,14 @@ class gemm_t<
         mem_desc_b_t matB_desc,
         uint32_t loop_count,
         mem_desc_scale_t scale_desc,
-        mem_desc_zero_pt_t zero_pt_desc) {
+        mem_desc_zero_pt_t zero_pt_desc,
+        mem_desc_gidx_t gidx_desc) {
       matA_base_desc = matA_desc;
       matB_base_desc = matB_desc;
       inner_loop_count = loop_count;
       scale_base_desc = scale_desc;
       zero_pt_base_desc = zero_pt_desc;
+      gidx_base_desc = gidx_desc;
     }
   };
 
@@ -423,6 +438,7 @@ class gemm_t<
     matB_payload_t matB_payload(args.matB_base_desc);
     scale_payload_t scale_payload(args.scale_base_desc);
     zero_pt_payload_t zero_pt_payload(args.zero_pt_base_desc);
+    gidx_payload_t gidx_payload(args.gidx_base_desc);
     matA_prefetch_payload_t matA_prefetch_payload(args.matA_base_desc, sg_idx);
     matB_prefetch_payload_t matB_prefetch_payload(args.matB_base_desc, sg_idy);
     scale_prefetch_payload_t scale_prefetch_payload(args.scale_base_desc, 0);
@@ -450,7 +466,7 @@ class gemm_t<
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           scale_prefetch_payload);
       if constexpr (
-          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+          compute_policy::weight_type != weight_dtype::S4_FULLRANGE_NO_ZP) {
         // TODO 1D prefetch need pack to U32/U64
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             zero_pt_prefetch_payload);
@@ -468,6 +484,11 @@ class gemm_t<
       }
     }
 
+    xetla_vector<float, 16> F4_LUT;
+    if constexpr (compute_policy::weight_type == weight_dtype::NF4) {
+      init_nf4_LUT<compute_policy::weight_type>(F4_LUT);
+    }
+
     for (uint32_t i = 0; i < args.inner_loop_count; i++) {
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
@@ -481,14 +502,18 @@ class gemm_t<
           }
         }
       }
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          matA, matA_payload);
+      if constexpr (!compute_policy::act_shuf) {
+        subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+            matA, matA_payload);
+      } else {
+        shuffle_load(matA, matA_payload, gidx_payload);
+        gidx_payload.update_tdesc(k_stride);
+      }
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           scale, scale_payload);
-      if constexpr (
-          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+      if constexpr (compute_policy::weight_type == weight_dtype::S4_ASYM) {
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
@@ -502,8 +527,7 @@ class gemm_t<
         // TODO 1D prefetch need pack to U32/U64
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             scale_prefetch_payload);
-        if constexpr (
-            compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+        if constexpr (compute_policy::weight_type == weight_dtype::S4_ASYM) {
           // TODO 1D prefetch need pack to U32/U64
           subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
               zero_pt_prefetch_payload);
@@ -539,7 +563,7 @@ class gemm_t<
         subgroup::vnni_reverse(matA);
       }
       subgroup::elemwise_cvt(matA_acc, matA);
-      dequantize(matB_acc, matB, scale, zero_pt);
+      dequantize(matB_acc, matB, scale, zero_pt, F4_LUT);
       SW_BARRIER();
       tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
       SW_BARRIER();
@@ -560,26 +584,90 @@ class gemm_t<
   }
 
  private:
-  template <typename T>
-  void dump_mat(T mat, size_t tile_x, size_t tile_y) {
+  template <weight_dtype wei_type>
+  struct wei_type_traits {
+    using shift_dtype = int8_t;
+    using cvt_dtype = int32_t;
+  };
+  template <>
+  struct wei_type_traits<weight_dtype::S4_ASYM> {
+    using shift_dtype = uint8_t;
+    using cvt_dtype = int32_t;
+  };
+  template <>
+  struct wei_type_traits<weight_dtype::NF4> {
+    using shift_dtype = uint8_t;
+    using cvt_dtype = float;
+  };
+
+  inline void shuffle_load(
+      matA_t& matA,
+      matA_payload_t& matA_payload,
+      gidx_payload_t& gidx_payload) {
+    static constexpr int block_y_num = tile_size_y_a / block_size_y_a;
+    static constexpr int block_x_num = tile_size_x_a / block_size_x_a;
+    static constexpr int elt_per_block = block_size_x_a * block_size_y_a;
+    int dst_swidth = gidx_payload.pitch_in_bytes / sizeof(uint32_t);
 #pragma unroll
-    for (size_t row = 0; row < tile_x; row++) {
+    for (int block_y = 0; block_y < block_y_num; block_y++) {
 #pragma unroll
-      for (size_t col = 0; col < tile_y; col++) {
-        sycl::ext::oneapi::experimental::printf(
-            "%0.1f ", (float)(sycl::half)mat.reg[row * tile_y + col]);
+      for (int block_x = 0; block_x < block_x_num; block_x++) {
+        auto gidx =
+            sycl::ext::intel::esimd::block_load<uint32_t, block_size_x_a>(
+                reinterpret_cast<uint32_t*>(gidx_payload.base_ptr) +
+                gidx_payload.base_offset / sizeof(uint32_t) +
+                block_x * block_size_x_a);
+        auto block_idx = block_y * block_x_num + block_x;
+#pragma unroll
+        for (uint32_t row = 0; row < block_size_y_a; row++) {
+          matA.reg.xetla_select<block_size_x_a, 1>(
+              block_idx * elt_per_block + row * tile_size_x_a) =
+              sycl::ext::intel::esimd::gather<dtype_a, block_size_x_a>(
+                  reinterpret_cast<dtype_a*>(matA_payload.base_ptr) +
+                      matA_payload.base_y * matA_payload.pitch_in_bytes /
+                          sizeof(dtype_a) +
+                      row * dst_swidth + block_y * block_size_y_a * dst_swidth,
+                  gidx);
+        }
       }
-      sycl::ext::oneapi::experimental::printf("\n ");
     }
-    sycl::ext::oneapi::experimental::printf("\n ");
+    if constexpr (compute_policy::mma_engine != mma_engine::xmx) {
+      tile_transpose(matA);
+    }
+  }
+
+  template <weight_dtype f4_type>
+  inline void init_nf4_LUT(xetla_vector<float, 16>& F4_LUT) {
+    if constexpr (f4_type == weight_dtype::NF4) {
+      F4_LUT[0] = -1.f;
+      F4_LUT[1] = -0.6961928009986877f;
+      F4_LUT[2] = -0.5250730514526367f;
+      F4_LUT[3] = -0.39491748809814453f;
+      F4_LUT[4] = -0.28444138169288635f;
+      F4_LUT[5] = -0.18477343022823334f;
+      F4_LUT[6] = -0.09105003625154495f;
+      F4_LUT[7] = 0.f;
+      F4_LUT[8] = 0.07958029955625534f;
+      F4_LUT[9] = 0.16093020141124725f;
+      F4_LUT[10] = 0.24611230194568634f;
+      F4_LUT[11] = 0.33791524171829224f;
+      F4_LUT[12] = 0.44070982933044434f;
+      F4_LUT[13] = 0.5626170039176941f;
+      F4_LUT[14] = 0.7229568362236023f;
+      F4_LUT[15] = 1.0f;
+    } else {
+      static_assert(false);
+    }
   }
 
   inline void dequantize(
       matB_acc_t& matB_acc,
       matB_t& matB,
       scale_t& scale,
-      zero_pt_t& zero_pt) {
+      zero_pt_t& zero_pt,
+      xetla_vector<float, 16>& F4_LUT) {
     // no tail, because this is matB
+    static_assert(block_size_y_b <= dequant_s);
     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
 
@@ -592,7 +680,8 @@ class gemm_t<
         auto matB_blk = matB.reg
                             .xetla_select<matB_t::block_elems, 1>(
                                 block_id * matB_t::block_elems)
-                            .xetla_format<int8_t>();
+                            .xetla_format<typename wei_type_traits<
+                                compute_policy::weight_type>::shift_dtype>();
         int scale_block_id = (i / block_b_y_per_scale * num_block_x + j);
         auto scale_vec = scale.reg.xetla_select<scale_t::block_size_x, 1>(
             scale_block_id * scale_t::block_size_x);
@@ -601,10 +690,16 @@ class gemm_t<
             block_id * matB_acc_t::block_elems);
 
         // 2: int8 includes 2 4bits data.
-        xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
+        xetla_vector<
+            typename wei_type_traits<compute_policy::weight_type>::shift_dtype,
+            block_size_x_b * block_size_y_b>
+            cvt_blk;
 
-        xetla_vector<int32_t, block_size_x_b * block_size_y_b> cvt_blk_i32;
-        if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
+        xetla_vector<
+            typename wei_type_traits<compute_policy::weight_type>::cvt_dtype,
+            block_size_x_b * block_size_y_b>
+            cvt_blk_32_bitwidth;
+        if constexpr (compute_policy::weight_type == weight_dtype::S4_ASYM) {
           auto zero_pt_vec = zero_pt.reg
                                  .xetla_select<zero_pt_t::block_size_x, 1>(
                                      scale_block_id * zero_pt_t::block_size_x)
@@ -622,28 +717,33 @@ class gemm_t<
                 .xetla_format<int8_t>() =
                 zero_pt_sub.xetla_format<int8_t>() + int8_t(1);
           }
-          cvt_blk_i32 =
+          cvt_blk_32_bitwidth =
               (cvt_blk.xetla_format<int8_t>() -
                zero_pt_blk.xetla_format<int8_t>());
         }
         if constexpr (
-            compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-          xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk_i8;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
-              cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) << 4;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
-              cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) >> 4;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1) =
+            compute_policy::weight_type == weight_dtype::S4_FULLRANGE_NO_ZP) {
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) =
+              cvt_blk.xetla_select<matB_t::block_elems, 2>(0) << 4;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) =
+              cvt_blk.xetla_select<matB_t::block_elems, 2>(0) >> 4;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(1) =
               matB_blk.xetla_format<int8_t>() >> 4;
-          cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
+          cvt_blk_32_bitwidth = (cvt_blk.xetla_format<int8_t>());
+        }
+        if constexpr (compute_policy::weight_type == weight_dtype::NF4) {
+          xetla_vector<uint16_t, block_size_x_b * block_size_y_b> idx_blk;
+          idx_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
+          idx_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk >> 4;
+          cvt_blk_32_bitwidth = F4_LUT.iselect(idx_blk);
         }
         if constexpr (compute_policy::mma_engine == mma_engine::xmx) {
           constexpr uint32_t vnni_rows = sizeof(uint32_t) / sizeof(dtype_mma_b);
           xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
               temp_blk;
           temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
-              cvt_blk_i32;
+              cvt_blk_32_bitwidth;
 
 #pragma unroll
           for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
@@ -674,7 +774,7 @@ class gemm_t<
 #pragma unroll
           for (uint32_t k = 0; k < block_size_y_b; k++) {
             dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
-                cvt_blk_i32.xetla_select<block_size_x_b, 1>(
+                cvt_blk_32_bitwidth.xetla_select<block_size_x_b, 1>(
                     k * block_size_x_b) *
                 scale_vec;
           }

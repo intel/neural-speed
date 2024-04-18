@@ -116,12 +116,12 @@ tile_prefetch(payload_t& payload) {
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
-        xetla_mask<num_channel> pred_y =
-            payload.base_y + offset_y + sub_block_y + num_channel >
-                payload.height_in_elems
-            ? (xetla_vector_gen<uint32_t, num_channel>(0, 1) <
-               (payload.height_in_elems % num_channel))
-            : 1;
+        xetla_mask<num_channel> pred_y = 1;
+        // payload.base_y + offset_y + sub_block_y + num_channel >
+        //     payload.height_in_elems
+        // ? (xetla_vector_gen<uint32_t, num_channel>(0, 1) <
+        //    (payload.height_in_elems % num_channel))
+        // : 1;
 
         xetla_prefetch_global<
             prefetch_dtype,

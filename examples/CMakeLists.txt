@@ -2,7 +2,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR})
 
 # Creates a separate device code module for each SYCL* kernel
-# so that kernel for Dg2 and Xe will be JIT separately
+# so that kernel for gpu_arch::XeHpg and Xe will be JIT separately
 add_compile_options(-fsycl-device-code-split=per_kernel)
 add_link_options(-fsycl-device-code-split=per_kernel)
 

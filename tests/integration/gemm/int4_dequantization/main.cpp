@@ -232,9 +232,8 @@ void dequantize_gemm_run(uint32_t iter) {
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_ASYM,
+      gpu::xetla::group::weight_dtype::S4_ASYM,
       dequant_s,
-      mma_engine::xmx,
       gpu_arch::XeHpg>;
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
@@ -332,22 +331,23 @@ void dequantize_gemm_run(uint32_t iter) {
       .wait();
 
   // set up gemm arguments
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg(
-      matrix_m,
-      matrix_k,
-      matrix_n,
-      A_d,
-      matrix_k,
-      B_d,
-      matrix_n,
-      C_d,
-      matrix_n,
-      scale_d,
-      matrix_n,
-      zero_pt_d,
-      matrix_n,
-      Acc_d,
-      Cnt_d);
+  typename gemm_op_t::template arguments_t<compute_policy::weight_type>
+      gemm_arg(
+          matrix_m,
+          matrix_k,
+          matrix_n,
+          A_d,
+          matrix_k,
+          B_d,
+          matrix_n,
+          C_d,
+          matrix_n,
+          scale_d,
+          matrix_n,
+          zero_pt_d,
+          matrix_n,
+          Acc_d,
+          Cnt_d);
 
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
   if (!gemm_op_t::can_implement(gemm_arg)) {

@@ -108,10 +108,10 @@ struct register_attr_t {};
 template <grf_mode grf_num_mode, gpu_arch arch_tag>
 struct client_register_attr_base_t {
   static constexpr uint32_t acc_reg_in_bytes =
-      (grf_num_mode == grf_mode::normal) ? 4 * 32 : 8 * 32;
+      (grf_num_mode == grf_mode::normal) ? 4 * 64 : 8 * 64;
   static constexpr uint32_t grf_in_bytes =
-      (grf_num_mode == grf_mode::normal) ? 128 * 32 : 256 * 32;
-  static constexpr uint32_t reg_in_bytes = 32;
+      (grf_num_mode == grf_mode::normal) ? 128 * 64 : 256 * 64;
+  static constexpr uint32_t reg_in_bytes = 64;
 };
 
 template <grf_mode grf_num_mode>
@@ -139,7 +139,7 @@ struct client_arch_attr_base_t {
   template <msg_type message_type = msg_type::block_2d>
   using load_store_attr = load_store_attr_t<message_type, gpu_arch::XeHpg>;
 
-  template <grf_mode grf_num_mode = grf_mode::normal>
+  template <grf_mode grf_num_mode = grf_mode::double_grf>
   using register_attr = register_attr_t<grf_num_mode, gpu_arch::XeHpg>;
 
   using mma_attr = mma_attr_t<gpu_arch::XeHpg>;

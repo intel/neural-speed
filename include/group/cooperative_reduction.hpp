@@ -180,8 +180,8 @@ class cooperative_reduce_t<
     nbarrier.wait();
 
     if (is_valid_post_process_wg()) {
-      // nbarrier.init_nbarrier(nbar_id, nbarrier_role::consumer);
-      // nbarrier.arrive();
+      nbarrier.init_nbarrier(nbar_id, nbarrier_role::consumer);
+      nbarrier.arrive();
       int32_t slm_load_offset_x = sg_idx * sg_tile_n + coop_id_x * tile_size_x;
       int32_t slm_load_offset_y = sg_idy * sg_tile_m + coop_id_y * tile_size_y;
 

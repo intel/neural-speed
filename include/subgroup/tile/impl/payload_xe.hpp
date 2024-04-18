@@ -404,14 +404,15 @@ struct mem_payload_t<
   // for pvc, we can use simd16 or simd32
   static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
   static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
-  static constexpr uint32_t num_channel =
+  static constexpr uint32_t simd_channel =
       ((tile_bytes % max_store_bytes) == 0 &&
        (block_bytes % max_store_bytes) == 0)
       ? 32
       : 16;
-
-  static constexpr uint32_t num_channel_x = block_size_x;
-  static constexpr uint32_t num_channel_y = num_channel / num_channel_x;
+  static constexpr uint32_t num_channel =
+      (simd_channel >= block_size_x) ? block_size_x : simd_channel;
+  static constexpr uint32_t num_channel_x = block_size_x; // 16
+  static constexpr uint32_t num_channel_y = num_channel / num_channel_x; // 1
   static constexpr uint32_t store_elems = num_channel_y * block_size_x;
 
   xetla_vector<uint32_t, num_channel> channel_offset;

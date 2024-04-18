@@ -113,7 +113,7 @@ struct gru_layer {
   using perf_tuning_knob =
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
 
-  using compute_attr = xetla::group::compute_attr_t<T, T, Act_T>;
+  using compute_attr = group::compute_attr_t<T, T, Act_T>;
   using compute_policy = compute_policy_default_xmx<
       compute_attr,
       perf_tuning_knob,
