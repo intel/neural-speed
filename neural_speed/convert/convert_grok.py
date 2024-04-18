@@ -153,7 +153,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         print(name)
         list_vars[name].requires_grad = False
         src = name
-        
         print(src, ' -> ', name)
         data = list_vars[src].squeeze().numpy()
         data = data.astype(np.float32)
@@ -188,4 +187,3 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
 if __name__ == '__main__':
     main()
-
