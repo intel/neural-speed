@@ -27,9 +27,9 @@ using policy_t = stage0<fmha_policy_32x128x128>;
 constexpr uint32_t num_batches = 1;
 constexpr uint32_t num_heads = 32;
 constexpr uint32_t head_size = 128;
-constexpr uint32_t num_queries = 1024;
+constexpr uint32_t num_queries = 124;
 // constexpr uint32_t num_queries = 1;
-constexpr uint32_t num_keys = 1024;
+constexpr uint32_t num_keys = 124;
 constexpr float softmax_scale = 0.125;
 
 // Q: [FxBxNxH] or [BxFxMxH]
