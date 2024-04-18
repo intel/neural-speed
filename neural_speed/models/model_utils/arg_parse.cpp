@@ -157,6 +157,8 @@ bool gpt_params_parse(int argc, char** argv, gpt_params& params) {  // NOLINT
         break;
       }
       params.n_ctx = std::stoi(argv[i]);
+    } else if (arg == "--mha-prefer-f32") {
+      params.mha_prefer_f32 = true;
     } else if (arg == "--memory-f32") {
       params.memory_type = KV_MEM_TYPE_F32;
     } else if (arg == "--memory-f16") {
@@ -458,6 +460,7 @@ void gpt_print_usage(int /*argc*/, char** argv, const gpt_params& params) {
   fprintf(stderr,
           "  --ignore-eos          ignore end of stream token and continue generating (implies --logit-bias 2-inf)\n");
   fprintf(stderr, "  --no-penalize-nl      do not penalize newline token\n");
+  fprintf(stderr, "  --mha-prefer-f32      whether mha use f32 as compute_dtype\n");
   fprintf(stderr, "  --memory-f32          use f32 for memory key+value\n");
   fprintf(stderr, "  --memory-f16          use f16 for memory key+value\n");
   fprintf(stderr, "  --memory-auto         use internal format for memory key+value\n");

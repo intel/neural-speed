@@ -1968,15 +1968,16 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
     const attn_fwd_args_t<float, bf16, bf16, float>& params) {
   GetCPUDevice();
   const auto pth = ne_threading::get();
-  if (_cd->AVX512F() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) {
+  if (_cd->AVX512F() &&
+      ((_cd->AMX_BF16() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) || !_cd->AMX_BF16())) {
     using GemmKernelBF16TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AMX_BF16,                                      //
+        BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
         prologue_a::gemm::ActivationBase,                        //
         mha::weight_cvt_bf16_ntile48_t,                          //
         mha::ScaleTrackMaxFp32Fp32>;                             //
     using GemmKernelBF16 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AMX_BF16,                                      //
+        BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
         mha::activation_identity_t,                              // pretty sure we have enough paddings for P-matrix
         mha::weight_cvt_bf16_ntile48_t,                          //
@@ -2063,91 +2064,92 @@ inline void bestla_fusion_attn_forward_ref(const attn_fwd_args_t<Q_T, K_T, V_T, 
   const float m0 = powf(2.0f, -(8.f) / n_heads_log2_floor);
   const float m1 = powf(2.0f, -(8.f / 2.0f) / n_heads_log2_floor);
 
-#pragma omp parallel for collapse(3)
+  // #pragma omp parallel for collapse(3)
   for (int ibs = 0; ibs < p.batch_size; ++ibs)
-    for (int ihn = 0; ihn < p.head_num; ++ihn)
-      for (int i = 0; i < p.sl_q; ++i) {
-        const auto ihkv = ihn / group_heads;
-        const auto q_curr = p.Q + ibs * p.step_q_bs + ihn * p.step_q_head_num + i * p.step_q_sl;
-        const auto dst_curr = p.dst + ibs * p.step_dst_bs + ihn * p.step_dst_head_num + i * p.step_dst_sl;
+    // for (int ihn = 0; ihn < p.head_num; ++ihn)
+    //   for (int i = 0; i < p.sl_q; ++i)
+    ne_threading::get()->parallel_for_collapse(0, p.head_num, 1, 0, p.sl_q, 1, [&](int ihn, int i) {
+      const auto ihkv = ihn / group_heads;
+      const auto q_curr = p.Q + ibs * p.step_q_bs + ihn * p.step_q_head_num + i * p.step_q_sl;
+      const auto dst_curr = p.dst + ibs * p.step_dst_bs + ihn * p.step_dst_head_num + i * p.step_dst_sl;
 
-        const auto k_curr = p.K + ibs * p.step_k_bs + ihkv * p.step_k_head_num;
-        const auto v_curr = p.V + ibs * p.step_v_bs + ihkv * p.step_v_head_num;
+      const auto k_curr = p.K + ibs * p.step_k_bs + ihkv * p.step_k_head_num;
+      const auto v_curr = p.V + ibs * p.step_v_bs + ihkv * p.step_v_head_num;
 
-        const auto sl_diff = p.sl_kv - p.sl_q;
-        const auto unmasked = is_causal ? sl_diff + i + 1 : p.sl_kv;
-        const auto curr_row = std::unique_ptr<float[]>(new float[unmasked]);
+      const auto sl_diff = p.sl_kv - p.sl_q;
+      const auto unmasked = is_causal ? sl_diff + i + 1 : p.sl_kv;
+      const auto curr_row = std::unique_ptr<float[]>(new float[unmasked]);
 
-        const auto alibi_ihn_m = !is_alibi ? 0.f
-                                 : (ihn + k_offset < n_heads_log2_floor)
-                                     ? powf(m0, ihn + k_offset + 1)
-                                     : powf(m1, 2 * (ihn + k_offset - n_heads_log2_floor) + 1);
+      const auto alibi_ihn_m = !is_alibi ? 0.f
+                               : (ihn + k_offset < n_heads_log2_floor)
+                                   ? powf(m0, ihn + k_offset + 1)
+                                   : powf(m1, 2 * (ihn + k_offset - n_heads_log2_floor) + 1);
 
-        // Q x K
-        float row_max = -INFINITY;
+      // Q x K
+      float row_max = -INFINITY;
+      for (int j = 0; j < unmasked; ++j) {
+        curr_row[j] = 0.f;
+        for (int k = 0; k < p.head_size; ++k) {
+          if (p.K_layout != ATTN_FWD_LAYOUT_PLAIN) {
+            const auto j_remain = j % NTILE;
+            const auto j_block = j - j_remain;
+            const auto k_remain = k % ROWPACK;
+            const auto k_block = k - k_remain;
+            const auto k_value =
+                static_cast<float>(k_curr[j_block * p.step_k_sl + k_block * NTILE + j_remain * ROWPACK + k_remain]);
+            const auto q_value =
+                IS_BF16_GEMM ? static_cast<float>(static_cast<bf16>(q_curr[k])) : static_cast<float>(q_curr[k]);
+            curr_row[j] += k_value * q_value;
+          } else if (IS_BF16_GEMM) {
+            curr_row[j] += static_cast<float>(static_cast<bf16>(q_curr[k])) *  // TODO(Yi) fp16 acc
+                           static_cast<float>(static_cast<bf16>(k_curr[j * p.step_k_sl + k * p.step_k_head_size]));
+          } else {
+            curr_row[j] += static_cast<float>(q_curr[k]) *  // TODO(Yi) fp16 acc
+                           static_cast<float>(k_curr[j * p.step_k_sl + k * p.step_k_head_size]);
+          }
+        }
+        curr_row[j] = curr_row[j] * p.QK_scale * p.Q_sc * p.K_sc + j * alibi_ihn_m;
+        row_max = std::max(row_max, curr_row[j]);
+      }
+
+      // exp
+      float exp_sum = 0.f;
+      for (int j = 0; j < unmasked; ++j) {
+        curr_row[j] = mha_exp_ref(curr_row[j] - row_max);
+        exp_sum += curr_row[j];
+      }
+
+      // softmax
+      if (std::is_same<V_T, int8_t>::value) {
+        for (int j = 0; j < unmasked; ++j) curr_row[j] = roundf(curr_row[j] * UINT8_MAX) / UINT8_MAX / exp_sum;
+      } else {
         for (int j = 0; j < unmasked; ++j) {
-          curr_row[j] = 0.f;
-          for (int k = 0; k < p.head_size; ++k) {
-            if (p.K_layout != ATTN_FWD_LAYOUT_PLAIN) {
-              const auto j_remain = j % NTILE;
-              const auto j_block = j - j_remain;
-              const auto k_remain = k % ROWPACK;
-              const auto k_block = k - k_remain;
-              const auto k_value =
-                  static_cast<float>(k_curr[j_block * p.step_k_sl + k_block * NTILE + j_remain * ROWPACK + k_remain]);
-              const auto q_value =
-                  IS_BF16_GEMM ? static_cast<float>(static_cast<bf16>(q_curr[k])) : static_cast<float>(q_curr[k]);
-              curr_row[j] += k_value * q_value;
-            } else if (IS_BF16_GEMM) {
-              curr_row[j] += static_cast<float>(static_cast<bf16>(q_curr[k])) *  // TODO(Yi) fp16 acc
-                             static_cast<float>(static_cast<bf16>(k_curr[j * p.step_k_sl + k * p.step_k_head_size]));
-            } else {
-              curr_row[j] += static_cast<float>(q_curr[k]) *  // TODO(Yi) fp16 acc
-                             static_cast<float>(k_curr[j * p.step_k_sl + k * p.step_k_head_size]);
-            }
-          }
-          curr_row[j] = curr_row[j] * p.QK_scale * p.Q_sc * p.K_sc + j * alibi_ihn_m;
-          row_max = std::max(row_max, curr_row[j]);
-        }
-
-        // exp
-        float exp_sum = 0.f;
-        for (int j = 0; j < unmasked; ++j) {
-          curr_row[j] = mha_exp_ref(curr_row[j] - row_max);
-          exp_sum += curr_row[j];
-        }
-
-        // softmax
-        if (std::is_same<V_T, int8_t>::value) {
-          for (int j = 0; j < unmasked; ++j) curr_row[j] = roundf(curr_row[j] * UINT8_MAX) / UINT8_MAX / exp_sum;
-        } else {
-          for (int j = 0; j < unmasked; ++j) {
-            curr_row[j] /= exp_sum;
-            if (IS_BF16_GEMM) curr_row[j] = static_cast<float>(static_cast<bf16>(curr_row[j]));
-          }
-        }
-
-        // P x V
-        for (int j = 0; j < p.head_size; ++j) {
-          float dst_f32_val = 0.f;
-          for (int k = 0; k < unmasked; ++k) {
-            if (p.V_layout != ATTN_FWD_LAYOUT_PLAIN) {
-              const auto j_remain = j % NTILE;
-              const auto j_block = j - j_remain;
-              const auto k_remain = k % ROWPACK;
-              const auto k_block = k - k_remain;
-              const auto v_value = static_cast<float>(
-                  v_curr[j_block * p.step_v_head_size + k_block * NTILE + j_remain * ROWPACK + k_remain]);
-              dst_f32_val += curr_row[k] * v_value;
-            } else if (IS_BF16_GEMM) {
-              dst_f32_val += curr_row[k] * static_cast<float>(static_cast<bf16>(v_curr[k * p.step_v_sl + j]));
-            } else {
-              dst_f32_val += curr_row[k] * static_cast<float>(v_curr[k * p.step_v_sl + j]);
-            }
-          }
-          dst_curr[j] = static_cast<DST_T>(dst_f32_val * p.V_sc / p.dst_sc);
+          curr_row[j] /= exp_sum;
+          if (IS_BF16_GEMM) curr_row[j] = static_cast<float>(static_cast<bf16>(curr_row[j]));
         }
       }
+
+      // P x V
+      for (int j = 0; j < p.head_size; ++j) {
+        float dst_f32_val = 0.f;
+        for (int k = 0; k < unmasked; ++k) {
+          if (p.V_layout != ATTN_FWD_LAYOUT_PLAIN) {
+            const auto j_remain = j % NTILE;
+            const auto j_block = j - j_remain;
+            const auto k_remain = k % ROWPACK;
+            const auto k_block = k - k_remain;
+            const auto v_value = static_cast<float>(
+                v_curr[j_block * p.step_v_head_size + k_block * NTILE + j_remain * ROWPACK + k_remain]);
+            dst_f32_val += curr_row[k] * v_value;
+          } else if (IS_BF16_GEMM) {
+            dst_f32_val += curr_row[k] * static_cast<float>(static_cast<bf16>(v_curr[k * p.step_v_sl + j]));
+          } else {
+            dst_f32_val += curr_row[k] * static_cast<float>(v_curr[k * p.step_v_sl + j]);
+          }
+        }
+        dst_curr[j] = static_cast<DST_T>(dst_f32_val * p.V_sc / p.dst_sc);
+      }
+    });
 }
 }  // namespace mha
 }  // namespace custom
