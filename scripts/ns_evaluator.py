@@ -79,6 +79,12 @@ def simple_evaluate(
     use_gptq : bool = False,
     use_awq : bool = False,
     use_autoround : bool = False,
+    weight_dtype : str = "int4",
+    compute_dtype : str = "int8",
+    group_size : int = 32,
+    use_ggml : bool = False,
+    alg : str = "sym",
+    scale_dtype : str = "fp32",
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -195,6 +201,12 @@ def simple_evaluate(
                     "use_gptq": use_gptq,
                     "use_awq": use_awq,
                     "use_autoround": use_autoround,
+                    "weight_dtype": weight_dtype,
+                    "compute_dtype": compute_dtype,
+                    "group_size" : group_size,  
+                    "use_ggml" : use_ggml,
+                    "alg" : alg,
+                    "scale_dtype" : scale_dtype,
                 },
             )
             lm._model = user_model
@@ -212,6 +224,12 @@ def simple_evaluate(
                     "use_gptq": use_gptq,
                     "use_awq": use_awq,
                     "use_autoround": use_autoround,
+                    "weight_dtype": weight_dtype,
+                    "compute_dtype": compute_dtype,
+                    "group_size" : group_size,  
+                    "use_ggml" : use_ggml,
+                    "alg" : alg,
+                    "scale_dtype" : scale_dtype,
                 },
             )
         else:
@@ -224,6 +242,12 @@ def simple_evaluate(
                     "use_gptq": use_gptq,
                     "use_awq": use_awq,
                     "use_autoround": use_autoround,
+                    "weight_dtype": weight_dtype,
+                    "compute_dtype": compute_dtype,
+                    "group_size" : group_size,  
+                    "use_ggml" : use_ggml,
+                    "alg" : alg,
+                    "scale_dtype" : scale_dtype,
                 },
             )
     else:
@@ -654,14 +678,19 @@ class LMEvalParser:
                  use_gptq=False,
                  use_autoround=False,
                  use_awq=False,
-                 use_neural_speed=False,
+                 weight_dtype=None,
+                 compute_dtype=None,
+                 group_size=None,
+                 use_ggml=None,
+                 alg=None,
+                 scale_dtype=None,
                  trust_remote_code=False
                  ):
         self.model = model
         self.tasks = tasks
         self.model_args = model_args
-        self.user_model=user_model
-        self.tokenizer=tokenizer
+        self.user_model = user_model
+        self.tokenizer = tokenizer
         self.num_fewshot = num_fewshot
         self.batch_size = batch_size
         self.max_batch_size = max_batch_size
@@ -680,8 +709,13 @@ class LMEvalParser:
         self.wandb_args = wandb_args
         self.predict_only = predict_only
         self.seed = seed
-        self.use_gptq=use_gptq,
-        self.use_autoround=use_autoround,
-        self.use_awq=use_awq,
-        self.use_neural_speed=use_neural_speed,
+        self.use_gptq = use_gptq
+        self.use_autoround = use_autoround
+        self.use_awq = use_awq
+        self.weight_dtype = weight_dtype
+        self.compute_dtype = compute_dtype
+        self.group_size = group_size
+        self.use_ggml = use_ggml
+        self.alg = alg
+        self.scale_dtype = scale_dtype
         self.trust_remote_code = trust_remote_code

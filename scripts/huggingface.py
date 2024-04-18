@@ -137,6 +137,12 @@ class HFLM(TemplateLM):
         use_gptq: Optional[bool] = False,
         use_autoround: Optional[bool] = False,
         use_awq: Optional[bool] = False,
+        weight_dtype : str = "int4",
+        compute_dtype : str = "int8",
+        group_size : int = 32,
+        use_ggml : bool = False,
+        alg : str = "sym",
+        scale_dtype : str = "fp32",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -249,6 +255,12 @@ class HFLM(TemplateLM):
                 use_gptq=use_gptq,
                 use_autoround=use_autoround,
                 use_awq=use_awq,
+                weight_dtype=weight_dtype,
+                compute_dtype=compute_dtype,
+                group_size=group_size,
+                use_ggml=use_ggml,
+                alg=alg,
+                scale_dtype=scale_dtype,
                 **kwargs,
             )
 
@@ -521,6 +533,12 @@ class HFLM(TemplateLM):
         use_gptq:  Optional[bool] = False,
         use_awq: Optional[bool] = False,
         use_autoround: Optional[bool] = False,
+        weight_dtype : str = "int4",
+        compute_dtype : str = "int8",
+        group_size : int = 32,
+        use_ggml : bool = False,
+        alg : str = "sym",
+        scale_dtype : str = "fp32",
         **kwargs,
     ) -> None:
         """Initializes an HF or HF-compatible PreTrainedModel from scratch
@@ -574,7 +592,11 @@ class HFLM(TemplateLM):
             if self.model_format == "neural_speed":
                 from neural_speed import Model
                 self._model = Model()
-                self._model.init(pretrained, weight_dtype="int4", compute_dtype="int8",
+                self._model.init(pretrained, weight_dtype=weight_dtype, compute_dtype=compute_dtype,
+                                    alg=alg,
+                                    use_ggml=use_ggml,
+                                    group_size=group_size,
+                                    scale_dtype=scale_dtype,
                                     use_quant=self.use_quant,
                                     use_gptq=use_gptq,
                                     use_awq=use_awq,

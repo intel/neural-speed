@@ -157,7 +157,6 @@ def cli_evaluate(args) -> None:
     request_caching_args = request_caching_arg_to_dict(
         cache_requests=args.cache_requests
     )
-
     results = simple_evaluate(
         model=args.model,
         model_args=args.model_args,
@@ -183,9 +182,14 @@ def cli_evaluate(args) -> None:
         use_gptq=args.use_gptq,
         use_awq=args.use_awq,
         use_autoround=args.use_autoround,
+        weight_dtype=args.weight_dtype,
+        compute_dtype=args.compute_dtype,
+        group_size=args.group_size,
+        use_ggml=args.use_ggml,
+        alg=args.alg,
+        scale_dtype=args.scale_dtype,
         **request_caching_args,
     )
-
     if results is not None:
         if args.log_samples:
             samples = results.pop("samples")
