@@ -151,18 +151,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
     for name in list_vars.keys():
         # No gradients for these
         print(name)
-        str_name = repr(name)
-        # import pdb
-        # pdb.set_trace()
-        # if str_name.find('transformer.decoder_layer.0') or str_name.find('transformer.decoder_layer.1') or str_name.find('transformer.in_out_embed.weight'):
-        #     print("true")
-        # else:
-        #     continue
         list_vars[name].requires_grad = False
         src = name
-        nn = name
         
-
         print(src, ' -> ', name)
         data = list_vars[src].squeeze().numpy()
         data = data.astype(np.float32)
