@@ -48,7 +48,7 @@ add_link_options(-fsycl)
 if(UNIX)
     # add_compile_options(-fsycl-targets=spir64_gen)
     # add_link_options(-fsycl-targets=spir64_gen -Xs "-device 0x7d55")
-    add_compile_options(-fp-model=precise -Wall -Wextra -ftemplate-backtrace-limit=0)
+    add_compile_options(-fp-model=precise -Wall -Wextra)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)
     link_libraries(-lgtest -lgtest_main)
 else() # Windows

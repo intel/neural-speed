@@ -395,6 +395,8 @@ void dequantize_gemm_run(int iter) {
       data_type_zero_pt,
       gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP,
       dequant_s,
+      false,
+      mma_engine::xmx,
       gpu_arch::XeHpc>;
 
   using gemm_t = xetla::group::
@@ -530,22 +532,23 @@ void dequantize_gemm_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
 
-  typename gemm_op_t::template arguments_t<compute_policy::weight_type>
-      gemm_arg(
-          matrix_m,
-          matrix_k,
-          matrix_n,
-          A_d,
-          matrix_k,
-          B_d,
-          matrix_n,
-          C_d,
-          matrix_n,
-          scale_d,
-          matrix_n,
-          Acc_d,
-          Cnt_d,
-          epilogue_args);
+  typename gemm_op_t::optional_argements_t opt_args{nullptr, nullptr};
+  typename gemm_op_t::arguments_t gemm_arg(
+      matrix_m,
+      matrix_k,
+      matrix_n,
+      A_d,
+      matrix_k,
+      B_d,
+      matrix_n,
+      C_d,
+      matrix_n,
+      scale_d,
+      matrix_n,
+      Acc_d,
+      Cnt_d,
+      epilogue_args,
+      opt_args);
 
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
   if (!gemm_op_t::can_implement(gemm_arg)) {
