@@ -1869,6 +1869,79 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   }
   return BTLA_CODE::Success;
 }
+
+template <typename ScaleT, int NTILE>
+static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
+  int blks = k / blocksize;
+  float accf[NTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto a8ptr = A.aptr;
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  auto asptr = A.sptr;
+  auto azptr = A.zpptr;
+  int constexpr KTILE = 4;
+  int8_t UnpackBuf[NTILE * KTILE];
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    int acci[NTILE];
+    std::memset(acci, 0, sizeof(acci));
+    if (A.zpptr) {
+      int wacc[NTILE];
+      std::memset(wacc, 0, sizeof(wacc));
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        decompress_kblock_s2_s8fp<BTLA_DTYPE::S2_CLIP, int8_t>(b2ptr, UnpackBuf, NTILE * KTILE, tmp, tmpsize);
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = UnpackBuf[in * KTILE + ikt];
+            acci[in] += int(a8ptr[ikt]) * bval;
+            wacc[in] += bval;
+          }
+        }
+        b2ptr += KTILE * NTILE / 4;
+        a8ptr += KTILE;
+      }
+      float scale = asptr[ib];
+      int zp = azptr[ib];
+      for (int in = 0; in < NTILE; in++) {
+        auto tmp = float(acci[in] - zp * wacc[in]);
+        tmp = tmp * (scale * bsptr[in]);
+        accf[in] += tmp;
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        decompress_kblock_s2_s8fp<BTLA_DTYPE::S2_CLIP, int8_t>(b2ptr, UnpackBuf, NTILE * KTILE, tmp, tmpsize);
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = UnpackBuf[in * KTILE + ikt];
+            acci[in] += int(a8ptr[ikt]) * bval;
+          }
+        }
+        b2ptr += KTILE * NTILE / 4;
+        a8ptr += KTILE;
+      }
+
+      float scale = asptr[ib];
+      for (int in = 0; in < NTILE; in++) {
+        auto tmp = float(acci[in]);
+        tmp = tmp * (scale * bsptr[in]);
+        accf[in] += tmp;
+      }
+    }
+  }
+  for (int in = 0; in < NTILE; in++) {
+    C[in] = accf[in];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE>
+static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
+  
+  return gemv_2bit_u8s8_fp32<ScaleT, NTILE>(A, {nullptr, B.b2ptr, nullptr, B.sptr, nullptr, B.nbits}, C, k, ld_scaleb,
+                                            blocksize, tmp, tmpsize);
+}
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla

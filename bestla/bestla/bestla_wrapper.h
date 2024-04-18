@@ -335,8 +335,9 @@ class LauncherIntKBlock {
 
     static bool implemented(const Param& _param) {
       bool impl = true;
-      impl &=
-          _param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP || _param.paramB.packedW->mDType == BTLA_DTYPE::S3_CLIP;
+      impl &= _param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP ||
+              _param.paramB.packedW->mDType == BTLA_DTYPE::S3_CLIP ||
+              _param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP;
       impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32 ||
               _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::BF16;
       impl &= _param.problem.dims[1] == 1;  // m==1
@@ -449,6 +450,57 @@ class LauncherIntKBlock {
                         StackTmp, TmpSize);
     }
 
+    template <typename ScaleT>
+    static void gemv_s2(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+      int constexpr NBits = 2;
+      auto constexpr TmpSize = 3 * 1024LL;
+      auto constexpr CSize = 1 * 1024LL;
+      auto StackTmp_ = alloca(TmpSize + CSize);
+      auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
+      auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
+      utils::GemvParamA paramA{_param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
+                               _param.paramA.quan->template ZPtr<uint8_t>()};
+      int m = _param.problem.dims[1];
+      int n = _param.problem.dims[2];
+      int k = _param.problem.dims[3];
+      int kblocksize = _param.problem.dims[4];
+      auto Cptr = _param.paramC.C + _config.loc[1];
+      auto const KPad = _param.paramB.packedW->mKPad;
+
+      int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
+      int in = 0;
+      int ld_scaleb = _param.paramB.packedW->CStep();
+      auto bit2_ptr = _param.paramB.packedW->template WPtr<uint8_t>() + _config.loc[1] * KPad / 4;
+      for (; in < size_padded; in += GemmCore::NTILE) {
+        utils::GemvParamB<ScaleT> paramB{nullptr, bit2_ptr + in * KPad / 4,
+                                         nullptr, _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
+                                         nullptr, NBits};
+        if constexpr (std::is_same_v<AType, uint8_t>) {
+          kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(
+              paramA, paramB, Cptr, k, ld_scaleb, kblocksize, StackTmp, TmpSize);
+        } else {
+          kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(
+              paramA, paramB, Cptr, k, ld_scaleb, kblocksize, StackTmp, TmpSize);
+        }
+        Cptr += GemmCore::NTILE;
+      }
+      if (size_padded != _config.size[1]) {
+        utils::GemvParamB<ScaleT> paramB{nullptr, bit2_ptr + in * KPad / 4,
+                                         nullptr, _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
+                                         nullptr, NBits};
+        if constexpr (std::is_same_v<AType, uint8_t>) {
+          kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(
+              paramA, paramB, tmpc_ptr, k, ld_scaleb, kblocksize, StackTmp, TmpSize);
+        } else {
+          kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(
+              paramA, paramB, tmpc_ptr, k, ld_scaleb, kblocksize, StackTmp, TmpSize);
+        }
+        memcpy(Cptr, tmpc_ptr, (_config.size[1] - in) * sizeof(CType));
+      }
+      Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,
+                        StackTmp, TmpSize);
+    }
+
     static void gemv(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if (_param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP) {
         if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
@@ -463,6 +515,14 @@ class LauncherIntKBlock {
           gemv_s3<float>(_param, _config);
         } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
           gemv_s3<utils::bf16>(_param, _config);
+        }
+        return;
+      }
+      if (_param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP) {
+        if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
+          gemv_s2<float>(_param, _config);
+        } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
+          gemv_s2<utils::bf16>(_param, _config);
         }
         return;
       }

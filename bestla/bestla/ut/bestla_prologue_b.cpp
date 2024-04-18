@@ -418,8 +418,8 @@ class UT_S2_WOQ {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_S2_WOQ sUT_S2_WOQ;
 #endif
+static UT_S2_WOQ sUT_S2_WOQ;
 
 class UT_TransposeBlockQuantize_F4 {
  public:
@@ -1276,8 +1276,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompInt8 sUT_CompInt8;
+#endif
 
 class UT_CompBf16 {
  public:

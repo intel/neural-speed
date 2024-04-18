@@ -1230,6 +1230,68 @@ static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr
   return BTLA_CODE::Success;
 }
 
+static inline __m256i unpack_4bits_avx2(utils::bit2x4* ptr, const __m256i& vshift_y, const __m256i& vmask0_y,
+                                        const __m256i& vsfhl_mask_y) {
+  auto raw64 = *(uint64_t*)ptr;
+  auto rawlo32 = (raw64 & 0xffffffff) | (raw64 << 32);
+  auto rawhi32 = (raw64 & 0xffffffff00000000) | (raw64 >> 32);
+  auto vlo_x = _mm_set_epi64x(*(int64_t*)&rawlo32, *(int64_t*)&rawlo32);
+  auto vhi_x = _mm_set_epi64x(*(int64_t*)&rawhi32, *(int64_t*)&rawhi32);
+  auto vsrc_y = _mm256_set_m128i(vhi_x, vlo_x);
+  auto vs_y = _mm256_sllv_epi32(vsrc_y, vshift_y);
+  auto v2_y = _mm256_and_si256(vs_y, vmask0_y);
+
+  auto vout_y = _mm256_shuffle_epi8(v2_y, vsfhl_mask_y);
+  return vout_y;
+}
+
+template <BTLA_DTYPE S2_T, typename _DST_T>
+inline BTLA_CODE decompress_kblock_s2_s8fp(utils::bit2x4* bit2ptr, _DST_T* dstptr, int unpack_elt, int8_t* tmp,
+                                           size_t tmpsize) {
+  int constexpr VBits = 256;
+  int constexpr VElt = VBits / 8;
+  int i = 0;
+  uint64_t mask0 = 0xc0c0c0c0c0c0c0c0;
+  auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
+  auto vshift_y = _mm256_set_epi32(0, 2, 4, 6, 0, 2, 4, 6);
+  auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0);
+  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  for (; i < elt_pad; i += VElt) {
+    auto vout = unpack_4bits_avx2(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y);
+    if (std::is_same_v<_DST_T, int8_t>) {
+      _mm256_storeu_si256((__m256i*)(dstptr + i), vout);
+    } else {
+      _mm256_storeu_si256((__m256i*)tmp, vout);
+      for (int j = 0; j < VElt; j++) {
+        dstptr[i + j] = tmp[j];
+      }
+    }
+  }
+  ref::decompress_kblock_s2_s8fp<S2_T, _DST_T>(bit2ptr + i / 4, dstptr + i, unpack_elt - i, tmp, tmpsize);
+  return BTLA_CODE::Success;
+}
+
+template <BTLA_DTYPE _S2_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_bit2_packrow_fp(utils::bit2x4* bit2ptr, _DST_T* dstptr, int row, int col,
+                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                          int NPad, void* tmp, size_t tmpsize) {
+  auto unpack_elt = row * col;
+  decompress_kblock_s2_s8fp<_S2_T>(bit2ptr, dstptr, unpack_elt, reinterpret_cast<int8_t*>(tmp), tmpsize);
+  // TODO(zhe): simd version
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = scales + kpos * NPad;
+    for (int j = 0; j < col; j++) {
+      float tmp = static_cast<float>(dstptr[i * col + j]);
+      if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
+      dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
+    }
+  }
+
+  return BTLA_CODE::Success;
+}
+
 inline __m256 poly_scale_2nd_ps(const __m256i z, const __m256 f, const __m256 c0, const __m256 c1, const __m256 c2) {
   const auto y = _mm256_fmadd_ps(_mm256_fmadd_ps(f, c0, c1), f, c2);  // auto y = (f * c0 + c1) * f + c2;
   static const auto mask_exp = _mm256_set1_epi32(0x7f800000);

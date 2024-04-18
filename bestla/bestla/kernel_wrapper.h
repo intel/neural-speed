@@ -482,6 +482,14 @@ class DecompressKBlockS2Fp {
   static inline BTLA_CODE forward(utils::bit2x4* bit2ptr, _DST_T* dstptr, int row, int col, _SCA_T* scales,
                                   int8_t* zero_points, int k_offset, int kblock, int NPad, void* tmp, size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_bit2_packrow_fp<S2_T, _DST_T, _PACK_ROW, _SCA_T>(
+          bit2ptr, dstptr, row, col, scales, zero_points, k_offset, kblock, NPad, tmp, tmpsize);
+      assert(ret == BTLA_CODE::Success);
+      return ret;
+    }
+#endif
     ret = ref::decompress_kblock_bit2_packrow_fp<S2_T, _DST_T, _PACK_ROW, _SCA_T>(
         bit2ptr, dstptr, row, col, scales, zero_points, k_offset, kblock, NPad, tmp, tmpsize);
     assert(ret == BTLA_CODE::Success);
@@ -549,6 +557,14 @@ class DecompressKBlockS2S8Fp {
   template <BTLA_ISA ISA_T, BTLA_DTYPE S2_T>
   static inline BTLA_CODE forward(utils::bit2x4* bit2ptr, _DST_T* dstptr, int unpack_elt, void* tmp, size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_s2_s8fp<S2_T, _DST_T>(bit2ptr, dstptr, unpack_elt, reinterpret_cast<int8_t*>(tmp),
+                                                          tmpsize);
+      assert(ret == BTLA_CODE::Success);
+      return ret;
+    }
+#endif
     ret = ref::decompress_kblock_s2_s8fp<S2_T, _DST_T>(bit2ptr, dstptr, unpack_elt, reinterpret_cast<int8_t*>(tmp),
                                                        tmpsize);
     assert(ret == BTLA_CODE::Success);
@@ -969,6 +985,9 @@ class GEMVWoqNBits {
       }
       return ref::gemv_3bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
+    if (B.nbits == 2) {
+      return ref::gemv_2bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+    }
     return BTLA_CODE::NotSupport;
   }
 
@@ -986,6 +1005,9 @@ class GEMVWoqNBits {
         return avx2::gemv_3bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
       }
       return ref::gemv_3bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    if (B.nbits == 2) {
+      return ref::gemv_2bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
   }
