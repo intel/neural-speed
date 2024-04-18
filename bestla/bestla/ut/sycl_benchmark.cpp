@@ -85,7 +85,7 @@ class Benchmark_Fp32Fp32 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
-static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+// static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 
 class Benchmark_Fp16Fp16 {
  public:
@@ -717,15 +717,15 @@ class Benchmark_S4Fp32Fp32 {
     }
   }
 };
-//static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
+static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
 
 class Benchmark_S4Fp16Fp16 {
  public:
   Benchmark_S4Fp16Fp16() {
     UT_START();
-    benchmark_all(1, 4096, 4096, 32);
-    benchmark_all(1, 4096, 4096 * 4, 32);
-    benchmark_all(1, 4096 * 3, 4096, 32);
+    benchmark_all(1, 4096, 4096, 128);
+    benchmark_all(1, 4096, 4096 * 4, 128);
+    benchmark_all(1, 4096 * 3, 4096, 128);
     benchmark_all(1024, 4096, 4096, 32);
     benchmark_all(2048, 4096 * 3, 4096, 32);
   }
@@ -854,7 +854,7 @@ class Benchmark_S4Fp16Fp16 {
     }
   }
 };
- static Benchmark_S4Fp16Fp16 sBenchmark_S4Fp16Fp16;
+static Benchmark_S4Fp16Fp16 sBenchmark_S4Fp16Fp16;
 
 class Benchmark_DequantS4 {
  public:

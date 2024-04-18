@@ -381,31 +381,62 @@ class WeightS4Trans {
             auto bptr = B + g_n * k / 2;
             auto aptr = A;
             auto cptr = C + g_n;
-            float tmpAcc = 0.f;
-            int constexpr Unroll = 1;
-            for (int i = 0; i < k; i += GroupK * Unroll) {
+            if constexpr (std::is_same_v<CType, sycl::half>) {
+              sycl::half2 tmpAcc = {0.f, 0.f};
+              int constexpr Unroll = 1;
+              for (int i = 0; i < k; i += GroupK * Unroll) {
 #pragma unroll
-              for (int iu = 0; iu < Unroll; iu++) {
-                uint8_t tmps8[TileK / 2];
-                *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
-                float scale = *(sptr + sg_id * TileK / blocksize);
+                for (int iu = 0; iu < Unroll; iu++) {
+                  uint8_t tmps8[TileK / 2];
+                  *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
+                  CType scale = *(sptr + sg_id * TileK / blocksize);
 #pragma unroll
-                for (int ikk = 0; ikk < TileK; ikk += 2) {
-                  tmpAcc +=
-                      float(aptr[sg_id * TileK + ikk]) * static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
-                  tmpAcc += float(aptr[sg_id * TileK + ikk + 1]) * static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
+                  for (int ikk = 0; ikk < TileK; ikk += 2) {
+                    sycl::half2 tmpA = *(sycl::half2*)&aptr[sg_id * TileK + ikk];
+                    sycl::half2 tmpB = {static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4),
+                                        static_cast<int8_t>((tmps8[ikk / 2] & 0xf0))};
+                    tmpAcc += tmpA * tmpB * scale;
+                  }
+                  sptr += GroupK / blocksize;
+                  aptr += GroupK;
+                  bptr += GroupK / 2;
                 }
-                sptr += GroupK / blocksize;
-                aptr += GroupK;
-                bptr += GroupK / 2;
               }
-            }
-            float sum = 0.f;
-            for (int i = 0; i < SgSize; i += 1) {
-              sum += sg.shuffle(tmpAcc, i);
-            }
-            if (sg_id == 0) {
-              *cptr = sum;
+              sycl::half2 sum = {0.f, 0.f};
+              for (int i = 0; i < SgSize; i += 1) {
+                sum += sg.shuffle(tmpAcc, i);
+              }
+              if (sg_id == 0) {
+                *cptr = sum[0] + sum[1];
+              }
+            } else {
+              CType tmpAcc = 0.f;
+              int constexpr Unroll = 1;
+              for (int i = 0; i < k; i += GroupK * Unroll) {
+#pragma unroll
+                for (int iu = 0; iu < Unroll; iu++) {
+                  uint8_t tmps8[TileK / 2];
+                  *(sycl::vec<uint8_t, TileK / 2>*)tmps8 = *(sycl::vec<uint8_t, TileK / 2>*)(bptr + sg_id * TileK / 2);
+                  CType scale = *(sptr + sg_id * TileK / blocksize);
+#pragma unroll
+                  for (int ikk = 0; ikk < TileK; ikk += 2) {
+                    tmpAcc +=
+                        CType(aptr[sg_id * TileK + ikk]) * static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
+                    tmpAcc +=
+                        CType(aptr[sg_id * TileK + ikk + 1]) * static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
+                  }
+                  sptr += GroupK / blocksize;
+                  aptr += GroupK;
+                  bptr += GroupK / 2;
+                }
+              }
+              float sum = 0.f;
+              for (int i = 0; i < SgSize; i += 1) {
+                sum += sg.shuffle(tmpAcc, i);
+              }
+              if (sg_id == 0) {
+                *cptr = sum;
+              }
             }
           });
     });
