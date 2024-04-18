@@ -341,6 +341,7 @@ class LauncherIntKBlock {
       impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32 ||
               _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::BF16;
       impl &= _param.problem.dims[1] == 1;  // m==1
+      impl &= !_param.paramB.packedW->IsAsym();
       return impl;
     }
     template <typename ScaleT>
