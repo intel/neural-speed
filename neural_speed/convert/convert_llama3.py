@@ -97,7 +97,8 @@ class QuantizedDataType(DataType):
         raise NotImplementedError(f'Quantization for {self.name} not implemented')
 
     def elements_to_bytes(self, n_elements: int) -> int:
-        assert n_elements % self.block_size == 0, f'Invalid number of elements {n_elements} for {self.name} with block size {self.block_size}'
+        assert n_elements % self.block_size == 0, \
+            f'Invalid number of elements {n_elements} for {self.name} with block size {self.block_size}'
         return self.quantized_dtype.itemsize * (n_elements // self.block_size)
 
 
@@ -157,8 +158,7 @@ class GGMLFileType(enum.IntEnum):
         dt = GGML_FILE_TYPE_TO_DATA_TYPE.get(self)
         if dt is None:
             raise ValueError(self)
-        # Convert all 1D tensors to F32.  Most of the codebase that takes in 1D tensors only handles F32 tensors, and most of the outputs tensors are F32.
-        #  Also The 1d tensors aren't much of a performance/size issue.  So instead of having to have separate F32 and F16 implementations of both, just convert everything to F32 for now.
+
         return dt if len(tensor.shape) > 1 else DT_F32
 
 
@@ -291,7 +291,6 @@ class Params:
         )
 
     # LLaMA v2 70B params.json
-    # {"dim": 8192, "multiple_of": 4096, "ffn_dim_multiplier": 1.3, "n_heads": 64, "n_kv_heads": 8, "n_layers": 80, "norm_eps": 1e-05, "vocab_size": -1}
     @staticmethod
     def loadOriginalParamsJson(model: LazyModel, config_path: Path) -> Params:
         with open(config_path) as f:
@@ -529,7 +528,8 @@ class SentencePieceVocab(Vocab):
         yield from self.added_tokens()
 
     def __repr__(self) -> str:
-        return f"<SentencePieceVocab with {self.vocab_size_base} base tokens and {len(self.added_tokens_list)} added tokens>"
+        return f"<SentencePieceVocab with {self.vocab_size_base} \
+            base tokens and {len(self.added_tokens_list)} added tokens>"
 
 
 class LlamaHfVocab(Vocab):
@@ -646,7 +646,8 @@ class LlamaHfVocab(Vocab):
 
 
 def permute(weights: NDArray, n_head: int, n_head_kv: int) -> NDArray:
-    # print( "permute debug " + str(weights.shape[0]) + " x " + str(weights.shape[1]) + " nhead " + str(n_head) + " nheadkv " + str(n_kv_head) )
+    # print( "permute debug " + str(weights.shape[0]) + " x " +
+    # str(weights.shape[1]) + " nhead " + str(n_head) + " nheadkv " + str(n_kv_head) )
     if n_head_kv is not None and n_head != n_head_kv:
         n_head = n_head_kv
     return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2,
@@ -1212,9 +1213,8 @@ class OutputFile:
             elapsed = time.time() - start
             size = ' x '.join(f"{dim:6d}" for dim in lazy_tensor.shape)
             padi = len(str(len(model)))
-            print(
-                f"[{i + 1:{padi}d}/{len(model)}] Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4} | T+{int(elapsed):4}"
-            )
+            print(f"[{i + 1:{padi}d}/{len(model)}] Writing tensor \
+                    {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4} | T+{int(elapsed):4}")
             self.gguf.write_tensor_data(ndarray)
 
     def close(self) -> None:
@@ -1341,7 +1341,6 @@ def convert_model_names(model: LazyModel, params: Params, skip_unknown: bool) ->
                 model[f"model.layers.{i}.self_attn.q_proj.weight"], params.n_head, params.n_head)
             tmp[f"model.layers.{i}.self_attn.k_proj.weight"] = permute_lazy(
                 model[f"model.layers.{i}.self_attn.k_proj.weight"], params.n_head, params.n_head_kv)
-            # tmp[f"model.layers.{i}.self_attn.v_proj.weight"] =              model[f"model.layers.{i}.self_attn.v_proj.weight"]
         elif f"model.layers.{i}.self_attn.W_pack.weight" in model:
             print(f"Unpacking and permuting layer {i}")
             tmp[f"model.layers.{i}.self_attn.q_proj.weight"] = permute_part_lazy(
