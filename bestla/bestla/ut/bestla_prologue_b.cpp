@@ -977,6 +977,7 @@ class UT_CompInt8 {
   void ut_s2() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
     }
