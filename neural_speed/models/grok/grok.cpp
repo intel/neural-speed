@@ -300,26 +300,34 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
     ne_tensor* moe_out = nullptr;
     for (int i = 0; i < n_expert_used; ++i) {
       ne_tensor* cur_expert;
-      ne_tensor* cur_up = ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
-      ne_set_name(cur_up, "ffn_moe_up");
+      if (bestla_fusion_FFN_Gelu_Mul_f32f32_support(
+              model.layers[il].ffn_gate_exp[0]->data, model.layers[il].ffn_down_exp[0]->data,
+              model.layers[il].ffn_up_exp[0]->data, N, cur->ne[0], model.layers[il].ffn_gate_exp[0]->ne[1],
+              model.layers[il].ffn_down_exp[0]->ne[1])) {
+        cur_expert = ne_mul_id_ffn_gelu(ctx0, model.layers[il].ffn_down_exp, model.layers[il].ffn_gate_exp,
+                                        model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
+      } else {
+        ne_tensor* cur_up = ne_mul_mat_id(ctx0, model.layers[il].ffn_up_exp, n_expert, selected_experts, i, cur);
+        ne_set_name(cur_up, "ffn_moe_up");
 
-      ne_tensor* cur_gate = ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur);
-      ne_set_name(cur_gate, "ffn_moe_gate");
+        ne_tensor* cur_gate = ne_mul_mat_id(ctx0, model.layers[il].ffn_gate_exp, n_expert, selected_experts, i, cur);
+        ne_set_name(cur_gate, "ffn_moe_gate");
 
-      cur_gate = ne_gelu(ctx0, cur_gate);
-      ne_set_name(cur_gate, "ffn_moe_gelu");
+        cur_gate = ne_gelu(ctx0, cur_gate);
+        ne_set_name(cur_gate, "ffn_moe_gelu");
 
-      cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
-      ne_set_name(cur_expert, "ffn_moe_gate_par");
+        cur_expert = ne_mul(ctx0, cur_up, cur_gate);  // [n_tokens, n_embd]
+        ne_set_name(cur_expert, "ffn_moe_gate_par");
 
-      cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
-                                 cur_expert);  // [n_tokens, n_embd]
-      ne_set_name(cur_expert, "ffn_moe_down");
+        cur_expert = ne_mul_mat_id(ctx0, model.layers[il].ffn_down_exp, n_expert, selected_experts, i,
+                                   cur_expert);  // [n_tokens, n_embd]
+        ne_set_name(cur_expert, "ffn_moe_down");
 
-      cur_expert =
-          ne_mul(ctx0, cur_expert,
-                 ne_repeat(ctx0, ne_view_2d(ctx0, weights, 1, N, weights->nb[1], i * weights->nb[0]), cur_expert));
-      ne_set_name(cur_expert, "ffn_moe_weighted_");
+        cur_expert =
+            ne_mul(ctx0, cur_expert,
+                   ne_repeat(ctx0, ne_view_2d(ctx0, weights, 1, N, weights->nb[1], i * weights->nb[0]), cur_expert));
+        ne_set_name(cur_expert, "ffn_moe_weighted_");
+      }
 
       if (i == 0) {
         moe_out = cur_expert;

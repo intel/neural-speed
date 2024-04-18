@@ -240,7 +240,7 @@ class grok_quant_layer : public quant_layer_base {
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;
     if ((layername.find("embedding") != std::string::npos) ||
-        (layername == "token_embd.weight" || layername == "model.embed_tokens.weight")) {
+        (layername == "token_embd.weight" || layername == "transformer.in_out_embed.weight")) {
       // special layer process, can be loaded by config file
       return quant_params_internal{quant_bits::q8};  // q80
     }
