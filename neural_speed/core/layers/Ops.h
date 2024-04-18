@@ -32,6 +32,7 @@ enum ne_op {
   NE_OP_LOG,
   NE_OP_SUM,
   NE_OP_SUM_ROWS,
+  NE_OP_TANH,
   NE_OP_MEAN,
   NE_OP_REPEAT,
   NE_OP_ABS,
@@ -94,7 +95,6 @@ enum ne_op {
   NE_OP_DEBUG,
   NE_OP_CONV_1D,
   NE_OP_ARGSORT,
-  NE_OP_TANH,
   NE_OP_COUNT,
 };
 
