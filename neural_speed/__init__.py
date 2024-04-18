@@ -137,6 +137,7 @@ class Model:
              compute_dtype="int8",
              use_ggml=False,
              model_hub="huggingface"):
+        self.model_name = model_name
         self.config = _get_model_config(model_name, model_hub=model_hub)
         model_type = _get_model_type(self.config)
         self.model_type = model_type
@@ -202,7 +203,8 @@ class Model:
         # clean
         os.remove(fp32_bin)
 
-    def init_from_bin(self, model_type, model_path, **generate_kwargs):
+    def init_from_bin(self, model_type, model_path, model_name, model_hub = 'huggingface', **generate_kwargs):
+        self.config = _get_model_config(model_name, model_hub)
         if self.module is None:
             self.module = _import_package(model_type)
         self.model = self.module.Model()
@@ -327,6 +329,7 @@ class Model:
         if self.model is None or self.reinit_from_bin:
             self.init_from_bin(self.model_type,
                                self.bin_file,
+                               self.model_name,
                                batch_size=batch_size,
                                max_request_num=self.max_request_num,
                                **generate_kwargs)
@@ -407,6 +410,7 @@ class Model:
             if self.model is None or self.reinit_from_bin:
                 self.init_from_bin(self.model_type,
                                    self.bin_file,
+                                   self.model_name,
                                    batch_size=batch_size,
                                    max_request_num=self.max_request_num,
                                    **kwargs)
