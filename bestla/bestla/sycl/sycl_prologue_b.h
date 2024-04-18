@@ -175,10 +175,17 @@ class WeightS4Trans {
       {
         auto scale = _param.scale[(sgn + icp * GemmCoreT::SgCount) * _param.ldb + koffset / blocksize];
         auto tmps8 = _param.B[((sgn + icp * GemmCoreT::SgCount) * wldb + (koffset + helper.sg_id() * LoadTileK)) / 2];
-        dstptr[sg_off + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
-            static_cast<int8_t>((tmps8 & 0x0f) << 4) * scale;
-        dstptr[sg_off + GemmCoreT::WgNEle + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
-            static_cast<int8_t>((tmps8 & 0xf0)) * scale;
+        if constexpr (std::is_same_v<BType, sycl::half>) {
+          sycl::half2 tmpBf = {static_cast<int8_t>((tmps8 & 0x0f) << 4), static_cast<int8_t>((tmps8 & 0xf0))};
+          tmpBf *= scale;
+          dstptr[sg_off + helper.sg_group_id() + icp * GemmCoreT::SgCount] = tmpBf[0];
+          dstptr[sg_off + GemmCoreT::WgNEle + helper.sg_group_id() + icp * GemmCoreT::SgCount] = tmpBf[1];
+        } else {
+          dstptr[sg_off + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
+              static_cast<int8_t>((tmps8 & 0x0f) << 4) * scale;
+          dstptr[sg_off + GemmCoreT::WgNEle + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
+              static_cast<int8_t>((tmps8 & 0xf0)) * scale;
+        }
       }
     }
   }
