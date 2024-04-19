@@ -193,7 +193,7 @@ class UT_S8S8S32 {
     ut::buffer_error(refC.data(), matC.data(), refC.size(), 0.001f);
   }
 };
-#ifdef BTLA_UT_DEBUG
+#ifdef BTLA_UT_WRAPPER
 static UT_S8S8S32 sUT_S8S8S32;
 #endif
 

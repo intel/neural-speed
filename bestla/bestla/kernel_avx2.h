@@ -1252,7 +1252,7 @@ inline BTLA_CODE decompress_kblock_s2_s8fp(utils::bit2x4* bit2ptr, _DST_T* dstpt
   auto vshift_y = _mm256_set_epi32(0, 2, 4, 6, 0, 2, 4, 6);
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
-  auto vorder_y = _mm256_set_epi32(1,1,1,1,0,0,0,0);
+  auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
   int elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_2bits_avx2(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
@@ -1384,6 +1384,24 @@ constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_
 #pragma GCC push_options
 #pragma GCC target("avxvnni")
 #endif
+
+template <typename ScaleT, int NReg>
+static inline void gemv_dequant_s32fp32(const float* asptr, const ScaleT* bsptr, __m256i* iacc, __m256* facc) {
+  const __m256 v_a_scale = _mm256_set1_ps(*asptr);
+  for (int i = 0; i < NReg; i++) {
+    __m256 v_b_scale;
+    if constexpr (std::is_same_v<ScaleT, float>) {
+      v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
+    } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
+      auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
+      v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+    }
+    v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
+    auto tmp = _mm256_cvtepi32_ps(iacc[i]);
+    facc[i] = _mm256_fmadd_ps(tmp, v_b_scale, facc[i]);
+  }
+}
+
 template <typename ScaleT, int NTILE>
 static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
@@ -1402,71 +1420,40 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   uint32_t mask = 0xf0f0f0f0;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   const __m256i onesu8 = _mm256_set1_epi8(1);
-
-  if (azptr) {
-    for (int ib = 0; ib < blks; ib += 1) {
-      __m256i iacc[NReg];
-      __m256i bacc[NReg];
+  assert(azptr);
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m256i iacc[NReg];
+    __m256i bacc[NReg];
+    for (int i = 0; i < NReg; i++) {
+      iacc[i] = _mm256_setzero_si256();
+      bacc[i] = _mm256_setzero_si256();
+    }
+    for (int ik = 0; ik < blocksize; ik += 4) {
+      auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
       for (int i = 0; i < NReg; i++) {
-        iacc[i] = _mm256_setzero_si256();
-        bacc[i] = _mm256_setzero_si256();
-      }
-      for (int ik = 0; ik < blocksize; ik += 4) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
-        for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2),
-                                                           vmask);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
-          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
-        }
-      }
-      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-      auto zp = int(azptr[ib]);
-      const __m256i v_a_zp = _mm256_set1_epi32(zp);
-      auto bsptr = B.sptr + ib * ld_scaleb;
-      for (int i = 0; i < NReg; i++) {
-        bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
-        iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
-        __m256 v_b_scale;
-        if constexpr (std::is_same_v<ScaleT, float>) {
-          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-        }
-        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
+        auto vb =
+            kernel::avx2::unpack_4bits_avx2<false>((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+        bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
       }
     }
-  } else {
-    for (int ib = 0; ib < blks; ib += 1) {
-      __m256i iacc[NReg];
-      for (int i = 0; i < NReg; i++) {
-        iacc[i] = _mm256_setzero_si256();
+    const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
+    auto zp = int(azptr[ib]);
+    const __m256i v_a_zp = _mm256_set1_epi32(zp);
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
+      iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
+      __m256 v_b_scale;
+      if constexpr (std::is_same_v<ScaleT, float>) {
+        v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
+      } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
+        auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
+        v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
       }
-      for (int ik = 0; ik < blocksize; ik += 4) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
-        for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2),
-                                                           vmask);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
-        }
-      }
-      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-      auto bsptr = B.sptr + ib * ld_scaleb;
-      for (int i = 0; i < NReg; i++) {
-        __m256 v_b_scale;
-        if constexpr (std::is_same_v<ScaleT, float>) {
-          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-        }
-        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
-      }
+      v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
+      auto tmp = _mm256_cvtepi32_ps(iacc[i]);
+      acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
     }
   }
 
@@ -1577,84 +1564,47 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       _mm256_storeu_si256((__m256i*)(dst + 32 * i), res);
     }
   };
-  if (azptr) {
-    for (int ib = 0; ib < blks; ib += 1) {
-      __m256i iacc[NReg];
-      __m256i bacc[NReg];
-      for (int i = 0; i < NReg; i++) {
-        iacc[i] = _mm256_setzero_si256();
-        bacc[i] = _mm256_setzero_si256();
-      }
-      for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        for (int il = 0; il < Loop128; il++) {
-          bit3_interleave_decompress_pack128(b2ptr, b1ptr, UnpackBuf + il * 128);
-          b2ptr += 128 / 4;
-          b1ptr += 128 / 8;
-        }
-        for (int iu = 0; iu < UnpackElt; iu++) {
-          auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
-          for (int i = 0; i < NReg; i++) {
-            auto vb = _mm256_loadu_si256((const __m256i*)(UnpackBuf + iu * NTILE * KTILE + i * 32));
-            iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
-            bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
-          }
-        }
-        a8ptr += KTILE * UnpackElt;
-      }
-      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-      auto zp = int(azptr[ib]);
-      const __m256i v_a_zp = _mm256_set1_epi32(zp);
-      auto bsptr = B.sptr + ib * ld_scaleb;
-      for (int i = 0; i < NReg; i++) {
-        bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
-        iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
-        __m256 v_b_scale;
-        if constexpr (std::is_same_v<ScaleT, float>) {
-          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-        }
-        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
-      }
+  assert(azptr);
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m256i iacc[NReg];
+    __m256i bacc[NReg];
+    for (int i = 0; i < NReg; i++) {
+      iacc[i] = _mm256_setzero_si256();
+      bacc[i] = _mm256_setzero_si256();
     }
-  } else {
-    for (int ib = 0; ib < blks; ib += 1) {
-      __m256i iacc[NReg];
-      for (int i = 0; i < NReg; i++) {
-        iacc[i] = _mm256_setzero_si256();
+    for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
+      for (int il = 0; il < Loop128; il++) {
+        bit3_interleave_decompress_pack128(b2ptr, b1ptr, UnpackBuf + il * 128);
+        b2ptr += 128 / 4;
+        b1ptr += 128 / 8;
       }
-      for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        for (int il = 0; il < Loop128; il++) {
-          bit3_interleave_decompress_pack128(b2ptr, b1ptr, UnpackBuf + il * 128);
-          b2ptr += 128 / 4;
-          b1ptr += 128 / 8;
+      for (int iu = 0; iu < UnpackElt; iu++) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
+        for (int i = 0; i < NReg; i++) {
+          auto vb = _mm256_loadu_si256((const __m256i*)(UnpackBuf + iu * NTILE * KTILE + i * 32));
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
         }
-        for (int iu = 0; iu < UnpackElt; iu++) {
-          auto va = _mm256_set1_epi32(*(int*)(a8ptr + iu * KTILE));
-          for (int i = 0; i < NReg; i++) {
-            auto vb = _mm256_loadu_si256((const __m256i*)(UnpackBuf + iu * NTILE * KTILE + i * 32));
-            iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
-          }
-        }
-        a8ptr += KTILE * UnpackElt;
       }
-      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-      auto bsptr = B.sptr + ib * ld_scaleb;
-      for (int i = 0; i < NReg; i++) {
-        __m256 v_b_scale;
-        if constexpr (std::is_same_v<ScaleT, float>) {
-          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-        }
-        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
+      a8ptr += KTILE * UnpackElt;
+    }
+    const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
+    auto zp = int(azptr[ib]);
+    const __m256i v_a_zp = _mm256_set1_epi32(zp);
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
+      iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
+      __m256 v_b_scale;
+      if constexpr (std::is_same_v<ScaleT, float>) {
+        v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
+      } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
+        auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
+        v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
       }
+      v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
+      auto tmp = _mm256_cvtepi32_ps(iacc[i]);
+      acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
     }
   }
 
@@ -1759,6 +1709,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
                                             int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
   auto a8ptr = A.aptr;
   auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  auto bzptr = B.zpptr;
   auto asptr = A.sptr;
   auto azptr = A.zpptr;
 
@@ -1778,14 +1729,37 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
   const __m256i onesu8 = _mm256_set1_epi8(1);
 
-  if (azptr) {
-    for (int ib = 0; ib < blks; ib += 1) {
-      __m256i iacc[NReg];
-      __m256i bacc[NReg];
-      for (int i = 0; i < NReg; i++) {
-        iacc[i] = _mm256_setzero_si256();
-        bacc[i] = _mm256_setzero_si256();
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m256i iacc[NReg];
+    __m256i bacc[NReg];
+    for (int i = 0; i < NReg; i++) {
+      iacc[i] = _mm256_setzero_si256();
+      bacc[i] = _mm256_setzero_si256();
+    }
+    auto zp = int(azptr[ib]);
+    if (bzptr) {
+      __m256i aacc = _mm256_setzero_si256();
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr));
+        aacc = _mm256_dpbusd_avx_epi32(aacc, va, onesu8);
+        for (int i = 0; i < NReg; i++) {
+          auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+          b2ptr += 8 * KTILE / 4;
+        }
+        a8ptr += KTILE;
       }
+      const __m256i v_a_zp = _mm256_set1_epi32(zp * blocksize);
+      for (int i = 0; i < NReg; i++) {
+        auto bzs8 = _mm_loadl_epi64((const __m128i*)(bzptr + i * 8));
+        auto bzs32 = _mm256_cvtepi8_epi32(bzs8);
+        auto tmp = _mm256_mullo_epi32(bzs32, aacc);
+        iacc[i] = _mm256_sub_epi32(iacc[i], tmp);
+        tmp = _mm256_mullo_epi32(bzs32, v_a_zp);
+        iacc[i] = _mm256_add_epi32(iacc[i], tmp);
+      }
+    } else {
       for (int ik = 0; ik < blocksize; ik += KTILE) {
         auto va = _mm256_set1_epi32(*(int*)(a8ptr));
         for (int i = 0; i < NReg; i++) {
@@ -1796,55 +1770,15 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         }
         a8ptr += KTILE;
       }
-      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-      auto zp = int(azptr[ib]);
-      const __m256i v_a_zp = _mm256_set1_epi32(zp);
-      auto bsptr = B.sptr + ib * ld_scaleb;
-      for (int i = 0; i < NReg; i++) {
-        bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
-        iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
-        __m256 v_b_scale;
-        if constexpr (std::is_same_v<ScaleT, float>) {
-          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-        }
-        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
-      }
     }
-  } else {
-    for (int ib = 0; ib < blks; ib += 1) {
-      __m256i iacc[NReg];
-      for (int i = 0; i < NReg; i++) {
-        iacc[i] = _mm256_setzero_si256();
-      }
-      for (int ik = 0; ik < blocksize; ik += KTILE) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr));
-        for (int i = 0; i < NReg; i++) {
-          auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
-          b2ptr += 8 * KTILE / 4;
-        }
-        a8ptr += KTILE;
-      }
-      const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-      auto bsptr = B.sptr + ib * ld_scaleb;
-      for (int i = 0; i < NReg; i++) {
-        __m256 v_b_scale;
-        if constexpr (std::is_same_v<ScaleT, float>) {
-          v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-        } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-          auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-          v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-        }
-        v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-        auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-        acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
-      }
+
+    const __m256i v_a_zp = _mm256_set1_epi32(zp);
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
+      iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
     }
+
+    gemv_dequant_s32fp32<ScaleT, NReg>(asptr + ib, B.sptr + ib * ld_scaleb, iacc, acc);
   }
 
   for (int i = 0; i < NReg; i++) {

@@ -418,8 +418,8 @@ class UT_S2_WOQ {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_S2_WOQ sUT_S2_WOQ;
+#endif
 
 class UT_TransposeBlockQuantize_F4 {
  public:
@@ -970,8 +970,8 @@ class UT_CompInt8 {
   UT_CompInt8() {
     UT_START();
     ut_s2();
-    ut_s3();
     ut_s4_newkblock();
+    ut_s3();
     ut_s4();
     ut_s8();
   }
@@ -1029,6 +1029,7 @@ class UT_CompInt8 {
   void ut_s4_newkblock() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
@@ -1289,8 +1290,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompInt8 sUT_CompInt8;
+#endif
 
 class UT_CompBf16 {
  public:

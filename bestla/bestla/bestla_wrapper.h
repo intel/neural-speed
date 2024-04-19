@@ -341,7 +341,7 @@ class LauncherIntKBlock {
       impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32 ||
               _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::BF16;
       impl &= _param.problem.dims[1] == 1;  // m==1
-      impl &= !_param.paramB.packedW->IsAsym();
+      // impl &= !_param.paramB.packedW->IsAsym();
       return impl;
     }
     template <typename ScaleT>
@@ -473,9 +473,12 @@ class LauncherIntKBlock {
       int ld_scaleb = _param.paramB.packedW->CStep();
       auto bit2_ptr = _param.paramB.packedW->template WPtr<uint8_t>() + _config.loc[1] * KPad / 4;
       for (; in < size_padded; in += GemmCore::NTILE) {
-        utils::GemvParamB<ScaleT> paramB{nullptr, bit2_ptr + in * KPad / 4,
-                                         nullptr, _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-                                         nullptr, NBits};
+        utils::GemvParamB<ScaleT> paramB{nullptr,
+                                         bit2_ptr + in * KPad / 4,
+                                         nullptr,
+                                         _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
+                                         _param.paramB.packedW->template ZPtr<int8_t>(),
+                                         NBits};
         if constexpr (std::is_same_v<AType, uint8_t>) {
           kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(
               paramA, paramB, Cptr, k, ld_scaleb, kblocksize, StackTmp, TmpSize);
@@ -486,9 +489,12 @@ class LauncherIntKBlock {
         Cptr += GemmCore::NTILE;
       }
       if (size_padded != _config.size[1]) {
-        utils::GemvParamB<ScaleT> paramB{nullptr, bit2_ptr + in * KPad / 4,
-                                         nullptr, _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-                                         nullptr, NBits};
+        utils::GemvParamB<ScaleT> paramB{nullptr,
+                                         bit2_ptr + in * KPad / 4,
+                                         nullptr,
+                                         _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
+                                         _param.paramB.packedW->template ZPtr<int8_t>(),
+                                         NBits};
         if constexpr (std::is_same_v<AType, uint8_t>) {
           kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE>(
               paramA, paramB, tmpc_ptr, k, ld_scaleb, kblocksize, StackTmp, TmpSize);

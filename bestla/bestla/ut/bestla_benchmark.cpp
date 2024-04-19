@@ -810,6 +810,7 @@ class UTWOQ_CompInt8 {
   }
 
   void ut_s2() {
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S2_CLIP, true);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S2_CLIP);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S2_CLIP);
     /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
@@ -838,7 +839,7 @@ class UTWOQ_CompInt8 {
 
   template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
   void benchmark(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems, int threads,
-                 BTLA_DTYPE qtype) {
+                 BTLA_DTYPE qtype, bool isasym) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerKBlockS<Core_T>;
     using Launcher =
@@ -849,7 +850,7 @@ class UTWOQ_CompInt8 {
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
     using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
-    WType tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+    WType tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isasym);
     std::vector<WType> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
@@ -889,7 +890,7 @@ class UTWOQ_CompInt8 {
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
-  void benchmark_all(int m, int n, int k, BTLA_DTYPE qtype) {
+  void benchmark_all(int m, int n, int k, BTLA_DTYPE qtype, bool isasym = false) {
     auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, qtype, BTLA_DTYPE::F32);
     int batch = auto_batch(memsize);
     printf("%d %d %d %d %s %s %s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F32), bestla_dtype_str(qtype),
@@ -910,17 +911,15 @@ class UTWOQ_CompInt8 {
       for (auto blocksize : {32, 128}) {
         if (_cd->AMX_INT8()) {
           benchmark<gemm::ICoreRowNAmxint8KBlock<64, 16>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
         if (_cd->AVX512_VNNI()) {
           benchmark<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
         if (_cd->AVX_VNNI()) {
-          benchmark<gemm::ICoreRowNAvxvnniKBlockSS<24, 2>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
       }
     }

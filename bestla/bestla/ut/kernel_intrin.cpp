@@ -80,6 +80,50 @@ class UT_avx2_decompress_s4_s8 {
 #ifdef BTLA_UT_KERNEL_INTRIN
 static UT_avx2_decompress_s4_s8 sUT_avx2_decompress_s4_s8;
 #endif
-#endif
+class UT_avx2_gemv {
+ public:
+  UT_avx2_gemv() {
+    UT_START();
+    CheckISA(AVX2);
+    ut_2bit(24, 32, 32, true);
+  }
+
+  void ut_2bit(int n, int k, int kblock, bool iasym) {
+    printf("Test Case %s: %d %d %d\n", __FUNCTION__, n, k, kblock);
+    int blks = k / kblock;
+    avector<bit2x4> b2(n * k / 4);
+    avector<float> scaleb(n * blks), scalea(blks);
+    avector<int8_t> bzp(n * blks);
+    avector<uint8_t> A(k), azp(blks);
+    avector<float> Af32(k), Bf32(n * k), Cf32(n), Cref(n);
+    fill_buffer_randn((uint8_t*)b2.data(), b2.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(A.data(), A.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(bzp.data(), bzp.size(), int8_t(-50), int8_t(50));
+    fill_buffer_randn(azp.data(), azp.size(), uint8_t(100), uint8_t(150));
+    fill_buffer_randn(scaleb.data(), scaleb.size(), 0.01f, 0.02f);
+    fill_buffer_randn(scalea.data(), scalea.size(), 0.01f, 0.02f);
+
+    for (int i = 0; i < k; i += 4) {
+      int bid = i / kblock;
+      for (int j = 0; j < 4; j++) {
+        Af32[i + j] = (int(A[i + j]) - azp[bid]) * scalea[bid];
+      }
+      for (int j = 0; j < n; j += 1) {
+        auto b24 = b2[(i * n + j * 4) / 4];
+        Bf32[(i + 0) * n + j] = (int(b24.a << 6) - bzp[bid * n + j]) * scaleb[bid * n + j];
+        Bf32[(i + 1) * n + j] = (int(b24.b << 6) - bzp[bid * n + j]) * scaleb[bid * n + j];
+        Bf32[(i + 2) * n + j] = (int(b24.c << 6) - bzp[bid * n + j]) * scaleb[bid * n + j];
+        Bf32[(i + 3) * n + j] = (int(b24.d << 6) - bzp[bid * n + j]) * scaleb[bid * n + j];
+      }
+    }
+    gemmref_fp32fp32fp32(1, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
+    kernel::avx2::gemv_2bit_u8s8_fp32<float, 24>({A.data(), scalea.data(), azp.data()},
+                                                {nullptr, (uint8_t*)b2.data(), nullptr, scaleb.data(), bzp.data(), 2},
+                                                Cf32.data(), k, n, kblock, cache, CacheSize);
+    buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
+  }
+};
+UT_avx2_gemv sUT_avx2_gemv;
+
 }  // namespace ut
 }  // namespace bestla
