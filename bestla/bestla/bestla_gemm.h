@@ -1401,13 +1401,15 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
           int mm_re = utils::remainsize(mm, _mtile, ARegCount);
           for (int imm = 0; imm < mm_re; imm++) {
             vpbroadcastd(vreg_t(AReg + imm), ptr[reg_tmp1]);
+            if constexpr (std::is_same_v<AType, int8_t>) {
+              vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg + imm), vreg_t(AReg + imm));
+            }
             add(reg_tmp1, reg_astride);
             for (int i = 0; i < NRegs; i++) {
               if constexpr (std::is_same_v<AType, uint8_t>) {
                 vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg + imm),
                            ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
               } else {
-                vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg + imm), vreg_t(AReg + imm));
                 vmovups(vreg_t(TmpReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
                 vpsignb(vreg_t(TmpReg), vreg_t(TmpReg), vreg_t(AReg + imm));
                 vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg));
@@ -2729,13 +2731,15 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
       if (BRegCount == 0) {
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
+          if constexpr (std::is_same_v<AType, int8_t>) {
+            vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
+          }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
             if constexpr (std::is_same_v<AType, uint8_t>) {
               vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg),
                          ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
             } else {
-              vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
               vmovups(vreg_t(TmpReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
               vpsignb(vreg_t(TmpReg), vreg_t(TmpReg), vreg_t(AReg));
               vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg));
