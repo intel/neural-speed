@@ -926,8 +926,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompInt8 sUTWOQ_CompInt8;
+#endif
 
 typedef struct {
   float d;             // delta
@@ -1419,20 +1419,93 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
     int constexpr Unroll = 4;
     int8_t tmpbuf[NTILE * Unroll];
     for (int ik = 0; ik < blocksize; ik += Unroll) {
-      for (int i = 0; i < NReg; i++) {
+      if constexpr (NTILE==24) {
         auto vb =
-            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
-        _mm256_storeu_si256((__m256i*)(tmpbuf + 32 * i), vb);
-      }
-      for (int ikk = 0; ikk < Unroll; ikk++) {
-        auto va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + ikk));
+            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + 0 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        auto va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + 0));
+        auto s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57); 
+        auto ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[0] = _mm256_fmadd_ps(va, ftmp, acc_local[0]);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[1] = _mm256_fmadd_ps(va, ftmp, acc_local[1]);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[2] = _mm256_fmadd_ps(va, ftmp, acc_local[2]);
+        va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + 1));
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[0] = _mm256_fmadd_ps(va, ftmp, acc_local[0]);
+
+        vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + 1 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[1] = _mm256_fmadd_ps(va, ftmp, acc_local[1]);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[2] = _mm256_fmadd_ps(va, ftmp, acc_local[2]);
+        va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + 2));
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[0] = _mm256_fmadd_ps(va, ftmp, acc_local[0]);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[1] = _mm256_fmadd_ps(va, ftmp, acc_local[1]);
+
+        vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + 2 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[2] = _mm256_fmadd_ps(va, ftmp, acc_local[2]);
+        va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + 3));
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[0] = _mm256_fmadd_ps(va, ftmp, acc_local[0]);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[1] = _mm256_fmadd_ps(va, ftmp, acc_local[1]);
+
+        s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
+        vb = _mm256_permute4x64_epi64(vb, 57);
+        ftmp = _mm256_cvtepi32_ps(s32tmp);
+        acc_local[2] = _mm256_fmadd_ps(va, ftmp, acc_local[2]);
+      } else {
         for (int i = 0; i < NReg; i++) {
-          auto tmp = _mm_loadl_epi64((const __m128i*)(tmpbuf + i * 8 + ikk * NTILE));
-          auto s32tmp = _mm256_cvtepi8_epi32(tmp);
-          auto ftmp = _mm256_cvtepi32_ps(s32tmp);
-          acc_local[i] = _mm256_fmadd_ps(va, ftmp, acc_local[i]);
+          auto vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2),
+                                                           vmask);
+          _mm256_storeu_si256((__m256i*)(tmpbuf + 32 * i), vb);
+        }
+        for (int ikk = 0; ikk < Unroll; ikk++) {
+          auto va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + ikk));
+          for (int i = 0; i < NReg; i++) {
+            auto tmp = _mm_loadl_epi64((const __m128i*)(tmpbuf + i * 8 + ikk * NTILE));
+            auto s32tmp = _mm256_cvtepi8_epi32(tmp);
+            auto ftmp = _mm256_cvtepi32_ps(s32tmp);
+            acc_local[i] = _mm256_fmadd_ps(va, ftmp, acc_local[i]);
+          }
         }
       }
+      
     }
     for (int i = 0; i < NReg; i++) {
       __m256 v_b_scale;
@@ -1455,8 +1528,8 @@ class UTWOQ_S4_VecDot {
  public:
   UTWOQ_S4_VecDot() {
     UT_START();
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
   }
