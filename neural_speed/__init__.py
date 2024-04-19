@@ -20,54 +20,57 @@ import torch
 from neural_speed.convert import convert_model
 
 model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
+vocab_size_map = {"llama3": 128256}
 max_request_num_default = 1
 
+
 def _import_package(model_type):
-        if model_type == "gptj":
-            import neural_speed.gptj_cpp as cpp_model
-        elif model_type == "falcon":
-            import neural_speed.falcon_cpp as cpp_model
-        elif model_type == "gptneox":
-            import neural_speed.gptneox_cpp as cpp_model
-        elif model_type == "dolly":
-            import neural_speed.dolly_cpp as cpp_model
-        elif model_type == "llama" or model_type == "llama2":
-            import neural_speed.llama_cpp as cpp_model
-        elif model_type == "mpt":
-            import neural_speed.mpt_cpp as cpp_model
-        elif model_type == "gpt_bigcode" or model_type == "starcoder":
-            import neural_speed.starcoder_cpp as cpp_model
-        elif model_type == "opt":
-            import neural_speed.opt_cpp as cpp_model
-        elif model_type == "bloom":
-            import neural_speed.bloom_cpp as cpp_model
-        elif model_type == "chatglm":
-            import neural_speed.chatglm_cpp as cpp_model
-        elif model_type == "chatglm2" or model_type == "chatglm3":
-            import neural_speed.chatglm2_cpp as cpp_model
-        elif model_type == "baichuan":
-            import neural_speed.baichuan_cpp as cpp_model
-        elif model_type == "polyglot":
-            import neural_speed.polyglot_cpp as cpp_model
-        elif model_type == "qwen":
-            import neural_speed.qwen_cpp as cpp_model
-        elif model_type == "mistral":
-            import neural_speed.mistral_cpp as cpp_model
-        elif model_type == "qwen2":
-            import neural_speed.qwen_cpp as cpp_model
-        elif model_type == "phi":
-            import neural_speed.phi_cpp as cpp_model
-        elif model_type == "gemma":
-            import neural_speed.gemma_cpp as cpp_model
-        elif model_type == "stablelm":
-            import neural_speed.stablelm_cpp as cpp_model
-        elif model_type == "whisper":
-            import neural_speed.whisper_cpp as cpp_model
-        elif model_type == "mixtral":
-            import neural_speed.mixtral_cpp as cpp_model
-        else:
-            raise TypeError("Unsupported model type {}!".format(model_type))
-        return cpp_model
+    if model_type == "gptj":
+        import neural_speed.gptj_cpp as cpp_model
+    elif model_type == "falcon":
+        import neural_speed.falcon_cpp as cpp_model
+    elif model_type == "gptneox":
+        import neural_speed.gptneox_cpp as cpp_model
+    elif model_type == "dolly":
+        import neural_speed.dolly_cpp as cpp_model
+    elif model_type == "llama" or model_type == "llama2":
+        import neural_speed.llama_cpp as cpp_model
+    elif model_type == "mpt":
+        import neural_speed.mpt_cpp as cpp_model
+    elif model_type == "gpt_bigcode" or model_type == "starcoder":
+        import neural_speed.starcoder_cpp as cpp_model
+    elif model_type == "opt":
+        import neural_speed.opt_cpp as cpp_model
+    elif model_type == "bloom":
+        import neural_speed.bloom_cpp as cpp_model
+    elif model_type == "chatglm":
+        import neural_speed.chatglm_cpp as cpp_model
+    elif model_type == "chatglm2" or model_type == "chatglm3":
+        import neural_speed.chatglm2_cpp as cpp_model
+    elif model_type == "baichuan":
+        import neural_speed.baichuan_cpp as cpp_model
+    elif model_type == "polyglot":
+        import neural_speed.polyglot_cpp as cpp_model
+    elif model_type == "qwen":
+        import neural_speed.qwen_cpp as cpp_model
+    elif model_type == "mistral":
+        import neural_speed.mistral_cpp as cpp_model
+    elif model_type == "qwen2":
+        import neural_speed.qwen_cpp as cpp_model
+    elif model_type == "phi":
+        import neural_speed.phi_cpp as cpp_model
+    elif model_type == "gemma":
+        import neural_speed.gemma_cpp as cpp_model
+    elif model_type == "stablelm":
+        import neural_speed.stablelm_cpp as cpp_model
+    elif model_type == "whisper":
+        import neural_speed.whisper_cpp as cpp_model
+    elif model_type == "mixtral":
+        import neural_speed.mixtral_cpp as cpp_model
+    else:
+        raise TypeError("Unsupported model type {}!".format(model_type))
+    return cpp_model
+
 
 def _get_model_config(model_name, model_hub="huggingface"):
     if model_hub == "modelscope":
@@ -77,6 +80,7 @@ def _get_model_config(model_name, model_hub="huggingface"):
         from transformers import AutoConfig
         config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     return config
+
 
 def _get_model_type(model_config):
     model_type = model_maps.get(model_config.model_type, model_config.model_type)
@@ -98,20 +102,23 @@ def _get_model_type(model_config):
 
     return model_type
 
+
 def _filter_model_args(valid_args, **input_kwargs):
-        invalid_args = []
-        for k in input_kwargs.keys():
-            if k not in valid_args:
-                invalid_args.append(k)
-        for k in invalid_args:
-            input_kwargs.pop(k)
-        return input_kwargs
+    invalid_args = []
+    for k in input_kwargs.keys():
+        if k not in valid_args:
+            invalid_args.append(k)
+    for k in invalid_args:
+        input_kwargs.pop(k)
+    return input_kwargs
+
 
 def get_cpp_module(model_name, model_hub="huggingface"):
     model_config = _get_model_config(model_name, model_hub=model_hub)
     model_type = _get_model_type(model_config)
     cpp_module = _import_package(model_type)
     return cpp_module
+
 
 class Model:
 
@@ -123,6 +130,7 @@ class Model:
         self.generate_round = 0
         self.max_request_num = -1
         self.reinit_from_bin = False
+        self.tokenizer = None
 
     def init(self,
              model_name,
@@ -140,6 +148,10 @@ class Model:
         self.config = _get_model_config(model_name, model_hub=model_hub)
         model_type = _get_model_type(self.config)
         self.model_type = model_type
+        if self.model_type == "llama" and self.config.vocab_size == vocab_size_map["llama3"]:
+            from transformers import AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
         if self.module is None:
             self.module = _import_package(model_type)
 
@@ -165,8 +177,8 @@ class Model:
 
             quant_desc = model_config['quantization_config'].get("quant_method", None)
             if quant_desc is None:
-               print("Error: No quant_method info in model config...")
-               exit(0)
+                print("Error: No quant_method info in model config...")
+                exit(0)
         quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
@@ -294,11 +306,12 @@ class Model:
                         else:
                             generate_kwargs["scratch_size_ratio"] = 35
 
-        valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
-                      "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
-                      "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
-                      "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
-                      "scratch_size_ratio"}
+        valid_args = {
+            "max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty", "num_beams", "do_sample",
+            "top_k", "top_p", "temperature", "min_new_tokens", "length_penalty", "early_stopping", "n_keep",
+            "n_discard", "shift_roped_k", "batch_size", "pad_token", "memory_dtype", "continuous_batching",
+            "max_request_num", "scratch_size_ratio"
+        }
         self.model.init_model(model_path, **_filter_model_args(valid_args, **generate_kwargs))
 
     def quant_model(self, model_type, model_path, out_path, **quant_kwargs):
@@ -366,7 +379,7 @@ class Model:
             if stopping_criteria is not None:
                 if stopping_criteria(torch.tensor(ret), None):
                     break
-            elif ret[0][-1] == self.__get_eos_id() or \
+            elif ret[0][-1] == self.__get_eos_id() or ret[0][-1] == self.__get_special_eos_id() or \
                     (max_new_tokens != -1 and out_count >= max_new_tokens):
                 break
         if streamer:
@@ -379,6 +392,14 @@ class Model:
 
     def is_token_end(self):
         return self.model.is_token_end()
+
+    def __get_special_eos_id(self):
+        if self.model_type == "llama" and self.config.vocab_size == vocab_size_map["llama3"]:
+            eot_id = self.tokenizer("<|eot_id|>")["input_ids"][0]
+
+            return eot_id
+
+        return self.model.get_eos_id()
 
     def __get_eos_id(self):
         return self.model.get_eos_id()
@@ -438,7 +459,7 @@ class Model:
             if padding_side == "left":
                 del input_list[il][0:count]
             elif padding_side == "right":
-                del input_list[il][len(input_list[il]) - count :]
+                del input_list[il][len(input_list[il]) - count:]
             else:
                 raise ValueError("padding_side must be 'left' or 'right'.")
             assert input_list[il] != [], "there are all pad tokens in batch {}.".format(il)
@@ -465,17 +486,18 @@ class Model:
 
 
 class ModelServer:
+
     def __init__(self, model_name, reponse_function, model_path, **server_kwargs):
         if not os.path.exists(model_path):
             raise ValueError("model file {} does not exist.".format(model_path))
         self.module = get_cpp_module(model_name)
-        valid_args = {"max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty",
-                      "num_beams", "do_sample", "top_k", "top_p", "temperature", "min_new_tokens",
-                      "length_penalty", "early_stopping", "n_keep", "n_discard", "shift_roped_k",
-                      "batch_size","pad_token", "memory_dtype", "continuous_batching", "max_request_num",
-                      "scratch_size_ratio", "return_prompt", "print_log", "init_cb"}
-        self.cpp_server = self.module.ModelServer(reponse_function,
-                                                  model_path,
+        valid_args = {
+            "max_new_tokens", "n_batch", "ctx_size", "seed", "threads", "repetition_penalty", "num_beams", "do_sample",
+            "top_k", "top_p", "temperature", "min_new_tokens", "length_penalty", "early_stopping", "n_keep",
+            "n_discard", "shift_roped_k", "batch_size", "pad_token", "memory_dtype", "continuous_batching",
+            "max_request_num", "scratch_size_ratio", "return_prompt", "print_log", "init_cb"
+        }
+        self.cpp_server = self.module.ModelServer(reponse_function, model_path,
                                                   **_filter_model_args(valid_args, **server_kwargs))
 
     def issueQuery(self, index, token_ids):
@@ -483,5 +505,6 @@ class ModelServer:
 
     def Empty(self):
         return self.cpp_server.Empty()
+
 
 __all__ = ["get_cpp_module", "Model", "ModelServer"]
