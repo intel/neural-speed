@@ -25,6 +25,19 @@ Neural Speed supports the following models:
 </thead>
 <tbody>
   <tr>
+    <td><a href="https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct" target="_blank" rel="noopener noreferrer">Meta-Llama-3-8B-Instruct</a></td>
+    <td>✅</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td>✅</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td>Latest</td>
+    <td>8192</td>
+  </tr>
+  <tr>
     <td><a href="https://huggingface.co/meta-llama/Llama-2-7b-chat-hf" target="_blank" rel="noopener noreferrer">LLaMA2-7B</a>,
     <a href="https://huggingface.co/meta-llama/Llama-2-13b-chat-hf" target="_blank" rel="noopener noreferrer">LLaMA2-13B</a>,
     <a href="https://huggingface.co/meta-llama/Llama-2-70b-chat-hf" target="_blank" rel="noopener noreferrer">LLaMA2-70B</a></td>
