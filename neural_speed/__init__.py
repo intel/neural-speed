@@ -148,7 +148,8 @@ class Model:
         self.config = _get_model_config(model_name, model_hub=model_hub)
         model_type = _get_model_type(self.config)
         self.model_type = model_type
-        if self.model_type == "llama" and self.config.vocab_size == vocab_size_map["llama3"]:
+        if self.__check_llama3():
+            print("The model_type: Llama3.")
             from transformers import AutoTokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -327,6 +328,10 @@ class Model:
                  stopping_criteria=None,
                  **generate_kwargs):
         batch_size = input_ids.shape[0]
+        if self.__check_llama3():
+            if int(input_ids[0][0]) != self.tokenizer.bos_token_id:
+                bos_token_tensor = torch.tensor([[self.tokenizer.bos_token_id]])
+                input_ids = torch.cat((bos_token_tensor, input_ids), dim=1)
 
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
         self.reinit_from_bin = False
@@ -393,8 +398,13 @@ class Model:
     def is_token_end(self):
         return self.model.is_token_end()
 
-    def __get_special_eos_id(self):
+    def __check_llama3(self):
         if self.model_type == "llama" and self.config.vocab_size == vocab_size_map["llama3"]:
+            return True
+        return False
+
+    def __get_special_eos_id(self):
+        if self.__check_llama3():
             eot_id = self.tokenizer("<|eot_id|>")["input_ids"][0]
 
             return eot_id
