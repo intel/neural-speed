@@ -79,6 +79,11 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     n_pasts[i] = inputs[i].n_past;
     n_totals[i] = inputs[i].n_total;
     block_ids[i] = inputs[i].request_idx * beam_size + inputs[i].beam_idx;
+    // enforce that the first token is BOS
+    if (n_totals[i] == 0 && inputs[i].tokens[0] != lctx.vocab.bos_token_id) {
+      fprintf(stderr, "%s: first token must be BOS (token id is %d) in %dth prompt\n", __func__,
+              lctx.vocab.bos_token_id, i);
+    }
   }
   const int seq_len_sum = std::accumulate(n_tokens.begin(), n_tokens.end(), 0);
   const int infer_bs = 1;
