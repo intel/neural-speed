@@ -676,4 +676,22 @@ layout_convert(T_dst& dst, T_src& src) {
     }
   }
 }
+
+template <typename T>
+void dump_mat(
+    T mat,
+    size_t tile_x = T::tile_size_x,
+    size_t tile_y = T::tile_size_y) {
+#pragma unroll
+  for (size_t row = 0; row < tile_x; row++) {
+#pragma unroll
+    for (size_t col = 0; col < tile_y; col++) {
+      sycl::ext::oneapi::experimental::printf(
+          "%f ", (float)(sycl::half)mat.reg[row * tile_y + col]);
+    }
+    sycl::ext::oneapi::experimental::printf("\n ");
+  }
+  sycl::ext::oneapi::experimental::printf("\n ");
+}
+
 } // namespace gpu::xetla::subgroup

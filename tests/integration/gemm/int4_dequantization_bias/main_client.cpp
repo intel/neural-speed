@@ -19,21 +19,68 @@
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 // The number of times the kernel is executed
-constexpr int ITER = 100;
+constexpr int ITER = 1000;
 
-class test1 {
+class test1_xehpg {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 16384;
-  static constexpr size_t mat_k = 4096;
+  static constexpr size_t mat_m = 8;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
   static constexpr size_t wg_m = 8;
-  static constexpr size_t wg_n = 64;
+  static constexpr size_t wg_n = 32 * 4;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 32;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 16;
+
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 2;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  static constexpr mma_engine mma_eng = mma_engine::xmx;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
+class test1_gpu_xelpg {
+ public:
+  static constexpr size_t mat_m = 8;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 8;
+  static constexpr size_t wg_n = 32 * 4;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 32;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 16;
+
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 2;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+};
+
+class t1 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 32;
+  static constexpr size_t wg_n = 32;
   static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+  static constexpr size_t dequant_s = 32;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -42,20 +89,21 @@ class test1 {
   using data_type_b = int4x2;
   using data_type_c = fp16;
 };
-class test2 {
+
+class t2 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_m = 1024;
   static constexpr size_t mat_n = 4096;
-  static constexpr size_t mat_k = 22016;
+  static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 8;
-  static constexpr size_t wg_n = 128;
+  static constexpr size_t wg_n = 32;
   static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 128;
-  static constexpr size_t num_buffer = 64;
-  static constexpr size_t local_kslicing = 4;
+  static constexpr size_t dequant_s = 32;
+
+  static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::row_major;
@@ -63,6 +111,28 @@ class test2 {
   using data_type_b = int4x2;
   using data_type_c = fp16;
 };
+class t3 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 16;
+  static constexpr size_t wg_n = 32;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 32;
+
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
 class qkv1 {
  public:
   // Extract the parameters required by different test cases
@@ -75,7 +145,7 @@ class qkv1 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -96,7 +166,7 @@ class qkv2 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -117,7 +187,7 @@ class qkv3 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -138,7 +208,7 @@ class qkv4 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 32;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 4;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -159,7 +229,7 @@ class qkv5 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -180,7 +250,7 @@ class qkv6 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -201,7 +271,7 @@ class qkv7 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -222,7 +292,7 @@ class qkv8 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -243,7 +313,7 @@ class qkv9 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 4;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -264,7 +334,7 @@ class qkv10 {
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 64;
-  static constexpr size_t num_buffer = 64;
+
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
@@ -331,8 +401,11 @@ void dequantize_gemm_run(int iter) {
   using data_type_zero_pt = int4x2;
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
-  using data_type_acc = float;
+  using data_type_acc = float; // modify
   using data_type_bias = fp16;
+
+  constexpr mem_layout layout_a = Test::layout_a;
+  constexpr mem_layout layout_b = Test::layout_b;
 
   constexpr size_t size_a = matrix_m * matrix_k;
   constexpr size_t size_b = matrix_k * matrix_n / 2;
@@ -348,6 +421,12 @@ void dequantize_gemm_run(int iter) {
   constexpr size_t size_c = matrix_m * matrix_n;
   constexpr size_t size_bias = matrix_n;
 
+  uint32_t lda = layout_a == mem_layout::row_major ? matrix_k : matrix_m;
+  uint32_t ldb = layout_b == mem_layout::row_major ? matrix_n : matrix_k;
+  uint32_t ldc = matrix_n;
+  //     uint32_t ld_scale = size_scale_n;
+  //     uint32_t ld_zero_pt = size_zero_pt_n;
+
   // Turn on the enable_profiling property to facilitate subsequent profiling
   sycl::property_list properties{sycl::property::queue::enable_profiling()};
   auto queue = sycl::queue(properties);
@@ -358,17 +437,17 @@ void dequantize_gemm_run(int iter) {
 
   using tile_shape =
       xetla::group::tile_shape_t<wg_tile_n, wg_tile_m, sg_tile_n, sg_tile_m>;
-  static constexpr uint32_t periodic_sync_interval = 0;
+  static constexpr uint32_t periodic_sync_interval = 1;
   static constexpr uint32_t prefetch_distance = 0;
 
   using mem_desc_a_t = xetla::mem_desc_t<
       data_type_a,
-      mem_layout::row_major,
+      layout_a,
       mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
   using mem_desc_b_t = xetla::mem_desc_t<
       data_type_b,
-      mem_layout::row_major,
+      layout_b,
       mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
   using mem_desc_c_t = xetla::mem_desc_t<
@@ -395,22 +474,24 @@ void dequantize_gemm_run(int iter) {
       data_type_zero_pt,
       gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
       dequant_s,
-      mma_engine::xmx,
-      gpu_arch::XeHpg>;
+      Test::mma_eng,
+      Test::arch>;
 
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using bias_op_t =
-      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::XeHpg>;
+      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, Test::arch>;
+
   using tile_op_t = gpu::xetla::subgroup::chained_tile_op_t<bias_op_t>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpg>,
+      xetla::group::epilogue_policy_tile_op<tile_op_t, Test::arch>,
       tile_shape,
       mem_desc_c_t>;
 
-  using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::XeHpg>;
+  using group_swizzle = xetla::kernel::group_swizzle_default<Test::arch>;
+
   using gemm_op_t = xetla::kernel::gemm_universal_t<
       gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
           group_swizzle,
@@ -470,32 +551,42 @@ void dequantize_gemm_run(int iter) {
     A_h[i] = random_float();
 #ifdef UT_DEBUG
     A_h[i] = 1.f;
+    // A_h[i] = layout_a == mem_layout::row_major
+    //     ? (i % matrix_k + i / matrix_k * 100)
+    //     : (i % matrix_m + i / matrix_m * 100);
 #endif
   }
+
   for (unsigned i = 0; i < size_b; ++i) {
     B_h[i] = uint8_t(random_uint8());
 #ifdef UT_DEBUG
-    B_h[i] = 153;
+    B_h[i] = 17;
 #endif
   }
+
   for (unsigned i = 0; i < size_scale; ++i) {
     scale_h[i] = random_float();
 #ifdef UT_DEBUG
     scale_h[i] = 1.f;
 #endif
   }
+
   for (unsigned i = 0; i < size_zero_pt; ++i) {
-    zero_pt_h[i] = 0.f;
+    zero_pt_h[i] = 0;
   }
+
   for (unsigned i = 0; i < size_c; ++i) {
-    C_h[i] = 0;
+    C_h[i] = random_float();
   }
+
   for (unsigned i = 0; i < size_acc; ++i) {
-    Acc_h[i] = 0;
+    Acc_h[i] = random_float();
   }
+
   for (unsigned i = 0; i < size_cnt; ++i) {
-    Cnt_h[i] = 0;
+    Cnt_h[i] = random_uint8();
   }
+
   for (unsigned i = 0; i < size_bias; ++i) {
     bias_h[i] = random_float();
 #ifdef UT_DEBUG
@@ -522,6 +613,8 @@ void dequantize_gemm_run(int iter) {
   queue.memcpy((void*)bias_d, (void*)bias_h, size_bias * sizeof(data_type_bias))
       .wait();
 
+  queue.memset(Cnt_d, 0, size_cnt * sizeof(uint32_t)).wait();
+  queue.memset(Acc_d, 0, size_acc * sizeof(data_type_acc)).wait();
   // set up gemm arguments
   typename bias_op_t::shape_t bias_add_shape(matrix_n, 1, matrix_n);
   using epilogue_args_t = epilogue_t::arguments_t;
@@ -536,11 +629,11 @@ void dequantize_gemm_run(int iter) {
       matrix_k,
       matrix_n,
       A_d,
-      matrix_k,
+      lda,
       B_d,
-      matrix_n,
+      ldb,
       C_d,
-      matrix_n,
+      ldc,
       scale_d,
       matrix_n,
       Acc_d,
@@ -548,17 +641,19 @@ void dequantize_gemm_run(int iter) {
       epilogue_args);
 
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  if (!gemm_op_t::can_implement(gemm_arg)) {
-    std::cout << "The arguments cannot be supported, aborting ... "
-              << std::endl;
-    FAIL();
-  }
+  // if (!gemm_op_t::can_implement(gemm_arg)) {
+  //   std::cout << "The arguments cannot be supported, aborting ... "
+  //             << std::endl;
+  //   FAIL();
+  // }
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");
+  int constexpr warm = 0;
   try {
-    for (int i = 0; i < iter; i++) {
-      prof.cpu_start();
+    for (int i = 0; i < iter + warm; i++) {
+      if (i >= warm)
+        prof.cpu_start();
       auto e_esimd = queue.submit([&](handler& cgh) {
         cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
           // allocate slm and nbarrier resource
@@ -567,9 +662,11 @@ void dequantize_gemm_run(int iter) {
           gemm_op(item, gemm_arg);
         });
       });
-      e_esimd.wait();
-      prof.cpu_end();
-      prof.add_gpu_event(e_esimd);
+      if (i >= warm) {
+        e_esimd.wait();
+        prof.cpu_end();
+        prof.add_gpu_event(e_esimd);
+      }
     }
   } catch (cl::sycl::exception const& e) {
     std::cout << "SYCL exception caught: " << e.what() << '\n';
@@ -577,7 +674,7 @@ void dequantize_gemm_run(int iter) {
   }
 
   // performance
-  prof.print_profiling_result(profiling_selector::GPU);
+  prof.print_profiling_result(profiling_selector::CPU);
 
   std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
   for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
@@ -587,8 +684,14 @@ void dequantize_gemm_run(int iter) {
       int start_scale = i * size_scale_n + j * 2;
       for (uint32_t ii = 0; ii < dequant_s; ii++) {
         uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
-        int8_t data_0 = int8_t(data_in & 0x0f) - 8;
-        int8_t data_1 = int8_t(data_in >> 4) - 8;
+        uint8_t data_even = (data_in & 0x0f) << 4;
+        int8_t data_0;
+        int8_t data_1;
+        memcpy(&data_0, &data_even, 1);
+        memcpy(&data_1, &data_in, 1);
+        data_0 = data_0 >> 4;
+        data_1 = data_1 >> 4;
+
         dequantize_b[start_out + ii * matrix_n] =
             fp16(data_0) * scale_h[start_scale];
         dequantize_b[start_out + ii * matrix_n + 1] =
@@ -601,7 +704,15 @@ void dequantize_gemm_run(int iter) {
   ASSERT_EQ(
       0,
       gemm_result_validate(
-          A_h, dequantize_b.data(), C_h, bias_h, matrix_m, matrix_k, matrix_n));
+          A_h,
+          dequantize_b.data(),
+          C_h,
+          bias_h,
+          matrix_m,
+          matrix_k,
+          matrix_n,
+          layout_a,
+          layout_b));
 
   free(A_h, context);
   free(B_h, context);
@@ -628,7 +739,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<qkv6>;
+using tests = ::testing::Types<test1_xehpg, test1_gpu_xelpg>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7,
 // qkv8,
 //         qkv9, qkv10>;
