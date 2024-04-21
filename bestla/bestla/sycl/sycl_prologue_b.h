@@ -35,7 +35,7 @@ class WeightBase {
   using Param = ParamWeightBase<SRCType>;
 
   static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
-                               sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+                               const sycl_utils::nd_item_helper<GemmCoreT>& helper) {
     int constexpr Iter_PerWorker = (GemmCoreT::TileK + GemmCoreT::WgM - 1) / GemmCoreT::WgM;
 #pragma unroll
     for (int icp = 0; icp < Iter_PerWorker; icp++) {
@@ -71,7 +71,7 @@ class WeightS4 {
   using Param = ParamWeightS4<ScaleT>;
 
   static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
-                               int blocksize, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+                               int blocksize, const sycl_utils::nd_item_helper<GemmCoreT>& helper) {
     int constexpr Iter_PerWorker = (GemmCoreT::TileK + GemmCoreT::WgM - 1) / GemmCoreT::WgM;
     ScaleT scale[GemmCoreT::TileN];
     for (size_t in = 0; in < GemmCoreT::TileN; in += 1)
@@ -163,7 +163,7 @@ class WeightS4Trans {
   using Param = ParamWeightS4<ScaleT>;
 
   static inline void getWeight(const Param& _param, const sycl::local_accessor<BType, 1>& dstptr, int koffset,
-                               int blocksize, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+                               int blocksize, const sycl_utils::nd_item_helper<GemmCoreT>& helper) {
     int constexpr LoadTileK = 2;
     static_assert(GemmCoreT::TileK == (LoadTileK * GemmCoreT::SgSize));
     int constexpr Iter_PerWorker = GemmCoreT::WgNEle / GemmCoreT::SgCount;

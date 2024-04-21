@@ -50,13 +50,15 @@ class Launcher {
   static inline sycl::event compute(const Param& _param, sycl::queue* q) {
     sycl::range<2> group{GemmCore::WgM, GemmCore::WgN};
     int k = _param.k;
+    int m = _param.m;
     auto A = _param.paramA.A;
     auto B = _param.paramB.B;
     auto C = _param.paramC.C;
     int lda = _param.paramA.lda;
     int ldb = _param.paramB.ldb;
     int ldc = _param.paramC.ldc;
-    sycl::range<2> problem{_param.m / GemmCore::TileM, _param.n / GemmCore::TileN};
+    int m_pad = utils::padto(utils::updiv(_param.m, GemmCore::TileM), GemmCore::WgM);
+    sycl::range<2> problem{m_pad, _param.n / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
       sycl::local_accessor<AType, 1> slm_a(sycl::range(GemmCore::SLM_A_Size), cgh);
@@ -66,21 +68,36 @@ class Launcher {
           [=](sycl::nd_item<2> it) [[cl::reqd_work_group_size(
               1, GemmCore::WgM,
               GemmCore::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
-            nd_item_helper<GemmCore> helper(it);
-            ACCType tmp[GemmCore::TileM * GemmCore::TileN];
-            for (size_t im = 0; im < GemmCore::TileM; im++)
-              for (size_t in = 0; in < GemmCore::TileN; in++) tmp[im * GemmCore::TileN + in] = ACCType(0.f);
-
+            sycl_utils::nd_item_helper<GemmCore> helper(it);
+            int m_tail = m - helper.sg_g_m();
+            m_tail = m_tail > GemmCore::TileM ? GemmCore::TileM : m_tail;
+            if (m_tail == GemmCore::TileM) {
+              ACCType tmp[GemmCore::TileM * GemmCore::TileN];
+              for (size_t im = 0; im < GemmCore::TileM; im++)
+                for (size_t in = 0; in < GemmCore::TileN; in++) tmp[im * GemmCore::TileN + in] = ACCType(0.f);
 #pragma forceinline recursive
-            for (int i = 0; i < k; i += GemmCore::TileK) {
-              PrologueB::getWeight({B, ldb}, slm_b, i, helper);
-              it.barrier(sycl::access::fence_space::local_space);
-              GemmCore::compute(&A[helper.item_g_m() * k + i], k, slm_b, tmp, helper);
-              it.barrier(sycl::access::fence_space::local_space);
+              for (int i = 0; i < k; i += GemmCore::TileK) {
+                PrologueB::getWeight({B, ldb}, slm_b, i, helper);
+                it.barrier(sycl::access::fence_space::local_space);
+                GemmCore::compute(&A[helper.item_g_m() * k + i], k, slm_b, tmp, helper);
+                it.barrier(sycl::access::fence_space::local_space);
+              }
+#pragma forceinline recursive
+              Epilogue::store(_param.paramC, tmp, helper);
+            } else {
+              ACCType tmp[GemmCore::TileM * GemmCore::TileN];
+              for (size_t im = 0; im < GemmCore::TileM; im++)
+                for (size_t in = 0; in < GemmCore::TileN; in++) tmp[im * GemmCore::TileN + in] = ACCType(0.f);
+#pragma forceinline recursive
+              for (int i = 0; i < k; i += GemmCore::TileK) {
+                 PrologueB::getWeight({B, ldb}, slm_b, i, helper);
+                it.barrier(sycl::access::fence_space::local_space);
+                 GemmCore::compute_mtail(&A[helper.item_g_m() * k + i], k, slm_b, tmp, helper, m_tail);
+                it.barrier(sycl::access::fence_space::local_space);
+              }
+#pragma forceinline recursive
+              Epilogue::store_tail(_param.paramC, tmp, helper, m_tail);
             }
-
-#pragma forceinline recursive
-            Epilogue::store(_param.paramC, tmp, helper);
           });
     });
     return ev;
@@ -120,7 +137,8 @@ class LauncherWOQ {
     int lda = _param.paramA.lda;
     int ldb = _param.paramB.ldb;
     int ldc = _param.paramC.ldc;
-    sycl::range<2> problem{_param.m / GemmCore::TileM, _param.n / GemmCore::TileN};
+    int m_pad = utils::padto(_param.m, GemmCore::WgM) / GemmCore::TileM;
+    sycl::range<2> problem{m_pad, _param.n / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
       sycl::local_accessor<AType, 1> slm_a(sycl::range(GemmCore::SLM_A_Size), cgh);

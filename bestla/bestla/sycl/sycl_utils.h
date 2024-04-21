@@ -83,25 +83,27 @@ class nd_item_helper {
   const sycl::sub_group sg;
   nd_item_helper(sycl::nd_item<2>& _it) : it(_it), sg(it.get_sub_group()) {}
 
-  constexpr inline int sg_group_id() { return sg.get_group_id()[0]; }
+  constexpr inline void local_barrier() const { it.barrier(sycl::access::fence_space::local_space); }
 
-  constexpr inline int wg_idx_m() { return it.get_group(0); }
-  constexpr inline int wg_size_m() { return GemmCoreT::WgM * GemmCoreT::TileM; }
-  constexpr inline int wg_g_m() { return wg_idx_m() * wg_size_m(); }
+  constexpr inline int sg_group_id() const { return sg.get_group_id()[0]; }
 
-  constexpr inline int wg_idx_n() { return it.get_group(1); }
-  constexpr inline int wg_size_n() { return GemmCoreT::WgN * GemmCoreT::TileN; }
-  constexpr inline int wg_g_n() { return wg_idx_n() * wg_size_n(); }
+  constexpr inline int wg_idx_m() const { return it.get_group(0); }
+  constexpr inline int wg_size_m() const { return GemmCoreT::WgM * GemmCoreT::TileM; }
+  constexpr inline int wg_g_m() const { return wg_idx_m() * wg_size_m(); }
 
-  constexpr inline int sg_idx_m() { return sg_group_id() / GemmCoreT::SgNStride; }
-  constexpr inline int sg_g_m() { return wg_g_m() + sg_idx_m() * GemmCoreT::TileM; }
+  constexpr inline int wg_idx_n() const { return it.get_group(1); }
+  constexpr inline int wg_size_n() const { return GemmCoreT::WgN * GemmCoreT::TileN; }
+  constexpr inline int wg_g_n() const { return wg_idx_n() * wg_size_n(); }
 
-  constexpr inline int sg_idx_n() { return sg_group_id() % GemmCoreT::SgNStride; }
-  constexpr inline int sg_g_n() { return wg_g_n() + sg_idx_n() * GemmCoreT::SgSize * GemmCoreT::TileN; }
+  constexpr inline int sg_idx_m() const { return sg_group_id() / GemmCoreT::SgNStride; }
+  constexpr inline int sg_g_m() const { return wg_g_m() + sg_idx_m() * GemmCoreT::TileM; }
 
-  constexpr inline int sg_id() { return sg.get_local_id()[0]; }
-  constexpr inline int item_g_m() { return sg_g_m(); }
-  constexpr inline int item_g_n() { return sg_g_n() + sg_id() * GemmCoreT::TileN; }
+  constexpr inline int sg_idx_n() const { return sg_group_id() % GemmCoreT::SgNStride; }
+  constexpr inline int sg_g_n() const { return wg_g_n() + sg_idx_n() * GemmCoreT::SgSize * GemmCoreT::TileN; }
+
+  constexpr inline int sg_id() const { return sg.get_local_id()[0]; }
+  constexpr inline int item_g_m() const { return sg_g_m(); }
+  constexpr inline int item_g_n() const { return sg_g_n() + sg_id() * GemmCoreT::TileN; }
 };
 
 

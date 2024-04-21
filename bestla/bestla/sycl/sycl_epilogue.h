@@ -31,12 +31,24 @@ class OutputBase {
   using CType = typename GemmCoreT::TACC;
   using DstType = DstT;
   using Param = ParamOutputBase<DstType>;
-  static inline void store(const Param& _param, CType* tmpAcc, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
+  static inline void store(const Param& _param, CType* tmpAcc, const sycl_utils::nd_item_helper<GemmCoreT>& helper) {
 #pragma unroll
     for (int im = 0; im < GemmCoreT::TileM; im++) {
 #pragma unroll
       for (int in = 0; in < GemmCoreT::TileN; in++) {
         _param.C[(helper.item_g_m() + im) * _param.ldc + helper.item_g_n() + in] = tmpAcc[im * GemmCoreT::TileN + in];
+      }
+    }
+  }
+
+  static inline void store_tail(const Param& _param, CType* tmpAcc, const sycl_utils::nd_item_helper<GemmCoreT>& helper,
+                                int m_tail) {
+    if (m_tail) {
+      for (int im = 0; im < m_tail; im++) {
+#pragma unroll
+        for (int in = 0; in < GemmCoreT::TileN; in++) {
+          _param.C[(helper.item_g_m() + im) * _param.ldc + helper.item_g_n() + in] = tmpAcc[im * GemmCoreT::TileN + in];
+        }
       }
     }
   }

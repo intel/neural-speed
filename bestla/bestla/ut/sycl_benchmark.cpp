@@ -85,13 +85,14 @@ class Benchmark_Fp32Fp32 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
-// static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 
 class Benchmark_Fp16Fp16 {
  public:
   Benchmark_Fp16Fp16() {
     UT_START();
     benchmark_all(1024, 4096, 4096);
+    benchmark_all(4096, 4096, 4096);
     benchmark_all(4096, 4096 * 3, 4096);
   }
 
@@ -149,7 +150,7 @@ class Benchmark_Fp16Fp16 {
     benchmark<LOG>(m, n, k, batch, dA.data(), dB.data(), dC.data(), testtime);
   }
 };
-// static Benchmark_Fp16Fp16 sBenchmark_Fp16Fp16;
+static Benchmark_Fp16Fp16 sBenchmark_Fp16Fp16;
 
 class Benchmark_S4Fp32Fp32 {
  public:
@@ -158,8 +159,8 @@ class Benchmark_S4Fp32Fp32 {
     benchmark_all(1, 4096, 4096);
     benchmark_all(1, 4096, 4096 * 3);
     benchmark_all(1, 4096 * 3, 4096);
-    // benchmark_all(1024, 4096, 4096);
-    // benchmark_all(4096, 4096, 4096);
+    benchmark_all(1024, 4096, 4096);
+    benchmark_all(4096, 4096, 4096);
   }
 
   using AType = float;
@@ -193,7 +194,7 @@ class Benchmark_S4Fp32Fp32 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncher::compute({m, n, k, 32, {A, k}, {B, B_scale, n}, {C, n}}, q);
+        auto e_esimd = KernelLauncher::compute({m, n, k, 128, {A, k}, {B, B_scale, n}, {C, n}}, q);
         e_esimd.wait();
         log.add(event_helper::execute_time(e_esimd) * 1000);
         if (tm.stop() >= timems) {
@@ -220,7 +221,7 @@ class Benchmark_S4Fp32Fp32 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncherT::compute({m, n, k, 32, {A, k}, {B, B_scale, blks}, {C, n}}, q);
+        auto e_esimd = KernelLauncherT::compute({m, n, k, 128, {A, k}, {B, B_scale, blks}, {C, n}}, q);
         e_esimd.wait();
         log.add(event_helper::execute_time(e_esimd) * 1000);
         if (tm.stop() >= timems) {
@@ -717,7 +718,7 @@ class Benchmark_S4Fp32Fp32 {
     }
   }
 };
-static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
+// static Benchmark_S4Fp32Fp32 sBenchmark_S4Fp32Fp32;
 
 class Benchmark_S4Fp16Fp16 {
  public:
@@ -804,6 +805,34 @@ class Benchmark_S4Fp16Fp16 {
   }
 
   template <typename LOG_T>
+  void benchmark_gemmT_DQ(int m, int n, int k, int blocksize, int batch, AType* A, uint8_t* B, BType* B_scale,
+                          BType* DQB, CType* C, float timems) {
+    LOG_T log;
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    utils::timer<std::chrono::milliseconds> tm;
+    auto A_d = (const AType*)A;
+    auto B_d = B;
+    auto C_d = C;
+    auto S_d = B_scale;
+    auto psize = (size_t)m * n * k * 2;
+    int blks = k / blocksize;
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        auto e_esimd = KernelTLauncher::compute({m, n, k, blocksize, {A_d, k}, {B_d, S_d, blks}, {C_d, n}}, q);
+        e_esimd.wait();
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
+  }
+  template <typename LOG_T>
   void benchmark_gemv_T2(int m, int n, int k, int blocksize, int batch, AType* A, uint8_t* B, BType* B_scale, CType* C,
                          float timems) {
     LOG_T log;
@@ -850,17 +879,18 @@ class Benchmark_S4Fp16Fp16 {
     if (m == 1) {
       benchmark_gemv_T2<LOG>(m, n, k, blocksize, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
     } else {
-      benchmark_gemmT<LOG>(m, n, k, blocksize, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
+      benchmark_gemm<LOG>(m, n, k, blocksize, batch, dA.data(), dBs8.data(), dB_scale.data(), dC.data(), testtime);
     }
   }
 };
-static Benchmark_S4Fp16Fp16 sBenchmark_S4Fp16Fp16;
+// static Benchmark_S4Fp16Fp16 sBenchmark_S4Fp16Fp16;
 
 class Benchmark_DequantS4 {
  public:
   Benchmark_DequantS4() {
     UT_START();
     benchmark_all_reorder_back(4096, 4096, 32);
+    // benchmark_all_reorder_back_half(4096, 4096, 32);
     benchmark_all_reorder(4096, 4096, 32);
     benchmark_all_reorder(16384, 4096, 32);
     benchmark_all(4096, 4096, 32);
@@ -916,6 +946,58 @@ class Benchmark_DequantS4 {
     buffer_error(refNT.data(), dequant.data(), dequant.size(), 0.001f);
     log.record();
     auto psize = (size_t)n * k * 4 + n * k / 2 + n * k / blocksize * 4;
+    double flops = double(psize) / log.min_val / 1e6;
+    printf(" %s Memory Bandwidth:%.3f\n", log.get_log_str(), flops);
+  }
+
+  void benchmark_all_reorder_back_half(int n, int k, int blocksize) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case %s: %d %d %d Device:%s\n", __FUNCTION__, n, k, blocksize, dev->getName().c_str());
+    avector<uint8_t> rawB(k * n / 2);
+    int blks = updiv(k, blocksize);
+    avector<utils::fp16> scale(blks * n), dequant(n * k), ref(n * k);
+    fill_buffer_randn(scale.data(), scale.size(), utils::fp16(0.01f), utils::fp16(0.03f));
+    fill_buffer_randn(rawB.data(), rawB.size(), uint8_t(0), uint8_t(255));
+    auto srcptr = (utils::int4x2*)rawB.data();
+    for (int j = 0; j < n; j += 1) {
+      for (int i = 0; i < k; i += 2) {
+        auto tmp = srcptr[i / 2 + j * k / 2];
+        auto noffset = i / blocksize + j * blks;
+        auto s = float(scale[noffset]);
+        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * s;
+        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * s;
+      }
+    }
+    sycl_vector<sycl::half> dS(scale.size(), q), dequantB(n * k, q);
+    sycl_vector<uint8_t> dB(rawB.size(), q);
+    q->memcpy(dS.data(), scale.data(), scale.size() * 2).wait();
+    q->memcpy(dB.data(), rawB.data(), rawB.size() * 1).wait();
+
+    auto S_d = dS.data();
+    auto B_d = dB.data();
+    auto DB_d = dequantB.data();
+    using LOG = timer_statistics_logger<TestMs * 2>;
+    LOG log;
+    using ProB = sycl_prologue_b::WeightS4Trans<sycl_gemm::xve::DefaultHGemmCore, sycl::half>;
+    utils::timer<std::chrono::milliseconds> tm;
+    tm.start();
+    while (tm.stop() < TestMs) {
+      for (size_t i = 0; i < 1; i++) {
+        auto e_esimd =
+            ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+        log.add(event_helper::execute_time(e_esimd) * 1000);
+        if (tm.stop() >= TestMs) {
+          break;
+        }
+      }
+    }
+    avector<utils::fp16> refNT(k * n);
+    kernel::wrapper::Transpose2D<utils::fp16>::forward<BTLA_ISA::NoSIMD>(ref.data(), refNT.data(), n, k, k, n);
+    q->memcpy(dequant.data(), DB_d, dequant.size() * 2).wait();
+    buffer_error(refNT.data(), dequant.data(), dequant.size(), utils::fp16(0.001f));
+    log.record();
+    auto psize = (size_t)n * k * 2 + n * k / 2 + n * k / blocksize * 2;
     double flops = double(psize) / log.min_val / 1e6;
     printf(" %s Memory Bandwidth:%.3f\n", log.get_log_str(), flops);
   }

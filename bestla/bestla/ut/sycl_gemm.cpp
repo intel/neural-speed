@@ -13,6 +13,8 @@ class UT_SyclSGemm {
  public:
   UT_SyclSGemm() {
     UT_START();
+    ut(1, 1024, 1024);
+    ut(300, 1024, 1024);
     ut(1024, 1024, 1024);
   }
   using SGemmT = xve::DefaultSGemmCore;
@@ -44,13 +46,16 @@ class UT_SyclSGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-// static UT_SyclSGemm sUT_SyclSGemm;
+static UT_SyclSGemm sUT_SyclSGemm;
 
 class UT_SyclHGemm {
  public:
   UT_SyclHGemm() {
     UT_START();
+    ut(1, 1024, 1024);
+    ut(300, 1024, 1024);
     ut(1024, 1024, 1024);
+    ut(1033, 1024, 1024);
   }
   using SGemmT = xve::DefaultHGemmCore;
   template <class GCT>
@@ -82,7 +87,7 @@ class UT_SyclHGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
 };
-// static UT_SyclHGemm sUT_SyclHGemm;
+static UT_SyclHGemm sUT_SyclHGemm;
 
 class UT_SyclS4SGemm {
  public:
@@ -183,7 +188,7 @@ class UT_SyclS4SGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
 };
-// static UT_SyclS4SGemm sUT_SyclS4SGemm;
+//static UT_SyclS4SGemm sUT_SyclS4SGemm;
 
 class UT_SyclS4HGemm {
  public:
@@ -278,7 +283,7 @@ class UT_SyclS4HGemm {
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
 };
-// static UT_SyclS4HGemm sUT_SyclS4HGemm;
+//static UT_SyclS4HGemm sUT_SyclS4HGemm;
 
 class UT_SyclInt4Dequant {
  public:
@@ -424,7 +429,7 @@ class UT_SyclInt4Dequant {
     buffer_error(refNT.data(), dequant.data(), dequant.size(), 0.001f);
   }
 };
-// static UT_SyclInt4Dequant sUT_SyclInt4Dequant;
+//static UT_SyclInt4Dequant sUT_SyclInt4Dequant;
 
 class UT_SyclS4Gemv {
  public:
@@ -952,6 +957,6 @@ class UT_SyclS4Gemv {
     buffer_error(refC.data(), C.data(), C.size(), 0.001f);
   }
 };
-static UT_SyclS4Gemv sUT_SyclS4Gemv;
+//static UT_SyclS4Gemv sUT_SyclS4Gemv;
 }  // namespace sycl_ut
 }  // namespace bestla
