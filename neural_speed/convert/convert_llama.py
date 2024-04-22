@@ -37,7 +37,7 @@ import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
 
 import gguf
-from common import load_vocab, BpeVocab
+from common import BpeVocab
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -1385,6 +1385,27 @@ def load_some_model(path: Path) -> ModelPlus:
 
 def filter_and_sort_tensors(model: LazyModel) -> LazyModel:
     return {name: model[name] for name in TENSORS_LIST if name in model}
+
+
+def load_vocab(path: Path, params_vocab_size: int) -> SentencePieceVocab:
+    # Be extra-friendly and accept either a file or a directory.  Also, if it's
+    # a directory, it might be the model directory, and tokenizer.model might
+    # be in the parent of that.
+    if path.is_dir():
+        path2 = path / "tokenizer.model"
+        # Use `.parent` instead of /.. to handle the symlink case better.
+        path3 = path.parent / "tokenizer.model"
+        if path2.exists():
+            path = path2
+        elif path3.exists():
+            path = path3
+        else:
+            raise FileNotFoundError(
+                f"Could not find tokenizer.model in {path} or its parent; if it's in another directory, \
+                pass the directory as --vocab-dir")
+    added_tokens_path = path.parent / "added_tokens.json"
+    print(f"Loading vocab file {path}")
+    return SentencePieceVocab(path, params_vocab_size, added_tokens_path if added_tokens_path.exists() else None)
 
 
 def default_outfile(model_paths: List[Path], params: Params) -> Path:
