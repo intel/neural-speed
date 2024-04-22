@@ -117,7 +117,7 @@ void init_gpt_params(gpt_params* params, const std::string& model_path, int max_
   else if (memory_dtype == "f16")
     params->memory_type = KV_MEM_TYPE_F16;
   else if (memory_dtype == "auto")
-    params->memory_type = KV_MEM_TYPE_F16;
+    params->memory_type = KV_MEM_TYPE_AUTO;
   else
     fprintf(stderr, "Unexpected memory dtype %s!", memory_dtype.c_str());
 
