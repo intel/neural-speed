@@ -340,6 +340,7 @@ class Model:
         max_new_tokens = generate_kwargs.get("max_new_tokens", -1)
         self.reinit_from_bin = False
         self._check_max_request_num(batch_size, **generate_kwargs)
+        self._check_ctx_size(generate_kwargs.get("ctx_size", 0), multi_round=interactive)
         generate_kwargs.pop("max_request_num", max_request_num_default)
 
         if self.model is None or self.reinit_from_bin:
@@ -402,6 +403,12 @@ class Model:
     def is_token_end(self):
         return self.model.is_token_end()
 
+    def reset_kv_cache(self):
+        if self.model is None:
+            return
+        self.model.reinit()
+        self.generate_round = 0
+
     def __check_llama3(self):
         if self.model_type == "llama" and self.config.vocab_size == vocab_size_map["llama3"]:
             return True
@@ -434,6 +441,7 @@ class Model:
             logits_seq_len_dim = model_input.shape[1] if logits_all else 1
             self.reinit_from_bin = False
             self._check_max_request_num(batch_size, **kwargs)
+            self._check_ctx_size(kwargs.get("ctx_size", 0), multi_round=(not reinit))
             kwargs.pop("max_request_num", max_request_num_default)
             if self.model is None or self.reinit_from_bin:
                 self.init_from_bin(self.model_type,
@@ -486,6 +494,20 @@ class Model:
             if self.max_request_num > 0:
                 print("Will start to reinit model from bin due to different max request num.")
             self.max_request_num = max(input_batch_size, max_request_num)
+
+    def _check_ctx_size(self, ctx_size, multi_round=False):
+        if self.model is None:
+            self.reinit_from_bin = True
+            return
+        model_n_ctx = self.model.get_n_ctx();
+        print(model_n_ctx)
+        if ctx_size <= model_n_ctx:
+            return
+        if multi_round:
+            print("Warning: you are in multi-round generation scenario, please make sure the ctx_size is enough "\
+                  "large or considering using streaming_llm.")
+            return
+        self.reinit_from_bin =True
 
     def _get_model_input_list(self, input_ids, **kwargs):
         input_list = None

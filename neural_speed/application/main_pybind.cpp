@@ -363,6 +363,7 @@ class Model {
   }
   bool is_token_end() { return token_eos; }
   model_token get_eos_id() { return ctx->vocab.eos_token_id; }
+  int32_t get_n_ctx() { return ctx->n_ctx; }
   static int quant_model(const std::string& model_path, const std::string& out_path, const std::string& weight_dtype,
                          const std::string& alg, int group_size, const std::string& scale_dtype,
                          const std::string& compute_dtype, bool use_ggml, int threads);
@@ -925,7 +926,8 @@ PYBIND11_MODULE(gemma_cpp, m)
       .def("print_time", &Model::print_time)
       .def("reset_time", &Model::reset_time)
       .def("get_eos_id", &Model::get_eos_id)
-      .def("reinit", &Model::reinit);
+      .def("reinit", &Model::reinit)
+      .def("get_n_ctx", &Model::get_n_ctx);
   py::class_<Query>(m, "Query")
       .def(py::init<uint64_t, py::array_t<model_vocab::id>>())
       .def("__repr__", &Query::to_string)
