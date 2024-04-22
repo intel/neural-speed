@@ -405,6 +405,7 @@ class Model:
 
     def reset_kv_cache(self):
         if self.model is None:
+            print("Warning: the model is not initialized, will return directly.")
             return
         self.model.reinit()
         self.generate_round = 0
