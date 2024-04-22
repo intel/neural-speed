@@ -500,7 +500,6 @@ class Model:
             self.reinit_from_bin = True
             return
         model_n_ctx = self.model.get_n_ctx();
-        print(model_n_ctx)
         if ctx_size <= model_n_ctx:
             return
         if multi_round:
