@@ -24,12 +24,6 @@ enum grok_model {
 
 static const model_scratch grok_mem_req(int n_layers, float enlarge_scale = 1.0f) {
   switch (n_layers) {
-    case 2:
-      return {
-          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 1024) * MB,
-          static_cast<unsigned long long>(enlarge_scale * 1608) * MB,
-      };
     case 64:
       return {
           static_cast<unsigned long long>(enlarge_scale * 3072) * MB,
