@@ -177,6 +177,7 @@ struct model_context_params model_context_default_params() {
       /*.gpu_layers                  =*/0,
       /*.seed                        =*/-1,
       /*.kv_type                     =*/KV_MEM_TYPE_AUTO,
+      /*.mha_prefer_f32              =*/false,
       /*.logits_all                  =*/false,
       /*.vocab_only                  =*/false,
       /*.use_mmap                    =*/true,
@@ -189,7 +190,7 @@ struct model_context_params model_context_default_params() {
       /*cont_batching                =*/true,
       /*.max_request_num             =*/1,
       /*.gen_conf                    =*/generation_config(),
-      /*scratch_size_ratio  =*/1.0f,
+      /*scratch_size_ratio           =*/1.0f,
       /*.progress_callback           =*/nullptr,
       /*.progress_callback_user_data =*/nullptr,
   };
@@ -976,6 +977,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
     } else {
       NE_ASSERT(("KV-cache not allocated!", false));
     }
+    ctx->model.hparams.mha_prefer_f32 = params.mha_prefer_f32;
 
     // resized during inference
     if (params.logits_all) {
@@ -1272,6 +1274,7 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.n_gpu_layers = params.n_gpu_layers;
   lparams.seed = params.seed;
   lparams.kv_type = params.memory_type;
+  lparams.mha_prefer_f32 = params.mha_prefer_f32;
 
   // TODO(Yi): MHA FOR LONG TOKENS
   int32_t long_tokens = 6144;
@@ -1291,10 +1294,18 @@ struct model_context* model_init_from_gpt_params(const gpt_params& params) {
   lparams.shift_roped_k = params.shift_roped_k;
   lparams.cont_batching = params.cont_batching;
   lparams.max_request_num = params.max_request_num;
-  lparams.gen_conf.max_new_tokens = params.n_predict;
-  lparams.gen_conf.min_new_tokens = params.min_new_tokens;
-  lparams.gen_conf.length_penalty = params.length_penalty;
-  lparams.gen_conf.do_early_stopping = params.do_early_stopping;
+  generation_config gen_conf = {
+      /*.max_new_tokens    =*/(uint32_t)params.n_predict,
+      /*.min_new_tokens    =*/params.min_new_tokens,
+      /*.length_penalty    =*/params.length_penalty,
+      /*.do_early_stopping =*/params.do_early_stopping,
+      /*.do_sample         =*/params.do_sample,
+      /*.top_k             =*/params.top_k,
+      /*.top_p             =*/params.top_p,
+      /*.temp              =*/params.temp,
+      /*.repeat_penalty    =*/params.repeat_penalty,
+  };
+  lparams.gen_conf = gen_conf;
   lparams.scratch_size_ratio = params.scratch_size_ratio;
 
   NE_ASSERT(("Start size cannot be greater than the maximum context size!", lparams.n_keep < lparams.n_ctx));
@@ -1797,43 +1808,59 @@ std::vector<std::pair<std::string, struct ne_tensor*>>& model_internal_get_tenso
 static void ne_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
                                       const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const uint32_t kv_n_ctx_block = ctx->kv_n_ctx_block;
-  const uint32_t n_head = ctx->model.hparams.n_head_kv > 0 ? ctx->model.hparams.n_head_kv : ctx->model.hparams.n_head;
+  uint32_t n_head = 0;
+  auto h_n_head_kv = ctx->model.hparams.n_head_kv;
+  auto h_multi_query_group_num = ctx->model.hparams.multi_query_group_num;
+  if (h_n_head_kv > 0) {
+    n_head = h_n_head_kv;
+    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!h_multi_query_group_num > 0)));
+  } else if (h_multi_query_group_num > 0) {
+    n_head = h_multi_query_group_num;
+  } else {
+    n_head = ctx->model.hparams.n_head;
+  }
   const uint32_t head_dim = ctx->model.hparams.n_embd / ctx->model.hparams.n_head;
   const uint32_t n_embd = n_head * head_dim;
   const uint32_t n_ctx = ctx->n_ctx;
   const size_t k_elem_size = ne_element_size(ctx->model.kv_self.k);
   const size_t v_elem_size = ne_element_size(ctx->model.kv_self.v);
-#pragma omp parallel for collapse(2)
-  for (int i = 0; i < ctx->model.layers.size(); ++i) {  // K
-    // [head_dim, N, n_head]
-    for (int nh = 0; nh < n_head; ++nh) {
-      memcpy(static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_dst * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
-                 p0 * k_elem_size * head_dim,
-             static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_src * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
-                 p0 * k_elem_size * head_dim,
-             k_elem_size * head_dim * (p1 - p0 + 1));
-    }
-  }
-#pragma omp parallel for collapse(2)
-  for (int i = 0; i < ctx->model.layers.size(); ++i) {  // V
-    // [N, head_dim, n_head] or [N, n_embd]
-    for (int nm = 0; nm < n_embd; ++nm) {
-      memcpy(static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_dst * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
-             static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
-                 seq_id_src * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
-             v_elem_size * (p1 - p0 + 1));
-    }
-  }
+  ne_bestla::ne_threading::get()->parallel_for_collapse(
+      0, ctx->model.layers.size(), 1, 0, n_head, 1, [&](int i, int nh) {
+        // [head_dim, N, n_head]
+        memcpy(static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_dst * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
+                   p0 * k_elem_size * head_dim,
+               static_cast<char*>(ctx->model.kv_self.k->data) + i * n_ctx * k_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_src * n_ctx * k_elem_size * n_embd + k_elem_size * nh * head_dim * n_ctx +
+                   p0 * k_elem_size * head_dim,
+               k_elem_size * head_dim * (p1 - p0 + 1));
+      });
+  ne_bestla::ne_threading::get()->parallel_for_collapse(
+      0, ctx->model.layers.size(), 1, 0, n_embd, 1, [&](int i, int nm) {
+        // [N, head_dim, n_head] or [N, n_embd]
+        memcpy(static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_dst * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
+               static_cast<char*>(ctx->model.kv_self.v->data) + i * n_ctx * v_elem_size * n_embd * kv_n_ctx_block +
+                   seq_id_src * n_ctx * v_elem_size * n_embd + n_ctx * nm * v_elem_size + p0 * v_elem_size,
+               v_elem_size * (p1 - p0 + 1));
+      });
 }
 
 static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq_id& seq_id_src,
                                           const model_seq_id& seq_id_dst, const model_pos& p0, const model_pos& p1) {
   const auto& kv_self = ctx->model.kv_self;
   const auto& hparams = ctx->model.hparams;
-  int heads_kv = hparams.multi_query_group_num > 0 ? hparams.multi_query_group_num : hparams.n_head;
+  int heads_kv = 0;
+  auto h_n_head_kv = hparams.n_head_kv;
+  auto h_multi_query_group_num = hparams.multi_query_group_num;
+  if (h_n_head_kv > 0) {
+    heads_kv = h_n_head_kv;
+    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!h_multi_query_group_num > 0)));
+  } else if (h_multi_query_group_num > 0) {
+    heads_kv = h_multi_query_group_num;
+  } else {
+    heads_kv = hparams.n_head;
+  }
   const auto head_size = hparams.n_embd_head_k == 0 ? hparams.n_embd / hparams.n_head : hparams.n_embd_head_k;
 #ifdef NS_TP_MODEL
   // when use TP, cached kv will also have smaller size
@@ -1988,12 +2015,11 @@ struct logits_info {
     normalizers.resize(lctx->batch_size);
     MODEL_ASSERT(lctx->logits.size() % lctx->batch_size == 0);
     // batch
-#pragma omp parallel for
-    for (int i = 0; i < batch_size; ++i) {
+    ne_bestla::ne_threading::get()->parallel_for_collapse(0, batch_size, 1, [&](int i) {
       max_ls[i] = *std::max_element(logits + i * bs_stride + offset, logits + i * bs_stride + offset + n_vocab);
       normalizers[i] = 1.0f / std::accumulate(logits + i * bs_stride + offset,
                                               logits + i * bs_stride + offset + n_vocab, 0.0f, sum_exp_t{max_ls[i]});
-    }
+    });
   }
 
   beam_next_token get_token_data(const int& batch_idx, const int32_t& token_idx) const {
@@ -2153,11 +2179,10 @@ std::vector<beam_next_token> beam_search_flow::beam_top_k_next_tokens(model_cont
   MODEL_ASSERT(raw_top_k[0].size() == raw_k);
   MODEL_ASSERT(beams_score.size() == ctx->batch_size);
   // compute score: log_softmax + prev_score
-#pragma omp parallel for
-  for (int i = 0; i < ctx->batch_size; ++i) {
+  ne_bestla::ne_threading::get()->parallel_for_collapse(0, ctx->batch_size, 1, [&](int i) {
     std::for_each(raw_top_k[i].begin(), raw_top_k[i].end(),
                   [&](beam_next_token& r) { r.score = li.log_probability_from_logit(i, r.score) + beams_score[i]; });
-  }
+  });
   MODEL_ASSERT(num_beams.size() == request_running_bs);
   std::vector<beam_next_token> res;
   res.reserve(sample_scale * beam_size * num_beams.size());
@@ -2504,8 +2529,7 @@ const std::vector<std::vector<model_token>>& beam_search_flow::loop(const std::v
   for (int ni = 0; ni < next_inputs.size(); ++ni) {
     n_tokens[ni] = next_inputs[ni].n_tokens;
     if (n_tokens[ni] > model_n_ctx(ctx)) {
-      fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, n_tokens[ni],
-              model_n_ctx(ctx) - 4);
+      fprintf(stderr, "%s: error: prompt is too long (%d tokens, max %d)\n", __func__, n_tokens[ni], model_n_ctx(ctx));
       return response;
     }
     n_prompt_tokens[ni] = next_inputs[ni].n_tokens;
@@ -2783,4 +2807,75 @@ std::vector<std::vector<int>> split_inputs_into_groups(const model_input* inputs
     groups.back().push_back(i);
   }
   return groups;
+}
+
+std::vector<model_token> model_post_greedy_search(const float* logits, model_context* ctx) {
+  std::vector<model_token> ids(ctx->batch_size);
+  const int n_vocab = model_n_vocab(ctx);
+  static int n_vocab_segment = 1024;
+  int num_segments = (n_vocab + n_vocab_segment - 1) / n_vocab_segment;
+  std::vector<model_token> candidate_tokens(ctx->batch_size * num_segments);
+  std::vector<float> candidate_logits(ctx->batch_size * num_segments);
+  ne_bestla::ne_threading::get()->parallel_for_collapse(
+      0, ctx->batch_size, 1, 0, n_vocab, n_vocab_segment, [&](int bs, int vocab) {
+        auto max_e =
+            std::max_element(logits + bs * n_vocab + vocab, vocab + n_vocab_segment > n_vocab
+                                                                ? logits + bs * n_vocab + n_vocab
+                                                                : logits + bs * n_vocab + vocab + n_vocab_segment);
+        candidate_tokens[bs * num_segments + vocab / n_vocab_segment] = max_e - (logits + bs * n_vocab);
+        candidate_logits[bs * num_segments + vocab / n_vocab_segment] = *max_e;
+      });
+  for (int bs = 0; bs < ctx->batch_size; ++bs) {
+    ids[bs] = candidate_tokens[std::distance(candidate_logits.begin(),
+                                             std::max_element(candidate_logits.begin() + bs * num_segments,
+                                                              candidate_logits.begin() + (bs + 1) * num_segments))];
+  }
+  return ids;
+}
+
+std::vector<model_token> model_post_sample_top_k_top_p_repeat(
+    const float* logits, model_context* ctx, const std::vector<std::vector<model_token>>& last_n_tokens,
+    const std::vector<int>& last_n_tokens_indices) {
+  int alpha_frequency = 0;
+  int alpha_presence = 0;
+  int repeat_last_n = 64;
+  int top_k = ctx->generation_conf.top_k;
+  float tfs_z = 1.00f;
+  float typical_p = 1.00f;
+  float top_p = ctx->generation_conf.top_p;
+  float temp = ctx->generation_conf.temp;
+  std::vector<model_token> ids(ctx->batch_size);
+  const int n_vocab = model_n_vocab(ctx);
+  if (!last_n_tokens_indices.empty()) MODEL_ASSERT(last_n_tokens_indices.size() == ctx->batch_size);
+  // #pragma omp parallel for  // omp will affect sampling positions in batch dimension
+  for (int bs = 0; bs < ctx->batch_size; ++bs) {
+    std::vector<model_token_data> candidates;
+    candidates.reserve(n_vocab);
+    for (model_token token_id = 0; token_id < n_vocab; token_id++) {
+      candidates.emplace_back(model_token_data{token_id, logits[bs * n_vocab + token_id], 0.0f});
+    }
+    model_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
+
+    // Apply penalties
+    float nl_logit = logits[bs * n_vocab + model_token_nl()];
+    // continuous batching will update last_n_tokens in request_idx dimension
+    int idx = last_n_tokens_indices.empty() ? bs : last_n_tokens_indices.at(bs);
+    auto last_n_repeat =
+        std::min(std::min(static_cast<int>(last_n_tokens[idx].size()), repeat_last_n), model_n_ctx(ctx));
+    model_sample_repetition_penalty(ctx, &candidates_p,
+                                    last_n_tokens[idx].data() + last_n_tokens[idx].size() - last_n_repeat,
+                                    last_n_repeat, ctx->generation_conf.repeat_penalty);
+    model_sample_frequency_and_presence_penalties(ctx, &candidates_p,
+                                                  last_n_tokens[idx].data() + last_n_tokens[idx].size() - last_n_repeat,
+                                                  last_n_repeat, alpha_frequency, alpha_presence);
+    // int id = model_sample_token_greedy(ctx, &candidates_p);
+    // Temperature sampling
+    model_sample_top_k(ctx, &candidates_p, top_k, 1);
+    model_sample_tail_free(ctx, &candidates_p, tfs_z, 1);
+    model_sample_typical(ctx, &candidates_p, typical_p, 1);
+    model_sample_top_p(ctx, &candidates_p, top_p, 1);
+    model_sample_temperature(ctx, &candidates_p, temp);
+    ids[bs] = model_sample_token(ctx, &candidates_p);
+  }
+  return ids;
 }

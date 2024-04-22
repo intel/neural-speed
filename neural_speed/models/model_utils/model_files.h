@@ -997,7 +997,7 @@ struct model_file_loader {
   enum model_format model_magic = UNKNOWN;
 
   model_file_loader(const char* fname, size_t file_idx, model_load_tensors_map& tensors_map) : file(fname, "rb") {
-    fprintf(stderr, "model.cpp: loading model from %s\n", fname);
+    fprintf(stderr, "%s: loading model from %s\n", __func__, fname);
     model_magic = read_file_magic();
     if (model_magic == GGUF) {
       std::cout << "Loading the bin file with GGUF format..." << std::endl;
@@ -1138,15 +1138,15 @@ struct model_file_loader {
     printf("%-16s %d.hparams.original_max_position_embeddings = %-30d\n", __func__, count++,
            hparams.original_max_position_embeddings);
     printf("%-16s %d.hparams.use_yarn = %-30d\n", __func__, count++, hparams.use_yarn);
-    unsigned int total = 25;
+    unsigned int total = 26;
     if (count != total) {
-      fprintf(stderr, "The number of ne_parameters is wrong.\n");
+      fprintf(stderr, "The number of ne_parameters is wrong, total = %d, count = %d.\n", total, count);
     }
   }
 
   void load_ne_vocab() {
     unsigned int count = 0;
-    unsigned int ne_hparams_total = 25;
+    unsigned int ne_hparams_total = 26;
     file.read_raw(&vocab.bos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.eos_token_id, sizeof(model_vocab::id));
     file.read_raw(&vocab.pad_token_id, sizeof(model_vocab::id));
@@ -1184,7 +1184,7 @@ struct model_file_loader {
       file.read_raw(shard.ne.data(), sizeof(shard.ne[0]) * n_dims);
       std::string name = file.read_string(name_len);
       if (n_dims < 1 || n_dims > 2) {
-        throw format("model.cpp: tensor '%s' should not be %u-dimensional", name.c_str(), n_dims);
+        throw format("%s: tensor '%s' should not be %u-dimensional", __func__, name.c_str(), n_dims);
       }
       switch (shard.type) {
         case NE_TYPE_F32:
@@ -1236,7 +1236,7 @@ struct model_file_saver {
   model_file_loader* any_file_loader;
   model_file_saver(const char* fname, model_file_loader* any_file_loader, enum ne_ftype new_ftype)
       : file(fname, "wb"), any_file_loader(any_file_loader) {
-    fprintf(stderr, "model.cpp: saving model to %s\n", fname);
+    fprintf(stderr, "%s: saving model to %s\n", __func__, fname);
     write_magic();
     write_hparams(new_ftype);
     write_vocab();
@@ -1425,7 +1425,7 @@ struct model_model_loader {
   struct ne_tensor* get_tensor(const std::string& name, const std::vector<uint32_t>& ne, ne_backend backend) {
     auto it = tensors_map.name_to_idx.find(name);
     if (it == tensors_map.name_to_idx.end()) {
-      throw format("model.cpp: tensor '%s' is missing from model", name.c_str());
+      throw format("%s: tensor '%s' is missing from model", __func__, name.c_str());
     }
     model_load_tensor& lt = tensors_map.tensors.at(it->second);
 #ifdef NS_TP_MODEL

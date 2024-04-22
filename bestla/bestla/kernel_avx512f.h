@@ -644,32 +644,29 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
     _mm512_storeu_si512((__m512i*)dst, zmm1);
     _mm512_storeu_si512((__m512i*)(dst + 64), zmm2);
   };
-
-  assert(head_ignore_num % 8 == 0);
-
-  auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
-  auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
   int compress_wei_ptr_offset = 0;
-  int8_t* s8_ptr = reinterpret_cast<int8_t*>(tmp);
-  auto head_write_num = 128 - head_ignore_num;
   if (head_ignore_num != 0) {
+    assert(head_ignore_num % 8 == 0);
+
+    auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
+    auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
+    auto head_write_num = 128 - head_ignore_num;
     bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
-    for (int i = 0; i < head_write_num; i++) dstptr[i] = s8_ptr[head_ignore_num + i];
+    for (int i = 0; i < head_write_num; i++) dstptr[i] = tmp[head_ignore_num + i];
     compress_wei_ptr_offset += head_write_num;
+    unpack_elt -= head_write_num;
   }
+  auto body_loop = unpack_elt / 128;
+  auto tail_proc_num = unpack_elt % 128;
 
-  auto body_loop = (unpack_elt - head_write_num % 128) / 128;
-  auto tail_proc_num = (unpack_elt - head_write_num % 128) % 128;
-
-  bestla::kernel::jit::DecompresssS3::forward_avx512f(bit2ptr + compress_wei_ptr_offset / 4,
-                                                      bit1ptr + compress_wei_ptr_offset / 8,
-                                                      dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
+  bestla::kernel::jit::DecompressS3::forward_avx512f(bit2ptr + compress_wei_ptr_offset / 4,
+                                                     bit1ptr + compress_wei_ptr_offset / 8,
+                                                     dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
   compress_wei_ptr_offset += body_loop * 128;
   if (tail_proc_num > 0) {
-    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
     bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
                                        tmp);
-    for (int i = 0; i < tail_proc_num; i++) dstptr[compress_wei_ptr_offset + i] = s8_ptr[i];
+    for (int i = 0; i < tail_proc_num; i++) dstptr[compress_wei_ptr_offset + i] = tmp[i];
   }
   return BTLA_CODE::Success;
 }

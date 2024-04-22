@@ -30,6 +30,36 @@ using thread_func = std::function<void(int tid)>;
 class IThreading {
  public:
   explicit IThreading(int nthreads, bool supportPE) : mThreadNum(nthreads), isSupportPE(supportPE) {}
+
+  // equal to "for(int i=begin1;i<end1;i+=step1)"
+  void parallel_for_collapse(const int& begin1, const int& end1, const int& step1,
+                             const std::function<void(int)>& func) {
+    assert(end1 >= begin1 && step1 > 0);
+    parallel_for([&](int tidx) {
+      const int length = (end1 - begin1 + step1 - 1) / step1;
+      const int block_size = length / mThreadNum;
+      const int block_remain = length % mThreadNum;
+      const int offset = std::min(tidx, block_remain) + tidx * block_size;
+      for (int i = begin1 + offset * step1; i < begin1 + (offset + block_size + (tidx < block_remain)) * step1;
+           i += step1)
+        func(i);
+    });
+  }
+
+  // equal to "for(int i=begin1;i<end1;i+=step1)for(int j=begin2;i<end2;i+=step2)"
+  void parallel_for_collapse(const int& begin1, const int& end1, const int& step1, const int& begin2, const int& end2,
+                             const int& step2, const std::function<void(int, int)>& func) {
+    assert(end1 >= begin1 && step1 > 0 && end2 >= begin2 && step2 > 0);
+    parallel_for([&](int tidx) {
+      const int length1 = (end1 - begin1 + step1 - 1) / step1;
+      const int length2 = (end2 - begin2 + step2 - 1) / step2;
+      const int block_size = (length1 * length2) / mThreadNum;
+      const int block_remain = (length1 * length2) % mThreadNum;
+      const int offset = std::min(tidx, block_remain) + tidx * block_size;
+      for (int i = offset; i < offset + block_size + (tidx < block_remain); ++i)
+        func(begin1 + (i / length2) * step1, begin2 + (i % length2) * step2);
+    });
+  }
   virtual void parallel_for(const thread_func& func) = 0;
   virtual inline void sync(int tidx, int idx = 0) = 0;
   virtual int num_threads() const { return mThreadNum; };
@@ -55,9 +85,12 @@ class OMPThreading : public IThreading {
       {
         int tidx = omp_get_thread_num();
         func(tidx);
+        (void)(tidx);
+        (void)(0);
       }
     } else {
       func(0);
+      void(0);
     }
   }
   virtual void set_threads(int nthreads) override {
@@ -138,7 +171,7 @@ class StdThreading : public IThreading {
 
   inline void sync(int tidx, int idx = 0) override {
     if (mThreadNum > 1) {
-      flag[idx].fetch_sub(1);
+      flag[idx]--;
       if (cr->mHybrid) {
         Timer_T tm;
         tm.start();
@@ -166,7 +199,7 @@ class StdThreading : public IThreading {
 
  private:
   void stop_threads() {
-    stop = true;
+    stop = 1;
     for (int i = 0; i < mThreadNum - 1; i++) thdset[i].join();
     thdset.clear();
     // printf("stop %d\n", mThreadNum);
@@ -174,7 +207,7 @@ class StdThreading : public IThreading {
   void create_threads() {
     // printf("create %d\n", mThreadNum);
     thdset.resize(mThreadNum - 1);
-    stop = false;
+    stop = 0;
     GetCPUDevice();
     std::vector<int> core_order;
     if (_cd->isHybrid()) {
@@ -187,7 +220,12 @@ class StdThreading : public IThreading {
              reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
     } else {
       core_order.resize(mThreadNum);
-      for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+      if (_cd->isClient()) {
+        for (int i = 0; i < _cd->getCores(); i++) core_order[i] = 2 * i;
+        for (int i = _cd->getCores(); i < mThreadNum; i++) core_order[i] = 2 * (i - _cd->getCores()) + 1;
+      } else {
+        for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+      }
     }
     _cd->core_bond(core_order[0]);
     if (cr->mHybrid) {
@@ -198,7 +236,7 @@ class StdThreading : public IThreading {
               _cd->core_bond(core_id);
               Timer_T tm;
               while (true) {
-                if (stop.load() == true) break;
+                if (stop) break;
                 if (func_[tidx] != nullptr) {
                   thread_time[tidx + 1] = 0;
                   tm.start();
@@ -219,11 +257,11 @@ class StdThreading : public IThreading {
             [&](int tidx, int core_id) {
               _cd->core_bond(core_id);
               while (true) {
-                if (stop.load() == true) break;
+                if (stop) break;
                 if (func_[tidx] != nullptr) {
                   (*func_[tidx])(tidx + 1);
                   func_[tidx] = nullptr;
-                  running.fetch_sub(1);
+                  running--;
                 } else {
                   _mm_pause();
                 }
@@ -233,13 +271,13 @@ class StdThreading : public IThreading {
       }
   }
   device::CpuRuntime* cr;
-  std::vector<int> thread_time;
-  float time_per_p, time_per_e;
-  std::vector<std::thread> thdset;
-  std::atomic_bool stop;
-  std::atomic_int running;
-  std::atomic_int flag[10];
+  std::atomic_int64_t running;
+  std::atomic_int64_t flag[10];
   const thread_func* func_[100];
+  bool stop;
+  std::vector<std::thread> thdset;
+  std::vector<int64_t> thread_time;
+  float time_per_p, time_per_e;
 };
 
 class SingleThread : public IThreading {

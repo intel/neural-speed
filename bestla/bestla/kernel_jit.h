@@ -250,8 +250,125 @@ class DequanS8FP {
     }
   }
 };
-class DecompresssS3 {
+class DecompressS3 {
  public:
+  template <typename _DST_T>
+  class MicroKernelAVX2 : protected xbyak::JitAvx2 {
+   public:
+    struct params {
+      void *bit2ptr, *bit1ptr, *dstptr, *tmpbuf;
+      int unpack_elt;
+      const int8_t lowMask = 3, highMask = 4;
+      const int32_t bit1Mask = 0x0F, bit1Shift2 = (1 << 23) + (1 << 16) + (1 << 9) + (1 << 2);
+      const int32_t bit1Shift1[8] = {0, 4, 8, 12, 16, 20, 24, 28};
+    };
+    typedef long long (*func_t)(params*);
+    static int constexpr VBytes = 32;
+    MicroKernelAVX2() {
+      generate();
+      this->ready();
+      mKernel = this->getCode<func_t>();
+    }
+
+    void generate() {
+      inLocalLabel();  // use local label for multiple instance
+      {
+        Xbyak::util::StackFrame st(this, 1, 13, 10 * 16);
+        parambase = st.p[0];
+        reg_bit1ptr = st.t[0];
+        reg_bit2ptr = st.t[1];
+        reg_loop = st.t[2];
+        reg_iter = st.t[3];
+        reg_dst = st.t[4];
+        reg_tmp = st.t[5];
+        reg_cache = st.t[6];
+        reg_ret = rax;
+        xor_(reg_loop, reg_loop);
+        mov(reg_loop.cvt32(), dword[parambase + OFFSET(unpack_elt)]);
+        xor_(reg_iter, reg_iter);
+        vreg_push(rsp);
+        Xbyak::Ymm lowMask = ymm15;
+        Xbyak::Ymm highMask = ymm14;
+        Xbyak::Ymm bit1Mask = ymm13;
+        Xbyak::Ymm bit1Shift1 = ymm12;
+        Xbyak::Ymm bit1Shift2 = ymm11;
+        vpbroadcastb(lowMask, byte[parambase + OFFSET(lowMask)]);
+        vpbroadcastb(highMask, byte[parambase + OFFSET(highMask)]);
+        vpbroadcastd(bit1Mask, dword[parambase + OFFSET(bit1Mask)]);
+        vpbroadcastd(bit1Shift2, dword[parambase + OFFSET(bit1Shift2)]);
+        vmovdqu(bit1Shift1, ptr[parambase + OFFSET(bit1Shift1)]);
+        mov(reg_bit1ptr, ptr[parambase + OFFSET(bit1ptr)]);
+        mov(reg_bit2ptr, ptr[parambase + OFFSET(bit2ptr)]);
+        mov(reg_dst, ptr[parambase + OFFSET(dstptr)]);
+        if constexpr (!std::is_same_v<_DST_T, int8_t>) mov(reg_cache, ptr[parambase + OFFSET(tmpbuf)]);
+        L("loop_label");
+        Xbyak::Ymm bit2_data = ymm8;
+        vmovups(bit2_data, ptr[reg_bit2ptr]);
+        for (int i = 0; i < 4; i++) {
+          vpbroadcastd(Xbyak::Ymm(i), dword[reg_bit1ptr + 4 * i]);
+          vpsrlvd(Xbyak::Ymm(i), Xbyak::Ymm(i), bit1Shift1);  // todo : check m256
+          vpand(Xbyak::Ymm(i), Xbyak::Ymm(i), bit1Mask);
+          vpmulld(Xbyak::Ymm(i), Xbyak::Ymm(i), bit1Shift2);
+          vpand(Xbyak::Ymm(i), Xbyak::Ymm(i), highMask);
+          vpsrlw(Xbyak::Ymm(4 + i), bit2_data, 2 * i);
+          vpand(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i), lowMask);
+          vpaddb(Xbyak::Ymm(i), Xbyak::Ymm(i), Xbyak::Ymm(4 + i));
+          vpslld(Xbyak::Ymm(i), Xbyak::Ymm(i), 5);
+          if constexpr (std::is_same_v<_DST_T, int8_t>) {
+            vmovdqu(ptr[reg_dst + 32 * i], Xbyak::Ymm(i));
+          } else if constexpr (std::is_same_v<_DST_T, float>) {
+            vmovdqu(ptr[reg_cache + 32 * i], Xbyak::Ymm(i));
+
+            vpmovsxbd(Xbyak::Ymm(i), qword[reg_cache + 32 * i + 0]);
+            vpmovsxbd(Xbyak::Ymm(4 + i), qword[reg_cache + 32 * i + 8]);
+            vcvtdq2ps(Xbyak::Ymm(i), Xbyak::Ymm(i));
+            vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
+            vmovups(ptr[reg_dst + 4 * (32 * i + 0)], Xbyak::Ymm(i));
+            vmovups(ptr[reg_dst + 4 * (32 * i + 8)], Xbyak::Ymm(4 + i));
+
+            vpmovsxbd(Xbyak::Ymm(i), qword[reg_cache + 32 * i + 16]);
+            vpmovsxbd(Xbyak::Ymm(4 + i), qword[reg_cache + 32 * i + 24]);
+            vcvtdq2ps(Xbyak::Ymm(i), Xbyak::Ymm(i));
+            vcvtdq2ps(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i));
+            vmovups(ptr[reg_dst + 4 * (32 * i + 16)], Xbyak::Ymm(i));
+            vmovups(ptr[reg_dst + 4 * (32 * i + 24)], Xbyak::Ymm(4 + i));
+          } else {
+            assert(0);
+          }
+        }
+
+        add(reg_iter, 1);
+        add(reg_bit1ptr, 16);
+        add(reg_bit2ptr, 32);
+        add(reg_dst, 128 * sizeof(_DST_T));
+        cmp(reg_iter, reg_loop);
+        jb("loop_label");
+        mov(reg_ret, 0);
+        vreg_pop(rsp);
+      }
+      outLocalLabel();  // end of local label
+    }
+
+    func_t mKernel = nullptr;
+
+   private:
+    Xbyak::Reg64 parambase;
+    Xbyak::Reg64 reg_bit1ptr;
+    Xbyak::Reg64 reg_bit2ptr;
+    Xbyak::Reg64 reg_loop;
+    Xbyak::Reg64 reg_iter;
+    Xbyak::Reg64 reg_dst;
+    Xbyak::Reg64 reg_tmp;
+    Xbyak::Reg64 reg_cache;
+    Xbyak::Reg64 reg_ret;
+    Xbyak::Reg64 bit;
+  };
+  template <typename _DST_T>
+  static void forward_avx2(void* bit2ptr, void* bit1ptr, _DST_T* dstptr, void* tmpbuf, int unpack_elt) {
+    static MicroKernelAVX2<_DST_T> ker;
+    typename MicroKernelAVX2<_DST_T>::params param{bit2ptr, bit1ptr, dstptr, tmpbuf, unpack_elt / 128};
+    ker.mKernel(&param);
+  }
   template <typename _DST_T>
   class MicroKernelAVX512F : protected xbyak::JitAvx512f {
    public:

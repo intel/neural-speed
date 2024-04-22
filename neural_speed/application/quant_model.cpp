@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   const std::string fname_inp = q_params.model_file;
   const std::string fname_out = q_params.out_file;
   ne_ftype ftype = quant_params_to_ftype(q_params);
-  printf("ne_ftype: %d\n", ftype);
+  printf("%s: quant_params_to_ftype: %d\n", __func__, ftype);
   const int nthread = q_params.nthread;
 
   const int64_t t_main_start_us = ne_time_us();

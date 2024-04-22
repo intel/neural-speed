@@ -128,6 +128,7 @@ struct model_hparams {
   uint32_t n_layer = 32;
   uint32_t n_rot = 64;
   enum ne_ftype ftype = NE_FTYPE_MOSTLY_F16;
+  bool mha_prefer_f32 = false;
   int32_t max_seq_len = 0;            // for mpt
   float alibi_bias_max = 0;           // for mpt
   float clip_qkv = 0;                 // for mpt
@@ -279,6 +280,12 @@ struct generation_config {
   // `length_penalty` < 0.0 encourages shorter sequences. (default = 1.0)
   float length_penalty = 1.0f;
   bool do_early_stopping = false;
+  // sampling parameters
+  bool do_sample = false;
+  int32_t top_k = 40;            // <= 0 to use vocab size
+  float top_p = 0.95f;           // 1.0 = disabled
+  float temp = 0.80f;            // 1.0 = disabled
+  float repeat_penalty = 1.10f;  // 1.0 = disabled
 };
 
 class beam_search_kv_cache_reorder;  //  forward declaration
@@ -432,6 +439,7 @@ struct model_context_params {
   int n_gpu_layers;     // number of layers to store in VRAM
   int seed;             // RNG seed, -1 for random
   KV_MEM_TYPE kv_type;  // KV cache type specification
+  bool mha_prefer_f32;  // whether mha use f32 as compute_dtype
   bool logits_all;      // the model_eval() call computes all logits, not just the last one
   bool vocab_only;      // only load the vocabulary, no weights
   bool use_mmap;        // use mmap if possible

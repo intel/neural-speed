@@ -14,6 +14,7 @@
 #pragma once
 #include "bestla.h"
 #include "bestla_utils.h"
+#include "kernel_jit.h"
 #include "kernel_ref.h"
 #if CompileAVX2()
 #include <immintrin.h>
@@ -1151,6 +1152,81 @@ static inline BTLA_CODE layernorm(const float* srcptr, const float* scaleptr, co
   if (mean_square_out) {
     *mean_square_out = mean_square;
   }
+  return BTLA_CODE::Success;
+}
+
+template <BTLA_DTYPE S3_T, typename _DST_T>
+inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, _DST_T* dstptr,
+                                           int interleave_n_offset, int unpack_elt, int8_t* tmp, size_t tmpsize) {
+  auto head_ignore_num = interleave_n_offset % 128;
+  const __m256i lowMask = _mm256_set1_epi8(0x03);
+  const __m256i highMask = _mm256_set1_epi8(0x04);
+  const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
+  const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
+  const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
+
+  auto bit3_interleave_decompress_pack128 = [&](utils::bit2x4* src1, utils::bit1x8* src2, int8_t* dst) {
+    __m256i bit2_data = _mm256_loadu_si256((const __m256i*)src1);
+    int32_t* bit1_ptr = reinterpret_cast<int32_t*>(src2);
+    for (int i = 0; i < 4; i++) {
+      auto bit1x32 = _mm256_set1_epi32(bit1_ptr[i]);
+      bit1x32 = _mm256_srlv_epi32(bit1x32, bit1Shift_1);
+      bit1x32 = _mm256_and_si256(bit1x32, bit1Mask);
+      bit1x32 = _mm256_mullo_epi32(bit1x32, bit1Shift_2);
+      bit1x32 = _mm256_and_si256(highMask, bit1x32);
+
+      auto bit2x32 = _mm256_and_si256(lowMask, _mm256_srli_epi16(bit2_data, 2 * i));
+      auto res = _mm256_add_epi8(bit1x32, bit2x32);
+      res = _mm256_slli_epi32(res, 5);
+      _mm256_storeu_si256((__m256i*)(dst + 32 * i), res);
+    }
+  };
+  int compress_wei_ptr_offset = 0;
+  if (head_ignore_num != 0) {
+    assert(head_ignore_num % 8 == 0);
+
+    auto base_bit2ptr = bit2ptr - head_ignore_num / 4;
+    auto base_bit1ptr = bit1ptr - head_ignore_num / 8;
+    auto head_write_num = 128 - head_ignore_num;
+    bit3_interleave_decompress_pack128(base_bit2ptr, base_bit1ptr, tmp);
+    for (int i = 0; i < head_write_num; i++) dstptr[i] = tmp[head_ignore_num + i];
+    compress_wei_ptr_offset += head_write_num;
+    unpack_elt -= head_write_num;
+  }
+  auto body_loop = unpack_elt / 128;
+  auto tail_proc_num = unpack_elt % 128;
+
+  bestla::kernel::jit::DecompressS3::forward_avx2(bit2ptr + compress_wei_ptr_offset / 4,
+                                                  bit1ptr + compress_wei_ptr_offset / 8,
+                                                  dstptr + compress_wei_ptr_offset, tmp, body_loop * 128);
+  compress_wei_ptr_offset += body_loop * 128;
+  if (tail_proc_num > 0) {
+    bit3_interleave_decompress_pack128(bit2ptr + compress_wei_ptr_offset / 4, bit1ptr + compress_wei_ptr_offset / 8,
+                                       tmp);
+    for (int i = 0; i < tail_proc_num; i++) dstptr[compress_wei_ptr_offset + i] = tmp[i];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <BTLA_DTYPE _S3_T, typename _DST_T, int _PACK_ROW, typename _ST>
+static inline BTLA_CODE decompress_kblock_bit3_packrow_fp(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                                          _DST_T* dstptr, int interleave_n_offset, int row, int col,
+                                                          _ST* scales, int8_t* zero_points, int k_offset, int kblock,
+                                                          int NPad, void* tmp, size_t tmpsize) {
+  auto unpack_elt = row * col;
+  decompress_kblock_s3_s8fp<_S3_T>(bit2ptr, bit1ptr, dstptr, interleave_n_offset, unpack_elt,
+                                   reinterpret_cast<int8_t*>(tmp), tmpsize);
+  // TODO(zhe): simd version
+  for (int i = 0; i < row; i++) {
+    int kpos = (k_offset + i) / kblock;
+    auto sptr = scales + kpos * NPad;
+    for (int j = 0; j < col; j++) {
+      float tmp = static_cast<float>(dstptr[i * col + j]);
+      if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
+      dstptr[i * col + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
+    }
+  }
+
   return BTLA_CODE::Success;
 }
 

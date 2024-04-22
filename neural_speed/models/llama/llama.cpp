@@ -42,9 +42,6 @@
 #include "models/model_utils/util.h"
 #include "models/models.h"
 
-static const bool NE_ATTN_PREFER_FP32 =
-    getenv("NE_ATTN_PREFER_FP32") != nullptr && std::string("1") == getenv("NE_ATTN_PREFER_FP32");
-
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -83,7 +80,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     if (n_totals[i] == 0 && inputs[i].tokens[0] != lctx.vocab.bos_token_id) {
       fprintf(stderr, "%s: first token must be BOS (token id is %d) in %dth prompt\n", __func__,
               lctx.vocab.bos_token_id, i);
-      return false;
     }
   }
   const int seq_len_sum = std::accumulate(n_tokens.begin(), n_tokens.end(), 0);
@@ -463,7 +459,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         ne_set_name(V, std::string("V_" + suffix).c_str());
 
         ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
-        if (NE_ATTN_PREFER_FP32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
+        if (hparams.mha_prefer_f32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
         if (n_total == 0 || !shift_roped_k) attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
         struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
         struct ne_tensor* KQV_merged_gi = ne_view_2d(ctx0, KQV_Out, head_size * n_head, attn_sl * attn_bs,
@@ -637,13 +633,14 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     } else {
       // return result for just the last token
       logits_out.resize(n_vocab * batch_size);
-#pragma omp parallel for
-      for (int i = 0; i < batch_size; ++i) {
+      bestla::parallel::IThreading* threading =
+          reinterpret_cast<bestla::parallel::IThreading*>(bestla_get_thread_handle());
+      threading->parallel_for_collapse(0, batch_size, 1, [&](int i) {
         size_t bs_off = std::accumulate(n_tokens.begin(), n_tokens.begin() + i, 0) * n_vocab;
         memcpy(logits_out.data() + (i * n_vocab),
                reinterpret_cast<float*>(ne_get_data(inpL)) + bs_off + (n_vocab * (n_tokens[i] - 1)),
                sizeof(float) * n_vocab);
-      }
+      });
     }
   }
   // extract embeddings

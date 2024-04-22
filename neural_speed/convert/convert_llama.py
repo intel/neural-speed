@@ -27,7 +27,7 @@ import re
 import signal
 import struct
 import sys
-import zipfile
+import zipfile38 as zipfile
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
