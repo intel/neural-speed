@@ -65,7 +65,7 @@ void Llama::init(const char* path_model, model_context* ctx, int n_gpu_layer_, b
   auto& hparams = model.hparams;
   n_ff = hparams.ffn_hidden_size;
   fprintf(stderr, "%s: n_vocab    = %u\n", __func__, hparams.n_vocab);
-  fprintf(stderr, "%s: n_ctx      = %u\n", __func__, hparams.max_seq_len);
+  fprintf(stderr, "%s: n_ctx      = %u\n", __func__, lctx.n_ctx);
   fprintf(stderr, "%s: n_embd     = %u\n", __func__, hparams.n_embd);
   fprintf(stderr, "%s: n_mult     = %u\n", __func__, hparams.n_mult);
   fprintf(stderr, "%s: n_head     = %u\n", __func__, hparams.n_head);
