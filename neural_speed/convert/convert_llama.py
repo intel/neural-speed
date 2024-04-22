@@ -37,7 +37,6 @@ import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
 
 import gguf
-from common import BpeVocab
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -1501,8 +1500,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
         else:
             if params.n_vocab == llama3_vocab_size:
                 # Llama3
+                from common import BpeVocab
                 vocab_dir = args.vocab_dir if args.vocab_dir else model_plus.paths[0].parent
-                vocab = BpeVocab(vocab_dir)
+                vocab = BpeVocab(Path(vocab_dir))
             else:
                 vocab_dir = args.vocab_dir if args.vocab_dir else model_plus.paths[0].parent
                 vocab = load_vocab(vocab_dir, params.n_vocab)
