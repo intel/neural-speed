@@ -43,12 +43,7 @@ def convert_model(model, outfile, outtype="f32", format="NE", model_hub="hugging
     if use_quantized_model:
         path = Path(Path(__file__).parent.absolute(), "convert_quantized_{}.py".format(model_type))
     else:
-        path = Path(Path(__file__).parent.absolute(), "convert_{}.py".format(model_type))
-
-    if model_type == "llama" and config.vocab_size == llama3_vocab_size:
-        if use_quantized_model:
-            path = Path(Path(__file__).parent.absolute(), "convert_quantized_llama3.py".format(model_type))
-        else:
+        if model_type == "llama" and config.vocab_size == llama3_vocab_size:
             path = Path(Path(__file__).parent.absolute(), "convert_llama3.py".format(model_type))
             cmd.extend(["python", path])
             cmd.extend(["--outfile", outfile])
@@ -58,6 +53,8 @@ def convert_model(model, outfile, outtype="f32", format="NE", model_hub="hugging
             print("cmd:", cmd)
             subprocess.run(cmd)
             return
+        else:
+            path = Path(Path(__file__).parent.absolute(), "convert_{}.py".format(model_type))
 
     cmd.extend(["python", path])
     cmd.extend(["--outfile", outfile])
