@@ -72,7 +72,8 @@ We enable a CPP model in the following four steps.
 graph LR;
     Convert-->Load;
     Load-->Inference;
-    Inference-->Optimize;
+    Inference-->acc_evaluate;
+    acc_evaluate-->Optimize;
 ```
 
 # 1.	Model conversion
@@ -414,15 +415,7 @@ We recommend to use continuous batching way since it has no padding effect and c
 +};
 +REGISTER_QUANT_LAYER_CLASS(new_model);
 ```
-- Add new CMakeLists.txt: We need to add the newly added model to the following CMakeList.txt. New model CMakeList.txt just like [gptneox_CMakeLists.txt](neural_speed/models/gptneox/CMakeLists.txt),
-```diff
-+set(TARGET new_model)
-+add_library_w_warning(${TARGET} new_model.cpp new_model_utils.cpp ${MODEL_UTILS_SOURCE})
-+target_compile_features(${TARGET} PUBLIC cxx_std_11) # don't bump
-+set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-+target_link_libraries(${TARGET} PUBLIC ne_layers bestla::bestla)
-```
- and and new_model to [models_CMakeLists.txt](neural_speed/models/CMakeLists.txt).
+- Add new CMakeLists.txt: We need to add the newly added model to the following CMakeList.txt. Add new_model to [models_CMakeLists.txt](neural_speed/models/CMakeLists.txt).
  ```diff
 add_subdirectory(opt)
 add_subdirectory(bloom)
@@ -499,9 +492,15 @@ index 894be0134d..a9a57c0a9e 100644
  {
    m.doc() = "cpp model python binding";
 ```
+# 3.	Accuracy evaluation
+## 3.1 Evalute llm model in neural speed by lm_eval
+```bash
 
-# 3.	Performance optimization
-## 3.1.	Quantize model and use Jblas library for better performance
+python scripts/cal_acc.py --model hf_model --tasks piqa --group_size 32 --compute_dtype int8 --weight_dtype int4
+```
+
+# 4.	Performance optimization
+## 4.1.	Quantize model and use Jblas library for better performance
 Quantize model and use the bestla library for inference can lead to better performance.
 ```bash
 
@@ -511,12 +510,12 @@ python scripts/convert_new_model.py --outtype f32 --outfile ne-f32.bin new_model
 ./build/bin/quant_new_model --model_file ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --compute_dtype int8
 ```
 Then you can use the model to inference according to the process in the [README](https://github.com/intel/intel-extension-for-transformers/tree/main/neural_speed).
-## 3.2.	MHA fusion
+## 4.2.	MHA fusion
 We can improve the performance by fusion the multihead attention process.
 - [MHA-Fusion Introduction](neural_speed/fused_attention.md)
 - [MHA-Fusion example](https://github.com/intel/intel-extension-for-transformers/pull/567)
-## 3.3.	FFN fusion
+## 4.3.	FFN fusion
 We can improve the performance by fusion the FFN process.
 - [FFN-Fusion example](https://github.com/intel/intel-extension-for-transformers/pull/160)
-# 4. A complete example
+# 5. A complete example
 - [Enable baichuan](https://github.com/intel/intel-extension-for-transformers/pull/376)
