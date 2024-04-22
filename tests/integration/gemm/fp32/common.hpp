@@ -49,6 +49,7 @@ class TestBase {
 
   static constexpr size_t batch_size = 1;
   static constexpr mma_engine engine = mma_engine::fpu;
+  static constexpr gpu_arch gpu_arch = gpu_arch::XeHpc;
 };
 
 class Test1 : public TestBase {
