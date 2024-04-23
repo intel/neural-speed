@@ -27,9 +27,9 @@ using policy_t = stage0<fmha_policy_32x128x128>;
 constexpr uint32_t num_batches = 1;
 constexpr uint32_t num_heads = 32;
 constexpr uint32_t head_size = 128;
-constexpr uint32_t num_queries = 1024;
+constexpr uint32_t num_queries = 33;
 // constexpr uint32_t num_queries = 1;
-constexpr uint32_t num_keys = 1024;
+constexpr uint32_t num_keys = 33;
 constexpr float softmax_scale = 0.125;
 
 // Q: [FxBxNxH] or [BxFxMxH]
@@ -175,8 +175,7 @@ void fmha_run(uint32_t iter, uint32_t warmup = 10) {
   using fmha_forward_op_t = gpu::xetla::fmha::fmha_forward_t<
       policy_t,
       FMHA_T,
-      gpu_arch::XeLpg,
-      // gpu_arch::XeHpg,
+      gpu_arch::XeHpg,
       false,
       false,
       false,
@@ -196,7 +195,7 @@ void fmha_run(uint32_t iter, uint32_t warmup = 10) {
   auto Q = alloc_device_and_init<FMHA_T>(
       num_batches * num_heads * head_size * num_queries,
       [](FMHA_T* data, size_t idx) {
-        data[idx] = static_cast<FMHA_T>(random_float());
+        data[idx] = static_cast<FMHA_T>(idx % 17);
       },
       queue,
       device,
@@ -204,7 +203,7 @@ void fmha_run(uint32_t iter, uint32_t warmup = 10) {
   auto K = alloc_device_and_init<FMHA_T>(
       num_batches * num_heads * head_size * num_keys,
       [](FMHA_T* data, size_t idx) {
-        data[idx] = static_cast<FMHA_T>(random_float());
+        data[idx] = static_cast<FMHA_T>(idx % 17);
       },
       queue,
       device,

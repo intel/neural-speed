@@ -380,9 +380,6 @@ class gemm_t<
       SW_BARRIER();
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matA, matA_payload);
-      if constexpr (!is_col_major_a)
-        reorder_matA(matA);
-
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
@@ -421,20 +418,6 @@ class gemm_t<
   }
 
  private:
-  inline void reorder_matA(matA_t& matA) {
-    constexpr uint32_t num_block_x = tile_size_x_a / block_size_x_a;
-    constexpr uint32_t num_block_y = tile_size_y_a / block_size_y_a;
-    for (uint32_t i = 0; i < num_block_y * num_block_x; i++) {
-      auto dst_blk = matA.reg.xetla_select<matA_t::block_elems, 1>(
-          i * matA_t::block_elems);
-      xetla_vector<dtype_a, matA_t::block_elems> trans_blk;
-      for (uint32_t j = 0; j < block_size_y_a; j++) {
-        trans_blk.xetla_select<block_size_x_a, block_size_y_a>(j) =
-            dst_blk.xetla_select<block_size_x_a, 1>(j * block_size_x_a);
-      }
-      dst_blk = trans_blk;
-    }
-  }
   /// @brief Updates tile base descriptor based on the tid.
   __XETLA_API static void update_sg_tile_tdesc(
       arguments_t& args,

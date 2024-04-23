@@ -153,10 +153,8 @@ struct compute_policy_default_fpu<
   static constexpr uint32_t block_bytes_x_a = 32;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_y_a =
-      arch_tag_ == gpu_arch::XeLpg ? 8 : 16;
-  static constexpr uint32_t block_bytes_x_b =
-      arch_tag_ == gpu_arch::XeLpg ? 32 : 64;
+  static constexpr uint32_t block_size_y_a = 16;
+  static constexpr uint32_t block_bytes_x_b = 64;
   static constexpr uint32_t block_size_x_b =
       block_bytes_x_b / sizeof(dtype_mma_b);
   static constexpr uint32_t block_size_y_b = block_size_x_a;

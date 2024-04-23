@@ -468,10 +468,15 @@ vnni_transform(T_dst& dst, T_src& src) {
 /// @return No return, update the data in-place.
 template <typename T>
 __XETLA_API void tile_transpose(T& mat_Acc) {
-  constexpr uint32_t tile_size_y = T::tile_size_y;
-  constexpr uint32_t tile_size_x = T::tile_size_x;
-  constexpr uint32_t block_size_y = T::block_size_y;
-  constexpr uint32_t block_size_x = T::block_size_x;
+  constexpr uint32_t tile_size_y =
+      T ::reg_transpose ? T::tile_size_y : T::tile_size_x;
+  constexpr uint32_t tile_size_x =
+      T ::reg_transpose ? T::tile_size_x : T::tile_size_y;
+  constexpr uint32_t block_size_y =
+      T ::reg_transpose ? T::block_size_y : T::block_size_x;
+  constexpr uint32_t block_size_x =
+      T ::reg_transpose ? T::block_size_x : T::block_size_y;
+
   constexpr uint32_t block_elems = block_size_y * block_size_x;
   constexpr int32_t num_block_x = tile_size_x / block_size_x;
   constexpr int32_t num_block_y = tile_size_y / block_size_y;

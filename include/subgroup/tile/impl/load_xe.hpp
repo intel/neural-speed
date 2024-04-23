@@ -467,7 +467,7 @@ tile_load(tile_t& tile, payload_t& payload) {
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += num_channel) {
         xetla_vector<load_dtype, load_elems> reg_tmp = 0;
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes + (offset_y + 0) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + 0) * payload.pitch_in_bytes;

@@ -960,10 +960,13 @@ struct mem_payload_t<
   // for pvc, we can use simd16 or simd32
   static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
   static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
-  static constexpr uint32_t num_channel = block_size_y;
+  static constexpr uint32_t num_channel =
+      mem_transpose ? block_size_x : block_size_y;
 
   static constexpr uint32_t simd_exec_size =
-      block_size_x >= pack_factor ? block_size_x / pack_factor : 1;
+      (mem_transpose ? block_size_y : block_size_x) >= pack_factor
+      ? (mem_transpose ? block_size_y : block_size_x) / pack_factor
+      : 1;
 
   xetla_vector<uint32_t, num_channel> channel_offset;
   xetla_vector<uint32_t, num_channel> step_x;
@@ -1020,6 +1023,7 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
+
     width_in_elems = mem_tdesc.shape.x;
     height_in_elems = mem_tdesc.shape.y;
     base_offset = mem_transpose
