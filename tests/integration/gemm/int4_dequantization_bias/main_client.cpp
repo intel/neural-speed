@@ -839,15 +839,15 @@ void dequantize_gemm_run(int iter) {
       epilogue_args);
 
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  // if (!gemm_op_t::can_implement(gemm_arg)) {
-  //   std::cout << "The arguments cannot be supported, aborting ... "
-  //             << std::endl;
-  //   FAIL();
-  // }
+  if (!gemm_op_t::can_implement(gemm_arg)) {
+    std::cout << "The arguments cannot be supported, aborting ... "
+              << std::endl;
+    FAIL();
+  }
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");
-  int constexpr warm = 0;
+  int constexpr warm = 10;
   try {
     for (int i = 0; i < iter + warm; i++) {
       if (i >= warm)
@@ -872,7 +872,7 @@ void dequantize_gemm_run(int iter) {
   }
 
   // performance
-  prof.print_profiling_result(profiling_selector::CPU);
+  prof.print_profiling_result(profiling_selector::GPU);
 
   std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
   for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
