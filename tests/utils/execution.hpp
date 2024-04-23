@@ -30,7 +30,7 @@ template <
     class Test,
     typename validate_func,
     typename KERNEL,
-    int SLMSIZE = Test::gpu_arch >= gpu_arch::XeHpc ? 128 * 1024 : 64 * 1024,
+    int SLMSIZE = arch_attr_t<Test::gpu_arch>::local_mem_size,
     int BARNUM = 32>
 void gemm_exec(const std::string& compile_str, size_t batch = 1) {
   test_result result = test_result::complete;
