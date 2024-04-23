@@ -560,20 +560,6 @@ class gemm_t<
   }
 
  private:
-  template <typename T>
-  void dump_mat(T mat, size_t tile_x, size_t tile_y) {
-#pragma unroll
-    for (size_t row = 0; row < tile_x; row++) {
-#pragma unroll
-      for (size_t col = 0; col < tile_y; col++) {
-        sycl::ext::oneapi::experimental::printf(
-            "%0.1f ", (float)(sycl::half)mat.reg[row * tile_y + col]);
-      }
-      sycl::ext::oneapi::experimental::printf("\n ");
-    }
-    sycl::ext::oneapi::experimental::printf("\n ");
-  }
-
   inline void dequantize(
       matB_acc_t& matB_acc,
       matB_t& matB,

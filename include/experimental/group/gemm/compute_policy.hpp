@@ -82,8 +82,9 @@ struct compute_policy_int4_dequantize<
 
   static constexpr bool is_int4_matB_policy = true;
 
-  static constexpr uint32_t block_size_x_b =
-      arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem;
+  static constexpr uint32_t block_size_x_b = (mma_engine == mma_engine::xmx)
+      ? arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem
+      : 32;
   static constexpr uint32_t block_bytes_y_b = 32;
   static_assert(
       block_bytes_x_a == block_bytes_y_b,

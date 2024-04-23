@@ -38,7 +38,8 @@ using ulp_vec = std::vector<size_t>;
 
 ///
 ///@brief Structure used to describe tensors / buffers as stdlib vectors,
-///idx_mapping vector is used to ignore "unwanted" elements from a tensor array.
+/// idx_mapping vector is used to ignore "unwanted" elements from a tensor
+/// array.
 ///
 /// @tparam dtype Datatype of buffer elements
 template <typename dtype, typename dtype_src = dtype>
@@ -155,7 +156,7 @@ buff_vals<dtype> xetla_get_buff_vals(
 }
 
 ///@brief Structure which contains the absolute (ate) and relative (rte)
-///element-wise errors of two input buffers.
+/// element-wise errors of two input buffers.
 struct rel_abs_vals {
   std::vector<double> ate;
   std::vector<double> rte;
@@ -164,14 +165,14 @@ struct rel_abs_vals {
 
 ///
 ///@brief Takes two buff_vals structures as input and calculates the relative
-///and absolute element-wise errors.
+/// and absolute element-wise errors.
 ///
 ///@tparam dtype1 Type of the first input buffer, buff_vals<dtype1> v1.
 ///@tparam dtype2 Type of the second input buffer, buff_vals<dtype2> v2.
 ///@param v1 First input buffer.
 ///@param v2 Second input buffer.
 ///@return rel_abs_vals Structure containing all ate and rte values for v1 and
-///v2.
+/// v2.
 ///
 template <typename T1, typename T2>
 rel_abs_vals xetla_get_rte_and_ate(T1& v1, T2& v2) {
@@ -217,7 +218,7 @@ ulp_vec xetla_get_ulp_buffer(T& v1) {
 
 ///
 ///@brief Internal function used to handle fp-type buffers in xetla_buff_cmp<Tx,
-///Ty>.
+/// Ty>.
 ///
 ///@tparam dtype Type of the two input buffers.
 ///@param data First input buffer.
@@ -225,7 +226,7 @@ ulp_vec xetla_get_ulp_buffer(T& v1) {
 ///@param name Name of the buffer comparison being performed.
 ///@param ulp_tol ULP-comparison threshold for acceptable FP buffer differences.
 ///@param abs_tol Relative-comparison threshold for acceptable FP buffer
-///differences.
+/// differences.
 ///@return true
 ///@return false
 ///
@@ -354,10 +355,10 @@ bool _cast_and_handle_fp_types(
 ///@param other Second input buffer.
 ///@param name Name of the buffer/tensor comparison beinf performed.
 ///@param diff_elems_tol Acceptable threshold percentage of int buffer elements
-///that vary between data and other.
+/// that vary between data and other.
 ///@param ulp_tol ULP-comparison threshold for acceptable FP buffer differences.
 ///@param abs_tol Relative-comparison threshold for acceptable FP buffer
-///differences.
+/// differences.
 ///@return true
 ///@return false
 ///

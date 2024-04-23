@@ -122,6 +122,7 @@ class TestBase {
   using data_type_in = float;
   using data_type_out = bf16;
   using data_type_acc = float;
+  static constexpr gpu_arch gpu_arch = gpu_arch::XeHpc;
 };
 
 class Test_fp32tobf16_128_64 : public TestBase {

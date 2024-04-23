@@ -46,6 +46,7 @@ class TestBase {
     return name;
   }
   static constexpr mma_engine engine = mma_engine::xmx;
+  static constexpr gpu_arch gpu_arch = gpu_arch::XeHpg;
 };
 
 class Test0 : public TestBase {
@@ -53,10 +54,10 @@ class Test0 : public TestBase {
   static constexpr size_t mat_m = 256;
   static constexpr size_t mat_n = 256;
   static constexpr size_t mat_k = 256;
-  static constexpr size_t wg_m = 256;
+  static constexpr size_t wg_m = 1;
   static constexpr size_t wg_n = 256;
-  static constexpr size_t sg_m = 32;
-  static constexpr size_t sg_n = 64;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 32;
   static constexpr size_t sg_k = 32;
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint32_t local_kslicing = 1;
@@ -66,6 +67,7 @@ class Test0 : public TestBase {
   using data_type_b = fp16;
   using data_type_c = fp16;
   using data_type_acc = float;
+  static constexpr mma_engine engine = mma_engine::fpu;
 };
 
 class Test1 : public TestBase {
@@ -483,4 +485,5 @@ using fp16_gemm_func = fp16_gemm_test_func<
     Test::layout_b,
     Test::global_kslicing,
     Test::local_kslicing,
-    Test::engine>;
+    Test::engine,
+    Test::gpu_arch>;

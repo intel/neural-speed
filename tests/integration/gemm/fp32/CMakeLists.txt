@@ -4,3 +4,4 @@ string(PREPEND ProjectId "gemm_")
 
 FILE(GLOB src main.cpp)
 add_integration_test(${ProjectId} ${src})
+add_integration_test(${ProjectId}_dg2 main_dg2.cpp)

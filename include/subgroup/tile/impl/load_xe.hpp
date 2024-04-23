@@ -28,6 +28,7 @@ namespace gpu::xetla::subgroup {
 namespace detail {
 template <typename tile_t, typename payload_t>
 struct check_load_type {
+  static constexpr bool is_lsc_gather = true;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
        (payload_t::message_type == msg_type::block_2d) &&
@@ -444,6 +445,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
+    detail::check_load_type<tile_t, payload_t>::is_lsc_gather &&
     payload_t::arch_tag <= gpu_arch::XeHpg>
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
@@ -531,6 +533,77 @@ tile_load(tile_t& tile, payload_t& payload) {
   }
 }
 
+/// @brief This function loads data from unaligned-2D memory surface.
+/// Loads an array of rectangular regions (X,Y)..(X+W,Y+H) from memory into
+/// registers. Each block will be loaded serially by its corresponding payload.
+/// @tparam tile_t Is the tile_t struct contains registers.
+/// These registers will be the destination of load operation.
+/// @tparam payload_t Is the mem_payload_t struct describing the memory
+/// information. Payload indicates the source of load operation.
+/// @tparam L1 Is the cache hint for L1 cache.
+/// @tparam L3 Is the cache hint for L3 cache.
+/// @param tile Is the tile object with type tile_t, holds the return data of
+/// the loads.
+/// @param payload Is the payload object with type payload_t. Contains all the
+/// information for loads.
+/// @return No return, update in place.
+template <
+    cache_hint L1 = cache_hint::cached,
+    cache_hint L3 = cache_hint::cached,
+    typename tile_t,
+    typename payload_t>
+__XETLA_API typename std::enable_if_t<
+    detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
+    !detail::check_load_type<tile_t, payload_t>::is_lsc_gather &&
+    !arch_has_2d_load_store(payload_t::arch_tag)>
+tile_load(tile_t& tile, payload_t& payload) {
+  using dtype = typename payload_t::dtype;
+  using tile_desc = typename payload_t::tile_desc;
+  using load_dtype = typename payload_t::mem_dtype;
+  constexpr uint32_t load_elems = payload_t::simd_exec_size;
+  constexpr uint32_t pack_factor = payload_t::pack_factor;
+
+#pragma unroll
+  for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
+    uint32_t offset_y = i * tile_desc::block_size_y;
+#pragma unroll
+    for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
+      uint32_t offset_x = j * tile_desc::block_size_x;
+      auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
+          (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
+#pragma unroll
+      for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
+           sub_block_y += 1) {
+        xetla_vector<load_dtype, load_elems> reg_tmp = 0;
+        uint32_t address_offset = payload_t::trans
+            ? offset_x * payload.pitch_in_bytes +
+                (offset_y + sub_block_y) * sizeof(dtype)
+            : offset_x * sizeof(dtype) +
+                (offset_y + sub_block_y) * payload.pitch_in_bytes;
+        reg_tmp = xetla_load_global<
+            load_dtype,
+            payload_t::simd_exec_size,
+            data_size::default_size,
+            L1,
+            L3>(payload.base_ptr, payload.base_offset + address_offset);
+
+        reg_sub
+            .xetla_select<load_elems * pack_factor, 1>(
+                sub_block_y * tile_desc::block_size_x)
+            .xetla_format<load_dtype>() = reg_tmp;
+      }
+    }
+  }
+
+  if constexpr (payload_t::trans) {
+    SW_BARRIER();
+    tile_transpose(tile);
+  }
+  if constexpr (payload_t::mem_transform) {
+    SW_BARRIER();
+    vnni_convert(tile);
+  }
+}
 /// @brief This function loads data from unaligned-2D memory surface.
 /// Loads an array of rectangular regions (X,Y)..(X+W,Y+H) from memory into
 /// registers. Each block will be loaded serially by its corresponding payload.

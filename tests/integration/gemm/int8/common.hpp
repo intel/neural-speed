@@ -51,6 +51,7 @@ class TestBase {
   }
 
   static constexpr mma_engine engine = mma_engine::xmx;
+  static constexpr gpu_arch gpu_arch = gpu_arch::XeHpc;
 };
 
 class Test0 : public TestBase {
