@@ -23,7 +23,7 @@
 
 namespace gpu::xetla::group {
 
-enum quant_mode : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP };
+enum weight_dtype : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP, NF4 };
 
 /// @brief Compute policy for unaligned shape and xmx engine.
 /// @tparam compute_attr_ Is compute-related attributes.
@@ -34,8 +34,9 @@ template <
     typename perf_tuning_knob_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    quant_mode quant_type_,
+    weight_dtype weight_type_,
     int dequant_s_,
+    bool act_shuf_,
     mma_engine mma_engine_ = mma_engine::xmx,
     gpu_arch arch_tag_ = gpu_arch::XeHpc,
     typename enable = void>
@@ -47,8 +48,9 @@ template <
     typename perf_tuning_knob_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    quant_mode quant_type_,
+    weight_dtype weight_type_,
     int dequant_s_,
+    bool act_shuf_,
     mma_engine mma_engine_,
     gpu_arch arch_tag_>
 struct compute_policy_int4_dequantize<
@@ -56,8 +58,9 @@ struct compute_policy_int4_dequantize<
     perf_tuning_knob_,
     dtype_scale_,
     dtype_zero_pt_,
-    quant_type_,
+    weight_type_,
     dequant_s_,
+    act_shuf_,
     mma_engine_,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
@@ -68,6 +71,7 @@ struct compute_policy_int4_dequantize<
   static constexpr int sync_freq = perf_tuning_knob::sync_freq;
   static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
+  static constexpr bool act_shuf = act_shuf_;
 
   static_assert(
       !(mma_engine == mma_engine::xmx && arch_tag == gpu_arch::XeLpg),
@@ -96,7 +100,7 @@ struct compute_policy_int4_dequantize<
       "dequant_s should be a multiply of 32B");
   using dtype_scale = dtype_scale_;
   using dtype_zero_pt = dtype_zero_pt_;
-  static constexpr quant_mode quant_type = quant_type_;
+  static constexpr weight_dtype weight_type = weight_type_;
 };
 
 } // namespace gpu::xetla::group

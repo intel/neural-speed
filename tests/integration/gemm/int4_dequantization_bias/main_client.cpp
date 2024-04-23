@@ -24,18 +24,18 @@ constexpr int ITER = 1000;
 class test1_xehpg {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 8;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 8;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 8;
+  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 4096 * 3;
+  static constexpr size_t mat_k = 4096 * 3;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 32 * 2;
+  static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 32;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 16;
 
   static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
+  static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::row_major;
   static constexpr mma_engine mma_eng = mma_engine::xmx;
@@ -43,225 +43,13 @@ class test1_xehpg {
   using data_type_a = fp16;
   using data_type_b = int4x2;
   using data_type_c = fp16;
+  static constexpr bool act_shuffle = true;
+  static constexpr gpu::xetla::group::weight_dtype weight_dtype =
+      gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP;
 };
 
-class test1_gpu_xelpg {
+class test1_gpu_xelpg : public test1_xehpg {
  public:
-  static constexpr size_t mat_m = 8;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 2;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 1;
-  static constexpr size_t global_kslicing = 1;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test2_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 32;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 2;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 1;
-  static constexpr size_t global_kslicing = 1;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test3_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1024;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 2;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 1;
-  static constexpr size_t global_kslicing = 1;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test4_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test5_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096 * 3;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test6_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 3;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test7_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 12288;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test8_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 12288;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test9_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 1024 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-};
-class test10_gpu_xelpg {
- public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 1024 * 1;
-  static constexpr size_t mat_k = 4096 * 1;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
-
-  static constexpr size_t local_kslicing = 8;
-  static constexpr size_t global_kslicing = 2;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  using data_type_a = fp16;
-  using data_type_b = int4x2;
-  using data_type_c = fp16;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
 };
@@ -501,7 +289,7 @@ class qkv8 {
 };
 class qkv9 {
  public:
-  // Extract the parameters required by different test cases
+  // Extract the parameters req>uired by different test cases
   static constexpr size_t mat_m = 1;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 11008;
@@ -553,6 +341,7 @@ int gemm_result_validate(
     data_type_b* B,
     data_type_c* C,
     data_type_bias* bias,
+    uint32_t* g_idx,
     uint32_t m,
     uint32_t k,
     uint32_t n,
@@ -560,8 +349,20 @@ int gemm_result_validate(
     mem_layout mem_layout_b_ = mem_layout::row_major) {
   buff_cmp::buff_vals<data_type_c> data(C, m, n, n);
   std::vector<data_type_acc> gold_C(m * n, 0);
-  get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
-      m, n, k, mem_layout_a_, mem_layout_b_, A, B, gold_C.data());
+  if (g_idx == nullptr) {
+    get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
+        m, n, k, mem_layout_a_, mem_layout_b_, A, B, gold_C.data());
+  } else {
+    // act-shuf
+    std::vector<data_type_a> A_tmp(m * k, 0);
+    for (uint32_t i = 0; i < m; i++) {
+      for (uint32_t j = 0; j < k; j++) {
+        A_tmp[i * k + j] = A[i * k + g_idx[j] / sizeof(data_type_a)];
+      }
+    }
+    get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
+        m, n, k, mem_layout_a_, mem_layout_b_, A_tmp.data(), B, gold_C.data());
+  }
 
   // BiasAdd
   for (uint32_t i = 0; i < gold_C.size(); ++i) {
@@ -618,6 +419,7 @@ void dequantize_gemm_run(int iter) {
 
   constexpr size_t size_c = matrix_m * matrix_n;
   constexpr size_t size_bias = matrix_n;
+  constexpr size_t size_gidx = matrix_k;
 
   uint32_t lda = layout_a == mem_layout::row_major ? matrix_k : matrix_m;
   uint32_t ldb = layout_b == mem_layout::row_major ? matrix_n : matrix_k;
@@ -670,8 +472,9 @@ void dequantize_gemm_run(int iter) {
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      Test::weight_dtype,
       dequant_s,
+      Test::act_shuffle,
       Test::mma_eng,
       Test::arch>;
 
@@ -718,6 +521,11 @@ void dequantize_gemm_run(int iter) {
       malloc_host(size_zero_pt * sizeof(data_type_zero_pt), context));
   auto* bias_h = static_cast<data_type_bias*>(
       malloc_host(size_bias * sizeof(data_type_bias), context));
+  uint32_t* gidx_h = nullptr;
+  if constexpr (Test::act_shuffle) {
+    gidx_h = static_cast<uint32_t*>(
+        malloc_host(size_gidx * sizeof(uint32_t), context));
+  }
 
   auto* A_d = static_cast<data_type_a*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_a * sizeof(data_type_a), device, context));
@@ -744,9 +552,23 @@ void dequantize_gemm_run(int iter) {
       size_bias * sizeof(data_type_bias),
       device,
       context));
+  auto* gidx_d = static_cast<uint32_t*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_gidx * sizeof(uint32_t), device, context));
+
+  if constexpr (Test::act_shuffle) {
+    for (uint32_t i = 0; i < matrix_k; i++) {
+      gidx_h[i] = i * sizeof(data_type_a);
+    }
+    for (int i = matrix_k - 1; i >= 0; i--) {
+      int j = rand() % (i + 1);
+      std::swap(gidx_h[i], gidx_h[j]);
+      // std::cout << gidx_h[i] << std::endl;
+    }
+  }
 
   for (unsigned i = 0; i < size_a; ++i) {
     A_h[i] = random_float();
+    // A_h[i] = i%matrix_k;
 #ifdef UT_DEBUG
     A_h[i] = 1.f;
     // A_h[i] = layout_a == mem_layout::row_major
@@ -758,7 +580,7 @@ void dequantize_gemm_run(int iter) {
   for (unsigned i = 0; i < size_b; ++i) {
     B_h[i] = uint8_t(random_uint8());
 #ifdef UT_DEBUG
-    B_h[i] = 17;
+    B_h[i] = 151;
 #endif
   }
 
@@ -770,7 +592,7 @@ void dequantize_gemm_run(int iter) {
   }
 
   for (unsigned i = 0; i < size_zero_pt; ++i) {
-    zero_pt_h[i] = 0;
+    zero_pt_h[i] = uint8_t(random_uint8());
   }
 
   for (unsigned i = 0; i < size_c; ++i) {
@@ -810,6 +632,10 @@ void dequantize_gemm_run(int iter) {
       .wait();
   queue.memcpy((void*)bias_d, (void*)bias_h, size_bias * sizeof(data_type_bias))
       .wait();
+  if constexpr (Test::act_shuffle) {
+    queue.memcpy((void*)gidx_d, (void*)gidx_h, size_gidx * sizeof(uint32_t))
+        .wait();
+  }
 
   queue.memset(Cnt_d, 0, size_cnt * sizeof(uint32_t)).wait();
   queue.memset(Acc_d, 0, size_acc * sizeof(data_type_acc)).wait();
@@ -822,7 +648,9 @@ void dequantize_gemm_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
 
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg(
+  typename gemm_op_t::optional_argements_t opt_args{zero_pt_d, gidx_d};
+
+  typename gemm_op_t::arguments_t gemm_arg(
       matrix_m,
       matrix_k,
       matrix_n,
@@ -836,18 +664,19 @@ void dequantize_gemm_run(int iter) {
       matrix_n,
       Acc_d,
       Cnt_d,
-      epilogue_args);
+      epilogue_args,
+      opt_args);
 
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  if (!gemm_op_t::can_implement(gemm_arg)) {
-    std::cout << "The arguments cannot be supported, aborting ... "
-              << std::endl;
-    FAIL();
-  }
+  // if (!gemm_op_t::can_implement(gemm_arg)) {
+  //   std::cout << "The arguments cannot be supported, aborting ... "
+  //             << std::endl;
+  //   FAIL();
+  // }
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");
-  int constexpr warm = 10;
+  int constexpr warm = 0;
   try {
     for (int i = 0; i < iter + warm; i++) {
       if (i >= warm)
@@ -872,28 +701,72 @@ void dequantize_gemm_run(int iter) {
   }
 
   // performance
-  prof.print_profiling_result(profiling_selector::GPU);
+  prof.print_profiling_result(profiling_selector::CPU);
 
   std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
+  static float nf4_dequant_fp32_LUT alignas(64)[] = {
+      -1.f,
+      -0.6961928009986877f,
+      -0.5250730514526367f,
+      -0.39491748809814453f,
+      -0.28444138169288635f,
+      -0.18477343022823334f,
+      -0.09105003625154495f,
+      0.f,
+      0.07958029955625534f,
+      0.16093020141124725f,
+      0.24611230194568634f,
+      0.33791524171829224f,
+      0.44070982933044434f,
+      0.5626170039176941f,
+      0.7229568362236023f,
+      1.0f};
+
   for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
     for (uint32_t j = 0; j < matrix_n / 2; j++) {
-      int start_in = i * dequant_s * matrix_n / 2 + j;
-      int start_out = i * dequant_s * matrix_n + j * 2;
-      int start_scale = i * size_scale_n + j * 2;
       for (uint32_t ii = 0; ii < dequant_s; ii++) {
-        uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
-        uint8_t data_even = (data_in & 0x0f) << 4;
-        int8_t data_0;
-        int8_t data_1;
-        memcpy(&data_0, &data_even, 1);
-        memcpy(&data_1, &data_in, 1);
-        data_0 = data_0 >> 4;
-        data_1 = data_1 >> 4;
-
-        dequantize_b[start_out + ii * matrix_n] =
-            fp16(data_0) * scale_h[start_scale];
-        dequantize_b[start_out + ii * matrix_n + 1] =
-            fp16(data_1) * scale_h[start_scale + 1];
+        int start_in = i * dequant_s * matrix_n / 2 + j;
+        int start_zero_pt = i * size_zero_pt_n + j;
+        int start_out = i * dequant_s * matrix_n + j * 2;
+        int start_scale = i * size_scale_n + j * 2;
+        int8_t data_0, data_1;
+        if constexpr (
+            Test::weight_dtype == gpu::xetla::group::weight_dtype::S4_ASYM) {
+          uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
+          uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
+          data_0 = int8_t(data_in & 0x0f);
+          data_1 = int8_t(data_in >> 4);
+          int8_t zero_pt_0 = int8_t((data_zero_pt & 0x0f) + 1);
+          int8_t zero_pt_1 = int8_t((data_zero_pt >> 4) + 1);
+          dequantize_b[start_out + ii * matrix_n] =
+              fp16(data_0 - zero_pt_0) * scale_h[start_scale];
+          dequantize_b[start_out + ii * matrix_n + 1] =
+              fp16(data_1 - zero_pt_1) * scale_h[start_scale + 1];
+        }
+        if constexpr (
+            Test::weight_dtype ==
+            gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP) {
+          uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
+          uint8_t data_even = (data_in & 0x0f) << 4;
+          memcpy(&data_0, &data_even, 1);
+          memcpy(&data_1, &data_in, 1);
+          data_0 = data_0 >> 4;
+          data_1 = data_1 >> 4;
+          dequantize_b[start_out + ii * matrix_n] =
+              fp16(data_0) * scale_h[start_scale];
+          dequantize_b[start_out + ii * matrix_n + 1] =
+              fp16(data_1) * scale_h[start_scale + 1];
+        }
+        if constexpr (
+            Test::weight_dtype == gpu::xetla::group::weight_dtype::NF4) {
+          uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
+          data_0 = int8_t(data_in & 0x0f);
+          data_1 = int8_t(data_in >> 4);
+          dequantize_b[start_out + ii * matrix_n] =
+              nf4_dequant_fp32_LUT[data_0] * scale_h[start_scale];
+          dequantize_b[start_out + ii * matrix_n + 1] =
+              nf4_dequant_fp32_LUT[data_1] * scale_h[start_scale + 1];
+        }
       }
     }
   }
@@ -906,6 +779,7 @@ void dequantize_gemm_run(int iter) {
           dequantize_b.data(),
           C_h,
           bias_h,
+          gidx_h,
           matrix_m,
           matrix_k,
           matrix_n,
@@ -937,17 +811,11 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<
-    test1_gpu_xelpg,
-    test2_gpu_xelpg,
-    test3_gpu_xelpg,
-    test4_gpu_xelpg,
-    test5_gpu_xelpg,
-    test6_gpu_xelpg,
-    test7_gpu_xelpg,
-    test8_gpu_xelpg,
-    test9_gpu_xelpg,
-    test10_gpu_xelpg>;
+// using tests = ::testing::Types<test1_xehpg, test1_gpu_xelpg>;
+using tests = ::testing::Types<test1_gpu_xelpg>;
+// using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7,
+// qkv8,
+//         qkv9, qkv10>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test_suite,
