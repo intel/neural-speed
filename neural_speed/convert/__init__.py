@@ -28,8 +28,6 @@ model_maps = {
     "phi-msft": "phi"
 }
 
-llama3_vocab_size = 128256
-
 
 def convert_model(model, outfile, outtype="f32", format="NE", model_hub="huggingface", use_quantized_model=False):
     if model_hub == "modelscope":
@@ -52,8 +50,6 @@ def convert_model(model, outfile, outtype="f32", format="NE", model_hub="hugging
         cmd.extend(["--format", format])
     cmd.extend(["--model_hub", model_hub])
     cmd.extend([model])
-    if model_type == "llama" and config.vocab_size == llama3_vocab_size:
-        cmd.extend(["--vocab-type", "bpe"])
 
     print("cmd:", cmd)
     subprocess.run(cmd)
