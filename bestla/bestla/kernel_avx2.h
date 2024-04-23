@@ -1419,7 +1419,8 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   const __m256i onesu8 = _mm256_set1_epi8(1);
-
+  const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0);
   for (int ib = 0; ib < blks; ib += 1) {
     __m256i iacc[NReg];
     __m256i bacc[NReg];
@@ -1427,15 +1428,34 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       iacc[i] = _mm256_setzero_si256();
       bacc[i] = _mm256_setzero_si256();
     }
-    for (int ik = 0; ik < blocksize; ik += 4) {
-      auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+    if (B.zpptr) {
+      __m256i bzp[NReg];
+      auto bzptr = B.zpptr + ib * ld_scaleb;
       for (int i = 0; i < NReg; i++) {
-        auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-            (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
-        iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
-        bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+      }
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, bzp[i]);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
+          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+        }
       }
     }
+
     const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
     auto zp = int(azptr[ib]);
     const __m256i v_a_zp = _mm256_set1_epi32(zp);
@@ -1478,22 +1498,43 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   }
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
-
+  const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0);
   for (int ib = 0; ib < blks; ib += 1) {
     __m256i iacc[NReg];
     for (int i = 0; i < NReg; i++) {
       iacc[i] = _mm256_setzero_si256();
     }
-    for (int ik = 0; ik < blocksize; ik += 4) {
-      auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
-      auto vabsa = _mm256_sign_epi8(va, va);
+    if (B.zpptr) {
+      __m256i bzp[NReg];
+      auto bzptr = B.zpptr + ib * ld_scaleb;
       for (int i = 0; i < NReg; i++) {
-        auto vb =
-            kernel::avx2::unpack_4bits_avx2<false>((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
-        vb = _mm256_sign_epi8(vb, va);
-        iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+      }
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        auto vabsa = _mm256_sign_epi8(va, va);
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, bzp[i]);
+          vb = _mm256_sign_epi8(vb, va);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        auto vabsa = _mm256_sign_epi8(va, va);
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sign_epi8(vb, va);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+        }
       }
     }
+
     const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
     auto bsptr = B.sptr + ib * ld_scaleb;
     for (int i = 0; i < NReg; i++) {
@@ -1805,23 +1846,45 @@ static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const ut
                                       13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
   const __m256i onesu8 = _mm256_set1_epi8(1);
-
+  const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0);
   for (int ib = 0; ib < blks; ib += 1) {
     __m256i iacc[NReg];
     for (int i = 0; i < NReg; i++) {
       iacc[i] = _mm256_setzero_si256();
     }
-    for (int ik = 0; ik < blocksize; ik += KTILE) {
-      auto va = _mm256_set1_epi32(*(int*)(a8ptr));
-      auto vabsa = _mm256_sign_epi8(va, va);
+    if (B.zpptr) {
+      __m256i bzp[NReg];
+      auto bzptr = B.zpptr + ib * ld_scaleb;
       for (int i = 0; i < NReg; i++) {
-        auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
-        vb = _mm256_sign_epi8(vb, va);
-        iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
-        b2ptr += 8 * KTILE / 4;
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
       }
-      a8ptr += KTILE;
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr));
+        auto vabsa = _mm256_sign_epi8(va, va);
+        for (int i = 0; i < NReg; i++) {
+          auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          vb = _mm256_sub_epi8(vb, bzp[i]);
+          vb = _mm256_sign_epi8(vb, va);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+          b2ptr += 8 * KTILE / 4;
+        }
+        a8ptr += KTILE;
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        auto va = _mm256_set1_epi32(*(int*)(a8ptr));
+        auto vabsa = _mm256_sign_epi8(va, va);
+        for (int i = 0; i < NReg; i++) {
+          auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          vb = _mm256_sign_epi8(vb, va);
+          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+          b2ptr += 8 * KTILE / 4;
+        }
+        a8ptr += KTILE;
+      }
     }
+
     const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
     auto bsptr = B.sptr + ib * ld_scaleb;
     for (int i = 0; i < NReg; i++) {
