@@ -817,6 +817,10 @@ tile_load(tile_t& tile, payload_t& payload) {
       }
     }
   }
+  if constexpr (payload_t::reg_transpose) {
+    SW_BARRIER();
+    tile_transpose(tile);
+  }
   if constexpr (mem_transform) {
     SW_BARRIER();
     vnni_convert(tile);

@@ -115,25 +115,28 @@ class fmha_forward_t {
   static constexpr uint32_t accum_step = fmha_policy::accum_step;
   static constexpr uint32_t stages = fmha_policy::stages;
   static constexpr uint32_t sync_freq = fmha_policy::sync_freq;
-
-  using comp_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
-  using knobs = group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
-  using compute_policy_BrBc = std::conditional_t<
-      (arch_tag >= gpu_arch::XeHpg),
-      group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
-      group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
-  // TODO: add k slicing
-  using compute_policy_BrBm = std::conditional_t<
-      (arch_tag >= gpu_arch::XeHpg),
-      group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
-      group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
-  // ---------------- // Tile shape and Threads // ---------------- //
   static constexpr uint32_t kBr = fmha_policy::kBr;
   static constexpr uint32_t kBc = fmha_policy::kBc;
   static constexpr uint32_t kHm = fmha_policy::kHm;
   static constexpr uint32_t kSgBr = fmha_policy::kSgBr;
   static constexpr uint32_t kSgBc = fmha_policy::kSgBc;
   static constexpr uint32_t kSgHm = fmha_policy::kSgHm;
+
+  using comp_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
+  using knobs = group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
+
+  // use fpu when M==1 even if xmx is available
+  static constexpr bool _use_xmx = arch_tag >= gpu_arch::XeHpg && kSgBr != 1;
+  using compute_policy_BrBc = std::conditional_t<
+      _use_xmx,
+      group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
+      group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
+  // TODO（Yi): add k slicing?
+  using compute_policy_BrBm = std::conditional_t<
+      _use_xmx,
+      group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
+      group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
+  // ---------------- // Tile shape and Threads // ---------------- //
 
   using tile_shape_BrBc = group::tile_shape_t<kBc, kBr, kSgBc, kSgBr>;
   using tile_shape_BrHm = group::tile_shape_t<kHm, kBr, kSgHm, kSgBr>;
