@@ -683,11 +683,24 @@ void dump_mat(
     size_t tile_x = T::tile_size_x,
     size_t tile_y = T::tile_size_y) {
 #pragma unroll
-  for (size_t row = 0; row < tile_x; row++) {
+  for (size_t row = 0; row < tile_y; row++) {
 #pragma unroll
-    for (size_t col = 0; col < tile_y; col++) {
+    for (size_t col = 0; col < tile_x; col++) {
       sycl::ext::oneapi::experimental::printf(
-          "%f ", (float)(sycl::half)mat.reg[row * tile_y + col]);
+          "%d ", (int)(sycl::half)mat.reg[row * tile_x + col]);
+    }
+    sycl::ext::oneapi::experimental::printf("\n ");
+  }
+  sycl::ext::oneapi::experimental::printf("\n ");
+}
+template <typename T>
+void dump_mat_reg(T mat, size_t tile_x, size_t tile_y) {
+#pragma unroll
+  for (size_t row = 0; row < tile_y; row++) {
+#pragma unroll
+    for (size_t col = 0; col < tile_x; col++) {
+      sycl::ext::oneapi::experimental::printf(
+          "%d ", (int)(sycl::half)mat[row * tile_x + col]);
     }
     sycl::ext::oneapi::experimental::printf("\n ");
   }
