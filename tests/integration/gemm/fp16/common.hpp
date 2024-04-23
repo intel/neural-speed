@@ -57,7 +57,7 @@ class Test0 : public TestBase {
   static constexpr size_t wg_m = 1;
   static constexpr size_t wg_n = 256;
   static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 64;
+  static constexpr size_t sg_n = 32;
   static constexpr size_t sg_k = 32;
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint32_t local_kslicing = 1;
