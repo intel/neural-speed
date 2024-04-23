@@ -390,7 +390,7 @@ class WeightS4Trans {
             auto cptr = C + g_n;
             if constexpr (std::is_same_v<CType, sycl::half>) {
               sycl::half2 tmpAcc = {0.f, 0.f};
-              int constexpr Unroll = 1;
+              int constexpr Unroll = 2;
               for (int i = 0; i < k; i += GroupK * Unroll) {
 #pragma unroll
                 for (int iu = 0; iu < Unroll; iu++) {
@@ -418,7 +418,7 @@ class WeightS4Trans {
               }
             } else {
               CType tmpAcc = 0.f;
-              int constexpr Unroll = 1;
+              int constexpr Unroll = 2;
               for (int i = 0; i < k; i += GroupK * Unroll) {
 #pragma unroll
                 for (int iu = 0; iu < Unroll; iu++) {

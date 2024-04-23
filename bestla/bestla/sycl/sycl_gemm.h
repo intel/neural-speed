@@ -29,7 +29,7 @@ class Config_Fp32Fp32Fp32 {
   static int constexpr sg_n = 2;
   static int constexpr sg_k = 32;
   static int constexpr unroll_k = 4;
-  static int constexpr wg_m = 16;
+  static int constexpr wg_m = 8;
   static int constexpr wg_n = 32;
 
   using data_type_a = float;
@@ -68,13 +68,13 @@ class SGemmCoreSharedB {
                              const sycl_utils::nd_item_helper<SGemmCoreSharedB<ConfigT>>& helper) {
 #pragma unroll(1)
     for (int ik = 0; ik < TileK; ik += UnrollK) {
-      TA regA[UnrollK];
-      if constexpr (UnrollK == 8) {
-        *(sycl::vec<float, 4>*)regA = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik];
-        *(sycl::vec<float, 4>*)&regA[4] = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik + 4];
-      } else {
-        *(sycl::vec<float, UnrollK>*)regA = *(sycl::vec<float, UnrollK>*)&aptr[helper.sg_id() * lda + ik];
+      int constexpr MReg = TileM / SgSize;
+      TA regA[UnrollK * MReg];
+      for (int im = 0; im < MReg; im++) {
+        *(sycl::vec<TA, UnrollK>*)&regA[im * UnrollK] =
+            *(sycl::vec<TA, UnrollK>*)&aptr[(helper.sg_id() + im * SgSize) * lda + ik];
       }
+
 #pragma unroll
       for (int ikk = 0; ikk < UnrollK; ikk++) {
         TB tmpB[TileN];
@@ -84,7 +84,7 @@ class SGemmCoreSharedB {
         }
 #pragma unroll
         for (size_t im = 0; im < TileM; im++) {
-          auto tmpA = helper.sg.shuffle(regA[ikk], im);
+          auto tmpA = helper.sg.shuffle(regA[ikk + im / SgSize * UnrollK], im % SgSize);
 #pragma unroll
           for (size_t in = 0; in < TileN; in++) {
             accptr[im * TileN + in] += tmpA * tmpB[in];
@@ -99,15 +99,6 @@ class SGemmCoreSharedB {
     if (m_tail > 0) {
 #pragma unroll(1)
       for (int ik = 0; ik < TileK; ik += UnrollK) {
-        TA regA[UnrollK];
-        if (helper.sg_id() < m_tail) {
-          if constexpr (UnrollK == 8) {
-            *(sycl::vec<float, 4>*)regA = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik];
-            *(sycl::vec<float, 4>*)&regA[4] = *(sycl::vec<float, 4>*)&aptr[helper.sg_id() * lda + ik + 4];
-          } else {
-            *(sycl::vec<float, UnrollK>*)regA = *(sycl::vec<float, UnrollK>*)&aptr[helper.sg_id() * lda + ik];
-          }
-        }
         for (int ikk = 0; ikk < UnrollK; ikk++) {
           TB tmpB[TileN];
 #pragma unroll
@@ -115,7 +106,7 @@ class SGemmCoreSharedB {
             tmpB[in] = bacc[helper.sg_idx_n() * SgNEle + helper.sg_id() * TileN + in + (ik + ikk) * WgNEle];
           }
           for (size_t im = 0; im < m_tail; im++) {
-            auto tmpA = helper.sg.shuffle(regA[ikk], im);
+            auto tmpA = aptr[im * lda + ik + ikk];
 #pragma unroll
             for (size_t in = 0; in < TileN; in++) {
               accptr[im * TileN + in] += tmpA * tmpB[in];
@@ -175,11 +166,14 @@ class HGemmCoreSharedB {
                              const sycl_utils::nd_item_helper<HGemmCoreSharedB<ConfigT>>& helper) {
 #pragma unroll(1)
     for (int ik = 0; ik < TileK; ik += UnrollK) {
-      TA regA[UnrollK];
       static_assert((UnrollK * sizeof(TA)) % sizeof(float) == 0);
-      int constexpr CpVec = (UnrollK * sizeof(TA)) / sizeof(float);
-      *(sycl::vec<float, CpVec>*)regA = *(sycl::vec<float, CpVec>*)&aptr[helper.sg_id() * lda + ik];
-
+      int constexpr MReg = TileM / SgSize;
+      static_assert(MReg == 1);
+      TA regA[UnrollK * MReg];
+      for (int im = 0; im < MReg; im++) {
+        *(sycl::vec<TA, UnrollK>*)&regA[im * UnrollK] =
+            *(sycl::vec<TA, UnrollK>*)&aptr[(helper.sg_id() + im * SgSize) * lda + ik];
+      }
 #pragma unroll
       for (int ikk = 0; ikk < UnrollK; ikk++) {
         TB tmpB[TileN];
@@ -189,7 +183,7 @@ class HGemmCoreSharedB {
         }
 #pragma unroll
         for (size_t im = 0; im < TileM; im++) {
-          auto tmpA = helper.sg.shuffle(regA[ikk], im);
+          auto tmpA = helper.sg.shuffle(regA[ikk + im / SgSize * UnrollK], im % SgSize);
 #pragma unroll
           for (size_t in = 0; in < TileN; in++) {
             accptr[im * TileN + in] += tmpA * tmpB[in];
@@ -205,13 +199,6 @@ class HGemmCoreSharedB {
     if (m_tail > 0) {
 #pragma unroll(1)
       for (int ik = 0; ik < TileK; ik += UnrollK) {
-        TA regA[UnrollK];
-        static_assert((UnrollK * sizeof(TA)) % sizeof(float) == 0);
-        int constexpr CpVec = (UnrollK * sizeof(TA)) / sizeof(float);
-        if (helper.sg_id() < m_tail) {
-          *(sycl::vec<float, CpVec>*)regA = *(sycl::vec<float, CpVec>*)&aptr[helper.sg_id() * lda + ik];
-        }
-
 #pragma unroll
         for (int ikk = 0; ikk < UnrollK; ikk++) {
           TB tmpB[TileN];
@@ -220,7 +207,7 @@ class HGemmCoreSharedB {
             tmpB[in] = bacc[helper.sg_idx_n() * SgNEle + helper.sg_id() * TileN + in + (ik + ikk) * WgNEle];
           }
           for (size_t im = 0; im < m_tail; im++) {
-            auto tmpA = helper.sg.shuffle(regA[ikk], im);
+            auto tmpA = aptr[im * lda + ik + ikk];
 #pragma unroll
             for (size_t in = 0; in < TileN; in++) {
               accptr[im * TileN + in] += tmpA * tmpB[in];
