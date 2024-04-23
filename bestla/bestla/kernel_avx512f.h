@@ -767,11 +767,7 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
         convert_s4_s8_highbits(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
       }
     }
-    for (; i < elesize; i += 2) {
-      auto tmp = srcptr[i / 2];
-      dstptr[i + 0] = kernel::ref::get_s8<S4_T>(tmp.x);
-      dstptr[i + 1] = kernel::ref::get_s8<S4_T>(tmp.y);
-    }
+    ref::decompress_s4_s8<S4_T>(srcptr + i / 2, dstptr + i, 1, elesize - i, 0, 0);
     return BTLA_CODE::Success;
   }
   return BTLA_CODE::NotSupport;
@@ -1463,11 +1459,7 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
         }
       }
     }
-    for (; i < elesize; i += 2) {
-      auto tmp = srcptr[i / 2];
-      dstptr[i + 0] = static_cast<_DST_T>(static_cast<float>(kernel::ref::get_s8<S4_T>(tmp.x)));
-      dstptr[i + 1] = static_cast<_DST_T>(static_cast<float>(kernel::ref::get_s8<S4_T>(tmp.y)));
-    }
+    ref::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr + i / 2, dstptr + i, 1, elesize - i, 0, 0, tmp, tmpsize);
     return BTLA_CODE::Success;
   }
   return BTLA_CODE::NotSupport;

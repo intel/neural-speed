@@ -224,26 +224,26 @@ struct fp16 {
 };
 
 struct bit2x4 {
-  int8_t a : 2;
-  int8_t b : 2;
-  int8_t c : 2;
-  int8_t d : 2;
+  uint8_t a : 2;
+  uint8_t b : 2;
+  uint8_t c : 2;
+  uint8_t d : 2;
 };
 
 struct bit1x8 {
-  int8_t a : 1;
-  int8_t b : 1;
-  int8_t c : 1;
-  int8_t d : 1;
-  int8_t e : 1;
-  int8_t f : 1;
-  int8_t g : 1;
-  int8_t h : 1;
+  uint8_t a : 1;
+  uint8_t b : 1;
+  uint8_t c : 1;
+  uint8_t d : 1;
+  uint8_t e : 1;
+  uint8_t f : 1;
+  uint8_t g : 1;
+  uint8_t h : 1;
 };
 
 struct bit4x2 {
-  int8_t x : 4;
-  int8_t y : 4;
+  uint8_t x : 4;
+  uint8_t y : 4;
   bit4x2(int8_t v) : x(v), y(v) {}
   bit4x2() : x(0), y(0) {}
 };
@@ -253,8 +253,6 @@ struct int4x2 : bit4x2 {
   int4x2() : bit4x2() {}
   static int8_t convert(int8_t src) {
     int32_t dst = src;
-    dst = dst >= 0 ? dst + 8 : dst - 8;
-    dst = dst / 16;
     dst = dst > 7 ? 7 : dst;
     dst = dst < -8 ? -8 : dst;
     return static_cast<int8_t>(dst);

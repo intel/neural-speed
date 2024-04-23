@@ -157,8 +157,8 @@ static inline BTLA_CODE compress_s8_s4(const int8_t* srcptr, utils::int4x2* dstp
   for (int j = 0; j < row; j++) {
     for (int ii = 0; ii < col; ii += 2) {
       utils::int4x2 tmp;
-      tmp.x = utils::int4x2::convert(srcptr[j * ld_src + ii + 0]);
-      tmp.y = utils::int4x2::convert(srcptr[j * ld_src + ii + 1]);
+      tmp.x = utils::int4x2::convert(srcptr[j * ld_src + ii + 0]) + 8;
+      tmp.y = utils::int4x2::convert(srcptr[j * ld_src + ii + 1]) + 8;
       dstptr[j * ld_dst / 2 + ii / 2] = tmp;
     }
   }
@@ -183,8 +183,6 @@ static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x
   assert(col % 128 == 0);
   auto round3bit = [](int8_t src) {
     int32_t dst = src;
-    dst = dst >= 0 ? dst + 16 : dst - 16;
-    dst = dst / 32;
     dst = dst > 3 ? 3 : dst;
     dst = dst < -4 ? -4 : dst;
     return static_cast<int8_t>(dst);
@@ -204,24 +202,24 @@ static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 128) {
       for (int k = 0; k < 128; k++) {
-        round_buf[k] = round3bit(const_cast<int8_t*>(srcptr + i * ld_src + j + k)[0]) << 5;
+        round_buf[k] = round3bit(const_cast<int8_t*>(srcptr + i * ld_src + j + k)[0]) + 4;
       }
       bit2_interleave(round_buf, interleave_buf);
       for (int k = 0; k < 32; k++) {
-        bit2ptr[i * ld_dst / 4 + j / 4 + k].a = interleave_buf[4 * k] >> 5;
-        bit2ptr[i * ld_dst / 4 + j / 4 + k].b = interleave_buf[4 * k + 1] >> 5;
-        bit2ptr[i * ld_dst / 4 + j / 4 + k].c = interleave_buf[4 * k + 2] >> 5;
-        bit2ptr[i * ld_dst / 4 + j / 4 + k].d = interleave_buf[4 * k + 3] >> 5;
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].a = interleave_buf[4 * k];
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].b = interleave_buf[4 * k + 1];
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].c = interleave_buf[4 * k + 2];
+        bit2ptr[i * ld_dst / 4 + j / 4 + k].d = interleave_buf[4 * k + 3];
       }
       for (int k = j; k < j + 128; k += 8) {
-        bit1ptr[i * ld_dst / 8 + k / 8].a = round_buf[k - j] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].b = round_buf[k - j + 1] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].c = round_buf[k - j + 2] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].d = round_buf[k - j + 3] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].e = round_buf[k - j + 4] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].f = round_buf[k - j + 5] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].g = round_buf[k - j + 6] >> 7;
-        bit1ptr[i * ld_dst / 8 + k / 8].h = round_buf[k - j + 7] >> 7;
+        bit1ptr[i * ld_dst / 8 + k / 8].a = round_buf[k - j] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].b = round_buf[k - j + 1] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].c = round_buf[k - j + 2] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].d = round_buf[k - j + 3] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].e = round_buf[k - j + 4] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].f = round_buf[k - j + 5] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].g = round_buf[k - j + 6] >> 2;
+        bit1ptr[i * ld_dst / 8 + k / 8].h = round_buf[k - j + 7] >> 2;
       }
     }
   }
@@ -232,18 +230,16 @@ static inline BTLA_CODE compress_2bit(const int8_t* srcptr, bestla::utils::bit2x
   assert(size % 4 == 0);
   auto round2bit = [](int8_t src) {
     int32_t dst = src;
-    dst = dst >= 0 ? dst + 32 : dst - 32;
-    dst = dst / 64;
     dst = dst > 1 ? 1 : dst;
     dst = dst < -2 ? -2 : dst;
     return static_cast<int8_t>(dst);
   };
 
   for (size_t i = 0; i < size; i += 4) {
-    bit2ptr[i / 4].a = round2bit(const_cast<int8_t*>(srcptr + i)[0]);
-    bit2ptr[i / 4].b = round2bit(const_cast<int8_t*>(srcptr + i + 1)[0]);
-    bit2ptr[i / 4].c = round2bit(const_cast<int8_t*>(srcptr + i + 2)[0]);
-    bit2ptr[i / 4].d = round2bit(const_cast<int8_t*>(srcptr + i + 3)[0]);
+    bit2ptr[i / 4].a = round2bit(const_cast<int8_t*>(srcptr + i)[0]) + 2;
+    bit2ptr[i / 4].b = round2bit(const_cast<int8_t*>(srcptr + i + 1)[0]) + 2;
+    bit2ptr[i / 4].c = round2bit(const_cast<int8_t*>(srcptr + i + 2)[0]) + 2;
+    bit2ptr[i / 4].d = round2bit(const_cast<int8_t*>(srcptr + i + 3)[0]) + 2;
   }
 
   return BTLA_CODE::Success;
@@ -256,73 +252,56 @@ static inline BTLA_CODE decompress_s4_f32(utils::int4x2* srcptr, float* dstptr, 
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
       auto noffset = i * NTile + j % NTile;
-      dstptr[i * ld_dst + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scales[noffset + 0];
-      dstptr[i * ld_dst + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scales[noffset + 1];
+      dstptr[i * ld_dst + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scales[noffset + 0];
+      dstptr[i * ld_dst + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scales[noffset + 1];
     }
   }
   return BTLA_CODE::Success;
 }
 
-template <BTLA_DTYPE S4_T>
-inline int8_t get_s8(int8_t v) {
-  static_assert(S4_T == BTLA_DTYPE::S4_CLIP);
-  return v << 4;
-}
-
-template <BTLA_DTYPE S4_T>
+template <BTLA_DTYPE Q4T>
 inline void convert_s4_s8_8(int8_t* dstptr, int8_t* srcptr) {
   auto src32 = *reinterpret_cast<uint32_t*>(srcptr);
-  auto tmp = static_cast<int8_t>(src32 & 0xf) << 4;
-  dstptr[0] = tmp;
-  tmp = static_cast<int8_t>(src32 & 0xf0);
-  dstptr[1] = tmp;
-  tmp = static_cast<int8_t>((src32 & 0xf00) >> 4);
-  dstptr[2] = tmp;
-  tmp = static_cast<int8_t>((src32 & 0xf000) >> 8);
-  dstptr[3] = tmp;
-  tmp = static_cast<int8_t>((src32 & 0xf0000) >> 12);
-  dstptr[4] = tmp;
-  tmp = static_cast<int8_t>((src32 & 0xf00000) >> 16);
-  dstptr[5] = tmp;
-  tmp = static_cast<int8_t>((src32 & 0xf000000) >> 20);
-  dstptr[6] = tmp;
-  tmp = static_cast<int8_t>((src32 & 0xf0000000) >> 24);
-  dstptr[7] = tmp;
-}
-
-inline void convert_s4_s8_8_lowbits(int8_t* dstptr, int8_t* srcptr) {
-  auto src32 = *reinterpret_cast<uint32_t*>(srcptr);
   auto tmp = static_cast<int>(src32 & 0xf);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[0] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>(src32 & 0xf0) >> 4;
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[1] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>((src32 & 0xf00) >> 8);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[2] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>((src32 & 0xf000) >> 12);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[3] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>((src32 & 0xf0000) >> 16);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[4] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>((src32 & 0xf00000) >> 20);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[5] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>((src32 & 0xf000000) >> 24);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[6] = static_cast<int8_t>(tmp);
   tmp = static_cast<int>((src32 & 0xf0000000) >> 28);
+  if constexpr (Q4T == BTLA_DTYPE::S4_CLIP) {
+    tmp -= 8;
+  }
   dstptr[7] = static_cast<int8_t>(tmp);
-}
-
-template <>
-inline void convert_s4_s8_8<BTLA_DTYPE::F4_BNB>(int8_t* dstptr, int8_t* srcptr) {
-  convert_s4_s8_8_lowbits(dstptr, srcptr);
-}
-
-template <>
-inline void convert_s4_s8_8<BTLA_DTYPE::F4_NF4>(int8_t* dstptr, int8_t* srcptr) {
-  convert_s4_s8_8_lowbits(dstptr, srcptr);
-}
-
-template <>
-inline void convert_s4_s8_8<BTLA_DTYPE::F4_E2M1>(int8_t* dstptr, int8_t* srcptr) {
-  convert_s4_s8_8_lowbits(dstptr, srcptr);
 }
 
 template <BTLA_DTYPE S4_T>
@@ -331,8 +310,8 @@ inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, int row
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
-      dstptr[i * ld_dst + j + 0] = get_s8<S4_T>(tmp.x);
-      dstptr[i * ld_dst + j + 1] = get_s8<S4_T>(tmp.y);
+      dstptr[i * ld_dst + j + 0] = tmp.x - 8;
+      dstptr[i * ld_dst + j + 1] = tmp.y - 8;
     }
   }
   return BTLA_CODE::Success;
@@ -411,13 +390,11 @@ inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, 
       scale0 = static_cast<float>(sptr[s0_idx]);
       scale1 = static_cast<float>(sptr[s1_idx]);
       if (zero_points != nullptr) {
-        dst0 = (static_cast<float>(get_s8<S4_T>(tmp.x)) - static_cast<float>((zero_points + kpos * NPad)[s0_idx])) *
-               scale0;
-        dst1 = (static_cast<float>(get_s8<S4_T>(tmp.y)) - static_cast<float>((zero_points + kpos * NPad)[s1_idx])) *
-               scale1;
+        dst0 = (static_cast<float>(tmp.x - 8) - static_cast<float>((zero_points + kpos * NPad)[s0_idx])) * scale0;
+        dst1 = (static_cast<float>(tmp.y - 8) - static_cast<float>((zero_points + kpos * NPad)[s1_idx])) * scale1;
       } else {
-        dst0 = static_cast<float>(get_s8<S4_T>(tmp.x)) * scale0;
-        dst1 = static_cast<float>(get_s8<S4_T>(tmp.y)) * scale1;
+        dst0 = static_cast<float>(tmp.x - 8) * scale0;
+        dst1 = static_cast<float>(tmp.y - 8) * scale1;
       }
       dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(dst0);
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
@@ -445,8 +422,8 @@ inline BTLA_CODE decompress_dq_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstpt
       auto dq_s1_idx = (n_offset + kpos * N + s1_idx) / dq_blk;
       scale0 = dq8_bnb_LUT[sptr[s0_idx]] * dq_scale[dq_s0_idx] + dq_scale[dq_offset_idx];
       scale1 = dq8_bnb_LUT[sptr[s1_idx]] * dq_scale[dq_s1_idx] + dq_scale[dq_offset_idx];
-      dst0 = static_cast<float>(get_s8<S4_T>(tmp.x)) * scale0;
-      dst1 = static_cast<float>(get_s8<S4_T>(tmp.y)) * scale1;
+      dst0 = static_cast<float>(tmp.x - 8) * scale0;
+      dst1 = static_cast<float>(tmp.y - 8) * scale1;
       dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(dst0);
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
     }
@@ -460,8 +437,8 @@ inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col; j += 2) {
       auto tmp = srcptr[i * ld_src / 2 + j / 2];
-      dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(static_cast<float>(get_s8<S4_T>(tmp.x)));
-      dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(static_cast<float>(get_s8<S4_T>(tmp.y)));
+      dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(static_cast<float>(tmp.x - 8));
+      dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(static_cast<float>(tmp.y - 8));
     }
   }
   return BTLA_CODE::Success;
@@ -838,7 +815,7 @@ static inline BTLA_CODE memcpy2d(const _SRC_T* srcptr, _DST_T* dstptr, int row, 
   return BTLA_CODE::Success;
 }
 
-static float postop(float x, BTLA_ELTWISEOP op, void* const_elt_v) {
+static inline float postop(float x, BTLA_ELTWISEOP op, void* const_elt_v) {
   if (op == BTLA_ELTWISEOP::GELU) {
     return 0.5f * x * (1.f + tanhf(0.7978845834732056f * (x + 0.044714998453855515f * x * x * x)));
   }
@@ -878,8 +855,9 @@ static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int r
 }
 
 template <BTLA_DTYPE QDT_T>
-inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                                int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
+static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col,
+                                                       int ld_src, int ld_dst, float* scales, int8_t* zero_points,
+                                                       int blocksize) {
   int raw_blocksize = blocksize;
   for (int i = 0; i < col; i++) {
     int align_row_loop = row / blocksize * blocksize;
@@ -907,10 +885,11 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
       float fmedium = (maxval + minval) / 2;
-      int8_t bzp = utils::cast<float, int8_t>((0 - fmedium) * rscale);
+      int8_t bzp = utils::cast<float, int8_t>((0 - minval) * rscale) - 128;
       zero_points[j / raw_blocksize * ld_dst + i] = bzp;
       for (size_t ij = 0; ij < blocksize; ij++) {
-        dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i] - fmedium) * rscale);
+        dstptr[(j + ij) * ld_dst + i] =
+            utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i] - minval) * rscale) - 128;
       }
     };
     auto sNauto_calc_store_scale_and_quantv_sym = [&](int blocksize) {
@@ -930,7 +909,6 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       if (abs(sum) >= absmax / FullValue) {
         NVal = sum > 0.f ? -FullValue : FullValue;
       }
-      NVal = NVal << (8 - NBits);
       float scale = absmax / NVal;
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
@@ -939,6 +917,32 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
       }
     };
 
+    auto sNauto_calc_store_scale_and_quantv_asym = [&](int blocksize) {
+      auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
+      int constexpr FullValue = 1 << (NBits - 1);
+      float maxval = 0.f;
+      float minval = 0.f;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        maxval = std::max(maxval, srcptr[(j + ij) * ld_src + i]);
+        minval = std::min(minval, srcptr[(j + ij) * ld_src + i]);
+      }
+      float scale = (maxval - minval) / ((1 << NBits) - 1);
+      float rscale = 1.f / scale;
+      scales[j / raw_blocksize * ld_dst + i] = scale;
+      int8_t bzp = utils::cast<float, int8_t>((0 - minval) * rscale) - FullValue;
+      auto clip = [&](int s) {
+        s = std::max(s, -FullValue);
+        s = std::min(s, FullValue - 1);
+        return s;
+      };
+      bzp = clip(bzp);
+      zero_points[j / raw_blocksize * ld_dst + i] = bzp;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        auto tmp = utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i]) * rscale + bzp);
+        tmp = clip(tmp);
+        dstptr[(j + ij) * ld_dst + i] = tmp;
+      }
+    };
     auto dispatch_calc = [&](int blocksize) {
       switch (QDT_T) {
         case BTLA_DTYPE::S8:
@@ -954,7 +958,7 @@ inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dst
           if (zero_points == nullptr) {
             sNauto_calc_store_scale_and_quantv_sym(blocksize);
           } else {
-            s8_calc_store_scale_and_quantv_asym(blocksize);
+            sNauto_calc_store_scale_and_quantv_asym(blocksize);
           }
           break;
         default:
@@ -1546,9 +1550,9 @@ inline BTLA_CODE decompress_kblock_s3_s8fp(utils::bit2x4* bit2ptr, utils::bit1x8
       for (size_t j = 0; j < 8; j++) {
         uint8_t bit2 = *(b2ptr + byteoff + j);
         bit2 >>= bit2off;
-        uint8_t dst8 = ((bit2 & 0x3) << 5) | ((bit1 & 0x1) << 7);
+        uint8_t dst8 = ((bit2 & 0x3)) | ((bit1 & 0x1) << 2);
         bit1 >>= 1;
-        dst[i + j] = *(int8_t*)&dst8;
+        dst[i + j] = (*(int8_t*)&dst8) - 4;
       }
     }
   };
@@ -1610,10 +1614,10 @@ inline BTLA_CODE decompress_kblock_s2_s8fp(utils::bit2x4* bit2ptr, _DST_T* dstpt
                                            size_t tmpsize) {
   for (size_t i = 0; i < unpack_elt; i += 4) {
     auto tmp = bit2ptr[i / 4];
-    dstptr[i + 0] = _DST_T(tmp.a << 6);
-    dstptr[i + 1] = _DST_T(tmp.b << 6);
-    dstptr[i + 2] = _DST_T(tmp.c << 6);
-    dstptr[i + 3] = _DST_T(tmp.d << 6);
+    dstptr[i + 0] = _DST_T(tmp.a - 2);
+    dstptr[i + 1] = _DST_T(tmp.b - 2);
+    dstptr[i + 2] = _DST_T(tmp.c - 2);
+    dstptr[i + 3] = _DST_T(tmp.d - 2);
   }
   return BTLA_CODE::Success;
 }
@@ -1652,51 +1656,30 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
     auto bsptr = B.sptr + ib * ld_scaleb;
     int acci[NTILE];
     std::memset(acci, 0, sizeof(acci));
-    if (A.zpptr) {
-      int wacc[NTILE];
-      std::memset(wacc, 0, sizeof(wacc));
-      for (int ik = 0; ik < blocksize; ik += 4) {
-        for (int in = 0; in < NTILE; in++) {
-          auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
-          auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-          acci[in] += int(a8ptr[0]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.x);
-          acci[in] += int(a8ptr[1]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.y);
-          acci[in] += int(a8ptr[2]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.x);
-          acci[in] += int(a8ptr[3]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.y);
-          wacc[in] += get_s8<BTLA_DTYPE::S4_CLIP>(bv0.x);
-          wacc[in] += get_s8<BTLA_DTYPE::S4_CLIP>(bv0.y);
-          wacc[in] += get_s8<BTLA_DTYPE::S4_CLIP>(bv1.x);
-          wacc[in] += get_s8<BTLA_DTYPE::S4_CLIP>(bv1.y);
-        }
-        a8ptr += 4;
-        b4ptr += NTILE * 2;
-      }
-      float scale = asptr[ib];
-      int zp = azptr[ib];
+    int wacc[NTILE];
+    std::memset(wacc, 0, sizeof(wacc));
+    for (int ik = 0; ik < blocksize; ik += 4) {
       for (int in = 0; in < NTILE; in++) {
-        auto tmp = float(acci[in] - zp * wacc[in]);
-        tmp = tmp * (scale * bsptr[in]);
-        accf[in] += tmp;
+        auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
+        auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
+        acci[in] += int(a8ptr[0]) * (bv0.x - 8);
+        acci[in] += int(a8ptr[1]) * (bv0.y - 8);
+        acci[in] += int(a8ptr[2]) * (bv1.x - 8);
+        acci[in] += int(a8ptr[3]) * (bv1.y - 8);
+        wacc[in] += (bv0.x - 8);
+        wacc[in] += (bv0.y - 8);
+        wacc[in] += (bv1.x - 8);
+        wacc[in] += (bv1.y - 8);
       }
-    } else {
-      for (int ik = 0; ik < blocksize; ik += 4) {
-        for (int in = 0; in < NTILE; in++) {
-          auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
-          auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-          acci[in] += int(a8ptr[0]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.x);
-          acci[in] += int(a8ptr[1]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.y);
-          acci[in] += int(a8ptr[2]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.x);
-          acci[in] += int(a8ptr[3]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.y);
-        }
-        a8ptr += 4;
-        b4ptr += NTILE * 2;
-      }
-      float scale = asptr[ib];
-      for (int in = 0; in < NTILE; in++) {
-        auto tmp = float(acci[in]);
-        tmp = tmp * (scale * bsptr[in]);
-        accf[in] += tmp;
-      }
+      a8ptr += 4;
+      b4ptr += NTILE * 2;
+    }
+    float scale = asptr[ib];
+    int zp = azptr[ib];
+    for (int in = 0; in < NTILE; in++) {
+      auto tmp = float(acci[in] - zp * wacc[in]);
+      tmp = tmp * (scale * bsptr[in]);
+      accf[in] += tmp;
     }
   }
   for (int in = 0; in < NTILE; in++) {
@@ -1723,10 +1706,10 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
       for (int in = 0; in < NTILE; in++) {
         auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
         auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-        acci[in] += int(a8ptr[0]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.x);
-        acci[in] += int(a8ptr[1]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv0.y);
-        acci[in] += int(a8ptr[2]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.x);
-        acci[in] += int(a8ptr[3]) * get_s8<BTLA_DTYPE::S4_CLIP>(bv1.y);
+        acci[in] += int(a8ptr[0]) * (bv0.x - 8);
+        acci[in] += int(a8ptr[1]) * (bv0.y - 8);
+        acci[in] += int(a8ptr[2]) * (bv1.x - 8);
+        acci[in] += int(a8ptr[3]) * (bv1.y - 8);
       }
       a8ptr += 4;
       b4ptr += NTILE * 2;
@@ -1764,56 +1747,31 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
     auto bsptr = B.sptr + ib * ld_scaleb;
     int acci[NTILE];
     std::memset(acci, 0, sizeof(acci));
-    if (A.zpptr) {
-      int wacc[NTILE];
-      std::memset(wacc, 0, sizeof(wacc));
-      for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
-                                                               NTILE * KTILE * UnpackElt, tmp, tmpsize);
-        for (int iu = 0; iu < UnpackElt; iu++) {
-          for (int in = 0; in < NTILE; in++) {
-            for (int ikt = 0; ikt < KTILE; ikt++) {
-              auto bval = UnpackBuf[iu * NTILE * KTILE + in * KTILE + ikt];
-              acci[in] += int(a8ptr[iu * KTILE + ikt]) * bval;
-              wacc[in] += bval;
-            }
+    int wacc[NTILE];
+    std::memset(wacc, 0, sizeof(wacc));
+    for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
+      decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
+                                                             NTILE * KTILE * UnpackElt, tmp, tmpsize);
+      for (int iu = 0; iu < UnpackElt; iu++) {
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = UnpackBuf[iu * NTILE * KTILE + in * KTILE + ikt];
+            acci[in] += int(a8ptr[iu * KTILE + ikt]) * bval;
+            wacc[in] += bval;
           }
         }
-
-        b2ptr += KTILE * UnpackElt * NTILE / 4;
-        b1ptr += KTILE * UnpackElt * NTILE / 8;
-        a8ptr += KTILE * UnpackElt;
-      }
-      float scale = asptr[ib];
-      int zp = azptr[ib];
-      for (int in = 0; in < NTILE; in++) {
-        auto tmp = float(acci[in] - zp * wacc[in]);
-        tmp = tmp * (scale * bsptr[in]);
-        accf[in] += tmp;
-      }
-    } else {
-      for (int ik = 0; ik < blocksize; ik += KTILE * UnpackElt) {
-        decompress_kblock_s3_s8fp<BTLA_DTYPE::S3_CLIP, int8_t>(b2ptr, b1ptr, UnpackBuf, ik * NTILE,
-                                                               NTILE * KTILE * UnpackElt, tmp, tmpsize);
-        for (int iu = 0; iu < UnpackElt; iu++) {
-          for (int in = 0; in < NTILE; in++) {
-            for (int ikt = 0; ikt < KTILE; ikt++) {
-              auto bval = UnpackBuf[iu * NTILE * KTILE + in * KTILE + ikt];
-              acci[in] += int(a8ptr[iu * KTILE + ikt]) * bval;
-            }
-          }
-        }
-        b2ptr += KTILE * UnpackElt * NTILE / 4;
-        b1ptr += KTILE * UnpackElt * NTILE / 8;
-        a8ptr += KTILE * UnpackElt;
       }
 
-      float scale = asptr[ib];
-      for (int in = 0; in < NTILE; in++) {
-        auto tmp = float(acci[in]);
-        tmp = tmp * (scale * bsptr[in]);
-        accf[in] += tmp;
-      }
+      b2ptr += KTILE * UnpackElt * NTILE / 4;
+      b1ptr += KTILE * UnpackElt * NTILE / 8;
+      a8ptr += KTILE * UnpackElt;
+    }
+    float scale = asptr[ib];
+    int zp = azptr[ib];
+    for (int in = 0; in < NTILE; in++) {
+      auto tmp = float(acci[in] - zp * wacc[in]);
+      tmp = tmp * (scale * bsptr[in]);
+      accf[in] += tmp;
     }
   }
   for (int in = 0; in < NTILE; in++) {
@@ -1892,12 +1850,23 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
     int aacc = 0;
     for (int ik = 0; ik < blocksize; ik += KTILE) {
       decompress_kblock_s2_s8fp<BTLA_DTYPE::S2_CLIP, int8_t>(b2ptr, UnpackBuf, NTILE * KTILE, tmp, tmpsize);
-      for (int in = 0; in < NTILE; in++) {
-        for (int ikt = 0; ikt < KTILE; ikt++) {
-          auto bval = UnpackBuf[in * KTILE + ikt];
-          auto aval = int(a8ptr[ikt]);
-          acci[in] += aval * bval;
-          wacc[in] += bval;
+      if (B.zpptr) {
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = UnpackBuf[in * KTILE + ikt] - bzptr[in];
+            auto aval = int(a8ptr[ikt]);
+            acci[in] += aval * bval;
+            wacc[in] += bval;
+          }
+        }
+      } else {
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = UnpackBuf[in * KTILE + ikt];
+            auto aval = int(a8ptr[ikt]);
+            acci[in] += aval * bval;
+            wacc[in] += bval;
+          }
         }
       }
       for (int ikt = 0; ikt < KTILE; ikt++) aacc += a8ptr[ikt];
@@ -1909,13 +1878,13 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       acci[in] = acci[in] - zp * wacc[in];
     }
 
-    if (B.zpptr) {
+    /*if (B.zpptr) {
       for (int in = 0; in < NTILE; in++) {
         acci[in] = acci[in] - bzptr[in] * aacc;
         acci[in] += zp * bzptr[in] * blocksize;
       }
-    }
-    
+    }*/
+
     float scale = asptr[ib];
     for (int in = 0; in < NTILE; in++) {
       auto tmp = float(acci[in]);
@@ -1932,8 +1901,52 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
 template <typename ScaleT, int NTILE>
 static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
-  return gemv_2bit_u8s8_fp32<ScaleT, NTILE>(A, {nullptr, B.b2ptr, nullptr, B.sptr, nullptr, B.nbits}, C, k, ld_scaleb,
-                                            blocksize, tmp, tmpsize);
+  int blks = k / blocksize;
+  float accf[NTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto a8ptr = A.aptr;
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  auto asptr = A.sptr;
+  int constexpr KTILE = 4;
+  int8_t UnpackBuf[NTILE * KTILE];
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    auto bzptr = B.zpptr + ib * ld_scaleb;
+    int acci[NTILE];
+    std::memset(acci, 0, sizeof(acci));
+
+    int aacc = 0;
+    for (int ik = 0; ik < blocksize; ik += KTILE) {
+      decompress_kblock_s2_s8fp<BTLA_DTYPE::S2_CLIP, int8_t>(b2ptr, UnpackBuf, NTILE * KTILE, tmp, tmpsize);
+      for (int in = 0; in < NTILE; in++) {
+        for (int ikt = 0; ikt < KTILE; ikt++) {
+          auto bval = UnpackBuf[in * KTILE + ikt];
+          auto aval = int(a8ptr[ikt]);
+          acci[in] += aval * bval;
+        }
+      }
+      for (int ikt = 0; ikt < KTILE; ikt++) aacc += a8ptr[ikt];
+      b2ptr += KTILE * NTILE / 4;
+      a8ptr += KTILE;
+    }
+    if (B.zpptr) {
+      for (int in = 0; in < NTILE; in++) {
+        acci[in] = acci[in] - bzptr[in] * aacc;
+        acci[in] += zp * bzptr[in] * blocksize;
+      }
+    }
+
+    float scale = asptr[ib];
+    for (int in = 0; in < NTILE; in++) {
+      auto tmp = float(acci[in]);
+      tmp = tmp * (scale * bsptr[in]);
+      accf[in] += tmp;
+    }
+  }
+  for (int in = 0; in < NTILE; in++) {
+    C[in] = accf[in];
+  }
+  return BTLA_CODE::Success;
 }
 }  // namespace ref
 }  // namespace kernel

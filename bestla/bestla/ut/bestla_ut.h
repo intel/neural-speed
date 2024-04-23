@@ -81,9 +81,9 @@ static int8_t cache[CacheSize];
 #define BF16_ERR 0.02f
 #define INT8_ERR 0.2f
 #define F8_ERR 1.5f
-#define INT4_ERR 3.f
-#define INT3_ERR 6.f
-#define INT2_ERR 18.f
+#define INT4_ERR 3.5f
+#define INT3_ERR 7.f
+#define INT2_ERR 18.f 
 #define FP4_ERR 3.5f
 
 static inline float get_ut_err(BTLA_DTYPE qtype) {

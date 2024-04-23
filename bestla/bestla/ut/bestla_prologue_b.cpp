@@ -177,32 +177,36 @@ class UT_BlockQunatize_S3S4 {
   UT_BlockQunatize_S3S4() {
     UT_START();
     CheckISA(AVX2);
-    ut<BTLA_ISA::AVX2>(127, 4096, 32, BTLA_DTYPE::S2_CLIP);
-    ut<BTLA_ISA::AVX2>(4096, 4096, 32, BTLA_DTYPE::S2_CLIP);
-    ut<BTLA_ISA::AVX2>(4096, 4096, 128, BTLA_DTYPE::S2_CLIP);
-    ut<BTLA_ISA::AVX2>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<BTLA_ISA::AVX2>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<BTLA_ISA::AVX2>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<BTLA_ISA::AVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<BTLA_ISA::AVX2>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S2_CLIP);
+    ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S2_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S2_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S2_CLIP);
+    ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S3_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S4_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     CheckISA(AVX512F);
-    ut<BTLA_ISA::AVX512F>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<BTLA_ISA::AVX512F>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
-    ut<BTLA_ISA::AVX512F>(4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
-    ut<BTLA_ISA::AVX512F>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<BTLA_ISA::AVX512F>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<BTLA_ISA::AVX512F>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX512F>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F>(4096, 4096, 128, BTLA_DTYPE::S3_CLIP);
+    ut<sAVX512F>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX512F>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX512F>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
   }
-  template <BTLA_ISA RuntimeISA>
-  void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
-    printf("%s DType %s %d: %d %d %d\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), int(RuntimeISA), n, k,
-           blocksize);
+  template <class GemmCore>
+  void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T, bool isAsym = false) {
+    auto constexpr RuntimeISA = GemmCore::ISA;
+    printf("%s DType %s %d: %d %d %d Asym:%d\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), int(RuntimeISA), n, k,
+           blocksize, isAsym);
     int ldb = n;
     utils::aligned_vector<float> raw(n * k);
     ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 0.5f);
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, RuntimeISA>;
     PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, true);
+    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, isAsym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
@@ -245,8 +249,7 @@ class UT_S3_WOQ {
     ut::fill_buffer_randn(scales.data(), scales.size(), 0.005f, 0.01f);
     ut::UT_vector_s8 quanW;
     quanW.resize(k * n);
-    quanW.fill_rand(-8, 7);
-    for (int i = 0; i < k * n; i++) quanW.data()[i] = (quanW.data()[i] * 16) & 0xe0;
+    quanW.fill_rand(-4, 3);
 
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>;
 
@@ -346,8 +349,7 @@ class UT_S2_WOQ {
     ut::fill_buffer_randn(scales.data(), scales.size(), 0.005f, 0.01f);
     ut::UT_vector_s8 quanW;
     quanW.resize(k * n);
-    quanW.fill_rand(-8, 7);
-    for (int i = 0; i < k * n; i++) quanW.data()[i] = (quanW.data()[i] * 16) & 0xc0;
+    quanW.fill_rand(-2, 1);
 
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>;
 
@@ -779,7 +781,7 @@ class UT_CompFp32 {
     CheckISA(AVX2);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16,
                                                           false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
                                                           true);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
                                                           false);
@@ -962,8 +964,8 @@ class UT_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompFp32 sUT_CompFp32;
 #endif
+static UT_CompFp32 sUT_CompFp32;
 
 class UT_CompInt8 {
  public:
@@ -979,6 +981,7 @@ class UT_CompInt8 {
   void ut_s2() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
@@ -1290,8 +1293,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompInt8 sUT_CompInt8;
 #endif
+static UT_CompInt8 sUT_CompInt8;
 
 class UT_CompBf16 {
  public:
