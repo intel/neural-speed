@@ -111,24 +111,31 @@ class UT_avx2_decompress_s4_fp {
     ut<1, 24, float>(32);
     ut<2, 24, float>(32);
     ut<4, 24, float>(32);
+    ut<4, 24, utils::bf16>(32);
+    ut<4, 24, utils::bf16, utils::bf16>(32);
     ut<1, 24, float>(32, true);
     ut<2, 24, float>(32, true);
     ut<4, 24, float>(32, true);
+    ut<4, 24, utils::bf16>(32, true);
+    ut<4, 24, utils::bf16, utils::bf16>(32, true);
   }
 
-  template <int PackRow, int NTILE, typename T>
+  template <int PackRow, int NTILE, typename T, typename ScaleT = float>
   void ut(int blocksize, bool isasym = false) {
+    auto dst_dtype = bestla_dtype<T>;
+    auto scale_dtype = bestla_dtype<ScaleT>;
     int row = blocksize * 2;
     int constexpr col = NTILE;
-    printf("Test Case %s: %d %d %d Asym:%d Pack:%d\n", __FUNCTION__, row, col, blocksize, isasym, PackRow);
+    printf("Test Case %s: %d %d %d Asym:%d Pack:%d %s %s\n", __FUNCTION__, row, col, blocksize, isasym, PackRow,
+           utils::bestla_dtype_str(dst_dtype), bestla_dtype_str(scale_dtype));
     std::vector<utils::int4x2> s4_wei(row * col / 2);
     std::vector<int8_t> s8_wei(col * row);
     std::vector<T> s8_ref(col * row);
     int blks = row / blocksize;
-    int row_offset = blocksize / 2;
+    int row_offset = PackRow;
     std::vector<int8_t> zp(col * blks);
-    avector<float> scale(col * blks);
-    fill_buffer_randn(scale.data(), scale.size(), 0.01f, 0.03f);
+    avector<ScaleT> scale(col * blks);
+    fill_buffer_randn(scale.data(), scale.size(), ScaleT(0.01f), ScaleT(0.03f));
     fill_buffer_randn(zp.data(), zp.size(), int8_t(-8), int8_t(7));
     std::vector<T> rev(col * row);
     fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-8), int8_t(7));
@@ -159,15 +166,14 @@ class UT_avx2_decompress_s4_fp {
         }
       }
     }
-
     kernel::avx2::decompress_kblock_s4_fp<PackRow, NTILE>(s4_wei.data(), rev.data(), row_offset, NTILE, scale.data(),
-                                                          BTLA_DTYPE::F32, isasym ? zp.data() : nullptr, 0, 0,
-                                                          blocksize, NTILE, cache, CacheSize);
+                                                          scale_dtype, isasym ? zp.data() : nullptr, 0, 0, blocksize,
+                                                          NTILE, cache, CacheSize);
     kernel::avx2::decompress_kblock_s4_fp<PackRow, NTILE>(
         s4_wei.data() + row_offset * NTILE / 2, rev.data() + row_offset * NTILE, row - row_offset, NTILE, scale.data(),
-        BTLA_DTYPE::F32, isasym ? zp.data() : nullptr, row_offset, 0, blocksize, NTILE, cache, CacheSize);
-
-    ut::buffer_error(s8_ref.data(), rev.data(), rev.size());
+        scale_dtype, isasym ? zp.data() : nullptr, row_offset, 0, blocksize, NTILE, cache, CacheSize);
+    float err = get_ut_err(dst_dtype);
+    ut::buffer_error(s8_ref.data(), rev.data(), rev.size(), T(err));
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
