@@ -12,5 +12,5 @@ class UT_Device {
     return &Instance;
   }
 };
-};  // namespace ut
+};  // namespace sycl_ut
 }  // namespace bestla

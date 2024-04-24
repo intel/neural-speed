@@ -33,10 +33,9 @@ class ActivationBase {
   using AType = typename GemmCoreT::TA;
   using SrcType = SrcT;
   using Param = ParamActivationBase<SrcType>;
-  static inline void getActivation(const Param& _param, AType* aptr, sycl_utils::nd_item_helper<GemmCoreT>& helper) {
-  }
+  static inline void getActivation(const Param& _param, AType* aptr, sycl_utils::nd_item_helper<GemmCoreT>& helper) {}
 };
 
-}  // namespace sycl_gemm
+}  // namespace sycl_prologue_a
 }  // namespace bestla
 #endif

@@ -106,8 +106,5 @@ class nd_item_helper {
   constexpr inline int item_g_n() const { return sg_g_n() + sg_id() * GemmCoreT::TileN; }
 };
 
-
-
-
 }  // namespace sycl_utils
 }  // namespace bestla
