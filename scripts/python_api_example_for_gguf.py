@@ -22,7 +22,7 @@ from transformers import AutoTokenizer, TextStreamer
 from neural_speed import Model
 
 # Usage:
-# python python_api_example_for_bin.py \
+# python python_api_example_for_gguf.py \
 # --model_name falcon \
 # --model_path /model_path/falcon-7b \
 # -m /model_path/falcon-7b/ggml-model-f32.gguf
