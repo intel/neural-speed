@@ -352,8 +352,14 @@ class LauncherIntKBlock {
       auto StackTmp_ = alloca(TmpSize + CSize);
       auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
       auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-      utils::GemvParamB<ScaleT> paramB{_param.paramB.packedW->template WPtr<uint8_t>(), nullptr, nullptr,
-                                       _param.paramB.packedW->template SPtr<ScaleT>(),  nullptr, NBits};
+      auto isasym = _param.paramB.packedW->IsAsym();
+      auto bzptr = _param.paramB.packedW->template ZPtr<int8_t>();
+      utils::GemvParamB<ScaleT> paramB{_param.paramB.packedW->template WPtr<uint8_t>(),
+                                       nullptr,
+                                       nullptr,
+                                       _param.paramB.packedW->template SPtr<ScaleT>(),
+                                       isasym ? bzptr : nullptr,
+                                       NBits};
       utils::GemvParamA paramA{_param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
                                _param.paramA.quan->template ZPtr<uint8_t>()};
       int m = _param.problem.dims[1];
@@ -363,6 +369,9 @@ class LauncherIntKBlock {
       auto Cptr = _param.paramC.C + _config.loc[1];
       paramB.b4ptr += _config.loc[1] * _param.paramB.packedW->mKPad / 2;
       paramB.sptr += _config.loc[1];
+      if (isasym) {
+        paramB.zpptr += _config.loc[1];
+      }
       int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
       int in = 0;
       int ld_scaleb = _param.paramB.packedW->CStep();
@@ -378,6 +387,9 @@ class LauncherIntKBlock {
         Cptr += GemmCore::NTILE;
         paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
         paramB.sptr += GemmCore::NTILE;
+        if (isasym) {
+          paramB.zpptr += GemmCore::NTILE;
+        }
       }
       if (size_padded != _config.size[1]) {
         if constexpr (std::is_same_v<AType, uint8_t>) {

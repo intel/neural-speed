@@ -34,9 +34,9 @@ class UT_Avx512f_decompress_kblock_s4_fp {
       s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
       s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
     }
-    kernel::ref::decompress_kblock_s4_fp<S4_T, DST_T, PACK_ROW, ST_T>(
-        s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
-        k_offset, kblock, NPad, cache, CacheSize);
+    // kernel::ref::decompress_kblock_s4_fp<S4_T, DST_T, PACK_ROW, ST_T>(
+    //     s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
+    //     k_offset, kblock, NPad, cache, CacheSize);
     kernel::avx512f::decompress_kblock_s4_fp<S4_T, DST_T, PACK_ROW, ST_T>(
         s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
@@ -53,33 +53,127 @@ class UT_avx2_decompress_s4_s8 {
   UT_avx2_decompress_s4_s8() {
     UT_START();
     CheckISA(AVX2);
-    ut<BTLA_DTYPE::S4_CLIP>(32, 128);
-    ut<BTLA_DTYPE::S4_CLIP>(32, 96);
-    ut<BTLA_DTYPE::S4_CLIP>(32, 48);
+    ut<1, 24>(32);
+    ut<4, 24>(32);
+    ut<1, 24>(32, true);
+    ut<2, 24>(32, true);
+    ut<4, 24>(32, true);
   }
 
-  template <BTLA_DTYPE S4_T>
-  void ut(int row, int col) {
-    printf("Test Case %s_%s: %d %d\n", __FUNCTION__, bestla_dtype_str(S4_T), row, col);
+  template <int PackRow, int NTILE>
+  void ut(int blocksize, bool isasym = false) {
+    int row = blocksize * 2;
+    int constexpr col = NTILE;
+    printf("Test Case %s: %d %d %d\n", __FUNCTION__, row, col, blocksize);
     std::vector<utils::int4x2> s4_wei(row * col / 2);
     std::vector<int8_t> s8_wei(col * row);
+    std::vector<int8_t> s8_ref(col * row);
+    int blks = row / blocksize;
+    int row_offset = PackRow;
+    std::vector<int8_t> zp(col * blks);
+    fill_buffer_randn(zp.data(), zp.size(), int8_t(-8), int8_t(7));
     std::vector<int8_t> rev(col * row);
-    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-128), int8_t(127));
+    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-8), int8_t(7));
 
     for (int i = 0; i < col * row; i += 2) {
-      s8_wei[i] = s8_wei[i] & 0xf0;
-      s8_wei[i + 1] = s8_wei[i + 1] & 0xf0;
-      s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
-      s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
+      s8_ref[i] = s8_wei[i];
+      s8_ref[i + 1] = s8_wei[i + 1];
+      s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]) + 8;
+      s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]) + 8;
     }
-    kernel::avx2::decompress_s4_s8<S4_T>(s4_wei.data(), rev.data(), row, col, col, col);
+    if (isasym) {
+      for (int i = 0; i < row; i += PackRow) {
+        for (int j = 0; j < NTILE; j++) {
+          for (int ip = 0; ip < PackRow; ip++) {
+            s8_ref[i * NTILE + j * PackRow + ip] -= zp[i / blocksize * NTILE + j];
+          }
+        }
+      }
+    }
 
-    ut::buffer_error(s8_wei.data(), rev.data(), rev.size(), int8_t(0));
+    kernel::avx2::decompress_kblock_s4_s8<PackRow, NTILE>(s4_wei.data(), isasym ? zp.data() : nullptr, rev.data(),
+                                                          blocksize, NTILE, 0, 0, row_offset, NTILE, cache, CacheSize);
+    kernel::avx2::decompress_kblock_s4_s8<PackRow, NTILE>(
+        s4_wei.data() + row_offset * NTILE / 2, isasym ? zp.data() : nullptr, rev.data() + row_offset * NTILE,
+        blocksize, NTILE, 0, row_offset, row - row_offset, NTILE, cache, CacheSize);
+    ut::buffer_error(s8_ref.data(), rev.data(), rev.size(), int8_t(0));
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-static UT_avx2_decompress_s4_s8 sUT_avx2_decompress_s4_s8;
 #endif
+static UT_avx2_decompress_s4_s8 sUT_avx2_decompress_s4_s8;
+
+class UT_avx2_decompress_s4_fp {
+ public:
+  UT_avx2_decompress_s4_fp() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<1, 24, float>(32);
+    ut<2, 24, float>(32);
+    ut<4, 24, float>(32);
+    ut<1, 24, float>(32, true);
+    ut<2, 24, float>(32, true);
+    ut<4, 24, float>(32, true);
+  }
+
+  template <int PackRow, int NTILE, typename T>
+  void ut(int blocksize, bool isasym = false) {
+    int row = blocksize * 2;
+    int constexpr col = NTILE;
+    printf("Test Case %s: %d %d %d Asym:%d Pack:%d\n", __FUNCTION__, row, col, blocksize, isasym, PackRow);
+    std::vector<utils::int4x2> s4_wei(row * col / 2);
+    std::vector<int8_t> s8_wei(col * row);
+    std::vector<T> s8_ref(col * row);
+    int blks = row / blocksize;
+    int row_offset = blocksize / 2;
+    std::vector<int8_t> zp(col * blks);
+    avector<float> scale(col * blks);
+    fill_buffer_randn(scale.data(), scale.size(), 0.01f, 0.03f);
+    fill_buffer_randn(zp.data(), zp.size(), int8_t(-8), int8_t(7));
+    std::vector<T> rev(col * row);
+    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-8), int8_t(7));
+
+    for (int i = 0; i < col * row; i += 2) {
+      s8_ref[i] = float(s8_wei[i]);
+      s8_ref[i + 1] = float(s8_wei[i + 1]);
+      s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]) + 8;
+      s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]) + 8;
+    }
+    if (isasym) {
+      for (int i = 0; i < row; i += PackRow) {
+        for (int j = 0; j < NTILE; j++) {
+          int corr_offset = i / blocksize * NTILE + j;
+          for (int ip = 0; ip < PackRow; ip++) {
+            s8_ref[i * NTILE + j * PackRow + ip] = float(s8_ref[i * NTILE + j * PackRow + ip]) - float(zp[corr_offset]);
+          }
+        }
+      }
+    }
+
+    for (int i = 0; i < row; i += PackRow) {
+      for (int j = 0; j < NTILE; j++) {
+        int corr_offset = i / blocksize * NTILE + j;
+        for (int ip = 0; ip < PackRow; ip++) {
+          s8_ref[i * NTILE + j * PackRow + ip] =
+              float(s8_ref[i * NTILE + j * PackRow + ip]) * float(scale[corr_offset]);
+        }
+      }
+    }
+
+    kernel::avx2::decompress_kblock_s4_fp<PackRow, NTILE>(s4_wei.data(), rev.data(), row_offset, NTILE, scale.data(),
+                                                          BTLA_DTYPE::F32, isasym ? zp.data() : nullptr, 0, 0,
+                                                          blocksize, NTILE, cache, CacheSize);
+    kernel::avx2::decompress_kblock_s4_fp<PackRow, NTILE>(
+        s4_wei.data() + row_offset * NTILE / 2, rev.data() + row_offset * NTILE, row - row_offset, NTILE, scale.data(),
+        BTLA_DTYPE::F32, isasym ? zp.data() : nullptr, row_offset, 0, blocksize, NTILE, cache, CacheSize);
+
+    ut::buffer_error(s8_ref.data(), rev.data(), rev.size());
+  }
+};
+#ifdef BTLA_UT_KERNEL_INTRIN
+#endif
+static UT_avx2_decompress_s4_fp sUT_avx2_decompress_s4_fp;
+
 class UT_avx2_gemv {
  public:
   UT_avx2_gemv() {

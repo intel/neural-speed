@@ -177,6 +177,9 @@ class UT_BlockQunatize_S3S4 {
   UT_BlockQunatize_S3S4() {
     UT_START();
     CheckISA(AVX2);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
     ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S2_CLIP);
     ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S2_CLIP, true);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S2_CLIP);
@@ -186,8 +189,7 @@ class UT_BlockQunatize_S3S4 {
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
     ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S4_CLIP);
     ut<sAVX2>(127, 4096, 32, BTLA_DTYPE::S4_CLIP, true);
-    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
-    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
+
     CheckISA(AVX512F);
     ut<sAVX512F>(127, 4096, 32, BTLA_DTYPE::S3_CLIP);
     ut<sAVX512F>(4096, 4096, 32, BTLA_DTYPE::S3_CLIP);
@@ -217,7 +219,7 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-// static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
+//static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
 
 class UT_S3_WOQ {
@@ -971,8 +973,8 @@ class UT_CompInt8 {
  public:
   UT_CompInt8() {
     UT_START();
-    ut_s2();
     ut_s4_newkblock();
+    ut_s2();
     ut_s3();
     ut_s4();
     ut_s8();
@@ -1032,7 +1034,10 @@ class UT_CompInt8 {
   void ut_s4_newkblock() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(128, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
+                                                        true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);

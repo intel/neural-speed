@@ -773,108 +773,101 @@ class WeightKBlockNInteger {
     int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
       auto zptr = wptr->template ZPtr<int8_t>();
-      if (wptr->SDtype() == BTLA_DTYPE::F32) {
-        auto sptr = wptr->template SPtr<float>() + n_offset + i;
-        if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
-          kernel::wrapper::DecompressKBlockS4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
-                                                                                             BTLA_DTYPE::S4_CLIP>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
-              zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S8) {
-          kernel::wrapper::DecompressKBlockS8Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float>(
-              wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
-              zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
-          int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
-          auto elt_offset =
-              n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
-          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
-          auto row = NPad / _GemmCore_T::NTILE;
-          assert(elt_offset % 8 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
-          auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
-          kernel::wrapper::DecompressKBlockS3Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
-                                                                                             BTLA_DTYPE::S3_CLIP>(
-              bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE, k_size / _GemmCore_T::PACK_ROW,
-              ColSize, sptr, zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S2_CLIP) {
-          int8_t* bit2_ptr = wptr->template WPtr<int8_t>();
-          auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
-          assert(elt_offset % 4 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit2_ptr + elt_offset / 4);
-          kernel::wrapper::DecompressKBlockS2Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
-                                                                                             BTLA_DTYPE::S2_CLIP>(
-              bit2ptr, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, sptr,
-              zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else {
-          assert(0);
-        }
-      } else if (wptr->SDtype() == BTLA_DTYPE::BF16) {
-        auto sptr = wptr->template SPtr<utils::bf16>() + n_offset + i;
-        if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
-          kernel::wrapper::DecompressKBlockS4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
-                                                                                             BTLA_DTYPE::S4_CLIP>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
-              zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S8) {
-          kernel::wrapper::DecompressKBlockS8Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16>(
-              wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
-              zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
-          int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
-          auto elt_offset =
-              n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
-          auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
-          auto row = NPad / _GemmCore_T::NTILE;
-          assert(elt_offset % 8 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
-          auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
-          kernel::wrapper::DecompressKBlockS3Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
-                                                                                             BTLA_DTYPE::S3_CLIP>(
-              bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE, k_size / _GemmCore_T::PACK_ROW,
-              ColSize, sptr, zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::S2_CLIP) {
-          int8_t* bit2_ptr = wptr->template WPtr<int8_t>();
-          auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
-          assert(elt_offset % 4 == 0);
-          auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit2_ptr + elt_offset / 4);
-          kernel::wrapper::DecompressKBlockS2Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
-                                                                                             BTLA_DTYPE::S2_CLIP>(
-              bit2ptr, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, sptr,
-              zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
-              wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
-        } else {
-          assert(0);
-        }
-      } else if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
-        auto internal_n_offset = n_offset + i;
-        if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
-          kernel::wrapper::DecompressDQKBlockS4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
-                                                                                               BTLA_DTYPE::S4_CLIP>(
-              wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
-                  i * KPad / 2,
-              *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize,
-              wptr->template SPtr<uint8_t>(), wptr->template DQPtr<float>(), k_offset / _GemmCore_T::PACK_ROW,
-              internal_n_offset, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, wptr->mN, wptr->mDqBlockSize,
-              wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1, tmpcache, cachesize);
-        } else {
-          assert(0);
-        }
+      if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
+        auto sptr = wptr->template SPtr<void>();
+        kernel::wrapper::DecompressKBlockS4Fp<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE, _T>::template forward<ISA_T>(
+            wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
+                i * KPad / 2,
+            *dstptr + i * k_size, k_size, _GemmCore_T::NTILE, sptr, wptr->SDtype(), zptr, k_offset, n_offset + i,
+            wptr->mBlockSize, NPad, tmpcache, cachesize);
       } else {
-        assert(0);
+        if (wptr->SDtype() == BTLA_DTYPE::F32) {
+          auto sptr = wptr->template SPtr<float>() + n_offset + i;
+          if (wptr->mDType == BTLA_DTYPE::S8) {
+            kernel::wrapper::DecompressKBlockS8Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float>(
+                wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
+                *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
+                zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
+                wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+          } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
+            int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
+            auto elt_offset =
+                n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
+            auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
+            auto row = NPad / _GemmCore_T::NTILE;
+            assert(elt_offset % 8 == 0);
+            auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+            auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
+            kernel::wrapper::DecompressKBlockS3Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
+                                                                                               BTLA_DTYPE::S3_CLIP>(
+                bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE, k_size / _GemmCore_T::PACK_ROW,
+                ColSize, sptr, zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
+                wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+          } else if (wptr->mDType == BTLA_DTYPE::S2_CLIP) {
+            int8_t* bit2_ptr = wptr->template WPtr<int8_t>();
+            auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
+            assert(elt_offset % 4 == 0);
+            auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit2_ptr + elt_offset / 4);
+            kernel::wrapper::DecompressKBlockS2Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
+                                                                                               BTLA_DTYPE::S2_CLIP>(
+                bit2ptr, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, sptr,
+                zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
+                wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+          } else {
+            assert(0);
+          }
+        } else if (wptr->SDtype() == BTLA_DTYPE::BF16) {
+          auto sptr = wptr->template SPtr<utils::bf16>() + n_offset + i;
+          if (wptr->mDType == BTLA_DTYPE::S8) {
+            kernel::wrapper::DecompressKBlockS8Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16>(
+                wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad,
+                *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
+                zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
+                wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+          } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
+            int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
+            auto elt_offset =
+                n_offset * utils::padto(KPad, 128) + k_offset * _GemmCore_T::NTILE + i * utils::padto(KPad, 128);
+            auto ld_dst = _GemmCore_T::NTILE * utils::padto(KPad, 128);
+            auto row = NPad / _GemmCore_T::NTILE;
+            assert(elt_offset % 8 == 0);
+            auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
+            auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + row * ld_dst / 4 + elt_offset / 8);
+            kernel::wrapper::DecompressKBlockS3Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
+                                                                                               BTLA_DTYPE::S3_CLIP>(
+                bit2ptr, bit1ptr, *dstptr + i * k_size, k_offset * _GemmCore_T::NTILE, k_size / _GemmCore_T::PACK_ROW,
+                ColSize, sptr, zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
+                wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+          } else if (wptr->mDType == BTLA_DTYPE::S2_CLIP) {
+            int8_t* bit2_ptr = wptr->template WPtr<int8_t>();
+            auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
+            assert(elt_offset % 4 == 0);
+            auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit2_ptr + elt_offset / 4);
+            kernel::wrapper::DecompressKBlockS2Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
+                                                                                               BTLA_DTYPE::S2_CLIP>(
+                bit2ptr, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, sptr,
+                zptr != nullptr ? zptr + n_offset + i : nullptr, k_offset / _GemmCore_T::PACK_ROW,
+                wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
+          } else {
+            assert(0);
+          }
+        } else if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+          auto internal_n_offset = n_offset + i;
+          if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
+            kernel::wrapper::DecompressDQKBlockS4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
+                                                                                                 BTLA_DTYPE::S4_CLIP>(
+                wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
+                    i * KPad / 2,
+                *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize,
+                wptr->template SPtr<uint8_t>(), wptr->template DQPtr<float>(), k_offset / _GemmCore_T::PACK_ROW,
+                internal_n_offset, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, wptr->mN, wptr->mDqBlockSize,
+                wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1, tmpcache, cachesize);
+          } else {
+            assert(0);
+          }
+        } else {
+          assert(0);
+        }
       }
     }
     *dststep = k_size;
@@ -898,14 +891,24 @@ class WeightKBlockNInteger {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2;
+    auto zpptr = wptr->template ZPtr<int8_t>() + n_offset;
     int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
+
     assert(wptr->mDType == BTLA_DTYPE::S4_CLIP);
+
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
-      kernel::wrapper::DecompressKBlockS4S8::template forward<ISA_T, BTLA_DTYPE::S4_CLIP>(
-          bptr + i * KPad / 2, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize);
+      kernel::wrapper::DecompressKBlockS4S8::template forward<ISA_T, _GemmCore_T::PACK_ROW, _GemmCore_T::NTILE>(
+          bptr + i * KPad / 2, wptr->IsAsym() ? zpptr : nullptr, *dstptr + i * k_size, wptr->mBlockSize, wptr->CStep(),
+          n_offset + i, k_offset, k_size, _GemmCore_T::NTILE, tmpcache, cachesize);
     }
     *dststep = k_size;
     return BTLA_CODE::Success;
+  }
+
+  static inline bool k_valid(int k_offset, int blocksize) {
+    if (k_offset >= blocksize) {
+      return k_offset % blocksize;
+    }
   }
 
   static inline BTLA_CODE getQ3Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,

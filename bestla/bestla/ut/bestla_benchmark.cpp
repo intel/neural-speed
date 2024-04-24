@@ -803,9 +803,9 @@ class UTWOQ_CompInt8 {
  public:
   UTWOQ_CompInt8() {
     UT_START();
+    ut_s4();
     ut_s2();
     ut_s3();
-    ut_s4();
     // ut_s8();
   }
 
@@ -825,10 +825,12 @@ class UTWOQ_CompInt8 {
   }
 
   void ut_s4() {
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP, true);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S4_CLIP, true);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S4_CLIP);
-    /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S4_CLIP);*/
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S4_CLIP);
   }
 
   void ut_s8() {
@@ -893,8 +895,8 @@ class UTWOQ_CompInt8 {
   void benchmark_all(int m, int n, int k, BTLA_DTYPE qtype, bool isasym = false) {
     auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, qtype, BTLA_DTYPE::F32);
     int batch = auto_batch(memsize);
-    printf("%d %d %d %d %s %s %s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F32), bestla_dtype_str(qtype),
-           bestla_dtype_str(BTLA_DTYPE::F32));
+    printf("%d %d %d %d %s %s %s Asym:%d Scale:%s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F32),
+           bestla_dtype_str(qtype), bestla_dtype_str(BTLA_DTYPE::F32), isasym, bestla_dtype_str(bestla_dtype<Scale_T>));
     avector<float> A(size_t(m) * k * batch);
     avector<float> B(size_t(k) * n);
     avector<float> C(size_t(m) * n * batch);
@@ -926,8 +928,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 #endif
+static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 
 typedef struct {
   float d;             // delta
@@ -1419,12 +1421,12 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
     int constexpr Unroll = 4;
     int8_t tmpbuf[NTILE * Unroll];
     for (int ik = 0; ik < blocksize; ik += Unroll) {
-      if constexpr (NTILE==24) {
-        auto vb =
-            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + 0 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+      if constexpr (NTILE == 24) {
+        auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+            (void*)(b_ptr + 0 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
         auto va = _mm256_set1_ps(*(a_ptr + ib * blocksize + ik + 0));
         auto s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
-        vb = _mm256_permute4x64_epi64(vb, 57); 
+        vb = _mm256_permute4x64_epi64(vb, 57);
         auto ftmp = _mm256_cvtepi32_ps(s32tmp);
         acc_local[0] = _mm256_fmadd_ps(va, ftmp, acc_local[0]);
 
@@ -1444,7 +1446,8 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
         ftmp = _mm256_cvtepi32_ps(s32tmp);
         acc_local[0] = _mm256_fmadd_ps(va, ftmp, acc_local[0]);
 
-        vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + 1 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+            (void*)(b_ptr + 1 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
 
         s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
         vb = _mm256_permute4x64_epi64(vb, 57);
@@ -1467,7 +1470,8 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
         ftmp = _mm256_cvtepi32_ps(s32tmp);
         acc_local[1] = _mm256_fmadd_ps(va, ftmp, acc_local[1]);
 
-        vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + 2 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+            (void*)(b_ptr + 2 * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
 
         s32tmp = _mm256_cvtepi8_epi32(_mm256_castsi256_si128(vb));
         vb = _mm256_permute4x64_epi64(vb, 57);
@@ -1491,8 +1495,8 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
         acc_local[2] = _mm256_fmadd_ps(va, ftmp, acc_local[2]);
       } else {
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2),
-                                                           vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+              (void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
           _mm256_storeu_si256((__m256i*)(tmpbuf + 32 * i), vb);
         }
         for (int ikk = 0; ikk < Unroll; ikk++) {
@@ -1505,7 +1509,6 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
           }
         }
       }
-      
     }
     for (int i = 0; i < NReg; i++) {
       __m256 v_b_scale;
@@ -1528,8 +1531,8 @@ class UTWOQ_S4_VecDot {
  public:
   UTWOQ_S4_VecDot() {
     UT_START();
-    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
-    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
   }
@@ -1760,7 +1763,7 @@ class UTWOQ_S4_VecDot {
     }
   }
 };
-static UTWOQ_S4_VecDot sUTWOQ_S4_VecDot;
+// static UTWOQ_S4_VecDot sUTWOQ_S4_VecDot;
 }  // namespace ut
 }  // namespace bestla
 int main() {
