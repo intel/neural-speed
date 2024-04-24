@@ -72,8 +72,8 @@ We enable a CPP model in the following four steps.
 graph LR;
     Convert-->Load;
     Load-->Inference;
-    Inference-->acc_evaluate;
-    acc_evaluate-->Optimize;
+    Inference-->Acc_evaluate;
+    Acc_evaluate-->Optimize;
 ```
 
 # 1.	Model conversion
