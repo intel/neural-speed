@@ -117,117 +117,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
     model, config, quantize_config = load_quantized_safetensors(model_path)
     f = open(out_path, "wb")
 
-    def llama3(model, config, quantize_config, f, model_path, out_path):
-        print("The model type: Llama3")
-        # 1. write hparams
-        n_vocab = config["vocab_size"]
-        n_embd = config["hidden_size"]
-        n_layer = config["num_hidden_layers"]
-        n_head = config["num_attention_heads"]
-        ffn_hidden_size = config["intermediate_size"]
-
-        # 1. write head and params
-        f.write(b"ggjt"[::-1])  # magic
-        rope_scale = 1
-        if "rope_scaling" in config and config["rope_scaling"] is not None:
-            rope_scale = config["rope_scaling"]["factor"] if "factor" in config["rope_scaling"] else 1
-        n_head = n_head
-        n_head_kv = config["num_key_value_heads"] if "num_key_value_heads" in config else n_head
-        values = [
-            1,  # file version
-            n_vocab,
-            n_embd,
-            256,  #hparams.n_mult,
-            n_head,
-            n_head_kv,  # n_head_kv (multi_query attention)
-            n_layer,
-            n_embd // n_head,  # rot (obsolete)
-            0,  #file_type.value, # TODO
-        ]
-        f.write(struct.pack("i" * len(values), *values))
-        f.write(struct.pack("i", 0))
-        f.write(struct.pack("f", 0))
-        f.write(struct.pack("f", 0))
-        f.write(struct.pack("i", 0))
-        f.write(struct.pack("i", 0))  # word_embed_proj_dim (for opt)
-        f.write(struct.pack("i", 0))  # do_layer_norm_before (for opt)
-
-        f.write(struct.pack("i", 0))
-        f.write(struct.pack("i", ffn_hidden_size))
-        f.write(struct.pack("i", 0))
-        f.write(struct.pack("i", 0))  # n_experts
-        f.write(struct.pack("i", 0))  # n_expert_used
-        f.write(struct.pack("i", 0))  # n_embd_head_k for gemma
-
-        f.write(struct.pack("f", config["rms_norm_eps"]))
-        f.write(struct.pack("f", config["rope_theta"] if "rope_theta" in config else 10000))
-        f.write(struct.pack("f", rope_scale))
-
-        f.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
-        f.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
-        f.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
-
-        # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
-        # but bos_token_id = 1 in llama.cpp
-        f.write(struct.pack("i", 1))
-        f.write(struct.pack("i", 2))
-
-        f.write(struct.pack("i", 0))
-        f.write(struct.pack("i", 0))
-
-        # 2. vocab
-        tokenizer_path = os.path.join(model_path, "")
-        vocab = BpeVocab(Path(tokenizer_path))
-
-        for text, score in vocab.all_tokens():
-            if isinstance(text, str):
-                text = text.encode("utf-8")
-            f.write(struct.pack("i", len(text)))
-            f.write(text)
-            f.write(struct.pack("f", score))
-
-        # 3. write tensors
-        list_vars = model
-        convert_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
-        convert_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
-        convert_to_q4_bestla_tensor(f"lm_head.weight", f"output.weight", list_vars, f, quantize_config, n_head)
-
-        for i in range(n_layer):
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
-                                        f"layers.{i}.attention.wq.weight",
-                                        list_vars,
-                                        f,
-                                        quantize_config,
-                                        n_head,
-                                        n_head,
-                                        permute_func=permute_func)
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.k_proj",
-                                        f"layers.{i}.attention.wk.weight",
-                                        list_vars,
-                                        f,
-                                        quantize_config,
-                                        n_head,
-                                        n_head_kv,
-                                        permute_func=permute_func)
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.v_proj", f"layers.{i}.attention.wv.weight",
-                                        list_vars, f, quantize_config, n_head)
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.o_proj", f"layers.{i}.attention.wo.weight",
-                                        list_vars, f, quantize_config, n_head)
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.mlp.gate_proj", f"layers.{i}.feed_forward.w1.weight",
-                                        list_vars, f, quantize_config, n_head)
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.mlp.down_proj", f"layers.{i}.feed_forward.w2.weight",
-                                        list_vars, f, quantize_config, n_head)
-            convert_to_q4_bestla_tensor(f"model.layers.{i}.mlp.up_proj", f"layers.{i}.feed_forward.w3.weight",
-                                        list_vars, f, quantize_config, n_head)
-
-            convert_to_fp32_tensor(f"model.layers.{i}.input_layernorm.weight", f"layers.{i}.attention_norm.weight",
-                                   list_vars, f)
-            convert_to_fp32_tensor(f"model.layers.{i}.post_attention_layernorm.weight", f"layers.{i}.ffn_norm.weight",
-                                   list_vars, f)
-
-        f.close()
-        print(f"Success! saved as {out_path}")
-
     def llama(model, config, quantize_config, f, model_path, out_path):
         # 1. write hparams
         n_vocab = config["vocab_size"]
@@ -236,9 +125,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         n_head = config["num_attention_heads"]
         ffn_hidden_size = config["intermediate_size"]
 
-        # hardcoded:
-        n_mult = 256
-
         # 1. write head and params
         f.write(b"ggjt"[::-1])  # magic
         rope_scale = 1
@@ -289,18 +175,31 @@ def main(args_in: Optional[List[str]] = None) -> None:
         f.write(struct.pack("i", 0))
 
         # 2. vocab
-        tokenizer_path = os.path.join(model_path, "tokenizer.model")
-        vocab = load_vocab(Path(tokenizer_path))
-        for text, score in vocab.all_tokens():
-            f.write(struct.pack("i", len(text)))
-            f.write(text)
-            f.write(struct.pack("f", score))
+        llama3_vocab_size = 128256
+        if config['vocab_size'] == llama3_vocab_size:
+            vocab = BpeVocab(Path(model_path))
+            for text, score in vocab.all_tokens():
+                if isinstance(text, str):
+                    text = text.encode("utf-8")
+                f.write(struct.pack("i", len(text)))
+                f.write(text)
+                f.write(struct.pack("f", score))
+        else:
+            tokenizer_path = os.path.join(model_path, "tokenizer.model")
+            vocab = load_vocab(Path(tokenizer_path))
+            for text, score in vocab.all_tokens():
+                f.write(struct.pack("i", len(text)))
+                f.write(text)
+                f.write(struct.pack("f", score))
 
         # 3. write tensors
         list_vars = model
         convert_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
         convert_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
-        convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
+        if list_vars.get("lm_head.qweight") is None:
+            convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
+        else:
+            convert_to_q4_bestla_tensor(f"lm_head.weight", f"output.weight", list_vars, f, quantize_config, n_head)
 
         for i in range(n_layer):
             convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
@@ -338,11 +237,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
         f.close()
         print(f"Success! saved as {out_path}")
 
-    llama3_vocab_size = 128256
-    if config['vocab_size'] == llama3_vocab_size:
-        llama3(model, config, quantize_config, f, model_path, out_path)
-    else:
-        llama(model, config, quantize_config, f, model_path, out_path)
+    llama(model, config, quantize_config, f, model_path, out_path)
 
 
 if __name__ == '__main__':
