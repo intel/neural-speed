@@ -1479,6 +1479,7 @@ struct inplace_precompute_max_softmax_t<std::enable_if_t<(ISA_T < BTLA_ISA::AVX5
   }
 };
 #endif
+#if CompileAVX512F()
 template <BTLA_ISA ISA_T>
 struct inplace_precompute_max_softmax_t<float, uint8_t, ISA_T> {
   TARGET_512 static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, uint8_t* dst,
@@ -1529,7 +1530,7 @@ struct inplace_precompute_max_softmax_t<float, uint8_t, ISA_T> {
     }
   }
 };
-
+#endif
 /**
  * @brief MHA interface with N-dim parallelism & stable softmax
  *
@@ -1821,6 +1822,7 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
   GetCPUDevice();
   const auto pth = ne_threading::get();
   if (MHA_PREFER_AVX512FP16 && _cd->AVX512_FP16() && params.step_k_sl == 1) {
+#if CompileAVX512F()
     using GemmKernelFP16TrackMax = mha::launcher_base_weight_t<  //
         BTLA_ISA::AVX512_FP16,                                   //
         gemm::HCoreRowNAvx512fp16<64, 8>,                        //
@@ -1836,9 +1838,13 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
     static mha_stable_interface_t<GemmKernelFP16TrackMax, GemmKernelFP16> kernel;
     [[maybe_unused]] const auto ret = kernel.compute(params, *pth);
     assert(ret == BTLA_CODE::Success);
+#else
+    assert(false);
+#endif
   } else if (_cd->AMX_BF16() &&                           //
              params.K_layout == ATTN_FWD_LAYOUT_PLAIN &&  //
              params.V_layout == ATTN_FWD_LAYOUT_PLAIN) {
+#if CompileBF16()
     if (params.step_k_head_size == 1) {
       using GemmKernelFP32FP16BF16ExpSum = mha::launcher_base_off_t<  //
           BTLA_ISA::AMX_BF16,                                         //
@@ -1872,9 +1878,13 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
       [[maybe_unused]] const auto ret = kernel.compute(params, *pth);
       assert(ret == BTLA_CODE::Success);
     }
+#else
+    assert(false);
+#endif
   } else if (_cd->AVX2() &&  //
              params.K_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1 &&
              params.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1) {
+#if CompileAVX2()
     using GemmKernelTrackMax = mha::launcher_base_weight_t<  //
         BTLA_ISA::AVX2,                                      //
         gemm::SCoreRowNAvx2<24, 4>,                          //
@@ -1890,6 +1900,9 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
     static mha_stable_interface_t<GemmKernelTrackMax, GemmKernelId> mha;
     [[maybe_unused]] const auto ret = mha.compute(params, *pth);
     assert(ret == BTLA_CODE::Success);
+#else
+    assert(false);
+#endif
   } else {
     assert(false);  // no suitbale launcher
   }
@@ -1970,6 +1983,7 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
   const auto pth = ne_threading::get();
   if (_cd->AVX512F() &&
       ((_cd->AMX_BF16() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) || !_cd->AMX_BF16())) {
+#if CompileAVX512F()
     using GemmKernelBF16TrackMax = mha::launcher_base_weight_t<  //
         BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
@@ -1985,7 +1999,11 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
     static mha_stable_interface_t<GemmKernelBF16TrackMax, GemmKernelBF16> mha;
     [[maybe_unused]] const auto ret = mha.compute(params, *pth);
     assert(ret == BTLA_CODE::Success);
-  } else if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {        // TODO(Yi): add vdpbf16ps impl
+#else
+    assert(false);
+#endif
+  } else if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {  // TODO(Yi): add vdpbf16ps impl
+#if CompileBF16()
     using GemmKernelBF16TrackMax = mha::launcher_base_weight_t<  //
         BTLA_ISA::AMX_BF16,                                      //
         gemm::HCoreRowNAmxbf16<48, 16>,                          //
@@ -2001,6 +2019,9 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
     static mha_stable_interface_t<GemmKernelBF16TrackMax, GemmKernelBF16> mha;
     [[maybe_unused]] const auto ret = mha.compute(params, *pth);
     assert(ret == BTLA_CODE::Success);
+#else
+    assert(false);
+#endif
   } else {
     assert(0);
   }
