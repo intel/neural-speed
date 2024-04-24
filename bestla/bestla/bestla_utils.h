@@ -80,7 +80,6 @@
 #define CompileAMXINT8() 0
 #endif
 
-
 #if defined(_MSC_VER) && defined(__INTEL_LLVM_COMPILER)
 #define CompileAVX512F() defined(__AVX512F__)
 #define CompileAVX2() defined(__AVX2__) && defined(__F16C__) && defined(__FMA__)
@@ -90,7 +89,6 @@
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
 #endif
-
 
 #include <immintrin.h>
 
