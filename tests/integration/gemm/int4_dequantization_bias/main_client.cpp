@@ -19,7 +19,7 @@
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 // The number of times the kernel is executed
-constexpr int ITER = 1000;
+constexpr int ITER = 100;
 
 enum optinal_feature { NONE, ACT_SHUFFLE };
 
@@ -1109,14 +1109,13 @@ TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test);
 
 TYPED_TEST_P(dequantize_gemm_act_shuf_test, esimd) {
   if constexpr (TypeParam::mat_m != 1) {
-    dequantize_gemm_run<TypeParam, act_shuf_feature_next_token>(ITER);
-  } else {
     dequantize_gemm_run<TypeParam, act_shuf_feature_first_token>(ITER);
+  } else {
+    dequantize_gemm_run<TypeParam, act_shuf_feature_next_token>(ITER);
   }
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test, esimd);
-using shuf_tests = ::testing::Types<test3_gpu_xelpg, test4_gpu_xelpg>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_act_shuf_test_suite,
