@@ -235,15 +235,15 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
 
       // store key and value to memory
       {
-        const auto k_cache = ne_view_3d(ctx0, kv_self.k,          // tensor
-                                        head_dim, n_ctx, n_head,  // ne
-                                        0, 0,                     // nb (bestla managed)
-                                        il * k_size);             // offset
+        const auto k_cache = ne_view_3d(ctx0, kv_self.k,             // tensor
+                                        head_dim, n_ctx, n_head_kv,  // ne
+                                        0, 0,                        // nb (bestla managed)
+                                        il * k_size);                // offset
         ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, false));
-        const auto v_cache = ne_view_3d(ctx0, kv_self.v,          // tensor
-                                        head_dim, n_ctx, n_head,  // ne
-                                        0, 0,                     // nb (bestla managed)
-                                        il * v_size);             // offset
+        const auto v_cache = ne_view_3d(ctx0, kv_self.v,             // tensor
+                                        head_dim, n_ctx, n_head_kv,  // ne
+                                        0, 0,                        // nb (bestla managed)
+                                        il * v_size);                // offset
         ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur, n_past, false));
       }
 
@@ -252,14 +252,14 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
 
       struct ne_tensor* K =
           ne_view_3d(ctx0, kv_self.k,                                             // tensor
-                     head_dim, seq_kv, n_head,                                    // ne
+                     head_dim, seq_kv, n_head_kv,                                 // ne
                      kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
                      il * k_size);                                                // offset
       *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
       ne_set_name(K, "K");
       struct ne_tensor* V =
           ne_view_3d(ctx0, kv_self.v,                                                    // tensor
-                     seq_kv, head_dim, n_head,                                           // ne
+                     seq_kv, head_dim, n_head_kv,                                        // ne
                      kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
                      il * v_size);                                                       // offset
       *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout

@@ -47,7 +47,7 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
   ms->load(ctx, progress_callback, progress_callback_user_data);
 
   model_context& lctx = *ctx;
-  lctx.support_bestla_kv = false;
+  lctx.support_bestla_kv = true;
 }
 
 void Grok::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
@@ -236,7 +236,7 @@ class grok_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;
-    if ((layername.find("embedding") != std::string::npos) ||
+    if ((layername.find("embedding") != std::string::npos) || (layername.find("router") != std::string::npos) ||
         (layername == "token_embd.weight" || layername == "transformer.in_out_embed.weight")) {
       // special layer process, can be loaded by config file
       return quant_params_internal{quant_bits::q8};  // q80
