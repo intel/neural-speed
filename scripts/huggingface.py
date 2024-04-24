@@ -137,8 +137,8 @@ class HFLM(TemplateLM):
         use_gptq: Optional[bool] = False,
         use_autoround: Optional[bool] = False,
         use_awq: Optional[bool] = False,
-        weight_dtype : str = "int4",
-        compute_dtype : str = "int8",
+        weight_dtype : str = "fp32",
+        compute_dtype : str = "fp32",
         group_size : int = 32,
         use_ggml : bool = False,
         alg : str = "sym",
@@ -148,7 +148,8 @@ class HFLM(TemplateLM):
         super().__init__()
         self.model_format = model_format
         if self.model_format == "neural_speed":
-            self.use_quant = kwargs.pop("use_quant", True)
+            if weight_dtype=="fp32":
+                self.use_quant = False
         # optionally: take in an already-initialized transformers.PreTrainedModel
         if not isinstance(pretrained, str):
             eval_logger.warning(
@@ -533,8 +534,8 @@ class HFLM(TemplateLM):
         use_gptq:  Optional[bool] = False,
         use_awq: Optional[bool] = False,
         use_autoround: Optional[bool] = False,
-        weight_dtype : str = "int4",
-        compute_dtype : str = "int8",
+        weight_dtype : str = "fp32",
+        compute_dtype : str = "fp32",
         group_size : int = 32,
         use_ggml : bool = False,
         alg : str = "sym",
