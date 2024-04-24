@@ -35,6 +35,7 @@ from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Lite
                     Union)
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore
+
 import gguf
 
 if TYPE_CHECKING:
@@ -44,6 +45,7 @@ if hasattr(faulthandler, 'register') and hasattr(signal, 'SIGUSR1'):
     faulthandler.register(signal.SIGUSR1)
 
 NDArray: 'TypeAlias' = 'np.ndarray[Any, Any]'
+llama3_vocab_size = 128256
 
 
 @dataclass(frozen=True)
@@ -201,9 +203,9 @@ class Params:
             rms_norm_eps=rms_norm_eps,
             rope_theta=rope_theta,
             rope_scale=rope_scale,
-            bos_token_id = bos_token_id,
-            eos_token_id = eos_token_id,
-            pad_token_id = pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
         )
 
     # LLaMA v2 70B params.json
@@ -235,9 +237,9 @@ class Params:
             n_head=n_head,
             n_head_kv=n_head_kv,
             ffn_hidden_size=ffn_hidden_size,
-            bos_token_id = bos_token_id,
-            eos_token_id = eos_token_id,
-            pad_token_id = pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
         )
 
     @staticmethod
@@ -260,6 +262,7 @@ class Params:
 
 
 class SentencePieceVocab:
+
     def __init__(self, fname_tokenizer: Path, params_vocab_size: int, fname_added_tokens: Optional[Path]) -> None:
         self.sentencepiece_tokenizer = SentencePieceProcessor(str(fname_tokenizer))
         added_tokens: Dict[str, int]
@@ -300,7 +303,7 @@ class SentencePieceVocab:
                     text = tokenizer.id_to_piece(i).replace("\u2581", " ").encode("utf-8")
                 score: float = tokenizer.get_score(i)
                 yield text, score
-            else :
+            else:
                 text = " \u2047 ".encode("utf-8")
                 score: float = i
                 yield text, score
@@ -320,6 +323,7 @@ class SentencePieceVocab:
 
 
 class NEVocab:
+
     def __init__(self, tokens: List[Tuple[bytes, float]]):
         self.tokens = tokens
         self.vocab_size = len(tokens)
@@ -404,6 +408,7 @@ def bf16_to_fp32(bf16_arr: np.ndarray) -> np.ndarray:
 
 
 class UnquantizedTensor(Tensor):
+
     def __init__(self, ndarray: NDArray) -> None:
         assert isinstance(ndarray, np.ndarray)
         self.ndarray = ndarray
@@ -475,6 +480,7 @@ NECompatibleTensor = Union[UnquantizedTensor, NEQuantizedTensor]
 
 
 class DeferredPermutedTensor(Tensor):
+
     def __init__(self, base: Tensor, n_head: int, kv_head: int) -> None:
         self.base = base
         self.n_head = n_head
@@ -492,6 +498,7 @@ class DeferredPermutedTensor(Tensor):
 
 
 class GPTQForLLaMaQuantizedTensor(Tensor):
+
     def __init__(self, model: 'LazyModel', namebase: str) -> None:
         qweight = load_unquantized(model[f"{namebase}.qweight"], np.int32)
         scales = load_unquantized(model[f"{namebase}.scales"], np.float32, convert=True)
@@ -715,6 +722,7 @@ def merge_multifile_models(models_plus: List[ModelPlus]) -> ModelPlus:
 
 
 def permute_lazy(lazy_tensor: LazyTensor, n_head: int, n_head_kv: int) -> LazyTensor:
+
     def load() -> Tensor:
         return lazy_tensor.load().permute(n_head, n_head_kv)
 
@@ -752,6 +760,7 @@ def handle_quantization(model: LazyModel) -> LazyModel:
     (which resolve to UnquantizedTensors with the raw data) to one with entries
     for 'foo.weight' (which resolve to QuantizedTensors).
     '''
+
     def convert(name: str) -> Tuple[str, LazyTensor]:
         if name.endswith(".qweight"):
             namebase = name.rsplit('.', 1)[0]
@@ -802,6 +811,7 @@ class LazyStorage:
 
 
 class LazyUnpickler(pickle.Unpickler):
+
     def __init__(self, fp: IO[bytes], data_base_path: str, zip_file: zipfile.ZipFile):
         super().__init__(fp)
         self.data_base_path = data_base_path
@@ -1060,8 +1070,10 @@ def check_vocab_size(params: Params, vocab: Vocab) -> None:
 
 
 class OutputFile:
+
     def __init__(self, fname_out: Path) -> None:
         self.fout = open(fname_out, "wb")
+        self.vocab_size = None
 
     def write_file_header(self, params: Params, file_type: NEFileType) -> None:
         self.fout.write(b"ggjt"[::-1])  # magic
@@ -1076,6 +1088,7 @@ class OutputFile:
             params.n_embd // params.n_head,  # rot (obsolete)
             file_type.value,
         ]
+        self.vocab_size = params.n_vocab
         self.fout.write(struct.pack("i" * len(values), *values))
         self.fout.write(struct.pack("i", 0))
         self.fout.write(struct.pack("f", 0))
@@ -1088,16 +1101,16 @@ class OutputFile:
         self.fout.write(struct.pack("i", params.ffn_hidden_size))
         self.fout.write(struct.pack("i", 0))
 
-        self.fout.write(struct.pack("i", 0))   # n_experts
-        self.fout.write(struct.pack("i", 0))   # n_expert_used
-        self.fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+        self.fout.write(struct.pack("i", 0))  # n_experts
+        self.fout.write(struct.pack("i", 0))  # n_expert_used
+        self.fout.write(struct.pack("i", 0))  # n_embd_head_k for gemma
         self.fout.write(struct.pack("f", params.rms_norm_eps))
         self.fout.write(struct.pack("f", params.rope_theta))
         self.fout.write(struct.pack("f", params.rope_scale))
 
-        self.fout.write(struct.pack("f", 0.0)) # config.json "rope_scaling.factor", not enabled
-        self.fout.write(struct.pack("i", 0))   # rope_scaling.original_max_position_embeddings
-        self.fout.write(struct.pack("i", 0))   # params["rope_scaling"]["type"] =="yarn" else 0))
+        self.fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
+        self.fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
+        self.fout.write(struct.pack("i", 0))  # params["rope_scaling"]["type"] =="yarn" else 0))
 
         # TODO, bos_token_id = 0 in https://huggingface.co/decapoda-research/llama-7b-hf/blob/main/config.json
         # but bos_token_id = 1 in llama.cpp
@@ -1114,10 +1127,18 @@ class OutputFile:
         self.fout.seek((self.fout.tell() + 31) & -32)
 
     def write_vocab(self, vocab: Vocab) -> None:
-        for text, score in vocab.all_tokens():
-            self.fout.write(struct.pack("i", len(text)))
-            self.fout.write(text)
-            self.fout.write(struct.pack("f", score))
+        if self.vocab_size == llama3_vocab_size:
+            for text, score in vocab.all_tokens():
+                if isinstance(text, str):
+                    text = text.encode("utf-8")
+                self.fout.write(struct.pack("i", len(text)))
+                self.fout.write(text)
+                self.fout.write(struct.pack("f", score))
+        else:
+            for text, score in vocab.all_tokens():
+                self.fout.write(struct.pack("i", len(text)))
+                self.fout.write(text)
+                self.fout.write(struct.pack("f", score))
 
     @staticmethod
     def write_vocab_only(fname_out: Path, vocab: Vocab) -> None:
@@ -1157,6 +1178,7 @@ class OutputFile:
 
 
 class OutputFile_GGUF:
+
     def __init__(self, fname_out: Path) -> None:
         self.gguf_file = str(fname_out) + '.gguf'
         self.gguf_writer = gguf.GGUFWriter(self.gguf_file, "llama")
@@ -1423,8 +1445,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         type=Path,
                         help="directory containing tokenizer.model, if separate from model file")
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
-    parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
-                        default="huggingface", help="hub to load model")
+    parser.add_argument("--model_hub",
+                        choices=["huggingface", "modelscope"],
+                        default="huggingface",
+                        help="hub to load model")
     parser.add_argument("model",
                         type=Path,
                         help="directory containing model file, or model file itself (*.pth, *.pt, *.bin)")
@@ -1433,6 +1457,9 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="NE",
                         choices=["NE", "GGUF"],
                         help="convert to the GGUF or NE format")
+    parser.add_argument("--vocab-type",
+                        help="vocab types to try in order, choose from 'spm', 'bpe', 'hfft' (default: spm,hfft)",
+                        default="spm,hfft")
     args = parser.parse_args(args_in)
     vocab: Vocab
     if args.dump_single:
@@ -1454,7 +1481,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 from modelscope import AutoModelForCausalLM, AutoTokenizer
             else:
                 from transformers import AutoModelForCausalLM, AutoTokenizer
-            model = AutoModelForCausalLM.from_pretrained(str(args.model), low_cpu_mem_usage=True,
+            model = AutoModelForCausalLM.from_pretrained(str(args.model),
+                                                         low_cpu_mem_usage=True,
                                                          trust_remote_code=True)
             tokenizer = AutoTokenizer.from_pretrained(str(args.model), trust_remote_code=True)
             cache_path = Path(tokenizer.vocab_file).parent
@@ -1470,8 +1498,15 @@ def main(args_in: Optional[List[str]] = None) -> None:
         if model_plus.vocab is not None and args.vocab_dir is None:
             vocab = model_plus.vocab
         else:
-            vocab_dir = args.vocab_dir if args.vocab_dir else model_plus.paths[0].parent
-            vocab = load_vocab(vocab_dir, params.n_vocab)
+            if params.n_vocab == llama3_vocab_size:
+                # Llama3
+                from common import BpeVocab
+                vocab_dir = args.vocab_dir if args.vocab_dir else model_plus.paths[0].parent
+                vocab = BpeVocab(Path(vocab_dir))
+            else:
+                vocab_dir = args.vocab_dir if args.vocab_dir else model_plus.paths[0].parent
+                vocab = load_vocab(vocab_dir, params.n_vocab)
+
         model = do_necessary_conversions(model, params)
         output_type = pick_output_type(model, args.outtype)
         model = convert_to_output_type(model, output_type)
