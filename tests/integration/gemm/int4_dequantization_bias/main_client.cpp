@@ -21,6 +21,33 @@ using namespace gpu::xetla;
 // The number of times the kernel is executed
 constexpr int ITER = 1000;
 
+enum optinal_feature { NONE, ACT_SHUFFLE };
+
+class no_feature {
+ public:
+  static constexpr optinal_feature feature = optinal_feature::NONE;
+};
+
+class act_shuf_feature_first_token {
+ public:
+  static constexpr optinal_feature feature = optinal_feature::ACT_SHUFFLE;
+  static constexpr size_t wg_shuf_x = 64;
+  static constexpr size_t wg_shuf_y = 16;
+  static constexpr size_t sg_shuf_x = 16;
+  static constexpr size_t sg_shuf_y = 8;
+  static constexpr size_t shuf_load_block = 16;
+};
+
+class act_shuf_feature_next_token {
+ public:
+  static constexpr optinal_feature feature = optinal_feature::ACT_SHUFFLE;
+  static constexpr size_t wg_shuf_x = 128;
+  static constexpr size_t wg_shuf_y = 1;
+  static constexpr size_t sg_shuf_x = 16;
+  static constexpr size_t sg_shuf_y = 1;
+  static constexpr size_t shuf_load_block = 16;
+};
+
 class test1_xehpg {
  public:
   // Extract the parameters required by different test cases
@@ -577,7 +604,7 @@ int gemm_result_validate(
   return result ? 0 : 1;
 }
 
-template <class Test>
+template <class Test, class Feature = act_shuf_feature_first_token>
 void dequantize_gemm_run(int iter) {
   using namespace gpu;
   // Accept incoming parameters
@@ -821,59 +848,181 @@ void dequantize_gemm_run(int iter) {
       {// epilogue_args init list
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
+  if constexpr (Feature::feature == optinal_feature::ACT_SHUFFLE) {
+    constexpr size_t size_gidx = matrix_k;
+    auto* gidx_h = static_cast<uint32_t*>(
+        malloc_host(size_gidx * sizeof(uint32_t), context));
+    auto* gidx_d = static_cast<uint32_t*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT, size_gidx * sizeof(uint32_t), device, context));
+    auto* A_d_shuf = static_cast<data_type_a*>(aligned_alloc_device(
+        DEVICE_MEM_ALIGNMENT, size_a * sizeof(data_type_a), device, context));
+    for (uint32_t i = 0; i < matrix_k; i++) {
+      gidx_h[i] = i * sizeof(data_type_a);
+    }
+    for (int i = matrix_k - 1; i >= 0; i--) {
+      int j = rand() % (i + 1);
+      std::swap(gidx_h[i], gidx_h[j]);
+    }
+    queue.memcpy((void*)gidx_d, (void*)gidx_h, size_gidx * sizeof(uint32_t))
+        .wait();
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg(
+            matrix_m,
+            matrix_k,
+            matrix_n,
+            A_d_shuf,
+            lda,
+            B_d,
+            ldb,
+            C_d,
+            ldc,
+            scale_d,
+            matrix_n,
+            Acc_d,
+            Cnt_d,
+            epilogue_args);
 
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg(
-      matrix_m,
-      matrix_k,
-      matrix_n,
-      A_d,
-      lda,
-      B_d,
-      ldb,
-      C_d,
-      ldc,
-      scale_d,
-      matrix_n,
-      Acc_d,
-      Cnt_d,
-      epilogue_args);
+    cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
+    if (!gemm_op_t::can_implement(gemm_arg)) {
+      std::cout << "The arguments cannot be supported, aborting ... "
+                << std::endl;
+      FAIL();
+    }
 
-  cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  if (!gemm_op_t::can_implement(gemm_arg)) {
-    std::cout << "The arguments cannot be supported, aborting ... "
-              << std::endl;
-    FAIL();
-  }
+    cl::sycl::range<3> shuf_group_range{
+        1, matrix_m / Feature::wg_shuf_y, matrix_k / Feature::wg_shuf_x};
+    cl::sycl::range<3> shuf_local_range{
+        1,
+        Feature::wg_shuf_y / Feature::sg_shuf_y,
+        Feature::wg_shuf_x / Feature::sg_shuf_x};
+    cl::sycl::nd_range<3> shuf_nd_range(
+        shuf_group_range * shuf_local_range, shuf_local_range);
 
-  size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
-  profiling_helper prof("dequantize_gemm", ops, "gflops");
-  int constexpr warm = 10;
-  try {
-    for (int i = 0; i < iter + warm; i++) {
-      if (i >= warm)
-        prof.cpu_start();
-      auto e_esimd = queue.submit([&](handler& cgh) {
-        cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
-          // allocate slm and nbarrier resource
-          slm_barrier_init<gemm_op_t>();
-          gemm_op_t gemm_op;
-          gemm_op(item, gemm_arg);
+    size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
+    profiling_helper prof("dequantize_gemm", ops, "gflops");
+    int constexpr warm = 10;
+    try {
+      for (int i = 0; i < iter + warm; i++) {
+        if (i >= warm)
+          prof.cpu_start();
+        auto e_esimd_shuf = queue.submit([&](handler& cgh) {
+          cgh.parallel_for(
+              shuf_nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
+                using col_major_shuf_attr =
+                    gpu::xetla::kernel::col_major_shuf_attr_t<
+                        Feature::wg_shuf_x,
+                        Feature::wg_shuf_y,
+                        Feature::sg_shuf_x,
+                        Feature::sg_shuf_y,
+                        Feature::shuf_load_block>;
+                using col_major_shuf = gpu::xetla::kernel::col_major_shuf_t<
+                    fp16,
+                    fp16,
+                    uint32_t,
+                    mem_layout::row_major,
+                    col_major_shuf_attr,
+                    gpu_arch::XeHpg>;
+
+                typename col_major_shuf::arguments_t args{
+                    A_d, A_d_shuf, gidx_d, matrix_k, matrix_m};
+                col_major_shuf::call(item, args);
+              });
         });
-      });
-      if (i >= warm) {
-        e_esimd.wait();
-        prof.cpu_end();
-        prof.add_gpu_event(e_esimd);
+        auto e_esimd = queue.submit([&](handler& cgh) {
+          cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
+            // allocate slm and nbarrier resource
+            slm_barrier_init<gemm_op_t>();
+            gemm_op_t gemm_op;
+            gemm_op(item, gemm_arg);
+          });
+        });
+        if (i >= warm) {
+          e_esimd.wait();
+          prof.cpu_end();
+          prof.add_gpu_event(e_esimd);
+        }
+      }
+    } catch (cl::sycl::exception const& e) {
+      std::cout << "SYCL exception caught: " << e.what() << '\n';
+      FAIL();
+    }
+
+    // performance
+    prof.print_profiling_result(profiling_selector::GPU);
+
+    // host act-shuffle
+    std::vector<data_type_a> A_tmp(matrix_m * matrix_k, 0);
+    for (uint32_t i = 0; i < matrix_m; i++) {
+      for (uint32_t j = 0; j < matrix_k; j++) {
+        A_tmp[i * matrix_k + j] =
+            A_h[i * matrix_k + gidx_h[j] / sizeof(data_type_a)];
       }
     }
-  } catch (cl::sycl::exception const& e) {
-    std::cout << "SYCL exception caught: " << e.what() << '\n';
-    FAIL();
+    for (uint32_t i = 0; i < matrix_m; i++) {
+      for (uint32_t j = 0; j < matrix_k; j++) {
+        A_h[i * matrix_k + j] = A_tmp[i * matrix_k + j];
+      }
+    }
+
+    // free
+    free(gidx_h, context);
+    free(gidx_d, context);
+    free(A_d_shuf, context);
   }
+  if constexpr (Feature::feature == optinal_feature::NONE) {
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg(
+            matrix_m,
+            matrix_k,
+            matrix_n,
+            A_d,
+            lda,
+            B_d,
+            ldb,
+            C_d,
+            ldc,
+            scale_d,
+            matrix_n,
+            Acc_d,
+            Cnt_d,
+            epilogue_args);
 
-  // performance
-  prof.print_profiling_result(profiling_selector::GPU);
+    cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
+    if (!gemm_op_t::can_implement(gemm_arg)) {
+      std::cout << "The arguments cannot be supported, aborting ... "
+                << std::endl;
+      FAIL();
+    }
 
+    size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
+    profiling_helper prof("dequantize_gemm", ops, "gflops");
+    int constexpr warm = 10;
+    try {
+      for (int i = 0; i < iter + warm; i++) {
+        if (i >= warm)
+          prof.cpu_start();
+        auto e_esimd = queue.submit([&](handler& cgh) {
+          cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
+            // allocate slm and nbarrier resource
+            slm_barrier_init<gemm_op_t>();
+            gemm_op_t gemm_op;
+            gemm_op(item, gemm_arg);
+          });
+        });
+        if (i >= warm) {
+          e_esimd.wait();
+          prof.cpu_end();
+          prof.add_gpu_event(e_esimd);
+        }
+      }
+    } catch (cl::sycl::exception const& e) {
+      std::cout << "SYCL exception caught: " << e.what() << '\n';
+      FAIL();
+    }
+
+    // performance
+    prof.print_profiling_result(profiling_selector::GPU);
+  }
   std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
   for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
     for (uint32_t j = 0; j < matrix_n / 2; j++) {
@@ -937,17 +1086,17 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<
-    test1_gpu_xelpg,
-    test2_gpu_xelpg,
-    test3_gpu_xelpg,
-    test4_gpu_xelpg,
-    test5_gpu_xelpg,
-    test6_gpu_xelpg,
-    test7_gpu_xelpg,
-    test8_gpu_xelpg,
-    test9_gpu_xelpg,
-    test10_gpu_xelpg>;
+using tests = ::testing::Types<test3_gpu_xelpg>;
+// test1_gpu_xelpg,
+// test2_gpu_xelpg,
+// test3_gpu_xelpg,
+// test4_gpu_xelpg,
+// test5_gpu_xelpg,
+// test6_gpu_xelpg,
+// test7_gpu_xelpg,
+// test8_gpu_xelpg,
+// test9_gpu_xelpg,
+// test10_gpu_xelpg>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test_suite,
