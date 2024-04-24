@@ -604,7 +604,7 @@ int gemm_result_validate(
   return result ? 0 : 1;
 }
 
-template <class Test, class Feature = act_shuf_feature_first_token>
+template <class Test, class Feature = no_feature>
 void dequantize_gemm_run(int iter) {
   using namespace gpu;
   // Accept incoming parameters
@@ -1086,19 +1086,39 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<test3_gpu_xelpg>;
-// test1_gpu_xelpg,
-// test2_gpu_xelpg,
-// test3_gpu_xelpg,
-// test4_gpu_xelpg,
-// test5_gpu_xelpg,
-// test6_gpu_xelpg,
-// test7_gpu_xelpg,
-// test8_gpu_xelpg,
-// test9_gpu_xelpg,
-// test10_gpu_xelpg>;
+using tests = ::testing::Types<
+    test1_gpu_xelpg,
+    test2_gpu_xelpg,
+    test3_gpu_xelpg,
+    test4_gpu_xelpg,
+    test5_gpu_xelpg,
+    test6_gpu_xelpg,
+    test7_gpu_xelpg,
+    test8_gpu_xelpg,
+    test9_gpu_xelpg,
+    test10_gpu_xelpg>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test_suite,
     dequantize_gemm_test,
+    tests);
+
+template <typename T>
+class dequantize_gemm_act_shuf_test : public ::testing::Test {};
+TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test);
+
+TYPED_TEST_P(dequantize_gemm_act_shuf_test, esimd) {
+  if constexpr (TypeParam::mat_m != 1) {
+    dequantize_gemm_run<TypeParam, act_shuf_feature_next_token>(ITER);
+  } else {
+    dequantize_gemm_run<TypeParam, act_shuf_feature_first_token>(ITER);
+  }
+}
+
+REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test, esimd);
+using shuf_tests = ::testing::Types<test3_gpu_xelpg, test4_gpu_xelpg>;
+
+INSTANTIATE_TYPED_TEST_SUITE_P(
+    dequantize_gemm_act_shuf_test_suite,
+    dequantize_gemm_act_shuf_test,
     tests);
