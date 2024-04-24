@@ -205,8 +205,7 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
 
       // K * Q
       // struct ne_tensor* KQ = ne_scale_inplace(ctx0,ne_mul_mat(ctx0, K, Q),ne_new_f32(ctx0,0.08838834764831845f));
-      struct ne_tensor* KQ =
-          ne_scale_inplace(ctx0, ne_mul_mat(ctx0, K, Q), ne_new_f32(ctx0, 0.08838834764831845f / 30.0f));
+      struct ne_tensor* KQ = ne_scale_inplace(ctx0, ne_mul_mat(ctx0, K, Q), ne_new_f32(ctx0, attn_scale / 30.0f));
       struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, ne_tanh(ctx0, KQ), ne_new_f32(ctx0, 30.0f));
 
       // KQ_masked = mask_past(KQ_scaled)
@@ -267,6 +266,7 @@ static bool grok_model_eval_internal(model_context* ctx, const model_input* inpu
       ne_set_name(V, "V");
 
       ne_attn_flags_t attn_flags = 0;
+      attn_flags |= NE_ATTN_FLAG_IS_TANH30;
       if (n_past == 0) attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
       struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
       cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
