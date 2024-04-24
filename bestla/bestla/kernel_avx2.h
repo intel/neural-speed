@@ -454,7 +454,7 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
       fp_v = _mm256_or_ps(fp_v, _mm256_castsi256_ps(mantissa_revert));
       if constexpr (WITH_SCALE && std::is_same_v<_S_T, float>) {
         auto scale = _mm256_loadu_ps(sptr + j / _PACK_ROW);
-        if constexpr (_PACK_ROW == 2) scale = _mm256_permutexvar_ps(packrow2_permute_idx, scale);
+        if constexpr (_PACK_ROW == 2) scale = _mm256_permutevar8x32_ps(scale, packrow2_permute_idx);
         fp_v = _mm256_mul_ps(fp_v, scale);
       }
       if constexpr (std::is_same_v<_DST_T, float>) {
