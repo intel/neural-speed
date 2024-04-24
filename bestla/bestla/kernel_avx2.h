@@ -74,7 +74,7 @@ inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
 
 inline __m128i ymm_cvtepi32_epi16(__m256i src) {
   __m128i tmp;
-#if defined(__GNUC__) || defined(__clang_major__) 
+#if defined(__GNUC__) || defined(__clang_major__)
   for (size_t i = 0; i < 8; i++) {
     (reinterpret_cast<int16_t*>(&tmp))[i] = (reinterpret_cast<int32_t*>(&src))[i];
   }
