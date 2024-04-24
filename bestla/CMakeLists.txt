@@ -84,8 +84,14 @@ endfunction()
 
 set(benchmark_srcs ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/ut/bestla_benchmark.cpp)
 # list(APPEND benchmark_srcs ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/ut/sycl_benchmark.cpp)
+
+
 if(UT_BUILD)
 	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everything even run parts of UTs
+  file(GLOB sycl_srcs ${PROJECT_NAME}/ut/sycl*)
+  if(NOT BTLA_SYCL)
+    list(REMOVE_ITEM srcs ${sycl_srcs})
+  endif()
   list(REMOVE_ITEM srcs ${benchmark_srcs})
 	file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
   include_directories(${PROJECT_NAME})
