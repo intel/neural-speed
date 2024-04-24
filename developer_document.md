@@ -494,7 +494,7 @@ index 894be0134d..a9a57c0a9e 100644
 ```
 # 3.	Accuracy evaluation
 ## 3.1 Evaluate llm model in neural speed by lm_eval
-Include gptq,awq,autoround model.
+We can use this python script for accuracy evaluation.
 ```
 python scripts/cal_acc.py --model hf_model --tasks piqa --group_size 32 --compute_dtype int8 --weight_dtype int4
 ```
