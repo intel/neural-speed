@@ -296,12 +296,15 @@ struct GemvParamB {
   ScaleT* sptr = 0;
   int8_t* zpptr = 0;
   int nbits = 0;
+  int ldzp = 0;
 };
 
 struct GemvParamA {
   uint8_t* aptr = 0;
   float* sptr = 0;
   uint8_t* zpptr = 0;
+  int lda = 0;
+  int ldzp = 0;
 };
 
 template <typename T>

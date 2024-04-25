@@ -97,14 +97,14 @@ static inline __m256i load_s8_s32(int8_t* srcptr) {
   return ymm;
 }
 
-static inline __m256 load_bf16_fp32(utils::bf16* srcptr) {
-  auto tmp = _mm_loadu_si128(reinterpret_cast<__m128i*>(srcptr));
+static inline __m256 load_bf16_fp32(const utils::bf16* srcptr) {
+  auto tmp = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcptr));
   auto vf32 = ymm_cvt_bf16_fp32(tmp);
   return vf32;
 }
 
 template <typename T>
-static inline __m256 load_T_fp32(T* srcptr) {
+static inline __m256 load_T_fp32(const T* srcptr) {
   __m256 vtmp;
   if constexpr (std::is_same_v<T, float>) {
     vtmp = _mm256_loadu_ps(srcptr);
@@ -1721,26 +1721,27 @@ constexpr decltype(load_maskz_fp32_fp16_tr_x8_word<1>)* load_maskz_fp32_fp16_tr_
 #pragma GCC target("avxvnni")
 #endif
 
-template <typename ScaleT, int NReg>
-static inline void gemv_dequant_s32fp32(const float* asptr, const ScaleT* bsptr, __m256i* iacc, __m256* facc) {
-  const __m256 v_a_scale = _mm256_set1_ps(*asptr);
+template <typename ScaleT, int NReg, int MTILE>
+static inline void gemv_dequant_s32fp32(const float* asptr, int ldzp, const ScaleT* bsptr, __m256i* iacc,
+                                        __m256* facc) {
+  __m256 v_a_scale[MTILE];
+  for (int im = 0; im < MTILE; im++) {
+    v_a_scale[im] = _mm256_set1_ps(*(asptr + im * ldzp));
+  }
+
   for (int i = 0; i < NReg; i++) {
-    __m256 v_b_scale;
-    if constexpr (std::is_same_v<ScaleT, float>) {
-      v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-    } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-      auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-      v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+    __m256 v_b_scale = load_T_fp32(bsptr + i * 8);
+    for (int im = 0; im < MTILE; im++) {
+      auto vtmp = _mm256_mul_ps(v_a_scale[im], v_b_scale);
+      auto tmp = _mm256_cvtepi32_ps(iacc[im * NReg + i]);
+      facc[im * NReg + i] = _mm256_fmadd_ps(tmp, vtmp, facc[im * NReg + i]);
     }
-    v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-    auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-    facc[i] = _mm256_fmadd_ps(tmp, v_b_scale, facc[i]);
   }
 }
 
-template <typename ScaleT, int NTILE>
+template <typename ScaleT, int NTILE, int MTILE>
 static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
-                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
   auto& a8ptr = A.aptr;
   auto& b4ptr = B.b4ptr;
   auto& asptr = A.sptr;
@@ -1748,9 +1749,11 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
 
   int blks = k / blocksize;
   int constexpr NReg = NTILE / 8;
+  int constexpr MReg = MTILE;
+  static_assert(NReg * MReg <= 12);
   // Initialize accumulator with zeros
-  __m256 acc[NReg];
-  for (int i = 0; i < NReg; i++) {
+  __m256 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
   uint32_t mask = 0x0f0f0f0f;
@@ -1759,78 +1762,87 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   for (int ib = 0; ib < blks; ib += 1) {
-    __m256i iacc[NReg];
+    __m256i iacc[NReg * MReg];
     __m256i bacc[NReg];
-    for (int i = 0; i < NReg; i++) {
+    for (int i = 0; i < NReg * MReg; i++) {
       iacc[i] = _mm256_setzero_si256();
+    }
+    for (int i = 0; i < NReg; i++) {
       bacc[i] = _mm256_setzero_si256();
     }
     if (B.zpptr) {
       __m256i bzp[NReg];
-      auto bzptr = B.zpptr + ib * ld_scaleb;
+      auto bzptr = B.zpptr + ib * B.ldzp;
       for (int i = 0; i < NReg; i++) {
         bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
       }
       for (int ik = 0; ik < blocksize; ik += 4) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        __m256i va[MReg];
+        for (int i = 0; i < MReg; i++) {
+          va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+        }
         for (int i = 0; i < NReg; i++) {
           auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
               (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
           vb = _mm256_sub_epi8(vb, bzp[i]);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
           bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+          for (int j = 0; j < MReg; j++) {
+            iacc[j * NReg + i] = _mm256_dpbusd_avx_epi32(iacc[j * NReg + i], va[j], vb);
+          }
         }
       }
     } else {
       for (int ik = 0; ik < blocksize; ik += 4) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+        __m256i va[MReg];
+        for (int i = 0; i < MReg; i++) {
+          va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+        }
         for (int i = 0; i < NReg; i++) {
           auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
               (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
           bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
+          for (int j = 0; j < MReg; j++) {
+            iacc[j * NReg + i] = _mm256_dpbusd_avx_epi32(iacc[j * NReg + i], va[j], vb);
+          }
         }
       }
     }
 
-    const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-    auto zp = int(azptr[ib]);
-    const __m256i v_a_zp = _mm256_set1_epi32(zp);
-    auto bsptr = B.sptr + ib * ld_scaleb;
-    for (int i = 0; i < NReg; i++) {
-      bacc[i] = _mm256_mullo_epi32(v_a_zp, bacc[i]);
-      iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
-      __m256 v_b_scale;
-      if constexpr (std::is_same_v<ScaleT, float>) {
-        v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-      } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-        auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-        v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
+    __m256i v_a_zp[MReg];
+    for (int im = 0; im < MReg; im++) {
+      auto zp = int(azptr[ib + im * A.ldzp]);
+      v_a_zp[im] = _mm256_set1_epi32(zp);
+      for (int in = 0; in < NReg; in++) {
+        auto vtmp = _mm256_mullo_epi32(v_a_zp[im], bacc[in]);
+        iacc[im * NReg + in] = _mm256_sub_epi32(iacc[im * NReg + in], vtmp);
       }
-      v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-      auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-      acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
     }
+
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
   }
 
-  for (int i = 0; i < NReg; i++) {
-    _mm256_storeu_ps(C + i * 8, acc[i]);
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm256_storeu_ps(C + i * 8 + j * ldc, acc[j * NReg + i]);
+    }
   }
   return BTLA_CODE::Success;
 }
 
-template <typename ScaleT, int NTILE>
+template <typename ScaleT, int NTILE, int MTILE>
 static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
-                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
-  int blks = k / blocksize;
-  auto a8ptr = reinterpret_cast<int8_t*>(A.aptr);
-  auto b4ptr = B.b4ptr;
-  auto asptr = A.sptr;
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto& a8ptr = A.aptr;
+  auto& b4ptr = B.b4ptr;
+  auto& asptr = A.sptr;
 
+  int blks = k / blocksize;
   int constexpr NReg = NTILE / 8;
+  int constexpr MReg = MTILE;
+  static_assert(NReg * MReg <= 12);
   // Initialize accumulator with zeros
-  __m256 acc[NReg];
-  for (int i = 0; i < NReg; i++) {
+  __m256 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
   uint32_t mask = 0x0f0f0f0f;
@@ -1838,57 +1850,57 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   for (int ib = 0; ib < blks; ib += 1) {
-    __m256i iacc[NReg];
-    for (int i = 0; i < NReg; i++) {
+    __m256i iacc[NReg * MReg];
+    for (int i = 0; i < NReg * MReg; i++) {
       iacc[i] = _mm256_setzero_si256();
     }
     if (B.zpptr) {
       __m256i bzp[NReg];
-      auto bzptr = B.zpptr + ib * ld_scaleb;
+      auto bzptr = B.zpptr + ib * B.ldzp;
       for (int i = 0; i < NReg; i++) {
         bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
       }
       for (int ik = 0; ik < blocksize; ik += 4) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
-        auto vabsa = _mm256_sign_epi8(va, va);
+        __m256i va[MReg];
+        for (int i = 0; i < MReg; i++) {
+          va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+        }
         for (int i = 0; i < NReg; i++) {
           auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
               (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
           vb = _mm256_sub_epi8(vb, bzp[i]);
-          vb = _mm256_sign_epi8(vb, va);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+          for (int j = 0; j < MReg; j++) {
+            auto vsb = _mm256_sign_epi8(vb, va[j]);
+            auto vabsa = _mm256_sign_epi8(va[j], va[j]);
+            iacc[j * NReg + i] = _mm256_dpbusd_avx_epi32(iacc[j * NReg + i], vabsa, vsb);
+          }
         }
       }
     } else {
       for (int ik = 0; ik < blocksize; ik += 4) {
-        auto va = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
-        auto vabsa = _mm256_sign_epi8(va, va);
+        __m256i va[MReg];
+        for (int i = 0; i < MReg; i++) {
+          va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+        }
         for (int i = 0; i < NReg; i++) {
           auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
               (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
-          vb = _mm256_sign_epi8(vb, va);
-          iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], vabsa, vb);
+          for (int j = 0; j < MReg; j++) {
+            auto vsb = _mm256_sign_epi8(vb, va[j]);
+            auto vabsa = _mm256_sign_epi8(va[j], va[j]);
+            iacc[j * NReg + i] = _mm256_dpbusd_avx_epi32(iacc[j * NReg + i], vabsa, vsb);
+          }
         }
       }
     }
 
-    const __m256 v_a_scale = _mm256_set1_ps(*(asptr + ib));
-    auto bsptr = B.sptr + ib * ld_scaleb;
-    for (int i = 0; i < NReg; i++) {
-      __m256 v_b_scale;
-      if constexpr (std::is_same_v<ScaleT, float>) {
-        v_b_scale = _mm256_loadu_ps(bsptr + i * 8);
-      } else if constexpr (std::is_same_v<ScaleT, utils::bf16>) {
-        auto tmp = _mm_loadu_si128((const __m128i*)(bsptr + i * 8));
-        v_b_scale = kernel::avx2::ymm_cvt_bf16_fp32(tmp);
-      }
-      v_b_scale = _mm256_mul_ps(v_a_scale, v_b_scale);
-      auto tmp = _mm256_cvtepi32_ps(iacc[i]);
-      acc[i] = _mm256_fmadd_ps(tmp, v_b_scale, acc[i]);
-    }
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
   }
-  for (int i = 0; i < NReg; i++) {
-    _mm256_storeu_ps(C + i * 8, acc[i]);
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm256_storeu_ps(C + i * 8 + j * ldc, acc[j * NReg + i]);
+    }
   }
   return BTLA_CODE::Success;
 }
@@ -2282,7 +2294,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       iacc[i] = _mm256_sub_epi32(iacc[i], bacc[i]);
     }
 
-    gemv_dequant_s32fp32<ScaleT, NReg>(asptr + ib, B.sptr + ib * ld_scaleb, iacc, acc);
+    //gemv_dequant_s32fp32<ScaleT, NReg>(asptr + ib, B.sptr + ib * ld_scaleb, iacc, acc);
   }
 
   for (int i = 0; i < NReg; i++) {

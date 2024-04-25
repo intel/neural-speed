@@ -977,10 +977,10 @@ class GEMVWoqNBits {
   static inline BTLA_CODE forward_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int k, int ld_scaleb, int blocksize, void* tmp, size_t tmpsize) {
     if (B.nbits == 4) {
-      if (ISA_T >= BTLA_ISA::AVX2) {
-        return avx2::gemv_4bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
-      }
-      return ref::gemv_4bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+      //if (ISA_T >= BTLA_ISA::AVX2) {
+      //  return avx2::gemv_4bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+      //}
+      //return ref::gemv_4bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
     if (B.nbits == 3) {
       if (ISA_T >= BTLA_ISA::AVX2) {
@@ -1000,12 +1000,12 @@ class GEMVWoqNBits {
   template <BTLA_ISA ISA_T, typename ScaleT, int NTILE>
   static inline BTLA_CODE forward_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int k, int ld_scaleb, int blocksize, void* tmp, size_t tmpsize) {
-    if (B.nbits == 4) {
+    /*if (B.nbits == 4) {
       if (ISA_T >= BTLA_ISA::AVX2) {
         return avx2::gemv_4bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
       }
       return ref::gemv_4bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
-    }
+    }*/
     if (B.nbits == 3) {
       if (ISA_T >= BTLA_ISA::AVX2) {
         return avx2::gemv_3bit_s8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
@@ -1028,7 +1028,7 @@ class GEMVWoqNBits {
       if (ISA_T >= BTLA_ISA::AVX2) {
         return avx2::gemv_4bit_fp32_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
       }
-      return ref::gemv_4bit_fp32_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+      //return ref::gemv_4bit_fp32_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
   }
