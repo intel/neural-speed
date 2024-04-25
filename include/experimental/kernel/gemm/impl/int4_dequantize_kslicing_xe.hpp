@@ -46,7 +46,8 @@ class gemm_universal_t<
         num_global_kslicing_,
         num_local_kslicing_>,
     gemm_t_,
-    epilogue_t_> {
+    epilogue_t_,
+    std::enable_if_t<(group_swizzle_::arch_tag <= gpu_arch::XeHpc)>> {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
@@ -294,7 +295,6 @@ class gemm_universal_t<
       return *this;
     }
   };
-
   template <>
   struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
@@ -408,11 +408,8 @@ class gemm_universal_t<
       this->matrix_k = args.matrix_k;
       this->matrix_n = args.matrix_n;
       this->matA_base = args.matA_base;
-      this->matA_ld = args.matA_ld;
       this->matB_base = args.matB_base;
-      this->matB_ld = args.matB_ld;
       this->matC_base = args.matC_base;
-      this->matC_ld = args.matC_ld;
       this->scale_base = args.scale_base;
       this->scale_ld = args.scale_ld;
       this->acc_base = args.acc_base;
@@ -607,14 +604,18 @@ class gemm_universal_t<
         : (start_m + wg_tile_m);
     uint32_t boundary_k = wg_tile_k;
     if constexpr (num_global_kslicing > 1) {
-      wg_tile_k = (wg_tile_k + num_global_kslicing - 1) / num_global_kslicing;
+      wg_tile_k =
+          ((wg_tile_k + dequant_s - 1) / dequant_s + num_global_kslicing - 1) /
+          num_global_kslicing * dequant_s;
       start_k =
           start_k + group_swizzle.template get_tile_idx<0>(item) * wg_tile_k;
       boundary_k = (start_k + wg_tile_k) > boundary_k ? boundary_k
                                                       : (start_k + wg_tile_k);
     }
     if constexpr (num_local_kslicing > 1) {
-      wg_tile_k = (wg_tile_k + num_local_kslicing - 1) / num_local_kslicing;
+      wg_tile_k =
+          ((wg_tile_k + dequant_s - 1) / dequant_s + num_local_kslicing - 1) /
+          num_local_kslicing * dequant_s;
       start_k = start_k + wg_id * wg_tile_k;
       boundary_k = (start_k + wg_tile_k) > boundary_k ? boundary_k
                                                       : (start_k + wg_tile_k);
@@ -673,7 +674,8 @@ class gemm_universal_t<
            scale_size_y,
            args.zero_pt_ld / pack_ratio},
           {start_x_zero_pt, start_y_zero_pt});
-      gemm_args = gemm_args_t(
+
+      gemm_args_t gemm_args(
           mem_desc_a,
           mem_desc_b,
           inner_loop_count,
@@ -744,4 +746,5 @@ class gemm_universal_t<
 };
 
 /// @} xetla_gemm
+
 } // namespace gpu::xetla::kernel

@@ -365,44 +365,38 @@ class gemm_universal_t<
     bool implementable = true;
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_a == msg_type::block_2d) {
-        implementable &=
-            kernel::block_2d<gpu_arch::XeHpc, dtype_a>::check_tensor(
-                (uint64_t)(args.matA_base.base),
-                gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
-                gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
-                args.matA_ld);
+        implementable &= kernel::block_2d<arch_tag, dtype_a>::check_tensor(
+            (uint64_t)(args.matA_base.base),
+            gemm_t::is_col_major_a ? args.matrix_m : args.matrix_k,
+            gemm_t::is_col_major_a ? args.matrix_k : args.matrix_m,
+            args.matA_ld);
       } else {
-        implementable &=
-            kernel::general_1d<gpu_arch::XeHpc, dtype_a>::check_alignment(
-                args.matA_base.base, args.matA_ld);
+        implementable &= kernel::general_1d<arch_tag, dtype_a>::check_alignment(
+            args.matA_base.base, args.matA_ld);
       }
     }
     if (gemm_t::msg_type_b != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_b == msg_type::block_2d) {
-        implementable &=
-            kernel::block_2d<gpu_arch::XeHpc, dtype_b>::check_tensor(
-                (uint64_t)(args.matB_base.base),
-                gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
-                gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
-                args.matB_ld);
+        implementable &= kernel::block_2d<arch_tag, dtype_b>::check_tensor(
+            (uint64_t)(args.matB_base.base),
+            gemm_t::is_col_major_b ? args.matrix_k : args.matrix_n,
+            gemm_t::is_col_major_b ? args.matrix_n : args.matrix_k,
+            args.matB_ld);
       } else {
-        implementable &=
-            kernel::general_1d<gpu_arch::XeHpc, dtype_b>::check_alignment(
-                args.matB_base.base, args.matB_ld);
+        implementable &= kernel::general_1d<arch_tag, dtype_b>::check_alignment(
+            args.matB_base.base, args.matB_ld);
       }
     }
     if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
       if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &=
-            kernel::block_2d<gpu_arch::XeHpc, dtype_c>::check_tensor(
-                (uint64_t)(args.matC_base.base),
-                args.matrix_n,
-                args.matrix_m,
-                args.matC_ld);
+        implementable &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
+            (uint64_t)(args.matC_base.base),
+            args.matrix_n,
+            args.matrix_m,
+            args.matC_ld);
       } else {
-        implementable &=
-            kernel::general_1d<gpu_arch::XeHpc, dtype_c>::check_alignment(
-                args.matC_base.base, args.matC_ld);
+        implementable &= kernel::general_1d<arch_tag, dtype_c>::check_alignment(
+            args.matC_base.base, args.matC_ld);
       }
     }
 
@@ -423,7 +417,7 @@ class gemm_universal_t<
       sycl::nd_item<3>& item,
       const arguments_t& args,
       uint32_t slm_base = 0,
-      uint32_t nbarrier_base = 0) {
+      uint32_t nbarrier_base = 0) const {
     // set up workgroup level coordinates and boundaries
     work_group_t g(item.get_local_linear_id() % work_group_size);
     uint32_t wg_id = item.get_local_linear_id() / work_group_size;
@@ -494,7 +488,6 @@ class gemm_universal_t<
     gemm_args_t gemm_args(mem_desc_a, mem_desc_b, inner_loop_count);
     matAcc_t matAcc;
     matAcc.init(0);
-
     gemm_t gemm;
     gemm(g, matAcc, gemm_args, gemm_slm_base, gemm_nbarr_base);
 
@@ -562,5 +555,7 @@ class gemm_universal_t<
     }
   }
 };
+
+/// @} xetla_gemm_universal
 
 } // namespace gpu::xetla::kernel

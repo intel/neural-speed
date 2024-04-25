@@ -69,7 +69,8 @@ struct tile_mma_t<
   static constexpr uint32_t tile_size_n = matDst_t::tile_size_x;
   static constexpr uint32_t tile_elems = tile_size_m * tile_size_n;
   static constexpr uint32_t block_size_n = matDst_t::block_size_x;
-  static constexpr uint32_t block_size_k = a_block_size_x;
+  static constexpr uint32_t block_size_k =
+      a_block_size_x; // cannot use b_block_size_y
   static constexpr uint32_t block_size_m = matDst_t::block_size_y;
   static constexpr uint32_t block_elems = block_size_m * block_size_n;
 
@@ -89,8 +90,8 @@ struct tile_mma_t<
       block_size_n == b_block_size_x,
       "matAcc block n should match with matB block n");
   static_assert(
-      a_block_size_x == b_block_size_y,
-      "matA block w should match with matB block h");
+      b_block_size_y % a_block_size_x == 0,
+      "matA block k should match with matB block k");
   static_assert(
       (tile_size_k % block_size_k) == 0,
       "matAcc tile_size_k should be a multiple of block_size_k");
@@ -103,6 +104,8 @@ struct tile_mma_t<
   static constexpr int32_t num_block_n = matDst_t::num_block_x;
   static constexpr int32_t num_block_m = matDst_t::num_block_y;
   static constexpr int32_t num_block_k = tile_size_k / block_size_k;
+  static constexpr int32_t num_block_mma_b = b_block_size_y / block_size_k;
+  static constexpr uint32_t b_block_mma_elems = b_block_elems / num_block_mma_b;
 
   static constexpr int32_t mma_m = mma_attr::mma_m_in_elem;
   static constexpr int32_t mma_k = mma_attr::mma_k_in_bytes / sizeof(uint32_t);
@@ -136,8 +139,9 @@ struct tile_mma_t<
                 (i * num_block_k) * a_block_elems);
             auto a_sub_blk =
                 a_block.xetla_select<a_mma_elems, 1>(mma_i * a_mma_elems);
-            auto b_sub_blk =
+            auto b_blk =
                 b.reg.xetla_select<b_block_elems, 1>(j * b_block_elems);
+            auto b_sub_blk = b_blk.xetla_select<b_block_mma_elems, 1>(0);
             dst_sub_blk = xetla_mma<
                 gpu::xetla::detail::mma_argument_type<dtype_b>(),
                 gpu::xetla::detail::mma_argument_type<dtype_a>(),
@@ -147,7 +151,7 @@ struct tile_mma_t<
                 uint32_t,
                 uint32_t,
                 c_mma_elems,
-                b_block_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
+                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
                 a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
                 src_sub_blk,
                 b_sub_blk.xetla_format<uint32_t>(),
@@ -160,8 +164,12 @@ struct tile_mma_t<
                 (i * num_block_k + k) * a_block_elems);
             auto a_sub_blk =
                 a_block.xetla_select<a_mma_elems, 1>(mma_i * a_mma_elems);
-            auto b_sub_blk = b.reg.xetla_select<b_block_elems, 1>(
-                (j + k * num_block_n) * b_block_elems);
+            int inter_k_b = k / num_block_mma_b;
+            int inner_k_b = k % num_block_mma_b;
+            auto b_blk = b.reg.xetla_select<b_block_elems, 1>(
+                (j + inter_k_b * num_block_n) * b_block_elems);
+            auto b_sub_blk = b_blk.xetla_select<b_block_mma_elems, 1>(
+                inner_k_b * b_block_mma_elems);
             dst_sub_blk = xetla_mma<
                 gpu::xetla::detail::mma_argument_type<dtype_b>(),
                 gpu::xetla::detail::mma_argument_type<dtype_a>(),
@@ -171,7 +179,7 @@ struct tile_mma_t<
                 uint32_t,
                 uint32_t,
                 c_mma_elems,
-                b_block_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
+                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
                 a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
                 dst_sub_blk,
                 b_sub_blk.xetla_format<uint32_t>(),
@@ -203,8 +211,10 @@ struct tile_mma_t<
                 a.reg.xetla_select<a_tail_block_elems, 1>(a_tail_elems_start);
             auto a_sub_blk =
                 a_block.xetla_select<a_mma_elems, 1>(mma_i * a_mma_elems);
-            auto b_sub_blk =
+            auto b_blk =
                 b.reg.xetla_select<b_block_elems, 1>(j * b_block_elems);
+            auto b_sub_blk = b_blk.xetla_select<b_block_mma_elems, 1>(0);
+
             dst_sub_blk = xetla_mma<
                 gpu::xetla::detail::mma_argument_type<dtype_b>(),
                 gpu::xetla::detail::mma_argument_type<dtype_a>(),
@@ -214,7 +224,7 @@ struct tile_mma_t<
                 uint32_t,
                 uint32_t,
                 c_mma_elems,
-                b_block_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
+                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
                 a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
                 src_sub_blk,
                 b_sub_blk.xetla_format<uint32_t>(),
@@ -226,8 +236,13 @@ struct tile_mma_t<
                 a_tail_elems_start + k * a_tail_block_elems);
             auto a_sub_blk =
                 a_block.xetla_select<a_mma_elems, 1>(mma_i * a_mma_elems);
-            auto b_sub_blk = b.reg.xetla_select<b_block_elems, 1>(
-                (j + k * num_block_n) * b_block_elems);
+            int inter_k_b = k / num_block_mma_b;
+            int inner_k_b = k % num_block_mma_b;
+            auto b_blk = b.reg.xetla_select<b_block_elems, 1>(
+                (j + inter_k_b * num_block_n) * b_block_elems);
+            auto b_sub_blk = b_blk.xetla_select<b_block_mma_elems, 1>(
+                inner_k_b * b_block_mma_elems);
+
             dst_sub_blk = xetla_mma<
                 gpu::xetla::detail::mma_argument_type<dtype_b>(),
                 gpu::xetla::detail::mma_argument_type<dtype_a>(),
@@ -237,7 +252,7 @@ struct tile_mma_t<
                 uint32_t,
                 uint32_t,
                 c_mma_elems,
-                b_block_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
+                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
                 a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
                 dst_sub_blk,
                 b_sub_blk.xetla_format<uint32_t>(),
@@ -247,6 +262,8 @@ struct tile_mma_t<
       }
     }
     if constexpr (num_block_k > 1) {
+    //   constexpr uint32_t last_uint16_idx =
+    //       tile_elems * sizeof(dtype_dst) / sizeof(uint16_t) - 1;
       xetla_wait(dst.reg.xetla_format<uint16_t>()[0]);
     }
   }

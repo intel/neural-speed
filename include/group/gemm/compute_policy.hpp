@@ -57,14 +57,18 @@ struct compute_policy_default_xmx<
   using dtype_mma_a = typename compute_attr::dtype_a;
   using dtype_mma_b = typename compute_attr::dtype_b;
 
-  static constexpr uint32_t block_bytes_x_a = 32;
+  using mma_attr = typename arch_attr_t<arch_tag>::mma_attr;
+
+  static constexpr uint32_t mma_k_in_bytes = mma_attr::mma_k_in_bytes;
+  static constexpr uint32_t mma_n_in_elem = mma_attr::mma_n_in_elem;
+
+  static constexpr uint32_t block_bytes_x_a = mma_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
   static constexpr uint32_t block_size_y_a = 16;
 
-  static constexpr uint32_t block_size_x_b =
-      arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem;
-  static constexpr uint32_t block_bytes_y_b = 32;
+  static constexpr uint32_t block_size_x_b = mma_n_in_elem;
+  static constexpr uint32_t block_bytes_y_b = mma_k_in_bytes;
   static constexpr uint32_t block_size_y_b =
       block_bytes_y_b / sizeof(dtype_mma_b);
   static_assert(

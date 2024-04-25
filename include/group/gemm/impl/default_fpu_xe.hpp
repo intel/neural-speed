@@ -371,10 +371,9 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.arrive();
           }
-          if constexpr (arch_tag >= gpu_arch::XeHpc)
-            if constexpr (wg_size_y > 1) {
-              nbarrier_b.arrive();
-            }
+          if constexpr (wg_size_y > 1) {
+            nbarrier_b.arrive();
+          }
         }
       }
       SW_BARRIER();
@@ -407,10 +406,9 @@ class gemm_t<
           if constexpr (wg_size_x > 1) {
             nbarrier_a.wait();
           }
-          if constexpr (arch_tag >= gpu_arch::XeHpc)
-            if constexpr (wg_size_y > 1) {
-              nbarrier_b.wait();
-            }
+          if constexpr (wg_size_y > 1) {
+            nbarrier_b.wait();
+          }
         }
       }
     }
