@@ -619,8 +619,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompFp32 sUTWOQ_CompFp32;
+#endif
 
 class UTWOQ_CompBf16 {
  public:
@@ -928,8 +928,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompInt8 sUTWOQ_CompInt8;
+#endif
 
 typedef struct {
   float d;             // delta

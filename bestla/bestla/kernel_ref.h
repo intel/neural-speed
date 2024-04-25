@@ -1671,32 +1671,38 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   auto azptr = A.zpptr;
   for (int ib = 0; ib < blks; ib += 1) {
     auto bsptr = B.sptr + ib * ld_scaleb;
-    int acci[NTILE];
-    std::memset(acci, 0, sizeof(acci));
-    int wacc[NTILE];
-    std::memset(wacc, 0, sizeof(wacc));
-    for (int ik = 0; ik < blocksize; ik += 4) {
-      for (int in = 0; in < NTILE; in++) {
-        auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
-        auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-        acci[in] += int(a8ptr[0]) * (bv0.x - 8);
-        acci[in] += int(a8ptr[1]) * (bv0.y - 8);
-        acci[in] += int(a8ptr[2]) * (bv1.x - 8);
-        acci[in] += int(a8ptr[3]) * (bv1.y - 8);
-        wacc[in] += (bv0.x - 8);
-        wacc[in] += (bv0.y - 8);
-        wacc[in] += (bv1.x - 8);
-        wacc[in] += (bv1.y - 8);
+    int azp = azptr[ib];
+    float ascale = asptr[ib];
+    if (B.zpptr) {
+      auto bzptr = B.zpptr + ib * ld_scaleb;
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        for (int in = 0; in < NTILE; in++) {
+          auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
+          auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
+          auto vscale = ascale * bsptr[in];
+          auto bzp = bzptr[in] + 8;
+          accf[in] += int(a8ptr[0] - azp) * (bv0.x - bzp) * vscale;
+          accf[in] += int(a8ptr[1] - azp) * (bv0.y - bzp) * vscale;
+          accf[in] += int(a8ptr[2] - azp) * (bv1.x - bzp) * vscale;
+          accf[in] += int(a8ptr[3] - azp) * (bv1.y - bzp) * vscale;
+        }
+        a8ptr += 4;
+        b4ptr += NTILE * 2;
       }
-      a8ptr += 4;
-      b4ptr += NTILE * 2;
-    }
-    float scale = asptr[ib];
-    int zp = azptr[ib];
-    for (int in = 0; in < NTILE; in++) {
-      auto tmp = float(acci[in] - zp * wacc[in]);
-      tmp = tmp * (scale * bsptr[in]);
-      accf[in] += tmp;
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        for (int in = 0; in < NTILE; in++) {
+          auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
+          auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
+          auto vscale = ascale * bsptr[in];
+          accf[in] += int(a8ptr[0] - azp) * (bv0.x - 8) * vscale;
+          accf[in] += int(a8ptr[1] - azp) * (bv0.y - 8) * vscale;
+          accf[in] += int(a8ptr[2] - azp) * (bv1.x - 8) * vscale;
+          accf[in] += int(a8ptr[3] - azp) * (bv1.y - 8) * vscale;
+        }
+        a8ptr += 4;
+        b4ptr += NTILE * 2;
+      }
     }
   }
   for (int in = 0; in < NTILE; in++) {
@@ -1717,25 +1723,37 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   auto azptr = A.zpptr;
   for (int ib = 0; ib < blks; ib += 1) {
     auto bsptr = B.sptr + ib * ld_scaleb;
-    int acci[NTILE];
-    std::memset(acci, 0, sizeof(acci));
-    for (int ik = 0; ik < blocksize; ik += 4) {
-      for (int in = 0; in < NTILE; in++) {
-        auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
-        auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-        acci[in] += int(a8ptr[0]) * (bv0.x - 8);
-        acci[in] += int(a8ptr[1]) * (bv0.y - 8);
-        acci[in] += int(a8ptr[2]) * (bv1.x - 8);
-        acci[in] += int(a8ptr[3]) * (bv1.y - 8);
+    float ascale = asptr[ib];
+    if (B.zpptr) {
+      auto bzptr = B.zpptr + ib * ld_scaleb;
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        for (int in = 0; in < NTILE; in++) {
+          auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
+          auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
+          auto vscale = ascale * bsptr[in];
+          auto bzp = bzptr[in] + 8;
+          accf[in] += int(a8ptr[0]) * (bv0.x - bzp) * vscale;
+          accf[in] += int(a8ptr[1]) * (bv0.y - bzp) * vscale;
+          accf[in] += int(a8ptr[2]) * (bv1.x - bzp) * vscale;
+          accf[in] += int(a8ptr[3]) * (bv1.y - bzp) * vscale;
+        }
+        a8ptr += 4;
+        b4ptr += NTILE * 2;
       }
-      a8ptr += 4;
-      b4ptr += NTILE * 2;
-    }
-    float scale = asptr[ib];
-    for (int in = 0; in < NTILE; in++) {
-      auto tmp = float(acci[in]);
-      tmp = tmp * (scale * bsptr[in]);
-      accf[in] += tmp;
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        for (int in = 0; in < NTILE; in++) {
+          auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
+          auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
+          auto vscale = ascale * bsptr[in];
+          accf[in] += int(a8ptr[0]) * (bv0.x - 8) * vscale;
+          accf[in] += int(a8ptr[1]) * (bv0.y - 8) * vscale;
+          accf[in] += int(a8ptr[2]) * (bv1.x - 8) * vscale;
+          accf[in] += int(a8ptr[3]) * (bv1.y - 8) * vscale;
+        }
+        a8ptr += 4;
+        b4ptr += NTILE * 2;
+      }
     }
   }
   for (int in = 0; in < NTILE; in++) {

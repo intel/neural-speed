@@ -199,7 +199,7 @@ class UT_avx2_gemv {
   }
 
   void ut_4bit(int n, int k, int kblock, bool iasym) {
-    printf("Test Case %s: %d %d %d\n", __FUNCTION__, n, k, kblock);
+    printf("Test Case %s: %d %d %d Asym:%d\n", __FUNCTION__, n, k, kblock, iasym);
     int blks = k / kblock;
     avector<bit4x2> b2(n * k / 2);
     avector<float> scaleb(n * blks), scalea(blks);
@@ -237,12 +237,12 @@ class UT_avx2_gemv {
     gemmref_fp32fp32fp32(1, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{(uint8_t*)b2.data(), nullptr, nullptr, scaleb.data(), iasym ? bzp.data() : nullptr, 2};
     kernel::avx2::gemv_4bit_u8s8_fp32<float, 24>({A.data(), scalea.data(), azp.data()}, B, Cf32.data(), k, n, kblock,
-                                                 cache, CacheSize);
+                                                cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
   void ut_4bit_fp32(int n, int k, int kblock, bool iasym) {
-    printf("Test Case %s: %d %d %d\n", __FUNCTION__, n, k, kblock);
+    printf("Test Case %s: %d %d %d Asym:%d\n", __FUNCTION__, n, k, kblock, iasym);
     int blks = k / kblock;
     avector<bit4x2> b2(n * k / 2);
     avector<float> scaleb(n * blks), scalea(blks);
@@ -273,7 +273,7 @@ class UT_avx2_gemv {
   }
 
   void ut_4bit_s8s8(int n, int k, int kblock, bool iasym) {
-    printf("Test Case %s: %d %d %d\n", __FUNCTION__, n, k, kblock);
+    printf("Test Case %s: %d %d %d Asym:%d\n", __FUNCTION__, n, k, kblock, iasym);
     int blks = k / kblock;
     avector<bit4x2> b2(n * k / 2);
     avector<float> scaleb(n * blks), scalea(blks);
