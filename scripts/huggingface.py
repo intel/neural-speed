@@ -148,6 +148,7 @@ class HFLM(TemplateLM):
         super().__init__()
         self.model_format = model_format
         if self.model_format == "neural_speed":
+            self.use_quant=True
             if weight_dtype=="fp32":
                 self.use_quant = False
         # optionally: take in an already-initialized transformers.PreTrainedModel
