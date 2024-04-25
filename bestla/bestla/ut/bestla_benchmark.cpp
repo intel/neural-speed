@@ -928,8 +928,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 #endif
+static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 
 typedef struct {
   float d;             // delta
@@ -1340,8 +1340,8 @@ static void bestla_vec_dot_q4_0_q8_0(const int k_reduce, const int blocksize, fl
     for (int ik = 0; ik < blocksize; ik += 4) {
       auto va = _mm256_set1_epi32(*(int*)(a_ptr + ib * blocksize + ik));
       for (int i = 0; i < NReg; i++) {
-        auto vb =
-            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+        auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
+            (void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
 #if AVX_VNNI_
         iacc[i] = _mm256_dpbusd_avx_epi32(iacc[i], va, vb);
 #else
@@ -1384,7 +1384,7 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   // Main loop
   for (int ib = 0; ib < k_blks; ++ib) {
-#if 0
+#if 1
     __m256 v_b_scale[NReg];
     for (int i = 0; i < NReg; i++) {
       if constexpr (std::is_same_v<SBT, float>) {
@@ -1399,7 +1399,7 @@ static void bestla_vec_dot_q4_0_f32(const int k_reduce, const int blocksize, flo
     for (int ik = 0; ik < blocksize; ik += Unroll) {
       for (int i = 0; i < NReg; i++) {
         auto vb =
-            kernel::avx2::unpack_4bits_avx2<false>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+            kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>((void*)(b_ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
         _mm256_storeu_si256((__m256i*)(tmpbuf + 32 * i), vb);
       }
       for (int ikk = 0; ikk < Unroll; ikk++) {
@@ -1531,8 +1531,8 @@ class UTWOQ_S4_VecDot {
  public:
   UTWOQ_S4_VecDot() {
     UT_START();
-    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
-    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
+     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
     benchmark_all_fp32<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4608, 4096, BTLA_DTYPE::S4_CLIP);
   }
@@ -1763,7 +1763,7 @@ class UTWOQ_S4_VecDot {
     }
   }
 };
-// static UTWOQ_S4_VecDot sUTWOQ_S4_VecDot;
+//static UTWOQ_S4_VecDot sUTWOQ_S4_VecDot;
 }  // namespace ut
 }  // namespace bestla
 int main() {

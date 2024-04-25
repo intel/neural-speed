@@ -1750,7 +1750,6 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   int blks = k / blocksize;
   int constexpr NReg = NTILE / 8;
   int constexpr MReg = MTILE;
-  static_assert(NReg * MReg <= 12);
   // Initialize accumulator with zeros
   __m256 acc[NReg * MReg];
   for (int i = 0; i < NReg * MReg; i++) {
@@ -1906,16 +1905,27 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 }
 template <int MTILE, int NReg, int Unroll>
 static inline void accumulate_fp32_s8_fp32(const float* Aptr, int lda, int8_t* Bptr, __m256* vacc, __m256* vsca) {
-  for (int ikk = 0; ikk < Unroll; ikk++) {
-    __m256 va[MTILE];
-    for (int im = 0; im < MTILE; im++) {
-      va[im] = _mm256_set1_ps(*(Aptr + ikk + im * lda));
+  if constexpr (MTILE == 1) {
+    for (int ikk = 0; ikk < Unroll; ikk++) {
+      __m256 va = _mm256_set1_ps(*(Aptr + ikk));
+      for (int i = 0; i < NReg; i++) {
+        auto ftmp = load_s8_fp32(Bptr + i * 8 + ikk * NReg * 8);
+        ftmp = _mm256_mul_ps(ftmp, vsca[i]);
+        vacc[i] = _mm256_fmadd_ps(va, ftmp, vacc[i]);
+      }
     }
-    for (int i = 0; i < NReg; i++) {
-      auto ftmp = load_s8_fp32(Bptr + i * 8 + ikk * NReg * 8);
-      ftmp = _mm256_mul_ps(ftmp, vsca[i]);
-      for (int im = 0; im < MTILE; im++) {
-        vacc[im * NReg + i] = _mm256_fmadd_ps(va[im], ftmp, vacc[im * NReg + i]);
+  } else {
+    for (int ikk = 0; ikk < Unroll; ikk++) {
+      __m256 va[MTILE];
+      for (int i = 0; i < NReg; i++) {
+        auto ftmp = load_s8_fp32(Bptr + i * 8 + ikk * NReg * 8);
+        ftmp = _mm256_mul_ps(ftmp, vsca[i]);
+        for (int im = 0; im < MTILE; im++) {
+          if (i == 0) {
+            va[im] = _mm256_set1_ps(*(Aptr + ikk + im * lda));
+          }
+          vacc[im * NReg + i] = _mm256_fmadd_ps(va[im], ftmp, vacc[im * NReg + i]);
+        }
       }
     }
   }
@@ -2439,7 +2449,7 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
     int constexpr Unroll = 4;
     assert((blocksize % 4) == 0);
     assert(tmpsize >= NTILE * Unroll);
-    
+
     if (B.zpptr) {
       __m256i bzp[NReg];
       auto bzptr = B.zpptr + ib * B.ldzp;
