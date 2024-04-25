@@ -820,9 +820,9 @@ class UT_CompFp32 {
   }
   void ut_s4() {
     CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                           true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                           false);
@@ -1299,8 +1299,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompInt8 sUT_CompInt8;
+#endif
 
 class UT_CompBf16 {
  public:

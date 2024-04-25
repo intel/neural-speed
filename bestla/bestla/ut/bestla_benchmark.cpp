@@ -87,8 +87,8 @@ class Benchmark_Fp32Fp32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-#endif
 static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
+#endif
 
 class Benchmark_U8S8S32 {
  public:
@@ -499,7 +499,7 @@ class UTWOQ_CompFp32 {
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
         log.start();
-        GemmProblem gp(1, m, n, k);
+        GemmProblem gp(1, m, n, k, blocksize);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {&packBs[i]}, {C + i * m * n, n}};
         parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
         log.stop();
@@ -604,7 +604,7 @@ class UTWOQ_CompFp32 {
           }
         }
         if (_cd->AVX2()) {
-          if (m > 4) {
+          if (m > 0) {
             benchmark<gemm::SCoreRowNAvx2<24, 4>, LOG, Wei, Scale_T>(m, n, k, batch, blocksize, A.data(), B.data(),
                                                                      C.data(), testtime, threads, qtype);
           } else {

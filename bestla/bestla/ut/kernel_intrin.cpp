@@ -185,6 +185,8 @@ class UT_avx2_gemv {
   UT_avx2_gemv() {
     UT_START();
     CheckISA(AVX2);
+    ut_4bit_fp32(24, 128, 32, true);
+    ut_4bit_fp32(24, 128, 32, false);
     ut_4bit(24, 128, 32, true);
     ut_4bit(24, 128, 32, false);
     ut_4bit_s8s8(24, 128, 32, true);
@@ -233,10 +235,40 @@ class UT_avx2_gemv {
       }
     }
     gemmref_fp32fp32fp32(1, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
-    kernel::avx2::gemv_4bit_u8s8_fp32<float, 24>(
-        {A.data(), scalea.data(), azp.data()},
-        {(uint8_t*)b2.data(), nullptr, nullptr, scaleb.data(), iasym ? bzp.data() : nullptr, 2}, Cf32.data(), k, n,
-        kblock, cache, CacheSize);
+    utils::GemvParamB<float> B{(uint8_t*)b2.data(), nullptr, nullptr, scaleb.data(), iasym ? bzp.data() : nullptr, 2};
+    kernel::avx2::gemv_4bit_u8s8_fp32<float, 24>({A.data(), scalea.data(), azp.data()}, B, Cf32.data(), k, n, kblock,
+                                                 cache, CacheSize);
+    buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
+  }
+
+  void ut_4bit_fp32(int n, int k, int kblock, bool iasym) {
+    printf("Test Case %s: %d %d %d\n", __FUNCTION__, n, k, kblock);
+    int blks = k / kblock;
+    avector<bit4x2> b2(n * k / 2);
+    avector<float> scaleb(n * blks), scalea(blks);
+    avector<int8_t> bzp(n * blks);
+    avector<float> Af32(k), Bf32(n * k), Cf32(n), Cref(n);
+    fill_buffer_randn((uint8_t*)b2.data(), b2.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(Af32.data(), Af32.size(), -0.5f, 0.5f);
+    fill_buffer_randn(bzp.data(), bzp.size(), int8_t(-8), int8_t(7));
+    fill_buffer_randn(scaleb.data(), scaleb.size(), 0.01f, 0.02f);
+
+    for (int i = 0; i < k; i += 1) {
+      int bid = i / kblock;
+      for (int j = 0; j < n; j += 2) {
+        auto b24 = b2[(i * n + j) / 2];
+        if (iasym) {
+          Bf32[(i)*n + j + 0] = (int(b24.x - 8) - bzp[bid * n + j + 0]) * scaleb[bid * n + j + 0];
+          Bf32[(i)*n + j + 1] = (int(b24.y - 8) - bzp[bid * n + j + 1]) * scaleb[bid * n + j + 1];
+        } else {
+          Bf32[(i)*n + j + 0] = (int(b24.x - 8)) * scaleb[bid * n + j + 0];
+          Bf32[(i)*n + j + 1] = (int(b24.y - 8)) * scaleb[bid * n + j + 1];
+        }
+      }
+    }
+    gemmref_fp32fp32fp32(1, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
+    utils::GemvParamB<float> B{(uint8_t*)b2.data(), nullptr, nullptr, scaleb.data(), iasym ? bzp.data() : nullptr, 4};
+    kernel::avx2::gemv_4bit_fp32_fp32<float, 24>(Af32.data(), B, Cf32.data(), k, n, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 

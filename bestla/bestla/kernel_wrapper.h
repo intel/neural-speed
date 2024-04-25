@@ -1020,6 +1020,18 @@ class GEMVWoqNBits {
     }
     return BTLA_CODE::NotSupport;
   }
+
+  template <BTLA_ISA ISA_T, typename ScaleT, int NTILE>
+  static inline BTLA_CODE forward_fp32_fp32(const float* A, const utils::GemvParamB<ScaleT>& B, float* C, int k,
+                                            int ld_scaleb, int blocksize, void* tmp, size_t tmpsize) {
+    if (B.nbits == 4) {
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_4bit_fp32_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+      }
+      return ref::gemv_4bit_fp32_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    return BTLA_CODE::NotSupport;
+  }
 };
 
 }  // namespace wrapper

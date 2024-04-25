@@ -1745,6 +1745,44 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 }
 
 template <typename ScaleT, int NTILE>
+static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, const utils::GemvParamB<ScaleT>& B, float* C, int k,
+                                            int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
+  int blks = k / blocksize;
+  float accf[NTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto b4ptr = B.b4ptr;
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * ld_scaleb;
+    if (B.zpptr) {
+      auto bzptr = B.zpptr + ib * ld_scaleb;
+      for (int ik = 0; ik < blocksize; ik += 1) {
+        auto aval = A[ib * blocksize + ik];
+        for (int in = 0; in < NTILE; in += 2) {
+          auto bv0 = *(utils::int4x2*)(b4ptr + in / 2);
+          accf[in + 0] += aval * (bv0.x - 8 - bzptr[in + 0]) * bsptr[in + 0];
+          accf[in + 1] += aval * (bv0.y - 8 - bzptr[in + 1]) * bsptr[in + 1];
+        }
+        b4ptr += NTILE / 2;
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 1) {
+        auto aval = A[ib * blocksize + ik];
+        for (int in = 0; in < NTILE; in += 2) {
+          auto bv0 = *(utils::int4x2*)(b4ptr + in / 2);
+          accf[in + 0] += aval * (bv0.x - 8) * bsptr[in + 0];
+          accf[in + 1] += aval * (bv0.y - 8) * bsptr[in + 1];
+        }
+        b4ptr += NTILE / 2;
+      }
+    }
+  }
+  for (int in = 0; in < NTILE; in++) {
+    C[in] = accf[in];
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE>
 static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
   int blks = k / blocksize;
