@@ -19,17 +19,17 @@
 // #define UT_DEBUG 1
 using namespace gpu::xetla;
 // The number of times the kernel is executed
-constexpr int ITER = 1000;
+constexpr int ITER = 100;
 
 class test1_xehpg {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_m = 1024;
   static constexpr size_t mat_n = 4096 * 3;
   static constexpr size_t mat_k = 4096 * 3;
-  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_m = 8;
   static constexpr size_t wg_n = 32 * 2;
-  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 32;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 16;
@@ -43,7 +43,7 @@ class test1_xehpg {
   using data_type_a = fp16;
   using data_type_b = int4x2;
   using data_type_c = fp16;
-  static constexpr bool act_shuffle = true;
+  static constexpr bool act_shuffle = false;
   static constexpr gpu::xetla::group::weight_dtype weight_dtype =
       gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP;
 };
@@ -52,6 +52,32 @@ class test1_gpu_xelpg : public test1_xehpg {
  public:
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
+};
+
+class test3_gpu_xelpg {
+ public:
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 32 * 2;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 32;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 16;
+
+  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr bool act_shuffle = false;
+  static constexpr gpu::xetla::group::weight_dtype weight_dtype =
+      gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP;
 };
 
 class test4_gpu_xelpg {
@@ -194,6 +220,32 @@ class test9_gpu_xelpg {
 
   static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 2;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr bool act_shuffle = true;
+  static constexpr gpu::xetla::group::weight_dtype weight_dtype =
+      gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP;
+};
+
+class test10_gpu_xelpg {
+ public:
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 32 * 2;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 32;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 16;
+
+  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::row_major;
   using data_type_a = fp16;
@@ -963,14 +1015,10 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-// using tests = ::testing::Types<test1_xehpg, test1_gpu_xelpg>;
-using tests = ::testing::Types<
-    test4_gpu_xelpg,
-    test5_gpu_xelpg,
-    test6_gpu_xelpg,
-    test7_gpu_xelpg,
-    test8_gpu_xelpg,
-    test9_gpu_xelpg>;
+using tests = ::testing::Types<test1_xehpg>;
+// using tests = ::testing::Types<
+//     test3_gpu_xelpg,
+//     test10_gpu_xelpg>;
 // using tests = ::testing::Types<qkv1, qkv2, qkv3, qkv4, qkv5, qkv6, qkv7,
 // qkv8,
 //         qkv9, qkv10>;

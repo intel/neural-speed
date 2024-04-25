@@ -164,7 +164,8 @@ class gemm_t<
   using matA_payload_t = subgroup::mem_payload_t<
       mem_desc_a_t,
       matA_tile_desc_t,
-      subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>,
+      //   subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>,
+      msg_type::block_2d,
       arch_tag>;
   using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
   using matA_prefetch_payload_t = subgroup::
@@ -624,8 +625,8 @@ class gemm_t<
               block_idx * elt_per_block + row * tile_size_x_a) =
               sycl::ext::intel::esimd::gather<dtype_a, block_size_x_a>(
                   reinterpret_cast<dtype_a*>(matA_payload.base_ptr) +
-                      // matA_payload.base_y * matA_payload.pitch_in_bytes /
-                      //     sizeof(dtype_a) +
+                      matA_payload.base_y * matA_payload.pitch_in_bytes /
+                          sizeof(dtype_a) +
                       row * dst_swidth + block_y * block_size_y_a * dst_swidth,
                   gidx);
         }
