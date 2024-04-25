@@ -87,8 +87,8 @@ class Benchmark_Fp32Fp32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 #endif
+static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 
 class Benchmark_U8S8S32 {
  public:
@@ -619,8 +619,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompFp32 sUTWOQ_CompFp32;
 #endif
+static UTWOQ_CompFp32 sUTWOQ_CompFp32;
 
 class UTWOQ_CompBf16 {
  public:

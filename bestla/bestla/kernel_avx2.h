@@ -448,7 +448,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack4_row(utils::int4x2* srcptr,
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   for (int ir = 0; ir < row; ir += blocksize) {
-    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp;
+    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
     for (int i = 0; i < NReg; i++) {
       v_zp_y[i] = load_zp_epi8_broadcast_epi32(zptr + i * 8, vindex);
     }
@@ -479,7 +479,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack2_row(utils::int4x2* srcptr,
   const auto vindex = _mm256_set_epi8(14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0, 14, 14, 12, 12, 10, 10, 8,
                                       8, 6, 6, 4, 4, 2, 2, 0, 0);
   for (int ir = 0; ir < row; ir += blocksize) {
-    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp;
+    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
     memcpy(tmp, zptr, NTILE * sizeof(int8_t));
     memcpy(tmp + NTILE, zptr, NTILE * sizeof(int8_t));
     for (int i = 0; i < NReg; i++) {
@@ -526,7 +526,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack1_row(utils::int4x2* srcptr,
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   for (int ir = 0; ir < row; ir += blocksize) {
-    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp;
+    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
     for (int i = 0; i < Unroll; i++) {
       memcpy(tmp + i * NTILE, zptr, NTILE * sizeof(int8_t));
     }
@@ -984,13 +984,14 @@ inline BTLA_CODE decompress_kblock_s4_fp_row(utils::int4x2* srcptr, DST_T* dstpt
 
   for (int ir = 0; ir < row; ir += blocksize) {
     int k_remain = utils::remainsize(ir, row, blocksize);
+    int ele_off = (k_offset + ir) / blocksize * ldzp + n_offset;
     if constexpr (PackRow == 1) {
       __m256 vscale_y[NReg];
       if (sdtype == BTLA_DTYPE::F32) {
-        auto sptr = (float*)scales_ + (k_offset + ir) / blocksize * ldzp;
+        auto sptr = (float*)scales_ + ele_off;
         for (int i = 0; i < NReg; i++) vscale_y[i] = _mm256_loadu_ps(sptr + i * 8);
       } else if (sdtype == BTLA_DTYPE::BF16) {
-        auto sptr = (utils::bf16*)scales_ + (k_offset + ir) / blocksize * ldzp;
+        auto sptr = (utils::bf16*)scales_ + ele_off;
         for (int i = 0; i < NReg; i++) vscale_y[i] = load_bf16_fp32(sptr + i * 8);
       }
       for (int ib = 0; ib < k_remain; ib += PackRow) {
@@ -1007,10 +1008,10 @@ inline BTLA_CODE decompress_kblock_s4_fp_row(utils::int4x2* srcptr, DST_T* dstpt
       for (int i = 0; i < NReg; i++) {
         __m256 vraw;
         if (sdtype == BTLA_DTYPE::F32) {
-          auto sptr = (float*)scales_ + (k_offset + ir) / blocksize * ldzp;
+          auto sptr = (float*)scales_ + ele_off;
           vraw = _mm256_loadu_ps(sptr + i * 8);
         } else if (sdtype == BTLA_DTYPE::BF16) {
-          auto sptr = (utils::bf16*)scales_ + (k_offset + ir) / blocksize * ldzp;
+          auto sptr = (utils::bf16*)scales_ + ele_off;
           vraw = load_bf16_fp32(sptr + i * 8);
         }
         auto vcast_y = broadcast_ps_1_2<true>(vraw, vshuf_index_y);
@@ -1036,10 +1037,10 @@ inline BTLA_CODE decompress_kblock_s4_fp_row(utils::int4x2* srcptr, DST_T* dstpt
       for (int i = 0; i < NReg; i++) {
         __m256 vraw;
         if (sdtype == BTLA_DTYPE::F32) {
-          auto sptr = (float*)scales_ + (k_offset + ir) / blocksize * ldzp;
+          auto sptr = (float*)scales_ + ele_off;
           vraw = _mm256_loadu_ps(sptr + i * 8);
         } else if (sdtype == BTLA_DTYPE::BF16) {
-          auto sptr = (utils::bf16*)scales_ + (k_offset + ir) / blocksize * ldzp;
+          auto sptr = (utils::bf16*)scales_ + ele_off;
           vraw = load_bf16_fp32(sptr + i * 8);
         }
         vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vraw, vshuf_index_y);

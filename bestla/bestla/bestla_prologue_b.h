@@ -891,7 +891,7 @@ class WeightKBlockNInteger {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2;
-    auto zpptr = wptr->template ZPtr<int8_t>() + n_offset;
+    auto zpptr = wptr->template ZPtr<int8_t>();
     int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
 
     assert(wptr->mDType == BTLA_DTYPE::S4_CLIP);
