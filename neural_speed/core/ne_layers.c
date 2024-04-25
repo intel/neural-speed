@@ -370,80 +370,80 @@ static bool NE_IS_QUANTIZED[NE_TYPE_COUNT] = {
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_IS_QUANTIZED is outdated");
 
-static const char* NE_OP_LABEL[NE_OP_COUNT] = {
-    "NONE",
+static const char* NE_OP_LABEL[NE_OP_COUNT] = {"NONE",
 
-    "DUP",
-    "ADD",
-    "ADD1",
-    "ACC",
-    "SUB",
-    "MUL",
-    "DIV",
-    "SQR",
-    "SQRT",
-    "LOG",
-    "SUM",
-    "SUM_ROWS",
-    "MEAN",
-    "REPEAT",
-    "ABS",
-    "SGN",
-    "NEG",
-    "STEP",
-    "RELU",
-    "GELU",
-    "SILU",
-    "SILU_BACK",
-    "NORM",
-    "RMS_NORM",
-    "RMS_NORM_BACK",
-    "ARGSORT",
-    "MUL_MAT",
-    "MUL_MAT_WITH_BIAS",
-    "MUL_MAT_ID",
-    "SCALE",
-    "SET",
-    "CPY",
-    "CONT",
-    "RESHAPE",
-    "VIEW",
-    "PERMUTE",
-    "TRANSPOSE",
-    "GET_ROWS",
-    "GET_ROWS_BACK",
-    "DIAG",
-    "DIAG_MASK_INF",
-    "DIAG_MASK_ZERO",
-    "PADDING_MASK_INF",
-    "SOFT_MAX",
-    "ROPE",
-    "ROPE_BACK",
-    "ALIBI",
-    "CLAMP",
-    "CONV_1D_1S",
-    "CONV_1D_2S",
+                                               "DUP",
+                                               "ADD",
+                                               "ADD1",
+                                               "ACC",
+                                               "SUB",
+                                               "MUL",
+                                               "DIV",
+                                               "SQR",
+                                               "SQRT",
+                                               "LOG",
+                                               "SUM",
+                                               "SUM_ROWS",
+                                               "TANH",
+                                               "MEAN",
+                                               "REPEAT",
+                                               "ABS",
+                                               "SGN",
+                                               "NEG",
+                                               "STEP",
+                                               "RELU",
+                                               "GELU",
+                                               "SILU",
+                                               "SILU_BACK",
+                                               "NORM",
+                                               "RMS_NORM",
+                                               "RMS_NORM_BACK",
+                                               "ARGSORT",
+                                               "MUL_MAT",
+                                               "MUL_MAT_WITH_BIAS",
+                                               "MUL_MAT_ID",
+                                               "SCALE",
+                                               "SET",
+                                               "CPY",
+                                               "CONT",
+                                               "RESHAPE",
+                                               "VIEW",
+                                               "PERMUTE",
+                                               "TRANSPOSE",
+                                               "GET_ROWS",
+                                               "GET_ROWS_BACK",
+                                               "DIAG",
+                                               "DIAG_MASK_INF",
+                                               "DIAG_MASK_ZERO",
+                                               "PADDING_MASK_INF",
+                                               "SOFT_MAX",
+                                               "ROPE",
+                                               "ROPE_BACK",
+                                               "ALIBI",
+                                               "CLAMP",
+                                               "CONV_1D_1S",
+                                               "CONV_1D_2S",
 
-    "MUL_QKV",
-    "FFN_SILU",
-    "FFN_GeLU",
-    "FFN_GeLU_MUL",
-    "FFN_ADD_GeLU",
-    "FFN_ID_SILU",
-    "FLASH_ATTN",
-    "FLASH_ATTN_KV_UPDATE",
-    "FLASH_FF",
-    "MAP_UNARY",
-    "MAP_BINARY",
-    "SPLIT",
-    "ALL_REDUCE",
-    "TP_CONCAT",
-    "DUMP_TENSOR",
-    "CONV_1D",
-    "DEBUG",
-};
+                                               "MUL_QKV",
+                                               "FFN_SILU",
+                                               "FFN_GeLU",
+                                               "FFN_GeLU_MUL",
+                                               "FFN_ADD_GeLU",
+                                               "FFN_ID_SILU",
+                                               "FFN_ID_GELU",
+                                               "FLASH_ATTN",
+                                               "FLASH_ATTN_KV_UPDATE",
+                                               "FLASH_FF",
+                                               "MAP_UNARY",
+                                               "MAP_BINARY",
+                                               "SPLIT",
+                                               "ALL_REDUCE",
+                                               "TP_CONCAT",
+                                               "DUMP_TENSOR",
+                                               "CONV_1D",
+                                               "DEBUG"};
 
-static_assert(NE_OP_COUNT == 69, "NE_OP_COUNT != 69");
+static_assert(NE_OP_COUNT == 71, "NE_OP_COUNT != 71");
 
 static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "none",
@@ -460,6 +460,7 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "log(x)",
     "Σx",
     "Σx_k",
+    "tanh(x)",
     "Σx/n",
     "repeat(x)",
     "abs(x)",
@@ -505,14 +506,15 @@ static const char* NE_OP_SYMBOL[NE_OP_COUNT] = {
     "ffn_gelu(x)",
     "ffn_gelu_mul(x)",
     "ffn_gelu_with_bias(x)",
+    "ffn_id_gelu(x)",
     "flash_attn(x)",
     "flash_attn_kv_update(x)",
     "flash_ff(x)",
     "f(x)",
     "f(x,y)",
     "conv_1d(x)",
-    "debug(x)",
     "argsort(x)",
+    "debug(x)",
 };
 
 static_assert(sizeof(struct ne_object) % NE_MEM_ALIGN == 0, "ne_object size must be a multiple of NE_MEM_ALIGN");
@@ -706,6 +708,9 @@ static inline int ne_up(int n, int m) {
   NE_ASSERT((m & (m - 1)) == 0);
   return (n + m - 1) & ~(m - 1);
 }
+
+// static inline  void ne_vec_tanh_f32 (const int n, float * y, const float * x) { for (int i = 0; i < n; ++i) y[i] =
+// tanhf(x[i]);  }
 
 // assert that pointer is aligned to NE_MEM_ALIGN
 #define ne_assert_aligned(ptr) NE_ASSERT(((uintptr_t)(ptr)) % NE_MEM_ALIGN == 0)
@@ -1645,6 +1650,18 @@ struct ne_tensor* ne_mul_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   return result;
 }
 
+struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a) {
+  bool is_node = false;
+
+  struct ne_tensor* result = ne_dup_tensor(ctx, a);
+
+  result->op = NE_OP_TANH;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = a;
+
+  return result;
+}
+
 struct ne_tensor* ne_mul(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b) {
   return ne_mul_impl(ctx, a, b, false);
 }
@@ -2248,6 +2265,51 @@ struct ne_tensor* ne_mul_id_ffn_silu(struct ne_context* ctx, struct ne_tensor* c
   int params[] = {id, n_as};
   ne_set_op_params(result, &params, sizeof(params));
   result->op = NE_OP_MUL_ID_FFN_SILU;
+  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->src0 = src;
+  result->src1 = ids;
+  for (int i = 0; i < n_as; i++) {
+    struct ne_tensor* a = gate[i];
+    struct ne_tensor* b = down[i];
+    struct ne_tensor* c = up[i];
+    result->opt[i] = a;
+    result->opt[i + 8] = b;
+    result->opt[i + 16] = c;
+  }
+  result->opt[24] = tmp;
+  result->opt[25] = tmp1;
+  // struct ne_tensor *result = ne_ffn_silu(ctx,gate[row_id], down[row_id],up[row_id], b);
+  return result;
+}
+
+struct ne_tensor* ne_mul_id_ffn_gelu(struct ne_context* ctx, struct ne_tensor* const down[],
+                                     struct ne_tensor* const gate[], struct ne_tensor* const up[], int n_as,
+                                     struct ne_tensor* ids, int id, struct ne_tensor* src) {
+  struct ne_tensor* w1 = gate[0];
+  struct ne_tensor* w2 = down[0];
+  struct ne_tensor* w3 = up[0];
+  NE_ASSERT(ids->type == NE_TYPE_I32);
+  NE_ASSERT(ids->ne[2] == 1 && ids->ne[3] == 1);
+  NE_ASSERT(ids->ne[1] == src->ne[1]);
+  NE_ASSERT(ids->ne[2] == src->ne[2] && ids->ne[3] == src->ne[3]);
+  NE_ASSERT(n_as > 0 && n_as <= 8);
+  NE_ASSERT(id >= 0 && id < ids->ne[0]);
+  NE_ASSERT(ne_are_same_shape(w1, w3));
+  NE_ASSERT(w2->ne[0] == w1->ne[1]);
+
+  bool is_node = false;
+
+  if (down[0]->grad || src->grad) {
+    is_node = true;
+  }
+  const int64_t ne[4] = {w2->ne[1], src->ne[1], src->ne[2], src->ne[3]};
+  struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, ne, NE_SIZE_CALC);
+  const int64_t tne[4] = {w1->ne[1], src->ne[1], src->ne[2], src->ne[3]};
+  struct ne_tensor* tmp = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC);
+  struct ne_tensor* tmp1 = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC);
+  int params[] = {id, n_as};
+  ne_set_op_params(result, &params, sizeof(params));
+  result->op = NE_OP_MUL_ID_FFN_GELU;
   result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
   result->src0 = src;
   result->src1 = ids;
@@ -5427,7 +5489,7 @@ static void ne_compute_forward_mul(const struct ne_compute_params* params, const
 
 static void ne_compute_forward_div_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        const struct ne_tensor* src1, struct ne_tensor* dst) {
-  // assert(params->ith == 0);
+  assert(params->ith == 0);
   assert(ne_are_same_shape(src0, src1) && ne_are_same_shape(src0, dst));
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -5656,7 +5718,7 @@ static void ne_compute_forward_sum(const struct ne_compute_params* params, const
 
 static void ne_compute_forward_sum_rows_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                             struct ne_tensor* dst) {
-  // NE_ASSERT(params->ith == 0);
+  NE_ASSERT(params->ith == 0);
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
@@ -7742,7 +7804,29 @@ static void ne_compute_forward_ffn_silu(const struct ne_compute_params* params, 
   bestla_fusion_FFN_SiLu_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
                                         (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
 }
+static void ne_compute_forward_ffn_id_gelu(const struct ne_compute_params* params, const struct ne_tensor* src,
+                                           const struct ne_tensor* ids, const struct ne_tensor* tmp,
+                                           struct ne_tensor* tmp1, struct ne_tensor* dst) {
+  const int id = dst->op_params[0];
+  if (params->type == NE_TASK_INIT) {
+    return;
+  }
 
+  if (params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  const int32_t row_id = *(const int32_t*)((const char*)ids->data + id * ids->nb[0]);
+  const struct ne_tensor* w1 = dst->opt[row_id];
+  const struct ne_tensor* w2 = dst->opt[row_id + 8];
+  const struct ne_tensor* w3 = dst->opt[row_id + 16];
+
+  const int fin = src->ne[0];
+  const int fout = dst->ne[0];
+  const int fmid = w1->ne[1];
+  const int seq = dst->ne[1];
+  bestla_fusion_FFN_Gelu_Mul_f32f32_forward((float*)src->data, w1->data, w2->data, w3->data, (float*)tmp->data,
+                                            (float*)tmp1->data, (float*)dst->data, seq, fin, fmid, fout, params->wdata);
+}
 static void ne_compute_forward_ffn_add_gelu(const struct ne_compute_params* params, const struct ne_tensor* src,
                                             const struct ne_tensor* w1, const struct ne_tensor* w2,
                                             const struct ne_tensor* b1, const struct ne_tensor* b2,
@@ -8168,7 +8252,39 @@ static void ne_compute_forward_get_rows(const struct ne_compute_params* params, 
 }
 
 // ne_compute_forward_get_rows_back
+// ggml_compute_forward_tanh
 
+static void ne_compute_forward_tanh_f32(const struct ne_compute_params* params, struct ne_tensor* src0,
+                                        struct ne_tensor* dst) {
+  assert(params->ith == 0);
+  assert(ne_are_same_shape(src0, dst));
+
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+
+  const int n = ne_nrows(src0);
+  const int nc = src0->ne[0];
+
+  assert(dst->nb[0] == sizeof(float));
+  assert(src0->nb[0] == sizeof(float));
+
+  for (int i = 0; i < n; i++) {
+    ne_vec_tanh_f32(nc, (float*)((char*)dst->data + i * (dst->nb[1])), (float*)((char*)src0->data + i * (src0->nb[1])));
+  }
+}
+
+static void ne_compute_forward_tanh(const struct ne_compute_params* params, struct ne_tensor* src0,
+                                    struct ne_tensor* dst) {
+  switch (src0->type) {
+    case NE_TYPE_F32: {
+      ne_compute_forward_tanh_f32(params, src0, dst);
+    } break;
+    default: {
+      NE_ASSERT(false);
+    } break;
+  }
+}
 static void ne_compute_forward_get_rows_back_f32_f16(const struct ne_compute_params* params,
                                                      const struct ne_tensor* src0, const struct ne_tensor* src1,
                                                      const struct ne_tensor* opt0, struct ne_tensor* dst) {
@@ -10422,6 +10538,9 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
     case NE_OP_MUL_MAT_ID: {
       ne_compute_forward_mul_mat_id(params, tensor->src0, tensor->src1, tensor);
     } break;
+    case NE_OP_TANH: {
+      ne_compute_forward_tanh(params, tensor->src0, tensor);
+    } break;
     case NE_OP_ARGSORT: {
       ne_compute_forward_argsort(params, tensor->src0, tensor);
     } break;
@@ -10434,6 +10553,9 @@ static void ne_compute_forward(struct ne_compute_params* params, struct ne_tenso
     case NE_OP_MUL_FFN_SILU: {
       ne_compute_forward_ffn_silu(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1], tensor->opt[2],
                                   tensor->opt[3], tensor);
+    } break;
+    case NE_OP_MUL_ID_FFN_GELU: {
+      ne_compute_forward_ffn_id_gelu(params, tensor->src0, tensor->src1, tensor->opt[24], tensor->opt[25], tensor);
     } break;
     case NE_OP_MUL_FFN_ADD_GELU: {
       ne_compute_forward_ffn_add_gelu(params, tensor->src0, tensor->src1, tensor->opt[0], tensor->opt[1],
@@ -11252,9 +11374,9 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_SUM:
         case NE_OP_DIV:
         case NE_OP_SUM_ROWS:
-        //  {
-        //   node->n_tasks = 1;
-        // } break;
+        case NE_OP_TANH: {
+          node->n_tasks = 1;
+        } break;
         case NE_OP_SQR:
         case NE_OP_SQRT:
         case NE_OP_LOG:
@@ -11336,6 +11458,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
           work_size = MAX(work_size, cur);
           node->n_tasks = 1;
         } break;
+        case NE_OP_MUL_ID_FFN_GELU:
         case NE_OP_MUL_ID_FFN_SILU: {
           size_t cur = 0;
           cur =
@@ -11543,16 +11666,12 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
   NE_PRINT("=== GRAPH Profiling ===\n");
 
   int64_t ip_duration = 0;
-  int64_t mul_mat_id_duration = 0;
   for (int i = 0; i < cgraph->n_nodes; i++) {
     struct ne_tensor* node = cgraph->nodes[i];
     if (node->op == NE_OP_MUL_MAT && node->ne[1] == node->ne[2]) {
       ip_duration += node->perf_time_us;
     } else {
       perf_total_per_op_us[node->op] += node->perf_time_us;
-      if (node->op == NE_OP_MUL_MAT_ID) {
-        mul_mat_id_duration += node->perf_time_us;
-      }
     }
   }
 
@@ -11563,7 +11682,6 @@ void ne_graph_profiling(const struct ne_cgraph* cgraph) {
     NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", NE_OP_LABEL[i], (double)perf_total_per_op_us[i] / 1000.0);
   }
   NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "INNER PRODUCT", (double)ip_duration / 1000.0);
-  NE_PRINT("perf_total_per_op_us[%24s] = %7.3f ms\n", "MUL_MAT_ID", (double)mul_mat_id_duration / 1000.0);
   NE_PRINT("========================================\n");
 
 #else

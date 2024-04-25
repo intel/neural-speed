@@ -855,6 +855,7 @@ class scale_track_max_t<ISA_T, fp16, float> {
     float scale;
     int causal_offset;  // offset for causal mask; negative value for disabling causal mask
     float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
+    float tanh_scale;
   };
 
   TARGET_512 BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
@@ -926,17 +927,24 @@ class scale_track_max_t<ISA_T, float, float> {
     float scale;
     int causal_offset;  // offset for causal mask; negative value for disabling causal mask
     float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
+    float tanh_scale;
   };
   static constexpr float seq15[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
   BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
                     const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
-    return p.alibi_slope == 0 ? forward_<false>(src, src_step, M_offset, N_offset, M, N, p)
-                              : forward_<true>(src, src_step, M_offset, N_offset, M, N, p);
+    if (p.alibi_slope == 0 && p.tanh_scale == 0)
+      return forward_<false, false>(src, src_step, M_offset, N_offset, M, N, p);
+    else if (p.alibi_slope == 0 && p.tanh_scale != 0)
+      return forward_<false, true>(src, src_step, M_offset, N_offset, M, N, p);
+    else if (p.alibi_slope != 0 && p.tanh_scale == 0)
+      return forward_<true, false>(src, src_step, M_offset, N_offset, M, N, p);
+    else
+      return BTLA_CODE::NotSupport;
   }
 
 #if CompileAVX512F()
-  template <bool HAS_ALIBI>
+  template <bool HAS_ALIBI, bool HAS_TANH>
   TARGET_512 BTLA_CODE forward_512(const SType* src, const int src_step, const int M_offset, const int N_offset,
                                    const int M, const int N, const Param& p) const {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
@@ -959,16 +967,27 @@ class scale_track_max_t<ISA_T, float, float> {
         const auto xs = _mm512_fmadd_ps(v_scale, _mm512_loadu_ps(src + i * src_step + j), alibi_curr);
         v_max = _mm512_max_ps(v_max, xs);
         _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI) alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+        if constexpr (HAS_ALIBI)
+          alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+        else if constexpr (HAS_TANH) {
+          float* dst_ = dst + i * p.ld_dst + j;
+          for (int jj = 0; jj < 16; jj++) dst_[jj] = p.tanh_scale * tanh(dst_[jj]);
+        }
       }
       if (j < N_unmasked) {
         const auto xs = _mm512_fmadd_ps(v_scale, _mm512_maskz_loadu_ps(v_mask, src + i * src_step + j), alibi_curr);
         v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
         _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI) alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+        if constexpr (HAS_ALIBI)
+          alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
+        else if constexpr (HAS_TANH) {
+          float* dst_ = dst + i * p.ld_dst + j;
+          for (int jj = 0; jj < N_unmasked - j; jj++) dst_[jj] = p.tanh_scale * tanh(dst_[jj]);
+        }
         j += 16;
       }
       dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
+      if constexpr (HAS_TANH) dst_max[i] = p.tanh_scale * tanh(dst_max[i]);
 
       // if (j < utils::padto(N, 64))
       //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
@@ -977,7 +996,7 @@ class scale_track_max_t<ISA_T, float, float> {
   }
 #endif
 #if CompileAVX2()
-  template <bool HAS_ALIBI>
+  template <bool HAS_ALIBI, bool HAS_TANH>
   BTLA_CODE forward_avx2(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
                          const int N, const Param& p) const {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
@@ -1019,7 +1038,7 @@ class scale_track_max_t<ISA_T, float, float> {
     return BTLA_CODE::Success;
   }
 #endif
-  template <bool HAS_ALIBI>
+  template <bool HAS_ALIBI, bool HAS_TANH>
   BTLA_CODE forward_(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
                      const int N, const Param& p) const {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
@@ -1027,17 +1046,17 @@ class scale_track_max_t<ISA_T, float, float> {
 #if MHA_2ND_EXP
 #if CompileAVX512F()
     if constexpr (ISA_T >= BTLA_ISA::AVX512F) {
-      return forward_512<HAS_ALIBI>(src, src_step, M_offset, N_offset, M, N, p);
+      return forward_512<HAS_ALIBI, HAS_TANH>(src, src_step, M_offset, N_offset, M, N, p);
     }
 #endif
 #if CompileAVX2()
     if constexpr (ISA_T >= BTLA_ISA::AVX2) {
-      return forward_avx2<HAS_ALIBI>(src, src_step, M_offset, N_offset, M, N, p);
+      return forward_avx2<HAS_ALIBI, HAS_TANH>(src, src_step, M_offset, N_offset, M, N, p);
     }
 #endif
 #endif
 
-    // reference
+    // reference without alibi and tanh. NO USE
     for (int i = 0; i < M; ++i) {
       const auto N_unmasked =
           std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
@@ -1067,6 +1086,7 @@ class scale_track_max_t<ISA_T, int32_t, float> {
     float scale;
     int causal_offset;  // offset for causal mask; negative value for disabling causal mask
     float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
+    float tanh_scale;
   };
 
   TARGET_512 BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
@@ -1606,7 +1626,8 @@ class mha_stable_interface_t {
     const auto num_heads = p.batch_size * p.head_num;  // Total number of heads
     GetCPUDevice();
     const bool is_causal = (p.attn_flags & NE_ATTN_FLAG_IS_CAUSAL) != 0;
-    const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;
+    const bool is_alibi = (p.attn_flags & NE_ATTN_FLAG_IS_ALIBI8) != 0;  // only support alibi with 8 now
+    const bool is_tanh = (p.attn_flags & NE_ATTN_FLAG_IS_TANH30) != 0;   // only support tanh with 30 now
     const bool prefer_fp32 = (p.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0;
 
     assert(("prefer_fp32 not followed!",  //
@@ -1631,8 +1652,9 @@ class mha_stable_interface_t {
 
     // alibi slope
     const int n_heads_log2_floor = 1 << static_cast<int>(floor(log2(log_head_num)));
-    const float m0 = powf(2.0f, -(8.f) / n_heads_log2_floor);
-    const float m1 = powf(2.0f, -(8.f / 2.0f) / n_heads_log2_floor);
+    const float m0 = powf(2.0f, -(8.f) / n_heads_log2_floor);         // 8.f is a param of alibi but hardcode now
+    const float m1 = powf(2.0f, -(8.f / 2.0f) / n_heads_log2_floor);  // 8.f is a param of alibi but hardcode now
+    const float tanh_scale = is_tanh ? 30.f : 0.f;                    // 30.f is a param of tanh but hardcode now
 
     const auto m_tiles = updiv(p.sl_q, M_TILE);
     const auto num_tasks = num_heads * m_tiles;
@@ -1722,9 +1744,10 @@ class mha_stable_interface_t {
                       /* .dst = */ tmp_s - i_m * ld_tmp_s,  // pretend that there is a whole S mat
                       /* .dst_sum = */ s_max - i_m,         // pretend that there is a whole S mat
                       /* .ld_dst = */ ld_tmp_s,
-                      /* .scale = */ p.QK_scale * p.Q_sc * p.K_sc,
+                      /* .scale = */ p.QK_scale * p.Q_sc * p.K_sc / (tanh_scale == 0 ? 1.0f : tanh_scale),
                       /* .causal_offset = */ is_causal ? sl_diff : -1,
                       /* .alibi_slope = */ alibi_ihn_m,
+                      /* .tanh_scale = */ tanh_scale,
                   },
                   // /* .workspace = */ nullptr,
               },

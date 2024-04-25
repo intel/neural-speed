@@ -890,6 +890,10 @@ PYBIND11_MODULE(chatglm3_cpp, m)
 
 PYBIND11_MODULE(gemma_cpp, m)
 
+#elif MODEL_NAME_ID == 22
+
+PYBIND11_MODULE(grok_cpp, m)
+
 #endif
 {
   m.doc() = "cpp model python binding";

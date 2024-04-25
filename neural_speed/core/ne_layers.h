@@ -65,8 +65,9 @@ extern "C" {
 typedef enum NE_ATTN_FLAG {
   NE_ATTN_FLAG_NONE = 0,
   NE_ATTN_FLAG_IS_CAUSAL = 1 << 0,
-  NE_ATTN_FLAG_IS_ALIBI8 = 1 << 1,
+  NE_ATTN_FLAG_IS_ALIBI8 = 1 << 1,    // only support alibi with 8 now
   NE_ATTN_FLAG_PREFER_FP32 = 1 << 2,  // prefer to use FP32 as compute type in attn
+  NE_ATTN_FLAG_IS_TANH30 = 1 << 3,    // only support tanh with 30 now
 } NE_ATTN_FLAG;
 typedef uint32_t ne_attn_flags_t;
 
@@ -258,7 +259,9 @@ NE_API struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor*
 NE_API struct ne_tensor* ne_mul_id_ffn_silu(struct ne_context* ctx, struct ne_tensor* const down[],
                                             struct ne_tensor* const gate[], struct ne_tensor* const up[], int n_as,
                                             struct ne_tensor* ids, int id, struct ne_tensor* b);
-
+NE_API struct ne_tensor* ne_mul_id_ffn_gelu(struct ne_context* ctx, struct ne_tensor* const down[],
+                                            struct ne_tensor* const gate[], struct ne_tensor* const up[], int n_as,
+                                            struct ne_tensor* ids, int id, struct ne_tensor* b);
 NE_API struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor* w, struct ne_tensor* b,
                                               struct ne_tensor* a);
 NE_API struct ne_tensor* ne_argsort(struct ne_context* ctx, struct ne_tensor* a);
@@ -355,6 +358,7 @@ NE_API struct ne_tensor* ne_view_4d(struct ne_context* ctx, struct ne_tensor* a,
 
 NE_API struct ne_tensor* ne_permute(struct ne_context* ctx, struct ne_tensor* a, int axis0, int axis1, int axis2,
                                     int axis3);
+NE_API struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a);
 
 // alias for ne_permute(ctx, a, 1, 0, 2, 3)
 NE_API struct ne_tensor* ne_transpose(struct ne_context* ctx, struct ne_tensor* a);
