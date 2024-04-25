@@ -28,7 +28,7 @@ namespace gpu::xetla::subgroup {
 namespace detail {
 template <typename tile_t, typename payload_t>
 struct check_load_type {
-  static constexpr bool is_lsc_gather = true;
+  static constexpr bool use_gather = false;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
        (payload_t::message_type == msg_type::block_2d) &&
@@ -440,12 +440,12 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @return No return, update in place.
 template <
     cache_hint L1 = cache_hint::cached,
-    cache_hint L3 = cache_hint::cached,
+    cache_hint L2 = cache_hint::cached,
     typename tile_t,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
-    detail::check_load_type<tile_t, payload_t>::is_lsc_gather &&
+    detail::check_load_type<tile_t, payload_t>::use_gather &&
     payload_t::arch_tag <= gpu_arch::XeHpg>
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
@@ -490,7 +490,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload_t::simd_exec_size,
             data_size::default_size,
             L1,
-            L3,
+            L2,
             payload_t::num_channel>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
@@ -549,19 +549,17 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @return No return, update in place.
 template <
     cache_hint L1 = cache_hint::cached,
-    cache_hint L3 = cache_hint::cached,
+    cache_hint L2 = cache_hint::cached,
     typename tile_t,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
-    !detail::check_load_type<tile_t, payload_t>::is_lsc_gather &&
-    !arch_has_2d_load_store(payload_t::arch_tag)>
+    !detail::check_load_type<tile_t, payload_t>::use_gather &&
+    payload_t::arch_tag <= gpu_arch::XeHpg>
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
-  using load_dtype = typename payload_t::mem_dtype;
-  constexpr uint32_t load_elems = payload_t::simd_exec_size;
-  constexpr uint32_t pack_factor = payload_t::pack_factor;
+  constexpr uint32_t load_elems = tile_desc::block_size_x;
 
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
@@ -574,23 +572,16 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += 1) {
-        xetla_vector<load_dtype, load_elems> reg_tmp = 0;
         uint32_t address_offset = payload_t::trans
             ? offset_x * payload.pitch_in_bytes +
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
-        reg_tmp = xetla_load_global<
-            load_dtype,
-            payload_t::simd_exec_size,
-            data_size::default_size,
-            L1,
-            L3>(payload.base_ptr, payload.base_offset + address_offset);
 
-        reg_sub
-            .xetla_select<load_elems * pack_factor, 1>(
-                sub_block_y * tile_desc::block_size_x)
-            .xetla_format<load_dtype>() = reg_tmp;
+        reg_sub.xetla_select<load_elems, 1>(
+            sub_block_y * tile_desc::block_size_x) =
+            xetla_load_global<dtype, load_elems>(
+                (dtype*)payload.base_ptr, payload.base_offset + address_offset);
       }
     }
   }
