@@ -70,7 +70,7 @@
 #define CompileAMXINT8() (CompileAMX())
 #endif
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__INTEL_LLVM_COMPILER)
 #define CompileAVX512F() _MSC_VER && (_MSC_VER >= 1911)
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
 #define CompileAMX() 0
@@ -80,12 +80,12 @@
 #define CompileAMXINT8() 0
 #endif
 
-#ifdef __clang_major__
-#define CompileAVX512F() (__clang_major__ >= 4)
-#define CompileAVX2() (__clang_major__ >= 3)
-#define CompileAMX() (__clang_major__ >= 11)
-#define CompileBF16() (__clang_major__ >= 11)
-#define CompileFP16() (__clang_major__ >= 16)
+#if defined(_MSC_VER) && defined(__INTEL_LLVM_COMPILER)
+#define CompileAVX512F() defined(__AVX512F__)
+#define CompileAVX2() defined(__AVX2__) && defined(__F16C__) && defined(__FMA__)
+#define CompileAMX() 0
+#define CompileBF16() 0
+#define CompileFP16() 0
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
 #endif

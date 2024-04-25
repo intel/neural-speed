@@ -106,6 +106,18 @@
       "cacheVariables": {
         "BTLA_UT_OPENMP": "OFF"
       }
+    },
+    {
+      "name": "x64-release-sycl",
+      "displayName": "x64 Release SYCL",
+      "description": "x64 SYCL",
+      "inherits": "x64-debug",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "icx-cl",
+        "CMAKE_C_COMPILER": "icx-cl",
+        "CMAKE_BUILD_TYPE": "Release",
+        "BTLA_UT_ALL": "ON"
+      }
     }
   ]
 }

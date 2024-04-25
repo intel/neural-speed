@@ -34,11 +34,13 @@ class PaddingInterleaveMN {
   template <BTLA_ISA ISA_T, typename T_SRC, typename T_DST = T_SRC>
   static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
                            int dst_step) {
+#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       const auto kern_ret = kernel::avx512f::padding_interleave_cvt<T_SRC, T_DST, RowPack>::forward(
           src, dst, NTile, row, col, row_pad, col_pad, src_step, dst_step);
       if (kern_ret != BTLA_CODE::NotSupport) return kern_ret;
     }
+#endif
     return ref::padding_interleave(src, dst, row, col, row_pad, col_pad, src_step, dst_step, NTile, RowPack);
   }
 };
@@ -62,12 +64,14 @@ class PaddingTransInterleaveMN {
   template <BTLA_ISA ISA_T, typename T_SRC, typename T_DST = T_SRC>
   static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
                            int dst_step) {
+#if CompileAVX512F()
     // Note: rows/cols and i/j are in terms of src
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       const auto kern_ret = kernel::avx512f::padding_trans_interleave_cvt<T_SRC, T_DST, ColPack>::forward(
           src, dst, MTile, row, col, row_pad, col_pad, src_step, dst_step);
       if (kern_ret != BTLA_CODE::NotSupport) return kern_ret;
     }
+#endif
     return ref::padding_trans_interleave(src, dst, row, col, row_pad, col_pad, src_step, dst_step, MTile, ColPack);
   }
 };
@@ -85,7 +89,6 @@ class Memcpy2D {
         return ret;
       }
     }
-#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       auto align_col = col * sizeof(_SRC_T) / 32 * 32 / sizeof(_SRC_T);
       ret = kernel::jit::JitMemcpy2DAvx2::forward<_SRC_T, _DST_T>(srcptr, dstptr, row, align_col, srcstep, dststep,
@@ -97,7 +100,6 @@ class Memcpy2D {
         return ret;
       }
     }
-#endif
     return kernel::ref::memcpy2d(srcptr, dstptr, row, col * sizeof(_SRC_T), srcstep * sizeof(_SRC_T),
                                  dststep * sizeof(_DST_T));
   }
@@ -106,7 +108,6 @@ class Memcpy2D {
   static BTLA_CODE forward1(const _SRC_T* srcptr, _DST_T* dstptr, int row, int col, int srcstep, int dststep,
                             void* const_elt_v = nullptr) {
     auto ret = BTLA_CODE::NotSupport;
-#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       ret = kernel::jit::JitMemcpy2DAvx512f::forward1<_SRC_T, _DST_T, OP_T>(srcptr, dstptr, row, col, srcstep, dststep,
                                                                             const_elt_v);
@@ -114,8 +115,6 @@ class Memcpy2D {
         return ret;
       }
     }
-#endif
-#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       auto align_col = col * sizeof(_SRC_T) / 32 * 32 / sizeof(_SRC_T);
       ret = kernel::jit::JitMemcpy2DAvx2::forward1<_SRC_T, _DST_T, OP_T>(srcptr, dstptr, row, align_col, srcstep,
@@ -128,7 +127,6 @@ class Memcpy2D {
         return ret;
       }
     }
-#endif
     return ref::memcpy2d_withop<_SRC_T, _DST_T, OP_T>(srcptr, dstptr, row, col, srcstep, dststep, const_elt_v);
   }
 };
@@ -504,10 +502,12 @@ class DecompressKBlockS4S8Fp {
                                                               reinterpret_cast<int8_t*>(tmp), tmpsize);
     }
 #endif
+#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                            reinterpret_cast<int8_t*>(tmp), tmpsize);
     }
+#endif
     return ref::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                         reinterpret_cast<int8_t*>(tmp), tmpsize);
   }
@@ -605,14 +605,18 @@ class DecompressKBlockF4FpNoscale {
   static inline BTLA_CODE forward(utils::f4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
                                   void* tmp, size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
+#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return avx512f::decompress_kblock_f4_fp_noscale<F4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                                     reinterpret_cast<int8_t*>(tmp), tmpsize);
     }
+#endif
+#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_f4_fp_noscale<F4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                                  reinterpret_cast<int8_t*>(tmp), tmpsize);
     }
+#endif
     return ref::decompress_kblock_f4_fp_noscale<F4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
                                                               reinterpret_cast<int8_t*>(tmp), tmpsize);
   }
@@ -669,12 +673,10 @@ class DecompressKBlockS8Fp {
   static inline BTLA_CODE forward(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
                                   SCA_T* scales, int8_t* zero_points, int k_offset, int kblock, int NPad, void* tmp,
                                   size_t tmpsize) {
-#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<SCA_T, float>) {  // TODO Scale type support
       return jit::DequanKBlockS8Fp::forward_avx512f<PACK_ROW>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
                                                               zero_points, k_offset, kblock, NPad);
     }
-#endif
 #if CompileAVX2()
     // PACK_ROW must be 1/4 when using avx2 proB.
     if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<SCA_T, float> &&
@@ -694,12 +696,16 @@ class DecompressKBlockS8S8Fp {
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst, void* tmp,
                                   size_t tmpsize) {
+#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {  // TODO Scale type support
       return avx512f::decompress_kblock_s8_s8fp<_DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst);
     }
+#endif
+#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {  // TODO Scale type support
       return avx2::decompress_kblock_s8_s8fp<_DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst);
     }
+#endif
     return ref::decompress_kblock_s8_s8fp<_DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst);
   }
 };
@@ -756,9 +762,11 @@ class CompFp32BlockScale {
       return avx512f::accum_alphaN_f32_f32(alpha, srcptr, srcstep, dstptr, dststep, M, N);
     }
 #endif
+#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::accum_alphaN_f32_f32(alpha, srcptr, srcstep, dstptr, dststep, M, N);
     }
+#endif
     return ref::accum_alphaN_f32_f32(alpha, srcptr, srcstep, dstptr, dststep, M, N);
   }
 };
@@ -845,12 +853,16 @@ class ColBlockReduceSum {
   template <BTLA_ISA ISA_T, typename SRC_T>
   static inline BTLA_CODE forward(const SRC_T* srcptr, int ldsrc, int row, int col, int blocksize, float* reduce,
                                   int ldr) {
+#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<SRC_T, float>) {
       return avx512f::col_block_reduce_sum<SRC_T>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
     }
+#endif
+#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<SRC_T, float>) {
       return avx2::col_block_reduce_sum<SRC_T>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
     }
+#endif
     return ref::col_block_reduce_sum<SRC_T>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
   }
 };
@@ -911,12 +923,16 @@ class LayerNormalization {
   template <BTLA_ISA ISA_T, typename T>
   static inline BTLA_CODE forward(const T* srcptr, const T* scaleptr, const T* biasptr, T epsilon, int norm_size,
                                   T* dstptr, T* mean, T* mean_square, bool simplified) {
+#if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<T, float>) {
       return avx512f::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
     }
+#endif
+#if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<T, float>) {
       return avx2::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
     }
+#endif
     return ref::layernorm(srcptr, scaleptr, biasptr, epsilon, norm_size, dstptr, mean, mean_square, simplified);
   }
   template <typename T>

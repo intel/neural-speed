@@ -235,6 +235,7 @@ void bestla_reordered_attn_fp32_update_k_24x1(const bestla_fusion_attn_fp32_upda
 
     if (p.seq_off == 0 && p.head_size % 8 == 0 && zero_padding) {
       int i = 0;
+#if CompileAVX2()
       for (; i < padto_le(p.seq_size, 8); i += 8) {  // QK_GEMM should not require 0-padding on seq_kv (i.e. N-dim)
         for (int j = 0; j < pad_headsize; j += 8) {  // K-dim padding for QK_GEMM
           const auto i_dst = p.seq_off + i;
@@ -256,6 +257,7 @@ void bestla_reordered_attn_fp32_update_k_24x1(const bestla_fusion_attn_fp32_upda
             _mm_store_si128(reinterpret_cast<__m128i*>(dst + i_blk * pad_headsize + ii + (j + jj) * 24), mm_dst[jj]);
         }
       }
+#endif
     } else {
       for (int i = 0; i < p.seq_size; ++i) {      // QK_GEMM should not require 0-padding on seq_kv (i.e. N-dim)
         for (int j = 0; j < pad_headsize; ++j) {  // K-dim padding for QK_GEMM
