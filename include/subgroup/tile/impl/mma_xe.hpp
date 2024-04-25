@@ -148,14 +148,11 @@ struct tile_mma_t<
                 mma_k,
                 mma_m,
                 dtype_src,
-                uint32_t,
-                uint32_t,
+                dtype_b,
+                dtype_a,
                 c_mma_elems,
-                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
-                a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
-                src_sub_blk,
-                b_sub_blk.xetla_format<uint32_t>(),
-                a_sub_blk.xetla_format<uint32_t>());
+                b_block_mma_elems,
+                a_mma_elems>(src_sub_blk, b_sub_blk, a_sub_blk);
           }
 
 #pragma unroll
@@ -176,14 +173,11 @@ struct tile_mma_t<
                 mma_k,
                 mma_m,
                 dtype_src,
-                uint32_t,
-                uint32_t,
+                dtype_b,
+                dtype_a,
                 c_mma_elems,
-                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
-                a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
-                dst_sub_blk,
-                b_sub_blk.xetla_format<uint32_t>(),
-                a_sub_blk.xetla_format<uint32_t>());
+                b_block_mma_elems,
+                a_mma_elems>(dst_sub_blk, b_sub_blk, a_sub_blk);
           }
         }
       }
@@ -221,14 +215,11 @@ struct tile_mma_t<
                 mma_k,
                 mma_m,
                 dtype_src,
-                uint32_t,
-                uint32_t,
+                dtype_b,
+                dtype_a,
                 c_mma_elems,
-                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
-                a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
-                src_sub_blk,
-                b_sub_blk.xetla_format<uint32_t>(),
-                a_sub_blk.xetla_format<uint32_t>());
+                b_block_mma_elems,
+                a_mma_elems>(src_sub_blk, b_sub_blk, a_sub_blk);
           }
 #pragma unroll
           for (uint32_t k = 1; k < num_block_k; k++) {
@@ -249,21 +240,18 @@ struct tile_mma_t<
                 mma_k,
                 mma_m,
                 dtype_src,
-                uint32_t,
-                uint32_t,
+                dtype_b,
+                dtype_a,
                 c_mma_elems,
-                b_block_mma_elems / (sizeof(uint32_t) / sizeof(dtype_b)),
-                a_mma_elems / (sizeof(uint32_t) / sizeof(dtype_a))>(
-                dst_sub_blk,
-                b_sub_blk.xetla_format<uint32_t>(),
-                a_sub_blk.xetla_format<uint32_t>());
+                b_block_mma_elems,
+                a_mma_elems>(dst_sub_blk, b_sub_blk, a_sub_blk);
           }
         }
       }
     }
     if constexpr (num_block_k > 1) {
-    //   constexpr uint32_t last_uint16_idx =
-    //       tile_elems * sizeof(dtype_dst) / sizeof(uint16_t) - 1;
+      //   constexpr uint32_t last_uint16_idx =
+      //       tile_elems * sizeof(dtype_dst) / sizeof(uint16_t) - 1;
       xetla_wait(dst.reg.xetla_format<uint16_t>()[0]);
     }
   }
