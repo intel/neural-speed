@@ -496,14 +496,15 @@ index 894be0134d..a9a57c0a9e 100644
 ## 3.1 Evaluate llm model in neural speed by lm_eval
 We can use this python script for accuracy evaluation.
 ```
-python scripts/cal_acc.py --model hf_model --tasks piqa --group_size 32 --compute_dtype int8 --weight_dtype int4
+python scripts/cal_acc.py --model hf_model --tasks lambada_openai,boolq,piqa,winogrande,hellaswag --use_autoround
 ```
 
-Here is lm-evaluate result for [Intel/neural-chat-7b-v3-1](https://huggingface.co/Intel/neural-chat-7b-v3-1) in weight_dtype=int4, compute_dtype=int8, group_size=-1 quant config.
+Here is lm-evaluate result for [Intel/neural-chat-7b-v3-3-int4-inc](https://huggingface.co/Intel/neural-chat-7b-v3-3-int4-inc).
+Install lm_eval from pip version 0.4.2.
 
-| lambada_openai | boolq | truthful_qa_mc1 | piqa | winogrande | openbookqa | mmlu | hellaswag | arc_easy | arc_challenge |
-|  :------: | :----: |  :----: | :----: |  :----: | :----: |  :---: | :----: |  :----: | :----: |
-| 63.98 | 86.3 | 40.76 | 80.52 | 72.61| 34.8 | 56.05 | 60.08 | 80.81 | 52.73 |
+| lambada_openai | boolq | piqa | winogrande | hellaswag |
+|  :------: | :----: |  :----: | :----: |  :----: |
+| 72.73 | 87.22 | 81.28 | 76.16 | 65.96|
 
 # 4.	Performance optimization
 ## 4.1.	Quantize model and use Jblas library for better performance
