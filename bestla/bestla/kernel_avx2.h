@@ -30,17 +30,12 @@ namespace avx2 {
 #pragma clang attribute push(__attribute__((target("avx,avx2,fma"))), apply_to = function)
 #endif
 
-template <BTLA_DTYPE Q4T>
 static inline __m256i unpack_4bits_avx2(void* srcptr, __m256i mask) {
   auto raw_data = _mm_loadu_si128(reinterpret_cast<__m128i*>(srcptr));
   auto ymm0 = _mm256_cvtepu8_epi16(raw_data);
   auto ymm1 = _mm256_slli_epi16(ymm0, 4);
   ymm0 = _mm256_or_si256(ymm0, ymm1);
   ymm0 = _mm256_and_si256(ymm0, mask);
-  if (Q4T == BTLA_DTYPE::S4_CLIP) {
-    const auto vbias = _mm256_set1_epi8(8);
-    ymm0 = _mm256_sub_epi8(ymm0, vbias);
-  }
   return ymm0;
 }
 
@@ -52,33 +47,7 @@ static inline __m256i unpack_2bits_avx2(utils::bit2x4* ptr, const __m256i& vshif
   auto vs_y = _mm256_srlv_epi32(vordered_y, vshift_y);
   auto v2_y = _mm256_and_si256(vs_y, vmask0_y);
   auto vout_y = _mm256_shuffle_epi8(v2_y, vsfhl_mask_y);
-  const auto vbias = _mm256_set1_epi8(2);
-  vout_y = _mm256_sub_epi8(vout_y, vbias);
   return vout_y;
-}
-
-template <int N, BTLA_DTYPE QT_T>
-static inline void convert_s4_s8_N_avx2(int8_t* dstptr, int8_t* srcptr, __m256i mask) {
-  static_assert(N % 2 == 0);
-  static_assert(N <= 64);
-  if constexpr (N == 32) {
-    auto dst0 = unpack_4bits_avx2<QT_T>(srcptr, mask);
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr), dst0);
-  } else if constexpr (N > 32) {
-    auto dst0 = unpack_4bits_avx2<QT_T>(srcptr, mask);
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr), dst0);
-    int8_t temp[32];
-    memcpy(temp, srcptr + 16, (N - 32) / 2);
-    dst0 = unpack_4bits_avx2<QT_T>(temp, mask);
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(temp), dst0);
-    memcpy(dstptr + 32, temp, (N - 32));
-  } else {
-    int8_t temp[32];
-    memcpy(temp, srcptr, N / 2);
-    auto dst0 = unpack_4bits_avx2<QT_T>(temp, mask);
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(temp), dst0);
-    memcpy(dstptr, temp, N);
-  }
 }
 
 inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
@@ -471,18 +440,20 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack4_row(utils::int4x2* srcptr,
   __m256i v_zp_y[NReg];
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm256_set1_epi8(8);
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   for (int ir = 0; ir < row; ir += blocksize) {
     auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
     for (int i = 0; i < NReg; i++) {
       v_zp_y[i] = load_zp_epi8_broadcast_epi32(zptr + i * 8, vindex);
+      v_zp_y[i] = _mm256_add_epi8(v_zp_y[i], vbias);
     }
     int k_remain = utils::remainsize(ir, row, blocksize);
     for (int ib = 0; ib < k_remain; ib += PackRow) {
       auto b4ptr = srcptr + (ir + ib) * NTILE / 2;
       for (int i = 0; i < NReg; i++) {
-        auto v_s8_y = unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(b4ptr + i * 16, vmask);
+        auto v_s8_y = unpack_4bits_avx2(b4ptr + i * 16, vmask);
         v_s8_y = _mm256_sub_epi8(v_s8_y, v_zp_y[i]);
         _mm256_storeu_si256((__m256i*)(dstptr + i * 32 + (ir + ib) * NTILE), v_s8_y);
       }
@@ -502,6 +473,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack2_row(utils::int4x2* srcptr,
   __m256i v_zp_y[NReg];
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm256_set1_epi8(8);
   const auto vindex = _mm256_set_epi8(14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0, 14, 14, 12, 12, 10, 10, 8,
                                       8, 6, 6, 4, 4, 2, 2, 0, 0);
   for (int ir = 0; ir < row; ir += blocksize) {
@@ -510,6 +482,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack2_row(utils::int4x2* srcptr,
     memcpy(tmp + NTILE, zptr, NTILE * sizeof(int8_t));
     for (int i = 0; i < NReg; i++) {
       v_zp_y[i] = load_zp_epi8_broadcast_epi16_v16(tmp + i * 16, vindex);
+      v_zp_y[i] = _mm256_add_epi8(v_zp_y[i], vbias);
     }
     int k_remain = utils::remainsize(ir, row, blocksize);
     int k_remain_unrll = utils::padto_le(k_remain, PackRow * Unroll);
@@ -517,7 +490,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack2_row(utils::int4x2* srcptr,
     for (; ib < k_remain_unrll; ib += PackRow * Unroll) {
       auto b4ptr = srcptr + (ir + ib) * NTILE / 2;
       for (int i = 0; i < NReg; i++) {
-        auto v_s8_y = unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(b4ptr + i * 16, vmask);
+        auto v_s8_y = unpack_4bits_avx2(b4ptr + i * 16, vmask);
         v_s8_y = _mm256_sub_epi8(v_s8_y, v_zp_y[i]);
         _mm256_storeu_si256((__m256i*)(dstptr + i * 32 + (ir + ib) * NTILE), v_s8_y);
       }
@@ -527,7 +500,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack2_row(utils::int4x2* srcptr,
       memcpy(tmp, srcptr + (ir + ib) * NTILE / 2, k_tail * NTILE / 2);
       auto tmpout = tmp + Unroll * PackRow * NTILE / 2;
       for (int i = 0; i < NReg; i++) {
-        auto v_s8_y = unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(tmp + i * 16, vmask);
+        auto v_s8_y = unpack_4bits_avx2(tmp + i * 16, vmask);
         v_s8_y = _mm256_sub_epi8(v_s8_y, v_zp_y[i]);
         _mm256_storeu_si256((__m256i*)(tmpout + i * 32), v_s8_y);
       }
@@ -549,6 +522,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack1_row(utils::int4x2* srcptr,
   __m256i v_zp_y[UnpackLoop];
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm256_set1_epi8(8);
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   for (int ir = 0; ir < row; ir += blocksize) {
@@ -558,6 +532,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack1_row(utils::int4x2* srcptr,
     }
     for (int i = 0; i < UnpackLoop; i++) {
       v_zp_y[i] = _mm256_loadu_si256((const __m256i*)(tmp + i * 32));
+      v_zp_y[i] = _mm256_add_epi8(v_zp_y[i], vbias);
     }
     int k_remain = utils::remainsize(ir, row, blocksize);
     int k_remain_unrll = utils::padto_le(k_remain, Unroll);
@@ -565,7 +540,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack1_row(utils::int4x2* srcptr,
     for (; ib < k_remain_unrll; ib += Unroll) {
       auto b4ptr = srcptr + (ir + ib) * NTILE / 2;
       for (int i = 0; i < UnpackLoop; i++) {
-        auto v_s8_y = unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(b4ptr + i * 16, vmask);
+        auto v_s8_y = unpack_4bits_avx2(b4ptr + i * 16, vmask);
         v_s8_y = _mm256_sub_epi8(v_s8_y, v_zp_y[i]);
         _mm256_storeu_si256((__m256i*)(dstptr + i * 32 + (ir + ib) * NTILE), v_s8_y);
       }
@@ -576,7 +551,7 @@ static inline BTLA_CODE decompress_kblock_s4_s8_pack1_row(utils::int4x2* srcptr,
       memcpy(tmp, srcptr + (ir + ib) * NTILE / 2, k_tail * NTILE / 2);
       auto tmpout = tmp + Unroll * NTILE / 2;
       for (int i = 0; i < UnpackLoop; i++) {
-        auto v_s8_y = unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(tmp + i * 16, vmask);
+        auto v_s8_y = unpack_4bits_avx2(tmp + i * 16, vmask);
         v_s8_y = _mm256_sub_epi8(v_s8_y, v_zp_y[i]);
         _mm256_storeu_si256((__m256i*)(tmpout + i * 32), v_s8_y);
       }
@@ -598,6 +573,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8_pack4_row(utils::bit2x4* srcptr,
                                       4, 4, 4, 0, 0, 0, 0);
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
+  auto vbias = _mm256_set1_epi8(2);
   auto vshift_y = _mm256_set_epi32(6, 4, 2, 0, 6, 4, 2, 0);
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
@@ -606,6 +582,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8_pack4_row(utils::bit2x4* srcptr,
     auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
     for (int i = 0; i < NReg; i++) {
       v_zp_y[i] = load_zp_epi8_broadcast_epi32(zptr + i * 8, vindex);
+      v_zp_y[i] = _mm256_add_epi8(v_zp_y[i], vbias);
     }
     int k_remain = utils::remainsize(ir, row, blocksize);
     for (int ib = 0; ib < k_remain; ib += PackRow) {
@@ -633,6 +610,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8_pack2_row(utils::bit2x4* srcptr,
                                       8, 6, 6, 4, 4, 2, 2, 0, 0);
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
+  auto vbias = _mm256_set1_epi8(2);
   auto vshift_y = _mm256_set_epi32(6, 4, 2, 0, 6, 4, 2, 0);
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
@@ -643,6 +621,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8_pack2_row(utils::bit2x4* srcptr,
     memcpy(tmp + NTILE, zptr, NTILE * sizeof(int8_t));
     for (int i = 0; i < NReg; i++) {
       v_zp_y[i] = load_zp_epi8_broadcast_epi16_v16(tmp + i * 16, vindex);
+      v_zp_y[i] = _mm256_add_epi8(v_zp_y[i], vbias);
     }
     int k_remain = utils::remainsize(ir, row, blocksize);
     int k_remain_unrll = utils::padto_le(k_remain, PackRow * Unroll);
@@ -682,6 +661,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8_pack1_row(utils::bit2x4* srcptr,
   __m256i v_zp_y[UnpackLoop];
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
+  auto vbias = _mm256_set1_epi8(2);
   auto vshift_y = _mm256_set_epi32(6, 4, 2, 0, 6, 4, 2, 0);
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
@@ -693,6 +673,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8_pack1_row(utils::bit2x4* srcptr,
     }
     for (int i = 0; i < UnpackLoop; i++) {
       v_zp_y[i] = _mm256_loadu_si256((const __m256i*)(tmp + i * 32));
+      v_zp_y[i] = _mm256_add_epi8(v_zp_y[i], vbias);
     }
     int k_remain = utils::remainsize(ir, row, blocksize);
     int k_remain_unrll = utils::padto_le(k_remain, Unroll);
@@ -727,13 +708,18 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   size_t velt = utils::padto_le(elesize, 32);
   size_t i = 0;
+  auto vbias = _mm256_set1_epi8(8);
   for (; i < velt; i += 32) {
-    convert_s4_s8_N_avx2<32, BTLA_DTYPE::S4_CLIP>(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
+    auto vout_y = unpack_4bits_avx2(reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
+    vout_y = _mm256_sub_epi8(vout_y, vbias);
+    _mm256_storeu_si256((__m256i*)(dstptr + i), vout_y);
   }
   if (velt < elesize) {
     if (elesize >= 32) {
       i = elesize - 32;
-      convert_s4_s8_N_avx2<32, BTLA_DTYPE::S4_CLIP>(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
+      auto vout_y = unpack_4bits_avx2(reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
+      vout_y = _mm256_sub_epi8(vout_y, vbias);
+      _mm256_storeu_si256((__m256i*)(dstptr + i), vout_y);
     } else {
       ref::decompress_kblock_s4_s8<1, 1>(srcptr + i / 2, nullptr, dstptr + i, 0, 0, 0, 0, 1, elesize - i, nullptr, 0);
     }
@@ -748,6 +734,7 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* bit2ptr, int8_t* dstptr,
   int i = 0;
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
+  auto vbias = _mm256_set1_epi8(2);
   auto vshift_y = _mm256_set_epi32(6, 4, 2, 0, 6, 4, 2, 0);
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
@@ -755,12 +742,14 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* bit2ptr, int8_t* dstptr,
   int elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_2bits_avx2(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+    vout = _mm256_sub_epi8(vout, vbias);
     _mm256_storeu_si256((__m256i*)(dstptr + i), vout);
   }
   if (elt_pad < unpack_elt) {
     if (unpack_elt >= 32) {
       i = unpack_elt - 32;
       auto vout = unpack_2bits_avx2(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+      vout = _mm256_sub_epi8(vout, vbias);
       _mm256_storeu_si256((__m256i*)(dstptr + i), vout);
     } else {
       ref::decompress_s2_s8(bit2ptr + i / 4, dstptr + i, unpack_elt - i, tmp, tmpsize);
@@ -1075,6 +1064,43 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
     return BTLA_CODE::Success;
   }
   return BTLA_CODE::Success;
+}
+
+template <int N, BTLA_DTYPE QT_T>
+static inline void convert_s4_s8_N_avx2(int8_t* dstptr, int8_t* srcptr, __m256i mask) {
+  static_assert(N % 2 == 0);
+  static_assert(N <= 64);
+  const auto vbias = _mm256_set1_epi8(8);
+  if constexpr (N == 32) {
+    auto dst0 = unpack_4bits_avx2(srcptr, mask);
+    if constexpr (QT_T == BTLA_DTYPE::S4_CLIP) {
+      dst0 = _mm256_sub_epi8(dst0, vbias);
+    }
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr), dst0);
+  } else if constexpr (N > 32) {
+    auto dst0 = unpack_4bits_avx2(srcptr, mask);
+    if constexpr (QT_T == BTLA_DTYPE::S4_CLIP) {
+      dst0 = _mm256_sub_epi8(dst0, vbias);
+    }
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr), dst0);
+    int8_t temp[32];
+    memcpy(temp, srcptr + 16, (N - 32) / 2);
+    dst0 = unpack_4bits_avx2(temp, mask);
+    if constexpr (QT_T == BTLA_DTYPE::S4_CLIP) {
+      dst0 = _mm256_sub_epi8(dst0, vbias);
+    }
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(temp), dst0);
+    memcpy(dstptr + 32, temp, (N - 32));
+  } else {
+    int8_t temp[32];
+    memcpy(temp, srcptr, N / 2);
+    auto dst0 = unpack_4bits_avx2(temp, mask);
+    if constexpr (QT_T == BTLA_DTYPE::S4_CLIP) {
+      dst0 = _mm256_sub_epi8(dst0, vbias);
+    }
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(temp), dst0);
+    memcpy(dstptr, temp, N);
+  }
 }
 
 template <BTLA_DTYPE QT_T, bool _IS_SYM, int _NCOL, typename _ST, typename _DST_T>
@@ -1983,6 +2009,7 @@ static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, int lda, const utils
   }
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm256_set1_epi8(8);
   for (int ib = 0; ib < blks; ib += 1) {
     auto bsptr = B.sptr + ib * B.ldzp;
     __m256 v_b_scale[NReg];
@@ -2003,11 +2030,11 @@ static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, int lda, const utils
       }
       for (int i = 0; i < NReg; i++) {
         bzp[i] = _mm256_loadu_si256((const __m256i*)(tmp + i * 32));
+        bzp[i] = _mm256_add_epi8(bzp[i], vbias);
       }
       for (int ik = 0; ik < blocksize; ik += Unroll) {
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
           vb = _mm256_sub_epi8(vb, bzp[i]);
           _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
         }
@@ -2017,8 +2044,8 @@ static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, int lda, const utils
     } else {
       for (int ik = 0; ik < blocksize; ik += Unroll) {
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, vbias);
           _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
         }
         accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc, v_b_scale);
@@ -2054,6 +2081,7 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
+  auto vbias = _mm256_set1_epi8(2);
 
   int constexpr KTILE = 1;
   for (int ib = 0; ib < blks; ib += 1) {
@@ -2075,6 +2103,7 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
       }
       for (int i = 0; i < NReg; i++) {
         bzp[i] = _mm256_loadu_si256((const __m256i*)(tmp + i * 32));
+        bzp[i] = _mm256_add_epi8(bzp[i], vbias);
       }
       for (int ik = 0; ik < blocksize; ik += Unroll) {
         for (int i = 0; i < NReg; i++) {
@@ -2090,6 +2119,7 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
       for (int ik = 0; ik < blocksize; ik += Unroll) {
         for (int i = 0; i < NReg; i++) {
           auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          vb = _mm256_sub_epi8(vb, vbias);
           _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
           b2ptr += 8 * Unroll / 4;
         }
@@ -2148,8 +2178,10 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   const __m256i onesu8 = _mm256_set1_epi8(1);
+  const __m256i vbias = _mm256_set1_epi8(8);
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
+
   for (int ib = 0; ib < blks; ib += 1) {
     __m256i iacc[NReg * MReg];
     __m256i bacc[NReg];
@@ -2164,6 +2196,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       auto bzptr = B.zpptr + ib * B.ldzp;
       for (int i = 0; i < NReg; i++) {
         bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+        bzp[i] = _mm256_add_epi8(bzp[i], vbias);
       }
       for (int ik = 0; ik < blocksize; ik += 4) {
         __m256i va[MReg];
@@ -2171,8 +2204,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
           va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
         }
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
           vb = _mm256_sub_epi8(vb, bzp[i]);
           bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
           for (int j = 0; j < MReg; j++) {
@@ -2187,8 +2219,8 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
           va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
         }
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, vbias);
           bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
           for (int j = 0; j < MReg; j++) {
             iacc[j * NReg + i] = _mm256_dpbusd_avx_epi32(iacc[j * NReg + i], va[j], vb);
@@ -2234,6 +2266,7 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   for (int i = 0; i < NReg * MReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
+  const __m256i vbias = _mm256_set1_epi8(8);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
@@ -2248,6 +2281,7 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
       auto bzptr = B.zpptr + ib * B.ldzp;
       for (int i = 0; i < NReg; i++) {
         bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+        bzp[i] = _mm256_add_epi8(bzp[i], vbias);
       }
       for (int ik = 0; ik < blocksize; ik += 4) {
         __m256i va[MReg];
@@ -2255,8 +2289,7 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
         }
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
           vb = _mm256_sub_epi8(vb, bzp[i]);
           for (int j = 0; j < MReg; j++) {
             auto vsb = _mm256_sign_epi8(vb, va[j]);
@@ -2272,8 +2305,8 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
         }
         for (int i = 0; i < NReg; i++) {
-          auto vb = kernel::avx2::unpack_4bits_avx2<BTLA_DTYPE::S4_CLIP>(
-              (void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, vbias);
           for (int j = 0; j < MReg; j++) {
             auto vsb = _mm256_sign_epi8(vb, va[j]);
             auto vabsa = _mm256_sign_epi8(va[j], va[j]);
@@ -2560,6 +2593,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
                                       13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
   const __m256i onesu8 = _mm256_set1_epi8(1);
+  const __m256i vbias = _mm256_set1_epi8(2);
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   int constexpr KTILE = 4;
@@ -2577,6 +2611,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       auto bzptr = B.zpptr + ib * B.ldzp;
       for (int i = 0; i < NReg; i++) {
         bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+        bzp[i] = _mm256_add_epi8(bzp[i], vbias);
       }
       for (int ik = 0; ik < blocksize; ik += KTILE) {
         __m256i va[MReg];
@@ -2601,6 +2636,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         }
         for (int i = 0; i < NReg; i++) {
           auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          vb = _mm256_sub_epi8(vb, vbias);
           bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
           for (int j = 0; j < MReg; j++) {
             iacc[j * NReg + i] = _mm256_dpbusd_avx_epi32(iacc[j * NReg + i], va[j], vb);
@@ -2651,6 +2687,7 @@ static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const ut
                                       13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
   const __m256i onesu8 = _mm256_set1_epi8(1);
+  const __m256i vbias = _mm256_set1_epi8(2);
   const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
                                       4, 4, 4, 0, 0, 0, 0);
   int constexpr KTILE = 4;
@@ -2665,6 +2702,7 @@ static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const ut
       auto bzptr = B.zpptr + ib * B.ldzp;
       for (int i = 0; i < NReg; i++) {
         bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+        bzp[i] = _mm256_add_epi8(vbias, bzp[i]);
       }
       for (int ik = 0; ik < blocksize; ik += KTILE) {
         __m256i va[MReg];
@@ -2690,6 +2728,7 @@ static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         }
         for (int i = 0; i < NReg; i++) {
           auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          vb = _mm256_sub_epi8(vb, vbias);
           for (int j = 0; j < MReg; j++) {
             auto vsb = _mm256_sign_epi8(vb, va[j]);
             auto vabsa = _mm256_sign_epi8(va[j], va[j]);
