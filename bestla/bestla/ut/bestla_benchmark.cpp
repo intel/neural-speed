@@ -804,8 +804,8 @@ class UTWOQ_CompInt8 {
   UTWOQ_CompInt8() {
     UT_START();
     ut_s4();
-    ut_s2();
     ut_s3();
+    //ut_s2();
     // ut_s8();
   }
 
@@ -1314,7 +1314,7 @@ class UTWOQ_GGML {
   }
 };
 // static UTWOQ_GGML sUTWOQ_GGML;
-
+#if 0
 #include "kernel_avx2.h"
 #define AVX_VNNI_ 1
 template <int NTILE, typename SBT>
@@ -1764,6 +1764,7 @@ class UTWOQ_S4_VecDot {
   }
 };
 //static UTWOQ_S4_VecDot sUTWOQ_S4_VecDot;
+#endif
 }  // namespace ut
 }  // namespace bestla
 int main() {

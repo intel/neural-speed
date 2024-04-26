@@ -178,8 +178,8 @@ static inline BTLA_CODE compress_f4(const int8_t* srcptr, utils::f4x2* dstptr, i
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
-                                      int row, int col, int ld_src, int ld_dst) {
+static inline BTLA_CODE compress_3bit_align128(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr,
+                                               utils::bit1x8* bit1ptr, int row, int col, int ld_src, int ld_dst) {
   assert(col % 128 == 0);
   auto round3bit = [](int8_t src) {
     int32_t dst = src;
@@ -221,6 +221,48 @@ static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x
         bit1ptr[i * ld_dst / 8 + k / 8].g = round_buf[k - j + 6] >> 2;
         bit1ptr[i * ld_dst / 8 + k / 8].h = round_buf[k - j + 7] >> 2;
       }
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                      int row, int col, int ld_src, int ld_dst) {
+  assert(col % 8 == 0);
+  auto round3bit = [](int8_t src) {
+    int32_t dst = src;
+    dst = dst > 3 ? 3 : dst;
+    dst = dst < -4 ? -4 : dst;
+    return static_cast<int8_t>(dst);
+  };
+
+  for (int i = 0; i < row; i++) {
+    for (int j = 0; j < col; j += 8) {
+      auto tmp = round3bit(srcptr[i * ld_src + j + 0]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 0].a = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].a = tmp >> 2;
+      tmp = round3bit(srcptr[i * ld_src + j + 1]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 0].b = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].b = tmp >> 2;
+      tmp = round3bit(srcptr[i * ld_src + j + 2]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 0].c = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].c = tmp >> 2;
+      tmp = round3bit(srcptr[i * ld_src + j + 3]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 0].d = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].d = tmp >> 2;
+
+      tmp = round3bit(srcptr[i * ld_src + j + 4]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 1].a = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].e = tmp >> 2;
+      tmp = round3bit(srcptr[i * ld_src + j + 5]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 1].b = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].f = tmp >> 2;
+      tmp = round3bit(srcptr[i * ld_src + j + 6]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 1].c = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].g = tmp >> 2;
+      tmp = round3bit(srcptr[i * ld_src + j + 7]) + 4;
+      bit2ptr[i * ld_dst / 4 + j / 4 + 1].d = tmp & 0x3;
+      bit1ptr[i * ld_dst / 8 + j / 8].h = tmp >> 2;
     }
   }
   return BTLA_CODE::Success;
@@ -379,9 +421,9 @@ static inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstpt
 }
 
 template <typename _DST_T, int _PACK_ROW, typename _S_T>
-static inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                int ld_dst, _S_T* scales, int8_t* zero_points, int k_offset, int kblock,
-                                                int NPad) {
+static inline BTLA_CODE decompress_kblock_s8_fp_depre(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
+                                                      int ld_dst, _S_T* scales, int8_t* zero_points, int k_offset,
+                                                      int kblock, int NPad) {
   for (int i = 0; i < row; i++) {
     int kpos = (k_offset + i) / kblock;
     auto sptr = scales + kpos * NPad;
@@ -389,6 +431,36 @@ static inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, _DST_T* dstptr, 
       float tmp = static_cast<float>(srcptr[i * ld_src + j]);
       if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
       dstptr[i * ld_dst + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int PackRow, int NTILE, typename DST_T>
+inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, DST_T* dstptr, int row, int col, void* scales_,
+                                         BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,
+                                         int blocksize, int ldzp, int8_t* tmp, size_t tmpsize) {
+  for (int i = 0; i < row; i += PackRow) {
+    int kpos = (k_offset + i) / blocksize * ldzp + n_offset;
+    auto zp = zero_points ? zero_points[kpos] : 0;
+    if (sdtype == BTLA_DTYPE::F32) {
+      auto sptr = (float*)scales_ + kpos;
+      for (int j = 0; j < col; j += 1) {
+        auto scale = float(sptr[j]);
+        for (int ir = 0; ir < PackRow; ir++) {
+          float tmp = static_cast<float>(srcptr[i * col + j * PackRow + ir] - zp) * scale;
+          dstptr[i * col + j * PackRow + ir] = tmp;
+        }
+      }
+    } else if (sdtype == BTLA_DTYPE::BF16) {
+      auto sptr = (utils::bf16*)scales_ + kpos;
+      for (int j = 0; j < col; j += 1) {
+        auto scale = float(sptr[j]);
+        for (int ir = 0; ir < PackRow; ir++) {
+          float tmp = static_cast<float>(srcptr[i * col + j * PackRow + ir] - zp) * scale;
+          dstptr[i * col + j * PackRow + ir] = tmp;
+        }
+      }
     }
   }
   return BTLA_CODE::Success;
@@ -406,24 +478,26 @@ static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, DST_T* ds
   tmps8ptr += DstSize - S8Size;
   decompress_kblock_s4_s8<PackRow, NTILE>(srcptr, zero_points, tmps8ptr, blocksize, ldzp, n_offset, k_offset, row, col,
                                           tmp, tmpsize);
-  for (int i = 0; i < row; i += PackRow) {
-    int corr_offset = (k_offset + i) / blocksize * ldzp + n_offset;
-    if (sdtype == BTLA_DTYPE::F32) {
-      auto scales = (float*)scales_ + corr_offset;
-      for (int in = 0; in < NTILE; in++) {
-        for (int ir = 0; ir < PackRow; ir++) {
-          dstptr[(i)*col + in * PackRow + ir] = tmps8ptr[(i)*col + in * PackRow + ir] * scales[in];
-        }
-      }
-    } else if (sdtype == BTLA_DTYPE::BF16) {
-      auto scales = (utils::bf16*)scales_ + corr_offset;
-      for (int in = 0; in < NTILE; in++) {
-        for (int ir = 0; ir < PackRow; ir++) {
-          dstptr[(i)*col + in * PackRow + ir] = tmps8ptr[(i)*col + in * PackRow + ir] * float(scales[in]);
-        }
-      }
-    }
-  }
+  decompress_kblock_s8_fp<PackRow, NTILE>(tmps8ptr, dstptr, row, col, scales_, sdtype, nullptr, k_offset, n_offset,
+                                          blocksize, ldzp, tmp, tmpsize);
+  return BTLA_CODE::Success;
+}
+
+template <int PackRow, int NTILE, typename DST_T>
+static inline BTLA_CODE decompress_kblock_s3_fp(utils::bit2x4* b2ptr, utils::bit1x8* b1ptr, DST_T* dstptr, int row,
+                                                int col, void* scales_, BTLA_DTYPE sdtype, int8_t* zero_points,
+                                                int k_offset, int n_offset, int blocksize, int ldzp, int8_t* tmp,
+                                                size_t tmpsize) {
+  assert(tmpsize >= PackRow * NTILE);
+  assert(NTILE == col);
+  const auto DstSize = row * NTILE * sizeof(DST_T);
+  const auto S8Size = row * NTILE * sizeof(int8_t);
+  auto tmps8ptr = (int8_t*)dstptr;
+  tmps8ptr += DstSize - S8Size;
+  decompress_kblock_s3_s8<PackRow, NTILE>(b2ptr, b1ptr, zero_points, tmps8ptr, blocksize, ldzp, n_offset, k_offset, row,
+                                          col, tmp, tmpsize);
+  decompress_kblock_s8_fp<PackRow, NTILE>(tmps8ptr, dstptr, row, col, scales_, sdtype, nullptr, k_offset, n_offset,
+                                          blocksize, ldzp, tmp, tmpsize);
   return BTLA_CODE::Success;
 }
 

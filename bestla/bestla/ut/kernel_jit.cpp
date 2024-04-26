@@ -260,7 +260,7 @@ class UT_DeQuant {
     ref.resize(row * col);
     tar.resize(row * col);
     int constexpr PACK_ROW = std::is_same_v<DST_T, float> ? 1 : 2;
-    kernel::ref::decompress_kblock_s8_fp<DST_T, PACK_ROW>(test.data(), ref.data(), row, col, col, col,
+    kernel::ref::decompress_kblock_s8_fp_depre<DST_T, PACK_ROW>(test.data(), ref.data(), row, col, col, col,
                                                           test.scales.data(), nullptr, 0, row * 2, col);
     kernel::jit::DequanS8FP::forward_avx512f<PACK_ROW>(test.data(), tar.data(), row, col, col, col, test.scales.data(),
                                                        nullptr);
