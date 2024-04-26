@@ -235,9 +235,9 @@ vnni_reverse(T& mat_Acc) {
     return;
   }
 #pragma unroll
-  for (int i = 0; i < tile_size_y / block_size_y; i++) {
+  for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
-    for (int j = 0; j < num_block_x; j++) {
+    for (uint32_t j = 0; j < num_block_x; j++) {
       auto reg = (mat_Acc.reg)
                      .xetla_select<block_elems, 1>(
                          (i * num_block_x + j) * block_elems);
