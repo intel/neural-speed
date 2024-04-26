@@ -498,8 +498,8 @@ We can use this python script for accuracy evaluation.
 ```
 python scripts/cal_acc.py --model hf_model --tasks lambada_openai,boolq,piqa,winogrande,hellaswag --use_autoround
 ```
-
 Here is lm-evaluate result for [Intel/neural-chat-7b-v3-3-int4-inc](https://huggingface.co/Intel/neural-chat-7b-v3-3-int4-inc).
+Neural speed used git id 86026042d6207de09a34e6feb9bb0ac25c3d3542
 Install lm_eval from pip version 0.4.2.
 
 | lambada_openai | boolq | piqa | winogrande | hellaswag |
