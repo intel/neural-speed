@@ -1067,7 +1067,8 @@ struct mem_payload_t<
     msg_type::block_2d,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpg)>> {
-  using dtype = dtype_;
+  using dtype =
+      std::conditional_t<std::is_same_v<dtype_, int4x2>, uint8_t, dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
   using tile_desc = tile_desc_;

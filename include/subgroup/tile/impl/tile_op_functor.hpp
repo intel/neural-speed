@@ -1188,12 +1188,9 @@ struct rng_dropout_op_t<
     // calculate the scale internally
     float scale = 1.f / (1.f - args.prob);
     uint32_t threshold = uint32_t(args.prob * float(4294967296));
-    xetla_vector<uint64_t, 1> rand_offset_v = xetla_load_global<
-        uint64_t,
-        1,
-        data_size::default_size,
-        cache_hint::cached,
-        cache_hint::cached>(args.rand_offset_ptr, 0);
+    xetla_vector<uint64_t, 1> rand_offset_v =
+        xetla_load_global<uint64_t, 1, cache_hint::cached, cache_hint::cached>(
+            args.rand_offset_ptr, 0);
     uint64_t rand_offset = rand_offset_v[0];
     uint64_t rand_subseq = uint64_t(coord.y) << 32 | uint64_t(coord.x);
     rand_gen.init(args.rand_seed, rand_subseq, rand_offset);

@@ -414,7 +414,7 @@ tile_load(tile_t& tile, payload_t& payload) {
       auto reg_sub = tile.reg.xetla_select<64 * scale_factor, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
       reg_sub.xetla_format<load_dtype>() =
-          xetla_load_global<load_dtype, 64, data_size::default_size, L1, L2>(
+          xetla_load_global<load_dtype, 64, L1, L2>(
               payload.base_ptr, payload.base_offset + address_offset);
     }
   }
@@ -432,7 +432,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
 /// information. Payload indicates the source of load operation.
 /// @tparam L1 Is the cache hint for L1 cache.
-/// @tparam L3 Is the cache hint for L3 cache.
+/// @tparam L2 Is the cache hint for L2 cache.
 /// @param tile Is the tile object with type tile_t, holds the return data of
 /// the loads.
 /// @param payload Is the payload object with type payload_t. Contains all the
@@ -541,7 +541,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
 /// information. Payload indicates the source of load operation.
 /// @tparam L1 Is the cache hint for L1 cache.
-/// @tparam L3 Is the cache hint for L3 cache.
+/// @tparam L2 Is the cache hint for L2 cache.
 /// @param tile Is the tile object with type tile_t, holds the return data of
 /// the loads.
 /// @param payload Is the payload object with type payload_t. Contains all the
@@ -603,7 +603,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
 /// information. Payload indicates the source of load operation.
 /// @tparam L1 Is the cache hint for L1 cache.
-/// @tparam L3 Is the cache hint for L3 cache.
+/// @tparam L2 Is the cache hint for L2 cache.
 /// @param tile Is the tile object with type tile_t, holds the return data of
 /// the loads.
 /// @param payload Is the payload object with type payload_t. Contains all the
@@ -611,7 +611,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @return No return, update in place.
 template <
     cache_hint L1 = cache_hint::cached,
-    cache_hint L3 = cache_hint::cached,
+    cache_hint L2 = cache_hint::cached,
     typename tile_t,
     typename payload_t,
     typename oob_check_tag = global_atomic_oob_check_on_tag>
@@ -662,7 +662,7 @@ tile_load(
             1,
             data_size::default_size,
             L1,
-            L3,
+            L2,
             load_elems>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
@@ -711,7 +711,7 @@ tile_load(
             1,
             data_size::default_size,
             L1,
-            L3,
+            L2,
             load_elems>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,

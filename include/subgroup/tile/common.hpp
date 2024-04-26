@@ -138,14 +138,11 @@ process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
     auto reg_sub =
         tile.reg.xetla_select<base_len * payload_t::scale_factor, 1>(offset);
     if constexpr (flag == process_flag::load) {
-      reg_sub.xetla_format<mem_dtype>() = xetla_load_global<
-          mem_dtype,
-          base_len,
-          data_size::default_size,
-          L1,
-          L2>(payload.base_ptr, payload.base_offset + address_offset);
+      reg_sub.xetla_format<mem_dtype>() =
+          xetla_load_global<mem_dtype, base_len, L1, L2>(
+              payload.base_ptr, payload.base_offset + address_offset);
     } else {
-      xetla_store_global<mem_dtype, base_len, data_size::default_size, L1, L2>(
+      xetla_store_global<mem_dtype, base_len, L1, L2>(
           payload.base_ptr,
           payload.base_offset + address_offset,
           reg_sub.xetla_format<mem_dtype>());

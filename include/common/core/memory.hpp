@@ -32,8 +32,26 @@ namespace detail {
 /// @brief lookup table for cache hint.
 ///
 ///
-constexpr __ESIMD_ENS::cache_hint get_cache_hint(gpu::xetla::cache_hint ch) {
+constexpr auto get_cache_hint(gpu::xetla::cache_hint ch) {
   switch (ch) {
+#if __INTEL_LLVM_COMPILER >= 20240100
+    case gpu::xetla::cache_hint::none:
+      return __ESIMD_NS::cache_hint::none;
+    case gpu::xetla::cache_hint::uncached:
+      return __ESIMD_NS::cache_hint::uncached;
+    case gpu::xetla::cache_hint::cached:
+      return __ESIMD_NS::cache_hint::cached;
+    case gpu::xetla::cache_hint::write_back:
+      return __ESIMD_NS::cache_hint::write_back;
+    case gpu::xetla::cache_hint::write_through:
+      return __ESIMD_NS::cache_hint::write_through;
+    case gpu::xetla::cache_hint::streaming:
+      return __ESIMD_NS::cache_hint::streaming;
+    case gpu::xetla::cache_hint::read_invalidate:
+      return __ESIMD_NS::cache_hint::read_invalidate;
+    case gpu::xetla::cache_hint::const_cached:
+      return __ESIMD_NS::cache_hint::const_cached;
+#else
     case gpu::xetla::cache_hint::none:
       return __ESIMD_ENS::cache_hint::none;
     case gpu::xetla::cache_hint::uncached:
@@ -48,6 +66,7 @@ constexpr __ESIMD_ENS::cache_hint get_cache_hint(gpu::xetla::cache_hint ch) {
       return __ESIMD_ENS::cache_hint::streaming;
     case gpu::xetla::cache_hint::read_invalidate:
       return __ESIMD_ENS::cache_hint::read_invalidate;
+#endif
   }
 }
 
@@ -326,13 +345,17 @@ __XETLA_API void xetla_prefetch_global(Ty* p, uint64_t offset = 0) {
 template <
     typename T,
     int N,
-    typename PropertyListT =
-        sycl::ext::oneapi::experimental::detail::empty_properties_t>
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int alignment = 16>
 __XETLA_API xetla_vector<T, N> xetla_load_global(
     const T* ptr,
-    size_t byte_offset,
-    PropertyListT props = {}) {
-  return __ESIMD_NS::block_load(ptr, byte_offset, props);
+    size_t byte_offset) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
+  return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
 }
 
 /// @brief Stateless scattered load.
@@ -382,47 +405,6 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
       N>((T*)p, offsets, pred);
 }
 
-/// @brief Stateless block load (transposed gather with 1 channel).
-/// Collects elements located at specified address and returns them
-/// to a single \ref xetla_vector object.
-///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_load.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to load per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p      [in] is the base pointer.
-/// @param offset [in] is the zero-based offset in bytes.
-/// @return is a xetla_vector of type T and size NElts.
-///
-template <
-    typename Ty,
-    uint8_t NElts = 1,
-    data_size DS = data_size::default_size,
-    cache_hint L1H = cache_hint::none,
-    cache_hint L2H = cache_hint::none>
-__XETLA_API xetla_vector<Ty, NElts> xetla_load_global(
-    Ty* p,
-    uint64_t offset = 0) {
-  using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
-          offset, (uint64_t)p));
-
-  return __ESIMD_ENS::lsc_block_load<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>((T*)p + (offset / sizeof(T)));
-}
-
 /// @brief Stateless scattered store.
 /// Writes elements to specific address.
 ///
@@ -465,43 +447,6 @@ __XETLA_API void xetla_store_global(
       N>((T*)p, offsets, vals, pred);
 }
 
-/// @brief Stateless block store (transposed scatter with 1 channel).
-/// Writes elements to specific address.
-///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_store.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to store per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p      [in] is the base pointer.
-/// @param offset [in] is the zero-based offset in bytes.
-/// @param vals   [in] is values to store.
-///
-template <
-    typename Ty,
-    uint8_t NElts = 1,
-    data_size DS,
-    cache_hint L1H,
-    cache_hint L2H>
-__XETLA_API void xetla_store_global(
-    Ty* p,
-    uint64_t offset,
-    xetla_vector<Ty, NElts> vals) {
-  using T = native_type_t<Ty>;
-  __ESIMD_ENS::lsc_block_store<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>(
-      (T*)p + (offset / sizeof(T)), vals);
-}
-
 /// void block_store(T* ptr, size_t byte_offset,         // (usm-bs-2)
 ///                          simd<T, N> vals, props={});
 /// This function stores a contiguous memory block to USM pointer \p ptr and
@@ -539,14 +484,18 @@ __XETLA_API void xetla_store_global(
 template <
     typename T,
     int N,
-    typename PropertyListT =
-        sycl::ext::oneapi::experimental::detail::empty_properties_t>
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int alignment = 16>
 __XETLA_API void xetla_store_global(
     T* ptr,
     size_t byte_offset,
-    xetla_vector<T, N> vals,
-    PropertyListT props = {}) {
-  __ESIMD_NS::block_store(ptr, byte_offset, vals, props);
+    xetla_vector<T, N> vals) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
+  __ESIMD_NS::block_store<T, N>(ptr, byte_offset, vals, props);
 }
 
 /// @brief Stateless scattered atomic (0 src).

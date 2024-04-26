@@ -301,7 +301,7 @@ tile_store(tile_t& tile, payload_t& payload) {
       auto reg_sub = tile.reg.xetla_select<64 * scale_factor, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
 
-      xetla_store_global<store_dtype, 64, data_size::default_size, L1, L2>(
+      xetla_store_global<store_dtype, 64, L1, L2>(
           payload.base_ptr,
           payload.base_offset + address_offset,
           reg_sub.xetla_format<store_dtype>());
