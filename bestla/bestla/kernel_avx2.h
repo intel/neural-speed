@@ -2789,8 +2789,9 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32_align128(const utils::GemvParamA& A,
 }
 
 template <typename ScaleT, int NTILE>
-static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
-                                            int k, int ld_scaleb, int blocksize, int8_t* tmp, size_t tmpsize) {
+static inline BTLA_CODE gemv_3bit_s8s8_fp32_align128(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B,
+                                                     float* C, int k, int ld_scaleb, int blocksize, int8_t* tmp,
+                                                     size_t tmpsize) {
   auto a8ptr = A.aptr;
   auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
   auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
@@ -3237,7 +3238,6 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           auto vb1 = unpack_1bits_avx2(b1ptr, bit1Shift_1, bit1Mask, bit1Shift_2, highMask);
           vb = _mm256_or_si256(vb, vb1);
           vb = _mm256_sub_epi8(vb, bzp[i]);
-          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
           for (int j = 0; j < MReg; j++) {
             auto vsb = _mm256_sign_epi8(vb, va[j]);
             auto vabsa = _mm256_sign_epi8(va[j], va[j]);
@@ -3258,7 +3258,6 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           auto vb1 = unpack_1bits_avx2(b1ptr, bit1Shift_1, bit1Mask, bit1Shift_2, highMask);
           vb = _mm256_or_si256(vb, vb1);
           vb = _mm256_sub_epi8(vb, vbias);
-          bacc[i] = _mm256_dpbusd_avx_epi32(bacc[i], onesu8, vb);
           for (int j = 0; j < MReg; j++) {
             auto vsb = _mm256_sign_epi8(vb, va[j]);
             auto vabsa = _mm256_sign_epi8(va[j], va[j]);
@@ -3269,7 +3268,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         }
       }
     }
-  
+
     gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
   }
 

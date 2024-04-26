@@ -982,12 +982,12 @@ class GEMVWoqNBits {
       }
       return ref::gemv_4bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
-    /*if (B.nbits == 3) {
+    if (B.nbits == 3) {
       if (ISA_T >= BTLA_ISA::AVX2) {
-        return avx2::gemv_3bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
+        return avx2::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
-      return ref::gemv_3bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
-    }*/
+      return ref::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
     /*if (B.nbits == 2) {
       if (ISA_T >= BTLA_ISA::AVX2) {
         return avx2::gemv_2bit_u8s8_fp32<ScaleT, NTILE>(A, B, C, k, ld_scaleb, blocksize, (int8_t*)tmp, tmpsize);
