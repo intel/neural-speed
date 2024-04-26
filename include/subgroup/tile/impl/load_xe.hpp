@@ -846,20 +846,29 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   constexpr uint32_t scale_factor = payload_t::scale_factor;
   constexpr uint32_t load_len = tile_desc::tile_size_x / scale_factor;
-  if constexpr (load_len >= 64) {
 #pragma unroll
-    for (uint32_t j = 0; j < load_len / 64; j++) {
-      uint32_t offset_x = j * 64 * scale_factor;
-      auto reg_sub = tile.reg.xetla_select<64 * scale_factor, 1>(offset_x);
-      uint32_t address_offset = offset_x * sizeof(dtype);
-      reg_sub.xetla_format<load_dtype>() =
-          xetla_load_local<load_dtype, 64, data_size::default_size>(
-              payload.address + address_offset);
+  for (uint32_t i = 0; i < tile_desc::tile_size_y; i++) {
+    uint32_t offset_y = i * tile_desc::tile_size_x;
+    uint32_t address_offset_y = i * payload.pitch_in_bytes;
+    if constexpr (load_len >= 64) {
+#pragma unroll
+      for (uint32_t j = 0; j < load_len / 64; j++) {
+        uint32_t offset_x = j * 64 * scale_factor;
+        auto reg_sub =
+            tile.reg.xetla_select<64 * scale_factor, 1>(offset_x + offset_y);
+        uint32_t address_offset = address_offset_y + offset_x * sizeof(dtype);
+        reg_sub.xetla_format<load_dtype>() =
+            xetla_load_local<load_dtype, 64, data_size::default_size>(
+                payload.base_address + payload.address + address_offset);
+      }
     }
+    uint32_t tail_offset = offset_y + load_len / 64 * 64 * scale_factor;
+    uint32_t tail_address_offset =
+        address_offset_y + load_len / 64 * 64 * scale_factor * sizeof(dtype);
+    detail::
+        process_1d_tail<load_len % 64, 32, detail::process_flag::load, L1, L2>(
+            tile, payload, tail_offset, tail_address_offset);
   }
-  detail::
-      process_1d_tail<load_len % 64, 32, detail::process_flag::load, L1, L2>(
-          tile, payload, load_len / 64 * 64 * scale_factor);
 }
 
 } // namespace gpu::xetla::subgroup

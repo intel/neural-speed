@@ -55,6 +55,141 @@ using fp16 = sycl::half;
 ///
 using tf32 = sycl::ext::intel::experimental::esimd::tfloat32;
 
+/// @brief mx_fp4(E2M1) data packed as 8bits data type.
+struct mx_fp4 {
+  uint8_t data;
+  operator uint8_t() const {
+    return data;
+  }
+  mx_fp4() = default;
+  mx_fp4(uint8_t val) {
+    data = val;
+  }
+};
+
+template <typename T>
+struct get_packed_num {
+  static constexpr uint32_t value = 1;
+};
+
+template <>
+struct get_packed_num<mx_fp4> {
+  static constexpr uint32_t value = 2;
+};
+
+#ifdef XETLA_EMBARGO
+
+/// @brief xetla bf8 data type.
+/// The difference between bf8 and fp16 is:
+///
+/// fp16: 0_00000_0000000000
+///
+/// bf8:  0_00000_00
+/// FP32 => BF8 conversion is handled in two steps
+/// First convert to FP16, then to BF8/FP32
+/// @note
+/// The member function in bf8 class is only used in host side.
+/// For device side, we will automatically convert it to its native type.
+/// @see native_type_t
+///
+using bf8 = sycl::ext::intel::experimental::esimd::bf8;
+
+/// @brief xetla hf8 data type.
+/// The difference between hf8 and fp16 is:
+///
+/// fp16: 0_00000_0000000000
+///
+/// hf8:  0_0000_000
+/// FP32 => HF8 conversion is handled in two steps
+/// First convert to FP16, then to HF8/FP32
+/// @note
+/// The member function in hf8 class is only used in host side.
+/// For device side, we will automatically convert it to its native type.
+/// @see native_type_t
+///
+using hf8 = sycl::ext::intel::experimental::esimd::hf8;
+
+template <typename T>
+struct is_fp8 {
+  static constexpr bool value = std::is_same<remove_const_t<T>, bf8>::value ||
+      std::is_same<remove_const_t<T>, hf8>::value;
+};
+
+/// @brief xetla fp4(E3M0) data packed as 8bits data type.
+struct fp4 {
+  uint8_t data;
+  operator uint8_t() const {
+    return data;
+  }
+  fp4() = default;
+  fp4(uint8_t val) {
+    data = val;
+  }
+
+  // only process least 4bits
+  operator bf8() const {
+    std::vector<uint8_t> LUT = {
+        0x00,
+        0x3c,
+        0x40,
+        0x44,
+        0x48,
+        0x4c,
+        0x50,
+        0x54,
+        0x7f,
+        0xbc,
+        0xc0,
+        0xc4,
+        0xc8,
+        0xcc,
+        0xd0,
+        0xd4};
+    uint32_t idx = data & 0xf;
+    uint8_t looked_val = LUT[idx];
+    bf8 looked_val_bf8 = (*reinterpret_cast<bf8*>(&looked_val));
+    return looked_val_bf8;
+  }
+
+  // only process least 4bits
+  operator fp16() const {
+    std::vector<uint16_t> LUT = {
+        0x0000,
+        0x3c00,
+        0x4000,
+        0x4400,
+        0x4800,
+        0x4c00,
+        0x5000,
+        0x5400,
+        0x7fff,
+        0xbc00,
+        0xc000,
+        0xc400,
+        0xc800,
+        0xcc00,
+        0xd000,
+        0xd400};
+    uint32_t idx = data & 0xf;
+    uint16_t looked_val = LUT[idx];
+    fp16 looked_val_fp16 = (*reinterpret_cast<fp16*>(&looked_val));
+    return looked_val_fp16;
+  }
+
+  fp4 operator>>(int shf_num) {
+    fp4 temp;
+    temp.data = data >> shf_num;
+    return temp;
+  }
+};
+
+template <>
+struct get_packed_num<fp4> {
+  static constexpr uint32_t value = 2;
+};
+
+#endif
+
 template <typename T, typename = void>
 struct is_host_callable : std::false_type {};
 template <typename T>
@@ -66,10 +201,9 @@ struct is_host_callable<T, std::enable_if_t<T::host_callable == true>>
 template <typename T>
 struct is_internal_type {
   static constexpr bool value = std::is_same<remove_const_t<T>, bf16>::value ||
-      std::is_same<remove_const_t<T>, tf32>::value;
+      std::is_same<remove_const_t<T>, tf32>::value ||
+      std::is_same<remove_const_t<T>, mx_fp4>::value;
 };
-template <typename T>
-inline constexpr bool is_internal_type_v = is_internal_type<T>::value;
 
 /// @brief Used to check if the type is floating_point.
 /// @tparam T is the data type
@@ -81,8 +215,6 @@ struct is_floating_point {
       std::is_same<remove_const_t<T>, float>::value ||
       std::is_same<remove_const_t<T>, double>::value;
 };
-template <typename T>
-inline constexpr bool is_floating_point_v = is_floating_point<T>::value;
 
 /// @brief Used to check if the type is floating_point.
 /// @tparam T is the data type
@@ -98,8 +230,6 @@ struct is_integral {
       std::is_same<remove_const_t<T>, int64_t>::value ||
       std::is_same<remove_const_t<T>, uint64_t>::value;
 };
-template <typename T>
-inline constexpr bool is_integral_v = is_integral<T>::value;
 
 /// @brief Set the native data type of T
 /// @tparam T is the data type
@@ -107,6 +237,21 @@ template <typename T>
 struct native_type {
   using type = T;
 };
+
+/// @brief Set uint8_t as the native data type of mx_fp4.
+template <>
+struct native_type<mx_fp4> {
+  using type = uint8_t;
+};
+
+#ifdef XETLA_EMBARGO
+/// @brief Set uint8_t as the native data type of fp4.
+template <>
+struct native_type<fp4> {
+  using type = uint8_t;
+};
+
+#endif
 
 /// @brief Return the native data type of T
 template <typename T>
@@ -251,4 +396,5 @@ struct is_device_copyable<
     std::enable_if_t<gpu::xetla::is_host_callable<T>::value>> : std::true_type {
 };
 } // namespace sycl
+
 #endif

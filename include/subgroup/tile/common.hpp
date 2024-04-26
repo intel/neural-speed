@@ -114,6 +114,20 @@ template <
     cache_hint L2,
     typename payload_t,
     typename tile_t>
+__XETLA_API typename std::enable_if_t<base_len == 0> process_1d_tail(
+    [[maybe_unused]] tile_t& tile,
+    [[maybe_unused]] payload_t& payload,
+    [[maybe_unused]] uint32_t offset,
+    [[maybe_unused]] uint32_t address_offset) {}
+
+template <
+    uint32_t remained_len,
+    uint32_t base_len,
+    process_flag flag,
+    cache_hint L1,
+    cache_hint L2,
+    typename payload_t,
+    typename tile_t>
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::global>
 process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
@@ -154,19 +168,23 @@ template <
     typename tile_t>
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::local>
-process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
+process_1d_tail(
+    tile_t& tile,
+    payload_t& payload,
+    uint32_t offset,
+    uint32_t address_offset) {
   using mem_dtype = typename payload_t::mem_dtype;
   if constexpr (remained_len >= base_len) {
     auto reg_sub =
         tile.reg.xetla_select<base_len * payload_t::scale_factor, 1>(offset);
-    uint32_t address_offset = offset * sizeof(typename tile_t::dtype);
     if constexpr (flag == process_flag::load) {
       reg_sub.xetla_format<mem_dtype>() =
           xetla_load_local<mem_dtype, base_len, data_size::default_size>(
-              payload.address + address_offset);
+              payload.base_address + payload.address + address_offset);
     } else {
       xetla_store_local<mem_dtype, base_len>(
-          payload.address + address_offset, reg_sub.xetla_format<mem_dtype>());
+          payload.base_address + payload.address + address_offset,
+          reg_sub.xetla_format<mem_dtype>());
     }
     process_1d_tail<
         remained_len - base_len,
@@ -175,7 +193,13 @@ process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
         L1,
         L2,
         payload_t,
-        tile_t>(tile, payload, offset + base_len * payload_t::scale_factor);
+        tile_t>(
+        tile,
+        payload,
+        offset + base_len * payload_t::scale_factor,
+        address_offset +
+            base_len * payload_t::scale_factor *
+                sizeof(typename tile_t::dtype));
   } else {
     process_1d_tail<
         remained_len,
@@ -184,12 +208,13 @@ process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
         L1,
         L2,
         payload_t,
-        tile_t>(tile, payload, offset);
+        tile_t>(tile, payload, offset, address_offset);
   }
 }
 
 // This will end up with base_len equal to 8 because we had made tile_size_x
 // divisible by 8/16/32, depends on dtype
+// this is for prefetch only and use different func arg compare with load/store
 template <
     uint32_t remained_len,
     uint32_t base_len,
@@ -276,6 +301,17 @@ struct is_same_layout {
 };
 
 template <typename T_dst, typename T_src>
+struct is_1d_src {
+  static constexpr bool value = (T_src::tile_elems == T_dst::tile_elems) &&
+      (T_src::block_size_y == 1) && (T_src::tile_size_y == 1);
+};
+
+template <typename T_dst, typename T_src>
+struct is_same_elements {
+  static constexpr bool value = (T_src::tile_elems == T_dst::tile_elems);
+};
+
+template <typename T_dst, typename T_src>
 struct is_floating_to_integer {
   static constexpr bool value =
       is_floating_point<typename T_src::dtype>::value &&
@@ -298,12 +334,8 @@ struct msg_type_query {
              : msg_type::scatter);
 };
 
-template <
-    typename tile_desc_,
-    mem_space memory_space,
-    mem_layout memory_layout = mem_layout::row_major>
-constexpr msg_type msg_type_v =
-    msg_type_query<tile_desc_, memory_space, memory_layout>::value;
+template <typename tile_desc_, mem_space memory_space>
+constexpr msg_type msg_type_v = msg_type_query<tile_desc_, memory_space>::value;
 
 template <
     typename dtype,
