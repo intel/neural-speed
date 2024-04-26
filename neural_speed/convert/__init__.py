@@ -53,4 +53,4 @@ def convert_model(model, outfile, outtype="f32", format="NE", model_hub="hugging
 
     print("cmd:", cmd)
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    print('output: ', result.stdout + result.stderr)
+    print('output:', result.stdout + result.stderr)
