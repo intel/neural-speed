@@ -273,7 +273,6 @@ class gemm_t<
       prefetch_payload_t<mem_desc_zero_pt_t, zero_pt_tile_desc_t, 1, arch_tag>;
   using gidx_tile_desc_t = subgroup::
       tile_desc_t<tile_size_x_a, 1, block_size_x_a, 1, reg_layout::tiled>;
-  using gidx_t = subgroup::tile_t<uint32_t, gidx_tile_desc_t>;
   using gidx_payload_t = subgroup::mem_payload_t<
       mem_desc_gidx_t,
       gidx_tile_desc_t,
@@ -503,13 +502,13 @@ class gemm_t<
           }
         }
       }
-      if constexpr (!compute_policy::act_shuf) {
-        subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-            matA, matA_payload);
-      } else {
-        shuffle_load(matA, matA_payload, gidx_payload);
-        gidx_payload.update_tdesc(k_stride);
-      }
+      // if constexpr (!compute_policy::act_shuf) {
+      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+          matA, matA_payload);
+      // } else {
+      //   shuffle_load(matA, matA_payload, gidx_payload);
+      //   gidx_payload.update_tdesc(k_stride);
+      // }
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(

@@ -733,6 +733,8 @@ void dequantize_gemm_run(int iter) {
 
   auto* A_d = static_cast<data_type_a*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_a * sizeof(data_type_a), device, context));
+  auto* A_d_shuf = static_cast<data_type_a*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_a * sizeof(data_type_a), device, context));
   auto* B_d = static_cast<data_type_b*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_b * sizeof(data_type_b), device, context));
   auto* C_d = static_cast<data_type_c*>(aligned_alloc_device(
@@ -852,13 +854,14 @@ void dequantize_gemm_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
 
-  typename gemm_op_t::optional_argements_t opt_args{zero_pt_d, gidx_d};
+  typename gemm_op_t::optional_argements_t opt_args{
+      zero_pt_d, A_d, A_d_shuf, gidx_d};
 
   typename gemm_op_t::arguments_t gemm_arg(
       matrix_m,
       matrix_k,
       matrix_n,
-      A_d,
+      A_d_shuf,
       lda,
       B_d,
       ldb,

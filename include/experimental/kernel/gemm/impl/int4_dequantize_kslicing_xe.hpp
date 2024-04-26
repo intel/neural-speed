@@ -159,6 +159,8 @@ class gemm_universal_t<
  public:
   struct optional_argements_t {
     zero_pt_base_t zero_pt_base;
+    matA_base_t matA_raw;
+    matA_base_t matA_shuf;
     mem_base_t<uint32_t, mem_space::global> gidx_pt_base;
   };
 
@@ -434,6 +436,85 @@ class gemm_universal_t<
     return implementable;
   }
 
+  inline void act_shuf(
+      mem_desc_a_t act,
+      mem_desc_a_t act_shuf,
+      mem_desc_gidx_t gidx,
+      uint32_t inner_loop_count) {
+    static constexpr uint32_t block_size_y_a =
+        gemm_t::compute_policy::block_size_y_a > sg_tile_m
+        ? sg_tile_m
+        : gemm_t::compute_policy::block_size_y_a;
+    static constexpr reg_layout reg_layout_a =
+        gemm_t::compute_policy::mma_engine == mma_engine::xmx
+        ? reg_layout::tiled
+        : reg_layout::transpose_tiled;
+    static constexpr uint32_t block_size_x_a =
+        gemm_t::compute_policy::block_bytes_x_a / sizeof(dtype_a);
+    using matA_tile_desc_t = subgroup::tile_desc_t<
+        k_stride,
+        sg_tile_m,
+        block_size_x_a,
+        block_size_y_a,
+        reg_layout_a>;
+    using matA_t = subgroup::tile_t<dtype_a, matA_tile_desc_t>;
+    using matA_payload_t = subgroup::mem_payload_t<
+        mem_desc_a_t,
+        matA_tile_desc_t,
+        msg_type::block_2d,
+        arch_tag>;
+    matA_payload_t matA_payload(act);
+    matA_payload_t matA_shuf_payload(act_shuf);
+
+    using gidx_tile_desc_t = subgroup::
+        tile_desc_t<k_stride, 1, block_size_x_a, 1, reg_layout::tiled>;
+    using gidx_payload_t = subgroup::mem_payload_t<
+        mem_desc_gidx_t,
+        gidx_tile_desc_t,
+        subgroup::msg_type_v<gidx_tile_desc_t, mem_space::global>,
+        arch_tag>;
+    gidx_payload_t gidx_payload(gidx);
+    matA_t matA;
+    // #pragma unroll
+    for (uint32_t i = 0; i < inner_loop_count; i++) {
+      static constexpr int block_y_num = sg_tile_m / block_size_y_a;
+      static constexpr int block_x_num = k_stride / block_size_x_a;
+      static constexpr int elt_per_block = block_size_x_a * block_size_y_a;
+      int dst_swidth = gidx_payload.pitch_in_bytes / sizeof(uint32_t);
+#pragma unroll
+      for (int block_y = 0; block_y < block_y_num; block_y++) {
+#pragma unroll
+        for (int block_x = 0; block_x < block_x_num; block_x++) {
+          auto gidx =
+              sycl::ext::intel::esimd::block_load<uint32_t, block_size_x_a>(
+                  reinterpret_cast<uint32_t*>(gidx_payload.base_ptr) +
+                  gidx_payload.base_offset / sizeof(uint32_t) +
+                  block_x * block_size_x_a);
+          auto block_idx = block_y * block_x_num + block_x;
+#pragma unroll
+          for (uint32_t row = 0; row < block_size_y_a; row++) {
+            matA.reg.xetla_select<block_size_x_a, 1>(
+                block_idx * elt_per_block + row * k_stride) =
+                sycl::ext::intel::esimd::gather<dtype_a, block_size_x_a>(
+                    reinterpret_cast<dtype_a*>(matA_payload.base_ptr) +
+                        matA_payload.base_y * matA_payload.pitch_in_bytes /
+                            sizeof(dtype_a) +
+                        row * dst_swidth +
+                        block_y * block_size_y_a * dst_swidth,
+                    gidx);
+          }
+        }
+      }
+      tile_store(matA, matA_shuf_payload);
+      gidx_payload.update_tdesc(k_stride);
+      matA_payload.template update_tdesc<tdesc_update_dir::x_dir>(
+          matA_t::tile_size_x);
+      matA_shuf_payload.template update_tdesc<tdesc_update_dir::x_dir>(
+          matA_t::tile_size_x);
+    }
+    SW_BARRIER();
+  }
+
   /// @brief Main execution function for GEMM.
   /// The processing order is 1) set group-level base and boundary, split group
   /// to workgroups -> 2) num_local_kslicing x gemms -> 3) local kslicing -> 4)
@@ -526,8 +607,17 @@ class gemm_universal_t<
         args.opt_args.gidx_pt_base,
         {args.matrix_k, 1, args.matrix_k},
         {start_k, 0});
+    mem_desc_a_t mem_desc_a_raw(
+        args.opt_args.matA_raw,
+        {boundary_k, boundary_m, args.matA_ld},
+        {start_k, start_m});
+    mem_desc_a_t mem_desc_a_shuf(
+        args.opt_args.matA_shuf,
+        {boundary_k, boundary_m, args.matA_ld},
+        {start_k, start_m});
 
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
+    act_shuf(mem_desc_a_raw, mem_desc_a_shuf, mem_desc_gidx, inner_loop_count);
     gemm_args_t gemm_args;
     gemm_args = gemm_args_t(
         mem_desc_a,
