@@ -287,6 +287,7 @@ __XETLA_API void xetla_prefetch_global(Ty* p, uint64_t offset = 0) {
       gpu::xetla::detail::get_cache_hint(L1H),
       gpu::xetla::detail::get_cache_hint(L2H)>((T*)p + (offset / sizeof(T)));
 }
+
 /// simd<T, N> block_load(const T* ptr, size_t byte_offset,
 ///                       props={});  // (usm-bl-2)
 /// This function loads a contiguous memory block from address referenced
@@ -462,6 +463,43 @@ __XETLA_API void xetla_store_global(
       gpu::xetla::detail::get_cache_hint(L1H),
       gpu::xetla::detail::get_cache_hint(L2H),
       N>((T*)p, offsets, vals, pred);
+}
+
+/// @brief Stateless block store (transposed scatter with 1 channel).
+/// Writes elements to specific address.
+///
+/// Supported platforms: DG2, PVC
+///
+/// VISA instruction: lsc_store.ugm
+///
+/// @tparam Ty is element type.
+/// @tparam NElts is the number of elements to store per address (i.e.
+/// vector_size per SIMD channel).
+/// @tparam DS is the data size.
+/// @tparam L1H is L1 cache hint.
+/// @tparam L2H is L2 cache hint.
+/// @param p      [in] is the base pointer.
+/// @param offset [in] is the zero-based offset in bytes.
+/// @param vals   [in] is values to store.
+///
+template <
+    typename Ty,
+    uint8_t NElts = 1,
+    data_size DS,
+    cache_hint L1H,
+    cache_hint L2H>
+__XETLA_API void xetla_store_global(
+    Ty* p,
+    uint64_t offset,
+    xetla_vector<Ty, NElts> vals) {
+  using T = native_type_t<Ty>;
+  __ESIMD_ENS::lsc_block_store<
+      T,
+      NElts,
+      gpu::xetla::detail::get_data_size(DS),
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H)>(
+      (T*)p + (offset / sizeof(T)), vals);
 }
 
 /// void block_store(T* ptr, size_t byte_offset,         // (usm-bs-2)

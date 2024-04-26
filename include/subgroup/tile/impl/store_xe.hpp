@@ -124,10 +124,16 @@ tile_store(tile_t& tile, payload_t& payload) {
       block_size_y > max_store_block_height ? max_store_block_height
                                             : block_size_y;
   // to make sure full CL store
-  static constexpr uint32_t st_block_x =
-      (((tile_size_x % elems_per_CL) == 0) ? elems_per_CL : block_size_x);
+  static constexpr uint32_t st_block_x = ((tile_size_x % elems_per_CL) == 0)
+      ? elems_per_CL
+      : (((elems_per_CL % tile_size_x) == 0) ? tile_size_x : block_size_x);
 
-  static constexpr uint8_t arr_len = st_block_x / block_size_x;
+  static constexpr uint8_t arr_len_candidate = st_block_x / block_size_x;
+  static constexpr bool is_valid_arr_len_candidate = (arr_len_candidate == 1) ||
+      (arr_len_candidate == 2) || (arr_len_candidate == 4);
+
+  static constexpr uint8_t arr_len =
+      is_valid_arr_len_candidate ? arr_len_candidate : 1;
 
   auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
 #pragma unroll
@@ -338,6 +344,7 @@ tile_store(
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
   using store_dtype = typename payload_t::mem_dtype;
+
   constexpr uint32_t num_channel_y = payload_t::num_channel_y;
   constexpr uint32_t store_elems = num_channel_y * payload_t::num_channel_x;
   constexpr uint32_t scale_factor = payload_t::scale_factor;
@@ -424,7 +431,6 @@ tile_store(
     }
   }
 }
-
 /// @brief Is the func storing data from register file to unaligned global
 /// memory surface. store a rectangular region (X,Y)..(X+W,Y+H) into memory from
 /// registers.
@@ -662,7 +668,8 @@ tile_store(
               L1,
               L2,
               op_kind,
-              payload_t::arch_tag>(
+              payload_t::arch_tag,
+              typename payload_t::Toffset>(
               payload.base_pointer + address_offset,
               payload.channel_offset,
               reg_sub.xetla_select<payload_t::store_elems, 1>(
@@ -716,7 +723,8 @@ tile_store(
             L1,
             L2,
             op_kind,
-            payload_t::arch_tag>(
+            payload_t::arch_tag,
+            typename payload_t::Toffset>(
             (uint64_t)payload.base_pointer + address_offset,
             payload.channel_offset,
             reg_sub.xetla_select<payload_t::store_elems, 1>(
@@ -832,7 +840,6 @@ tile_store(tile_t& tile, payload_t& payload) {
 
   constexpr uint32_t vnni_scale_factor = payload_t::vnni_scale_factor;
   constexpr uint32_t num_vector_size = payload_t::num_vector_size;
-  constexpr uint32_t num_channel_y = payload_t::num_channel_y;
   constexpr uint32_t store_elems = payload_t::store_elems;
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
@@ -845,11 +852,12 @@ tile_store(tile_t& tile, payload_t& payload) {
           (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
-           sub_block_y += num_channel_y * num_vector_size * vnni_scale_factor) {
-        uint32_t address_offset = offset_x * payload.pitch_in_bytes +
+           sub_block_y += num_vector_size * vnni_scale_factor) {
+        uint32_t address_offset = payload.base_address +
+            offset_x * payload.pitch_in_bytes +
             (sub_block_y + offset_y) * sizeof(dtype);
         xetla_store_local<store_dtype, num_vector_size>(
-            payload.address + address_offset,
+            payload.channel_address + address_offset,
             reg_sub
                 .xetla_select<store_elems, 1>(
                     sub_block_y * tile_desc::block_size_x)
@@ -871,11 +879,12 @@ tile_store(tile_t& tile, payload_t& payload) {
           processed_elems + j * remain_block_elems);
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < remained_size_y;
-           sub_block_y += num_channel_y * num_vector_size * vnni_scale_factor) {
-        uint32_t address_offset = offset_x * payload.pitch_in_bytes +
+           sub_block_y += num_vector_size * vnni_scale_factor) {
+        uint32_t address_offset = payload.base_address +
+            offset_x * payload.pitch_in_bytes +
             (sub_block_y + offset_y) * sizeof(dtype);
         xetla_store_local<store_dtype, num_vector_size>(
-            payload.address + address_offset,
+            payload.channel_address + address_offset,
             reg_sub
                 .xetla_select<store_elems, 1>(
                     sub_block_y * tile_desc::block_size_x)
@@ -932,7 +941,8 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t row_i = 0; row_i < tile_desc::block_size_y; row_i++) {
         xetla_store_local<store_dtype, vector_size>(
-            payload.address + address_offset + row_i * payload.pitch_in_bytes,
+            payload.base_address + payload.address + address_offset +
+                row_i * payload.pitch_in_bytes,
             reg_sub_2d.row(row_i).xetla_format<store_dtype>());
       }
     }
@@ -957,7 +967,8 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t row_i = 0; row_i < remained_size_y; row_i++) {
         xetla_store_local<store_dtype, vector_size>(
-            payload.address + address_offset + row_i * payload.pitch_in_bytes,
+            payload.base_address + payload.address + address_offset +
+                row_i * payload.pitch_in_bytes,
             reg_sub_2d.row(row_i).xetla_format<store_dtype>());
       }
     }
@@ -999,13 +1010,14 @@ tile_store(tile_t& tile, payload_t& payload) {
       auto reg_sub = tile.reg.xetla_select<64 * scale_factor, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
       xetla_store_local<store_dtype, 64>(
-          payload.address + address_offset,
+          payload.base_address + payload.address + address_offset,
           reg_sub.xetla_format<store_dtype>());
     }
   }
+  uint32_t tail_offset = store_len / 64 * 64 * scale_factor;
   detail::
       process_1d_tail<store_len % 64, 32, detail::process_flag::store, L1, L2>(
-          tile, payload, store_len / 64 * 64 * scale_factor);
+          tile, payload, tail_offset, tail_offset * sizeof(dtype));
 }
 
 } // namespace gpu::xetla::subgroup
