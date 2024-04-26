@@ -657,8 +657,8 @@ class DecompressKBlockS4S8 {
                                                            row, col, (int8_t*)tmp, tmpsize);
     }
 #endif
-    return ref::decompress_kblock_s4_s8<PackRow>(srcptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset, row, col,
-                                                 (int8_t*)tmp, tmpsize);
+    return ref::decompress_kblock_s4_s8<PackRow, NTILE>(srcptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset, row,
+                                                        col, (int8_t*)tmp, tmpsize);
   }
 };
 
