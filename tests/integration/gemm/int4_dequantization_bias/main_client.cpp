@@ -890,11 +890,13 @@ void dequantize_gemm_run(int iter) {
     }
 
     cl::sycl::range<3> shuf_group_range{
-        1, matrix_m / Feature::wg_shuf_y, matrix_k / Feature::wg_shuf_x};
+        1,
+        (matrix_m + Feature::wg_shuf_y - 1) / Feature::wg_shuf_y,
+        (matrix_k + Feature::wg_shuf_x - 1) / Feature::wg_shuf_x};
     cl::sycl::range<3> shuf_local_range{
         1,
-        Feature::wg_shuf_y / Feature::sg_shuf_y,
-        Feature::wg_shuf_x / Feature::sg_shuf_x};
+        (Feature::wg_shuf_y + Feature::sg_shuf_y - 1) / Feature::sg_shuf_y,
+        (Feature::wg_shuf_x + Feature::sg_shuf_x - 1) / Feature::sg_shuf_x};
     cl::sycl::nd_range<3> shuf_nd_range(
         shuf_group_range * shuf_local_range, shuf_local_range);
 
@@ -916,12 +918,12 @@ void dequantize_gemm_run(int iter) {
                         Feature::sg_shuf_y,
                         Feature::shuf_load_block>;
                 using col_major_shuf = gpu::xetla::kernel::col_major_shuf_t<
-                    fp16,
-                    fp16,
+                    typename Test::data_type_a,
+                    typename Test::data_type_a,
                     uint32_t,
                     mem_layout::row_major,
                     col_major_shuf_attr,
-                    gpu_arch::XeHpg>;
+                    Test::arch>;
 
                 typename col_major_shuf::arguments_t args{
                     A_d, A_d_shuf, gidx_d, matrix_k, matrix_m};

@@ -32,11 +32,6 @@ static void col_major_shuf_run() {
   constexpr uint32_t sg_tile_m = Test::sg_m;
   constexpr uint32_t sg_tile_n = Test::sg_n;
 
-  static_assert(
-      // Test::mat_m % Test::sg_m == 0 && Test::mat_n % Test::sg_n == 0,
-      Test::mat_n % Test::sg_n == 0,
-      "Matrix size should be multiple of subgroup size");
-
   using data_type_in = typename Test::data_type_in;
   using data_type_out = typename Test::data_type_out;
 
@@ -104,8 +99,6 @@ static void col_major_shuf_run() {
     auto e_esimd = queue.submit([&](handler& cgh) {
       cgh.use_kernel_bundle(exeBundle);
       cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
-        // cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item)
-        // SYCL_ESIMD_KERNEL {
         using col_major_shuf_attr = gpu::xetla::kernel::col_major_shuf_attr_t<
             wg_tile_n,
             wg_tile_m,
