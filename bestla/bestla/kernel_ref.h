@@ -500,6 +500,23 @@ static inline BTLA_CODE decompress_kblock_s3_fp(utils::bit2x4* b2ptr, utils::bit
   return BTLA_CODE::Success;
 }
 
+template <int PackRow, int NTILE, typename DST_T>
+static inline BTLA_CODE decompress_kblock_s2_fp(utils::bit2x4* b2ptr, DST_T* dstptr, int row, int col, void* scales_,
+                                                BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,
+                                                int blocksize, int ldzp, int8_t* tmp, size_t tmpsize) {
+  assert(tmpsize >= PackRow * NTILE);
+  assert(NTILE == col);
+  const auto DstSize = row * NTILE * sizeof(DST_T);
+  const auto S8Size = row * NTILE * sizeof(int8_t);
+  auto tmps8ptr = (int8_t*)dstptr;
+  tmps8ptr += DstSize - S8Size;
+  decompress_kblock_s2_s8<PackRow, NTILE>(b2ptr, zero_points, tmps8ptr, blocksize, ldzp, n_offset, k_offset, row, col,
+                                          tmp, tmpsize);
+  decompress_kblock_s8_fp<PackRow, NTILE>(tmps8ptr, dstptr, row, col, scales_, sdtype, nullptr, k_offset, n_offset,
+                                          blocksize, ldzp, tmp, tmpsize);
+  return BTLA_CODE::Success;
+}
+
 template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW>
 static inline BTLA_CODE decompress_dq_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
                                                    int ld_dst, uint8_t* scales, float* dq_scale, int k_offset,

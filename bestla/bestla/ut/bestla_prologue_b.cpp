@@ -219,7 +219,7 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-// 
+//
 static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
 
@@ -773,9 +773,9 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
+    ut_s2();
     ut_s3();
     ut_s4();
-    ut_s2();
     ut_s8();
     ut_f4();
     ut_f8();
@@ -786,7 +786,7 @@ class UT_CompFp32 {
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
                                                           true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
                                                           false);
@@ -890,8 +890,8 @@ class UT_CompFp32 {
 
   template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei>
   void ut_int(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype, bool isAsym) {
-    printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
-           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype));
+    printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
+           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher =
         wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
@@ -922,11 +922,7 @@ class UT_CompFp32 {
 
     launcher.mProA.reduce({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k, blocksize);
-    typename Launcher::Param args{
-        gp,
-        {matAf32.data(), k, &reduceA},
-        {&packedw},
-        {matC.data(), n}};
+    typename Launcher::Param args{gp, {matAf32.data(), k, &reduceA}, {&packedw}, {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     auto dbits = bestla_dtype_bits(qtype);
@@ -972,16 +968,16 @@ class UT_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompFp32 sUT_CompFp32;
+#endif
 
 class UT_CompInt8 {
  public:
   UT_CompInt8() {
     UT_START();
+    ut_s2();
     ut_s3();
     ut_s4_newkblock();
-    ut_s2();
     ut_s4();
     ut_s8();
   }
@@ -991,6 +987,9 @@ class UT_CompInt8 {
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
     }
@@ -1000,8 +999,8 @@ class UT_CompInt8 {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
     }
   }
