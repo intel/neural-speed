@@ -541,6 +541,93 @@ class UT_GEMM_AVXVNNI_KBLOCK {
 static UT_GEMM_AVXVNNI_KBLOCK sUT_GEMM_AVXVNNI_KBLOCK;
 #endif
 
+class UT_GEMM_AVX2VNNI_KBLOCK {
+ public:
+  UT_GEMM_AVX2VNNI_KBLOCK() {
+    UT_START();
+    CheckISA(AVX2);
+    ut_ss<24, 1>(1, 96, 36, 36);
+    ut<24, 1>(1, 96, 36, 36);
+    ut<24, 1>(1, 144, 128, 32);
+    ut<24, 1>(1, 144, 128, 128);
+    ut<24, 1>(1, 144, 256, 128);
+  }
+
+  template <int NTile, int MTile>
+  void ut(int m, int n, int k, int kblock) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx2vnniKBlock<NTile, MTile>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<uint8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<float> C(m * n, 0), RefC(m * n, 0);
+    int blk_num = utils::updiv(k, kblock);
+    avector<float> scaleA(blk_num * m), scaleB(blk_num * n), reduceB(blk_num * n, 0.f);
+    avector<uint8_t> zpA(m * blk_num);
+    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)128);
+    fill_buffer_randn(zpA.data(), zpA.size(), (uint8_t)0, (uint8_t)64);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(scaleA.data(), scaleA.size(), 0.003f, 0.005f);
+    fill_buffer_randn(scaleB.data(), scaleB.size(), 0.003f, 0.005f);
+    for (size_t i = 0; i < k; i++) {
+      for (size_t j = 0; j < n; j++) {
+        reduceB[i / kblock * n + j] += B[i * n + j];
+      }
+    }
+    for (size_t i = 0; i < blk_num; i++) {
+      for (size_t j = 0; j < n; j++) {
+        reduceB[i * n + j] *= scaleB[i * n + j];
+      }
+    }
+
+    ref_kblock_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), zpA.data(), scaleA.data(), blk_num,
+                                       scaleB.data(), reduceB.data(), n, m, n, k, kblock, k * sizeof(A[0]),
+                                       k * sizeof(B[0]), n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), zpA.data(), scaleA.data(), blk_num, scaleB.data(), reduceB.data(), n, m,
+                 n, k, kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, 1.f, cache, CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
+  }
+
+  template <int NTile, int MTile>
+  void ut_ss(int m, int n, int k, int kblock) {
+    printf("Test Case SS: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx2vnniKBlockSS<NTile, MTile>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<int8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<float> C(m * n, 0), RefC(m * n, 0);
+    int blk_num = utils::updiv(k, kblock);
+    avector<float> scaleA(blk_num * m), scaleB(blk_num * n);
+    fill_buffer_randn(A.data(), A.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(scaleA.data(), scaleA.size(), 0.003f, 0.005f);
+    fill_buffer_randn(scaleB.data(), scaleB.size(), 0.003f, 0.005f);
+
+    ref_kblock_int8_ss<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), scaleA.data(), blk_num, scaleB.data(), n, m,
+                                          n, k, kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), nullptr, scaleA.data(), blk_num, scaleB.data(), nullptr, n, m, n, k,
+                 kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, 1.f, cache, CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
+  }
+};
+#ifdef BTLA_UT_GEMM
+#endif
+static UT_GEMM_AVX2VNNI_KBLOCK sUT_GEMM_AVX2VNNI_KBLOCK;
+
 class UT_GEMM_AMXINT8_KBLOCK {
  public:
   UT_GEMM_AMXINT8_KBLOCK() {
