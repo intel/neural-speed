@@ -21,16 +21,16 @@ using namespace gpu::xetla;
 // The number of times the kernel is executed
 constexpr int ITER = 100;
 
-enum optinal_feature { NONE, ACT_SHUFFLE };
+enum optional_feature { NONE, ACT_SHUFFLE };
 
 class no_feature {
  public:
-  static constexpr optinal_feature feature = optinal_feature::NONE;
+  static constexpr optional_feature feature = optional_feature::NONE;
 };
 
 class act_shuf_feature_first_token {
  public:
-  static constexpr optinal_feature feature = optinal_feature::ACT_SHUFFLE;
+  static constexpr optional_feature feature = optional_feature::ACT_SHUFFLE;
   static constexpr size_t wg_shuf_x = 64;
   static constexpr size_t wg_shuf_y = 16;
   static constexpr size_t sg_shuf_x = 16;
@@ -40,7 +40,7 @@ class act_shuf_feature_first_token {
 
 class act_shuf_feature_next_token {
  public:
-  static constexpr optinal_feature feature = optinal_feature::ACT_SHUFFLE;
+  static constexpr optional_feature feature = optional_feature::ACT_SHUFFLE;
   static constexpr size_t wg_shuf_x = 128;
   static constexpr size_t wg_shuf_y = 1;
   static constexpr size_t sg_shuf_x = 16;
@@ -653,7 +653,9 @@ void dequantize_gemm_run(int iter) {
   //     uint32_t ld_zero_pt = size_zero_pt_n;
 
   // Turn on the enable_profiling property to facilitate subsequent profiling
-  sycl::property_list properties{sycl::property::queue::enable_profiling()};
+  sycl::property_list properties{
+      sycl::property::queue::enable_profiling(),
+      sycl::property::queue::in_order()};
   auto queue = sycl::queue(properties);
   auto context = queue.get_info<info::queue::context>();
   auto device = queue.get_info<info::queue::device>();
@@ -848,7 +850,7 @@ void dequantize_gemm_run(int iter) {
       {// epilogue_args init list
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
-  if constexpr (Feature::feature == optinal_feature::ACT_SHUFFLE) {
+  if constexpr (Feature::feature == optional_feature::ACT_SHUFFLE) {
     constexpr size_t size_gidx = matrix_k;
     auto* gidx_h = static_cast<uint32_t*>(
         malloc_host(size_gidx * sizeof(uint32_t), context));
@@ -971,7 +973,7 @@ void dequantize_gemm_run(int iter) {
     free(gidx_d, context);
     free(A_d_shuf, context);
   }
-  if constexpr (Feature::feature == optinal_feature::NONE) {
+  if constexpr (Feature::feature == optional_feature::NONE) {
     typename gemm_op_t::template arguments_t<compute_policy::quant_type>
         gemm_arg(
             matrix_m,
