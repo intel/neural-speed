@@ -223,7 +223,7 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
   // from low precision to high precision
   switch (CompType) {
     case NE_COMP_INT8:
-      if (dtype_type == dtype_int && !isAsym) {  // asym int8 is not optimized, so fall through to others.
+      if (dtype_type == dtype_int) { 
         if (_cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           return BTLABuSize<tLauncher_Int8_F32F32<tAMX_INT8_SS_KBlock, Wei_T>>(
               static_cast<int>(BlkSize), N, K, QuantType, ScaleDtype, isAsym, shuffle_indice);
@@ -307,7 +307,7 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
   auto constexpr dtype_int = utils::bestla_dtype_type(BTLA_DTYPE::TypeInt);
   switch (CompType) {
     case NE_COMP_INT8:
-      if (dtype_type == dtype_int && !isAsym) {  // asym int8 is not optimized, so fall through to others.
+      if (dtype_type == dtype_int) { 
         if (_cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           BTLAGemmQuantPackB<tLauncher_Int8_F32F32<tAMX_INT8_SS_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
@@ -412,7 +412,7 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
   }
   switch (CompType) {
     case NE_COMP_INT8:
-      if (dtype_type == dtype_int && !isAsym) {  // asym int8 is not optimized, so fall through to others.
+      if (dtype_type == dtype_int) {
         if (_cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           BTLAGemmPackBImpl<tLauncher_Int8_F32F32<tAMX_INT8_SS_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
