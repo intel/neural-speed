@@ -1480,7 +1480,7 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
   static_assert(NRegs * MRegs <= RegCount - KeepRegs);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
+  static auto constexpr ISA = BTLA_ISA::AVX2;
   static auto constexpr COMPUTE =
       std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_INT32 : CompType::COMP_INT8_SS_INT32;
   using AType = AT;
@@ -3178,7 +3178,7 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
   static_assert(NRegs * MRegs <= RegCount - (TmpReserve + 1));
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
+  static auto constexpr ISA = BTLA_ISA::AVX2;
   static auto constexpr COMPUTE =
       std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_FP32 : CompType::COMP_INT8_SS_FP32;
   using AType = AT;
