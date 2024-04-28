@@ -3173,8 +3173,9 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
   static int constexpr RegLen = 8, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
   static int constexpr NRegs = _NTILE / RegLen;
-  static int constexpr MRegs = _MTILE == 0 ? (RegCount - 5) / (NRegs * 2) : _MTILE;
-  static_assert(NRegs * MRegs <= RegCount - 5);
+  static int constexpr TmpReserve = std::is_same_v<AT, uint8_t> ? 2 : 4;
+  static int constexpr MRegs = _MTILE == 0 ? (RegCount - (TmpReserve + 1)) / (NRegs * 2) : _MTILE;
+  static_assert(NRegs * MRegs <= RegCount - (TmpReserve + 1));
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
   static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
@@ -3242,7 +3243,7 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
   void assign_regs() {
     CRegCount = MRegs * NRegs;
     ARegCount = 1;
-    BRegCount = RegCount - CRegCount - CRegCount - ARegCount - 4;
+    BRegCount = RegCount - CRegCount - CRegCount - ARegCount - TmpReserve;
     if (BRegCount >= NRegs) {
       BRegCount = NRegs;
     } else {
@@ -3255,7 +3256,7 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
     TmpReg = AReg + ARegCount;
     assert(TmpReg < RegCount);
     TmpRegCount = RegCount - TmpReg;
-    assert(TmpRegCount >= 4);
+    assert(TmpRegCount >= TmpReserve);
   }
 
   void generate_mtile(int _mtile) {
@@ -3280,7 +3281,6 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
     reg_ret = rax;
 
     vreg_push(rsp);
-    vpbroadcastw(vreg_t(TmpReg + 2), ptr[parambase + OFFSET(one)]);
     load32(reg_ksize, ptr[parambase + OFFSET(k)]);
     load32(reg_nsize, ptr[parambase + OFFSET(n)]);
     xor_(reg_itern, reg_itern);
@@ -3313,6 +3313,7 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
         vxor(vreg_t(CReg + i * NRegs + j), vreg_t(CReg + i * NRegs + j), vreg_t(CReg + i * NRegs + j));
       }
     }
+    vpbroadcastw(vreg_t(TmpReg + 0), ptr[parambase + OFFSET(one)]);
     xor_(reg_tmp2, reg_tmp2);
     load32(reg_tmp3, ptr[parambase + OFFSET(kblock)]);
     mov(reg_tmp, reg_tmp3);
@@ -3353,18 +3354,18 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
           if constexpr (std::is_same_v<AType, int8_t>) {
-            vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
+            vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg), vreg_t(AReg));
           }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
             if constexpr (std::is_same_v<AType, uint8_t>) {
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 3), vreg_t(AReg),
-                         ptr[reg_matBptr + kk * BKStepSize + i * VecBytes], vreg_t(TmpReg + 2));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg),
+                         ptr[reg_matBptr + kk * BKStepSize + i * VecBytes], vreg_t(TmpReg + 0));
             } else {
-              vmovups(vreg_t(TmpReg), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
-              vpsignb(vreg_t(TmpReg), vreg_t(TmpReg), vreg_t(AReg));
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 3), vreg_t(TmpReg + 1), vreg_t(TmpReg),
-                         vreg_t(TmpReg + 2));
+              vmovups(vreg_t(TmpReg + 3), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+              vpsignb(vreg_t(TmpReg + 3), vreg_t(TmpReg + 3), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
+                         vreg_t(TmpReg + 0));
             }
           }
         }
@@ -3375,17 +3376,17 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
           if constexpr (std::is_same_v<AType, int8_t>) {
-            vpsignb(vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(AReg));
+            vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg), vreg_t(AReg));
           }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
             if constexpr (std::is_same_v<AType, uint8_t>) {
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 3), vreg_t(AReg), vreg_t(BReg + i),
-                         vreg_t(TmpReg + 2));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(BReg + i),
+                         vreg_t(TmpReg + 0));
             } else {
-              vpsignb(vreg_t(TmpReg), vreg_t(BReg + i), vreg_t(AReg));
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 3), vreg_t(TmpReg + 1), vreg_t(TmpReg),
-                         vreg_t(TmpReg + 2));
+              vpsignb(vreg_t(TmpReg + 3), vreg_t(BReg + i), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
+                         vreg_t(TmpReg + 0));
             }
           }
         }

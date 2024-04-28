@@ -546,11 +546,11 @@ class UT_GEMM_AVX2VNNI_KBLOCK {
   UT_GEMM_AVX2VNNI_KBLOCK() {
     UT_START();
     CheckISA(AVX2);
-    ut_ss<24, 1>(1, 96, 36, 36);
     ut<24, 1>(1, 96, 36, 36);
     ut<24, 1>(1, 144, 128, 32);
     ut<24, 1>(1, 144, 128, 128);
     ut<24, 1>(1, 144, 256, 128);
+    ut_ss<24, 1>(1, 96, 36, 36);
   }
 
   template <int NTile, int MTile>
@@ -625,8 +625,8 @@ class UT_GEMM_AVX2VNNI_KBLOCK {
   }
 };
 #ifdef BTLA_UT_GEMM
-#endif
 static UT_GEMM_AVX2VNNI_KBLOCK sUT_GEMM_AVX2VNNI_KBLOCK;
+#endif
 
 class UT_GEMM_AMXINT8_KBLOCK {
  public:
