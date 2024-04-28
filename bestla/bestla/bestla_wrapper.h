@@ -144,6 +144,12 @@ class LauncherBase {
           return true;
         }
       }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512F) {
+        static_assert(GemmCore::PACK_ROW == 1);
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_FP32) {
+          return true;
+        }
+      }
       return false;
     }
     static int constexpr MaxGemvM = 4;
@@ -383,6 +389,15 @@ class LauncherIntKBlock {
         }
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX2) {
+        static_assert(GemmCore::PACK_ROW == 4);
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
+          return true;
+        }
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_SS_FP32) {
+          return true;
+        }
+      }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512_VNNI) {
         static_assert(GemmCore::PACK_ROW == 4);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
           return true;

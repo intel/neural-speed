@@ -2840,7 +2840,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
   return BTLA_CODE::Success;
 }
 
-namespace avx_vnni {
+namespace vnni {
 
 #ifdef __GNUC__
 #pragma GCC push_options
