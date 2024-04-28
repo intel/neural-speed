@@ -442,8 +442,8 @@ class UTWOQ_CompFp32 {
   UTWOQ_CompFp32() {
     UT_START();
     ut_s2();
+    ut_s4();
     ut_s3();
-    // ut_s4();
     // ut_s8();
     // ut_f4();
   }

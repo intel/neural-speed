@@ -2473,21 +2473,14 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
       }
 
     } else {
-      for (int ik = 0; ik < blocksize; ik += Unroll * 2) {
+      for (int ik = 0; ik < blocksize; ik += Unroll) {
         for (int i = 0; i < NReg; i++) {
           auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
           vb = _mm256_sub_epi8(vb, vbias);
           _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
           b2ptr += 8 * Unroll / 4;
         }
-        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik + Unroll, lda, tmp, acc_loc);
-        for (int i = 0; i < NReg; i++) {
-          auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
-          vb = _mm256_sub_epi8(vb, vbias);
-          _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
-          b2ptr += 8 * Unroll / 4;
-        }
-        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik + Unroll, lda, tmp, acc_loc);
+        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc_loc);
       }
     }
 
