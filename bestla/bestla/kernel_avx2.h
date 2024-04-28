@@ -2327,6 +2327,32 @@ static inline void accumulate_fp32_s8_fp32(const float* Aptr, int lda, int8_t* B
   }
 }
 
+template <int MTILE, int NReg, int Unroll>
+static inline void accumulate_fp32_s8_fp32(const float* Aptr, int lda, int8_t* Bptr, __m256* vacc_loc) {
+  if constexpr (MTILE == 1) {
+    for (int ikk = 0; ikk < Unroll; ikk++) {
+      __m256 va = _mm256_set1_ps(*(Aptr + ikk));
+      for (int i = 0; i < NReg; i++) {
+        auto ftmp = load_s8_fp32(Bptr + i * 8 + ikk * NReg * 8);
+        vacc_loc[i] = _mm256_fmadd_ps(va, ftmp, vacc_loc[i]);
+      }
+    }
+  } else {
+    for (int ikk = 0; ikk < Unroll; ikk++) {
+      __m256 va[MTILE];
+      for (int i = 0; i < NReg; i++) {
+        auto ftmp = load_s8_fp32(Bptr + i * 8 + ikk * NReg * 8);
+        for (int im = 0; im < MTILE; im++) {
+          if (i == 0) {
+            va[im] = _mm256_set1_ps(*(Aptr + ikk + im * lda));
+          }
+          vacc_loc[im * NReg + i] = _mm256_fmadd_ps(va[im], ftmp, vacc_loc[im * NReg + i]);
+        }
+      }
+    }
+  }
+}
+
 template <typename ScaleT, int NTILE, int MTILE>
 static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, int lda, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
@@ -2417,11 +2443,11 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
   int constexpr KTILE = 1;
   for (int ib = 0; ib < blks; ib += 1) {
     auto bsptr = B.sptr + ib * B.ldzp;
-    __m256 v_b_scale[NReg];
-    for (int i = 0; i < NReg; i++) {
-      v_b_scale[i] = load_T_fp32(bsptr + i * 8);
-    }
 
+    __m256 acc_loc[NReg * MReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      acc_loc[i] = _mm256_setzero_ps();
+    }
     int constexpr Unroll = 4;
     assert((blocksize % 4) == 0);
     assert(tmpsize >= NTILE * Unroll);
@@ -2443,18 +2469,35 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
           _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
           b2ptr += 8 * Unroll / 4;
         }
-        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc, v_b_scale);
+        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc_loc);
       }
 
     } else {
-      for (int ik = 0; ik < blocksize; ik += Unroll) {
+      for (int ik = 0; ik < blocksize; ik += Unroll * 2) {
         for (int i = 0; i < NReg; i++) {
           auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
           vb = _mm256_sub_epi8(vb, vbias);
           _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
           b2ptr += 8 * Unroll / 4;
         }
-        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc, v_b_scale);
+        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik + Unroll, lda, tmp, acc_loc);
+        for (int i = 0; i < NReg; i++) {
+          auto vb = unpack_2bits_avx2(b2ptr, vshift_y, vmask0_y, vsfhl_mask_y, vorder_y);
+          vb = _mm256_sub_epi8(vb, vbias);
+          _mm256_storeu_si256((__m256i*)(tmp + 32 * i), vb);
+          b2ptr += 8 * Unroll / 4;
+        }
+        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik + Unroll, lda, tmp, acc_loc);
+      }
+    }
+
+    __m256 v_b_scale[NReg];
+    for (int i = 0; i < NReg; i++) {
+      v_b_scale[i] = load_T_fp32(bsptr + i * 8);
+    }
+    for (int im = 0; im < MTILE; im++) {
+      for (int in = 0; in < NReg; in++) {
+        acc[im * NReg + in] = _mm256_fmadd_ps(acc_loc[im * NReg + in], v_b_scale[in], acc[im * NReg + in]);
       }
     }
   }
@@ -2481,6 +2524,7 @@ static inline BTLA_CODE gemv_3bit_fp32_fp32(const float* A, int lda, const utils
   for (int i = 0; i < NReg * MReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
+
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0_y = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
   auto vshift_y = _mm256_set_epi32(6, 4, 2, 0, 6, 4, 2, 0);
@@ -2496,11 +2540,11 @@ static inline BTLA_CODE gemv_3bit_fp32_fp32(const float* A, int lda, const utils
   int constexpr KTILE = 1;
   for (int ib = 0; ib < blks; ib += 1) {
     auto bsptr = B.sptr + ib * B.ldzp;
-    __m256 v_b_scale[NReg];
-    for (int i = 0; i < NReg; i++) {
-      v_b_scale[i] = load_T_fp32(bsptr + i * 8);
-    }
 
+    __m256 acc_loc[NReg * MReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      acc_loc[i] = _mm256_setzero_ps();
+    }
     int constexpr Unroll = 4;
     assert((blocksize % 4) == 0);
     assert(tmpsize >= NTILE * Unroll);
@@ -2525,7 +2569,7 @@ static inline BTLA_CODE gemv_3bit_fp32_fp32(const float* A, int lda, const utils
           b2ptr += 8 * Unroll / 4;
           b1ptr += 8 * Unroll / 8;
         }
-        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc, v_b_scale);
+        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc_loc);
       }
 
     } else {
@@ -2539,7 +2583,17 @@ static inline BTLA_CODE gemv_3bit_fp32_fp32(const float* A, int lda, const utils
           b2ptr += 8 * Unroll / 4;
           b1ptr += 8 * Unroll / 8;
         }
-        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc, v_b_scale);
+        accumulate_fp32_s8_fp32<MTILE, NReg, Unroll>(A + ib * blocksize + ik, lda, tmp, acc_loc);
+      }
+    }
+
+    __m256 v_b_scale[NReg];
+    for (int i = 0; i < NReg; i++) {
+      v_b_scale[i] = load_T_fp32(bsptr + i * 8);
+    }
+    for (int im = 0; im < MTILE; im++) {
+      for (int in = 0; in < NReg; in++) {
+        acc[im * NReg + in] = _mm256_fmadd_ps(acc_loc[im * NReg + in], v_b_scale[in], acc[im * NReg + in]);
       }
     }
   }
