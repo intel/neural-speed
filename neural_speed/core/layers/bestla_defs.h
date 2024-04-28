@@ -37,6 +37,7 @@ using tAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
 using tAMX_INT8_US = gemm::ICoreRowNAmxint8<48, 16>;
 using tAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<48, 16>;
 
+using tAVX2_VNNI_KBlock = gemm::ICoreRowNAvx2vnniKBlock<24, 2>;
 using tAVX_VNNI_KBlock = gemm::ICoreRowNAvxvnniKBlock<24, 2>;
 using tAVX512_VNNI_KBlock = gemm::ICoreRowNAvx512vnniKBlock<48, 4>;
 using tAMX_INT8_US_KBlock = gemm::ICoreRowNAmxint8KBlock<48, 16>;

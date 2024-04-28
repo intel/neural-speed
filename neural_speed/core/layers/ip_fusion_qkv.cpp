@@ -212,6 +212,9 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
       } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
         ip_qkv::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
                                                              ldo, workspace, pth);
+      } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+        ip_qkv::BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                              ldo, workspace, pth);
       }
     }
   }

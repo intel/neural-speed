@@ -251,6 +251,9 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
               activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+        } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
         }
       }
     }
@@ -534,6 +537,10 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
           BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
                                                                              output, seq, fin, fmid, fout, workspace,
                                                                              pth, epi_args1, epi_args2);
+        } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
+                                                                              output, seq, fin, fmid, fout, workspace,
+                                                                              pth, epi_args1, epi_args2);
         }
       }
     }

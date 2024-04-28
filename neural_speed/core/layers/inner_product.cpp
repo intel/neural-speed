@@ -157,6 +157,9 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           ip_add::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
                                                                broadcast_bias, workspace, pth);
+        } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          ip_add::BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
+                                                               broadcast_bias, workspace, pth);
         }
       }
     }
