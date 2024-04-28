@@ -953,8 +953,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompInt8 sUT_CompInt8;
+#endif
 
 class UT_CompBf16 {
  public:

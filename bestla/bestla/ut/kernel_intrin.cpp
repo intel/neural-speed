@@ -100,8 +100,8 @@ class UT_avx2_decompress_s4_s8 {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx2_decompress_s4_s8 sUT_avx2_decompress_s4_s8;
+#endif
 
 class UT_avx2_decompress_s3_s8 {
  public:
@@ -174,8 +174,8 @@ class UT_avx2_decompress_s3_s8 {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx2_decompress_s3_s8 sUT_avx2_decompress_s3_s8;
+#endif
 
 class UT_avx2_decompress_s2_s8 {
  public:
@@ -232,8 +232,8 @@ class UT_avx2_decompress_s2_s8 {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx2_decompress_s2_s8 sUT_avx2_decompress_s2_s8;
+#endif
 
 class UT_avx2_decompress_s4_fp {
  public:
@@ -309,8 +309,8 @@ class UT_avx2_decompress_s4_fp {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx2_decompress_s4_fp sUT_avx2_decompress_s4_fp;
+#endif
 
 class UT_avx2_gemv {
  public:
@@ -763,7 +763,9 @@ class UT_avx2_gemv {
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 };
+#ifdef BTLA_UT_KERNEL_INTRIN
 UT_avx2_gemv sUT_avx2_gemv;
+#endif
 
 }  // namespace ut
 }  // namespace bestla

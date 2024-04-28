@@ -1469,6 +1469,259 @@ using AvxvnniN8P4U8 = AvxvnniN8P4<uint8_t, N, M>;
 template <int N, int M>
 using AvxvnniN8P4S8 = AvxvnniN8P4<int8_t, N, M>;
 
+template <typename AT, int _NTILE, int _MTILE = 0>
+class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
+ public:
+  static int constexpr RegLen = 8, PackRow = 4;
+  static_assert(_NTILE % RegLen == 0);
+  static int constexpr NRegs = _NTILE / RegLen;
+  static int constexpr KeepRegs = std::is_same_v<AT, uint8_t> ? 3 : 5;
+  static int constexpr MRegs = _MTILE == 0 ? (RegCount - KeepRegs) / NRegs : _MTILE;
+  static_assert(NRegs * MRegs <= RegCount - KeepRegs);
+  static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
+  static int constexpr KUNROLL = 1;
+  static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
+  static auto constexpr COMPUTE =
+      std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_INT32 : CompType::COMP_INT8_SS_INT32;
+  using AType = AT;
+  typedef int8_t BType;
+  typedef int32_t CType;
+  struct params {
+    AType* matA;
+    int astride;
+    BType* matB;
+    int bstride;
+    CType* matC;
+    int cstride;
+    int k;
+    int n;
+    int init;
+    const int16_t one = 1;
+  };
+  typedef long long (*func_t)(params*);
+
+  int CRegCount = 0, BRegCount = 0, ARegCount = 0, TmpRegCount = 0;
+  int CReg = 0, BReg = 0, AReg = 0, TmpReg = 0;
+  static int constexpr BKStepSize = KTILE * NTILE * sizeof(BType);
+  static int constexpr AKStepSize = KTILE * sizeof(AType);
+
+  void generate_code(int _mtile) {
+    assign_regs();
+    reset();
+    generate_mtile(_mtile);
+    ready();
+    mKernel = getCode<func_t>();
+  }
+  func_t mKernel = nullptr;
+
+ private:
+  Xbyak::Reg64 parambase;
+  Xbyak::Reg64 reg_matAptr;
+  Xbyak::Reg64 reg_matBptr;
+  Xbyak::Reg64 reg_matCptr;
+  Xbyak::Reg64 reg_ksize;
+  Xbyak::Reg64 reg_nsize;
+  Xbyak::Reg64 reg_cstride;
+  Xbyak::Reg64 reg_astride;
+  Xbyak::Reg64 reg_iterk;
+  Xbyak::Reg64 reg_itern;
+  Xbyak::Reg64 reg_tmp;
+  Xbyak::Reg64 reg_tmp1;
+  Xbyak::Reg64 reg_tmp2;
+  Xbyak::Reg64 reg_ret = rax;
+  Xbyak::Opmask msk_wr = k1;
+
+ protected:
+  void assign_regs() {
+    CRegCount = MRegs * NRegs;
+    ARegCount = 1;
+    if (std::is_same_v<AT, int8_t>) {
+      TmpRegCount = 4;
+    } else {
+      TmpRegCount = 2;
+    }
+    BRegCount = RegCount - ARegCount - CRegCount - TmpRegCount;
+    if (BRegCount < NRegs) {
+      BRegCount = 0;
+      ARegCount = BRegCount + 1;
+    }
+    if (BRegCount > NRegs) {
+      BRegCount = NRegs;
+    }
+    CReg = 0;
+    BReg = CReg + CRegCount;
+    AReg = BReg + BRegCount;
+    TmpReg = AReg + ARegCount;
+    assert(TmpReg + TmpRegCount <= RegCount);
+  }
+
+  void generate_mtile(int _mtile) {
+    inLocalLabel();
+    Xbyak::util::StackFrame st(this, 1, 10, 16 * 10);
+    parambase = st.p[0];
+    reg_matAptr = st.t[0];
+    reg_matBptr = st.t[1];
+    reg_matCptr = st.t[0];
+    reg_ksize = st.t[2];
+    reg_astride = st.t[3];
+    reg_cstride = st.t[3];
+    reg_iterk = st.t[4];
+    reg_tmp = st.t[5];
+    reg_tmp1 = st.t[6];
+    reg_tmp2 = st.t[7];
+    reg_nsize = st.t[8];
+    reg_itern = st.t[9];
+    reg_ret = rax;
+
+    vreg_push(rsp);
+    vpbroadcastw(vreg_t(TmpReg + 0), ptr[parambase + OFFSET(one)]);
+    load32(reg_ksize, ptr[parambase + OFFSET(k)]);
+    load32(reg_nsize, ptr[parambase + OFFSET(n)]);
+    xor_(reg_itern, reg_itern);
+    L(".nloop");
+    init_regs(_mtile);
+    mov(reg_matAptr, ptr[parambase + OFFSET(matA)]);
+    load32(reg_astride, ptr[parambase + OFFSET(astride)]);
+    mov(reg_matBptr, ptr[parambase + OFFSET(matB)]);
+    load32(reg_tmp, ptr[parambase + OFFSET(bstride)]);
+    imul(reg_tmp, reg_itern);
+    lea(reg_matBptr, ptr[reg_matBptr + reg_tmp]);
+    xor_(reg_iterk, reg_iterk);
+    generate_kloop(_mtile);
+    write_back(_mtile);
+    add(reg_itern, NTILE);
+    cmp(reg_itern, reg_nsize);
+    jb(".nloop");
+    mov(reg_ret, 0);
+    vreg_pop(rsp);
+
+    outLocalLabel();  // end of local label
+  }
+
+  void generate_kloop(int _mtile) {
+    inLocalLabel();
+    mov(reg_tmp, reg_ksize);
+    padto_le(reg_tmp, KUNROLL * KTILE);
+    cmp(reg_tmp, 0);
+    jz(".kloop", T_NEAR);
+    L(".unkloop");
+    generate_fma(_mtile, KUNROLL);
+    add(reg_matAptr, KUNROLL * AKStepSize);
+    add(reg_matBptr, KUNROLL * BKStepSize);
+    add(reg_iterk, KUNROLL * KTILE);
+    cmp(reg_iterk, reg_tmp);  // k iteration variable
+    jb(".unkloop");
+    cmp(reg_tmp, reg_ksize);
+    jge(".kend", T_NEAR);
+    L(".kloop");
+    generate_fma(_mtile, 1);
+    add(reg_matAptr, 1 * AKStepSize);
+    add(reg_matBptr, 1 * BKStepSize);
+    add(reg_iterk, 1 * KTILE);
+    cmp(reg_iterk, reg_ksize);  // k iteration variable
+    jb(".kloop");
+    L(".kend");
+    outLocalLabel();
+  }
+
+  void generate_fma(int _mtile, int _kunroll) {
+    for (int kk = 0; kk < _kunroll; kk++) {
+      lea(reg_tmp1, ptr[reg_matAptr + kk * AKStepSize]);
+      if (BRegCount == NRegs) {
+        for (int i = 0; i < NRegs; i++) {
+          vmovups(vreg_t(BReg + i), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+        }
+        for (int mm = 0; mm < _mtile; mm++) {
+          vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
+          if constexpr (std::is_same_v<AType, int8_t>) {
+            vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg), vreg_t(AReg));
+          }
+          add(reg_tmp1, reg_astride);
+          for (int i = 0; i < NRegs; i++) {
+            if constexpr (std::is_same_v<AType, uint8_t>) {
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(BReg + i),
+                         vreg_t(TmpReg + 0));
+            } else {
+              vpsignb(vreg_t(TmpReg + 3), vreg_t(BReg + i), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
+                         vreg_t(TmpReg + 0));
+            }
+          }
+        }
+      } else if (BRegCount == 0) {
+        for (int mm = 0; mm < _mtile; mm += ARegCount) {
+          int mm_re = utils::remainsize(mm, _mtile, ARegCount);
+          for (int imm = 0; imm < mm_re; imm++) {
+            vpbroadcastd(vreg_t(AReg + imm), ptr[reg_tmp1]);
+            if constexpr (std::is_same_v<AType, int8_t>) {
+              vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg + imm), vreg_t(AReg + imm));
+            }
+            add(reg_tmp1, reg_astride);
+            for (int i = 0; i < NRegs; i++) {
+              if constexpr (std::is_same_v<AType, uint8_t>) {
+                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg + imm),
+                           ptr[reg_matBptr + kk * BKStepSize + i * VecBytes], vreg_t(TmpReg + 0));
+              } else {
+                vmovups(vreg_t(TmpReg + 3), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+                vpsignb(vreg_t(TmpReg + 3), vreg_t(TmpReg + 3), vreg_t(AReg + imm));
+                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
+                           vreg_t(TmpReg + 0));
+              }
+            }
+          }
+        }
+      } else {
+        assert(0);
+      }
+    }
+  }
+
+  void init_regs(int _mtile) {
+    inLocalLabel();
+    load32(reg_tmp, ptr[parambase + OFFSET(init)]);
+    cmp(reg_tmp, 0);
+    je(".read", T_NEAR);
+    for (int i = 0; i < _mtile; i++) {
+      for (int j = 0; j < NRegs; j++) {
+        vxor(vreg_t(CReg + i * NRegs + j), vreg_t(CReg + i * NRegs + j), vreg_t(CReg + i * NRegs + j));
+      }
+    }
+    jmp(".end", T_NEAR);
+    L(".read");
+    mov(reg_matCptr, ptr[parambase + OFFSET(matC)]);
+    lea(reg_matCptr, ptr[reg_matCptr + reg_itern * sizeof(CType)]);
+    load32(reg_cstride, ptr[parambase + OFFSET(cstride)]);
+    for (int i = 0; i < _mtile; i++) {
+      for (int j = 0; j < NRegs; j++) {
+        vmovups(vreg_t(CReg + i * NRegs + j), ptr[reg_matCptr + j * VecBytes]);
+      }
+      add(reg_matCptr, reg_cstride);
+    }
+    L(".end");
+    outLocalLabel();
+  }
+
+  void write_back(int _mtile) {
+    inLocalLabel();
+    mov(reg_matCptr, ptr[parambase + OFFSET(matC)]);
+    load32(reg_cstride, ptr[parambase + OFFSET(cstride)]);
+    lea(reg_matCptr, ptr[reg_matCptr + reg_itern * sizeof(CType)]);
+    for (int i = 0; i < _mtile; i++) {
+      for (int j = 0; j < NRegs; j++) {
+        vmovups(ptr[reg_matCptr + j * VecBytes], vreg_t(CReg + i * NRegs + j));
+      }
+      add(reg_matCptr, reg_cstride);
+    }
+    outLocalLabel();
+  }
+};
+
+template <int N, int M>
+using Avx2vnniN8P4U8 = Avx2vnniN8P4<uint8_t, N, M>;
+
+template <int N, int M>
+using Avx2vnniN8P4S8 = Avx2vnniN8P4<int8_t, N, M>;
+
 template <int _NTILE, int _MTILE = 0>
 class Amxbf16N16P2 : protected bestla::xbyak::JitAmxbf16 {
  public:
@@ -3473,6 +3726,38 @@ template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvxvnniSS : public CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE> {
  public:
   using Code = typename CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE>::Code;
+
+  void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+    auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
+    if (_m <= Code::MTILE) {
+      this->mCodes[_m - 1].mKernel(&param);
+    } else {
+      assert(0);
+    }
+  }
+};
+
+template <int _NTILE, int _MTILE = 0>
+class ICoreRowNAvx2vnni : public CoreCodeBase<code::Avx2vnniN8P4U8, _NTILE, _MTILE> {
+ public:
+  using Code = typename CoreCodeBase<code::Avx2vnniN8P4U8, _NTILE, _MTILE>::Code;
+
+  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+    auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
+    if (_m <= Code::MTILE) {
+      this->mCodes[_m - 1].mKernel(&param);
+    } else {
+      assert(0);
+    }
+  }
+};
+
+template <int _NTILE, int _MTILE = 0>
+class ICoreRowNAvx2vnniSS : public CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _MTILE> {
+ public:
+  using Code = typename CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _MTILE>::Code;
 
   void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
                int _cstride, int kpos, void* tmpcache, size_t cachesize) {

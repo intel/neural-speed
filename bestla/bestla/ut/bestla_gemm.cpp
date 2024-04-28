@@ -663,6 +663,70 @@ class UT_GEMM_AVXVNNI {
 static UT_GEMM_AVXVNNI sUT_GEMM_AVXVNNI;
 #endif
 
+class UT_GEMM_AVX2VNNI {
+ public:
+  UT_GEMM_AVX2VNNI() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<24>(1, 48, 12);
+    ut<24>(2, 48, 12);
+
+    ut_ss<24>(1, 48, 12);
+    ut_ss<24>(2, 96, 12);
+  }
+
+  template <int NTile>
+  void ut(int m, int n, int k) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx2vnni<NTile, 3>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<uint8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<int> C(m * n, 0), RefC(m * n, 0);
+    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)127);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    ref_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]),
+                                n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, cache,
+                 CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 1);
+  }
+
+  template <int NTile>
+  void ut_ss(int m, int n, int k) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx2vnniSS<NTile, 3>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<int8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<int> C(m * n, 0), RefC(m * n, 0);
+    fill_buffer_randn(A.data(), A.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    ref_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]),
+                                n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, cache,
+                 CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 1);
+  }
+};
+#ifdef BTLA_UT_GEMM
+static UT_GEMM_AVX2VNNI sUT_GEMM_AVX2VNNI;
+#endif
+
 class UT_GEMM_AVX512FP16 {
  public:
   UT_GEMM_AVX512FP16() {
