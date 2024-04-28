@@ -195,18 +195,18 @@ class BpeVocab:
         self.vocab_size = self.vocab_size_base + len(self.added_tokens_list)
         self.fname_tokenizer = fname_tokenizer
 
-    def bpe_tokens(self) -> Iterable[tuple[bytes, float]]:
+    def bpe_tokens(self) -> Iterable[Tuple[bytes, float]]:
         reverse_vocab = {id: encoded_tok for encoded_tok, id in self.vocab.items()}
 
         for i, _ in enumerate(self.vocab):
             yield reverse_vocab[i], 0.0
 
-    def added_tokens(self) -> Iterable[tuple[bytes, float]]:
+    def added_tokens(self) -> Iterable[Tuple[bytes, float]]:
         for text in self.added_tokens_list:
             score = -1000.0
             yield text.encode("utf-8"), score
 
-    def all_tokens(self) -> Iterable[tuple[bytes, float]]:
+    def all_tokens(self) -> Iterable[Tuple[bytes, float]]:
         yield from self.bpe_tokens()
         yield from self.added_tokens()
 
