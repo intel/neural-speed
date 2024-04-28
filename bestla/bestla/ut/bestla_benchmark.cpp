@@ -557,8 +557,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompFp32 sUTWOQ_CompFp32;
+#endif
 
 class UTWOQ_CompBf16 {
  public:
@@ -677,6 +677,7 @@ class UTWOQ_CompInt8 {
  public:
   UTWOQ_CompInt8() {
     UT_START();
+    ut_s4();
     ut_s3();
     // ut_s4();
     // ut_s2();
@@ -797,6 +798,10 @@ class UTWOQ_CompInt8 {
         }
         if (_cd->AVX_VNNI()) {
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
+        }
+        if (_cd->AVX2()) {
+          benchmark<gemm::ICoreRowNAvx2vnniKBlock<24, 2>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
       }
