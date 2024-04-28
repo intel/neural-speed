@@ -37,9 +37,9 @@ class UT_Avx512f_decompress_kblock_s4_fp {
     // kernel::ref::decompress_kblock_s4_fp<S4_T, DST_T, PACK_ROW, ST_T>(
     //     s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
     //     k_offset, kblock, NPad, cache, CacheSize);
-    kernel::avx512f::decompress_kblock_s4_fp<S4_T, DST_T, PACK_ROW, ST_T>(
+   /* kernel::avx512f::decompress_kblock_s4_fp<S4_T, DST_T, PACK_ROW, ST_T>(
         s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
-        k_offset, kblock, NPad, cache, CacheSize);
+        k_offset, kblock, NPad, cache, CacheSize);*/
     ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(BF16_ERR));
   }
 };
@@ -287,6 +287,84 @@ class UT_avx2_decompress_s2_s8 {
 #ifdef BTLA_UT_KERNEL_INTRIN
 static UT_avx2_decompress_s2_s8 sUT_avx2_decompress_s2_s8;
 #endif
+
+class UT_avx512_decompress_s4_fp {
+ public:
+  UT_avx512_decompress_s4_fp() {
+    UT_START();
+    CheckISA(AVX512F);
+    ut<1, 48, float>(32);
+    ut<2, 48, float>(32);
+    ut<4, 48, float>(32);
+    ut<4, 48, utils::bf16>(32);
+    ut<4, 48, utils::bf16, utils::bf16>(32);
+    ut<1, 48, float>(32, true);
+    ut<2, 48, float>(32, true);
+    ut<4, 48, float>(32, true);
+    ut<4, 48, utils::bf16>(32, true);
+    ut<4, 48, utils::bf16, utils::bf16>(32, true);
+  }
+
+  template <int PackRow, int NTILE, typename T, typename ScaleT = float>
+  void ut(int blocksize, bool isasym = false) {
+    auto dst_dtype = bestla_dtype<T>;
+    auto scale_dtype = bestla_dtype<ScaleT>;
+    int row = blocksize * 2;
+    int constexpr col = NTILE;
+    printf("Test Case %s: %d %d %d Asym:%d Pack:%d %s %s\n", __FUNCTION__, row, col, blocksize, isasym, PackRow,
+           utils::bestla_dtype_str(dst_dtype), bestla_dtype_str(scale_dtype));
+    std::vector<utils::int4x2> s4_wei(row * col / 2);
+    std::vector<int8_t> s8_wei(col * row);
+    std::vector<T> s8_ref(col * row);
+    int blks = row / blocksize;
+    int row_offset = PackRow;
+    std::vector<int8_t> zp(col * blks);
+    avector<ScaleT> scale(col * blks);
+    fill_buffer_randn(scale.data(), scale.size(), ScaleT(0.01f), ScaleT(0.03f));
+    fill_buffer_randn(zp.data(), zp.size(), int8_t(-8), int8_t(7));
+    std::vector<T> rev(col * row);
+    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-8), int8_t(7));
+
+    for (int i = 0; i < col * row; i += 2) {
+      s8_ref[i] = float(s8_wei[i]);
+      s8_ref[i + 1] = float(s8_wei[i + 1]);
+      s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]) + 8;
+      s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]) + 8;
+    }
+    if (isasym) {
+      for (int i = 0; i < row; i += PackRow) {
+        for (int j = 0; j < NTILE; j++) {
+          int corr_offset = i / blocksize * NTILE + j;
+          for (int ip = 0; ip < PackRow; ip++) {
+            s8_ref[i * NTILE + j * PackRow + ip] = float(s8_ref[i * NTILE + j * PackRow + ip]) - float(zp[corr_offset]);
+          }
+        }
+      }
+    }
+
+    for (int i = 0; i < row; i += PackRow) {
+      for (int j = 0; j < NTILE; j++) {
+        int corr_offset = i / blocksize * NTILE + j;
+        for (int ip = 0; ip < PackRow; ip++) {
+          s8_ref[i * NTILE + j * PackRow + ip] =
+              float(s8_ref[i * NTILE + j * PackRow + ip]) * float(scale[corr_offset]);
+        }
+      }
+    }
+    kernel::avx512f::decompress_kblock_s4_fp<PackRow, NTILE>(s4_wei.data(), rev.data(), row_offset, NTILE, scale.data(),
+                                                          scale_dtype, isasym ? zp.data() : nullptr, 0, 0, blocksize,
+                                                          NTILE, cache, CacheSize);
+    kernel::avx512f::decompress_kblock_s4_fp<PackRow, NTILE>(
+        s4_wei.data() + row_offset * NTILE / 2, rev.data() + row_offset * NTILE, row - row_offset, NTILE, scale.data(),
+        scale_dtype, isasym ? zp.data() : nullptr, row_offset, 0, blocksize, NTILE, cache, CacheSize);
+    float err = get_ut_err(dst_dtype);
+    ut::buffer_error(s8_ref.data(), rev.data(), rev.size(), T(err));
+  }
+};
+#ifdef BTLA_UT_KERNEL_INTRIN
+#endif
+static UT_avx512_decompress_s4_fp sUT_avx512_decompress_s4_fp;
+
 
 class UT_avx2_decompress_s4_fp {
  public:

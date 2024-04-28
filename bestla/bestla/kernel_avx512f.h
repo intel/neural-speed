@@ -54,6 +54,11 @@ inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) {
 #endif
 }
 
+static inline __m512 load_bf16_fp32(const utils::bf16* srcptr) {
+  auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr));
+  auto vf32 = zmm_cvt_bf16_fp32(tmp);
+  return vf32;
+}
 static inline __m512i unpack_4bits(__m256i v4bits, __m512i vmask) {
   auto ymm1 = _mm256_slli_epi32(v4bits, 4);
   auto zmm = _mm512_cvtepi8_epi16(v4bits);
@@ -131,6 +136,33 @@ static inline void dequant_s8_N(_DST_T* dstptr, int8_t* srcptr, __m512* vscales,
     } else {
       assert(false);
     }
+  }
+}
+
+static inline __m512i load_s8_s32(int8_t* srcptr) {
+  auto xmm = _mm_loadu_si128(reinterpret_cast<__m128i*>(srcptr));
+  auto ymm = _mm512_cvtepi8_epi32(xmm);
+  return ymm;
+}
+
+template <bool IsAsym = false>
+static inline __m512 dequant_s8_fp(int8_t* srcptr, __m512 vscales, __m512i vzps = {0}) {
+  auto src_s32_y = load_s8_s32(srcptr);
+  if constexpr (IsAsym) src_s32_y = _mm512_sub_epi32(src_s32_y, vzps);
+  auto src_fp_y = _mm512_cvtepi32_ps(src_s32_y);
+  src_fp_y = _mm512_mul_ps(src_fp_y, vscales);
+  return src_fp_y;
+}
+
+template <typename T>
+static inline void store_fp_T(__m512 src_y, T* dstptr) {
+  if constexpr (std::is_same_v<T, utils::bf16>) {
+    auto xmm = zmm_cvt_fp32_bf16(src_y);
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(dstptr), xmm);
+  } else if constexpr (std::is_same_v<T, float>) {
+    _mm512_storeu_ps(dstptr, src_y);
+  } else {
+    static_assert(false);
   }
 }
 
@@ -218,6 +250,23 @@ static inline void vec_broadcast_ps_1_2(__m512* dst2regs, __m512* src1regs, __m5
   auto tmpreg = _mm512_permutexvar_epi64(idxreg, _mm512_castps_si512(src1regs[0]));
   dst2regs[0] = _mm512_castsi512_ps(_mm512_unpacklo_epi32(tmpreg, tmpreg));
   dst2regs[1] = _mm512_castsi512_ps(_mm512_unpackhi_epi32(tmpreg, tmpreg));
+}
+
+template <bool LowBits>
+static inline __m512 broadcast_ps_1_2(__m512 vsrc_y, const __m512i& vshuf_index_high, const __m512i& vshuf_index_low) {
+  __m512 tmp;
+  if constexpr (LowBits) {
+    tmp = _mm512_permutex2var_ps(vsrc_y, vshuf_index_low, vsrc_y);
+  } else {
+    tmp = _mm512_permutex2var_ps(vsrc_y, vshuf_index_high, vsrc_y);
+  }
+  return tmp;
+}
+
+template <bool LowBits>
+static inline __m512i broadcast_epi32_1_2(__m512i vsrc_y, const __m512i& vshuf_index_high,
+                                          const __m512i& vshuf_index_low) {
+  return _mm512_castps_si512(broadcast_ps_1_2<LowBits>(_mm512_castsi512_ps(vsrc_y), vshuf_index_high, vshuf_index_low));
 }
 
 static inline void vec_broadcast_epi32_1_2(__m512i* dst2regs, __m512i* src1regs, __m512i idxreg) {
@@ -608,9 +657,9 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
 }
 
 template <BTLA_DTYPE S4_T, typename _DST_T, int _PACK_ROW, typename _ST>
-static inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                int ld_dst, _ST* scales, int8_t* zero_points, int k_offset, int kblock,
-                                                int NPad, int8_t* tmp, size_t tmpsize) {
+static inline BTLA_CODE decompress_kblock_s4_fp_Dep(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
+                                                    int ld_dst, _ST* scales, int8_t* zero_points, int k_offset,
+                                                    int kblock, int NPad, int8_t* tmp, size_t tmpsize) {
   if constexpr (_PACK_ROW == 1) {
     if (zero_points == nullptr) {
       return decompress_kblock_bit4_packrow1<_ST, _DST_T, true>(
@@ -2655,6 +2704,230 @@ inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* zpptr, i
     return decompress_s4_s8(srcptr, dstptr, elesize, tmp, tmpsize);
   }
   return BTLA_CODE::Success;
+}
+
+template <int PackRow, int NTILE, typename DST_T>
+inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int row, void* scales_, BTLA_DTYPE sdtype,
+                                             int8_t* zero_points, int k_offset, int n_offset, int blocksize, int ldzp,
+                                             int8_t* tmp, size_t tmpsize) {
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  const auto DstSize = row * NTILE * sizeof(DST_T);
+  const auto S8Size = row * NTILE * sizeof(int8_t);
+  const auto vshuf_index_low = _mm512_set_epi32(7, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 0, 0);
+  const auto vshuf_index_high = _mm512_set_epi32(15, 15, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8);
+  if (zero_points == nullptr) {
+    for (int ir = 0; ir < row; ir += blocksize) {
+      int k_remain = utils::remainsize(ir, row, blocksize);
+      int ele_off = (k_offset + ir) / blocksize * ldzp + n_offset;
+      if constexpr (PackRow == 1) {
+        __m512 vscale_y[NReg];
+        if (sdtype == BTLA_DTYPE::F32) {
+          auto sptr = (float*)scales_ + ele_off;
+          for (int i = 0; i < NReg; i++) vscale_y[i] = _mm512_loadu_ps(sptr + i * VLen);
+        } else if (sdtype == BTLA_DTYPE::BF16) {
+          auto sptr = (utils::bf16*)scales_ + ele_off;
+          for (int i = 0; i < NReg; i++) vscale_y[i] = load_bf16_fp32(sptr + i * VLen);
+        }
+        for (int ib = 0; ib < k_remain; ib += PackRow) {
+          auto b8ptr = srcptr + (ir + ib) * NTILE;
+          for (int i = 0; i < NReg; i++) {
+            auto vdeq_y = dequant_s8_fp(b8ptr + i * VLen, vscale_y[i]);
+            store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * VLen);
+          }
+        }
+      } else if constexpr (PackRow == 4) {
+        __m512 vscale_y[PackRow * NReg];
+        for (int i = 0; i < NReg; i++) {
+          __m512 vraw;
+          if (sdtype == BTLA_DTYPE::F32) {
+            auto sptr = (float*)scales_ + ele_off;
+            vraw = _mm512_loadu_ps(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::BF16) {
+            auto sptr = (utils::bf16*)scales_ + ele_off;
+            vraw = load_bf16_fp32(sptr + i * VLen);
+          } else {
+            assert(0);
+          }
+          auto vcast_y = broadcast_ps_1_2<true>(vraw, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vcast_y, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 1] = broadcast_ps_1_2<false>(vcast_y, vshuf_index_high, vshuf_index_low);
+          vcast_y = broadcast_ps_1_2<false>(vraw, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 2] = broadcast_ps_1_2<true>(vcast_y, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 3] = broadcast_ps_1_2<false>(vcast_y, vshuf_index_high, vshuf_index_low);
+        }
+        for (int ib = 0; ib < k_remain; ib += PackRow) {
+          auto b8ptr = srcptr + (ir + ib) * NTILE;
+          for (int i = 0; i < NReg; i++) {
+            for (int ip = 0; ip < PackRow; ip++) {
+              auto vdeq_y = dequant_s8_fp(b8ptr + i * VLen * PackRow + ip * VLen, vscale_y[i * PackRow + ip]);
+              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * VLen * PackRow + ip * VLen);
+            }
+          }
+        }
+      } else if constexpr (PackRow == 2) {
+        __m512 vscale_y[PackRow * NReg];
+        for (int i = 0; i < NReg; i++) {
+          __m512 vraw;
+          if (sdtype == BTLA_DTYPE::F32) {
+            auto sptr = (float*)scales_ + ele_off;
+            vraw = _mm512_loadu_ps(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::BF16) {
+            auto sptr = (utils::bf16*)scales_ + ele_off;
+            vraw = load_bf16_fp32(sptr + i * VLen);
+          }
+          vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vraw, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 1] = broadcast_ps_1_2<false>(vraw, vshuf_index_high, vshuf_index_low);
+        }
+        for (int ib = 0; ib < k_remain; ib += PackRow) {
+          auto b8ptr = srcptr + (ir + ib) * NTILE;
+          for (int i = 0; i < NReg; i++) {
+            for (int ip = 0; ip < PackRow; ip++) {
+              auto vdeq_y = dequant_s8_fp(b8ptr + i * VLen * PackRow + ip * VLen, vscale_y[i * PackRow + ip]);
+              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * VLen * PackRow + ip * VLen);
+            }
+          }
+        }
+      } else {
+        static_assert(0);
+      }
+    }
+    return BTLA_CODE::Success;
+  } else {
+    for (int ir = 0; ir < row; ir += blocksize) {
+      int k_remain = utils::remainsize(ir, row, blocksize);
+      int ele_off = (k_offset + ir) / blocksize * ldzp + n_offset;
+      if constexpr (PackRow == 1) {
+        __m512 vscale_y[NReg];
+        if (sdtype == BTLA_DTYPE::F32) {
+          auto sptr = (float*)scales_ + ele_off;
+          for (int i = 0; i < NReg; i++) vscale_y[i] = _mm512_loadu_ps(sptr + i * VLen);
+        } else if (sdtype == BTLA_DTYPE::BF16) {
+          auto sptr = (utils::bf16*)scales_ + ele_off;
+          for (int i = 0; i < NReg; i++) vscale_y[i] = load_bf16_fp32(sptr + i * VLen);
+        }
+        __m512i vzp_y[NReg];
+        for (int i = 0; i < NReg; i++) vzp_y[i] = load_s8_s32(zero_points + ele_off + i * VLen);
+        for (int ib = 0; ib < k_remain; ib += PackRow) {
+          auto b8ptr = srcptr + (ir + ib) * NTILE;
+          for (int i = 0; i < NReg; i++) {
+            auto vdeq_y = dequant_s8_fp<true>(b8ptr + i * VLen, vscale_y[i], vzp_y[i]);
+            store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * VLen);
+          }
+        }
+      } else if constexpr (PackRow == 4) {
+        __m512 vscale_y[PackRow * NReg];
+        __m512i vzp_y[PackRow * NReg];
+        for (int i = 0; i < NReg; i++) {
+          __m512 vraw;
+          if (sdtype == BTLA_DTYPE::F32) {
+            auto sptr = (float*)scales_ + ele_off;
+            vraw = _mm512_loadu_ps(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::BF16) {
+            auto sptr = (utils::bf16*)scales_ + ele_off;
+            vraw = load_bf16_fp32(sptr + i * VLen);
+          } else {
+            assert(0);
+          }
+          auto vcast_y = broadcast_ps_1_2<true>(vraw, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vcast_y, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 1] = broadcast_ps_1_2<false>(vcast_y, vshuf_index_high, vshuf_index_low);
+          vcast_y = broadcast_ps_1_2<false>(vraw, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 2] = broadcast_ps_1_2<true>(vcast_y, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 3] = broadcast_ps_1_2<false>(vcast_y, vshuf_index_high, vshuf_index_low);
+
+          auto tmp = load_s8_s32(zero_points + ele_off + i * VLen);
+          auto vcasti_y = broadcast_epi32_1_2<true>(tmp, vshuf_index_high, vshuf_index_low);
+          vzp_y[i * PackRow + 0] = broadcast_epi32_1_2<true>(vcasti_y, vshuf_index_high, vshuf_index_low);
+          vzp_y[i * PackRow + 1] = broadcast_epi32_1_2<false>(vcasti_y, vshuf_index_high, vshuf_index_low);
+          vcasti_y = broadcast_epi32_1_2<false>(tmp, vshuf_index_high, vshuf_index_low);
+          vzp_y[i * PackRow + 2] = broadcast_epi32_1_2<true>(vcasti_y, vshuf_index_high, vshuf_index_low);
+          vzp_y[i * PackRow + 3] = broadcast_epi32_1_2<false>(vcasti_y, vshuf_index_high, vshuf_index_low);
+        }
+        for (int ib = 0; ib < k_remain; ib += PackRow) {
+          auto b8ptr = srcptr + (ir + ib) * NTILE;
+          for (int i = 0; i < NReg; i++) {
+            for (int ip = 0; ip < PackRow; ip++) {
+              auto vdeq_y = dequant_s8_fp<true>(b8ptr + i * VLen * PackRow + ip * VLen, vscale_y[i * PackRow + ip],
+                                                vzp_y[i * PackRow + ip]);
+              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * VLen * PackRow + ip * VLen);
+            }
+          }
+        }
+      } else if constexpr (PackRow == 2) {
+        __m512 vscale_y[PackRow * NReg];
+        __m512i vzp_y[PackRow * NReg];
+        for (int i = 0; i < NReg; i++) {
+          __m512 vraw;
+          if (sdtype == BTLA_DTYPE::F32) {
+            auto sptr = (float*)scales_ + ele_off;
+            vraw = _mm512_loadu_ps(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::BF16) {
+            auto sptr = (utils::bf16*)scales_ + ele_off;
+            vraw = load_bf16_fp32(sptr + i * VLen);
+          }
+          vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vraw, vshuf_index_high, vshuf_index_low);
+          vscale_y[i * PackRow + 1] = broadcast_ps_1_2<false>(vraw, vshuf_index_high, vshuf_index_low);
+          auto tmp = load_s8_s32(zero_points + ele_off + i * VLen);
+          vzp_y[i * PackRow + 0] = broadcast_epi32_1_2<true>(tmp, vshuf_index_high, vshuf_index_low);
+          vzp_y[i * PackRow + 1] = broadcast_epi32_1_2<false>(tmp, vshuf_index_high, vshuf_index_low);
+        }
+        for (int ib = 0; ib < k_remain; ib += PackRow) {
+          auto b8ptr = srcptr + (ir + ib) * NTILE;
+          for (int i = 0; i < NReg; i++) {
+            for (int ip = 0; ip < PackRow; ip++) {
+              auto vdeq_y = dequant_s8_fp<true>(b8ptr + i * VLen * PackRow + ip * VLen, vscale_y[i * PackRow + ip],
+                                                vzp_y[i * PackRow + ip]);
+              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * VLen * PackRow + ip * VLen);
+            }
+          }
+        }
+      } else {
+        static_assert(0);
+      }
+    }
+    return BTLA_CODE::Success;
+  }
+}
+
+template <int PackRow, int NTILE, typename DST_T>
+inline BTLA_CODE decompress_kblock_s4_fp_row(utils::int4x2* srcptr, DST_T* dstptr, int row, void* scales_,
+                                             BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,
+                                             int blocksize, int ldzp, int8_t* tmp, size_t tmpsize) {
+  int constexpr NReg = NTILE / 8;
+  const auto DstSize = row * NTILE * sizeof(DST_T);
+  const auto S8Size = row * NTILE * sizeof(int8_t);
+  auto tmps8ptr = (int8_t*)dstptr;
+  tmps8ptr += DstSize - S8Size;
+  auto ret = decompress_kblock_s4_s8<PackRow, NTILE>(srcptr, zero_points, tmps8ptr, blocksize, ldzp, n_offset, k_offset,
+                                                     row, NTILE, tmp, tmpsize);
+  assert(ret == BTLA_CODE::Success);
+  return decompress_kblock_s8_fp_row<PackRow, NTILE, DST_T>(tmps8ptr, dstptr, row, scales_, sdtype, nullptr, k_offset,
+                                                            n_offset, blocksize, ldzp, tmp, tmpsize);
+}
+
+template <int PackRow, int NTILE, typename DST_T>
+inline BTLA_CODE decompress_kblock_s4_fp(utils::int4x2* srcptr, DST_T* dstptr, int row, int col, void* scales_,
+                                         BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,
+                                         int blocksize, int ldzp, int8_t* tmp, size_t tmpsize) {
+  auto ret = BTLA_CODE::NotSupport;
+  if (col == NTILE) {
+    int head_end = utils::padto(k_offset, blocksize);
+    head_end = std::min(head_end, k_offset + row);
+    int head_size = head_end - k_offset;
+    if (head_size > 0) {
+      decompress_kblock_s4_fp_row<PackRow, NTILE, DST_T>(srcptr, dstptr, head_size, scales_, sdtype, zero_points,
+                                                         k_offset, n_offset, blocksize, ldzp, tmp, tmpsize);
+    }
+    int body_size = row - head_size;
+    if (body_size > 0) {
+      decompress_kblock_s4_fp_row<PackRow, NTILE, DST_T>(srcptr + head_size * NTILE / 2, dstptr + head_size * NTILE,
+                                                         body_size, scales_, sdtype, zero_points, head_end, n_offset,
+                                                         blocksize, ldzp, tmp, tmpsize);
+    }
+    return BTLA_CODE::Success;
+  }
+  return ret;
 }
 
 #ifdef __GNUC__
