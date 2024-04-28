@@ -22,6 +22,80 @@
 
 namespace bestla {
 namespace wrapper {
+namespace gemv_nbits {
+class S4 {
+ public:
+  static int constexpr NBits = 4;
+  template <typename ScaleT>
+  static inline utils::GemvParamB<ScaleT> createB(storage::gemm::StorageWeightKBlockNInteger* packedW) {
+    auto isasym = packedW->IsAsym();
+    auto bzptr = packedW->template ZPtr<int8_t>();
+    int ld_scaleb = packedW->CStep();
+    utils::GemvParamB<ScaleT> paramB{
+        packedW->template WPtr<uint8_t>(), nullptr, nullptr,   packedW->template SPtr<ScaleT>(),
+        isasym ? bzptr : nullptr,          NBits,   ld_scaleb, packedW->mKPad};
+    return paramB;
+  }
+  template <typename ScaleT>
+  static void updateBNStep(utils::GemvParamB<ScaleT>& paramB, int n_offset) {
+    paramB.b4ptr += n_offset * paramB.kpad / 2;
+    paramB.sptr += n_offset;
+    if (paramB.zpptr) {
+      paramB.zpptr += n_offset;
+    }
+  }
+};
+
+class S3 {
+ public:
+  static int constexpr NBits = 3;
+  template <typename ScaleT>
+  static inline utils::GemvParamB<ScaleT> createB(storage::gemm::StorageWeightKBlockNInteger* packedW) {
+    auto isasym = packedW->IsAsym();
+    auto bzptr = packedW->template ZPtr<int8_t>();
+    int ld_scaleb = packedW->CStep();
+    auto bwptr = packedW->template WPtr<uint8_t>();
+    auto bit1_offset = packedW->mNPad * packedW->mKPad / 4;
+    utils::GemvParamB<ScaleT> paramB{
+        nullptr, bwptr,     bwptr + bit1_offset, packedW->template SPtr<ScaleT>(), isasym ? bzptr : nullptr,
+        NBits,   ld_scaleb, packedW->mKPad};
+    return paramB;
+  }
+  template <typename ScaleT>
+  static void updateBNStep(utils::GemvParamB<ScaleT>& paramB, int n_offset) {
+    paramB.b2ptr += n_offset * paramB.kpad / 4;
+    paramB.b1ptr += n_offset * paramB.kpad / 8;
+    paramB.sptr += n_offset;
+    if (paramB.zpptr) {
+      paramB.zpptr += n_offset;
+    }
+  }
+};
+
+class S2 {
+ public:
+  static int constexpr NBits = 2;
+  template <typename ScaleT>
+  static inline utils::GemvParamB<ScaleT> createB(storage::gemm::StorageWeightKBlockNInteger* packedW) {
+    auto isasym = packedW->IsAsym();
+    auto bzptr = packedW->template ZPtr<int8_t>();
+    int ld_scaleb = packedW->CStep();
+    auto bwptr = packedW->template WPtr<uint8_t>();
+    utils::GemvParamB<ScaleT> paramB{
+        nullptr, bwptr,     nullptr,       packedW->template SPtr<ScaleT>(), isasym ? bzptr : nullptr,
+        NBits,   ld_scaleb, packedW->mKPad};
+    return paramB;
+  }
+  template <typename ScaleT>
+  static void updateBNStep(utils::GemvParamB<ScaleT>& paramB, int n_offset) {
+    paramB.b2ptr += n_offset * paramB.kpad / 4;
+    paramB.sptr += n_offset;
+    if (paramB.zpptr) {
+      paramB.zpptr += n_offset;
+    }
+  }
+};
+}  // namespace gemv_nbits
 
 namespace gemm {
 template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
@@ -86,25 +160,16 @@ class LauncherBase {
       impl &= _param.problem.dims[1] <= MaxGemvM;
       return impl;
     }
-    template <typename ScaleT, int MTILE>
-    static void gemv_s4(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      int constexpr NBits = 4;
+
+    template <typename ScaleT, int MTILE, class SNbits>
+    static void gemv_kblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
         auto constexpr TmpSize = 3 * 1024LL;
         auto constexpr CSize = 1 * 1024LL;
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        auto isasym = _param.paramB.packedW->IsAsym();
-        auto bzptr = _param.paramB.packedW->template ZPtr<int8_t>();
-        int ld_scaleb = _param.paramB.packedW->CStep();
-        utils::GemvParamB<ScaleT> paramB{_param.paramB.packedW->template WPtr<uint8_t>(),
-                                         nullptr,
-                                         nullptr,
-                                         _param.paramB.packedW->template SPtr<ScaleT>(),
-                                         isasym ? bzptr : nullptr,
-                                         NBits,
-                                         ld_scaleb};
+        utils::GemvParamB<ScaleT> paramB = SNbits::createB<ScaleT>(_param.paramB.packedW);
         const float* Aptr = _param.paramA.A;
         if constexpr (std::is_same_v<PrologueA,
                                      prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
@@ -117,11 +182,7 @@ class LauncherBase {
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
         auto Cptr = _param.paramC.C + _config.loc[1];
-        paramB.b4ptr += _config.loc[1] * _param.paramB.packedW->mKPad / 2;
-        paramB.sptr += _config.loc[1];
-        if (isasym) {
-          paramB.zpptr += _config.loc[1];
-        }
+        SNbits::updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
@@ -131,11 +192,7 @@ class LauncherBase {
           }
 
           Cptr += GemmCore::NTILE;
-          paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
-          paramB.sptr += GemmCore::NTILE;
-          if (isasym) {
-            paramB.zpptr += GemmCore::NTILE;
-          }
+          SNbits::updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
           if constexpr (std::is_same_v<AType, float>) {
@@ -152,185 +209,52 @@ class LauncherBase {
       }
     }
 
-    template <typename ScaleT, int MTILE>
-    static void gemv_s3(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      int constexpr NBits = 3;
-      if constexpr (support()) {
-        auto constexpr TmpSize = 3 * 1024LL;
-        auto constexpr CSize = 1 * 1024LL;
-        auto StackTmp_ = alloca(TmpSize + CSize);
-        auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
-        auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        auto isasym = _param.paramB.packedW->IsAsym();
-        int m = _param.problem.dims[1];
-        int n = _param.problem.dims[2];
-        int k = _param.problem.dims[3];
-        int kblocksize = _param.problem.dims[4];
-        auto Cptr = _param.paramC.C + _config.loc[1];
-        auto const KPad = _param.paramB.packedW->mKPad;
-        const float* Aptr = _param.paramA.A;
-        if constexpr (std::is_same_v<PrologueA,
-                                     prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
-          if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
-            Aptr = _param.paramA.reordered->template APtr<float>();
-          }
-        }
-        int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
-        int in = 0;
-        int ld_scaleb = _param.paramB.packedW->CStep();
-        auto bit3_ptr = _param.paramB.packedW->template WPtr<uint8_t>();
-        auto bit1_offset = _param.paramB.packedW->mNPad * KPad / 4;
-        for (; in < size_padded; in += GemmCore::NTILE) {
-          auto elt_offset = (_config.loc[1] + in) * KPad;
-          auto bit2ptr = bit3_ptr + elt_offset / 4;
-          auto bit1ptr = bit3_ptr + bit1_offset + elt_offset / 8;
-          utils::GemvParamB<ScaleT> paramB{
-              nullptr,
-              bit2ptr,
-              bit1ptr,
-              _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-              isasym ? _param.paramB.packedW->template ZPtr<int8_t>() + _config.loc[1] + in : nullptr,
-              NBits,
-              ld_scaleb};
-          kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-              Aptr, _param.paramA.lda, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          Cptr += GemmCore::NTILE;
-        }
-        if (size_padded != _config.size[1]) {
-          auto elt_offset = (_config.loc[1] + in) * KPad;
-          auto bit2ptr = bit3_ptr + elt_offset / 4;
-          auto bit1ptr = bit3_ptr + bit1_offset + elt_offset / 8;
-          utils::GemvParamB<ScaleT> paramB{
-              nullptr,
-              bit2ptr,
-              bit1ptr,
-              _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-              isasym ? _param.paramB.packedW->template ZPtr<int8_t>() + _config.loc[1] + in : nullptr,
-              NBits,
-              ld_scaleb};
-          kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-              Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          for (int i = 0; i < MTILE; i++) {
-            memcpy(Cptr + i * _param.paramC.ldc, tmpc_ptr + i * GemmCore::NTILE,
-                   (_config.size[1] - in) * sizeof(CType));
-          }
-        }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,
-                          StackTmp, TmpSize);
-      }
-    }
-
-    template <typename ScaleT, int MTILE>
-    static void gemv_s2(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      int constexpr NBits = 2;
-      if constexpr (support()) {
-        auto constexpr TmpSize = 3 * 1024LL;
-        auto constexpr CSize = 1 * 1024LL;
-        auto StackTmp_ = alloca(TmpSize + CSize);
-        auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
-        auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        auto isasym = _param.paramB.packedW->IsAsym();
-        int m = _param.problem.dims[1];
-        int n = _param.problem.dims[2];
-        int k = _param.problem.dims[3];
-        int kblocksize = _param.problem.dims[4];
-        auto Cptr = _param.paramC.C + _config.loc[1];
-        auto const KPad = _param.paramB.packedW->mKPad;
-        const float* Aptr = _param.paramA.A;
-        if constexpr (std::is_same_v<PrologueA,
-                                     prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
-          if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
-            Aptr = _param.paramA.reordered->template APtr<float>();
-          }
-        }
-        int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
-        int in = 0;
-        int ld_scaleb = _param.paramB.packedW->CStep();
-        auto bit2_ptr = _param.paramB.packedW->template WPtr<uint8_t>();
-        for (; in < size_padded; in += GemmCore::NTILE) {
-          auto elt_offset = (_config.loc[1] + in) * KPad;
-          auto bit2ptr = bit2_ptr + elt_offset / 4;
-          utils::GemvParamB<ScaleT> paramB{
-              nullptr,
-              bit2ptr,
-              nullptr,
-              _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-              isasym ? _param.paramB.packedW->template ZPtr<int8_t>() + _config.loc[1] + in : nullptr,
-              NBits,
-              ld_scaleb};
-          kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-              Aptr, _param.paramA.lda, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          Cptr += GemmCore::NTILE;
-        }
-        if (size_padded != _config.size[1]) {
-          auto elt_offset = (_config.loc[1] + in) * KPad;
-          auto bit2ptr = bit2_ptr + elt_offset / 4;
-          utils::GemvParamB<ScaleT> paramB{
-              nullptr,
-              bit2ptr,
-              nullptr,
-              _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-              isasym ? _param.paramB.packedW->template ZPtr<int8_t>() + _config.loc[1] + in : nullptr,
-              NBits,
-              ld_scaleb};
-          kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-              Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          for (int i = 0; i < MTILE; i++) {
-            memcpy(Cptr + i * _param.paramC.ldc, tmpc_ptr + i * GemmCore::NTILE,
-                   (_config.size[1] - in) * sizeof(CType));
-          }
-        }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,
-                          StackTmp, TmpSize);
-      }
-    }
-
     static void gemv(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
         assert(_param.problem.dims[4] > 0);
         auto& m = _param.problem.dims[1];
         if (_param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP) {
           if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_s4<float, 1>(_param, _config);
-            if (m == 2) gemv_s4<float, 2>(_param, _config);
-            if (m == 3) gemv_s4<float, 3>(_param, _config);
-            if (m == 4) gemv_s4<float, 4>(_param, _config);
+            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S4>(_param, _config);
+            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S4>(_param, _config);
+            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S4>(_param, _config);
+            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S4>(_param, _config);
 
           } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_s4<utils::bf16, 1>(_param, _config);
-            if (m == 2) gemv_s4<utils::bf16, 2>(_param, _config);
-            if (m == 3) gemv_s4<utils::bf16, 3>(_param, _config);
-            if (m == 4) gemv_s4<utils::bf16, 4>(_param, _config);
+            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S4>(_param, _config);
+            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S4>(_param, _config);
+            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S4>(_param, _config);
+            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S4>(_param, _config);
           }
           return;
         }
         if (_param.paramB.packedW->mDType == BTLA_DTYPE::S3_CLIP) {
           if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_s3<float, 1>(_param, _config);
-            if (m == 2) gemv_s3<float, 2>(_param, _config);
-            if (m == 3) gemv_s3<float, 3>(_param, _config);
-            if (m == 4) gemv_s3<float, 4>(_param, _config);
+            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S3>(_param, _config);
+            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S3>(_param, _config);
+            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S3>(_param, _config);
+            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S3>(_param, _config);
 
           } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_s3<utils::bf16, 1>(_param, _config);
-            if (m == 2) gemv_s3<utils::bf16, 2>(_param, _config);
-            if (m == 3) gemv_s3<utils::bf16, 3>(_param, _config);
-            if (m == 4) gemv_s3<utils::bf16, 4>(_param, _config);
+            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S3>(_param, _config);
+            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S3>(_param, _config);
+            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S3>(_param, _config);
+            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S3>(_param, _config);
           }
           return;
         }
         if (_param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP) {
           if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_s2<float, 1>(_param, _config);
-            if (m == 2) gemv_s2<float, 2>(_param, _config);
-            if (m == 3) gemv_s2<float, 3>(_param, _config);
-            if (m == 4) gemv_s2<float, 4>(_param, _config);
+            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S2>(_param, _config);
+            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S2>(_param, _config);
+            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S2>(_param, _config);
+            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S2>(_param, _config);
 
           } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_s2<utils::bf16, 1>(_param, _config);
-            if (m == 2) gemv_s2<utils::bf16, 2>(_param, _config);
-            if (m == 3) gemv_s2<utils::bf16, 3>(_param, _config);
-            if (m == 4) gemv_s2<utils::bf16, 4>(_param, _config);
+            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S2>(_param, _config);
+            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S2>(_param, _config);
+            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S2>(_param, _config);
+            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S2>(_param, _config);
           }
           return;
         }
@@ -472,208 +396,50 @@ class LauncherIntKBlock {
       impl &= _param.problem.dims[1] <= MaxGemvM;
       return impl;
     }
-    template <typename ScaleT, int MTILE>
-    static void gemv_s4(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      int constexpr NBits = 4;
+
+    template <typename ScaleT, int MTILE, class SNbits>
+    static void gemv_kblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
         auto constexpr TmpSize = 3 * 1024LL;
         auto constexpr CSize = 1 * 1024LL;
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        auto isasym = _param.paramB.packedW->IsAsym();
-        auto bzptr = _param.paramB.packedW->template ZPtr<int8_t>();
-        utils::GemvParamB<ScaleT> paramB{_param.paramB.packedW->template WPtr<uint8_t>(),
-                                         nullptr,
-                                         nullptr,
-                                         _param.paramB.packedW->template SPtr<ScaleT>(),
-                                         isasym ? bzptr : nullptr,
-                                         NBits,
-                                         _param.paramB.packedW->CStep()};
+        utils::GemvParamB<ScaleT> paramB = SNbits::createB<ScaleT>(_param.paramB.packedW);
         utils::GemvParamA paramA{
             _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
             _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
+
         int m = _param.problem.dims[1];
         int n = _param.problem.dims[2];
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
         auto Cptr = _param.paramC.C + _config.loc[1];
-        paramB.b4ptr += _config.loc[1] * _param.paramB.packedW->mKPad / 2;
-        paramB.sptr += _config.loc[1];
-        if (isasym) {
-          paramB.zpptr += _config.loc[1];
-        }
+        SNbits::updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
-        int ld_scaleb = _param.paramB.packedW->CStep();
         for (; in < size_padded; in += GemmCore::NTILE) {
           if constexpr (std::is_same_v<AType, uint8_t>) {
             kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          } else {
+          } else if constexpr (std::is_same_v<AType, int8_t>) {
             kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
           }
 
           Cptr += GemmCore::NTILE;
-          paramB.b4ptr += GemmCore::NTILE * _param.paramB.packedW->mKPad / 2;
-          paramB.sptr += GemmCore::NTILE;
-          if (isasym) {
-            paramB.zpptr += GemmCore::NTILE;
-          }
+          SNbits::updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
           if constexpr (std::is_same_v<AType, uint8_t>) {
             kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          } else {
+          } else if constexpr (std::is_same_v<AType, int8_t>) {
             kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-          for (int im = 0; im < MTILE; im++) {
-            memcpy(Cptr + im * _param.paramC.ldc, tmpc_ptr + im * GemmCore::NTILE,
-                   (_config.size[1] - in) * sizeof(CType));
-          }
-        }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,
-                          StackTmp, TmpSize);
-      }
-    }
-
-    template <typename ScaleT, int MTILE>
-    static void gemv_s3(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      int constexpr NBits = 3;
-      if constexpr (support()) {
-        auto constexpr TmpSize = 3 * 1024LL;
-        auto constexpr CSize = 1 * 1024LL;
-        auto StackTmp_ = alloca(TmpSize + CSize);
-        auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
-        auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        utils::GemvParamA paramA{
-            _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
-            _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
-        int m = _param.problem.dims[1];
-        int n = _param.problem.dims[2];
-        int k = _param.problem.dims[3];
-        int kblocksize = _param.problem.dims[4];
-        auto Cptr = _param.paramC.C + _config.loc[1];
-        auto const KPad = _param.paramB.packedW->mKPad;
-
-        int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
-        int in = 0;
-        int ld_scaleb = _param.paramB.packedW->CStep();
-        auto bit3_ptr = _param.paramB.packedW->template WPtr<uint8_t>();
-        auto isasym = _param.paramB.packedW->IsAsym();
-        auto bzptr = _param.paramB.packedW->template ZPtr<int8_t>();
-        auto bit1_offset = _param.paramB.packedW->mNPad * KPad / 4;
-        for (; in < size_padded; in += GemmCore::NTILE) {
-          auto elt_offset = (_config.loc[1] + in) * KPad;
-          auto bit2ptr = bit3_ptr + elt_offset / 4;
-          auto bit1ptr = bit3_ptr + bit1_offset + elt_offset / 8;
-          utils::GemvParamB<ScaleT> paramB{nullptr,
-                                           bit2ptr,
-                                           bit1ptr,
-                                           _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-                                           isasym ? bzptr + _config.loc[1] + in : nullptr,
-                                           NBits,
-                                           ld_scaleb};
-          if constexpr (std::is_same_v<AType, uint8_t>) {
-            kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          } else {
-            kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          }
-          Cptr += GemmCore::NTILE;
-        }
-        if (size_padded != _config.size[1]) {
-          auto elt_offset = (_config.loc[1] + in) * KPad;
-          auto bit2ptr = bit3_ptr + elt_offset / 4;
-          auto bit1ptr = bit3_ptr + bit1_offset + elt_offset / 8;
-          utils::GemvParamB<ScaleT> paramB{nullptr,
-                                           bit2ptr,
-                                           bit1ptr,
-                                           _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-                                           isasym ? bzptr + _config.loc[1] + in : nullptr,
-                                           NBits,
-                                           ld_scaleb};
-          if constexpr (std::is_same_v<AType, uint8_t>) {
-            kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          } else {
-            kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          }
-          for (int im = 0; im < MTILE; im++) {
-            memcpy(Cptr + im * _param.paramC.ldc, tmpc_ptr + im * GemmCore::NTILE,
-                   (_config.size[1] - in) * sizeof(CType));
-          }
-        }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], 0, 0, _config.loc[1], 1, _config.size[1], _param.paramC,
-                          StackTmp, TmpSize);
-      }
-    }
-
-    template <typename ScaleT, int MTILE>
-    static void gemv_s2(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-      int constexpr NBits = 2;
-      if constexpr (support()) {
-        auto constexpr TmpSize = 3 * 1024LL;
-        auto constexpr CSize = 1 * 1024LL;
-        auto StackTmp_ = alloca(TmpSize + CSize);
-        auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
-        auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        utils::GemvParamA paramA{
-            _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
-            _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
-        int m = _param.problem.dims[1];
-        int n = _param.problem.dims[2];
-        int k = _param.problem.dims[3];
-        int kblocksize = _param.problem.dims[4];
-        auto Cptr = _param.paramC.C + _config.loc[1];
-        auto const KPad = _param.paramB.packedW->mKPad;
-
-        int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
-        int in = 0;
-        int ld_scaleb = _param.paramB.packedW->CStep();
-        auto bit2_ptr = _param.paramB.packedW->template WPtr<uint8_t>() + _config.loc[1] * KPad / 4;
-        auto is_asym = _param.paramB.packedW->IsAsym();
-        for (; in < size_padded; in += GemmCore::NTILE) {
-          utils::GemvParamB<ScaleT> paramB{
-              nullptr,
-              bit2_ptr + in * KPad / 4,
-              nullptr,
-              _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-              is_asym ? _param.paramB.packedW->template ZPtr<int8_t>() + _config.loc[1] + in : nullptr,
-              NBits,
-              ld_scaleb};
-          if constexpr (std::is_same_v<AType, uint8_t>) {
-            kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          } else {
-            kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
-          }
-          Cptr += GemmCore::NTILE;
-        }
-        if (size_padded != _config.size[1]) {
-          utils::GemvParamB<ScaleT> paramB{
-              nullptr,
-              bit2_ptr + in * KPad / 4,
-              nullptr,
-              _param.paramB.packedW->template SPtr<ScaleT>() + _config.loc[1] + in,
-              is_asym ? _param.paramB.packedW->template ZPtr<int8_t>() + _config.loc[1] + in : nullptr,
-              NBits,
-              ld_scaleb};
-          if constexpr (std::is_same_v<AType, uint8_t>) {
-            kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          } else {
-            kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-          }
-          for (int im = 0; im < MTILE; im++) {
-            memcpy(Cptr + im * _param.paramC.ldc, tmpc_ptr + im * GemmCore::NTILE,
+          for (int i = 0; i < MTILE; i++) {
+            memcpy(Cptr + i * _param.paramC.ldc, tmpc_ptr + i * GemmCore::NTILE,
                    (_config.size[1] - in) * sizeof(CType));
           }
         }
@@ -687,45 +453,45 @@ class LauncherIntKBlock {
         auto& m = _param.problem.dims[1];
         if (_param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP) {
           if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_s4<float, 1>(_param, _config);
-            if (m == 2) gemv_s4<float, 2>(_param, _config);
-            if (m == 3) gemv_s4<float, 3>(_param, _config);
-            if (m == 4) gemv_s4<float, 4>(_param, _config);
+            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S4>(_param, _config);
+            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S4>(_param, _config);
+            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S4>(_param, _config);
+            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S4>(_param, _config);
 
           } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_s4<utils::bf16, 1>(_param, _config);
-            if (m == 2) gemv_s4<utils::bf16, 2>(_param, _config);
-            if (m == 3) gemv_s4<utils::bf16, 3>(_param, _config);
-            if (m == 4) gemv_s4<utils::bf16, 4>(_param, _config);
+            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S4>(_param, _config);
+            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S4>(_param, _config);
+            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S4>(_param, _config);
+            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S4>(_param, _config);
           }
           return;
         }
 
         if (_param.paramB.packedW->mDType == BTLA_DTYPE::S3_CLIP) {
           if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_s3<float, 1>(_param, _config);
-            if (m == 2) gemv_s3<float, 2>(_param, _config);
-            if (m == 3) gemv_s3<float, 3>(_param, _config);
-            if (m == 4) gemv_s3<float, 4>(_param, _config);
+            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S3>(_param, _config);
+            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S3>(_param, _config);
+            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S3>(_param, _config);
+            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S3>(_param, _config);
           } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_s3<utils::bf16, 1>(_param, _config);
-            if (m == 2) gemv_s3<utils::bf16, 2>(_param, _config);
-            if (m == 3) gemv_s3<utils::bf16, 3>(_param, _config);
-            if (m == 4) gemv_s3<utils::bf16, 4>(_param, _config);
+            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S3>(_param, _config);
+            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S3>(_param, _config);
+            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S3>(_param, _config);
+            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S3>(_param, _config);
           }
           return;
         }
         if (_param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP) {
           if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_s2<float, 1>(_param, _config);
-            if (m == 2) gemv_s2<float, 2>(_param, _config);
-            if (m == 3) gemv_s2<float, 3>(_param, _config);
-            if (m == 4) gemv_s2<float, 4>(_param, _config);
+            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S2>(_param, _config);
+            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S2>(_param, _config);
+            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S2>(_param, _config);
+            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S2>(_param, _config);
           } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_s2<utils::bf16, 1>(_param, _config);
-            if (m == 2) gemv_s2<utils::bf16, 2>(_param, _config);
-            if (m == 3) gemv_s2<utils::bf16, 3>(_param, _config);
-            if (m == 4) gemv_s2<utils::bf16, 4>(_param, _config);
+            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S2>(_param, _config);
+            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S2>(_param, _config);
+            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S2>(_param, _config);
+            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S2>(_param, _config);
           }
           return;
         }

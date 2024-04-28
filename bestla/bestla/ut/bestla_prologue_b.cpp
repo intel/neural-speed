@@ -644,10 +644,10 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
+    ut_s4();
+    ut_s3();
     ut_s8();
     ut_s2();
-    ut_s3();
-    ut_s4();
     ut_f4();
     ut_f8();
   }
@@ -835,8 +835,8 @@ class UT_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompFp32 sUT_CompFp32;
+#endif
 
 class UT_CompInt8 {
  public:
@@ -953,8 +953,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompInt8 sUT_CompInt8;
 #endif
+static UT_CompInt8 sUT_CompInt8;
 
 class UT_CompBf16 {
  public:
