@@ -28,7 +28,7 @@ namespace gpu::xetla::subgroup {
 namespace detail {
 template <typename tile_t, typename payload_t>
 struct check_store_type {
-  static constexpr bool use_scatter = false;
+  static constexpr bool use_scatter = true;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
        (payload_t::message_type == msg_type::block_2d) &&

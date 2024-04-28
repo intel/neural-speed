@@ -28,7 +28,7 @@ namespace gpu::xetla::subgroup {
 namespace detail {
 template <typename tile_t, typename payload_t>
 struct check_load_type {
-  static constexpr bool use_gather = false;
+  static constexpr bool use_gather = true;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
        (payload_t::message_type == msg_type::block_2d) &&
@@ -572,7 +572,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += 1) {
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes +
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
