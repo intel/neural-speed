@@ -408,8 +408,8 @@ class UT_avx2_gemv {
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{(uint8_t*)b2.data(),          nullptr, nullptr, scaleb.data(),
                                iasym ? bzp.data() : nullptr, 2,       n};
-    kernel::avx2::gemv_4bit_u8s8_fp32<float, 24, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B, Cf32.data(),
-                                                        n, k, kblock, cache, CacheSize);
+    kernel::avx2::avx_vnni::gemv_4bit_u8s8_fp32<float, 24, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B,
+                                                                  Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
@@ -490,8 +490,8 @@ class UT_avx2_gemv {
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{(uint8_t*)b2.data(),          nullptr, nullptr, scaleb.data(),
                                iasym ? bzp.data() : nullptr, 2,       n};
-    kernel::avx2::gemv_4bit_s8s8_fp32<float, 24, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks}, B,
-                                                        Cf32.data(), n, k, kblock, cache, CacheSize);
+    kernel::avx2::avx_vnni::gemv_4bit_s8s8_fp32<float, 24, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks},
+                                                                  B, Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
@@ -533,7 +533,7 @@ class UT_avx2_gemv {
       }
     }
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
-    kernel::avx2::gemv_2bit_u8s8_fp32<float, 24, MTILE>(
+    kernel::avx2::avx_vnni::gemv_2bit_u8s8_fp32<float, 24, MTILE>(
         {A.data(), scalea.data(), azp.data(), k, blks},
         {nullptr, (uint8_t*)b2.data(), nullptr, scaleb.data(), iasym ? bzp.data() : nullptr, 2, n}, Cf32.data(), n, k,
         kblock, cache, CacheSize);
@@ -577,7 +577,7 @@ class UT_avx2_gemv {
       }
     }
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
-    kernel::avx2::gemv_2bit_s8s8_fp32<float, 24, MTILE>(
+    kernel::avx2::avx_vnni::gemv_2bit_s8s8_fp32<float, 24, MTILE>(
         {(uint8_t*)A.data(), scalea.data(), nullptr, k, blks},
         {nullptr, (uint8_t*)b2.data(), nullptr, scaleb.data(), iasym ? bzp.data() : nullptr, 2, n}, Cf32.data(), n, k,
         kblock, cache, CacheSize);
@@ -707,8 +707,8 @@ class UT_avx2_gemv {
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{
         nullptr, (uint8_t*)b2.data(), (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr, 2, n};
-    kernel::avx2::gemv_3bit_u8s8_fp32<float, 24, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B, Cf32.data(),
-                                                        n, k, kblock, cache, CacheSize);
+    kernel::avx2::avx_vnni::gemv_3bit_u8s8_fp32<float, 24, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B,
+                                                                  Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
@@ -758,8 +758,8 @@ class UT_avx2_gemv {
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{
         nullptr, (uint8_t*)b2.data(), (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr, 2, n};
-    kernel::avx2::gemv_3bit_s8s8_fp32<float, 24, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks}, B,
-                                                        Cf32.data(), n, k, kblock, cache, CacheSize);
+    kernel::avx2::avx_vnni::gemv_3bit_s8s8_fp32<float, 24, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks},
+                                                                  B, Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 };

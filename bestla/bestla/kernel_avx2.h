@@ -2724,10 +2724,12 @@ static inline BTLA_CODE gemv_3bit_fp32_fp32(const float* A, int lda, const utils
   return BTLA_CODE::Success;
 }
 
-#ifdef __GNUC__
-#pragma GCC push_options
-#pragma GCC target("avxvnni")
-#endif
+static inline __m256i _mm256_dpbusd_avx2_epi32(__m256i& c, const __m256i& a, const __m256i& b) {
+  const __m256i dot2 = _mm256_maddubs_epi16(a, b);
+  const __m256i ones = _mm256_set1_epi16(1);
+  const __m256i sum4 = _mm256_madd_epi16(ones, dot2);
+  return _mm256_add_epi32(c, sum4);
+}
 
 template <typename ScaleT, int NReg, int MTILE>
 static inline void gemv_dequant_s32fp32(const float* asptr, int ldzp, const ScaleT* bsptr, __m256i* iacc,
@@ -2746,6 +2748,104 @@ static inline void gemv_dequant_s32fp32(const float* asptr, int ldzp, const Scal
     }
   }
 }
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto& a8ptr = A.aptr;
+  auto& b4ptr = B.b4ptr;
+  auto& asptr = A.sptr;
+  auto& azptr = A.zpptr;
+
+  int blks = k / blocksize;
+  int constexpr NReg = NTILE / 8;
+  int constexpr MReg = MTILE;
+  // Initialize accumulator with zeros
+  __m256 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm256_setzero_ps();
+  }
+  uint32_t mask = 0x0f0f0f0f;
+  auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  const __m256i onesu8 = _mm256_set1_epi8(1);
+  const __m256i vbias = _mm256_set1_epi8(8);
+  const auto vindex = _mm256_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0);
+
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m256i iacc[NReg * MReg];
+    __m256i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm256_setzero_si256();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm256_setzero_si256();
+    }
+    if (B.zpptr) {
+      __m256i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 8, vindex);
+        bzp[i] = _mm256_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        __m256i va[MReg];
+        for (int i = 0; i < MReg; i++) {
+          va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+        }
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, bzp[i]);
+          bacc[i] = _mm256_dpbusd_avx2_epi32(bacc[i], onesu8, vb);
+          for (int j = 0; j < MReg; j++) {
+            iacc[j * NReg + i] = _mm256_dpbusd_avx2_epi32(iacc[j * NReg + i], va[j], vb);
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        __m256i va[MReg];
+        for (int i = 0; i < MReg; i++) {
+          va[i] = _mm256_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+        }
+        for (int i = 0; i < NReg; i++) {
+          auto vb = kernel::avx2::unpack_4bits_avx2((void*)(b4ptr + i * 16 + (ib * blocksize + ik) * NTILE / 2), vmask);
+          vb = _mm256_sub_epi8(vb, vbias);
+          bacc[i] = _mm256_dpbusd_avx2_epi32(bacc[i], onesu8, vb);
+          for (int j = 0; j < MReg; j++) {
+            iacc[j * NReg + i] = _mm256_dpbusd_avx2_epi32(iacc[j * NReg + i], va[j], vb);
+          }
+        }
+      }
+    }
+
+    __m256i v_a_zp[MReg];
+    for (int im = 0; im < MReg; im++) {
+      auto zp = int(azptr[ib + im * A.ldzp]);
+      v_a_zp[im] = _mm256_set1_epi32(zp);
+      for (int in = 0; in < NReg; in++) {
+        auto vtmp = _mm256_mullo_epi32(v_a_zp[im], bacc[in]);
+        iacc[im * NReg + in] = _mm256_sub_epi32(iacc[im * NReg + in], vtmp);
+      }
+    }
+
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm256_storeu_ps(C + i * 8 + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+namespace avx_vnni {
+
+#ifdef __GNUC__
+#pragma GCC push_options
+#pragma GCC target("avxvnni")
+#endif
 
 template <typename ScaleT, int NTILE, int MTILE>
 static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
@@ -3535,6 +3635,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
+}  // namespace avx_vnni
 
 #ifdef __GNUC__
 #pragma GCC pop_options
