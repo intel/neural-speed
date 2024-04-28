@@ -171,7 +171,7 @@ class gemm_t<
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
       matB_tile_desc_t,
-      policy   ,  //subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
+      subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
       arch_tag>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_tile_desc_t>;
   using matB_prefetch_payload_t = subgroup::prefetch_payload_t<
