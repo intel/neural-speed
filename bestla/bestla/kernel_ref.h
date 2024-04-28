@@ -441,11 +441,11 @@ inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, DST_T* dstptr, int row,
                                          int blocksize, int ldzp, int8_t* tmp, size_t tmpsize) {
   for (int i = 0; i < row; i += PackRow) {
     int kpos = (k_offset + i) / blocksize * ldzp + n_offset;
-    auto zp = zero_points ? zero_points[kpos] : 0;
     if (sdtype == BTLA_DTYPE::F32) {
       auto sptr = (float*)scales_ + kpos;
       for (int j = 0; j < col; j += 1) {
         auto scale = float(sptr[j]);
+        auto zp = zero_points ? zero_points[kpos + j] : 0;
         for (int ir = 0; ir < PackRow; ir++) {
           float tmp = static_cast<float>(srcptr[i * col + j * PackRow + ir] - zp) * scale;
           dstptr[i * col + j * PackRow + ir] = tmp;
@@ -455,6 +455,7 @@ inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, DST_T* dstptr, int row,
       auto sptr = (utils::bf16*)scales_ + kpos;
       for (int j = 0; j < col; j += 1) {
         auto scale = float(sptr[j]);
+        auto zp = zero_points ? zero_points[kpos + j] : 0;
         for (int ir = 0; ir < PackRow; ir++) {
           float tmp = static_cast<float>(srcptr[i * col + j * PackRow + ir] - zp) * scale;
           dstptr[i * col + j * PackRow + ir] = tmp;
@@ -999,12 +1000,11 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       float scale = (maxval - minval) / 255;
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
-      float fmedium = (maxval + minval) / 2;
-      int8_t bzp = utils::cast<float, int8_t>((0 - minval) * rscale) - 128;
+      int8_t bzp = utils::cast<float, int8_t>(utils::cast<float, int>((0 - minval) * rscale) - 128);
       zero_points[j / raw_blocksize * ld_dst + i] = bzp;
       for (size_t ij = 0; ij < blocksize; ij++) {
         dstptr[(j + ij) * ld_dst + i] =
-            utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i] - minval) * rscale) - 128;
+            utils::cast<float, int8_t>(utils::cast<float, int>((srcptr[(j + ij) * ld_src + i]) * rscale) + bzp);
       }
     };
     auto sNauto_calc_store_scale_and_quantv_sym = [&](int blocksize) {
@@ -1044,16 +1044,16 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       float scale = (maxval - minval) / ((1 << NBits) - 1);
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
-      int8_t bzp = utils::cast<float, int8_t>((0 - minval) * rscale) - FullValue;
+      int bzp = utils::cast<float, int>((0 - minval) * rscale) - FullValue;
       auto clip = [&](int s) {
         s = std::max(s, -FullValue);
         s = std::min(s, FullValue - 1);
         return s;
       };
       bzp = clip(bzp);
-      zero_points[j / raw_blocksize * ld_dst + i] = bzp;
+      zero_points[j / raw_blocksize * ld_dst + i] = static_cast<int8_t>(bzp);
       for (size_t ij = 0; ij < blocksize; ij++) {
-        auto tmp = utils::cast<float, int8_t>((srcptr[(j + ij) * ld_src + i]) * rscale + bzp);
+        auto tmp = utils::cast<float, int>((srcptr[(j + ij) * ld_src + i]) * rscale) + bzp;
         tmp = clip(tmp);
         dstptr[(j + ij) * ld_dst + i] = tmp;
       }
@@ -1061,12 +1061,6 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
     auto dispatch_calc = [&](int blocksize) {
       switch (QDT_T) {
         case BTLA_DTYPE::S8:
-          if (zero_points == nullptr) {
-            s8_calc_store_scale_and_quantv_sym(blocksize);
-          } else {
-            s8_calc_store_scale_and_quantv_asym(blocksize);
-          }
-          break;
         case BTLA_DTYPE::S2_CLIP:
         case BTLA_DTYPE::S3_CLIP:
         case BTLA_DTYPE::S4_CLIP:

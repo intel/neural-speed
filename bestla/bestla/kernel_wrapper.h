@@ -462,6 +462,38 @@ class DecompressKBlockS2S8 {
 };
 
 template <int PackRow, int NTILE, typename DstT>
+class DecompressKBlockS8Fp {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(int8_t* srcptr, DstT* dstptr, int row, int col, void* scales, BTLA_DTYPE sdtype,
+                                  int8_t* zero_points, int k_offset, int n_offset, int kblock, int NPad, void* tmp,
+                                  size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+    // #if CompileAVX512F()
+    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
+    //       ret = avx512f::decompress_kblock_s4_fp<S4_T, _DST_T, _PACK_ROW, _SCA_T>(
+    //           srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, k_offset, kblock, NPad,
+    //           reinterpret_cast<int8_t*>(tmp), tmpsize);
+    //       if (ret == BTLA_CODE::Success) return ret;
+    //     }
+    // #endif
+#if CompileAVX2()
+    // AVX2 device only focus on fp32 data and layout
+   /* if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_s8_fp<PackRow, NTILE, DstT>(srcptr, dstptr, row, col, scales, sdtype, zero_points,
+                                                                k_offset, n_offset, kblock, NPad,
+                                                                reinterpret_cast<int8_t*>(tmp), tmpsize);
+      if (ret == BTLA_CODE::Success) return ret;
+    }*/
+#endif
+    ret = ref::decompress_kblock_s8_fp<PackRow, NTILE, DstT>(srcptr, dstptr, row, col, scales, sdtype, zero_points,
+                                                             k_offset, n_offset, kblock, NPad,
+                                                             reinterpret_cast<int8_t*>(tmp), tmpsize);
+    return ret;
+  }
+};
+
+template <int PackRow, int NTILE, typename DstT>
 class DecompressKBlockS4Fp {
  public:
   template <BTLA_ISA ISA_T>
@@ -655,7 +687,7 @@ class DecompressKBlockF8FP {
 };
 
 template <typename _DST_T, int PACK_ROW>
-class DecompressKBlockS8Fp {
+class DecompressKBlockS8FpDep {
  public:
   template <BTLA_ISA ISA_T, typename SCA_T>
   static inline BTLA_CODE forward(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
