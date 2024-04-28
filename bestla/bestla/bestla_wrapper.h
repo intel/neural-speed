@@ -108,7 +108,9 @@ class LauncherBase {
         const float* Aptr = _param.paramA.A;
         if constexpr (std::is_same_v<PrologueA,
                                      prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
-          Aptr = _param.paramA.reordered->template APtr<float>();
+          if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
+            Aptr = _param.paramA.reordered->template APtr<float>();
+          }
         }
         int m = _param.problem.dims[1];
         int n = _param.problem.dims[2];
@@ -169,7 +171,9 @@ class LauncherBase {
         const float* Aptr = _param.paramA.A;
         if constexpr (std::is_same_v<PrologueA,
                                      prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
-          Aptr = _param.paramA.reordered->template APtr<float>();
+          if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
+            Aptr = _param.paramA.reordered->template APtr<float>();
+          }
         }
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
@@ -235,7 +239,9 @@ class LauncherBase {
         const float* Aptr = _param.paramA.A;
         if constexpr (std::is_same_v<PrologueA,
                                      prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
-          Aptr = _param.paramA.reordered->template APtr<float>();
+          if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
+            Aptr = _param.paramA.reordered->template APtr<float>();
+          }
         }
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
@@ -797,8 +803,8 @@ class LauncherIntKBlock {
       int ldsb_cache = tmp_ldsb;
       auto scaleB_cache = scaleB;
       auto reduceB_cache = reduceB;
-      mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB,
-                            tmp_, _config.tmpcachesize);
+      mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB, tmp_,
+                      _config.tmpcachesize);
       mProB.getScale(&scaleB_cache, &ldsb_cache, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB, tmp_,
                      _config.tmpcachesize);
       mProB.getReduce(&reduceB_cache, &ldsb_cache, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB,
@@ -863,8 +869,8 @@ class LauncherIntKBlock {
         int ldsb_cache = tmp_ldsb;
         auto scaleB_cache = scaleB;
         auto reduceB_cache = reduceB;
-        mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterkk, _config.loc[1] + blk_n,
-                              _param.paramB, tmp_, _config.tmpcachesize);
+        mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterkk, _config.loc[1] + blk_n, _param.paramB,
+                        tmp_, _config.tmpcachesize);
         mProB.getScale(&scaleB_cache, &ldsb_cache, k_padded, n_padded, iterkk, _config.loc[1] + blk_n, _param.paramB,
                        tmp_, _config.tmpcachesize);
         mProB.getReduce(&reduceB_cache, &ldsb_cache, k_padded, n_padded, iterkk, _config.loc[1] + blk_n, _param.paramB,

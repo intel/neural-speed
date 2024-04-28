@@ -35,46 +35,20 @@ template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
                      storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
                      parallel::IThreading* th) {
-  if (M <= 16) {
-    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
-    using Launcher = tLauncher_Fp_F32F32<GemmCore_T, Wei_T>;
-    static Launcher kernel;
-    auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-    utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
-    auto reduceA = kernel.mProA.createReduceStorage(M, K, B->mBlockSize);
-    if (B->IsAsym()) {
-      reduceA.assign(WorkSpace);
-      WorkSpace += reduceA.mSize;
-    }
-    auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-    if (B->ShfIndice()) {
-      reordA.assign(WorkSpace);
-    }
-    typename Launcher::BEpiParam blkargs{
-        B->template SPtr<int8_t>(),     B->SDtype(), B->CStep(), B->template ZPtr<int8_t>(),
-        reduceA.template RPtr<float>(), reduceA.lda};
-    typename Launcher::Param args{gp, {A, K, &reduceA, B->ShfIndice(), &reordA}, {B}, blkargs, {C, N}};
-    if (B->IsAsym() || B->ShfIndice()) {
-      parallel::GemmRunWithA<Parallel>(kernel, args, th);
-    } else {
-      parallel::GemmRun<Parallel>(kernel, args, th);
-    }
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher =
+      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+                                  epilogue::gemm::AccumulatorWriteBackFp32>;
+  static Launcher kernel;
+  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
+  utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
+  auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
+  typename Launcher::Param args{gp, {A, K, nullptr, B->ShfIndice(), &reordA}, {B}, {C, N}};
+  if (B->ShfIndice()) {
+    reordA.assign(WorkSpace);
+    parallel::GemmRunWithA<Parallel>(kernel, args, th);
   } else {
-    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32,
-                                    Wei_T, epilogue::gemm::AccumulatorWriteBackFp32>;
-    static Launcher kernel;
-    auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-    utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
-    auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-    typename Launcher::Param args{gp, {A, K, nullptr, B->ShfIndice(), &reordA}, {B}, {C, N}};
-    if (B->ShfIndice()) {
-      reordA.assign(WorkSpace);
-      parallel::GemmRunWithA<Parallel>(kernel, args, th);
-    } else {
-      parallel::GemmRun<Parallel>(kernel, args, th);
-    }
+    parallel::GemmRun<Parallel>(kernel, args, th);
   }
 }
 

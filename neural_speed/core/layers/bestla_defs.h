@@ -19,8 +19,8 @@
 namespace bestla {
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 using tLauncher_Fp_F32F32 =
-    wrapper::gemm::LauncherKBlock<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
-                                  epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
+    wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+                                epilogue::gemm::AccumulatorWriteBackFp32>;
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 using tLauncher_Int8_F32F32 =
