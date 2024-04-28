@@ -558,16 +558,10 @@ class WeightKBlockNInteger {
 
   static void compressBit3Weight(const int N, const int K, const int8_t* B, int8_t* dstptr,
                                  parallel::IThreading* threading) {
-    // TODO(zhe): 1D parallel compress
-    auto ld_dst = _GemmCore_T::NTILE * utils::padto(K, 64);
-    auto col = _GemmCore_T::NTILE * K;
-    auto row = N / _GemmCore_T::NTILE;
-    auto pad_64_buf = utils::avector<int8_t>(row * ld_dst, 0);
-    kernel::wrapper::Memcpy2D::forward<BTLA_ISA::NoSIMD>(B, pad_64_buf.data(), row, col, col, ld_dst);
+    auto bit1_offset = size_t(N) * K;
     auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
-    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + row * ld_dst / 4);
-    auto ret =
-        kernel::wrapper::CompressBit3::forward<ISA_T>(pad_64_buf.data(), bit2ptr, bit1ptr, row, col, ld_dst, ld_dst);
+    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + bit1_offset / 4);
+    auto ret = kernel::wrapper::CompressBit3::forward<ISA_T>(B, bit2ptr, bit1ptr, bit1_offset);
     assert(ret == BTLA_CODE::Success);
   }
 

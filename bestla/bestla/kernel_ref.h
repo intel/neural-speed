@@ -227,8 +227,8 @@ static inline BTLA_CODE compress_3bit_align128(const int8_t* srcptr, bestla::uti
 }
 
 static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
-                                      int row, int col, int ld_src, int ld_dst) {
-  assert(col % 8 == 0);
+                                      size_t size) {
+  assert(size % 8 == 0);
   auto round3bit = [](int8_t src) {
     int32_t dst = src;
     dst = dst > 3 ? 3 : dst;
@@ -236,35 +236,34 @@ static inline BTLA_CODE compress_3bit(const int8_t* srcptr, bestla::utils::bit2x
     return static_cast<int8_t>(dst);
   };
 
-  for (int i = 0; i < row; i++) {
-    for (int j = 0; j < col; j += 8) {
-      auto tmp = round3bit(srcptr[i * ld_src + j + 0]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 0].a = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].a = tmp >> 2;
-      tmp = round3bit(srcptr[i * ld_src + j + 1]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 0].b = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].b = tmp >> 2;
-      tmp = round3bit(srcptr[i * ld_src + j + 2]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 0].c = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].c = tmp >> 2;
-      tmp = round3bit(srcptr[i * ld_src + j + 3]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 0].d = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].d = tmp >> 2;
+  for (int j = 0; j < size; j += 8) {
+    auto tmp = round3bit(srcptr[j + 0]) + 4;
+    bit2ptr[j / 4 + 0].a = tmp & 0x3;
+    bit1ptr[j / 8].a = tmp >> 2;
+    tmp = round3bit(srcptr[j + 1]) + 4;
+    bit2ptr[j / 4 + 0].b = tmp & 0x3;
+    bit1ptr[j / 8].b = tmp >> 2;
+    tmp = round3bit(srcptr[j + 2]) + 4;
+    bit2ptr[j / 4 + 0].c = tmp & 0x3;
+    bit1ptr[j / 8].c = tmp >> 2;
+    tmp = round3bit(srcptr[j + 3]) + 4;
+    bit2ptr[j / 4 + 0].d = tmp & 0x3;
+    bit1ptr[j / 8].d = tmp >> 2;
 
-      tmp = round3bit(srcptr[i * ld_src + j + 4]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 1].a = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].e = tmp >> 2;
-      tmp = round3bit(srcptr[i * ld_src + j + 5]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 1].b = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].f = tmp >> 2;
-      tmp = round3bit(srcptr[i * ld_src + j + 6]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 1].c = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].g = tmp >> 2;
-      tmp = round3bit(srcptr[i * ld_src + j + 7]) + 4;
-      bit2ptr[i * ld_dst / 4 + j / 4 + 1].d = tmp & 0x3;
-      bit1ptr[i * ld_dst / 8 + j / 8].h = tmp >> 2;
-    }
+    tmp = round3bit(srcptr[j + 4]) + 4;
+    bit2ptr[j / 4 + 1].a = tmp & 0x3;
+    bit1ptr[j / 8].e = tmp >> 2;
+    tmp = round3bit(srcptr[j + 5]) + 4;
+    bit2ptr[j / 4 + 1].b = tmp & 0x3;
+    bit1ptr[j / 8].f = tmp >> 2;
+    tmp = round3bit(srcptr[j + 6]) + 4;
+    bit2ptr[j / 4 + 1].c = tmp & 0x3;
+    bit1ptr[j / 8].g = tmp >> 2;
+    tmp = round3bit(srcptr[j + 7]) + 4;
+    bit2ptr[j / 4 + 1].d = tmp & 0x3;
+    bit1ptr[j / 8].h = tmp >> 2;
   }
+
   return BTLA_CODE::Success;
 }
 

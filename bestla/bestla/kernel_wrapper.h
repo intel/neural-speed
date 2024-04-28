@@ -278,9 +278,9 @@ class CompressFp4 {
 class CompressBit3 {
  public:
   template <BTLA_ISA ISA_T>
-  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int row,
-                                  int col, int ld_src, int ld_dst) {
-    return ref::compress_3bit(srcptr, bit2ptr, bit1ptr, row, col, ld_src, ld_dst);
+  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                  size_t size) {
+    return ref::compress_3bit(srcptr, bit2ptr, bit1ptr, size);
   }
 };
 
@@ -457,21 +457,44 @@ class DecompressKBlockS3Fp {
     //       if (ret == BTLA_CODE::Success) return ret;
     //     }
     // #endif
-    // #if CompileAVX2()
-    //     // AVX2 device only focus on fp32 data and layout
-    //     if constexpr (utils::isa_base<ISA_T>::avx2) {
-    //       ret = avx2::decompress_kblock_s3_fp<PackRow, NTILE, DstT>(b2ptr, b1ptr, dstptr, row, col, scales, sdtype,
-    //                                                                 zero_points, k_offset, n_offset, kblock, NPad,
-    //                                                                 reinterpret_cast<int8_t*>(tmp), tmpsize);
-    //       if (ret == BTLA_CODE::Success) return ret;
-    //     }
-    // #endif
+#if CompileAVX2()
+    // AVX2 device only focus on fp32 data and layout
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      ret = avx2::decompress_kblock_s3_fp<PackRow, NTILE, DstT>(b2ptr, b1ptr, dstptr, row, col, scales, sdtype,
+                                                                zero_points, k_offset, n_offset, kblock, NPad,
+                                                                reinterpret_cast<int8_t*>(tmp), tmpsize);
+      if (ret == BTLA_CODE::Success) return ret;
+    }
+#endif
     ret = ref::decompress_kblock_s3_fp<PackRow, NTILE, DstT>(b2ptr, b1ptr, dstptr, row, col, scales, sdtype,
                                                              zero_points, k_offset, n_offset, kblock, NPad,
                                                              reinterpret_cast<int8_t*>(tmp), tmpsize);
     return ret;
   }
 };
+//
+// template <int PackRow, int NTILE, typename DstT>
+// class DecompressKBlockS2Fp {
+// public:
+//  template <BTLA_ISA ISA_T>
+//  static inline BTLA_CODE forward(utils::bit2x4* bit2ptr, _DST_T* dstptr, int row, int col, _SCA_T* scales,
+//                                  int8_t* zero_points, int k_offset, int kblock, int NPad, void* tmp, size_t tmpsize)
+//                                  {
+//    BTLA_CODE ret = BTLA_CODE::NotSupport;
+// #if CompileAVX2()
+//    if constexpr (utils::isa_base<ISA_T>::avx2) {
+//      ret = avx2::decompress_kblock_bit2_packrow_fp<S2_T, _DST_T, _PACK_ROW, _SCA_T>(
+//          bit2ptr, dstptr, row, col, scales, zero_points, k_offset, kblock, NPad, tmp, tmpsize);
+//      assert(ret == BTLA_CODE::Success);
+//      return ret;
+//    }
+// #endif
+//    ret = ref::decompress_kblock_bit2_packrow_fp<S2_T, _DST_T, _PACK_ROW, _SCA_T>(
+//        bit2ptr, dstptr, row, col, scales, zero_points, k_offset, kblock, NPad, tmp, tmpsize);
+//    assert(ret == BTLA_CODE::Success);
+//    return ret;
+//  }
+//};
 
 template <typename _DST_T, int _PACK_ROW, typename _Z_T = int8_t>  // zero points always be int8_t, not compressed
 class DecompressKBlockS3FpDe {
