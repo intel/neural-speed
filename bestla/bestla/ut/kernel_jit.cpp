@@ -234,43 +234,6 @@ class UT_CScaleInterleavedBF16FP16 {
 static UT_CScaleInterleavedBF16FP16 sUT_CScaleInterleavedBF16FP16;
 #endif
 
-class UT_DeQuant {
- public:
-  UT_DeQuant() {
-    UT_START();
-    ut<float>(512, 48);
-    ut<float>(512, 64);
-    ut<float>(512, 32);
-    ut<bf16>(512, 48);
-    ut<bf16>(512, 64);
-    ut<bf16>(512, 512);
-  }
-  template <typename DST_T>
-  void ut(int row, int col) {
-    int srcstride = col;
-    int dststride = col * 4;
-    printf("Test Case : %d %d %d %d\n", row, col, srcstride, dststride);
-    CheckISA(AVX512F);
-    ut::UT_vector_s8 test;
-    test.resize(row * col);
-    test.fill_rand(-127, 127);
-
-    test.rand_scale(col, -0.05f, 0.05f);
-    utils::aligned_vector<DST_T> ref, tar;
-    ref.resize(row * col);
-    tar.resize(row * col);
-    int constexpr PACK_ROW = std::is_same_v<DST_T, float> ? 1 : 2;
-    kernel::ref::decompress_kblock_s8_fp_depre<DST_T, PACK_ROW>(test.data(), ref.data(), row, col, col, col,
-                                                          test.scales.data(), nullptr, 0, row * 2, col);
-    kernel::jit::DequanS8FP::forward_avx512f<PACK_ROW>(test.data(), tar.data(), row, col, col, col, test.scales.data(),
-                                                       nullptr);
-    ut::buffer_error<DST_T>(ref.data(), tar.data(), ref.size());
-  }
-};
-#ifdef BTLA_UT_KERNEL_JIT
-static UT_DeQuant sUT_DeQuant;
-#endif
-
 class UT_DecompressS4S8 {
  public:
   UT_DecompressS4S8() {
