@@ -4337,8 +4337,10 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   return BTLA_CODE::Success;
 }
 
+
 #ifdef __GNUC__
-#pragma GCC diagnostic pop
+#pragma GCC pop_options
+#else
 #endif
 }  // namespace vnni
 
