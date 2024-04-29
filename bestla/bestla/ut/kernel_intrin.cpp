@@ -463,10 +463,10 @@ class UT_avx2_decompress_s4_fp {
   UT_avx2_decompress_s4_fp() {
     UT_START();
     CheckISA(AVX2);
+    ut<4, 24, utils::bf16>(32);
     ut<1, 24, float>(32);
     ut<2, 24, float>(32);
     ut<4, 24, float>(32);
-    ut<4, 24, utils::bf16>(32);
     ut<4, 24, utils::bf16, utils::bf16>(32);
     ut<1, 24, float>(32, true);
     ut<2, 24, float>(32, true);

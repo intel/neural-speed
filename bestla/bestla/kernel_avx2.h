@@ -66,20 +66,15 @@ inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
 }
 
 inline __m128i ymm_cvtepi32_epi16(__m256i src) {
-  __m128i tmp;
-#if defined(__GNUC__) || defined(__clang_major__)
-  for (size_t i = 0; i < 8; i++) {
-    (reinterpret_cast<int16_t*>(&tmp))[i] = (reinterpret_cast<int32_t*>(&src))[i];
-  }
-#else
-  for (size_t i = 0; i < 8; i++) {
-    tmp.m128i_i16[i] = src.m256i_i32[i];
-  }
-#endif
-  return tmp;
+  const auto shuffle_mask_32_to_16 = _mm256_set_epi8(13, 12, 9, 8, 5, 4, 1, 0, 13, 12, 9, 8, 5, 4, 1, 0, 13, 12, 9, 8,
+                                                     5, 4, 1, 0, 13, 12, 9, 8, 5, 4, 1, 0);
+  __m256i trunc_elements = _mm256_shuffle_epi8(src, shuffle_mask_32_to_16);
+  __m256i ordered = _mm256_permute4x64_epi64(trunc_elements, 0x58);
+  __m128i result = _mm256_castsi256_si128(ordered);
+  return result;
 }
 
-inline __m128i ymm_cvt_fp32_bf16(__m256 vfp32) {
+inline __m128i ymm_cvt_fp32_bf16(const __m256& vfp32) {
   return ymm_cvtepi32_epi16(_mm256_bsrli_epi128(_mm256_castps_si256(vfp32), 2));
 }
 
@@ -115,14 +110,14 @@ static inline __m256 load_s8_fp32(int8_t* srcptr) {
 }
 
 template <typename T>
-static inline void store_fp_T(__m256 src_y, T* dstptr) {
+static inline void store_fp_T(const __m256& src_y, T* dstptr) {
   if constexpr (std::is_same_v<T, utils::bf16>) {
     auto xmm = ymm_cvt_fp32_bf16(src_y);
     _mm_storeu_si128(reinterpret_cast<__m128i*>(dstptr), xmm);
   } else if constexpr (std::is_same_v<T, float>) {
     _mm256_storeu_ps(dstptr, src_y);
   } else {
-    static_assert(std::is_same_v<T, utils::bf16> || std::is_same_v<T, float>);
+    assert(0);
   }
 }
 
