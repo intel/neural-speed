@@ -456,18 +456,17 @@ class WeightKBlockNInteger {
     auto tmpscales = tmp;
     auto tmpzeropoints = reinterpret_cast<int8_t*>(tmpscales + N * blks);
     if (scales) {
-      for (size_t i = 0; i < N * blks; i += 2) {
-        tmpscales[i] = scales[i] / 16;
-        tmpscales[i + 1] = scales[i + 1] / 16;
+      for (size_t i = 0; i < N * blks; i += 1) {
+        tmpscales[i] = scales[i];
       }
     }
     if (zero_points) {
       for (size_t i = 0; i < N; i += 1) {
         for (size_t ib = 0; ib < blks; ib += 2) {
           auto tmpzp = *(zero_points + i * blks_padding2 / 2 + ib / 2);
-          tmpzeropoints[i * blks + ib] = ((tmpzp & 0xf) - 8) << 4;
+          tmpzeropoints[i * blks + ib] = (tmpzp & 0x0f) - 8;
           if (ib + 1 < blks) {
-            tmpzeropoints[i * blks + ib + 1] = (((tmpzp & 0xf0) >> 4) - 8) << 4;
+            tmpzeropoints[i * blks + ib + 1] = ((tmpzp & 0xf0) >> 4) - 8;
           }
         }
       }
@@ -486,8 +485,8 @@ class WeightKBlockNInteger {
             for (size_t i = thdp.loc[0]; i < thdp.loc[0] + thdp.size[0]; i++) {
               for (size_t j = thdp.loc[1]; j < thdp.loc[1] + thdp.size[1]; j += 2) {
                 auto src = *(B + i * ldb / 2 + j / 2);
-                s8ptr[(j + 0) * N + i] = ((src & 0xf) - 8) << 4;
-                s8ptr[(j + 1) * N + i] = (((src & 0xf0) >> 4) - 8) << 4;
+                s8ptr[(j + 0) * N + i] = ((src & 0xf) - 8);
+                s8ptr[(j + 1) * N + i] = (((src & 0xf0) >> 4) - 8);
               }
             }
           }

@@ -187,8 +187,8 @@ class UT_avx512_decompress_s3_s8 {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx512_decompress_s3_s8 sUT_avx512_decompress_s3_s8;
+#endif
 
 class UT_avx2_decompress_s3_s8 {
  public:
@@ -320,8 +320,8 @@ class UT_avx512_decompress_s2_s8 {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx512_decompress_s2_s8 sUT_avx512_decompress_s2_s8;
+#endif
 
 class UT_avx2_decompress_s2_s8 {
  public:
@@ -455,8 +455,8 @@ class UT_avx512_decompress_s4_fp {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx512_decompress_s4_fp sUT_avx512_decompress_s4_fp;
+#endif
 
 class UT_avx2_decompress_s4_fp {
  public:
@@ -1445,7 +1445,7 @@ class UT_avx512_gemv {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 UT_avx512_gemv sUT_avx512_gemv;
+#endif
 }  // namespace ut
 }  // namespace bestla
