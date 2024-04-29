@@ -234,30 +234,5 @@ class UT_CScaleInterleavedBF16FP16 {
 static UT_CScaleInterleavedBF16FP16 sUT_CScaleInterleavedBF16FP16;
 #endif
 
-class UT_DecompressS4S8 {
- public:
-  UT_DecompressS4S8() {
-    UT_START();
-    ut(512, 48);
-    ut(2, 48);
-    ut(111, 48);
-  }
-  void ut(int row, int col) {
-    printf("Test Case : %d %d\n", row, col);
-    CheckISA(AVX512F);
-    ut::UT_vector_s8 test;
-    aligned_vector<int4x2> src(row * col / 2);
-    aligned_vector<int8_t> src8(row * col);
-    ut::fill_buffer_randn(src8.data(), src8.size(), int8_t(-128), int8_t(127));
-    kernel::ref::compress_s8_s4(src8.data(), src.data(), row, col, col, col);
-    aligned_vector<int8_t> ref(row * col), tar(row * col);
-    //kernel::ref::decompress_s4_s8<BTLA_DTYPE::S4_CLIP>(src.data(), ref.data(), row, col, col, col);
-    //kernel::jit::decompress_s4_s8(src.data(), tar.data(), row, col, col, col);
-    ut::buffer_error<int8_t>(ref.data(), tar.data(), ref.size());
-  }
-};
-#ifdef BTLA_UT_KERNEL_JIT
-static UT_DecompressS4S8 sUT_DecompressS4S8;
-#endif
 }  // namespace ut
 }  // namespace bestla

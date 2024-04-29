@@ -213,7 +213,7 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-//static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
+// static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
 
 class UT_S3_WOQ {

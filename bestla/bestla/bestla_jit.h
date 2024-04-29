@@ -118,7 +118,7 @@ class JitAvx2 : protected JitAvx {
   }
 
   void vpdpbusds_(const Xbyak::Xmm& sum4, const Xbyak::Xmm& sum2, const Xbyak::Xmm& x, const Xbyak::Operand& op,
-                 const Xbyak::Xmm& ones) {
+                  const Xbyak::Xmm& ones) {
     vpmaddubsw(sum2, x, op);
     vpmaddwd(sum2, sum2, ones);
     vpaddd(sum4, sum4, sum2);

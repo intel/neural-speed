@@ -133,7 +133,7 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           }
         }
       }
