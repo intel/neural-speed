@@ -788,7 +788,7 @@ class UTWOQ_CompInt8 {
     auto threads_cfg = UT_Threading::get_threads_config();
     for (auto threads : threads_cfg) {
       for (auto blocksize : {32, 128}) {
-        if (_cd->AMX_INT8()) {
+        if (_cd->AMX_INT8() && blocksize % 64 == 0) {
           benchmark<gemm::ICoreRowNAmxint8KBlock<64, 16>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
@@ -1174,16 +1174,6 @@ class UTWOQ_GGML {
     auto threads_cfg = UT_Threading::get_threads_config();
     for (auto threads : threads_cfg) {
       for (auto blocksize : {32}) {
-        if (_cd->AMX_INT8()) {
-          benchmark<gemm::ICoreRowNAmxint8KBlock<64, 16>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
-        }
-        if (_cd->AVX512_VNNI()) {
-          benchmark<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
-          benchmark<gemm::ICoreRowNAvx512vnniKBlock<96, 2>, LOG, Wei, Scale_T>(
-              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
-        }
         if (_cd->AVX_VNNI()) {
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
