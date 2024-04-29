@@ -52,7 +52,7 @@ int col_major_shuf_result_validate(
   return err_num;
 }
 
-class TestBase {
+class Test1 {
  public:
   static constexpr size_t mat_m = 1024;
   static constexpr size_t mat_n = 11008;
@@ -61,6 +61,22 @@ class TestBase {
   static constexpr uint32_t wg_n = 64;
   static constexpr uint32_t sg_m = 8;
   static constexpr uint32_t sg_n = 16;
+
+  static constexpr uint32_t load_block_size = 16;
+
+  using data_type_in = fp16;
+  using data_type_out = fp16;
+};
+
+class Test2 {
+ public:
+  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 4096;
+
+  static constexpr size_t wg_n = 128;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_m = 1;
 
   static constexpr uint32_t load_block_size = 16;
 

@@ -26,12 +26,12 @@ namespace gpu::xetla::kernel {
 
 /// @brief
 ///
-/// @tparam dtype_in_
-/// @tparam dtype_out_
-/// @tparam dtype_gidx_
-/// @tparam mem_layout_in_
-/// @tparam col_major_shuf_attr_
-/// @tparam arch_
+/// @tparam dtype_in_  input data type.
+/// @tparam dtype_out_ output data type.
+/// @tparam dtype_gidx_ gidx data type.
+/// @tparam mem_layout_in_ input memory layout.
+/// @tparam col_major_shuf_attr_ parallel-related attributes.
+/// @tparam arch_ HW architecture.
 template <
     typename dtype_in_,
     typename dtype_out_,

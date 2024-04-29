@@ -37,8 +37,7 @@ struct col_major_shuf_t<
     dtype_gidx_,
     mem_layout_in_,
     col_major_shuf_attr_,
-    arch_,
-    std::enable_if_t<arch_ == gpu_arch::XeHpg || arch_ == gpu_arch::XeLpg>> {
+    arch_> {
   using dtype_in = dtype_in_;
   using dtype_out = dtype_out_;
   using dtype_gidx = dtype_gidx_;
@@ -84,7 +83,7 @@ struct col_major_shuf_t<
   using store_tile_payload_t = subgroup::mem_payload_t<
       mem_desc_store_tile_t,
       store_tile_desc_t,
-      msg_type::block_2d,
+      subgroup::msg_type_v<store_tile_desc_t, mem_space::global>,
       arch_>;
 
   using mem_desc_gidx_t = mem_desc_t<
@@ -133,17 +132,27 @@ struct col_major_shuf_t<
 
 #pragma unroll
     for (int block_x = 0; block_x < block_x_num; block_x++) {
-      auto gidx = sycl::ext::intel::esimd::block_load<uint32_t, block_size_x>(
-          reinterpret_cast<uint32_t*>(gidx_payload.base_ptr) +
-          gidx_payload.base_offset / sizeof(uint32_t) + block_x * block_size_x);
+      auto gidx = xetla_load_global<
+          uint32_t,
+          block_size_x,
+          data_size::default_size,
+          cache_hint::cached,
+          cache_hint::cached>(
+          args.gidx_ptr, gidx_payload.base_offset + block_x * block_size_x);
 #pragma unroll
       for (uint32_t row = 0; row < tile_size_y; row++) {
         store_tile.reg.xetla_select<block_size_x, 1>(
             block_x * elt_per_block + row * block_size_x) =
-            sycl::ext::intel::esimd::gather<dtype_in, block_size_x>(
-                args.mat_in_ptr +
-                    (store_tile_payload.base_y + row) * args.matrix_x,
-                gidx);
+            xetla_load_global<
+                dtype_in,
+                1,
+                data_size::default_size,
+                cache_hint::cached,
+                cache_hint::cached,
+                block_size_x>(
+                args.mat_in_ptr + (y_dim_offset + row) * args.matrix_x,
+                gidx,
+                1);
       }
     }
     tile_store(store_tile, store_tile_payload);

@@ -22,7 +22,7 @@ using namespace gpu::xetla;
 using namespace cl::sycl;
 
 template <class Test>
-static void col_major_shuf_run() {
+static void col_major_shuf_run(int iter = 100) {
   size_t matrix_m = Test::mat_m;
   size_t matrix_n = Test::mat_n;
   size_t size_gidx = matrix_n;
@@ -94,40 +94,45 @@ static void col_major_shuf_run() {
   kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
   static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
   putenv(const_cast<char*>(env_unset_str.c_str()));
-
+  profiling_helper prof;
   try {
-    auto e_esimd = queue.submit([&](handler& cgh) {
-      cgh.use_kernel_bundle(exeBundle);
-      cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
-        using col_major_shuf_attr = gpu::xetla::kernel::col_major_shuf_attr_t<
-            wg_tile_n,
-            wg_tile_m,
-            sg_tile_n,
-            sg_tile_m,
-            Test::load_block_size>;
-        using col_major_shuf = gpu::xetla::kernel::col_major_shuf_t<
-            data_type_in,
-            data_type_out,
-            uint32_t,
-            mem_layout::row_major,
-            col_major_shuf_attr,
-            gpu_arch::XeHpg>;
+    for (int i = 0; i < iter; i++) {
+      prof.cpu_start();
+      auto e_esimd = queue.submit([&](handler& cgh) {
+        cgh.use_kernel_bundle(exeBundle);
+        cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
+          using col_major_shuf_attr = gpu::xetla::kernel::col_major_shuf_attr_t<
+              wg_tile_n,
+              wg_tile_m,
+              sg_tile_n,
+              sg_tile_m,
+              Test::load_block_size>;
+          using col_major_shuf = gpu::xetla::kernel::col_major_shuf_t<
+              data_type_in,
+              data_type_out,
+              uint32_t,
+              mem_layout::row_major,
+              col_major_shuf_attr,
+              gpu_arch::XeHpg>;
 
-        typename col_major_shuf::arguments_t args;
-        args.mat_in_ptr = buffer_in;
-        args.mat_out_ptr = buffer_out;
-        args.gidx_ptr = gidx_d;
-        args.matrix_x = matrix_n;
-        args.matrix_y = matrix_m;
-        col_major_shuf::call(item, args);
+          typename col_major_shuf::arguments_t args;
+          args.mat_in_ptr = buffer_in;
+          args.mat_out_ptr = buffer_out;
+          args.gidx_ptr = gidx_d;
+          args.matrix_x = matrix_n;
+          args.matrix_y = matrix_m;
+          col_major_shuf::call(item, args);
+        });
       });
-    });
-    e_esimd.wait();
+      e_esimd.wait();
+      prof.cpu_end();
+      prof.add_gpu_event(e_esimd);
+    }
   } catch (cl::sycl::exception const& e) {
     std::cout << "SYCL exception caught: " << e.what() << '\n';
     FAIL();
   }
-
+  prof.print_profiling_result(profiling_selector::GPU);
   // validation
   ASSERT_EQ(
       0,
@@ -140,6 +145,9 @@ static void col_major_shuf_run() {
   free(gidx_h, context);
 }
 
-TEST(TestBase, esimd) {
-  col_major_shuf_run<TestBase>();
+TEST(Test1, esimd) {
+  col_major_shuf_run<Test1>();
+}
+TEST(Test2, esimd) {
+  col_major_shuf_run<Test2>();
 }
