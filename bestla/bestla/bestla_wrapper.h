@@ -397,7 +397,7 @@ class LauncherIntKBlock {
           return true;
         }
       }
-      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512_VNNI) {
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512_VNNI || GemmCore::ISA == BTLA_ISA::AMX_INT8) {
         static_assert(GemmCore::PACK_ROW == 4);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
           return true;
