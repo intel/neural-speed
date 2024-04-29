@@ -1623,6 +1623,7 @@ struct prefetch_payload_t<
       reg_layout_>;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
+  static constexpr msg_type message_type = msg_type::block_2d;
   static constexpr uint32_t alignment_in_bytes = mem_desc_t::alignment_in_bytes;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
@@ -1631,23 +1632,10 @@ struct prefetch_payload_t<
   static constexpr uint32_t tile_size_y = tile_desc::tile_size_y;
   static constexpr uint32_t block_size_x = tile_desc::block_size_x;
   static constexpr uint32_t block_size_y = tile_desc::block_size_y;
-  static constexpr msg_type message_type = msg_type::block_2d;
   static constexpr uint32_t tile_bytes =
       tile_size_x * tile_size_y * sizeof(dtype);
   static constexpr uint32_t block_bytes =
       block_size_x * block_size_y * sizeof(dtype);
-
-  using prefetch_dtype = typename std::conditional<
-      (alignment_in_bytes % (sizeof(uint64_t)) == 0),
-      uint64_t,
-      typename std::conditional<
-          (alignment_in_bytes % (sizeof(uint32_t)) == 0),
-          uint32_t,
-          dtype>::type>::type;
-  static constexpr uint32_t scale_factor =
-      sizeof(prefetch_dtype) / sizeof(dtype);
-  static constexpr uint32_t simd_exec_size =
-      block_size_x / scale_factor <= 0 ? 1 : block_size_x / scale_factor;
 
  private:
   using this_payload_t =
@@ -1659,7 +1647,23 @@ struct prefetch_payload_t<
   static constexpr bool reg_transpose =
       register_layout == reg_layout::transpose_tiled;
   static constexpr bool trans = mem_transpose ^ reg_transpose;
-  static constexpr uint32_t num_channel = block_size_y;
+
+  using prefetch_dtype = typename std::conditional<
+      (alignment_in_bytes % (sizeof(uint64_t)) == 0),
+      uint64_t,
+      typename std::conditional<
+          (alignment_in_bytes % (sizeof(uint32_t)) == 0),
+          uint32_t,
+          dtype>::type>::type;
+  static constexpr uint32_t pack_factor =
+      sizeof(prefetch_dtype) / sizeof(dtype);
+
+  static constexpr uint32_t simd_exec_size =
+      (mem_transpose ? block_size_y : block_size_x) >= pack_factor
+      ? (mem_transpose ? block_size_y : block_size_x) / pack_factor
+      : 1;
+  static constexpr uint32_t num_channel =
+      mem_transpose ? block_size_x : block_size_y;
 
   static constexpr uint32_t mem_tile_size_w =
       mem_transpose ? tile_size_y : tile_size_x;
