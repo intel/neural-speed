@@ -574,22 +574,6 @@ static inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstpt
   return BTLA_CODE::Success;
 }
 
-template <typename _DST_T, int _PACK_ROW, typename _S_T>
-static inline BTLA_CODE decompress_kblock_s8_fp_depre(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                      int ld_dst, _S_T* scales, int8_t* zero_points, int k_offset,
-                                                      int kblock, int NPad) {
-  for (int i = 0; i < row; i++) {
-    int kpos = (k_offset + i) / kblock;
-    auto sptr = scales + kpos * NPad;
-    for (int j = 0; j < col; j += 1) {
-      float tmp = static_cast<float>(srcptr[i * ld_src + j]);
-      if (zero_points != nullptr) tmp -= static_cast<float>(zero_points[kpos * NPad + j / _PACK_ROW]);
-      dstptr[i * ld_dst + j] = static_cast<_DST_T>(tmp * sptr[j / _PACK_ROW]);
-    }
-  }
-  return BTLA_CODE::Success;
-}
-
 template <int PackRow, int NTILE, typename DST_T>
 inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, DST_T* dstptr, int row, int col, void* scales_,
                                          BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,

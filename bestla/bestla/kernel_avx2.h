@@ -279,57 +279,6 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
   return BTLA_CODE::Success;
 }
 
-template <int PACK_ROW, bool WITH_ZP, typename _DST_T>
-BTLA_CODE dequant_kblock_s8_fp_fwd(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                   float* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
-  const int Vlen = 8;
-  size_t simd_process_num = utils::padto_le(col, Vlen);
-  auto packrow4_permute_idx = _mm256_setr_epi32(0, 0, 0, 0, 1, 1, 1, 1);
-  for (int i = 0; i < row; i++) {
-    int kpos = (k_offset + i) / kblock;
-    auto sptr = scales + kpos * NPad;
-    int j = 0;
-    for (; j < simd_process_num; j += Vlen) {
-      auto s8_ymm_v = _mm_loadl_epi64(reinterpret_cast<__m128i*>(srcptr + i * ld_src + j));
-      auto s32_ymm_v = _mm256_cvtepi8_epi32(s8_ymm_v);
-      if constexpr (WITH_ZP) {
-        auto zp_ymm =
-            _mm256_cvtepi8_epi32(_mm_loadl_epi64(reinterpret_cast<__m128i*>(zero_points + kpos * NPad + j / PACK_ROW)));
-        if constexpr (PACK_ROW == 4) zp_ymm = _mm256_permutevar8x32_epi32(zp_ymm, packrow4_permute_idx);
-        s32_ymm_v = _mm256_sub_epi32(s32_ymm_v, zp_ymm);
-      }
-      auto f32_ymm_v = _mm256_cvtepi32_ps(s32_ymm_v);
-      auto scale_ymm = _mm256_loadu_ps(sptr + j / PACK_ROW);
-      if constexpr (PACK_ROW == 4) scale_ymm = _mm256_permutevar8x32_ps(scale_ymm, packrow4_permute_idx);
-      f32_ymm_v = _mm256_mul_ps(f32_ymm_v, scale_ymm);
-      if constexpr (std::is_same_v<_DST_T, float>) {
-        _mm256_storeu_ps(dstptr + i * ld_dst + j, f32_ymm_v);
-      } else if constexpr (std::is_same_v<_DST_T, utils::bf16>) {
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(dstptr + i * ld_dst), ymm_cvt_fp32_bf16(f32_ymm_v));
-      } else {
-        assert(0);
-      }
-    }
-    for (; j < col; j++) {
-      float tmp = (float)(srcptr[i * ld_src + j]);
-      if constexpr (WITH_ZP) tmp -= (float)(zero_points[kpos * NPad + j / PACK_ROW]);
-      dstptr[i * ld_dst + j] = tmp * sptr[j / PACK_ROW];
-    }
-  }
-  return BTLA_CODE::Success;
-}
-
-template <int PACK_ROW, typename _DST_T>
-static inline BTLA_CODE dequant_kblock_s8_fp(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                             float* scales, int8_t* zero_points, int k_offset, int kblock, int NPad) {
-  if (zero_points == nullptr)
-    return dequant_kblock_s8_fp_fwd<PACK_ROW, false>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
-                                                     k_offset, kblock, NPad);
-  else
-    return dequant_kblock_s8_fp_fwd<PACK_ROW, true>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
-                                                    k_offset, kblock, NPad);
-}
-
 template <typename SCAB_T>
 static inline BTLA_CODE dequant_s32_fp32(const int32_t* srcptr, const int srcstep, float* dstptr, const int dststep,
                                          const int row, const int col, const float* scaleA, const int ldsa,
