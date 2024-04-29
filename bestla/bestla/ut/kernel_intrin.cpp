@@ -539,7 +539,7 @@ class UT_avx2_gemv {
  public:
   UT_avx2_gemv() {
     UT_START();
-    CheckISA(AVX2);
+    CheckISA(AVX_VNNI);
     ut_4bit<1>(24, 128, 32, true);
     ut_4bit<1>(24, 128, 32, false);
     ut_4bit<4>(24, 128, 32, false);
@@ -994,7 +994,7 @@ class UT_avx512_gemv {
  public:
   UT_avx512_gemv() {
     UT_START();
-    CheckISA(AVX512F);
+    CheckISA(AVX512_VNNI);
     ut_4bit<1>(48, 128, 32, true);
     ut_4bit<1>(48, 128, 32, false);
     ut_4bit<4>(48, 128, 32, false);

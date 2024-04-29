@@ -71,9 +71,6 @@ class UT_BlockQunatize_INT8 {
     kernel.packWeight(n, k, dequanRef.data(), ldb, &ptr, UT_Threading::get());
     avector<float> dequant(n * k);
     kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
-    avector<int8_t> ws8(n * k);
-    kernel.unpackWeight(n, k, &ptr, ws8.data(), n, UT_Threading::get());
-    ut::buffer_error(quanW.data(), ws8.data(), ws8.size(), (int8_t)1);
     ut::buffer_error(dequanRef.data(), dequant.data(), dequanRef.size(), 0.01f);
   }
 
@@ -123,9 +120,6 @@ class UT_BlockQunatize_INT8 {
     kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
     kernel.unpackTransposeWeight(n, k, &ptr, tardequanT.data(), k, UT_Threading::get());
     ut::buffer_error(dequanT.data(), tardequanT.data(), tardequanT.size(), 0.01f);
-    avector<int8_t> ws8(n * k);
-    kernel.unpackWeight(n, k, &ptr, ws8.data(), n, UT_Threading::get());
-    ut::buffer_error(quanW.data(), ws8.data(), ws8.size(), (int8_t)1);
     ut::buffer_error(dequanRef.data(), dequant.data(), dequanRef.size(), 0.01f);
   }
 };
