@@ -78,7 +78,31 @@ class test2_xehpg {
   static constexpr size_t mat_n = 4096 * 1;
   static constexpr size_t mat_k = 4096 * 3;
   static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 16 * 1;
+  static constexpr size_t wg_n = 16 * 8;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 16;
+  static constexpr size_t dequant_s = 128;
+
+  static constexpr size_t local_kslicing = 16;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
+class test3_xehpg {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 16 * 8;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 16;
