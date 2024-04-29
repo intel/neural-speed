@@ -60,6 +60,7 @@ struct test_params_t {
 };
 
 using FMHA_T = fp16;
+// using FMHA_T = bf16;
 
 template <bool kSeqLast, typename accum_t>
 int fma_result_validate(

@@ -122,7 +122,10 @@ class fmha_forward_t {
   static constexpr uint32_t kSgBc = fmha_policy::kSgBc;
   static constexpr uint32_t kSgHm = fmha_policy::kSgHm;
 
-  using comp_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
+  using comp_attr = std::conditional_t<
+      std::is_same_v<scalar_t, bf16>,
+      group::compute_attr_t<accum_t, accum_t, accum_t>,
+      group::compute_attr_t<scalar_t, scalar_t, accum_t>>;
   using knobs = group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
 
   // use fpu when M==1 even if xmx is available
