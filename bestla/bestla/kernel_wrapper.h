@@ -577,29 +577,6 @@ class DecompressKBlockS2Fp {
   }
 };
 
-template <typename _DST_T>  // zero points always be int8_t, not compressed
-class DecompressKBlockS4S8Fp {
- public:
-  template <BTLA_ISA ISA_T, BTLA_DTYPE S4_T>
-  static inline BTLA_CODE forward(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
-                                  void* tmp, size_t tmpsize) {
-    BTLA_CODE ret = BTLA_CODE::NotSupport;
-#if CompileAVX512F()
-    if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return avx512f::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                              reinterpret_cast<int8_t*>(tmp), tmpsize);
-    }
-#endif
-#if CompileAVX2()
-    if constexpr (utils::isa_base<ISA_T>::avx2) {
-      return avx2::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                           reinterpret_cast<int8_t*>(tmp), tmpsize);
-    }
-#endif
-    return ref::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                        reinterpret_cast<int8_t*>(tmp), tmpsize);
-  }
-};
 
 template <typename _DST_T, int _PACK_ROW>
 class DecompressKBlockF4Fp {
@@ -711,26 +688,6 @@ class DecompressKBlockS8FpDep {
 #endif
     return ref::decompress_kblock_s8_fp_depre<_DST_T, PACK_ROW, SCA_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
                                                                        zero_points, k_offset, kblock, NPad);
-  }
-};
-
-template <typename _DST_T>
-class DecompressKBlockS8S8Fp {
- public:
-  template <BTLA_ISA ISA_T>
-  static inline BTLA_CODE forward(int8_t* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst, void* tmp,
-                                  size_t tmpsize) {
-#if CompileAVX512F()
-    if constexpr (utils::isa_base<ISA_T>::avx512f) {  // TODO Scale type support
-      return avx512f::decompress_kblock_s8_s8fp<_DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst);
-    }
-#endif
-#if CompileAVX2()
-    if constexpr (utils::isa_base<ISA_T>::avx2) {  // TODO Scale type support
-      return avx2::decompress_kblock_s8_s8fp<_DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst);
-    }
-#endif
-    return ref::decompress_kblock_s8_s8fp<_DST_T>(srcptr, dstptr, row, col, ld_src, ld_dst);
   }
 };
 

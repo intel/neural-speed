@@ -341,6 +341,36 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
   return BTLA_CODE::Success;
 }
 
+static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* dstptr, int unpack_elt,
+                                         int8_t* tmp, size_t tmpsize) {
+  for (size_t i = 0; i < unpack_elt; i += 8) {
+    auto bit1 = bit1ptr[i / 8];
+    auto tmp = bit2ptr[i / 4];
+    dstptr[i + 0] = (tmp.a | (bit1.a << 2)) - 4;
+    dstptr[i + 1] = (tmp.b | (bit1.b << 2)) - 4;
+    dstptr[i + 2] = (tmp.c | (bit1.c << 2)) - 4;
+    dstptr[i + 3] = (tmp.d | (bit1.d << 2)) - 4;
+    tmp = bit2ptr[i / 4 + 1];
+    dstptr[i + 4] = (tmp.a | (bit1.e << 2)) - 4;
+    dstptr[i + 5] = (tmp.b | (bit1.f << 2)) - 4;
+    dstptr[i + 6] = (tmp.c | (bit1.g << 2)) - 4;
+    dstptr[i + 7] = (tmp.d | (bit1.h << 2)) - 4;
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* srcptr, int8_t* dstptr, size_t unpackelt, int8_t* tmp,
+                                         size_t tmpsize) {
+  for (int j = 0; j < unpackelt; j += 4) {
+    auto tmp = srcptr[j / 4];
+    dstptr[j + 0] = tmp.a - 2;
+    dstptr[j + 1] = tmp.b - 2;
+    dstptr[j + 2] = tmp.c - 2;
+    dstptr[j + 3] = tmp.d - 2;
+  }
+  return BTLA_CODE::Success;
+}
+
 template <int PackRow, int NTILE>
 static inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize,
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
@@ -368,10 +398,135 @@ static inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* z
         }
       }
     } else {
-      static_assert(false);
+      static_assert(PackRow == 1 || PackRow == 2 || PackRow == 4);
     }
   } else {
     return decompress_s4_s8(srcptr, dstptr, size_t(row) * col, tmp, tmpsize);
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int PackRow, int NTILE>
+static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* zpptr,
+                                                int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
+                                                int row, int col, int8_t* tmp, size_t tmpsize) {
+  static_assert(NTILE % 8 == 0);
+  assert(((col * PackRow) % 8) == 0);
+  if (zpptr) {
+    if constexpr (PackRow == 4) {
+      for (int i = 0; i < row; i += PackRow) {
+        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
+        for (int j = 0; j < col; j += 2) {
+          auto zp = zptr[j] + 4;
+          auto bit1 = bit1ptr[(i * col + j * PackRow) / 8];
+          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
+          dstptr[i * col + j * PackRow + 0] = (tmp.a | (bit1.a << 2)) - zp;
+          dstptr[i * col + j * PackRow + 1] = (tmp.b | (bit1.b << 2)) - zp;
+          dstptr[i * col + j * PackRow + 2] = (tmp.c | (bit1.c << 2)) - zp;
+          dstptr[i * col + j * PackRow + 3] = (tmp.d | (bit1.d << 2)) - zp;
+          zp = zptr[j + 1] + 4;
+          tmp = bit2ptr[(i * col + j * PackRow) / 4 + 1];
+          dstptr[i * col + j * PackRow + 4] = (tmp.a | (bit1.e << 2)) - zp;
+          dstptr[i * col + j * PackRow + 5] = (tmp.b | (bit1.f << 2)) - zp;
+          dstptr[i * col + j * PackRow + 6] = (tmp.c | (bit1.g << 2)) - zp;
+          dstptr[i * col + j * PackRow + 7] = (tmp.d | (bit1.h << 2)) - zp;
+        }
+      }
+    } else if constexpr (PackRow == 1) {
+      for (int i = 0; i < row; i += 1) {
+        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
+        for (int j = 0; j < col; j += 8) {
+          auto bit1 = bit1ptr[(i * col + j * PackRow) / 8];
+          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
+          dstptr[i * col + j * PackRow + 0] = (tmp.a | (bit1.a << 2)) - 4 - zptr[j + 0];
+          dstptr[i * col + j * PackRow + 1] = (tmp.b | (bit1.b << 2)) - 4 - zptr[j + 1];
+          dstptr[i * col + j * PackRow + 2] = (tmp.c | (bit1.c << 2)) - 4 - zptr[j + 2];
+          dstptr[i * col + j * PackRow + 3] = (tmp.d | (bit1.d << 2)) - 4 - zptr[j + 3];
+          tmp = bit2ptr[(i * col + j * PackRow) / 4 + 1];
+          dstptr[i * col + j * PackRow + 4] = (tmp.a | (bit1.e << 2)) - 4 - zptr[j + 4];
+          dstptr[i * col + j * PackRow + 5] = (tmp.b | (bit1.f << 2)) - 4 - zptr[j + 5];
+          dstptr[i * col + j * PackRow + 6] = (tmp.c | (bit1.g << 2)) - 4 - zptr[j + 6];
+          dstptr[i * col + j * PackRow + 7] = (tmp.d | (bit1.h << 2)) - 4 - zptr[j + 7];
+        }
+      }
+    } else if constexpr (PackRow == 2) {
+      for (int i = 0; i < row; i += PackRow) {
+        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
+        for (int j = 0; j < col; j += 4) {
+          auto bit1 = bit1ptr[(i * col + j * PackRow) / 8];
+          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
+          auto zp = zptr[j] + 4;
+          dstptr[i * col + j * PackRow + 0] = (tmp.a | (bit1.a << 2)) - zp;
+          dstptr[i * col + j * PackRow + 1] = (tmp.b | (bit1.b << 2)) - zp;
+          zp = zptr[j + 1] + 4;
+          dstptr[i * col + j * PackRow + 2] = (tmp.c | (bit1.c << 2)) - zp;
+          dstptr[i * col + j * PackRow + 3] = (tmp.d | (bit1.d << 2)) - zp;
+          tmp = bit2ptr[(i * col + j * PackRow) / 4 + 1];
+          zp = zptr[j + 2] + 4;
+          dstptr[i * col + j * PackRow + 4] = (tmp.a | (bit1.e << 2)) - zp;
+          dstptr[i * col + j * PackRow + 5] = (tmp.b | (bit1.f << 2)) - zp;
+          zp = zptr[j + 3] + 4;
+          dstptr[i * col + j * PackRow + 6] = (tmp.c | (bit1.g << 2)) - zp;
+          dstptr[i * col + j * PackRow + 7] = (tmp.d | (bit1.h << 2)) - zp;
+        }
+      }
+    } else {
+      static_assert(PackRow == 1 || PackRow == 2 || PackRow == 4);
+    }
+  } else {
+    return decompress_s3_s8(bit2ptr, bit1ptr, dstptr, size_t(row) * col, tmp, tmpsize);
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int PackRow, int NTILE>
+static inline BTLA_CODE decompress_kblock_s2_s8(utils::bit2x4* bit2ptr, int8_t* zpptr, int8_t* dstptr, int blocksize,
+                                                int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
+                                                size_t tmpsize) {
+  static_assert(NTILE % 4 == 0);
+  assert(((col * PackRow) % 4) == 0);
+  if (zpptr) {
+    if constexpr (PackRow == 4) {
+      for (int i = 0; i < row; i += PackRow) {
+        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
+        for (int j = 0; j < col; j += 1) {
+          auto zp = zptr[j] + 2;
+          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
+          dstptr[i * col + j * PackRow + 0] = (tmp.a) - zp;
+          dstptr[i * col + j * PackRow + 1] = (tmp.b) - zp;
+          dstptr[i * col + j * PackRow + 2] = (tmp.c) - zp;
+          dstptr[i * col + j * PackRow + 3] = (tmp.d) - zp;
+        }
+      }
+    } else if constexpr (PackRow == 1) {
+      for (int i = 0; i < row; i += 1) {
+        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
+        for (int j = 0; j < col; j += 4) {
+          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
+          dstptr[i * col + j * PackRow + 0] = (tmp.a) - 2 - zptr[j + 0];
+          dstptr[i * col + j * PackRow + 1] = (tmp.b) - 2 - zptr[j + 1];
+          dstptr[i * col + j * PackRow + 2] = (tmp.c) - 2 - zptr[j + 2];
+          dstptr[i * col + j * PackRow + 3] = (tmp.d) - 2 - zptr[j + 3];
+        }
+      }
+    } else if constexpr (PackRow == 2) {
+      for (int i = 0; i < row; i += PackRow) {
+        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
+        for (int j = 0; j < col; j += 2) {
+          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
+          auto zp = zptr[j] + 2;
+          dstptr[i * col + j * PackRow + 0] = (tmp.a) - zp;
+          dstptr[i * col + j * PackRow + 1] = (tmp.b) - zp;
+          zp = zptr[j + 1] + 2;
+          dstptr[i * col + j * PackRow + 2] = (tmp.c) - zp;
+          dstptr[i * col + j * PackRow + 3] = (tmp.d) - zp;
+        }
+      }
+    } else {
+      static_assert(PackRow == 1 || PackRow == 2 || PackRow == 4);
+    }
+  } else {
+    return decompress_s2_s8(bit2ptr, dstptr, size_t(row) * col, tmp, tmpsize);
   }
   return BTLA_CODE::Success;
 }
@@ -541,31 +696,6 @@ static inline BTLA_CODE decompress_dq_kblock_s4_fp(utils::int4x2* srcptr, _DST_T
       dst1 = static_cast<float>(tmp.y - 8) * scale1;
       dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(dst0);
       dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(dst1);
-    }
-  }
-  return BTLA_CODE::Success;
-}
-
-template <BTLA_DTYPE S4_T, typename _DST_T>
-static inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                                  int ld_dst, int8_t* tmp, size_t tmpsize) {
-  for (int i = 0; i < row; i++) {
-    for (int j = 0; j < col; j += 2) {
-      auto tmp = srcptr[i * ld_src / 2 + j / 2];
-      dstptr[i * ld_dst + j + 0] = static_cast<_DST_T>(static_cast<float>(tmp.x - 8));
-      dstptr[i * ld_dst + j + 1] = static_cast<_DST_T>(static_cast<float>(tmp.y - 8));
-    }
-  }
-  return BTLA_CODE::Success;
-}
-
-template <typename DST_T>
-static inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int row, int col, int ld_src,
-                                                  int ld_dst) {
-  for (int i = 0; i < row; i++) {
-    for (int j = 0; j < col; j += 1) {
-      auto tmp = srcptr[i * ld_src + j];
-      dstptr[i * ld_dst + j] = static_cast<DST_T>(static_cast<float>(tmp));
     }
   }
   return BTLA_CODE::Success;
@@ -1730,161 +1860,6 @@ static inline BTLA_CODE decompress_kblock_s2_s8fp(utils::bit2x4* bit2ptr, _DST_T
     dstptr[i + 1] = _DST_T(tmp.b - 2);
     dstptr[i + 2] = _DST_T(tmp.c - 2);
     dstptr[i + 3] = _DST_T(tmp.d - 2);
-  }
-  return BTLA_CODE::Success;
-}
-
-static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* srcptr, int8_t* dstptr, size_t unpackelt, int8_t* tmp,
-                                         size_t tmpsize) {
-  for (int j = 0; j < unpackelt; j += 4) {
-    auto tmp = srcptr[j / 4];
-    dstptr[j + 0] = tmp.a - 2;
-    dstptr[j + 1] = tmp.b - 2;
-    dstptr[j + 2] = tmp.c - 2;
-    dstptr[j + 3] = tmp.d - 2;
-  }
-  return BTLA_CODE::Success;
-}
-
-template <int PackRow, int NTILE>
-static inline BTLA_CODE decompress_kblock_s2_s8(utils::bit2x4* bit2ptr, int8_t* zpptr, int8_t* dstptr, int blocksize,
-                                                int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
-                                                size_t tmpsize) {
-  static_assert(NTILE % 4 == 0);
-  assert(((col * PackRow) % 4) == 0);
-  if (zpptr) {
-    if constexpr (PackRow == 4) {
-      for (int i = 0; i < row; i += PackRow) {
-        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
-        for (int j = 0; j < col; j += 1) {
-          auto zp = zptr[j] + 2;
-          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
-          dstptr[i * col + j * PackRow + 0] = (tmp.a) - zp;
-          dstptr[i * col + j * PackRow + 1] = (tmp.b) - zp;
-          dstptr[i * col + j * PackRow + 2] = (tmp.c) - zp;
-          dstptr[i * col + j * PackRow + 3] = (tmp.d) - zp;
-        }
-      }
-    } else if constexpr (PackRow == 1) {
-      for (int i = 0; i < row; i += 1) {
-        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
-        for (int j = 0; j < col; j += 4) {
-          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
-          dstptr[i * col + j * PackRow + 0] = (tmp.a) - 2 - zptr[j + 0];
-          dstptr[i * col + j * PackRow + 1] = (tmp.b) - 2 - zptr[j + 1];
-          dstptr[i * col + j * PackRow + 2] = (tmp.c) - 2 - zptr[j + 2];
-          dstptr[i * col + j * PackRow + 3] = (tmp.d) - 2 - zptr[j + 3];
-        }
-      }
-    } else if constexpr (PackRow == 2) {
-      for (int i = 0; i < row; i += PackRow) {
-        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
-        for (int j = 0; j < col; j += 2) {
-          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
-          auto zp = zptr[j] + 2;
-          dstptr[i * col + j * PackRow + 0] = (tmp.a) - zp;
-          dstptr[i * col + j * PackRow + 1] = (tmp.b) - zp;
-          zp = zptr[j + 1] + 2;
-          dstptr[i * col + j * PackRow + 2] = (tmp.c) - zp;
-          dstptr[i * col + j * PackRow + 3] = (tmp.d) - zp;
-        }
-      }
-    } else {
-      static_assert(false);
-    }
-  } else {
-    return decompress_s2_s8(bit2ptr, dstptr, size_t(row) * col, tmp, tmpsize);
-  }
-  return BTLA_CODE::Success;
-}
-
-static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* dstptr, int unpack_elt,
-                                         int8_t* tmp, size_t tmpsize) {
-  for (size_t i = 0; i < unpack_elt; i += 8) {
-    auto bit1 = bit1ptr[i / 8];
-    auto tmp = bit2ptr[i / 4];
-    dstptr[i + 0] = (tmp.a | (bit1.a << 2)) - 4;
-    dstptr[i + 1] = (tmp.b | (bit1.b << 2)) - 4;
-    dstptr[i + 2] = (tmp.c | (bit1.c << 2)) - 4;
-    dstptr[i + 3] = (tmp.d | (bit1.d << 2)) - 4;
-    tmp = bit2ptr[i / 4 + 1];
-    dstptr[i + 4] = (tmp.a | (bit1.e << 2)) - 4;
-    dstptr[i + 5] = (tmp.b | (bit1.f << 2)) - 4;
-    dstptr[i + 6] = (tmp.c | (bit1.g << 2)) - 4;
-    dstptr[i + 7] = (tmp.d | (bit1.h << 2)) - 4;
-  }
-  return BTLA_CODE::Success;
-}
-
-template <int PackRow, int NTILE>
-static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* zpptr,
-                                                int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
-                                                int row, int col, int8_t* tmp, size_t tmpsize) {
-  static_assert(NTILE % 8 == 0);
-  assert(((col * PackRow) % 8) == 0);
-  if (zpptr) {
-    if constexpr (PackRow == 4) {
-      for (int i = 0; i < row; i += PackRow) {
-        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
-        for (int j = 0; j < col; j += 2) {
-          auto zp = zptr[j] + 4;
-          auto bit1 = bit1ptr[(i * col + j * PackRow) / 8];
-          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
-          dstptr[i * col + j * PackRow + 0] = (tmp.a | (bit1.a << 2)) - zp;
-          dstptr[i * col + j * PackRow + 1] = (tmp.b | (bit1.b << 2)) - zp;
-          dstptr[i * col + j * PackRow + 2] = (tmp.c | (bit1.c << 2)) - zp;
-          dstptr[i * col + j * PackRow + 3] = (tmp.d | (bit1.d << 2)) - zp;
-          zp = zptr[j + 1] + 4;
-          tmp = bit2ptr[(i * col + j * PackRow) / 4 + 1];
-          dstptr[i * col + j * PackRow + 4] = (tmp.a | (bit1.e << 2)) - zp;
-          dstptr[i * col + j * PackRow + 5] = (tmp.b | (bit1.f << 2)) - zp;
-          dstptr[i * col + j * PackRow + 6] = (tmp.c | (bit1.g << 2)) - zp;
-          dstptr[i * col + j * PackRow + 7] = (tmp.d | (bit1.h << 2)) - zp;
-        }
-      }
-    } else if constexpr (PackRow == 1) {
-      for (int i = 0; i < row; i += 1) {
-        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
-        for (int j = 0; j < col; j += 8) {
-          auto bit1 = bit1ptr[(i * col + j * PackRow) / 8];
-          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
-          dstptr[i * col + j * PackRow + 0] = (tmp.a | (bit1.a << 2)) - 4 - zptr[j + 0];
-          dstptr[i * col + j * PackRow + 1] = (tmp.b | (bit1.b << 2)) - 4 - zptr[j + 1];
-          dstptr[i * col + j * PackRow + 2] = (tmp.c | (bit1.c << 2)) - 4 - zptr[j + 2];
-          dstptr[i * col + j * PackRow + 3] = (tmp.d | (bit1.d << 2)) - 4 - zptr[j + 3];
-          tmp = bit2ptr[(i * col + j * PackRow) / 4 + 1];
-          dstptr[i * col + j * PackRow + 4] = (tmp.a | (bit1.e << 2)) - 4 - zptr[j + 4];
-          dstptr[i * col + j * PackRow + 5] = (tmp.b | (bit1.f << 2)) - 4 - zptr[j + 5];
-          dstptr[i * col + j * PackRow + 6] = (tmp.c | (bit1.g << 2)) - 4 - zptr[j + 6];
-          dstptr[i * col + j * PackRow + 7] = (tmp.d | (bit1.h << 2)) - 4 - zptr[j + 7];
-        }
-      }
-    } else if constexpr (PackRow == 2) {
-      for (int i = 0; i < row; i += PackRow) {
-        auto zptr = zpptr + (i + k_offset) / blocksize * ldzp + n_offset;
-        for (int j = 0; j < col; j += 4) {
-          auto bit1 = bit1ptr[(i * col + j * PackRow) / 8];
-          auto tmp = bit2ptr[(i * col + j * PackRow) / 4];
-          auto zp = zptr[j] + 4;
-          dstptr[i * col + j * PackRow + 0] = (tmp.a | (bit1.a << 2)) - zp;
-          dstptr[i * col + j * PackRow + 1] = (tmp.b | (bit1.b << 2)) - zp;
-          zp = zptr[j + 1] + 4;
-          dstptr[i * col + j * PackRow + 2] = (tmp.c | (bit1.c << 2)) - zp;
-          dstptr[i * col + j * PackRow + 3] = (tmp.d | (bit1.d << 2)) - zp;
-          tmp = bit2ptr[(i * col + j * PackRow) / 4 + 1];
-          zp = zptr[j + 2] + 4;
-          dstptr[i * col + j * PackRow + 4] = (tmp.a | (bit1.e << 2)) - zp;
-          dstptr[i * col + j * PackRow + 5] = (tmp.b | (bit1.f << 2)) - zp;
-          zp = zptr[j + 3] + 4;
-          dstptr[i * col + j * PackRow + 6] = (tmp.c | (bit1.g << 2)) - zp;
-          dstptr[i * col + j * PackRow + 7] = (tmp.d | (bit1.h << 2)) - zp;
-        }
-      }
-    } else {
-      static_assert(false);
-    }
-  } else {
-    return decompress_s3_s8(bit2ptr, bit1ptr, dstptr, size_t(row) * col, tmp, tmpsize);
   }
   return BTLA_CODE::Success;
 }

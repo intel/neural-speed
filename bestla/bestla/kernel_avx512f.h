@@ -146,7 +146,7 @@ static inline __m512i load_s8_s32(int8_t* srcptr) {
 }
 
 template <bool IsAsym = false>
-static inline __m512 dequant_s8_fp(int8_t* srcptr, __m512 vscales, __m512i vzps = {0}) {
+static inline __m512 dequant_s8_fp(int8_t* srcptr, __m512 vscales, __m512i vzps = __m512i()) {
   auto src_s32_y = load_s8_s32(srcptr);
   if constexpr (IsAsym) src_s32_y = _mm512_sub_epi32(src_s32_y, vzps);
   auto src_fp_y = _mm512_cvtepi32_ps(src_s32_y);
@@ -162,7 +162,7 @@ static inline void store_fp_T(__m512 src_y, T* dstptr) {
   } else if constexpr (std::is_same_v<T, float>) {
     _mm512_storeu_ps(dstptr, src_y);
   } else {
-    static_assert(false);
+    assert(false);
   }
 }
 
@@ -811,31 +811,6 @@ inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dst
     }
     return BTLA_CODE::Success;
   }
-  return BTLA_CODE::NotSupport;
-}
-
-template <BTLA_DTYPE S4_T>
-static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, size_t elesize, int8_t* tmp,
-                                         size_t tmpsize) {
-  uint32_t mask = 0xf0f0f0f0;
-  auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
-  size_t ele256 = utils::padto_le(elesize, 256);
-  size_t ele64 = utils::padto_le(elesize, 64);
-  size_t i = 0;
-  constexpr int LoadMask64 = (1 << (64 / 8)) - 1;
-  for (; i < ele256; i += 256) {
-    convert_s4_s8_highbits(dstptr + i + 0, reinterpret_cast<int8_t*>(srcptr + i / 2 + 0), zmm_mask, LoadMask64);
-    convert_s4_s8_highbits(dstptr + i + 64, reinterpret_cast<int8_t*>(srcptr + i / 2 + 32), zmm_mask, LoadMask64);
-    convert_s4_s8_highbits(dstptr + i + 128, reinterpret_cast<int8_t*>(srcptr + i / 2 + 64), zmm_mask, LoadMask64);
-    convert_s4_s8_highbits(dstptr + i + 192, reinterpret_cast<int8_t*>(srcptr + i / 2 + 96), zmm_mask, LoadMask64);
-  }
-  if (i + 64 <= ele64) {
-    for (; i < ele64; i += 64) {
-      convert_s4_s8_highbits(dstptr + i, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
-    }
-  }
-  ref::decompress_s4_s8<S4_T>(srcptr + i / 2, dstptr + i, 1, elesize - i, 0, 0);
-  return BTLA_CODE::Success;
   return BTLA_CODE::NotSupport;
 }
 
@@ -1494,63 +1469,6 @@ static inline BTLA_CODE alphabeta_f32_f32(const float alpha, const float* srcptr
     }
   }
   return BTLA_CODE::Success;
-}
-
-template <BTLA_DTYPE S4_T, typename _DST_T>
-inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                           int ld_dst, int8_t* tmp, size_t tmpsize) {
-  uint32_t mask = 0xf0f0f0f0;
-  auto zmm_mask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
-  if (col == ld_src) {
-    size_t elesize = (size_t)row * col;
-    size_t ele256 = utils::padto_le(elesize, 256);
-    size_t ele64 = utils::padto_le(elesize, 64);
-    assert(tmpsize >= 256);
-    size_t i = 0;
-    constexpr int LoadMask64 = (1 << (64 / 8)) - 1;
-    for (; i < ele256; i += 256) {
-      convert_s4_s8_highbits(tmp + 0, reinterpret_cast<int8_t*>(srcptr + i / 2 + 0), zmm_mask, LoadMask64);
-      convert_s4_s8_highbits(tmp + 64, reinterpret_cast<int8_t*>(srcptr + i / 2 + 32), zmm_mask, LoadMask64);
-      convert_s4_s8_highbits(tmp + 128, reinterpret_cast<int8_t*>(srcptr + i / 2 + 64), zmm_mask, LoadMask64);
-      convert_s4_s8_highbits(tmp + 192, reinterpret_cast<int8_t*>(srcptr + i / 2 + 96), zmm_mask, LoadMask64);
-      for (size_t j = 0; j < 256; j += 16) {
-        convert_s8_fp_v16(dstptr + i + j, tmp + j);
-      }
-    }
-    if (i + 64 <= ele64) {
-      for (; i < ele64; i += 64) {
-        convert_s4_s8_highbits(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), zmm_mask, LoadMask64);
-        for (size_t j = 0; j < 64; j += 16) {
-          convert_s8_fp_v16(dstptr + i + j, tmp + j);
-        }
-      }
-    }
-    ref::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr + i / 2, dstptr + i, 1, elesize - i, 0, 0, tmp, tmpsize);
-    return BTLA_CODE::Success;
-  }
-  return BTLA_CODE::NotSupport;
-}
-
-template <typename DST_T>
-inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int row, int col, int ld_src, int ld_dst) {
-  if (col == ld_src) {
-    size_t elesize = (size_t)row * col;
-    size_t ele64 = utils::padto_le(elesize, 64);
-    size_t i = 0;
-    if (i + 64 <= ele64) {
-      for (; i < ele64; i += 64) {
-        for (size_t j = 0; j < 64; j += 16) {
-          convert_s8_fp_v16(dstptr + i + j, srcptr + i + j);
-        }
-      }
-    }
-    for (; i < elesize; i += 1) {
-      auto tmp = srcptr[i];
-      dstptr[i] = static_cast<DST_T>(static_cast<float>(tmp));
-    }
-    return BTLA_CODE::Success;
-  }
-  return BTLA_CODE::NotSupport;
 }
 
 template <typename SCA_T>
@@ -2789,7 +2707,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           }
         }
       } else {
-        static_assert(0);
+        assert(0);
       }
     }
     return BTLA_CODE::Success;
@@ -2883,7 +2801,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           }
         }
       } else {
-        static_assert(0);
+        assert(0);
       }
     }
     return BTLA_CODE::Success;
@@ -2961,7 +2879,7 @@ static inline __m512 load_T_fp32(const T* srcptr) {
   } else if constexpr (std::is_same_v<T, utils::bf16>) {
     vtmp = load_bf16_fp32(srcptr);
   } else {
-    static_assert(0);
+    assert(0);
   }
   return vtmp;
 }

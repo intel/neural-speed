@@ -1170,9 +1170,8 @@ class UT_ORT_NBits {
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), isasym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher =
-        wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
-                                      prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::CompFp32BlockEpilogue,
-                                      epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
+                                    prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
     Launcher launcher;
     const char *qfile = "int_weight.bin", *sfile = "scales.bin", *zfile = "zeros.bin";
@@ -1223,13 +1222,7 @@ class UT_ORT_NBits {
     buffer_error(matBf32.data(), revB.data(), revB.size(), FP32_ERR);
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), revB.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
-    typename Launcher::Param args{
-        gp,
-        {matAf32.data(), k, &rA},
-        {&packedw},
-        {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep(),
-         isasym ? packedw.template ZPtr<int8_t>() : nullptr, rA.template RPtr<float>(), rA.lda},
-        {matC.data(), n}};
+    typename Launcher::Param args{gp, {matAf32.data(), k, &rA}, {&packedw}, {matC.data(), n}};
     if (isasym) {
       parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
     } else {

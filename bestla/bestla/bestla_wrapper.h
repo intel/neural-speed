@@ -175,7 +175,7 @@ class LauncherBase {
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        utils::GemvParamB<ScaleT> paramB = SNbits::createB<ScaleT>(_param.paramB.packedW);
+        utils::GemvParamB<ScaleT> paramB = SNbits::template createB<ScaleT>(_param.paramB.packedW);
         const float* Aptr = _param.paramA.A;
         if constexpr (std::is_same_v<PrologueA,
                                      prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
@@ -188,7 +188,7 @@ class LauncherBase {
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
         auto Cptr = _param.paramC.C + _config.loc[1];
-        SNbits::updateBNStep<ScaleT>(paramB, _config.loc[1]);
+        SNbits::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
@@ -198,7 +198,7 @@ class LauncherBase {
           }
 
           Cptr += GemmCore::NTILE;
-          SNbits::updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
+          SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
           if constexpr (std::is_same_v<AType, float>) {
@@ -429,7 +429,7 @@ class LauncherIntKBlock {
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        utils::GemvParamB<ScaleT> paramB = SNbits::createB<ScaleT>(_param.paramB.packedW);
+        utils::GemvParamB<ScaleT> paramB = SNbits::template createB<ScaleT>(_param.paramB.packedW);
         utils::GemvParamA paramA{
             _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
             _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
@@ -439,7 +439,7 @@ class LauncherIntKBlock {
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
         auto Cptr = _param.paramC.C + _config.loc[1];
-        SNbits::updateBNStep<ScaleT>(paramB, _config.loc[1]);
+        SNbits::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
@@ -452,7 +452,7 @@ class LauncherIntKBlock {
           }
 
           Cptr += GemmCore::NTILE;
-          SNbits::updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
+          SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
           if constexpr (std::is_same_v<AType, uint8_t>) {

@@ -103,7 +103,7 @@ static inline __m256 load_T_fp32(const T* srcptr) {
   } else if constexpr (std::is_same_v<T, utils::bf16>) {
     vtmp = load_bf16_fp32(srcptr);
   } else {
-    static_assert(0);
+    static_assert(std::is_same_v<T, float> || std::is_same_v<T, utils::bf16>);
   }
   return vtmp;
 }
@@ -122,7 +122,7 @@ static inline void store_fp_T(__m256 src_y, T* dstptr) {
   } else if constexpr (std::is_same_v<T, float>) {
     _mm256_storeu_ps(dstptr, src_y);
   } else {
-    static_assert(false);
+    static_assert(std::is_same_v<T, utils::bf16> || std::is_same_v<T, float>);
   }
 }
 
@@ -133,7 +133,7 @@ static inline void convert_s8_fp_v8(T* dstptr, int8_t* srcptr) {
 }
 
 template <bool IsAsym = false>
-static inline __m256 dequant_s8_fp(int8_t* srcptr, __m256 vscales, __m256i vzps = {0}) {
+static inline __m256 dequant_s8_fp(int8_t* srcptr, __m256 vscales, __m256i vzps = __m256i()) {
   auto src_s32_y = load_s8_s32(srcptr);
   if constexpr (IsAsym) src_s32_y = _mm256_sub_epi32(src_s32_y, vzps);
   auto src_fp_y = _mm256_cvtepi32_ps(src_s32_y);
@@ -1115,30 +1115,6 @@ static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::b
   return BTLA_CODE::Success;
 }
 
-template <BTLA_DTYPE S4_T, typename _DST_T>
-inline BTLA_CODE decompress_kblock_s4_s8fp(utils::int4x2* srcptr, _DST_T* dstptr, int row, int col, int ld_src,
-                                           int ld_dst, int8_t* tmp, size_t tmpsize) {
-  uint32_t mask = 0x0f0f0f0f;
-  auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
-  if (col == ld_src) {
-    size_t elesize = static_cast<size_t>(row) * col;
-
-    size_t velt = utils::padto_le(elesize, 32);
-    size_t i = 0;
-    assert(tmpsize >= 32);
-    for (; i < velt; i += 32) {
-      convert_s4_s8_N_avx2<32, S4_T>(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
-      convert_s8_fp_v8(dstptr + i, tmp);
-      convert_s8_fp_v8(dstptr + i + 8, tmp + 8);
-      convert_s8_fp_v8(dstptr + i + 16, tmp + 16);
-      convert_s8_fp_v8(dstptr + i + 24, tmp + 24);
-    }
-    ref::decompress_kblock_s4_s8fp<S4_T, _DST_T>(srcptr + i / 2, dstptr + i, 1, elesize - i, 0, 0, tmp, tmpsize);
-    return BTLA_CODE::Success;
-  }
-  return BTLA_CODE::Success;
-}
-
 template <bool WITH_SCALE, typename _DST_T, int _PACK_ROW, typename _S_T>
 inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int row, int col, int ld_src, int ld_dst,
                                          _S_T* scales, int k_offset, int kblock, int NPad, BTLA_DTYPE src_f8_type) {
@@ -1204,25 +1180,6 @@ inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstptr, int 
   return BTLA_CODE::Success;
 }
 
-template <typename DST_T>
-inline BTLA_CODE decompress_kblock_s8_s8fp(int8_t* srcptr, DST_T* dstptr, int row, int col, int ld_src, int ld_dst) {
-  if (col == ld_src) {
-    size_t elesize = (size_t)row * col;
-    size_t ele64 = utils::padto_le(elesize, 64);
-    size_t i = 0;
-    if (i + 64 <= ele64) {
-      for (; i < ele64; i += 64) {
-        for (size_t j = 0; j < 64; j += 8) {
-          convert_s8_fp_v8(dstptr + i + j, srcptr + i + j);
-        }
-      }
-    }
-    ref::decompress_kblock_s8_s8fp<DST_T>(srcptr + i, dstptr + i, 1, elesize - i, 0, 0);
-    return BTLA_CODE::Success;
-  }
-  return BTLA_CODE::NotSupport;
-}
-
 template <typename SCA_T>
 static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* srcptr, const int srcstep, float* dstptr,
                                              const int dststep, const int M, const int N) {
@@ -1286,41 +1243,6 @@ static inline void dequant_f4_N(_DST_T* dstptr, int8_t* srcptr, __m256* vscales,
   }
 }
 
-template <BTLA_DTYPE F4_T, typename DST_T>
-inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dstptr, int row, int col, int ld_src,
-                                                 int ld_dst, int8_t* tmp, size_t tmpsize) {
-  uint32_t mask = 0x0f0f0f0f;
-  auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
-  float* LUT;
-  static_assert(F4_T == BTLA_DTYPE::F4_BNB || F4_T == BTLA_DTYPE::F4_NF4 || F4_T == BTLA_DTYPE::F4_E2M1,
-                "Unsupported F4 type");
-  if constexpr (F4_T == BTLA_DTYPE::F4_BNB) {
-    LUT = fp4_bnb_dequant_fp32_LUT;
-  } else if constexpr (F4_T == BTLA_DTYPE::F4_NF4) {
-    LUT = nf4_dequant_fp32_LUT;
-  } else if constexpr (F4_T == BTLA_DTYPE::F4_E2M1) {
-    LUT = fp4_e2m1_dequant_fp32_LUT;
-  }
-  auto vLutL = _mm256_loadu_ps(LUT);
-  auto vLutH = _mm256_loadu_ps(LUT + 8);
-  if (col == ld_src) {
-    size_t elesize = static_cast<size_t>(row) * col;
-    size_t velt = utils::padto_le(elesize, 32);
-    size_t i = 0;
-    assert(tmpsize >= 32);
-    for (; i < velt; i += 32) {
-      convert_s4_s8_N_avx2<32, F4_T>(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
-      dequant_f4_N<32, DST_T, F4_T, false>(dstptr + i, tmp, nullptr, vLutL, vLutH);
-    }
-    for (; i < elesize; i += 2) {
-      auto tmp = srcptr[i / 2];
-      dstptr[i + 0] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.x));
-      dstptr[i + 1] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.y));
-    }
-    return BTLA_CODE::Success;
-  }
-  return BTLA_CODE::Success;
-}
 
 template <int N, BTLA_DTYPE QT_T>
 static inline void convert_s4_s8_N_avx2(int8_t* dstptr, int8_t* srcptr, __m256i mask) {
@@ -1358,6 +1280,43 @@ static inline void convert_s4_s8_N_avx2(int8_t* dstptr, int8_t* srcptr, __m256i 
     memcpy(dstptr, temp, N);
   }
 }
+
+template <BTLA_DTYPE F4_T, typename DST_T>
+inline BTLA_CODE decompress_kblock_f4_fp_noscale(utils::f4x2* srcptr, DST_T* dstptr, int row, int col, int ld_src,
+                                                 int ld_dst, int8_t* tmp, size_t tmpsize) {
+  uint32_t mask = 0x0f0f0f0f;
+  auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
+  float* LUT;
+  static_assert(F4_T == BTLA_DTYPE::F4_BNB || F4_T == BTLA_DTYPE::F4_NF4 || F4_T == BTLA_DTYPE::F4_E2M1,
+                "Unsupported F4 type");
+  if constexpr (F4_T == BTLA_DTYPE::F4_BNB) {
+    LUT = fp4_bnb_dequant_fp32_LUT;
+  } else if constexpr (F4_T == BTLA_DTYPE::F4_NF4) {
+    LUT = nf4_dequant_fp32_LUT;
+  } else if constexpr (F4_T == BTLA_DTYPE::F4_E2M1) {
+    LUT = fp4_e2m1_dequant_fp32_LUT;
+  }
+  auto vLutL = _mm256_loadu_ps(LUT);
+  auto vLutH = _mm256_loadu_ps(LUT + 8);
+  if (col == ld_src) {
+    size_t elesize = static_cast<size_t>(row) * col;
+    size_t velt = utils::padto_le(elesize, 32);
+    size_t i = 0;
+    assert(tmpsize >= 32);
+    for (; i < velt; i += 32) {
+      convert_s4_s8_N_avx2<32, F4_T>(tmp, reinterpret_cast<int8_t*>(srcptr + i / 2), vmask);
+      dequant_f4_N<32, DST_T, F4_T, false>(dstptr + i, tmp, nullptr, vLutL, vLutH);
+    }
+    for (; i < elesize; i += 2) {
+      auto tmp = srcptr[i / 2];
+      dstptr[i + 0] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.x));
+      dstptr[i + 1] = static_cast<DST_T>(ref::f4_unpack<F4_T>(tmp.y));
+    }
+    return BTLA_CODE::Success;
+  }
+  return BTLA_CODE::Success;
+}
+
 
 template <BTLA_DTYPE QT_T, bool _IS_SYM, int _NCOL, typename _ST, typename _DST_T>
 static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _DST_T* dstptr, int row, int col,
@@ -1563,7 +1522,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           }
         }
       } else {
-        static_assert(0);
+        assert(0);
       }
     }
     return BTLA_CODE::Success;
@@ -1661,7 +1620,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           }
         }
       } else {
-        static_assert(0);
+        assert(0);
       }
     }
     return BTLA_CODE::Success;
@@ -3635,7 +3594,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
-}  // namespace avx_vnni
+}  // namespace vnni
 
 #ifdef __GNUC__
 #pragma GCC pop_options

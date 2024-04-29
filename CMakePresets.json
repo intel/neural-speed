@@ -8,7 +8,13 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NS_PROFILING": "ON",
+        "NS_USE_OMP": "ON",
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_BENCHMARK": "ON"
+      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
