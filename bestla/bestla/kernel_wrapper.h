@@ -306,12 +306,13 @@ class QuantizeSignIntRowBlock {
   template <BTLA_ISA ISA_T, BTLA_DTYPE QDT_T>
   static inline BTLA_CODE forward(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
                                   float* scales, int8_t* zero_points, int blocksize) {
-//#if CompileAVX512F()
-//    if constexpr (utils::isa_base<ISA_T>::avx512f) {
-//      return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
-//                                                            zero_points, blocksize);
-//    }
-//#endif
+    // TODO(Yu) simd version for quick quant
+    // #if CompileAVX512F()
+    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
+    //       return avx512f::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+    //                                                             zero_points, blocksize);
+    //     }
+    // #endif
     return ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
                                                       blocksize);
   }
@@ -417,8 +418,8 @@ class DecompressKBlockS4S8 {
                                   int n_offset, int k_offset, int row, int col, void* tmp, size_t tmpsize) {
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return avx512f::decompress_kblock_s4_s8<PackRow, NTILE>(srcptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset,
-                                                           row, col, (int8_t*)tmp, tmpsize);
+      return avx512f::decompress_kblock_s4_s8<PackRow, NTILE>(srcptr, zpptr, dstptr, blocksize, ldzp, n_offset,
+                                                              k_offset, row, col, (int8_t*)tmp, tmpsize);
     }
 #endif
 #if CompileAVX2()
@@ -456,6 +457,12 @@ class DecompressKBlockS2S8 {
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(utils::bit2x4* b2ptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                   int n_offset, int k_offset, int row, int col, void* tmp, size_t tmpsize) {
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::decompress_kblock_s2_s8<PackRow, NTILE>(b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset,
+                                                              row, col, (int8_t*)tmp, tmpsize);
+    }
+#endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_s2_s8<PackRow, NTILE>(b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset,
@@ -477,9 +484,9 @@ class DecompressKBlockS8Fp {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      ret = avx512f::decompress_kblock_s8_fp<PackRow, NTILE, DstT>(srcptr, dstptr, row, col, scales, sdtype, zero_points,
-                                                                k_offset, n_offset, kblock, NPad,
-                                                                reinterpret_cast<int8_t*>(tmp), tmpsize);
+      ret = avx512f::decompress_kblock_s8_fp<PackRow, NTILE, DstT>(srcptr, dstptr, row, col, scales, sdtype,
+                                                                   zero_points, k_offset, n_offset, kblock, NPad,
+                                                                   reinterpret_cast<int8_t*>(tmp), tmpsize);
       if (ret == BTLA_CODE::Success) return ret;
     }
 #endif
@@ -561,6 +568,15 @@ class DecompressKBlockS2Fp {
                                   int8_t* zero_points, int k_offset, int n_offset, int kblock, int NPad, void* tmp,
                                   size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
+#if CompileAVX512F()
+    // AVX2 device only focus on fp32 data and layout
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      ret = avx512f::decompress_kblock_s2_fp<PackRow, NTILE, DstT>(b2ptr, dstptr, row, col, scales, sdtype, zero_points,
+                                                                   k_offset, n_offset, kblock, NPad,
+                                                                   reinterpret_cast<int8_t*>(tmp), tmpsize);
+      if (ret == BTLA_CODE::Success) return ret;
+    }
+#endif
 #if CompileAVX2()
     // AVX2 device only focus on fp32 data and layout
     if constexpr (utils::isa_base<ISA_T>::avx2) {
@@ -576,7 +592,6 @@ class DecompressKBlockS2Fp {
     return ret;
   }
 };
-
 
 template <typename _DST_T, int _PACK_ROW>
 class DecompressKBlockF4Fp {
