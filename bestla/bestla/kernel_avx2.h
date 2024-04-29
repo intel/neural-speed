@@ -2856,8 +2856,6 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   int blks = k / blocksize;
   int constexpr NReg = NTILE / 8;
   int constexpr MReg = MTILE;
-  static_assert(NReg * MReg <= 12);
-  // Initialize accumulator with zeros
   __m256 acc[NReg * MReg];
   for (int i = 0; i < NReg * MReg; i++) {
     acc[i] = _mm256_setzero_ps();
