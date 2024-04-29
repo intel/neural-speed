@@ -32,9 +32,9 @@ class UT_Threading {
  public:
   static bestla::parallel::IThreading* get() {
 #if BTLA_OPENMP
-    static bestla::parallel::OMPThreading DefaultThreading(4);
+    static bestla::parallel::OMPThreading DefaultThreading;
 #else
-    static bestla::parallel::StdThreading DefaultThreading(4);
+    static bestla::parallel::StdThreading DefaultThreading;
 #endif  // _OPNEMP
     return &DefaultThreading;
   }

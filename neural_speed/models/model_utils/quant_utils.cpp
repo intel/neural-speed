@@ -227,11 +227,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
                     const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
-#ifdef __OPENMP
-  bestla::parallel::OMPThreading threading(nthread);
-#else
-  bestla::parallel::StdThreading threading(nthread);
-#endif
+  bestla_set_threads(nthread);
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
     quant_type = BTLA_DTYPE::S8;
@@ -260,7 +256,7 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
   if (size) {
     if (!BTLAGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
-                       params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
+                       params.alg == quant_alg::asym, ctype, g_idx, bestla_get_thread_handle())) {
       printf("Failed to quant this weight\n");
       return 0;
     }

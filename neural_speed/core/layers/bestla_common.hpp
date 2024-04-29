@@ -27,9 +27,9 @@ class ne_threading {
  public:
   static bestla::parallel::IThreading* get() {
     GetCPUDevice();
-    static bestla::parallel::StdThreading OptmizedThreading(4);
+    static bestla::parallel::StdThreading OptmizedThreading;
 #ifdef NS_USE_OMP
-    static bestla::parallel::OMPThreading DefaultThreading(4);
+    static bestla::parallel::OMPThreading DefaultThreading;
     if (!_cd->isHybrid()) {
       return &DefaultThreading;
     }

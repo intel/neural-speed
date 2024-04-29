@@ -29,7 +29,7 @@ using thread_func = std::function<void(int tid)>;
 
 class IThreading {
  public:
-  explicit IThreading(int nthreads, bool supportPE) : mThreadNum(nthreads), isSupportPE(supportPE) {}
+  explicit IThreading(bool supportPE) : isSupportPE(supportPE) {}
 
   // equal to "for(int i=begin1;i<end1;i+=step1)"
   void parallel_for_collapse(const int& begin1, const int& end1, const int& step1,
@@ -75,10 +75,8 @@ class IThreading {
 #if BTLA_OPENMP
 class OMPThreading : public IThreading {
  public:
-  explicit OMPThreading(int nthreads) : IThreading(nthreads, false) {
-    // printf("Using OMP\n");
-    omp_set_num_threads(nthreads);
-  }
+  explicit OMPThreading() : IThreading(false) {}
+
   void parallel_for(const thread_func& func) override {
     if (mThreadNum > 1) {
 #pragma omp parallel
@@ -109,11 +107,8 @@ class OMPThreading : public IThreading {
 class StdThreading : public IThreading {
  public:
   using Timer_T = utils::timer<utils::microseconds>;
-  explicit StdThreading(int nthreads) : IThreading(nthreads, true) {
-    // printf("Using Std\n");
-    cr = &device::CpuRuntime::getInstance(nthreads);
-    create_threads();
-  }
+  explicit StdThreading() : IThreading(true) { cr = nullptr; }
+
   void parallel_for(const thread_func& func) override {
     time_per_p = 0;
     time_per_e = 0;
@@ -202,10 +197,8 @@ class StdThreading : public IThreading {
     stop = 1;
     for (int i = 0; i < mThreadNum - 1; i++) thdset[i].join();
     thdset.clear();
-    // printf("stop %d\n", mThreadNum);
   }
   void create_threads() {
-    // printf("create %d\n", mThreadNum);
     thdset.resize(mThreadNum - 1);
     stop = 0;
     GetCPUDevice();
@@ -282,7 +275,8 @@ class StdThreading : public IThreading {
 
 class SingleThread : public IThreading {
  public:
-  SingleThread() : IThreading(1, false) {}
+  SingleThread() : IThreading(false) { mThreadNum = 1;
+  }
 
   void set_threads(int nthreads) override {
     assert(0);
