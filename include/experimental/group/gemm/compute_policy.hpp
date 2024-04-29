@@ -77,19 +77,7 @@ struct compute_policy_int4_dequantize<
   using dtype_mma_a = typename compute_attr::dtype_a;
   using dtype_mma_b = typename compute_attr::dtype_b;
 
-  static constexpr uint32_t block_bytes_x_a = 32;
-  static constexpr uint32_t block_size_y_a = 16;
-
   static constexpr bool is_int4_matB_policy = true;
-
-  static constexpr uint32_t block_size_x_b = (mma_engine == mma_engine::xmx)
-      ? arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem
-      : 32;
-  static constexpr uint32_t block_bytes_y_b = 32;
-  static_assert(
-      block_bytes_x_a == block_bytes_y_b,
-      "mat_a x need to match with mat_b y");
-
   static constexpr uint32_t dequant_s = dequant_s_;
   static_assert(
       (dequant_s % (32 / sizeof(dtype_mma_b))) == 0,
@@ -97,6 +85,22 @@ struct compute_policy_int4_dequantize<
   using dtype_scale = dtype_scale_;
   using dtype_zero_pt = dtype_zero_pt_;
   static constexpr quant_mode quant_type = quant_type_;
+
+  static constexpr uint32_t block_bytes_x_a = 32;
+  static constexpr uint32_t block_size_x_a =
+      block_bytes_x_a / sizeof(dtype_mma_a);
+  static constexpr uint32_t block_size_y_a = 16;
+
+  static constexpr uint32_t block_size_x_b = (mma_engine == mma_engine::xmx)
+      ? arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem
+      : 64;
+  static constexpr uint32_t block_bytes_y_b = 32;
+  static constexpr uint32_t block_size_y_b =
+      block_bytes_y_b / sizeof(dtype_mma_b);
+
+  static_assert(
+      block_bytes_x_a == block_bytes_y_b,
+      "mat_a x need to match with mat_b y");
 };
 
 } // namespace gpu::xetla::group
