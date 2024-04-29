@@ -1014,6 +1014,10 @@ class GEMVWoqNBits {
       return ref::gemv_4bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     if (B.nbits == 3) {
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_3bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp,
+                                                                  tmpsize);
+      }
       if (ISA_T >= BTLA_ISA::AVX2) {
         return avx2::gemv_3bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
