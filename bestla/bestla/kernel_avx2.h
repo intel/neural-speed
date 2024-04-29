@@ -839,7 +839,7 @@ static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* 
       vout = _mm256_sub_epi8(vout, vbias);
       _mm256_storeu_si256((__m256i*)(dstptr + i), vout);
     } else {
-      ref::decompress_s2_s8(bit2ptr + i / 4, dstptr + i, unpack_elt - i, tmp, tmpsize);
+      ref::decompress_s3_s8(bit2ptr + i / 4, bit1ptr + i / 8, dstptr + i, unpack_elt - i, tmp, tmpsize);
     }
   }
   return BTLA_CODE::Success;

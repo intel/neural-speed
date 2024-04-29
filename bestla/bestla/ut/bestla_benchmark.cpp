@@ -557,8 +557,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompFp32 sUTWOQ_CompFp32;
 #endif
+static UTWOQ_CompFp32 sUTWOQ_CompFp32;
 
 class UTWOQ_CompBf16 {
  public:
@@ -677,10 +677,9 @@ class UTWOQ_CompInt8 {
  public:
   UTWOQ_CompInt8() {
     UT_START();
+    ut_s2();
     ut_s4();
     ut_s3();
-    // ut_s4();
-    //
     //   ut_s8();
   }
 
