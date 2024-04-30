@@ -43,9 +43,13 @@ class UT_Threading {
 
   static std::vector<int> get_threads_config() {
     GetCPUDevice();
-    if (_cd->isHybrid()) {
-      return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+    if (_cd->isClient()) {
+      if (_cd->isHybrid()) {
+        return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+      }
+      return std::vector<int>{_cd->getCores() * 2, _cd->getCores()};
     }
+
     if (_cd->getThreads() == 56) {
       return std::vector<int>{48, 56};
     }

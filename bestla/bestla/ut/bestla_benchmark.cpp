@@ -557,8 +557,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompFp32 sUTWOQ_CompFp32;
+#endif
 
 class UTWOQ_CompBf16 {
  public:
@@ -696,8 +696,8 @@ class UTWOQ_CompInt8 {
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S3_CLIP, true);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S3_CLIP);
 
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S4_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S4_CLIP);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S3_CLIP);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S3_CLIP);
   }
 
   void ut_s4() {
@@ -811,6 +811,7 @@ class UTWOQ_CompInt8 {
 #endif
 static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 
+#if 0
 typedef struct {
   float d;             // delta
   uint8_t qs[32 / 2];  // nibbles / quants
@@ -823,6 +824,7 @@ typedef struct {
 #pragma GCC push_options
 #pragma GCC target("avx2", "fma", "f16c", "avxvnni")
 #endif
+#define __AVX2__
 // Unpack 32 4-bit fields into 32 bytes
 // The output vector contains 32 bytes, each one in [ 0 .. 15 ] interval
 static inline __m256i bytes_from_nibbles_32(const uint8_t* rsi) {
@@ -1173,7 +1175,7 @@ class UTWOQ_GGML {
     auto threads_cfg = UT_Threading::get_threads_config();
     for (auto threads : threads_cfg) {
       for (auto blocksize : {32}) {
-        if (_cd->AVX_VNNI()) {
+        if (_cd->AVX2()) {
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype);
           benchmark<gemm::ICoreRowNAvxvnniKBlock<48, 1>, LOG, Wei, Scale_T>(
@@ -1183,8 +1185,7 @@ class UTWOQ_GGML {
     }
   }
 };
-// static UTWOQ_GGML sUTWOQ_GGML;
-#if 0
+static UTWOQ_GGML sUTWOQ_GGML;
 #include "kernel_avx2.h"
 #define AVX_VNNI_ 1
 template <int NTILE, typename SBT>
