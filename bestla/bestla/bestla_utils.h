@@ -62,7 +62,9 @@
 // Only the ISA you use in your project will be compiled.
 #ifdef __GNUC__
 #define CompileAVX512F() (__GNUC__ >= 6)
+#define CompileAVX512VNNI() (__GNUC__ >= 9)
 #define CompileAVX2() (__GNUC__ >= 5)
+#define CompileAVXVNNI() (__GNUC__ >= 11)
 #define CompileAMX() (__GNUC__ >= 11)
 #define CompileBF16() (__GNUC__ >= 11)
 #define CompileFP16() (__GNUC__ >= 13)
@@ -72,20 +74,24 @@
 
 #if defined(_MSC_VER) && !defined(__INTEL_LLVM_COMPILER)
 #define CompileAVX512F() _MSC_VER && (_MSC_VER >= 1911)
+#define CompileAVX512VNNI() _MSC_VER && (_MSC_VER >= 1939)  // TODO(Yu) check the minimum version
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
-#define CompileAMX() 0
-#define CompileBF16() 0
-#define CompileFP16() 0
-#define CompileAMXBF16() 0
-#define CompileAMXINT8() 0
+#define CompileAVXVNNI() _MSC_VER && (_MSC_VER >= 1939)  // TODO(Yu) check the minimum version
+#define CompileAMX() _MSC_VER && (_MSC_VER >= 1939)      // TODO(Yu) check the minimum version
+#define CompileBF16() _MSC_VER && (_MSC_VER >= 1939)     // TODO(Yu) check the minimum version
+#define CompileFP16() _MSC_VER && (_MSC_VER >= 1939)     // TODO(Yu) check the minimum version
+#define CompileAMXBF16() (CompileAMX())
+#define CompileAMXINT8() (CompileAMX())
 #endif
 
 #if defined(_MSC_VER) && defined(__INTEL_LLVM_COMPILER)
 #define CompileAVX512F() defined(__AVX512F__)
+#define CompileAVX512VNNI() defined(__AVX512VNNI__)
 #define CompileAVX2() defined(__AVX2__) && defined(__F16C__) && defined(__FMA__)
-#define CompileAMX() 0
-#define CompileBF16() 0
-#define CompileFP16() 0
+#define CompileAVXVNNI() defined(__AVXVNNI__)
+#define CompileAMX() defined(__AMX_TILE__)
+#define CompileBF16() defined(__AVX512BF16__)
+#define CompileFP16() defined(__AVX512FP16__)
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
 #endif

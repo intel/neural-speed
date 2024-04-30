@@ -139,16 +139,20 @@ class LauncherBase {
       }
 
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX2) {
+#if CompileAVX2()
         static_assert(GemmCore::PACK_ROW == 1);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_FP32) {
           return true;
         }
+#endif
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX512F) {
+#if CompileAVX512F()
         static_assert(GemmCore::PACK_ROW == 1);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_FP32) {
           return true;
         }
+#endif
       }
       return false;
     }
@@ -380,6 +384,7 @@ class LauncherIntKBlock {
         return false;
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX_VNNI) {
+#if CompileAVXVNNI()
         static_assert(GemmCore::PACK_ROW == 4);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
           return true;
@@ -387,8 +392,10 @@ class LauncherIntKBlock {
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_SS_FP32) {
           return true;
         }
+#endif
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX2) {
+#if CompileAVX2()
         static_assert(GemmCore::PACK_ROW == 4);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
           return true;
@@ -396,8 +403,10 @@ class LauncherIntKBlock {
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_SS_FP32) {
           return true;
         }
+#endif
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX512_VNNI || GemmCore::ISA == BTLA_ISA::AMX_INT8) {
+#if CompileAVX512VNNI()
         static_assert(GemmCore::PACK_ROW == 4);
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
           return true;
@@ -405,6 +414,7 @@ class LauncherIntKBlock {
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_SS_FP32) {
           return true;
         }
+#endif
       }
       return false;
     }
