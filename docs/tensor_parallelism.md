@@ -87,23 +87,23 @@ make -j
 
 ```
 
-### Download the model weights and quantize to q4_0 format.
+### Download the model weights and quantize to q4_j format.
 First you should download and convert the model to f32 format. You can also quantize the model to q4_0 format, but it is optional.
 
 ```shell
-python scripts/convert.py --outtype f32 --outfile EleutherAI/gpt-j-6b
+python scripts/convert_llama.py --outtype f32 --outfile /path/to/your/ne-f32.bin /path/to/your/models--meta-llama--Llama-2-7b-hf
 ```
-Then quantize the model to q4_0 format(optional).
+Then quantize the model to q4_j format(optional).
 
 ```shell
-python scripts/quantize.py --model_name gptj --model_file /path/to/your/ne-f32.bin --out_file ne-q4_0.bin --weight_dtype int4
+./build/bin/quant_llama --model_file /path/to/your/ne-f32.bin --out_file ne-q4_j.bin --weight_dtype int4 --group_size 128 --scale_dtype fp32 --compute_dtype fp32 --alg sym
 ```
 
 ## Examples
 
 We can config the `mpirun` to start parallel programs. Here is an example about running tensor pallelsim on 2 sockets in CPU.
 ```shell
-mpirun -np 2 -bind-to=socket ./build/bin/main_gptj -m ne-q4_0.bin --seed 1234 -t 56 -c 68 -n 32 -p "Once upon a time, there existed a little girl, who liked to have adventures. She wanted to go to places and meet new people, and have fun." --no_mmap
+mpirun -np 2 -bind-to=socket ./build/bin/run_llama -m ne-q4_j.bin --seed 1234 -t 56 -c 68 -n 32 -p "Once upon a time, there existed a little girl, who liked to have adventures. She wanted to go to places and meet new people, and have fun."
 ```
 We only add `mpirun -np 2 -bind-to=socket` to the original command to enable 2 processes to run parallel. If you want to bind specific core to each process. You can write the original command to a shell script and use command like below.
 
@@ -111,4 +111,8 @@ We only add `mpirun -np 2 -bind-to=socket` to the original command to enable 2 p
 mpirun -n 1 taskset -c 0-47 sh run.sh : -n 1 taskset -c 48-95 sh run.sh
 
 ```
-**NOTICE**: tensor parallelsim strategy will split the model to specific node/socket, each device already use part of the original weights differently. So we should not use shared-memory of weights to avoid cross numa weight movement. Use option `--no-mmap` to disable shared weights between processes.
+The content in run.sh shows like this:
+```shell
+./build/bin/run_llama -m ne-q4_j.bin --seed 1234 -t 56 -c 68 -n 32 -p "Once upon a time, there existed a little girl, who liked to have adventures. She wanted to go to places and meet new people, and have fun."
+```
+Please make sure you use the right thread number on `-t` option, in our case we use `-t 56` means each instance will launch 56 threads. Make the threads equal to your core number for best performance.
