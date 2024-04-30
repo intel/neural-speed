@@ -78,8 +78,8 @@
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
 #define CompileAVXVNNI() _MSC_VER && (_MSC_VER >= 1930)  // TODO(Yu) check the minimum version
 #define CompileAMX() _MSC_VER && (_MSC_VER >= 1930)      // TODO(Yu) check the minimum version
-#define CompileBF16() _MSC_VER && (_MSC_VER >= 1930)     // TODO(Yu) check the minimum version
-#define CompileFP16() _MSC_VER && (_MSC_VER >= 1930)     // TODO(Yu) check the minimum version
+#define CompileBF16() _MSC_VER && (_MSC_VER >= 1938)     // TODO(Yu) check the minimum version
+#define CompileFP16() _MSC_VER && (_MSC_VER >= 1938)     // TODO(Yu) check the minimum version
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
 #endif
