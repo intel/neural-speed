@@ -1813,7 +1813,7 @@ static void ne_model_kv_cache_seq_cpy(struct model_context* ctx, const model_seq
   auto h_multi_query_group_num = ctx->model.hparams.multi_query_group_num;
   if (h_n_head_kv > 0) {
     n_head = h_n_head_kv;
-    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!h_multi_query_group_num > 0)));
+    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!(h_multi_query_group_num > 0))));
   } else if (h_multi_query_group_num > 0) {
     n_head = h_multi_query_group_num;
   } else {
@@ -1855,7 +1855,7 @@ static void bestla_model_kv_cache_seq_cpy(struct model_context* ctx, const model
   auto h_multi_query_group_num = hparams.multi_query_group_num;
   if (h_n_head_kv > 0) {
     heads_kv = h_n_head_kv;
-    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!h_multi_query_group_num > 0)));
+    MODEL_ASSERT(("Invalid: multi_query_group_num > 0 and n_head_kv >0 !\n", (!(h_multi_query_group_num > 0))));
   } else if (h_multi_query_group_num > 0) {
     heads_kv = h_multi_query_group_num;
   } else {
