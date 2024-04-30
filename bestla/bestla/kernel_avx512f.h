@@ -2594,7 +2594,7 @@ template <int PackRow, int NTILE>
 inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                          int n_offset, int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::int4x2 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -2816,7 +2816,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8(utils::bit2x4* bit2ptr, int8_t* 
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
                                                 size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -3074,7 +3074,7 @@ static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -4063,7 +4063,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
       }
     } else {
       for (int ik = 0; ik < blocksize; ik += KTILE) {
-        if constexpr (MTILE==1) {
+        if constexpr (MTILE == 1) {
           __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
           for (int i = 0; i < NReg; i++) {
             auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
@@ -4087,7 +4087,6 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
             b2ptr += VLen * KTILE / 4;
           }
         }
-        
       }
     }
 
@@ -4297,7 +4296,6 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
             b1ptr += VLen * KTILE / 8;
           }
         }
-        
       }
     }
 

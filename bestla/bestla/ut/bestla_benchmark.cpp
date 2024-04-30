@@ -696,8 +696,8 @@ class UTWOQ_CompInt8 {
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S3_CLIP, true);
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S3_CLIP);
 
-    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S3_CLIP);
-    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S3_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S3_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S3_CLIP);
   }
 
   void ut_s4() {
