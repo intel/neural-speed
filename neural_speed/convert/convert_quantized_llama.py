@@ -69,8 +69,8 @@ def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_hea
 
     weight_dtype = "int8"
     if q_config['bits'] == 4:
-        int_weight = (int_weight - 8) 
-        gptq_scales = gptq_scales 
+        int_weight = (int_weight - 8)
+        gptq_scales = gptq_scales
         gptq_zeros = (gptq_zeros - 8)
         weight_dtype = "int4"
 

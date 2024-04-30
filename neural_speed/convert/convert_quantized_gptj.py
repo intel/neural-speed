@@ -63,7 +63,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     weight_dtype = "int8"
     if q_config['bits'] == 4:
         int_weight = (int_weight - 8)
-        gptq_scales = gptq_scales 
+        gptq_scales = gptq_scales
         gptq_zeros = (gptq_zeros - 8)
         weight_dtype = "int4"
     elif q_config['bits'] == 3:

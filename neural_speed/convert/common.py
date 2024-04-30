@@ -684,7 +684,7 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
     write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
 
     if q_config['bits'] == 4:
-        int_weight = (int_weight - 8) 
+        int_weight = (int_weight - 8)
         gptq_scales = gptq_scales
         gptq_zeros = (gptq_zeros - 8)
     dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
@@ -760,10 +760,10 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     if q_config['bits'] == 4:
         int_weight = (int_weight - 8)
         gptq_scales = gptq_scales
-        gptq_zeros = (gptq_zeros - 8) 
+        gptq_zeros = (gptq_zeros - 8)
         weight_dtype = "int4"
     elif q_config['bits'] == 3:
-        int_weight = (int_weight - 4) 
+        int_weight = (int_weight - 4)
         gptq_scales = gptq_scales
         gptq_zeros = (gptq_zeros - 4)
         weight_dtype = "int3"
