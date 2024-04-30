@@ -42,7 +42,7 @@ class AccumulatorWriteBack {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto cptr = _param.C + COffset;
     if constexpr (std::is_same_v<_SRC_T, DType>) {
-      if (cacheptr == _param.C) {
+      if (cacheptr == cptr) {
         return BTLA_CODE::Success;
       }
     }
