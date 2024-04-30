@@ -49,18 +49,10 @@ from lm_eval.models.utils import (
     pad_and_concat,
     stop_sequences_criteria,
 )
-from intel_extension_for_transformers.transformers import (
-    AutoModelForCausalLM,
-    AutoModelForSeq2SeqLM,
-    AutoModel,
-)
 from packaging.version import Version
 
 eval_logger = utils.eval_logger
-import transformers
-transformers.AutoModelForCausalLM = AutoModelForCausalLM
-transformers.AutoModelForSeq2SeqLM = AutoModelForSeq2SeqLM
-transformers.AutoModel = AutoModel
+from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoModel
 
 
 def _get_accelerate_args(
@@ -587,9 +579,6 @@ class HFLM(TemplateLM):
                         model_kwargs["bnb_4bit_compute_dtype"] = get_dtype(
                             model_kwargs["bnb_4bit_compute_dtype"]
                         )
-            from intel_extension_for_transformers.transformers import (
-                AutoModelForCausalLM,
-            )
 
             if self.model_format == "neural_speed":
                 from neural_speed import Model
