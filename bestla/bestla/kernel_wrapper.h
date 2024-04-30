@@ -959,6 +959,11 @@ class GEMVWoqNBits {
         return avx2::vnni::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
 #endif
+#if CompileAVX2()
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
       return ref::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     if (B.nbits == 2) {
@@ -971,6 +976,11 @@ class GEMVWoqNBits {
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_2bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
+#if CompileAVX2()
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_2bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
 #endif
       return ref::gemv_2bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
