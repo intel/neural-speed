@@ -477,8 +477,8 @@ class LauncherIntKBlock {
                    (_config.size[1] - in) * sizeof(CType));
           }
         }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], _param.paramC.ldc, 0, _config.loc[1], MTILE, _config.size[1],
-                          _param.paramC, StackTmp, TmpSize);
+        Epilogue::forward(_param.paramC.C + _config.loc[1], _param.paramC.ldc, 0, _config.loc[1], MTILE,
+                          _config.size[1], _param.paramC, StackTmp, TmpSize);
       }
     }
 
