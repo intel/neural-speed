@@ -275,8 +275,7 @@ class StdThreading : public IThreading {
 
 class SingleThread : public IThreading {
  public:
-  SingleThread() : IThreading(false) { mThreadNum = 1;
-  }
+  SingleThread() : IThreading(false) { mThreadNum = 1; }
 
   void set_threads(int nthreads) override {
     assert(0);
