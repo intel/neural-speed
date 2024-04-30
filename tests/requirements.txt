@@ -1,5 +1,5 @@
 gguf
+lm_eval==0.4.2
 modelscope==1.13.1
 optimum==1.13.2
 optimum-intel==1.11.0
-lm_eval==0.4.2

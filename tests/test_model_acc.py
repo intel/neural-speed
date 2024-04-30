@@ -32,7 +32,7 @@ class TestLLMRUNTIME(unittest.TestCase):
 
     def test_ns_acc(self):
         os.system("numactl -l -C 0-55 python ../scripts/cal_acc.py --model_name /tf_dataset2/models/nlp_toolkit/llama-2-7b-chat/Llama-2-7b-chat-hf --weight_dtype int4 --group_size 32 --compute_dtype int8 --tasks piqa")
-        
+
 
 
 if __name__ == "__main__":
