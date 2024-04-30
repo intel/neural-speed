@@ -74,12 +74,12 @@
 
 #if defined(_MSC_VER) && !defined(__INTEL_LLVM_COMPILER)
 #define CompileAVX512F() _MSC_VER && (_MSC_VER >= 1911)
-#define CompileAVX512VNNI() _MSC_VER && (_MSC_VER >= 1939)  // TODO(Yu) check the minimum version
+#define CompileAVX512VNNI() _MSC_VER && (_MSC_VER >= 1930)  // TODO(Yu) check the minimum version
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
-#define CompileAVXVNNI() _MSC_VER && (_MSC_VER >= 1939)  // TODO(Yu) check the minimum version
-#define CompileAMX() _MSC_VER && (_MSC_VER >= 1939)      // TODO(Yu) check the minimum version
-#define CompileBF16() _MSC_VER && (_MSC_VER >= 1939)     // TODO(Yu) check the minimum version
-#define CompileFP16() _MSC_VER && (_MSC_VER >= 1939)     // TODO(Yu) check the minimum version
+#define CompileAVXVNNI() _MSC_VER && (_MSC_VER >= 1930)  // TODO(Yu) check the minimum version
+#define CompileAMX() _MSC_VER && (_MSC_VER >= 1930)      // TODO(Yu) check the minimum version
+#define CompileBF16() _MSC_VER && (_MSC_VER >= 1930)     // TODO(Yu) check the minimum version
+#define CompileFP16() _MSC_VER && (_MSC_VER >= 1930)     // TODO(Yu) check the minimum version
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
 #endif
