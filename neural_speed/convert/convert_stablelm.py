@@ -20,6 +20,7 @@
 # This script is similar to "convert-pt-to-ne.py"
 #
 import os
+import sys
 import struct
 import numpy as np
 from pathlib import Path
@@ -27,6 +28,7 @@ import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 import gguf
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
@@ -51,26 +53,50 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
+
+def stack_qk_norm(block_count, name, n_head, norms, n_dims, ftype, layer_name="q_layernorm"):
+    for bid in range(block_count):
+        datas = []
+        for xid in range(n_head):
+            ename = f"model.layers.{bid}.self_attn.{layer_name}.norms.{xid}.weight"
+            print(f"-----> Merging Tensor {ename} with shape {norms[ename].shape} <-----")
+            datas.append(norms[ename])
+            del norms[ename]
+        data = np.stack(datas, axis=0)
+        data_dtype = data.dtype
+        merged_name = f"model.layers.{bid}.self_attn.{layer_name}.weight"
+
+        if ftype == 1 and data_dtype == np.float16 and (n_dims == 1 or merged_name.endswith("_norm.weight")):
+            data = data.astype(np.float32)
+        if ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and not merged_name.endswith("_norm.weight") and n_dims == 2:
+            data = data.astype(np.float16)
+
+        return merged_name, data
+
+
 def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("stablelm.gguf converting: ")
     list_vars = model.state_dict()
+    n_head = hparams["num_attention_heads"]
+    n_kv_head = hparams["num_key_value_heads"]
+    block_count = hparams["num_hidden_layers"]
     n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     for name in list_vars.keys():
         print(name, list_vars[name].shape, list_vars[name].dtype)
 
     print(hparams)
 
-    gguf_file = fname_out + '.gguf'
+    gguf_file = fname_out + '.gguf' if not fname_out.endswith(".gguf") else fname_out
     gguf_writer = gguf.GGUFWriter(gguf_file, "stablelm")
 
     gguf_writer.add_uint32('magic', 0x67676d66)
     gguf_writer.add_uint32('version', 1)
     gguf_writer.add_uint32('n_vocab', hparams["vocab_size"])
     gguf_writer.add_embedding_length(hparams["hidden_size"])
-    gguf_writer.add_head_count(hparams["num_attention_heads"])
-    gguf_writer.add_head_count_kv(hparams["num_key_value_heads"])
+    gguf_writer.add_head_count(n_head)
+    gguf_writer.add_head_count_kv(n_kv_head)
 
-    gguf_writer.add_block_count(hparams["num_hidden_layers"])
+    gguf_writer.add_block_count(block_count)
     gguf_writer.add_rope_dimension_count(n_rot)
     gguf_writer.add_uint32('ftype', ftype)
     gguf_writer.add_context_length(hparams["max_position_embeddings"])
@@ -118,32 +144,48 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
 
     # tensor info
     print("gguf: get tensor metadata")
-    for name in list_vars.keys():
-        data = list_vars[name].squeeze().numpy()
+    q_norms, k_norms = dict(), dict()
+    for name, data_torch in list_vars.items():
+        # Convert any unsupported data types to float32
+        if data_torch.dtype not in (torch.float16, torch.float32):
+            data_torch = data_torch.to(torch.float32)
 
-        print("Processing variable: " + name + " with shape: ", data.shape)
-        if 'inv_freq' in name:
+        data = data_torch.squeeze().numpy()
+        # Skip some tensors
+        if name.endswith((".attention.rotary_emb.inv_freq")):
             continue
 
+        old_dtype = data.dtype
         n_dims = len(data.shape)
-
+        if name.find("q_layernorm.norms") != -1:
+            q_norms[name] = data
+            if len(q_norms) >= (block_count * n_head):
+                name, data = stack_qk_norm(block_count, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
+                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                gguf_writer.add_tensor(name, data)
+            continue
+        if name.find("k_layernorm.norms") != -1:
+            k_norms[name] = data
+            if len(k_norms) >= (block_count * n_kv_head):
+                name, data = stack_qk_norm(block_count, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                gguf_writer.add_tensor(name, data)
+            continue
+        
         # ftype == 0 -> float32, ftype == 1 -> float16
-        ftype_cur = 0
         if ftype != 0:
-            if name[-7:] == ".weight" and n_dims == 2:
+            if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
                 print("  Converting to float16")
                 data = data.astype(np.float16)
-                ftype_cur = 1
             else:
                 print("  Converting to float32")
                 data = data.astype(np.float32)
-                ftype_cur = 0
         else:
             if data.dtype != np.float32:
                 print("  Converting to float32")
                 data = data.astype(np.float32)
-                ftype_cur = 0
 
+        print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
         gguf_writer.add_tensor(name, data)
 
     print("gguf: write header")
