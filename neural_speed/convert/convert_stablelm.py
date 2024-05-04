@@ -55,21 +55,29 @@ def bytes_to_unicode():
 
 
 def stack_qk_norm(block_count, name, n_head, norms, n_dims, ftype, layer_name="q_layernorm"):
-    for bid in range(block_count):
+    for block in range(block_count):
         datas = []
-        for xid in range(n_head):
-            ename = f"model.layers.{bid}.self_attn.{layer_name}.norms.{xid}.weight"
-            print(f"-----> Merging Tensor {ename} with shape {norms[ename].shape} <-----")
+        for i in range(n_head):
+            ename = f"model.layers.{block}.self_attn.{layer_name}.norms.{i}.weight"
+            print(f"-----> Merging Tensor {ename} with shape {norms[ename].shape}")
             datas.append(norms[ename])
             del norms[ename]
         data = np.stack(datas, axis=0)
         data_dtype = data.dtype
-        merged_name = f"model.layers.{bid}.self_attn.{layer_name}.weight"
+        merged_name = f"model.layers.{block}.self_attn.{layer_name}.weight"
 
-        if ftype == 1 and data_dtype == np.float16 and (n_dims == 1 or merged_name.endswith("_norm.weight")):
-            data = data.astype(np.float32)
-        if ftype == 1 and data_dtype == np.float32 and name.endswith(".weight") and not merged_name.endswith("_norm.weight") and n_dims == 2:
-            data = data.astype(np.float16)
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        if ftype != 0:
+            if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
+                print("  Converting to float16")
+                data = data.astype(np.float16)
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+        else:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
 
         return merged_name, data
 
@@ -150,11 +158,11 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
         if data_torch.dtype not in (torch.float16, torch.float32):
             data_torch = data_torch.to(torch.float32)
 
-        data = data_torch.squeeze().numpy()
         # Skip some tensors
         if name.endswith((".attention.rotary_emb.inv_freq")):
             continue
 
+        data = data_torch.squeeze().numpy()
         old_dtype = data.dtype
         n_dims = len(data.shape)
         if name.find("q_layernorm.norms") != -1:
@@ -201,15 +209,17 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("")
 
 def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
-    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
-    model.eval()
-    for p in model.parameters():
-        p.requires_grad = False
-    hparams = model.config.to_dict()
+    print("stablelm ne converting: ")
+    list_vars = model.state_dict()
+    n_head = hparams["num_attention_heads"]
+    n_kv_head = hparams["num_key_value_heads"]
+    block_count = hparams["num_hidden_layers"]
     vocab_size = hparams["vocab_size"]
+    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     print("Model loaded: ", dir_model)
 
-    fout = open(fname_out, "wb")
+    ne_file = fname_out + '.bin' if not fname_out.endswith(".bin") else fname_out
+    fout = open(ne_file, "wb")
 
     # 0x67676d6c is unversioned ne
     # 0x67676d66 is versioned ggmf (requires token scores)
@@ -264,46 +274,69 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             fout.write(struct.pack("i", len(text)))
             fout.write(text)
             fout.write(struct.pack("f", -10000))
-
-    list_vars = model.state_dict()
-
-    print(hparams)
-
-    for name in list_vars.keys():
-        # No gradients for these
-        list_vars[name].requires_grad = False
-        src = name
-        print(src, ' -> ', name)
-        data = list_vars[src].squeeze().numpy()
-        data = data.astype(np.float32)
-
+    
+    def write_header(name, data):
+        tmp = name.encode('utf-8')
         n_dims = len(data.shape)
-        print(name, n_dims, data.shape)
-
-        # default type is fp32
-        ftype_cur = 0
-        if ftype == 1 and n_dims > 1:
-            print("  Converting to float16", data.shape, data[:3, :3].tolist())
-            data = data.astype(np.float16)
-            ftype_cur = 1
-        else:
-            print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
-            data = data.astype(np.float32)
-
-        # header
-        str = name.encode('utf-8')
-        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        fout.write(struct.pack("iii", n_dims, len(tmp), ftype))
         for i in range(n_dims):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-        print(str)
-        fout.write(str)
+        print(tmp)
+        fout.write(tmp)
+
+    print(hparams)
+    q_norms, k_norms = dict(), dict()
+    for name, data_torch in list_vars.items():
+        # Convert any unsupported data types to float32
+        if data_torch.dtype not in (torch.float16, torch.float32):
+            data_torch = data_torch.to(torch.float32)
+
+        # Skip some tensors
+        if name.endswith((".attention.rotary_emb.inv_freq")):
+            continue
+        
+        data = data_torch.squeeze().numpy()
+        old_dtype = data.dtype
+        n_dims = len(data.shape)
+        if name.find("q_layernorm.norms") != -1:
+            q_norms[name] = data
+            if len(q_norms) >= (block_count * n_head):
+                name, data = stack_qk_norm(block_count, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
+                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                write_header(name, data)
+                data.tofile(fout)
+            continue
+        if name.find("k_layernorm.norms") != -1:
+            k_norms[name] = data
+            if len(k_norms) >= (block_count * n_kv_head):
+                name, data = stack_qk_norm(block_count, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                write_header(name, data)
+                data.tofile(fout)
+            continue
+
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        if ftype != 0:
+            if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
+                print("  Converting to float16")
+                data = data.astype(np.float16)
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+        else:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+
+        # header
+        write_header(name, data)
 
         # data
         data.tofile(fout)
 
     fout.close()
 
-    print("Done. Output file: " + fname_out)
+    print("Done. Output file: " + ne_file)
     print("")
 
 def main(args_in: Optional[List[str]] = None) -> None:
