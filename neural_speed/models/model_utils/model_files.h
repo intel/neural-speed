@@ -1423,7 +1423,7 @@ struct model_model_loader {
   }
 
   struct ne_tensor* get_tensor(const std::string& name, const std::vector<uint32_t>& ne, ne_backend backend) {
-    auto it = tensors_map.name_to_idx.find(name);
+     auto it = tensors_map.name_to_idx.find(name);
     if (it == tensors_map.name_to_idx.end()) {
       throw format("%s: tensor '%s' is missing from model", __func__, name.c_str());
     }

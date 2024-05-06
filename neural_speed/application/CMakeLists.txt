@@ -75,6 +75,7 @@ compile_quant(quant_gemma   quant_model.cpp gemma   gemma)
 compile_quant(quant_stablelm   quant_model.cpp stablelm   stablelm)
 compile_quant(quant_grok   quant_model.cpp grok   grok)
 compile_quant(quant_whisper   quant_whisper.cpp whisper   whisper)
+compile_quant(quant_phi3   quant_model.cpp phi3   phi3)
 
 # all models running
 if (NS_PYTHON_API)
@@ -103,6 +104,7 @@ set(mymap_mixtral 19)
 set(mymap_chatglm3 20)
 set(mymap_gemma 21)
 set(mymap_grok 22)
+set(mymap_phi3 23)
 
 
 function(compile_run TARGET MAIN_CPP MAIN_PY MODEL_NAME MODEL_LIB)
@@ -143,6 +145,7 @@ compile_run(run_gemma  main_run.cpp   main_pybind.cpp gemma   gemma)
 compile_run(run_stablelm      main_run.cpp   main_pybind.cpp stablelm      stablelm)
 compile_run(run_mixtral   main_run.cpp   main_pybind.cpp mixtral   llama)
 compile_run(run_grok   main_run.cpp   main_pybind.cpp grok   grok)
+compile_run(run_phi3   main_run.cpp   main_pybind.cpp phi3   phi3)
 
 # speech recognition
 compile_run(run_whisper   audio_run.cpp  whisper_pybind.cpp whisper   whisper)

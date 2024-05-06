@@ -236,6 +236,7 @@ enum llm_arch {
   LLM_ARCH_QWEN2,
   LLM_ARCH_UNKNOWN,
   LLM_ARCH_GROK,
+  LLM_ARCH_PHI3,
 };
 
 static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {{LLM_ARCH_LLAMA, "llama"},
@@ -257,7 +258,8 @@ static std::map<llm_arch, std::string> LLM_ARCH_NAMES = {{LLM_ARCH_LLAMA, "llama
                                                          {LLM_ARCH_PHI, "phi"},
                                                          {LLM_ARCH_GEMMA, "gemma"},
                                                          {LLM_ARCH_QWEN2, "qwen2"},
-                                                         {LLM_ARCH_GROK, "grok"}};
+                                                         {LLM_ARCH_GROK, "grok"},
+                                                         {LLM_ARCH_PHI3, "phi3"},};
 
 struct gguf_tensor_info {
   struct gguf_str name;
