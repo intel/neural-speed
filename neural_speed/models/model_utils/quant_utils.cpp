@@ -231,8 +231,11 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
 
 #ifdef __OPENMP
   bestla::parallel::OMPThreading threading(nthread);
+  printf("[DEBUG]: 11111111111111111 of bestla_qpack\n");
 #else
   bestla::parallel::StdThreading threading(nthread);
+    printf("[DEBUG]: 22222222222222222222222 of bestla_qpack\n");
+
 #endif
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
   if (params.bits == quant_bits::q8) {
@@ -240,8 +243,12 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   }
   if (params.bits == quant_bits::q3) quant_type = BTLA_DTYPE::S3_CLIP;
   if (params.bits == quant_bits::q2) quant_type = BTLA_DTYPE::S2_CLIP;
+      printf("[DEBUG]: 333333333333333333333333333333 of bestla_qpack\n");
+
   auto dtype_type = static_cast<BTLA_DTYPE>(
       bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
+      printf("[DEBUG]: 4444444444444444444444444 of bestla_qpack\n");
+
   if (dtype_type == BTLA_DTYPE::TypeFloat) {
     printf("Not support float dtype in qpack\n");
     if (params.alg == quant_alg::asym) {
@@ -259,7 +266,11 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
     printf("Current not support float16 scale, reset to bf16\n");
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
+      printf("[DEBUG]: 555555555555555555555555 of bestla_qpack\n");
+
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
+      printf("[DEBUG]: 6666666666666666666666666666666 of bestla_qpack\n");
+
   printf("[DEBUG]: end of bestla_qpack\n");
   if (size) {
     if (!BTLAGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
