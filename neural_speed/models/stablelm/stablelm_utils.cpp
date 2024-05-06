@@ -167,16 +167,21 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.ffn[2] = ml->get_tensor(layers_i + ".mlp.up_proj.weight", {n_embd, n_ff}, backend);
 
     if (backend != NE_BACKEND_CPU) {
-      if (ml->verify_tensor(layers_i + ".self_attn.q_proj.bias")) {
+      if (n_layer == 24) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
                       ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
                       ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) + ne_nbytes(layer.ffn[0]) +
                       ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
-      } else {
+      } else if (n_layer == 32)  {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
                       ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.ffn[0]) +
+                      ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      } else if (n_layer == 40)  {
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
+                      ne_nbytes(layer.attn[1]) + ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) +
+                      ne_nbytes(layer.attn[4]) + ne_nbytes(layer.attn[5]) + ne_nbytes(layer.ffn[0]) +
                       ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
       }
     }

@@ -84,7 +84,7 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     print("stablelm.gguf converting: ")
     list_vars = model.state_dict()
     n_head = hparams["num_attention_heads"]
-    n_kv_head = hparams["num_key_value_heads"]
+    n_head_kv = hparams["num_key_value_heads"]
     block_count = hparams["num_hidden_layers"]
     n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     for name in list_vars.keys():
@@ -100,7 +100,7 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
     gguf_writer.add_uint32('n_vocab', hparams["vocab_size"])
     gguf_writer.add_embedding_length(hparams["hidden_size"])
     gguf_writer.add_head_count(n_head)
-    gguf_writer.add_head_count_kv(n_kv_head)
+    gguf_writer.add_head_count_kv(n_head_kv)
 
     gguf_writer.add_block_count(block_count)
     gguf_writer.add_rope_dimension_count(n_rot)
@@ -173,9 +173,9 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
             continue
         if name.find("k_layernorm.norms") != -1:
             k_norms[name] = data
-            if len(k_norms) >= (block_count * n_kv_head):
+            if len(k_norms) >= (block_count * n_head_kv):
                 for block in range(block_count):
-                    name, data = stack_qk_norm(block, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                    name, data = stack_qk_norm(block, name, n_head_kv, k_norms, n_dims, ftype, layer_name="k_layernorm")
                     print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
                     gguf_writer.add_tensor(name, data)
             continue
@@ -212,7 +212,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     print("stablelm ne converting: ")
     list_vars = model.state_dict()
     n_head = hparams["num_attention_heads"]
-    n_kv_head = hparams["num_key_value_heads"]
+    n_head_kv = hparams["num_key_value_heads"]
     block_count = hparams["num_hidden_layers"]
     vocab_size = hparams["vocab_size"]
     n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
@@ -232,7 +232,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", n_head))
-    fout.write(struct.pack("i", n_kv_head))  # multi-query attention
+    fout.write(struct.pack("i", n_head_kv))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
     fout.write(struct.pack("i", n_rot))
     fout.write(struct.pack("i", ftype))
@@ -309,9 +309,9 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             continue
         if name.find("k_layernorm.norms") != -1:
             k_norms[name] = data
-            if len(k_norms) >= (block_count * n_kv_head):
+            if len(k_norms) >= (block_count * n_head_kv):
                 for block in range(block_count):
-                    name, data = stack_qk_norm(block, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                    name, data = stack_qk_norm(block, name, n_head_kv, k_norms, n_dims, ftype, layer_name="k_layernorm")
                     print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
                     write_header(name, data)
                     data.tofile(fout)

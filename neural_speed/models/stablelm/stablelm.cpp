@@ -74,6 +74,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
   const int n_ctx = lctx.n_ctx;
   const int n_keep = lctx.n_keep;
   const int n_head = hparams.n_head;
+  const int n_head_kv = hparams.n_head_kv;
   const int n_vocab = hparams.n_vocab;
   const int n_rot = hparams.n_rot;
   const int head_dim = n_embd / n_head;
@@ -143,7 +144,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
       struct ne_tensor* Qcur;
       struct ne_tensor* Kcur;
       struct ne_tensor* Vcur;
-      if (n_layer == 24) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+      if (n_layer == 24) {  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
         Qcur =
             ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
                           head_dim, n_head, N, 1);
@@ -155,7 +156,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
                           head_dim, n_head, N, 1);
       } else {  // Stablelm 3B
         Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N, 1);
-        Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head, N, 1);
+        Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head_kv, N, 1);
         Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head, N, 1);
       }
 
