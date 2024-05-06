@@ -41,6 +41,9 @@ NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
+# define install requirements
+install_requires_list = ['einops']
+
 class CMakeExtension(Extension):
     """CMakeExtension class."""
 
@@ -256,6 +259,7 @@ if __name__ == '__main__':
             '': ["*.yaml", "*.mat"],
         },
         cmdclass=cmdclass,
+        install_requires=install_requires_list,
         python_requires='>=3.7.0',
         classifiers=[
             'Intended Audience :: Science/Research',
