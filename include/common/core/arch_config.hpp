@@ -107,20 +107,22 @@ struct register_attr_t {};
 
 template <grf_mode grf_num_mode, gpu_arch arch_tag>
 struct client_register_attr_base_t {
-  static constexpr uint32_t acc_reg_in_bytes =
-      (grf_num_mode == grf_mode::normal) ? 4 * 32 : 8 * 32;
-  static constexpr uint32_t grf_in_bytes =
-      (grf_num_mode == grf_mode::normal) ? 128 * 32 : 256 * 32;
   static constexpr uint32_t reg_in_bytes = 32;
+  static constexpr uint32_t acc_reg_in_bytes =
+      (grf_num_mode == grf_mode::normal) ? 4 * reg_in_bytes : 8 * reg_in_bytes;
+  static constexpr uint32_t grf_in_bytes = (grf_num_mode == grf_mode::normal)
+      ? 128 * reg_in_bytes
+      : 256 * reg_in_bytes;
 };
 
 template <grf_mode grf_num_mode>
 struct register_attr_t<grf_num_mode, gpu_arch::XeHpc> {
-  static constexpr uint32_t acc_reg_in_bytes =
-      (grf_num_mode == grf_mode::normal) ? 4 * 64 : 8 * 64;
-  static constexpr uint32_t grf_in_bytes =
-      (grf_num_mode == grf_mode::normal) ? 128 * 64 : 256 * 64;
   static constexpr uint32_t reg_in_bytes = 64;
+  static constexpr uint32_t acc_reg_in_bytes =
+      (grf_num_mode == grf_mode::normal) ? 4 * reg_in_bytes : 8 * reg_in_bytes;
+  static constexpr uint32_t grf_in_bytes = (grf_num_mode == grf_mode::normal)
+      ? 128 * reg_in_bytes
+      : 256 * reg_in_bytes;
 };
 
 template <grf_mode grf_num_mode>

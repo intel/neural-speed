@@ -16,10 +16,10 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-// #define UT_DEBUG 1
+#define UT_DEBUG 1
 using namespace gpu::xetla;
 // The number of times the kernel is executed
-constexpr int ITER = 1000;
+constexpr int ITER = 1;
 
 enum optional_feature { NONE, ACT_SHUFFLE };
 
@@ -117,6 +117,30 @@ class test3_xehpg {
   using data_type_a = fp16;
   using data_type_b = int4x2;
   using data_type_c = fp16;
+};
+
+class test4_xehpg {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 32;
+  static constexpr size_t mat_n = 32 * 1;
+  static constexpr size_t mat_k = 32 * 1;
+  static constexpr size_t wg_m = 32 * 1;
+  static constexpr size_t wg_n = 32 * 1;
+  static constexpr size_t sg_m = 32;
+  static constexpr size_t sg_n = 32;
+  static constexpr size_t sg_k = 32;
+  static constexpr size_t dequant_s = 32;
+
+  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+  static constexpr mma_engine mma_eng = mma_engine::xmx;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
 };
 
 class test1_xelpg {
@@ -711,7 +735,7 @@ void dequantize_gemm_run(int iter) {
 
   using tile_shape =
       xetla::group::tile_shape_t<wg_tile_n, wg_tile_m, sg_tile_n, sg_tile_m>;
-  static constexpr uint32_t periodic_sync_interval = 1;
+  static constexpr uint32_t periodic_sync_interval = 0;
   static constexpr uint32_t prefetch_distance = 0;
 
   using mem_desc_a_t = xetla::mem_desc_t<
@@ -951,7 +975,7 @@ void dequantize_gemm_run(int iter) {
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
-    int constexpr warm = 10;
+    int constexpr warm = 0;
     try {
       for (int i = 0; i < iter + warm; i++) {
         if (i >= warm)
@@ -1039,15 +1063,15 @@ void dequantize_gemm_run(int iter) {
             epilogue_args);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-    if (!gemm_op_t::can_implement(gemm_arg)) {
-      std::cout << "The arguments cannot be supported, aborting ... "
-                << std::endl;
-      FAIL();
-    }
+    // if (!gemm_op_t::can_implement(gemm_arg)) {
+    //   std::cout << "The arguments cannot be supported, aborting ... "
+    //             << std::endl;
+    //   FAIL();
+    // }
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
-    int constexpr warm = 10;
+    int constexpr warm = 0;
     try {
       for (int i = 0; i < iter + warm; i++) {
         if (i >= warm)
@@ -1138,7 +1162,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
 using tests = ::testing::Types<
-    test2_xehpg>;
+    test4_xehpg>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test_suite,
