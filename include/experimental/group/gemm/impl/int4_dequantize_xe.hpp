@@ -686,6 +686,60 @@ class gemm_t<
     using cvt_dtype = int32_t;
   };
 
+  template <typename T>
+  inline void block_wise_mul_scale(
+      int block_id,
+      int scale_block_id,
+      matB_acc_t& matB_acc,
+      scale_t& scale,
+      T cvt_blk_32_bitwidth) {
+    auto scale_vec = scale.reg.xetla_select<block_size_x_b, 1>(
+        scale_block_id * scale_t::block_size_x);
+
+    auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
+        block_id * matB_acc_t::block_elems);
+    if constexpr (compute_policy::mma_engine == mma_engine::xmx) {
+      constexpr uint32_t vnni_rows = sizeof(uint32_t) / sizeof(dtype_mma_b);
+      xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows> temp_blk;
+      temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
+          cvt_blk_32_bitwidth;
+
+#pragma unroll
+      for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+#pragma unroll
+        for (uint32_t row = 0; row < vnni_rows; row++) {
+          temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+              row + block_size_x_b * k * vnni_rows) =
+              temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                  (k + row) * block_size_x_b * vnni_rows);
+        }
+      }
+
+      xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
+#pragma unroll
+      for (uint32_t row = 0; row < vnni_rows; row++) {
+        scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) = scale_vec;
+      }
+
+#pragma unroll
+      for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+        dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+            k * block_size_x_b) =
+            temp_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                k * block_size_x_b * vnni_rows) *
+            scale_blk;
+      }
+    } else {
+#pragma unroll
+      for (uint32_t k = 0; k < block_size_y_b; k++) {
+        dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
+            cvt_blk_32_bitwidth.xetla_select<block_size_x_b, 1>(
+                k * block_size_x_b) *
+            scale_vec;
+      }
+    }
+  }
+
   inline void dequantize2(
       matB_acc_t& matB_acc,
       matB_t& matB,
@@ -775,55 +829,39 @@ class gemm_t<
             int scale_block_id =
                 (i / block_b_y_per_scale * num_matB_acc_block_x +
                  j * blk_per_matB_decompress + reorder_block_x);
-            auto scale_vec = scale.reg.xetla_select<block_size_x_b, 1>(
-                scale_block_id * scale_t::block_size_x);
-
-            auto dst_blk =
-                matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
-                    block_id * matB_acc_t::block_elems);
-            if constexpr (compute_policy::mma_engine == mma_engine::xmx) {
-              constexpr uint32_t vnni_rows =
-                  sizeof(uint32_t) / sizeof(dtype_mma_b);
-              xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
-                  temp_blk;
-              temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
-                  cvt_blk_32_bitwidth;
-
-#pragma unroll
-              for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
-#pragma unroll
-                for (uint32_t row = 0; row < vnni_rows; row++) {
-                  temp_blk.xetla_select<block_size_x_b, vnni_rows>(
-                      row + block_size_x_b * k * vnni_rows) =
-                      temp_blk.xetla_select<block_size_x_b, vnni_rows>(
-                          (k + row) * block_size_x_b * vnni_rows);
-                }
-              }
-
-              xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
-#pragma unroll
-              for (uint32_t row = 0; row < vnni_rows; row++) {
-                scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) =
-                    scale_vec;
-              }
-
-#pragma unroll
-              for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
-                dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
-                    k * block_size_x_b) =
-                    temp_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
-                        k * block_size_x_b * vnni_rows) *
-                    scale_blk;
-              }
-            } else {
-#pragma unroll
-              for (uint32_t k = 0; k < block_size_y_b; k++) {
-                dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
-                    cvt_blk_32_bitwidth.xetla_select<block_size_x_b, 1>(
-                        k * block_size_x_b) *
-                    scale_vec;
-              }
+            block_wise_mul_scale(
+                block_id, scale_block_id, matB_acc, scale, cvt_blk_32_bitwidth);
+          }
+        } else if constexpr (
+            compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) =
+              cvt_blk.xetla_select<matB_t::block_elems, 2>(0) << 4;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(0) =
+              cvt_blk.xetla_select<matB_t::block_elems, 2>(0) >> 4;
+          cvt_blk.xetla_select<matB_t::block_elems, 2>(1) =
+              matB_blk.xetla_format<int8_t>() >> 4;
+          // reorder to matB_acc format.
+          for (uint32_t reorder_block_x = 0;
+               reorder_block_x < blk_per_matB_decompress;
+               reorder_block_x++) {
+            for (uint32_t row = 0; row < block_size_y_b; row++) {
+              cvt_blk_32_bitwidth.xetla_select<block_size_x_b, 1>(
+                  row * block_size_x_b) =
+                  cvt_blk
+                      .xetla_select<block_size_x_b, 1>(
+                          row * matB_block_size_x * pack_ratio +
+                          reorder_block_x * block_size_x_b)
+                      .xetla_format<int8_t>();
             }
+            int block_id =
+                (i * num_matB_acc_block_x + j * blk_per_matB_decompress +
+                 reorder_block_x);
+            int scale_block_id =
+                (i / block_b_y_per_scale * num_matB_acc_block_x +
+                 j * blk_per_matB_decompress + reorder_block_x);
+            block_wise_mul_scale(
+                block_id, scale_block_id, matB_acc, scale, cvt_blk_32_bitwidth);
           }
         } else {
           assert(0);
