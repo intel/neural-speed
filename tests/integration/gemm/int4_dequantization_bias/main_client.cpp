@@ -139,8 +139,8 @@ class test4_xehpg {
   using data_type_a = fp16;
   using data_type_b = int4x2;
   using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::xmx;
-  static constexpr gpu_arch arch = gpu_arch::XeHpg;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
 };
 
 class test1_xelpg {
@@ -770,7 +770,8 @@ void dequantize_gemm_run(int iter) {
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      // gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      gpu::xetla::group::quant_mode::S4_ASYM,
       dequant_s,
       Test::mma_eng,
       Test::arch>;
@@ -1058,6 +1059,8 @@ void dequantize_gemm_run(int iter) {
             ldc,
             scale_d,
             matrix_n,
+            zero_pt_d,
+            matrix_n,
             Acc_d,
             Cnt_d,
             epilogue_args);
@@ -1101,23 +1104,39 @@ void dequantize_gemm_run(int iter) {
   std::vector<fp16> dequantize_b(matrix_k * matrix_n, 0);
   for (uint32_t i = 0; i < matrix_k / dequant_s; i++) {
     for (uint32_t j = 0; j < matrix_n / 2; j++) {
-      int start_in = i * dequant_s * matrix_n / 2 + j;
-      int start_out = i * dequant_s * matrix_n + j * 2;
-      int start_scale = i * size_scale_n + j * 2;
       for (uint32_t ii = 0; ii < dequant_s; ii++) {
+        int start_in = i * dequant_s * matrix_n / 2 + j;
+        int start_zero_pt = i * size_zero_pt_n + j;
+        int start_out = i * dequant_s * matrix_n + j * 2;
+        int start_scale = i * size_scale_n + j * 2;
+        int8_t data_0, data_1;
+        // if constexpr (
+        // Test::weight_dtype == gpu::xetla::group::weight_dtype::S4_ASYM) {
         uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
-        uint8_t data_even = (data_in & 0x0f) << 4;
-        int8_t data_0;
-        int8_t data_1;
-        memcpy(&data_0, &data_even, 1);
-        memcpy(&data_1, &data_in, 1);
-        data_0 = data_0 >> 4;
-        data_1 = data_1 >> 4;
-
+        uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
+        data_0 = int8_t(data_in & 0x0f);
+        data_1 = int8_t(data_in >> 4);
+        int8_t zero_pt_0 = int8_t((data_zero_pt & 0x0f) + 1);
+        int8_t zero_pt_1 = int8_t((data_zero_pt >> 4) + 1);
         dequantize_b[start_out + ii * matrix_n] =
-            fp16(data_0) * scale_h[start_scale];
+            fp16(data_0 - zero_pt_0) * scale_h[start_scale];
         dequantize_b[start_out + ii * matrix_n + 1] =
-            fp16(data_1) * scale_h[start_scale + 1];
+            fp16(data_1 - zero_pt_1) * scale_h[start_scale + 1];
+        // }
+        // if constexpr (
+        //     Test::weight_dtype ==
+        //     gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP) {
+        //   uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
+        //   uint8_t data_even = (data_in & 0x0f) << 4;
+        //   memcpy(&data_0, &data_even, 1);
+        //   memcpy(&data_1, &data_in, 1);
+        //   data_0 = data_0 >> 4;
+        //   data_1 = data_1 >> 4;
+        //   dequantize_b[start_out + ii * matrix_n] =
+        //       fp16(data_0) * scale_h[start_scale];
+        //   dequantize_b[start_out + ii * matrix_n + 1] =
+        //       fp16(data_1) * scale_h[start_scale + 1];
+        // }
       }
     }
   }
@@ -1161,8 +1180,7 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<
-    test4_xehpg>;
+using tests = ::testing::Types<test4_xehpg>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test_suite,

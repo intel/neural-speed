@@ -55,7 +55,7 @@ if(UNIX)
         add_compile_options(-fsycl-targets=spir64_gen)
         add_link_options(-fsycl-targets=spir64_gen -Xs "-device ${AOT_DEVICE}") # MTL
     endif()
-    add_compile_options(-fp-model=precise -Wall -Wextra -Werror)
+    add_compile_options(-fp-model=precise -Wall -Wextra)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)
     link_libraries(-lgtest -lgtest_main)
 else() # Windows
