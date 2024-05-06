@@ -42,7 +42,7 @@ NS_PROFILING_ENV = os.environ.get("NS_PROFILING", "OFF")
 cwd = os.path.dirname(os.path.abspath(__file__))
 
 # define install requirements
-install_requires_list = ['einops']
+install_requires_list = ['einops', 'gguf']
 
 class CMakeExtension(Extension):
     """CMakeExtension class."""
