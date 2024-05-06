@@ -227,6 +227,8 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
                     const quant_params_internal params, int nthread, int n, int k, int* g_idx) {
   auto ctype = quant2ne_comp_type(params.compute_dtype);
   auto dstbptr = reinterpret_cast<int8_t*>(dstpr);
+  printf("[DEBUG]: begin of bestla_qpack\n");
+
 #ifdef __OPENMP
   bestla::parallel::OMPThreading threading(nthread);
 #else
@@ -258,14 +260,18 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
+  printf("[DEBUG]: end of bestla_qpack\n");
   if (size) {
     if (!BTLAGemmPackB(dstpr, src_w, src_scales, src_zps, n, k, n, gsize, quant_type, scale_type,
                        params.alg == quant_alg::asym, ctype, g_idx, &threading)) {
       printf("Failed to quant this weight\n");
+      printf("[DEBUG]: end1 of bestla_qpack\n");
       return 0;
     }
+    printf("[DEBUG]: end2 of bestla_qpack\n");
     return size;
   }
+  printf("[DEBUG]: end3 of bestla_qpack\n");
   return 0;
 }
 

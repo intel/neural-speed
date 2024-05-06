@@ -379,6 +379,7 @@ class Model {
                                 py::array_t<int32_t> g_idx, py::array_t<int8_t> dst, const std::string& weight_dtype,
                                 const std::string& alg, int group_size, const std::string& scale_dtype,
                                 const std::string& compute_dtype, int threads) {
+    printf("[DEBUG]: begin of np_bestla_qpack\n");
     int8_t* w_ptr = src_w.mutable_data();
     float* scales_ptr = src_scales.mutable_data();
     int8_t* zeros_ptr = nullptr;
@@ -390,13 +391,14 @@ class Model {
       g_idx_ptr = g_idx.mutable_data();
     }
     int8_t* dst_ptr = dst.mutable_data();
-
+    printf("[DEBUG]: mid of np_bestla_qpack\n");
     quant_params_internal q_params;
     q_params.bits = parse_bits(weight_dtype);
     q_params.scale_dtype = parse_scale_dtype(scale_dtype);
     q_params.compute_dtype = parse_compute_type(compute_dtype, /*ggml_arg=*/0);
     q_params.alg = parse_alg(alg);
     q_params.group_size = group_size;
+    printf("[DEBUG]: end of np_bestla_qpack\n");
     return bestla_qpack(w_ptr, scales_ptr, zeros_ptr, dst_ptr, q_params, threads, src_w.shape(1), src_w.shape(0),
                         g_idx_ptr);
   }
