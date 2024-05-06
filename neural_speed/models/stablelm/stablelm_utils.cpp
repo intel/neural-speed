@@ -73,6 +73,9 @@ void stablelm::init(const char* path_model, model_context* ctx, int n_gpu_layer_
   n_embd = hparams.n_embd;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
+  n_head = hparams.n_head;
+  n_head_kv = hparams.n_head_kv;
+  n_embd_head_k = hparams.n_embd_head_k;
   n_embd = hparams.n_embd;
   scratch = stablelm_mem_req(n_layer);
   model.scratchs = scratch;
@@ -130,7 +133,7 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     layer.norm[1] = ml->get_tensor(layers_i + ".input_layernorm.bias", {n_embd}, backend);
 
     // qkv GEMM + out proj GEMM
-    if (ml->verify_tensor(layers_i + ".self_attn.q_proj.bias")) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+    if (n_layer == 24) {  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
       layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
       layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
@@ -138,16 +141,25 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
       layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
       layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
-    } else {  // Stablelm 3B
+    } else if (n_layer == 32) {  // StableLM-3B & Stable-Code-3B
       layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
-    }
+    } else if (n_layer == 40) {  // StableLM-2-12B
+      layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
+      layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.q_layernorm.weight", {n_embd_head_k, n_head}, backend);
+      layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.k_layernorm.weight", {n_embd_head_k, n_head_kv}, backend);
+    } 
 
-    // Post Attention norm
-    layer.norm[2] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
-    layer.norm[3] = ml->get_tensor(layers_i + ".post_attention_layernorm.bias", {n_embd}, backend);
+    // Post Attention norm - Only present in 1.6B & 3B
+    if (n_layer < 40) {
+      layer.norm[2] = ml->get_tensor(layers_i + ".post_attention_layernorm.weight", {n_embd}, backend);
+      layer.norm[3] = ml->get_tensor(layers_i + ".post_attention_layernorm.bias", {n_embd}, backend);
+    }
 
     // ffn GEMM
     layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.gate_proj.weight", {n_embd, n_ff}, backend);

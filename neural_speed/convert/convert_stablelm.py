@@ -54,32 +54,30 @@ def bytes_to_unicode():
     return dict(zip(bs, cs))
 
 
-def stack_qk_norm(block_count, name, n_head, norms, n_dims, ftype, layer_name="q_layernorm"):
-    for block in range(block_count):
-        datas = []
-        for i in range(n_head):
-            ename = f"model.layers.{block}.self_attn.{layer_name}.norms.{i}.weight"
-            print(f"-----> Merging Tensor {ename} with shape {norms[ename].shape}")
-            datas.append(norms[ename])
-            del norms[ename]
-        data = np.stack(datas, axis=0)
-        data_dtype = data.dtype
-        merged_name = f"model.layers.{block}.self_attn.{layer_name}.weight"
+def stack_qk_norm(block, name, n_head, norms, n_dims, ftype, layer_name="q_layernorm"):
+    datas = []
+    for i in range(n_head):
+        ename = f"model.layers.{block}.self_attn.{layer_name}.norms.{i}.weight"
+        print(f"-----> Merging Tensor {ename} with shape {norms[ename].shape}")
+        datas.append(norms[ename])
+        del norms[ename]
+    data = np.stack(datas, axis=0)
+    merged_name = f"model.layers.{block}.self_attn.{layer_name}.weight"
 
-        # ftype == 0 -> float32, ftype == 1 -> float16
-        if ftype != 0:
-            if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
-                print("  Converting to float16")
-                data = data.astype(np.float16)
-            else:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
+    # ftype == 0 -> float32, ftype == 1 -> float16
+    if ftype != 0:
+        if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
+            print("  Converting to float16")
+            data = data.astype(np.float16)
         else:
-            if data.dtype != np.float32:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
+            print("  Converting to float32")
+            data = data.astype(np.float32)
+    else:
+        if data.dtype != np.float32:
+            print("  Converting to float32")
+            data = data.astype(np.float32)
 
-        return merged_name, data
+    return merged_name, data
 
 
 def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
@@ -168,16 +166,18 @@ def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams
         if name.find("q_layernorm.norms") != -1:
             q_norms[name] = data
             if len(q_norms) >= (block_count * n_head):
-                name, data = stack_qk_norm(block_count, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
-                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
-                gguf_writer.add_tensor(name, data)
+                for block in range(block_count):
+                    name, data = stack_qk_norm(block, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
+                    print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                    gguf_writer.add_tensor(name, data)
             continue
         if name.find("k_layernorm.norms") != -1:
             k_norms[name] = data
             if len(k_norms) >= (block_count * n_kv_head):
-                name, data = stack_qk_norm(block_count, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
-                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
-                gguf_writer.add_tensor(name, data)
+                for block in range(block_count):
+                    name, data = stack_qk_norm(block, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                    print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                    gguf_writer.add_tensor(name, data)
             continue
         
         # ftype == 0 -> float32, ftype == 1 -> float16
@@ -228,11 +228,11 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
     fout.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
     fout.write(struct.pack("i", 1))
-    fout.write(struct.pack("i", hparams["vocab_size"]))
+    fout.write(struct.pack("i", vocab_size))
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", hparams["num_attention_heads"]))
-    fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
+    fout.write(struct.pack("i", n_head))
+    fout.write(struct.pack("i", n_kv_head))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
     fout.write(struct.pack("i", n_rot))
     fout.write(struct.pack("i", ftype))
@@ -249,7 +249,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", hparams["hidden_size"] // n_head)) # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layer_norm_eps", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
     fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
@@ -301,18 +301,20 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
         if name.find("q_layernorm.norms") != -1:
             q_norms[name] = data
             if len(q_norms) >= (block_count * n_head):
-                name, data = stack_qk_norm(block_count, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
-                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
-                write_header(name, data)
-                data.tofile(fout)
+                for block in range(block_count):
+                    name, data = stack_qk_norm(block, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
+                    print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                    write_header(name, data)
+                    data.tofile(fout)
             continue
         if name.find("k_layernorm.norms") != -1:
             k_norms[name] = data
             if len(k_norms) >= (block_count * n_kv_head):
-                name, data = stack_qk_norm(block_count, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
-                print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
-                write_header(name, data)
-                data.tofile(fout)
+                for block in range(block_count):
+                    name, data = stack_qk_norm(block, name, n_kv_head, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                    print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                    write_header(name, data)
+                    data.tofile(fout)
             continue
 
         # ftype == 0 -> float32, ftype == 1 -> float16
