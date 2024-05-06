@@ -179,7 +179,8 @@ class gemm_t<
   using matB_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b / pack_ratio,
       tile_size_y_b,
-      block_size_x_b / pack_ratio,
+      //   block_size_x_b / pack_ratio,
+      block_size_x_b,
       block_size_y_b,
       reg_layout::tiled>;
   using matB_t = subgroup::tile_t<dtype_b, matB_tile_desc_t>;
@@ -257,7 +258,8 @@ class gemm_t<
   using zero_pt_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b / pack_ratio,
       tile_size_y_zero_pt,
-      block_size_x_b / pack_ratio,
+      //   block_size_x_b / pack_ratio,
+      block_size_x_b,
       block_size_y_zero_pt,
       reg_layout::tiled>;
   using zero_pt_t = subgroup::tile_t<dtype_zero_pt, zero_pt_tile_desc_t>;
@@ -447,6 +449,8 @@ class gemm_t<
     int scale_prefetch_addr_i = args.matB_base_desc.coord.y;
     int scale_load_addr_i = args.matB_base_desc.coord.y;
     SW_BARRIER();
+    sycl::ext::oneapi::experimental::printf(
+        "BLOCK_SIZE_X_B: %d\n", block_size_x_b);
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -541,7 +545,7 @@ class gemm_t<
       matA_acc_t matA_acc;
       matB_acc_t matB_acc;
       subgroup::elemwise_cvt(matA_acc, matA);
-      dequantize(matB_acc, matB, scale, zero_pt);
+      dequantize2(matB_acc, matB, scale, zero_pt);
       SW_BARRIER();
       tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
       SW_BARRIER();
@@ -578,7 +582,7 @@ class gemm_t<
         auto matB_blk = matB.reg
                             .xetla_select<matB_t::block_elems, 1>(
                                 block_id * matB_t::block_elems)
-                            .xetla_format<int8_t>();
+                            .xetla_format<uint8_t>();
         int scale_block_id = (i / block_b_y_per_scale * num_block_x + j);
         auto scale_vec = scale.reg.xetla_select<scale_t::block_size_x, 1>(
             scale_block_id * scale_t::block_size_x);
@@ -713,15 +717,15 @@ class gemm_t<
                             .xetla_select<matB_t::block_elems, 1>(
                                 matB_block_id * matB_t::block_elems)
                             .xetla_format<typename wei_type_traits<
-                                compute_policy::weight_type>::shift_dtype>();
+                                compute_policy::quant_type>::shift_dtype>();
 
         xetla_vector<
-            typename wei_type_traits<compute_policy::weight_type>::shift_dtype,
+            typename wei_type_traits<compute_policy::quant_type>::shift_dtype,
             matB_block_size_x * pack_ratio * block_size_y_b>
             cvt_blk;
 
         xetla_vector<
-            typename wei_type_traits<compute_policy::weight_type>::cvt_dtype,
+            typename wei_type_traits<compute_policy::quant_type>::cvt_dtype,
             block_size_x_b * block_size_y_b>
             cvt_blk_32_bitwidth;
         if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
@@ -777,12 +781,48 @@ class gemm_t<
             auto dst_blk =
                 matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
                     block_id * matB_acc_t::block_elems);
+            if constexpr (compute_policy::mma_engine == mma_engine::xmx) {
+              constexpr uint32_t vnni_rows =
+                  sizeof(uint32_t) / sizeof(dtype_mma_b);
+              xetla_vector<dtype_mma_b, matB_acc_t::block_elems * vnni_rows>
+                  temp_blk;
+              temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
+                  cvt_blk_32_bitwidth;
+
 #pragma unroll
-            for (uint32_t k = 0; k < block_size_y_b; k++) {
-              dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
-                  cvt_blk_32_bitwidth.xetla_select<block_size_x_b, 1>(
-                      k * block_size_x_b) *
-                  scale_vec;
+              for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+#pragma unroll
+                for (uint32_t row = 0; row < vnni_rows; row++) {
+                  temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                      row + block_size_x_b * k * vnni_rows) =
+                      temp_blk.xetla_select<block_size_x_b, vnni_rows>(
+                          (k + row) * block_size_x_b * vnni_rows);
+                }
+              }
+
+              xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
+#pragma unroll
+              for (uint32_t row = 0; row < vnni_rows; row++) {
+                scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) =
+                    scale_vec;
+              }
+
+#pragma unroll
+              for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
+                dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                    k * block_size_x_b) =
+                    temp_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
+                        k * block_size_x_b * vnni_rows) *
+                    scale_blk;
+              }
+            } else {
+#pragma unroll
+              for (uint32_t k = 0; k < block_size_y_b; k++) {
+                dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
+                    cvt_blk_32_bitwidth.xetla_select<block_size_x_b, 1>(
+                        k * block_size_x_b) *
+                    scale_vec;
+              }
             }
           }
         } else {

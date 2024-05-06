@@ -675,7 +675,7 @@ class gemm_universal_t<
            args.zero_pt_ld / pack_ratio},
           {start_x_zero_pt, start_y_zero_pt});
 
-      gemm_args_t gemm_args(
+      gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,
           inner_loop_count,

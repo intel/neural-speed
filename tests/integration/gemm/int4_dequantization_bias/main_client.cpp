@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-#define UT_DEBUG 1
+// #define UT_DEBUG 0
 using namespace gpu::xetla;
 // The number of times the kernel is executed
 constexpr int ITER = 1;
@@ -139,8 +139,8 @@ class test4_xehpg {
   using data_type_a = fp16;
   using data_type_b = int4x2;
   using data_type_c = fp16;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr mma_engine mma_eng = mma_engine::xmx;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
 };
 
 class test1_xelpg {
@@ -871,7 +871,10 @@ void dequantize_gemm_run(int iter) {
   }
 
   for (unsigned i = 0; i < size_zero_pt; ++i) {
+    zero_pt_h[i] = uint8_t(random_uint8());
+#ifdef UT_DEBUG
     zero_pt_h[i] = 0;
+#endif
   }
 
   for (unsigned i = 0; i < size_c; ++i) {
