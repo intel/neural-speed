@@ -89,6 +89,7 @@ def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_hea
         g_idx = np.empty(0, dtype=np.int32)
 
     # pack int weight in bestla format
+    print(f"converting {dst_name} quantized tensor to bestla q4 block")
     byte_size = cpp_model.Model.np_bestla_qpack(int_weight,
                                                 gptq_scales,
                                                 gptq_zeros,
@@ -99,7 +100,6 @@ def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_hea
                                                 alg="sym" if q_config['sym'] else "asym",
                                                 compute_dtype="int8")
     dst.flatten()[:byte_size].tofile(fout)
-    print(f"converting {dst_name} quantized tensor to bestla q4 block")
 
 
 def main(args_in: Optional[List[str]] = None) -> None:
