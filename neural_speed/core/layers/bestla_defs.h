@@ -19,8 +19,8 @@
 namespace bestla {
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 using tLauncher_Fp_F32F32 =
-    wrapper::gemm::LauncherKBlock<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
-                                  epilogue::gemm::CompFp32BlockEpilogue, epilogue::gemm::AccumulatorWriteBackFp32>;
+    wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+                                epilogue::gemm::AccumulatorWriteBackFp32>;
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 using tLauncher_Int8_F32F32 =
@@ -37,6 +37,7 @@ using tAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
 using tAMX_INT8_US = gemm::ICoreRowNAmxint8<48, 16>;
 using tAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<48, 16>;
 
+using tAVX2_VNNI_KBlock = gemm::ICoreRowNAvx2vnniKBlock<24, 2>;
 using tAVX_VNNI_KBlock = gemm::ICoreRowNAvxvnniKBlock<24, 2>;
 using tAVX512_VNNI_KBlock = gemm::ICoreRowNAvx512vnniKBlock<48, 4>;
 using tAMX_INT8_US_KBlock = gemm::ICoreRowNAmxint8KBlock<48, 16>;

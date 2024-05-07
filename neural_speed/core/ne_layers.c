@@ -11494,10 +11494,10 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_PADDING_MASK_INF:
         case NE_OP_ROPE:
           // only first token use parallel
-          if (node->type != NE_TYPE_BTLA && node->src0->ne[2] > 1)
-            node->n_tasks = n_threads;
-          else
+          if (node->type == NE_TYPE_BTLA)
             node->n_tasks = 1;
+          else
+            node->n_tasks = n_threads;
           break;
         case NE_OP_SOFT_MAX: {
           size_t rows = ne_nrows(node->src0);

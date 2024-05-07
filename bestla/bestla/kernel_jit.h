@@ -313,7 +313,7 @@ class DecompressS3 {
           vpsrlw(Xbyak::Ymm(4 + i), bit2_data, 2 * i);
           vpand(Xbyak::Ymm(4 + i), Xbyak::Ymm(4 + i), lowMask);
           vpaddb(Xbyak::Ymm(i), Xbyak::Ymm(i), Xbyak::Ymm(4 + i));
-          vpslld(Xbyak::Ymm(i), Xbyak::Ymm(i), 5);
+          vpsubb(Xbyak::Ymm(i), Xbyak::Ymm(i), highMask);
           if constexpr (std::is_same_v<_DST_T, int8_t>) {
             vmovdqu(ptr[reg_dst + 32 * i], Xbyak::Ymm(i));
           } else if constexpr (std::is_same_v<_DST_T, float>) {

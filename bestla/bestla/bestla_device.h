@@ -340,14 +340,17 @@ class CpuDevice {
               case 9:  // ALD
                 PE[int(BTLA_ISA::AVX2)] = 3.0f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 5.0f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.5f;
                 break;
               case 10:  // MTL
                 PE[int(BTLA_ISA::AVX2)] = 2.2f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 3.0f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.0f;
                 break;
               case 11:  // RPL
                 PE[int(BTLA_ISA::AVX2)] = 1.8f;
                 PE[int(BTLA_ISA::AVX_VNNI)] = 2.6f;
+                PE[int(BTLA_ISA::NoSIMD)] = 3.0f;
                 break;
             }
         }
@@ -488,7 +491,7 @@ class CpuRuntime {
 
   inline void adjustPE(const BTLA_ISA isa, const float PE_) {
     // printf("Adjust:%d,%f\n",int(isa),PE_);
-    PE[int(isa)] *= PE_;
+    PE[int(isa)] = PE[int(isa)] * PE_ * 0.7 + PE[int(isa)] * 0.3;
   }
 
   size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
@@ -514,7 +517,7 @@ class CpuRuntime {
         P_core_num = static_cast<int>(_cd->getPcoreNum());
         E_core_num = thread - P_core_num;
       }
-      if (mHybrid) {
+      if (_cd->isHybrid()) {
         mL1Cache_E = _cd->getL1CacheSize_E();
         mL2Cache_E = _cd->getL2CacheSize_E();
         mHybrid = true;
