@@ -267,7 +267,8 @@ size_t bestla_qpack(const int8_t* src_w, const float* src_scales, const int8_t* 
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
       printf("[DEBUG]: 555555555555555555555555 of bestla_qpack\n");
-
+printf("n = %d, k = %d\n", n, k);
+  printf("gsize = %d", gsize);
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, g_idx);
       printf("[DEBUG]: 6666666666666666666666666666666 of bestla_qpack\n");
 
