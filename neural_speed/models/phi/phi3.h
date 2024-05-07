@@ -33,8 +33,8 @@ static const model_scratch phi3_mem_req(int n_layers, float scratch_size_ratio =
       };
     case 32:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
       };
     default:

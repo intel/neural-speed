@@ -894,6 +894,10 @@ PYBIND11_MODULE(gemma_cpp, m)
 
 PYBIND11_MODULE(grok_cpp, m)
 
+#elif MODEL_NAME_ID == 23
+
+PYBIND11_MODULE(phi3_cpp, m)
+
 #endif
 {
   m.doc() = "cpp model python binding";

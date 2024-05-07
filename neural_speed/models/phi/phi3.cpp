@@ -53,7 +53,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
   model_context& lctx = *ctx;
 
   // static batching for now
-  const int N = 7;
+  const int N = inputs->n_tokens;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
@@ -118,11 +118,11 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
     bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
-  int embd_input[7] = {1, 1183, 1722,  278, 3050,  322, 1074};
+  // int embd_input[7] = {1, 1183, 1722,  278, 3050,  322, 1074};
   ne_set_name(embd, "embd");
   for (int i = 0; i < batch_size; ++i) {
-    // memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
-  memcpy(static_cast<model_token*>(embd->data) + i * N, embd_input, N * ne_element_size(embd));
+    memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
+  // memcpy(static_cast<model_token*>(embd->data) + i * N, embd_input, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
