@@ -275,14 +275,14 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             fout.write(text)
             fout.write(struct.pack("f", -10000))
     
-    def write_header(name, data):
-        tmp = name.encode('utf-8')
+    def write_header(name, data, ftype=0):
+        str = name.encode('utf-8')
         n_dims = len(data.shape)
-        fout.write(struct.pack("iii", n_dims, len(tmp), ftype))
+        fout.write(struct.pack("iii", n_dims, len(str), ftype))
         for i in range(n_dims):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-        print(tmp)
-        fout.write(tmp)
+        print(str)
+        fout.write(str)
 
     print(hparams)
     q_norms, k_norms = dict(), dict()
@@ -318,10 +318,12 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             continue
 
         # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
         if ftype != 0:
             if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
                 print("  Converting to float16")
                 data = data.astype(np.float16)
+                ftype_cur = 1
             else:
                 print("  Converting to float32")
                 data = data.astype(np.float32)
@@ -331,7 +333,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
                 data = data.astype(np.float32)
 
         # header
-        write_header(name, data)
+        write_header(name, data, ftype_cur)
 
         # data
         data.tofile(fout)
