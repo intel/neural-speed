@@ -180,7 +180,8 @@ class gemm_t<
       tile_size_x_b / pack_ratio,
       tile_size_y_b,
       //   block_size_x_b / pack_ratio,
-      block_size_x_b,
+      block_size_x_b * pack_ratio,
+      //   block_size_x_b,
       block_size_y_b,
       reg_layout::tiled>;
   using matB_t = subgroup::tile_t<dtype_b, matB_tile_desc_t>;
@@ -258,8 +259,9 @@ class gemm_t<
   using zero_pt_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b / pack_ratio,
       tile_size_y_zero_pt,
-      //   block_size_x_b / pack_ratio,
-      block_size_x_b,
+      // block_size_x_b / pack_ratio,
+      block_size_x_b * pack_ratio,
+      //   block_size_x_b,
       block_size_y_zero_pt,
       reg_layout::tiled>;
   using zero_pt_t = subgroup::tile_t<dtype_zero_pt, zero_pt_tile_desc_t>;
@@ -449,8 +451,6 @@ class gemm_t<
     int scale_prefetch_addr_i = args.matB_base_desc.coord.y;
     int scale_load_addr_i = args.matB_base_desc.coord.y;
     SW_BARRIER();
-    sycl::ext::oneapi::experimental::printf(
-        "BLOCK_SIZE_X_B: %d\n", block_size_x_b);
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -582,7 +582,8 @@ class gemm_t<
         auto matB_blk = matB.reg
                             .xetla_select<matB_t::block_elems, 1>(
                                 block_id * matB_t::block_elems)
-                            .xetla_format<uint8_t>();
+                            .xetla_format<typename wei_type_traits<
+                                compute_policy::quant_type>::shift_dtype>();
         int scale_block_id = (i / block_b_y_per_scale * num_block_x + j);
         auto scale_vec = scale.reg.xetla_select<scale_t::block_size_x, 1>(
             scale_block_id * scale_t::block_size_x);
@@ -715,7 +716,7 @@ class gemm_t<
         }
       }
 
-      xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
+      xetla_vector<float, block_size_x_b * vnni_rows> scale_blk;
 #pragma unroll
       for (uint32_t row = 0; row < vnni_rows; row++) {
         scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) = scale_vec;

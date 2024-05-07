@@ -16,7 +16,9 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-// #define UT_DEBUG 0
+// #define UT_DEBUG 1
+#define S4_SYM_UT 1
+// #define S4_ASYM_UT 1
 using namespace gpu::xetla;
 // The number of times the kernel is executed
 constexpr int ITER = 1;
@@ -122,9 +124,9 @@ class test3_xehpg {
 class test4_xehpg {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 32;
-  static constexpr size_t mat_n = 32 * 1;
-  static constexpr size_t mat_k = 32 * 1;
+  static constexpr size_t mat_m = 64;
+  static constexpr size_t mat_n = 64 * 1;
+  static constexpr size_t mat_k = 64 * 1;
   static constexpr size_t wg_m = 32 * 1;
   static constexpr size_t wg_n = 32 * 1;
   static constexpr size_t sg_m = 32;
@@ -770,8 +772,11 @@ void dequantize_gemm_run(int iter) {
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      // gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+#ifdef S4_SYM_UT
+      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+#elif defined S4_ASYM_UT
       gpu::xetla::group::quant_mode::S4_ASYM,
+#endif
       dequant_s,
       Test::mma_eng,
       Test::arch>;
@@ -1049,6 +1054,24 @@ void dequantize_gemm_run(int iter) {
     free(A_d_shuf, context);
   }
   if constexpr (Feature::feature == optional_feature::NONE) {
+#ifdef S4_SYM_UT
+    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+        gemm_arg(
+            matrix_m,
+            matrix_k,
+            matrix_n,
+            A_d,
+            lda,
+            B_d,
+            ldb,
+            C_d,
+            ldc,
+            scale_d,
+            matrix_n,
+            Acc_d,
+            Cnt_d,
+            epilogue_args);
+#elif defined S4_ASYM_UT
     typename gemm_op_t::template arguments_t<compute_policy::quant_type>
         gemm_arg(
             matrix_m,
@@ -1067,6 +1090,7 @@ void dequantize_gemm_run(int iter) {
             Acc_d,
             Cnt_d,
             epilogue_args);
+#endif
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
     // if (!gemm_op_t::can_implement(gemm_arg)) {
@@ -1109,12 +1133,11 @@ void dequantize_gemm_run(int iter) {
     for (uint32_t j = 0; j < matrix_n / 2; j++) {
       for (uint32_t ii = 0; ii < dequant_s; ii++) {
         int start_in = i * dequant_s * matrix_n / 2 + j;
-        int start_zero_pt = i * size_zero_pt_n + j;
         int start_out = i * dequant_s * matrix_n + j * 2;
         int start_scale = i * size_scale_n + j * 2;
         int8_t data_0, data_1;
-        // if constexpr (
-        // Test::weight_dtype == gpu::xetla::group::weight_dtype::S4_ASYM) {
+#ifdef S4_ASYM_UT
+        int start_zero_pt = i * size_zero_pt_n + j;
         uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
         uint8_t data_zero_pt = zero_pt_h[start_zero_pt];
         data_0 = int8_t(data_in & 0x0f);
@@ -1125,21 +1148,18 @@ void dequantize_gemm_run(int iter) {
             fp16(data_0 - zero_pt_0) * scale_h[start_scale];
         dequantize_b[start_out + ii * matrix_n + 1] =
             fp16(data_1 - zero_pt_1) * scale_h[start_scale + 1];
-        // }
-        // if constexpr (
-        //     Test::weight_dtype ==
-        //     gpu::xetla::group::weight_dtype::S4_FULLRANGE_NO_ZP) {
-        //   uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
-        //   uint8_t data_even = (data_in & 0x0f) << 4;
-        //   memcpy(&data_0, &data_even, 1);
-        //   memcpy(&data_1, &data_in, 1);
-        //   data_0 = data_0 >> 4;
-        //   data_1 = data_1 >> 4;
-        //   dequantize_b[start_out + ii * matrix_n] =
-        //       fp16(data_0) * scale_h[start_scale];
-        //   dequantize_b[start_out + ii * matrix_n + 1] =
-        //       fp16(data_1) * scale_h[start_scale + 1];
-        // }
+#elif defined S4_SYM_UT
+        uint8_t data_in = B_h[start_in + ii * matrix_n / 2];
+        uint8_t data_even = (data_in & 0x0f) << 4;
+        memcpy(&data_0, &data_even, 1);
+        memcpy(&data_1, &data_in, 1);
+        data_0 = data_0 >> 4;
+        data_1 = data_1 >> 4;
+        dequantize_b[start_out + ii * matrix_n] =
+            fp16(data_0) * scale_h[start_scale];
+        dequantize_b[start_out + ii * matrix_n + 1] =
+            fp16(data_1) * scale_h[start_scale + 1];
+#endif
       }
     }
   }
