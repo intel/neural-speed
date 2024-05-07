@@ -25,7 +25,7 @@ enum stablelm_model {
   STABLELM_3B,
 };
 
-static const model_scratch stablelm_mem_req(int n_layers) {
+static const model_scratch stablelm_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
     case 24: // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
       return {
@@ -54,7 +54,7 @@ class stablelm : public IModel {
  private:
   model_archs name = MODEL_STABLELM;
   std::unique_ptr<model_model_loader> ml;
-  uint32_t n_layer, n_embd, n_ff, n_vocab;
+  uint32_t n_layer, n_embd, n_ff, n_vocab, n_head, n_head_kv, n_embd_head_k;
   int n_ctx, n_gpu_layer;
   bool use_mmap, use_mlock, vocab_only;
   model_scratch scratch;
