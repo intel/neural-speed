@@ -124,12 +124,12 @@ class test3_xehpg {
 class test4_xehpg {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 64;
-  static constexpr size_t mat_n = 64 * 1;
-  static constexpr size_t mat_k = 64 * 1;
-  static constexpr size_t wg_m = 32 * 1;
-  static constexpr size_t wg_n = 32 * 1;
-  static constexpr size_t sg_m = 32;
+  static constexpr size_t mat_m = 8;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 8 * 1;
+  static constexpr size_t wg_n = 32 * 4;
+  static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 32;
   static constexpr size_t sg_k = 32;
   static constexpr size_t dequant_s = 32;
