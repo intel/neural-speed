@@ -42,7 +42,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<arch_has_fpu<arch_tag_>>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;

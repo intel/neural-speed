@@ -42,7 +42,7 @@ class gemm_t<
     mem_desc_a_t_, // memory attribute of matA
     mem_desc_b_t_, // memory attribute of matB
     pre_processing_t_, // pre_processing functor
-    std::enable_if_t<arch_has_xmx(arch_tag_)>> {
+    std::enable_if_t<arch_has_xmx<arch_tag_>>> {
  public:
   using mem_desc_a_t = mem_desc_a_t_;
   using mem_desc_b_t = mem_desc_b_t_;
@@ -72,8 +72,8 @@ class gemm_t<
   using dtype_mma_a = typename compute_policy::dtype_mma_a;
   using dtype_mma_b = typename compute_policy::dtype_mma_b;
 
-  using check_dtype = group::gemm<gpu_arch::XeHpc>::default_xmx::
-      check_dtype_default<dtype_a, dtype_b, dtype_mma_a, dtype_mma_b>;
+  using check_dtype = group::gemm<arch_tag>::default_xmx::
+      template check_dtype_default<dtype_a, dtype_b, dtype_mma_a, dtype_mma_b>;
 
   /******** set memory attribute **********/
   static constexpr mem_space mem_space_a = mem_desc_a_t::space;
@@ -87,7 +87,7 @@ class gemm_t<
       is_col_major_b ? tdesc_update_dir::x_dir : tdesc_update_dir::y_dir;
 
   using check_memory =
-      group::gemm<gpu_arch::XeHpc>::default_xmx::check_memory_default<
+      group::gemm<arch_tag>::default_xmx::template check_memory_default<
           mem_layout_a,
           mem_layout_b,
           mem_space_a,
@@ -103,6 +103,7 @@ class gemm_t<
   static constexpr uint32_t tile_size_y_b = k_stride;
   static constexpr uint32_t tile_size_x_c = sg_tile_n;
   static constexpr uint32_t tile_size_y_c = sg_tile_m;
+
   static constexpr uint32_t block_size_x_a = compute_policy::block_size_x_a;
   static constexpr uint32_t block_size_y_a =
       (compute_policy::block_size_y_a > tile_size_y_a)
@@ -112,7 +113,7 @@ class gemm_t<
   static constexpr uint32_t block_size_y_b = compute_policy::block_size_y_b;
 
   using check_tile_size =
-      group::gemm<gpu_arch::XeHpc>::default_xmx::check_tile_size_default<
+      group::gemm<arch_tag>::default_xmx::template check_tile_size_default<
           dtype_mma_a,
           tile_size_x_a,
           tile_size_y_a,

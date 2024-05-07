@@ -38,7 +38,7 @@ struct tile_mma_t<
     matA_t_,
     mma_engine::xmx,
     arch_tag_,
-    std::enable_if_t<arch_has_xmx(arch_tag_)>> {
+    std::enable_if_t<arch_has_xmx<arch_tag_>>> {
   using matA_t = matA_t_;
   using matB_t = matB_t_;
   using matSrc_t = matAcc_src_t_;
@@ -47,8 +47,6 @@ struct tile_mma_t<
   using dtype_b = typename matB_t::dtype;
   using dtype_src = typename matSrc_t::dtype;
   using dtype_dst = typename matDst_t::dtype;
-
-  using mma_attr = typename arch_attr_t<arch_tag_>::mma_attr;
 
   static constexpr uint32_t a_tile_size_y = matA_t::tile_size_y;
   static constexpr uint32_t a_tile_size_x = matA_t::tile_size_x;
@@ -104,8 +102,10 @@ struct tile_mma_t<
   static constexpr int32_t num_block_m = matDst_t::num_block_y;
   static constexpr int32_t num_block_k = tile_size_k / block_size_k;
 
+  using mma_attr = mma_attr_t<arch_tag_, a_block_size_y>;
   static constexpr int32_t mma_m = mma_attr::mma_m_in_elem;
   static constexpr int32_t mma_k = mma_attr::mma_k_in_bytes / sizeof(uint32_t);
+
   static_assert(
       tile_size_m % mma_m == 0,
       "tile_size_m shoud be a multiple of mma_m");
