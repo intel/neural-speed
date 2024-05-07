@@ -127,7 +127,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
 
-  for (int il = 0; il < 1; ++il) {
+  for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
 
     lctx.use_buf(ctx0, 0);
@@ -148,12 +148,26 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
       // using mode = 2 for GPT-NeoX mode
       // struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
       //                                          Qcur->nb[1], Qcur->nb[2], Qcur->nb[3], 0);
-      Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
+      if (hparams.max_seq_len > 4096){
+        if(N <=4096) {
+          Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
+          Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
+        }
+        else {
+          Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 17, 0, hparams.freq_base, hparams.freq_scale);
+          Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 17, 0, hparams.freq_base, hparams.freq_scale);
+        }
+      }
+      else {
+          Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
+          Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
+      }
+      
       // ne_build_forward_expand(&gf, Qcur_Part);
       ne_set_name(Qcur, "Qcur");
       // struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
       //                                          Kcur->nb[1], Kcur->nb[2], Kcur->nb[3], 0);
-      Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
+      
       // ne_build_forward_expand(&gf, Kcur_Part);
       ne_set_name(Kcur, "kcur");
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
