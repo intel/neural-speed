@@ -23,8 +23,11 @@ file(GLOB HEADERS
     ${PROJECT_SOURCE_DIR}/include/*.hpp
 )
 
-include(FetchContent)
-include(neural_speed.cmake)
+# include(FetchContent)
+# include(neural_speed.cmake)
+
+add_subdirectory(../../bestla/ bestla)
+
 
 add_library(bestla_dispatcher STATIC ${HEADERS} ${SOURCES})
 if(WIN32)
@@ -35,5 +38,5 @@ endif()
 
 set_target_properties(bestla_dispatcher PROPERTIES POSITION_INDEPENDENTBTLA_CODE ON)
 set_target_properties(bestla_dispatcher PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(bestla_dispatcher OpenMP::OpenMP_CXX OpenMP::OpenMP_C "${TORCH_LIBRARIES}" bestla::bestla)
+target_link_libraries(bestla_dispatcher OpenMP::OpenMP_CXX OpenMP::OpenMP_C "${TORCH_LIBRARIES}" bestla)
 set_property(TARGET torch_cpu PROPERTY INTERFACE_COMPILE_OPTIONS "")

@@ -123,7 +123,12 @@ void do_compute(woq_config_param* p, woq_runtime_ctx* ctx, ParamA param_a) {
   if (dispatcher_utils::initer.verbose) dispatcher_utils::timer.start();
   static Launcher launcher;
   using EpiParam = typename Launcher::EpiParam;
-  EpiParam param_epi = {ctx->output->data_ptr(), ctx->bias->data_ptr(), ctx->ldo, 0, ctx->alpha, ctx->beta};
+  EpiParam param_epi = {reinterpret_cast<typename Launcher::Epilogue::DstType*>(ctx->output->data_ptr()),
+                        ctx->bias->data_ptr<float>(),
+                        ctx->ldo,
+                        0,
+                        ctx->alpha,
+                        ctx->beta};
   using GemmCore = typename Launcher::GemmCore;
   using StorageWeight = typename Launcher::PrologueB::StorageWeight;
   size_t asym_size = 0, shuf_size = 0;
@@ -170,13 +175,7 @@ void do_compute(woq_config_param* p, woq_runtime_ctx* ctx, ParamA param_a) {
     bestla::utils::GemmProblem gp(1, ctx->m, ctx->n, ctx->k, p->blocksize);
 
     typename Launcher::Param args{
-        gp,
-        param_a,
-        dynamic_cast<bestla::storage::gemm::StorageWeightKBlockNInteger*>(ctx->deseries_wei),
-        {packedw->template SPtr<int8_t>(), packedw->SDtype(), packedw->CStep(),
-         p->asym ? packedw->template ZPtr<int8_t>() : nullptr,
-         p->asym ? param_a.reduce->template RPtr<float>() : nullptr, p->asym ? param_a.reduce->lda : -1},
-        param_epi};
+        gp, param_a, dynamic_cast<bestla::storage::gemm::StorageWeightKBlockNInteger*>(ctx->deseries_wei), param_epi};
 
     if (p->asym || packedw->ShfIndice()) {
       bestla::parallel::GemmRunWithA<Parallel>(launcher, args, &dispatcher_utils::DefaultThreading);
@@ -243,8 +242,7 @@ void parse_launcher(woq_config_param* p, woq_runtime_ctx* ctx) {
     using Launcher = bestla::wrapper::gemm::LauncherIntKBlock<GemmCore::ISA, GemmCore, PrologueA, PrologueB, Epilogue>;
     return execute_task<TASK, Launcher>(p, ctx);
   } else {
-    using Launcher = bestla::wrapper::gemm::LauncherKBlock<GemmCore::ISA, GemmCore, PrologueA, PrologueB,
-                                                           bestla::epilogue::gemm::CompFp32BlockEpilogue, Epilogue>;
+    using Launcher = bestla::wrapper::gemm::LauncherBase<GemmCore::ISA, GemmCore, PrologueA, PrologueB, Epilogue>;
     return execute_task<TASK, Launcher>(p, ctx);
   }
 }
@@ -289,7 +287,7 @@ void parse_activation(woq_config_param* p, woq_runtime_ctx* ctx) {
 template <WOQ_TASK TASK, class GemmCore>
 void parse_weight(woq_config_param* p, woq_runtime_ctx* ctx) {
   using namespace bestla::prologue_b::gemm;
-  if (p->weight_type == "int8" || p->weight_type == "int4_clip" || p->weight_type == "int4_fullrange") {
+  if (p->weight_type == "int8" || p->weight_type == "int4_clip") {
     return parse_activation<TASK, GemmCore, WeightKBlockNInteger>(p, ctx);
   }
   if (p->weight_type == "nf4" || p->weight_type == "fp4_e2m1_bnb" || p->weight_type == "fp4_e2m1" ||

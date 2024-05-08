@@ -56,7 +56,7 @@ class Timer {
   high_resolution_clock::time_point m_end;
 };
 static Timer timer;
-static bestla::parallel::OMPThreading DefaultThreading(bestla::device::CpuDevice::getInstance()->getThreads());
+static bestla::parallel::OMPThreading DefaultThreading;
 string get_torch_dt_name(torch::Tensor* tensor);
 
 }  // namespace dispatcher_utils

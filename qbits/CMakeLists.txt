@@ -38,7 +38,8 @@ endif()
 
 include(FindOpenMP)
 add_subdirectory(dispatcher)
-add_subdirectory(../transformers/runtime/third_party/pybind11 pybind11)
+# add_subdirectory(../transformers/runtime/third_party/pybind11 pybind11)
+add_subdirectory(../third_party/pybind11 pybind11)
 
 file(GLOB HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 file(GLOB qbits_src ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
