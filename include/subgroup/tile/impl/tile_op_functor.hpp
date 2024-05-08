@@ -24,6 +24,7 @@
 #include <subgroup/tile/impl/load_xe.hpp>
 #include <subgroup/tile/impl/payload_xe.hpp>
 #include <subgroup/tile/impl/prefetch_xe.hpp>
+#include <subgroup/tile/impl/reduction.hpp>
 #include <subgroup/tile/impl/store_xe.hpp>
 
 namespace gpu::xetla::subgroup {
@@ -39,10 +40,19 @@ struct none_op_t {
       [[maybe_unused]] const arguments_t& args,
       [[maybe_unused]] uint32_t slm_base = 0,
       [[maybe_unused]] uint32_t nbarrier_base = 0) {}
+  // none_op_t functor for dequant_op
+  template <typename mat_out_t, typename mat_in_t, typename coord_t>
+  __XETLA_API KERNEL_FUNC void operator()(
+      [[maybe_unused]] mat_out_t& mat_out,
+      [[maybe_unused]] mat_in_t& mat_in,
+      [[maybe_unused]] const coord_t& coord,
+      [[maybe_unused]] const arguments_t& args) {
+    mat_out = mat_in;
+  }
 };
 
 /// @brief Is the element-wise relu op functor.
-/// Get the relu input from matAcc, update the the relu output in place,
+/// Get the relu input from matAcc, update the relu output in place,
 /// Used in epilogue::tile_op or chained_tile_op.
 struct relu_op_t {
   struct arguments_t {};
@@ -53,7 +63,7 @@ struct relu_op_t {
       [[maybe_unused]] const arguments_t& args,
       [[maybe_unused]] uint32_t slm_base = 0,
       [[maybe_unused]] uint32_t nbarrier_base = 0) {
-    xetla_mask<matAcc_t::tile_elems> mask = matAcc.reg <= 0;
+    xetla_mask<matAcc_t::tile_elems> mask = matAcc.reg < 0;
     matAcc.reg.xetla_merge(0, mask);
   }
 };
@@ -77,11 +87,11 @@ struct tanh_op_t {
       auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
       sub_vec = xetla_tanh<dtype, elems>(sub_vec);
     }
-    constexpr int remained_elems = matAcc_t::tile_desc::tile_elems % elems;
-    if constexpr (remained_elems != 0) {
-      auto sub_vec = matAcc.reg.xetla_select<remained_elems, 1>(
+    constexpr int remaining_elems = matAcc_t::tile_desc::tile_elems % elems;
+    if constexpr (remaining_elems != 0) {
+      auto sub_vec = matAcc.reg.xetla_select<remaining_elems, 1>(
           elems * (matAcc_t::tile_elems / elems));
-      sub_vec = xetla_tanh<dtype, remained_elems>(sub_vec);
+      sub_vec = xetla_tanh<dtype, remaining_elems>(sub_vec);
     }
   }
 };
@@ -99,29 +109,49 @@ struct sigmoid_op_t {
       [[maybe_unused]] uint32_t nbarrier_base = 0) {
     constexpr int elems = matAcc_t::tile_desc::block_elems;
     constexpr int rounds = matAcc_t::tile_desc::tile_elems / elems;
-    constexpr float one = 1.0f;
 #pragma unroll
     for (uint32_t i = 0; i < rounds; ++i) {
       auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
-      xetla_mask<elems> mask = sub_vec >= 10;
-      xetla_vector<typename matAcc_t::dtype, elems> temp_vec =
-          xetla_exp<typename matAcc_t::dtype, elems>(sub_vec);
-      xetla_vector<typename matAcc_t::dtype, elems> sigmoid_value =
-          temp_vec / (temp_vec + one);
-      sigmoid_value.xetla_merge(1, mask);
-      sub_vec = sigmoid_value;
+      sub_vec = xetla_sigmoid<typename matAcc_t::dtype, elems>(sub_vec);
     }
-    constexpr int remained_elems = matAcc_t::tile_desc::tile_elems % elems;
-    if constexpr (remained_elems != 0) {
-      auto sub_vec = matAcc.reg.xetla_select<remained_elems, 1>(
+    constexpr int remaining_elems = matAcc_t::tile_desc::tile_elems % elems;
+    if constexpr (remaining_elems != 0) {
+      auto sub_vec = matAcc.reg.xetla_select<remaining_elems, 1>(
           elems * (matAcc_t::tile_elems / elems));
-      xetla_mask<remained_elems> mask = sub_vec >= 250;
-      xetla_vector<typename matAcc_t::dtype, remained_elems> temp_vec =
-          xetla_exp<typename matAcc_t::dtype, remained_elems>(sub_vec);
-      xetla_vector<typename matAcc_t::dtype, remained_elems> sigmoid_value =
-          temp_vec / (temp_vec + one);
-      sigmoid_value.xetla_merge(1, mask);
-      sub_vec = sigmoid_value;
+      sub_vec =
+          xetla_sigmoid<typename matAcc_t::dtype, remaining_elems>(sub_vec);
+    }
+  }
+};
+
+/// @brief Is the element-wise silu op functor.
+/// Get the silu input from matAcc, update the the silu output in place,
+/// Used in epilogue::tile_op or chained_tile_op.
+struct silu_op_t {
+  struct arguments_t {};
+  template <typename matAcc_t, typename coord_t>
+  __XETLA_API KERNEL_FUNC void operator()(
+      [[maybe_unused]] matAcc_t& matAcc,
+      [[maybe_unused]] const coord_t& coord,
+      [[maybe_unused]] const arguments_t& args,
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
+    constexpr int elems = matAcc_t::tile_desc::block_elems;
+    constexpr int rounds = matAcc_t::tile_desc::tile_elems / elems;
+#pragma unroll
+    for (int i = 0; i < rounds; ++i) {
+      auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
+      xetla_vector<typename matAcc_t::dtype, elems> sigmoid_value =
+          xetla_sigmoid<typename matAcc_t::dtype, elems>(sub_vec);
+      sub_vec = sub_vec * sigmoid_value;
+    }
+    constexpr int remaining_elems = matAcc_t::tile_desc::tile_elems % elems;
+    if constexpr (remaining_elems != 0) {
+      auto sub_vec = matAcc.reg.xetla_select<remaining_elems, 1>(
+          elems * (matAcc_t::tile_elems / elems));
+      xetla_vector<typename matAcc_t::dtype, remaining_elems> sigmoid_value =
+          xetla_sigmoid<typename matAcc_t::dtype, remaining_elems>(sub_vec);
+      sub_vec = sub_vec * sigmoid_value;
     }
   }
 };
@@ -144,10 +174,9 @@ struct gelu_fwd_op_t {
     // total flag register
     constexpr int elems = 8 * 16;
     constexpr int rounds = matAcc_t::tile_elems / elems;
-
-    if constexpr (rounds > 0) {
+    if constexpr (rounds != 0) {
 #pragma unroll
-      for (uint32_t i = 0; i < rounds; ++i) {
+      for (int i = 0; i < rounds; ++i) {
         auto sub_vec = matAcc.reg.xetla_select<elems, 1>(elems * i);
         xetla_vector<dtype, elems> sub_vec_x =
             (sqrt_two_over_pi * sub_vec * (1.f + C0 * sub_vec * sub_vec));
@@ -157,13 +186,14 @@ struct gelu_fwd_op_t {
       }
     }
 
-    constexpr int remained_elems = matAcc_t::tile_elems % elems;
-    if constexpr (remained_elems != 0) {
-      auto sub_vec = matAcc.reg.xetla_select<remained_elems, 1>(elems * rounds);
-      xetla_vector<dtype, remained_elems> sub_vec_x =
+    constexpr int remaining_elems = matAcc_t::tile_elems % elems;
+    if constexpr (remaining_elems != 0) {
+      auto sub_vec = matAcc.reg.xetla_select<remaining_elems, 1>(
+          elems * (matAcc_t::tile_elems / elems));
+      xetla_vector<dtype, remaining_elems> sub_vec_x =
           (sqrt_two_over_pi * sub_vec * (1.f + C0 * sub_vec * sub_vec));
-      xetla_vector<dtype, remained_elems> tanh_value =
-          xetla_tanh<dtype, remained_elems>(sub_vec_x);
+      xetla_vector<dtype, remaining_elems> tanh_value =
+          xetla_tanh<dtype, remaining_elems>(sub_vec_x);
       sub_vec = 0.5f * sub_vec * (1.f + tanh_value);
     }
   }
@@ -886,12 +916,17 @@ struct elemwise_reduce_op_t<
 template <
     reduce_op reduce_kind,
     typename dtype_in,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+    gpu_arch arch_tag = gpu_arch::XeHpc,
+    class enable = void>
 struct elemwise_reduce_op_stream_k_t {};
 /// @brief Is the element-wise reduce op functor, specialized for Xe
 /// architecture.
-template <reduce_op reduce_kind_, typename dtype_in_>
-struct elemwise_reduce_op_stream_k_t<reduce_kind_, dtype_in_, gpu_arch::XeHpc> {
+template <reduce_op reduce_kind_, typename dtype_in_, gpu_arch arch_tag>
+struct elemwise_reduce_op_stream_k_t<
+    reduce_kind_,
+    dtype_in_,
+    arch_tag,
+    std::enable_if_t<(arch_tag <= gpu_arch::XeHpc)>> {
   using dtype_in = dtype_in_;
   using mem_desc_in_t =
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
@@ -909,9 +944,9 @@ struct elemwise_reduce_op_stream_k_t<reduce_kind_, dtype_in_, gpu_arch::XeHpc> {
   };
   template <typename matAcc_t>
   __XETLA_API KERNEL_FUNC void operator()(
-      matAcc_t& matAcc,
-      const coord_t& coord,
-      const arguments_t& args,
+      [[maybe_unused]] matAcc_t& matAcc,
+      [[maybe_unused]] const coord_t& coord,
+      [[maybe_unused]] const arguments_t& args,
       [[maybe_unused]] uint32_t slm_base = 0,
       [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using dtype_acc = typename matAcc_t::dtype;
@@ -933,7 +968,7 @@ struct elemwise_reduce_op_stream_k_t<reduce_kind_, dtype_in_, gpu_arch::XeHpc> {
         mem_desc_in_t,
         mat_in_tile_desc_t,
         msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
     mat_in_tile_t mat_in;
     mat_in_tile_t mat_zero(0);
@@ -992,6 +1027,7 @@ struct elemwise_reduce_op_stream_k_t<reduce_kind_, dtype_in_, gpu_arch::XeHpc> {
 /// @brief Is the dropout op functor.
 /// Load the mask from memory and get input from matAcc,
 /// do the scaling and zero out, update the output in place.
+/// The mask has the same layout as the output.
 /// Used in epilogue::tile_op or chained_tile_op.
 /// @tparam dtype_mask Is the mask data type.
 /// @tparam arch_tag Is the hardware architecture tag.
@@ -1052,13 +1088,15 @@ struct dropout_op_t<
     mask_in_tile_t mask_in;
     mask_in_payload_t mask_in_payload(mem_desc_mask);
     tile_load<cache_hint::cached, cache_hint::cached>(mask_in, mask_in_payload);
+    if constexpr (tile_elems / unroll_size != 0) {
 #pragma unroll
-    for (uint32_t i = 0; i < tile_elems / unroll_size; i++) {
-      xetla_mask<unroll_size> mask_flag =
-          mask_in.reg.xetla_select<unroll_size, 1>(i * unroll_size) > 0;
-      auto dst_reg = matAcc.reg.xetla_select<unroll_size, 1>(i * unroll_size);
-      dst_reg *= args.scale;
-      dst_reg.xetla_merge(0, mask_flag);
+      for (uint32_t i = 0; i < tile_elems / unroll_size; i++) {
+        xetla_mask<unroll_size> mask_flag =
+            mask_in.reg.xetla_select<unroll_size, 1>(i * unroll_size) > 0;
+        auto dst_reg = matAcc.reg.xetla_select<unroll_size, 1>(i * unroll_size);
+        dst_reg *= args.scale;
+        dst_reg.xetla_merge(0, mask_flag);
+      }
     }
     if constexpr (tile_elems % unroll_size != 0) {
       constexpr uint32_t remain_len = tile_elems % unroll_size;
@@ -1074,8 +1112,9 @@ struct dropout_op_t<
 
 /// @brief Is the random number generator and dropout op functor.
 /// Generate the mask data and get input from matAcc, do the scaling and zero
-/// out, update the output in place, dump the mask buffer to memory. Used in
-/// epilogue::tile_op or chained_tile_op.
+/// out, update the output in place, dump the mask buffer to memory. The mask
+/// has the same layout as the output. Used in epilogue::tile_op or
+/// chained_tile_op.
 /// @tparam dtype_mask Is the mask data type.
 /// @tparam arch_tag Is the hardware architecture tag.
 template <typename dtype_mask, gpu_arch arch_tag, class enable = void>
@@ -1149,12 +1188,9 @@ struct rng_dropout_op_t<
     // calculate the scale internally
     float scale = 1.f / (1.f - args.prob);
     uint32_t threshold = uint32_t(args.prob * float(4294967296));
-    xetla_vector<uint64_t, 1> rand_offset_v = xetla_load_global<
-        uint64_t,
-        1,
-        data_size::default_size,
-        cache_hint::cached,
-        cache_hint::cached>(args.rand_offset_ptr, 0);
+    xetla_vector<uint64_t, 1> rand_offset_v =
+        xetla_load_global<uint64_t, 1, cache_hint::cached, cache_hint::cached>(
+            args.rand_offset_ptr, 0);
     uint64_t rand_offset = rand_offset_v[0];
     uint64_t rand_subseq = uint64_t(coord.y) << 32 | uint64_t(coord.x);
     rand_gen.init(args.rand_seed, rand_subseq, rand_offset);
@@ -1162,16 +1198,18 @@ struct rng_dropout_op_t<
     mem_desc_mask_t mem_desc_mask(args.mask_base, args.mask_shape, coord);
     mask_out_tile_t mask_out;
     mask_out_payload_t mask_out_payload(mem_desc_mask);
-
+    if constexpr (tile_elems / random_len != 0) {
 #pragma unroll
-    for (uint32_t i = 0; i < tile_elems / random_len; i++) {
-      auto out_sub = matAcc.reg.xetla_select<random_len, 1>(i * random_len);
-      auto mask_sub = mask_out.reg.xetla_select<random_len, 1>(i * random_len);
-      xetla_vector<uint32_t, random_len> rand_val = rand_gen.rand();
-      xetla_mask<random_len> mask_flag = rand_val < threshold;
-      out_sub *= scale;
-      out_sub.xetla_merge(0, mask_flag);
-      mask_sub.xetla_merge(1, 0, mask_flag);
+      for (uint32_t i = 0; i < tile_elems / random_len; i++) {
+        auto out_sub = matAcc.reg.xetla_select<random_len, 1>(i * random_len);
+        auto mask_sub =
+            mask_out.reg.xetla_select<random_len, 1>(i * random_len);
+        xetla_vector<uint32_t, random_len> rand_val = rand_gen.rand();
+        xetla_mask<random_len> mask_flag = rand_val < threshold;
+        out_sub *= scale;
+        out_sub.xetla_merge(0, mask_flag);
+        mask_sub.xetla_merge(1, 0, mask_flag);
+      }
     }
     if constexpr (tile_elems % random_len != 0) {
       constexpr uint32_t remain_len = tile_elems % random_len;

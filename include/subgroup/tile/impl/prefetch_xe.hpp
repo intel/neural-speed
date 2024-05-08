@@ -107,17 +107,11 @@ tile_prefetch(payload_t& payload) {
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += num_channel) {
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes +
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
-        xetla_mask<num_channel> pred_y =
-            payload.base_y + offset_y + sub_block_y + num_channel >
-                payload.height_in_elems
-            ? (xetla_vector_gen<uint32_t, num_channel>(0, 1) <
-               (payload.height_in_elems % num_channel))
-            : 1;
 
         xetla_prefetch_global<
             prefetch_dtype,
@@ -128,7 +122,7 @@ tile_prefetch(payload_t& payload) {
             payload_t::num_channel>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
-            pred_y);
+            1);
       }
     }
   }

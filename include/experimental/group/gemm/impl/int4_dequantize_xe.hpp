@@ -118,7 +118,7 @@ class gemm_t<
   static_assert(!is_col_major_b, "only support MatB row-major for now");
   static_assert(
       (!is_local_a) && (!is_local_b),
-      "only support  from global memory for now");
+      "only support from global memory for now");
 
   static constexpr uint32_t stages = compute_policy::stages;
   static constexpr uint32_t sync_freq = compute_policy::sync_freq;
@@ -130,16 +130,23 @@ class gemm_t<
   static constexpr uint32_t tile_size_y_b = k_stride;
   static constexpr uint32_t tile_size_x_c = sg_tile_n;
   static constexpr uint32_t tile_size_y_c = sg_tile_m;
+
   static constexpr uint32_t block_size_x_a =
-      compute_policy::block_bytes_x_a / sizeof(dtype_mma_a);
+      (compute_policy::block_size_x_a > tile_size_x_a)
+      ? tile_size_x_a
+      : compute_policy::block_size_x_a;
   static constexpr uint32_t block_size_y_a =
       (compute_policy::block_size_y_a > tile_size_y_a)
       ? tile_size_y_a
       : compute_policy::block_size_y_a;
-
-  static constexpr uint32_t block_size_x_b = compute_policy::block_size_x_b;
+  static constexpr uint32_t block_size_x_b =
+      (compute_policy::block_size_x_b > tile_size_x_b)
+      ? tile_size_x_b
+      : compute_policy::block_size_x_b;
   static constexpr uint32_t block_size_y_b =
-      compute_policy::block_bytes_y_b / sizeof(dtype_mma_b);
+      (compute_policy::block_size_y_b > tile_size_y_b)
+      ? tile_size_y_b
+      : compute_policy::block_size_y_b;
 
   /******** set tile  **********/
   static constexpr bool is_vnni_tiled_a =
@@ -189,7 +196,8 @@ class gemm_t<
       tile_size_y_b,
       block_size_x_b,
       block_size_y_b,
-      reg_layout::tiled>;
+      compute_policy::mma_engine == mma_engine::xmx ? reg_layout::vnni_tiled
+                                                    : reg_layout::tiled>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_acc_tile_desc_t>;
 
  public:

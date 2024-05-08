@@ -261,7 +261,6 @@ struct xetla_data_transformer<
       xetla_vector<dtype_compute, 1> local_scale = xetla_load_global<
           dtype_compute,
           1,
-          data_size::default_size,
           cache_hint::cached,
           cache_hint::cached>(args->scale, offset);
 

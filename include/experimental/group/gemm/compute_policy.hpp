@@ -92,6 +92,30 @@ struct compute_policy_int4_dequantize<
   using dtype_scale = dtype_scale_;
   using dtype_zero_pt = dtype_zero_pt_;
   static constexpr quant_mode quant_type = quant_type_;
+
+  static constexpr uint32_t block_bytes_x_a = (mma_engine == mma_engine::xmx)
+      ? arch_attr_t<arch_tag>::mma_attr::mma_k_in_bytes
+      : 64;
+
+  static constexpr uint32_t block_size_x_a =
+      block_bytes_x_a / sizeof(dtype_mma_a);
+
+  static constexpr uint32_t block_size_y_a = 16;
+
+  static constexpr uint32_t block_size_x_b = (mma_engine == mma_engine::xmx)
+      ? arch_attr_t<arch_tag>::mma_attr::mma_n_in_elem
+      : 64;
+
+  static constexpr uint32_t block_bytes_y_b = (mma_engine == mma_engine::xmx)
+      ? arch_attr_t<arch_tag>::mma_attr::mma_k_in_bytes
+      : 64;
+
+  static constexpr uint32_t block_size_y_b =
+      block_bytes_y_b / sizeof(dtype_mma_b);
+
+  static_assert(
+      block_bytes_x_a == block_bytes_y_b,
+      "mat_a x need to match with mat_b y");
 };
 
 } // namespace gpu::xetla::group

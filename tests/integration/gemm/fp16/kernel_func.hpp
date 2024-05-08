@@ -41,8 +41,8 @@ template <
     gpu_arch gpu_arch>
 struct fp16_gemm_test_func {
   using tile_shape = tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-  static constexpr uint32_t periodic_sync_interval = 8;
-  static constexpr uint32_t prefetch_distance = 3;
+  static constexpr uint32_t periodic_sync_interval = 0 ; //8;
+  static constexpr uint32_t prefetch_distance = 0 ;//256 / (sg_k * sizeof(dtype_a));
 
   using compute_attr = typename std::conditional<
       (engine == mma_engine::fpu),
@@ -75,6 +75,9 @@ struct fp16_gemm_test_func {
       dispatch_policy_kslicing<group_swizzle, global_kslicing, local_kslicing>;
 
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+  static constexpr uint32_t barrier_count = gemm_op_t::get_barrier_count();
+  static constexpr uint32_t slm_size = gemm_op_t::get_slm_size();
 
   static const char* func_name() {
     return "fp16_gemm_test_func";

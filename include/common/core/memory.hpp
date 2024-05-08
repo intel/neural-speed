@@ -32,8 +32,26 @@ namespace detail {
 /// @brief lookup table for cache hint.
 ///
 ///
-constexpr __ESIMD_ENS::cache_hint get_cache_hint(gpu::xetla::cache_hint ch) {
+constexpr auto get_cache_hint(gpu::xetla::cache_hint ch) {
   switch (ch) {
+#if __INTEL_LLVM_COMPILER >= 20240100
+    case gpu::xetla::cache_hint::none:
+      return __ESIMD_NS::cache_hint::none;
+    case gpu::xetla::cache_hint::uncached:
+      return __ESIMD_NS::cache_hint::uncached;
+    case gpu::xetla::cache_hint::cached:
+      return __ESIMD_NS::cache_hint::cached;
+    case gpu::xetla::cache_hint::write_back:
+      return __ESIMD_NS::cache_hint::write_back;
+    case gpu::xetla::cache_hint::write_through:
+      return __ESIMD_NS::cache_hint::write_through;
+    case gpu::xetla::cache_hint::streaming:
+      return __ESIMD_NS::cache_hint::streaming;
+    case gpu::xetla::cache_hint::read_invalidate:
+      return __ESIMD_NS::cache_hint::read_invalidate;
+    case gpu::xetla::cache_hint::const_cached:
+      return __ESIMD_NS::cache_hint::const_cached;
+#else
     case gpu::xetla::cache_hint::none:
       return __ESIMD_ENS::cache_hint::none;
     case gpu::xetla::cache_hint::uncached:
@@ -48,6 +66,7 @@ constexpr __ESIMD_ENS::cache_hint get_cache_hint(gpu::xetla::cache_hint ch) {
       return __ESIMD_ENS::cache_hint::streaming;
     case gpu::xetla::cache_hint::read_invalidate:
       return __ESIMD_ENS::cache_hint::read_invalidate;
+#endif
   }
 }
 
@@ -288,6 +307,57 @@ __XETLA_API void xetla_prefetch_global(Ty* p, uint64_t offset = 0) {
       gpu::xetla::detail::get_cache_hint(L2H)>((T*)p + (offset / sizeof(T)));
 }
 
+/// simd<T, N> block_load(const T* ptr, size_t byte_offset,
+///                       props={});  // (usm-bl-2)
+/// This function loads a contiguous memory block from address referenced
+/// by USM pointer \p ptr and the given \p byte_offset.
+///
+/// There may be temporary restrictions depending on L1, L2 cache hints,
+/// See details in the 'Restrictions' section below. The restrictions will be
+/// relaxed in the future.
+///
+/// The parameter \p props specifies the optional compile-time properties
+/// of the type esimd::properties and may include esimd::cache_hint_L1,
+/// esimd::cache_hint_L2, esimd::alignment. Other properties are ignored.
+///
+/// Cache hints: If \p props does not specify any L1 or L2 cache hints, then
+/// the cache_hint::none value is assumed by default.
+///
+/// Alignment: If \p props does not specify the 'alignment' property, then
+/// the default assumed alignment is 4-bytes for 4-byte or smaller elements
+/// and 8-bytes for 8-byte elements. The address may be element-size aligned
+/// even for byte- and word-elements, but in such case the smaller alignment
+/// property must explicitly passed to this function. Extra restrictions
+/// may be in place - see Restrictions/R1 below.
+///
+/// Restrictions - cache hint imposed - temporary:
+/// If L1 or L2 cache hint is passed, then:
+/// R1: The pointer must be at least 4-byte aligned for elements of 4-bytes or
+///     smaller and 8-byte aligned for 8-byte elements.
+/// R2: The number of elements for 8-byte data: 1, 2, 3, 4, 8, 16, 32, 64;
+///     for 4-byte data: 1, 2, 3, 4, 8, 16, 32, 64,
+///                      or 128(only if alignment is 8-bytes or more);
+///     for 2-byte data: 2, 4, 6, 8, 16, 32, 64, 128,
+///                      or 256(only if alignment is 8-bytes or more);
+///     for 1-byte data: 4, 8, 12, 16, 32, 64, 128, 256,
+///                      or 512(only if alignment is 8-bytes or more).
+/// R3: The target device must be DG2, PVC or newer GPU.
+template <
+    typename T,
+    int N,
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int alignment = 16>
+__XETLA_API xetla_vector<T, N> xetla_load_global(
+    const T* ptr,
+    size_t byte_offset) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
+  return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
+}
+
 /// @brief Stateless scattered load.
 /// Collects elements located at specified address and returns them
 /// to a single \ref xetla_vector object.
@@ -335,47 +405,6 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
       N>((T*)p, offsets, pred);
 }
 
-/// @brief Stateless block load (transposed gather with 1 channel).
-/// Collects elements located at specified address and returns them
-/// to a single \ref xetla_vector object.
-///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_load.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to load per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p      [in] is the base pointer.
-/// @param offset [in] is the zero-based offset in bytes.
-/// @return is a xetla_vector of type T and size NElts.
-///
-template <
-    typename Ty,
-    uint8_t NElts = 1,
-    data_size DS = data_size::default_size,
-    cache_hint L1H = cache_hint::none,
-    cache_hint L2H = cache_hint::none>
-__XETLA_API xetla_vector<Ty, NElts> xetla_load_global(
-    Ty* p,
-    uint64_t offset = 0) {
-  using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
-          offset, (uint64_t)p));
-
-  return __ESIMD_ENS::lsc_block_load<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>((T*)p + (offset / sizeof(T)));
-}
-
 /// @brief Stateless scattered store.
 /// Writes elements to specific address.
 ///
@@ -418,41 +447,55 @@ __XETLA_API void xetla_store_global(
       N>((T*)p, offsets, vals, pred);
 }
 
-/// @brief Stateless block store (transposed scatter with 1 channel).
-/// Writes elements to specific address.
+/// void block_store(T* ptr, size_t byte_offset,         // (usm-bs-2)
+///                          simd<T, N> vals, props={});
+/// This function stores a contiguous memory block to USM pointer \p ptr and
+/// byte-offset \p byte_offset with data specified by \p vals.
 ///
-/// Supported platforms: DG2, PVC
+/// There may be temporary restrictions depending on L1, L2 cache hints,
+/// See details in the 'Restrictions' section below. The restrictions will be
+/// relaxed in the future.
 ///
-/// VISA instruction: lsc_store.ugm
+/// The parameter \p props specifies the optional compile-time properties
+/// of the type esimd::properties and may include esimd::cache_hint_L1,
+/// esimd::cache_hint_L2, esimd::alignment. Other properties are ignored.
 ///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to store per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p      [in] is the base pointer.
-/// @param offset [in] is the zero-based offset in bytes.
-/// @param vals   [in] is values to store.
+/// Cache hints: If \p props does not specify any L1 or L2 cache hints, then
+/// the cache_hint::none value is assumed by default.
 ///
+/// Alignment: If \p props does not specify the 'alignment' property, then
+/// the default assumed alignment is 16 bytes if \p props does not specify any
+/// L1 or L2 cache hints, and the minimally required element-size
+/// alignment otherwise. Note that additional/temporary restrictions may apply
+/// (see Restrictions below).
+///
+/// Restrictions - cache hint imposed - temporary:
+/// If L1 or L2 cache hint is passed, then:
+/// R1: The pointer plus byte offset must be at least 4-byte aligned for
+/// elements of 4-bytes or smaller and 8-byte aligned for 8-byte elements.
+/// R2: The number of elements for 8-byte data: 1, 2, 3, 4, 8, 16, 32, 64;
+///     for 4-byte data: 1, 2, 3, 4, 8, 16, 32, 64,
+///                      or 128(only if alignment is 8-bytes or more);
+///     for 2-byte data: 2, 4, 6, 8, 16, 32, 64, 128,
+///                      or 256(only if alignment is 8-bytes or more);
+///     for 1-byte data: 4, 8, 12, 16, 32, 64, 128, 256,
+///                      or 512(only if alignment is 8-bytes or more).
+/// R3: The target device must be DG2, PVC or newer GPU.
 template <
-    typename Ty,
-    uint8_t NElts = 1,
-    data_size DS = data_size::default_size,
+    typename T,
+    int N,
     cache_hint L1H = cache_hint::none,
-    cache_hint L2H = cache_hint::none>
+    cache_hint L2H = cache_hint::none,
+    int alignment = 16>
 __XETLA_API void xetla_store_global(
-    Ty* p,
-    uint64_t offset,
-    xetla_vector<Ty, NElts> vals) {
-  using T = native_type_t<Ty>;
-  __ESIMD_ENS::lsc_block_store<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>(
-      (T*)p + (offset / sizeof(T)), vals);
+    T* ptr,
+    size_t byte_offset,
+    xetla_vector<T, N> vals) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
+  __ESIMD_NS::block_store<T, N>(ptr, byte_offset, vals, props);
 }
 
 /// @brief Stateless scattered atomic (0 src).

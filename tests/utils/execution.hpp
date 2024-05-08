@@ -98,6 +98,9 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
       device,
       context);
 
+  size_t ops = 2 * matrix_m * matrix_n * matrix_k;
+  profiling_helper prof("gemm", ops, "gflops");
+
   try {
     std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
     auto inputBundle =
@@ -128,6 +131,8 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(arg);
 
+    int constexpr warm_up = 10;
+    int constexpr iters = 100;
     for (size_t i = 0; i < batch; i++) {
       auto A_ptr = A + i * size_a;
       auto B_ptr = B + i * size_b;
@@ -147,31 +152,41 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
         result = test_result::skip;
         break;
       }
-
-      auto e_esimd = queue.submit([&](handler& cgh) {
-        cgh.use_kernel_bundle(exeBundle);
-        cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
-          gpu::xetla::xetla_local_init<SLMSIZE>();
-          gpu::xetla::xetla_nbarrier_init<BARNUM>();
-          KERNEL::run(
-              item,
-              A_ptr,
-              B_ptr,
-              C_ptr,
-              matrix_m,
-              matrix_n,
-              matrix_k,
-              Acc_ptr,
-              Cnt_ptr);
+      for (int iter = 0; iter < iters + warm_up; iter++) {
+        if (iter >= warm_up) {
+          prof.cpu_start();
+        }
+        auto e_esimd = queue.submit([&](handler& cgh) {
+          cgh.use_kernel_bundle(exeBundle);
+          cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
+            gpu::xetla::xetla_local_init<SLMSIZE>();
+            gpu::xetla::xetla_nbarrier_init<BARNUM>();
+            KERNEL::run(
+                item,
+                A_ptr,
+                B_ptr,
+                C_ptr,
+                matrix_m,
+                matrix_n,
+                matrix_k,
+                Acc_ptr,
+                Cnt_ptr);
+          });
         });
-      });
-      e_esimd.wait();
+        e_esimd.wait();
+        if (iter >= warm_up) {
+          prof.cpu_end();
+          prof.add_gpu_event(e_esimd);
+        }
+      }
     }
   } catch (cl::sycl::exception const& e) {
     std::cout << "SYCL exception caught: " << e.what() << '\n';
     result = test_result::fail;
   }
 
+  // performance
+  prof.print_profiling_result(profiling_selector::GPU);
   // validation
   if (result == test_result::complete) {
     validate_func vfunc;

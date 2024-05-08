@@ -58,7 +58,6 @@ KERNEL_FUNC inline void vector_add_func(
   xetla_vector<dtype, SIMD> ivector2 = xetla_load_global<
       dtype,
       SIMD,
-      data_size::default_size,
       cache_hint::uncached,
       cache_hint::uncached>(b, offset);
 

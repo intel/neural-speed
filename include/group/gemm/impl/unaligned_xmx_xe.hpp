@@ -129,8 +129,6 @@ class gemm_t<
 
   /******** set tile  **********/
   static constexpr reg_layout reg_layout_a = reg_layout::tiled;
-
- public:
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
       tile_size_y_a,
@@ -216,6 +214,7 @@ class gemm_t<
       wg_size_y,
       arch_tag>;
 
+ public:
   using matAcc_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_c,
       tile_size_y_c,

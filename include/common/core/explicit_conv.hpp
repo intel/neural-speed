@@ -55,6 +55,9 @@ __XETLA_API typename std::enable_if_t<
     std::is_same<T_dst, bf16>::value && std::is_same<T_src, float>::value,
     xetla_vector<T_dst, N>>
 xetla_cvt(xetla_vector<T_src, N> src) {
+  // xetla_vector<int32_t, N> a = src.template bit_cast_view<int32_t>();
+  // xetla_vector<int16_t, N> c = a >> 16;
+  // return c.xetla_format<bf16>();
   xetla_vector<T_dst, N> dst = src;
   return dst;
 }
@@ -68,6 +71,10 @@ __XETLA_API typename std::enable_if_t<
     std::is_same<T_dst, float>::value && std::is_same<T_src, bf16>::value,
     xetla_vector<T_dst, N>>
 xetla_cvt(xetla_vector<T_src, N> src) {
+  // xetla_vector<int16_t, N> a = src.template bit_cast_view<int16_t>();
+  // xetla_vector<int32_t, N> b = a;
+  // auto c = b << 16;
+  // return c.xetla_format<float>();
   xetla_vector<T_dst, N> dst = src;
   return dst;
 }

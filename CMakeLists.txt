@@ -8,6 +8,8 @@ if (NOT CMAKE_BUILD_TYPE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 if(UNIX)
+    set(CMAKE_C_COMPILER icx)
+    set(CMAKE_CXX_COMPILER icpx)
 else() # Windows
     # Force CMake to use icx-cl rather than the default C++ compiler/linker
     # (needed on Windows only)
