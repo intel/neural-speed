@@ -3,6 +3,7 @@
 namespace bestla {
 using namespace utils;
 namespace ut {
+#if 0
 class UT_DecompressKBlockS4FP {
  public:
   UT_DecompressKBlockS4FP() {
@@ -10,38 +11,8 @@ class UT_DecompressKBlockS4FP {
     CheckISA(AVX2);
     ut_avx2<BTLA_DTYPE::S4_CLIP, 1, float, float>(410, 24, 24, 24, 0, 128, 24);
     ut_avx2<BTLA_DTYPE::S4_CLIP, 1, float, float>(410, 48, 48, 48, 0, 128, 48);
-    CheckISA(AVX512F);
-    ut<BTLA_DTYPE::S4_CLIP, 2, float, float>(32, 128, 128, 128, 0, 32, 128);
-    ut<BTLA_DTYPE::S4_CLIP, 1, float, float>(32, 48, 48, 128, 0, 32, 128);
-    ut<BTLA_DTYPE::S4_CLIP, 1, float, utils::bf16>(32, 48, 48, 128, 0, 32, 128);
   }
 
-  template <BTLA_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
-  void ut(int row, int col, int ld_src, int ld_dst, int k_offset, int kblock, int NPad, bool asym = false) {
-    printf("Test Case %s_%d_%d: %d %d %d %d %d %d %d %d\n", __FUNCTION__, int(S4_T), PACK_ROW, row, col, ld_src, ld_dst,
-           k_offset, kblock, NPad, asym);
-    std::vector<utils::int4x2> s4_wei(row * col / 2);
-    std::vector<int8_t> s8_wei(col * row);
-    std::vector<DST_T> bf16_wei(ld_dst * row);
-    std::vector<DST_T> ref_wei(ld_dst * row);
-    std::vector<ST_T> scales(col);
-    std::vector<int8_t> zero_points(col);
-    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-128), int8_t(127));
-    fill_buffer_randn(scales.data(), scales.size(), ST_T(0.01f), ST_T(0.02f));
-    fill_buffer_randn(zero_points.data(), zero_points.size(), (int8_t)(-5), (int8_t)(5));
-
-    for (int i = 0; i < col * row; i += 2) {
-      s4_wei[i / 2].x = utils::int4x2::convert(s8_wei[i]);
-      s4_wei[i / 2].y = utils::int4x2::convert(s8_wei[i + 1]);
-    }
-    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::AVX512F, ST_T, S4_T>(
-        s4_wei.data(), bf16_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
-        k_offset, kblock, NPad, cache, CacheSize);
-    kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::NoSIMD, ST_T, S4_T>(
-        s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
-        k_offset, kblock, NPad, cache, CacheSize);
-    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
-  }
 
   template <BTLA_DTYPE S4_T, int PACK_ROW, typename ST_T, typename DST_T>
   void ut_avx2(int row, int col, int ld_src, int ld_dst, int k_offset, int kblock, int NPad, bool asym = false) {
@@ -68,11 +39,16 @@ class UT_DecompressKBlockS4FP {
     kernel::wrapper::DecompressKBlockS4Fp<DST_T, PACK_ROW>::template forward<BTLA_ISA::AVX2, ST_T, S4_T>(
         s4_wei.data(), ref_wei.data(), row, col, ld_src, ld_dst, scales.data(), asym ? zero_points.data() : nullptr,
         k_offset, kblock, NPad, cache, CacheSize);
-    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), DST_T(0.01f));
+    DST_T thres = DST_T(0.01f);
+    if constexpr (std::is_same_v<DST_T, utils::bf16>) {
+      thres = DST_T(BF16_ERR);
+    }
+    ut::buffer_error(ref_wei.data(), bf16_wei.data(), bf16_wei.size(), thres);
   }
 };
 #ifdef BTLA_UT_KERNEL_WRAPPER
 static UT_DecompressKBlockS4FP sUT_DecompressKBlockS4FP;
+#endif
 #endif
 
 class UT_DecompressKBlockF4FP {

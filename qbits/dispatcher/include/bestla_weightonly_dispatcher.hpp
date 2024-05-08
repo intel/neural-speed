@@ -25,6 +25,8 @@ enum WOQ_TASK {
   WOQ_QUANTIZE,
   WOQ_DEQUANTIZE,
   WOQ_LINEAR,
+  WOQ_REPACK,
+  WOQ_GET_PACKW_SIZE,
 };
 
 struct woq_param_base {
@@ -40,13 +42,14 @@ struct woq_config_param : public woq_param_base {
   dispatcher_utils::QBITS_DT dst_dt;  // determine write_back template
 };
 
-struct woq_packq_param : public woq_param_base {
+struct repack_quantized_weight_param : public woq_param_base {
   bool enable_act_shuffle;
 };
 
-struct woq_packq_ctx {
+struct repack_quantized_weight_ctx {
   torch::Tensor *qweight, *scale, *zp, *g_idx, *output;
   int n, k;
+  size_t packw_size;
 };
 
 struct woq_runtime_ctx {

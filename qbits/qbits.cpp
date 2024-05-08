@@ -58,26 +58,38 @@ static void inline init_woq_config_param(woq::woq_config_param* p, woq::woq_runt
   }
 }
 
-static torch::Tensor woq_packq(const torch::Tensor& qweight, const torch::Tensor& scale, const torch::Tensor& zp,
-                               const torch::Tensor& g_idx, const std::string& weight_type,
-                               const std::string& scale_type, const std::string& compute_type, bool asym,
-                               int64_t blocksize) {
+static torch::Tensor repack_quantized_weight(const torch::Tensor& qweight, const torch::Tensor& scale,
+                                             const torch::Tensor& zp, const torch::Tensor& g_idx,
+                                             const std::string& weight_type, const std::string& scale_type,
+                                             const std::string& compute_type, bool asym, int64_t blocksize) {
   torch::Tensor output;
-  woq::woq_packq_param p{compute_type, weight_type, scale_type, asym, static_cast<int>(blocksize), g_idx.numel() != 0};
-  woq::woq_packq_ctx ctx{const_cast<torch::Tensor*>(&qweight),
-                         const_cast<torch::Tensor*>(&scale),
-                         const_cast<torch::Tensor*>(&zp),
-                         const_cast<torch::Tensor*>(&g_idx),
-                         &output,
-                         static_cast<int>(qweight.sizes()[1]),
-                         static_cast<int>(qweight.sizes()[0])};
-  woq::bestla_packq(&p, &ctx);
+  woq::repack_quantized_weight_param p{compute_type,      weight_type, scale_type, asym, static_cast<int>(blocksize),
+                                       g_idx.numel() != 0};
+  woq::repack_quantized_weight_ctx ctx{const_cast<torch::Tensor*>(&qweight),
+                                       const_cast<torch::Tensor*>(&scale),
+                                       const_cast<torch::Tensor*>(&zp),
+                                       const_cast<torch::Tensor*>(&g_idx),
+                                       &output,
+                                       static_cast<int>(qweight.sizes()[1]),
+                                       static_cast<int>(qweight.sizes()[0])};
+  woq::bestla_packq(&p, &ctx, woq::WOQ_REPACK);
   return output;
 }
 
-static torch::Tensor woq_quantize(const torch::Tensor& fp32_weight, bool transpose, int64_t blocksize,
-                                  const std::string& compute_type, const std::string& weight_type,
-                                  const std::string& scale_type, bool asym) {
+static size_t get_packed_weight_size(int k, int n, const std::string& weight_type, const std::string& scale_type,
+                                     const std::string& compute_type, bool asym, int64_t blocksize, bool act_shuf) {
+  woq::repack_quantized_weight_param p{compute_type, weight_type, scale_type, asym, static_cast<int>(blocksize),
+                                       act_shuf};
+  woq::repack_quantized_weight_ctx ctx;
+  ctx.n = n;
+  ctx.k = k;
+  woq::bestla_packq(&p, &ctx, woq::WOQ_GET_PACKW_SIZE);
+  return ctx.packw_size;
+}
+
+static torch::Tensor quantize_to_packed_weight(const torch::Tensor& fp32_weight, bool transpose, int64_t blocksize,
+                                               const std::string& compute_type, const std::string& weight_type,
+                                               const std::string& scale_type, bool asym) {
   torch::Tensor output;
   woq::woq_config_param p;
   woq::woq_runtime_ctx ctx{nullptr, const_cast<torch::Tensor*>(&fp32_weight), nullptr, &output, transpose};
@@ -87,9 +99,9 @@ static torch::Tensor woq_quantize(const torch::Tensor& fp32_weight, bool transpo
   return output;
 }
 
-static void woq_dequantize(const torch::Tensor& compressed_weight, torch::Tensor& dequantize_weight, bool transpose,
-                           const std::string& compute_type, const std::string& weight_type,
-                           const std::string& scale_type) {
+static void dequantize_packed_weight(const torch::Tensor& compressed_weight, torch::Tensor& dequantize_weight,
+                                     bool transpose, const std::string& compute_type, const std::string& weight_type,
+                                     const std::string& scale_type) {
   woq::woq_config_param p;
   woq::woq_runtime_ctx ctx{nullptr, const_cast<torch::Tensor*>(&compressed_weight), nullptr, &dequantize_weight,
                            transpose};
@@ -99,10 +111,18 @@ static void woq_dequantize(const torch::Tensor& compressed_weight, torch::Tensor
 }
 
 static void woq_linear(const torch::Tensor& activation, const torch::Tensor& weight, const torch::Tensor& bias,
-                       torch::Tensor& output, int64_t ldo, bool with_bias, const std::string& compute_type,
-                       const std::string& weight_type, const std::string& scale_type, bool asym) {
+                       torch::Tensor& output, const std::string& compute_type, const std::string& weight_type,
+                       const std::string& scale_type, bool asym) {
   woq::woq_config_param p;
-  torch::Tensor* rt_bias = with_bias ? const_cast<torch::Tensor*>(&bias) : &output;
+
+  torch::Tensor bias_fp32;
+  torch::Tensor* rt_bias = bias.numel() == 0 ? &output : const_cast<torch::Tensor*>(&bias);
+  if (bias.scalar_type() != torch::kFloat32 && bias.numel() != 0) {
+    LOG(WARNING) << "QBits: bias in qbits linear op should be fp32, internal conversion will affect performance";
+    bias_fp32 = bias.to(torch::kFloat32);
+    rt_bias = &bias_fp32;
+  }
+
   woq::woq_runtime_ctx ctx{
       const_cast<torch::Tensor*>(&activation),
       const_cast<torch::Tensor*>(&weight),
@@ -110,12 +130,12 @@ static void woq_linear(const torch::Tensor& activation, const torch::Tensor& wei
       &output,
   };
   ctx.lda = static_cast<int>(activation.sizes()[1]);
-  ctx.ldo = static_cast<int>(ldo);
+  ctx.ldo = static_cast<int>(output.sizes()[1]);
   ctx.m = static_cast<int>(activation.sizes()[0]);
   ctx.k = static_cast<int>(activation.sizes()[1]);
-  ctx.n = static_cast<int>(ldo);
+  ctx.n = ctx.ldo;
   ctx.alpha = 1.f;
-  ctx.beta = with_bias ? 1.f : 0.f;
+  ctx.beta = bias.numel() != 0 ? 1.f : 0.f;
   init_woq_config_param<woq::WOQ_LINEAR>(&p, &ctx, compute_type, weight_type, scale_type, asym);
   woq::dispatch_woq_task(&p, &ctx, woq::WOQ_LINEAR);
 }
@@ -141,7 +161,7 @@ static void bestlaop_gemm(const torch::Tensor& matA, const torch::Tensor& matB, 
   return bestla_gemm::dispatch_bestla_gemm(&ctx);
 }
 
-static torch::Tensor acquire_woq_packw_info(torch::Tensor& packw, int64_t acquire_type) {
+static torch::Tensor acquire_packed_weight_info(torch::Tensor& packw, int64_t acquire_type) {
   return woq::get_packw_info(packw, static_cast<woq::PACKW_ACQUIRE_TYPE>(acquire_type));
 }
 
@@ -158,14 +178,15 @@ static bool check_isa_supported(std::string isa) {
   return false;
 }
 
-PYBIND11_MODULE(qbits, m) {
-  m.def("woq_quantize", &woq_quantize);
+PYBIND11_MODULE(qbits_py, m) {
+  m.def("quantize_to_packed_weight", &quantize_to_packed_weight);
   m.def("woq_linear", &woq_linear);
-  m.def("woq_dequantize", &woq_dequantize);
-  m.def("woq_packq", &woq_packq);
+  m.def("dequantize_packed_weight", &dequantize_packed_weight);
+  m.def("repack_quantized_weight", &repack_quantized_weight);
+  m.def("get_packed_weight_size", &get_packed_weight_size);
   m.def("set_woq_workspace", &set_woq_workspace);
   m.def("matmul", &bestlaop_gemm);
-  m.def("acquire_woq_packw_info", &acquire_woq_packw_info);
+  m.def("acquire_packed_weight_info", &acquire_packed_weight_info);
   m.def("dropout_fwd", &qbits_dropout_fwd);
   m.def("dropout_bwd", &qbits_dropout_bwd);
   m.def("check_isa_supported", &check_isa_supported);
