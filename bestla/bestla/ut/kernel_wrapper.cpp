@@ -93,6 +93,7 @@ class UT_PaddingInterleaveMN {
   UT_PaddingInterleaveMN() {
     UT_START();
     // ut<48, 2, bf16, bf16>(128, 128, 2);  // TO IMPLEMENT
+    CheckISA(AVX512_FP16);
     ut<32, 2, fp16, bf16>(128, 128, 2);
   }
   template <int NTile, int RowPack, typename T_SRC, typename T_DST>
@@ -120,6 +121,7 @@ class UT_PaddingTransInterleaveMN {
  public:
   UT_PaddingTransInterleaveMN() {
     UT_START();
+    CheckISA(AVX512_FP16);
     // ut<48, 2, bf16, bf16>(128, 128, 2);  // TO IMPLEMENT
     ut<32, 2, fp16, bf16>(128, 128, 2);
   }

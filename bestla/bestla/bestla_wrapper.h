@@ -191,17 +191,16 @@ class LauncherBase {
         int n = _param.problem.dims[2];
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
-        auto Cptr = _param.paramC.C + _config.loc[1];
         SNbits::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
           if constexpr (std::is_same_v<AType, float>) {
             kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                Aptr, _param.paramA.lda, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
+                Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-
-          Cptr += GemmCore::NTILE;
+          Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE, _param.paramC,
+                            StackTmp, TmpSize);
           SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
@@ -209,13 +208,9 @@ class LauncherBase {
             kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-          for (int i = 0; i < MTILE; i++) {
-            memcpy(Cptr + i * _param.paramC.ldc, tmpc_ptr + i * GemmCore::NTILE,
-                   (_config.size[1] - in) * sizeof(CType));
-          }
+          Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
+                            _param.paramC, StackTmp, TmpSize);
         }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], _param.paramC.ldc, 0, _config.loc[1], MTILE,
-                          _config.size[1], _param.paramC, StackTmp, TmpSize);
       }
     }
 
@@ -448,20 +443,19 @@ class LauncherIntKBlock {
         int n = _param.problem.dims[2];
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
-        auto Cptr = _param.paramC.C + _config.loc[1];
         SNbits::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
           if constexpr (std::is_same_v<AType, uint8_t>) {
             kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
+                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           } else if constexpr (std::is_same_v<AType, int8_t>) {
             kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
-                paramA, paramB, Cptr, _param.paramC.ldc, k, kblocksize, StackTmp, TmpSize);
+                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-
-          Cptr += GemmCore::NTILE;
+          Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE, _param.paramC,
+                            StackTmp, TmpSize);
           SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
@@ -472,13 +466,9 @@ class LauncherIntKBlock {
             kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-          for (int i = 0; i < MTILE; i++) {
-            memcpy(Cptr + i * _param.paramC.ldc, tmpc_ptr + i * GemmCore::NTILE,
-                   (_config.size[1] - in) * sizeof(CType));
-          }
+          Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
+                            _param.paramC, StackTmp, TmpSize);
         }
-        Epilogue::forward(_param.paramC.C + _config.loc[1], _param.paramC.ldc, 0, _config.loc[1], MTILE,
-                          _config.size[1], _param.paramC, StackTmp, TmpSize);
       }
     }
 
