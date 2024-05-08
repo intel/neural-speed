@@ -72,7 +72,6 @@ void quantize_to_packed_weight(woq_config_param* p, woq_runtime_ctx* ctx) {
   if constexpr (std::is_same_v<WType, bestla::storage::gemm::StorageWeightKBlockNInteger>) {
     TORCH_CHECK(p->scale_type == "fp32" || p->scale_type == "bf16",
                 "Qbits: scale_type must be fp32/bf16 in NInteger Weight.");
-    if (p->scale_type == "bf16") TORCH_CHECK(!p->asym, "Qbits: asym is not supported when scale_type==bf16 currently.");
     packedw = launcher.mProB.createStorage(ctx->n, ctx->k, p->blocksize, wei2bestladt_map[p->weight_type],
                                            scale2bestladt_map[p->scale_type], BTLA_DTYPE::BF16, p->asym);
   } else if constexpr (std::is_same_v<WType, bestla::storage::gemm::StorageWeightKBlockNFloat>) {
@@ -306,7 +305,6 @@ void parse_gemm_core_online(woq_config_param* p, woq_runtime_ctx* ctx) {
   set_nk(ctx, ctx->weight);
   p->blocksize = p->blocksize == -1 ? ctx->k : p->blocksize;
   if (p->compute_type == "int8") {
-    TORCH_CHECK(p->asym == false, "Qbits: int8 compute_type doesn't support asym quantization currently.")
     if (dispatcher_utils::check_amx() && p->blocksize % bestla::gemm::ICoreRowNAmxint8KBlock<48, 16>::KTILE == 0) {
       return parse_weight<TASK, bestla::gemm::ICoreRowNAmxint8KBlock<48, 16>>(p, ctx);
     }
@@ -348,13 +346,11 @@ void parse_gemm_core_offline(woq_config_param* p, woq_runtime_ctx* ctx) {
   auto CType = bestla::gemm::CoreAttr::get_mask_val(ctx->deseries_wei->mCoreId, bestla::gemm::CoreAttr::COMP_MASK,
                                                     bestla::gemm::CoreAttr::COMP_SHIFT);
   if (CType == uint32_t(bestla::gemm::CompType::COMP_INT8_US_INT32)) {
-    TORCH_CHECK(p->asym == false, "Qbits: int8 compute_type doesn't support asym quantization currently.")
     if (NTile == bestla::gemm::ICoreRowNAmxint8KBlock<48, 16>::NTILE && dispatcher_utils::check_amx()) {
       return parse_weight<TASK, bestla::gemm::ICoreRowNAmxint8KBlock<48, 16>>(p, ctx);
     }
   }
   if (CType == uint32_t(bestla::gemm::CompType::COMP_INT8_US_FP32)) {
-    TORCH_CHECK(p->asym == false, "Qbits: int8 compute_type doesn't support asym quantization currently.")
     if (NTile == bestla::gemm::ICoreRowNAvx512vnniKBlock<48, 4>::NTILE && dispatcher_utils::check_avx512_vnni()) {
       return parse_weight<TASK, bestla::gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(p, ctx);
     }
