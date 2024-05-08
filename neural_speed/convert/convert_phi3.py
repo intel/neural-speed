@@ -51,117 +51,6 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-def phi3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
-    print("phi3.gguf converting: ")
-    list_vars = model.state_dict()
-    n_rot = int(hparams["partial_rotary_factor"]*hparams["hidden_size"]/hparams["num_attention_heads"])
-    for name in list_vars.keys():
-        print(name, list_vars[name].shape, list_vars[name].dtype)
-
-    print(hparams)
-
-    gguf_file = fname_out + '.gguf'
-    gguf_writer = gguf.GGUFWriter(gguf_file, "phi3")
-
-    gguf_writer.add_uint32('magic', 0x67676d66)
-    gguf_writer.add_uint32('version', 1)
-    gguf_writer.add_uint32('n_vocab', hparams["vocab_size"])
-    gguf_writer.add_embedding_length(hparams["hidden_size"])
-    gguf_writer.add_head_count(hparams["num_attention_heads"])
-    gguf_writer.add_head_count_kv(hparams["num_key_value_heads"])
-
-    gguf_writer.add_block_count(hparams["num_hidden_layers"])
-    gguf_writer.add_rope_dimension_count(n_rot)
-    gguf_writer.add_uint32('ftype', ftype)
-    gguf_writer.add_context_length(hparams["max_position_embeddings"])
-    gguf_writer.add_feed_forward_length(hparams["intermediate_size"])
-
-    gguf_writer.add_bos_token_id(tokenizer.bos_token_id)
-    gguf_writer.add_eos_token_id(tokenizer.eos_token_id)
-    gguf_writer.add_pad_token_id(tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0)
-    gguf_writer.add_sep_token_id(tokenizer.sep_token_id if tokenizer.sep_token_id is not None else 0)
-
-    def write_vocab_gguf(dir_model, hparams, gguf_writer):
-        tokens: list[bytearray] = []
-        toktypes: list[int] = []
-
-        from transformers import AutoTokenizer  # type: ignore[attr-defined]
-        tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
-        vocab_size = hparams.get("vocab_size", len(tokenizer.vocab))
-        assert max(tokenizer.vocab.values()) < vocab_size
-
-        reverse_vocab = {id_: encoded_tok for encoded_tok, id_ in tokenizer.vocab.items()}
-        added_vocab = tokenizer.get_added_vocab()
-
-        for i in range(vocab_size):
-            if i not in reverse_vocab:
-                pad_token = f"[PAD{i}]".encode('utf-8')
-                tokens.append(bytearray(pad_token))
-                toktypes.append(gguf.TokenType.USER_DEFINED)
-            elif reverse_vocab[i] in added_vocab:
-                tokens.append(reverse_vocab[i])
-                if tokenizer.added_tokens_decoder[i].special:
-                    toktypes.append(gguf.TokenType.CONTROL)
-                else:
-                    toktypes.append(gguf.TokenType.USER_DEFINED)
-            else:
-                tokens.append(reverse_vocab[i])
-                toktypes.append(gguf.TokenType.NORMAL)
-
-        gguf_writer.add_tokenizer_model("gpt2")
-        gguf_writer.add_token_list(tokens)
-        gguf_writer.add_token_types(toktypes)
-
-        special_vocab = gguf.SpecialVocab(dir_model, load_merges=True)
-        special_vocab.add_to_gguf(gguf_writer)
-
-    write_vocab_gguf(dir_model, hparams, gguf_writer)
-
-    # tensor info
-    print("gguf: get tensor metadata")
-    for name in list_vars.keys():
-        data = list_vars[name].squeeze().numpy()
-
-        print("Processing variable: " + name + " with shape: ", data.shape)
-        if 'inv_freq' in name:
-            continue
-
-        n_dims = len(data.shape)
-
-        # ftype == 0 -> float32, ftype == 1 -> float16
-        ftype_cur = 0
-        if ftype != 0:
-            if name[-7:] == ".weight" and n_dims == 2:
-                print("  Converting to float16")
-                data = data.astype(np.float16)
-                ftype_cur = 1
-            else:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
-                ftype_cur = 0
-        else:
-            if data.dtype != np.float32:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
-                ftype_cur = 0
-
-        # print(f"[{i+1:{padi}d}/{len(model)}]
-        # Writing tensor {name:38s} | size {size:16} | type {lazy_tensor.data_type.name:4}")
-
-        gguf_writer.add_tensor(name, data)
-
-    print("gguf: write header")
-    gguf_writer.write_header_to_file()
-    print("gguf: write metadata")
-    gguf_writer.write_kv_data_to_file()
-    print("gguf: write tensors")
-    gguf_writer.write_tensors_to_file()
-
-    gguf_writer.close()
-
-    print("Done. Output file: " + fname_out)
-    print("")
-
 def phi3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     n_rot = int(hparams["hidden_size"]/hparams["num_attention_heads"])
     model.eval()
@@ -274,7 +163,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--format",
                         type=str,
                         default="NE",
-                        choices=["NE", "GGUF"],
+                        choices=["NE"],
                         help="convert to the GGUF or NE format")
     args = parser.parse_args(args_in)
 
@@ -295,10 +184,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
     hparams = model.config.to_dict()
-    if args.format == "GGUF":
-        phi3_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
-    else:
-        phi3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
+    phi3_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
 
 
 
