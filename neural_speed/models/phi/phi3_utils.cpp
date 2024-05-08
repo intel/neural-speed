@@ -49,7 +49,7 @@ void model_load_internal(const std::string& fname, model_archs arch, model_conte
 }
 
 void phi3::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bool use_mmap_, bool use_mlock_,
-               bool vocab_only_) {
+                bool vocab_only_) {
   model_context& lctx = *ctx;
   n_gpu_layer = n_gpu_layer_;
   use_mmap = use_mmap_;
@@ -131,16 +131,16 @@ void phi3::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.attn[1] = ml->get_tensor(layers_i + ".attn_output.weight", {n_embd, n_embd}, backend);
       // ffn norm
       // layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
-    // ffn GEMM
+      // ffn GEMM
       layer.ffn[0] = ml->get_tensor(layers_i + ".ffn_down.weight", {8192, n_embd}, backend);
       layer.ffn[1] = ml->get_tensor(layers_i + ".ffn_up.weight", {n_embd, 2 * 8192}, backend);
       // ffn GEMM
       if (backend != NE_BACKEND_CPU) {
-        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) 
-         + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                      ne_nbytes(layer.norm[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
       }
     }
-  }else{  // ns_bin
+  } else {  // ns_bin
     model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("model.norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("lm_head.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
@@ -158,13 +158,13 @@ void phi3::load(model_context* ctx, model_progress_callback progress_callback, v
       layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
       // ffn norm
       // layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
-    // ffn GEMM
+      // ffn GEMM
       layer.ffn[0] = ml->get_tensor(layers_i + ".mlp.down_proj.weight", {8192, n_embd}, backend);
       layer.ffn[1] = ml->get_tensor(layers_i + ".mlp.gate_up_proj.weight", {n_embd, 2 * 8192}, backend);
       // ffn GEMM
       if (backend != NE_BACKEND_CPU) {
-        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) 
-         + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
+        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                      ne_nbytes(layer.norm[1]) + ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]);
       }
     }
   }
@@ -198,9 +198,9 @@ class phi3_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
-    if (layername == "model.embed_tokens.weight") {
+    if (layername == "model.embed_tokens.weight" || layername == "output.weight" || layername == "lm_head.weight") {
       // special layer process, can be loaded by config file
-      return quant_params_internal();  // return q4_0 to cover the usage of getrow
+      return quant_params_internal{quant_bits::count};  // return q4_0 to cover the usage of getrow
     }
     quantize &= (ne.size() == 2);
     if (quantize) {

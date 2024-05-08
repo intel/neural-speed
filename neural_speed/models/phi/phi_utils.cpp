@@ -111,7 +111,7 @@ void phi::load(model_context* ctx, model_progress_callback progress_callback, vo
 
   // PHI is set up so that if padding_idx is specified then offset the embedding ids by 2
   // and adjust num_embeddings appropriately. Other models don't have this hack
-  
+
   model.others[0] = ml->get_tensor("model.embed_tokens.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
   model.others[1] = ml->get_tensor("model.final_layernorm.weight", {n_embd}, NE_BACKEND_CPU);
   model.others[2] = ml->get_tensor("model.final_layernorm.bias", {n_embd}, NE_BACKEND_CPU);

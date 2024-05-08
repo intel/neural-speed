@@ -37,7 +37,6 @@
 #include "models/model_utils/model_utils.h"
 #include "models/model_utils/util.h"
 
-
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -122,7 +121,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
   ne_set_name(embd, "embd");
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + i * N, (inputs + i)->tokens, N * ne_element_size(embd));
-  // memcpy(static_cast<model_token*>(embd->data) + i * N, embd_input, N * ne_element_size(embd));
+    // memcpy(static_cast<model_token*>(embd->data) + i * N, embd_input, N * ne_element_size(embd));
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
@@ -141,33 +140,37 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
       }
       // compute QKV
       cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
-      struct ne_tensor* Qcur = ne_reshape_3d(ctx0, ne_cont(ctx0, ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0 * sizeof(float) * n_embd)),head_dim,n_head,N);
-      struct ne_tensor* Kcur = ne_reshape_3d(ctx0,ne_cont(ctx0, ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1 * sizeof(float) * n_embd)),head_dim,n_head,N);
-      struct ne_tensor* Vcur = ne_reshape_3d(ctx0,ne_cont(ctx0, ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2 * sizeof(float) * n_embd)),head_dim,n_head,N);
+      struct ne_tensor* Qcur =
+          ne_reshape_3d(ctx0, ne_cont(ctx0, ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0 * sizeof(float) * n_embd)),
+                        head_dim, n_head, N);
+      struct ne_tensor* Kcur =
+          ne_reshape_3d(ctx0, ne_cont(ctx0, ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1 * sizeof(float) * n_embd)),
+                        head_dim, n_head, N);
+      struct ne_tensor* Vcur =
+          ne_reshape_3d(ctx0, ne_cont(ctx0, ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2 * sizeof(float) * n_embd)),
+                        head_dim, n_head, N);
 
       // using mode = 2 for GPT-NeoX mode
       // struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
       //                                          Qcur->nb[1], Qcur->nb[2], Qcur->nb[3], 0);
-      if (hparams.max_seq_len > 4096){
-        if(N <=4096) {
+      if (hparams.max_seq_len > 4096) {
+        if (N <= 4096) {
           Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
           Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
-        }
-        else {
+        } else {
           Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 17, 0, hparams.freq_base, hparams.freq_scale);
           Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 17, 0, hparams.freq_base, hparams.freq_scale);
         }
+      } else {
+        Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
+        Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       }
-      else {
-          Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
-          Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
-      }
-      
+
       // ne_build_forward_expand(&gf, Qcur_Part);
       ne_set_name(Qcur, "Qcur");
       // struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
       //                                          Kcur->nb[1], Kcur->nb[2], Kcur->nb[3], 0);
-      
+
       // ne_build_forward_expand(&gf, Kcur_Part);
       ne_set_name(Kcur, "kcur");
       const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
@@ -227,7 +230,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
             ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>((n_embd) / n_head))));
 
         // KQ_masked = mask_past(KQ_scaled)
-        struct ne_tensor* KQ_masked = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
+        struct ne_tensor* KQ_masked = ne_diag_mask_inf(ctx0, KQ_scaled, n_past);
 
         // KQ = soft_max(KQ_masked)
         struct ne_tensor* KQ_soft_max = ne_soft_max_inplace(ctx0, KQ_masked);
@@ -302,12 +305,17 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
       cur = ne_rms_norm(ctx0, cur, hparams.norm_eps);
       cur = ne_mul(ctx0, cur, model.layers[il].norm[1]);
     }
-    struct ne_tensor* ffn_gate = ne_view_2d(ctx0,model.layers[il].ffn[1],n_embd, 8192, model.layers[il].ffn[1]->nb[1], 0 * sizeof(float) * n_embd * 8192);
-    struct ne_tensor* ffn_up = ne_view_2d(ctx0,model.layers[il].ffn[1],n_embd, 8192, model.layers[il].ffn[1]->nb[1], 1 * sizeof(float) * n_embd * 8192);
+    // size_t weight_size=ne_element_size(model.layers[il].ffn[1]);
+    // struct ne_tensor* ffn_gate = ne_cont(ctx0,ne_view_2d(ctx0,model.layers[il].ffn[1],n_embd, 8192,
+    // model.layers[il].ffn[1]->nb[1], 0 * weight_size * n_embd * 8192)); struct ne_tensor* ffn_up =
+    // ne_cont(ctx0,ne_view_2d(ctx0,model.layers[il].ffn[1],n_embd, 8192, model.layers[il].ffn[1]->nb[1], 1 *
+    // weight_size * n_embd * 8192));
     {
-      struct ne_tensor* cur1 = ne_mul_mat(ctx0, ffn_gate, cur);
-      struct ne_tensor* cur2 = ne_mul_mat(ctx0, ffn_up, cur);
-      cur = ne_mul(ctx0, cur2, ne_silu(ctx0,cur1));
+      struct ne_tensor* cur1 = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
+      struct ne_tensor* cur_gate = ne_cont(ctx0, ne_view_2d(ctx0, cur1, cur1->ne[0] / 2, cur1->ne[1], cur1->nb[1], 0));
+      struct ne_tensor* cur_up =
+          ne_cont(ctx0, ne_view_2d(ctx0, cur1, cur1->ne[0] / 2, cur1->ne[1], cur1->nb[1], cur1->nb[1] / 2));
+      cur = ne_mul(ctx0, cur_up, ne_silu(ctx0, cur_gate));
       cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
     }
 
