@@ -282,7 +282,8 @@ void parse_activation(woq_config_param* p, woq_runtime_ctx* ctx) {
 template <WOQ_TASK TASK, class GemmCore>
 void parse_weight(woq_config_param* p, woq_runtime_ctx* ctx) {
   using namespace bestla::prologue_b::gemm;
-  if (p->weight_type == "int8" || p->weight_type == "int4_clip") {
+  if (p->weight_type == "int8" || p->weight_type == "int4_clip" || p->weight_type == "int3_clip" ||
+      p->weight_type == "int2_clip") {
     return parse_activation<TASK, GemmCore, WeightKBlockNInteger>(p, ctx);
   }
   if (p->weight_type == "nf4" || p->weight_type == "fp4_e2m1_bnb" || p->weight_type == "fp4_e2m1" ||

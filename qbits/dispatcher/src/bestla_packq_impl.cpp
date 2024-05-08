@@ -41,6 +41,10 @@ std::string get_dtype_str(BTLA_DTYPE dtype) {
       return "bf16";
     case BTLA_DTYPE::S4_CLIP:
       return "int4_clip";
+    case BTLA_DTYPE::S3_CLIP:
+      return "int3_clip";
+    case BTLA_DTYPE::S2_CLIP:
+      return "int2_clip";
     case BTLA_DTYPE::F4_NF4:
       return "nf4";
     case BTLA_DTYPE::F4_E2M1:
@@ -180,7 +184,10 @@ torch::Tensor get_packw_info(torch::Tensor& packw, PACKW_ACQUIRE_TYPE ACQ_T) {
 }
 
 void bestla_packq(repack_quantized_weight_param* p, repack_quantized_weight_ctx* ctx, WOQ_TASK task) {
-  TORCH_CHECK(p->weight_type == "int8" || p->weight_type == "int4_clip", "Qbits: only support Integer WOQ in PACKQ");
+  // TODO(zhe): elegant impl.
+  TORCH_CHECK(p->weight_type == "int8" || p->weight_type == "int4_clip" || p->weight_type == "int3_clip" ||
+                  p->weight_type == "int2_clip",
+              "Qbits: only support Integer WOQ in PACKQ");
 
   // NTILE & compute-dtype determine the padsize.
   // in qbits:
