@@ -216,6 +216,107 @@ class UT_BlockQunatize_S3S4 {
 // static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
 #endif
 
+class UT_BlockQunatize_Sym_Comparison {
+ public:
+  UT_BlockQunatize_Sym_Comparison() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<sAVX2>(128, BTLA_DTYPE::S4_CLIP, -0.5f, 0.5f);
+    ut<sAVX2>(128, BTLA_DTYPE::S4_CLIP, -0.3f, 0.5f);
+    ut<sAVX2>(128, BTLA_DTYPE::S3_CLIP, -0.5f, 0.5f);
+    ut<sAVX2>(128, BTLA_DTYPE::S3_CLIP, -0.1f, 0.5f);
+    ut<sAVX2>(128, BTLA_DTYPE::S2_CLIP, -0.5f, 0.5f);
+    ut<sAVX2>(128, BTLA_DTYPE::S2_CLIP, -0.1f, 0.5f);
+  }
+  template <class GemmCore>
+  void ut(int blocksize, BTLA_DTYPE QUANT_T, float minval, float maxval) {
+    auto constexpr RuntimeISA = GemmCore::ISA;
+    printf("%s DType %s %d: %d, [%f,%f]\n", __FUNCTION__, utils::bestla_dtype_str(QUANT_T), int(RuntimeISA), blocksize,
+           minval, maxval);
+    int ldb = 1;
+    utils::aligned_vector<float> raw(blocksize);
+    ut::fill_buffer_randn(raw.data(), raw.size(), minval, maxval);
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, RuntimeISA>;
+    PrologueB kernel;
+    auto ptr = kernel.createStorage(1, blocksize, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, false);
+    avector<int8_t> buffer(ptr.mSize);
+    ptr.assign(buffer.data());
+    kernel.packWeight(1, blocksize, raw.data(), ldb, &ptr, UT_Threading::get());
+    avector<float> dequant(blocksize, 0);
+    kernel.unpackWeight(1, blocksize, &ptr, dequant.data(), 1, UT_Threading::get());
+    ut::buffer_error(raw.data(), dequant.data(), dequant.size(), 0.01f);
+    auto sTraditionalSym = [&](float* srcptr, int blocksize, float* scale_, int8_t* dstptr) {
+      int const NBits = utils::bestla_dtype_bits(QUANT_T);
+      int const FullValue = 1 << (NBits - 1);
+      int const SymValue = FullValue - 1;
+      float absmax = 0;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        absmax = std::max(absmax, std::abs(srcptr[ij]));
+      }
+      auto clip = [&](int s) {
+        s = std::max(s, -FullValue);
+        s = std::min(s, FullValue - 1);
+        return s;
+      };
+      float scale = absmax / SymValue;
+      float rscale = 1.f / scale;
+      *scale_ = scale;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        dstptr[ij] = utils::cast<float, int8_t>(srcptr[ij] * rscale);
+        dstptr[ij] = clip(dstptr[ij]);
+      }
+    };
+    avector<int8_t> traQ(blocksize);
+    float traScale = 0.f;
+    sTraditionalSym(raw.data(), blocksize, &traScale, traQ.data());
+    auto dequantfunc = [](int8_t* qptr, int blocksize, float scale, float* fptr) {
+      for (size_t i = 0; i < blocksize; i++) {
+        fptr[i] = float(qptr[i] * scale);
+      }
+    };
+    avector<float> traDQ(blocksize);
+    dequantfunc(traQ.data(), blocksize, traScale, traDQ.data());
+    ut::buffer_error(raw.data(), traDQ.data(), traDQ.size(), 0.01f);
+
+    auto sLlamaSym = [&](float* srcptr, int blocksize, float* scale_, int8_t* dstptr) {
+      int const NBits = utils::bestla_dtype_bits(QUANT_T);
+      int const FullValue = 1 << (NBits - 1);
+      int const SymValue = FullValue - 1;
+      float amax = 0.0f;  // absolute max
+      float max = 0.0f;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        if (amax < std::abs(srcptr[ij])) {
+          amax = std::abs(srcptr[ij]);
+          max = srcptr[ij];
+        }
+      }
+      auto clip = [&](int s) {
+        s = std::max(s, -FullValue);
+        s = std::min(s, FullValue - 1);
+        return s;
+      };
+      float scale = max / -FullValue;
+      float rscale = 1.f / scale;
+      *scale_ = scale;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        dstptr[ij] = utils::cast<float, int8_t>(srcptr[ij] * rscale);
+        dstptr[ij] = clip(dstptr[ij]);
+      }
+    };
+    avector<int8_t> llamaQ(blocksize);
+    float llamaScale = 0.f;
+    sLlamaSym(raw.data(), blocksize, &llamaScale, llamaQ.data());
+    avector<float> llamaDQ(blocksize);
+    dequantfunc(llamaQ.data(), blocksize, llamaScale, llamaDQ.data());
+    ut::buffer_error(raw.data(), llamaDQ.data(), llamaDQ.size(), 0.01f);
+  }
+};
+#ifdef BTLA_UT_PROLOGUE_B
+// no proper threshold for this UT
+//
+#endif
+static UT_BlockQunatize_Sym_Comparison sUT_BlockQunatize_Sym_Comparison;
+
 class UT_S3_WOQ {
  public:
   UT_S3_WOQ() {

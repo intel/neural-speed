@@ -1141,8 +1141,14 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       float scale = absmax / NVal;
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
+      auto clip = [&](int s) {
+        s = std::max(s, -FullValue);
+        s = std::min(s, FullValue - 1);
+        return s;
+      };
       for (size_t ij = 0; ij < blocksize; ij++) {
-        dstptr[(j + ij) * ld_dst + i] = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
+        auto tmp = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
+        dstptr[(j + ij) * ld_dst + i] = clip(tmp);
       }
     };
 
