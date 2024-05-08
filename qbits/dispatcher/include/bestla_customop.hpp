@@ -49,8 +49,8 @@ class AlphaBetaProcess {
     float alpha, beta;
   };
   using DstType = DST_T;
-  BTLA_CODE forward(float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& _param, void* tmpcache = nullptr, size_t cachesize = -1) {
+  static BTLA_CODE forward(float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
+                           const int N, const Param& _param, void* tmpcache = nullptr, size_t cachesize = -1) {
     return alphabeta_dt_cvt_process<Param, DST_T, ISA_T>(cacheptr, cachestep, M_offset, N_offset, M, N, _param);
   }
 };
