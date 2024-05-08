@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
-#undef BTLA_UT_WRAPPER
-#undef BTLA_UT_PROLOGUE_B
+
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -747,6 +746,9 @@ class UTWOQ_CompInt8 {
     int blks = k / blocksize;
     int nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
+    if (isasym) {
+      memsize += n * blks * sizeof(int8_t);
+    }
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
@@ -808,8 +810,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompInt8 sUTWOQ_CompInt8;
+#endif
 
 #if 0
 typedef struct {
