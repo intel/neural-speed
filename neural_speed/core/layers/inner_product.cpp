@@ -40,47 +40,19 @@ template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <cl
 void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
                      storage::gemm::IWeightBase* _B, float* C, const int ldc, float* bias, bool broadcast_bias,
                      int8_t* WorkSpace, parallel::IThreading* th) {
-  if (M <= 16) {
-    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
-    using Launcher = wrapper::gemm::LauncherKBlock<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T,
-                                                   epilogue::gemm::CompFp32BlockEpilogue, custom::epilogue::AddFp32>;
-    auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-    static Launcher kernel;
-    utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
-    auto reduceA = kernel.mProA.createReduceStorage(M, K, B->mBlockSize);
-    auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-    if (B->IsAsym()) {
-      reduceA.assign(WorkSpace);
-      WorkSpace += reduceA.mSize;
-    }
-    if (B->ShfIndice()) {
-      reordA.assign(WorkSpace);
-    }
-    typename Launcher::BEpiParam blkargs{
-        B->template SPtr<int8_t>(),     B->SDtype(), B->CStep(), B->template ZPtr<int8_t>(),
-        reduceA.template RPtr<float>(), reduceA.lda};
-    typename Launcher::Param args{
-        gp, {A, lda, &reduceA, B->ShfIndice(), &reordA}, {B}, blkargs, {C, bias, ldc, broadcast_bias ? 0 : ldc}};
-    if (B->IsAsym() || B->ShfIndice()) {
-      parallel::GemmRunWithA<Parallel>(kernel, args, th);
-    } else {
-      parallel::GemmRun<Parallel>(kernel, args, th);
-    }
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, custom::epilogue::AddFp32>;
+  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
+  utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
+  static Launcher kernel;
+  auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
+  typename Launcher::Param args{
+      gp, {A, lda, nullptr, B->ShfIndice(), &reordA}, {B}, {C, bias, ldc, broadcast_bias ? 0 : ldc}};
+  if (B->ShfIndice()) {
+    reordA.assign(WorkSpace);
+    parallel::GemmRunWithA<Parallel>(kernel, args, th);
   } else {
-    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, custom::epilogue::AddFp32>;
-    auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-    utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
-    static Launcher kernel;
-    auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-    typename Launcher::Param args{
-        gp, {A, lda, nullptr, B->ShfIndice(), &reordA}, {B}, {C, bias, ldc, broadcast_bias ? 0 : ldc}};
-    if (B->ShfIndice()) {
-      reordA.assign(WorkSpace);
-      parallel::GemmRunWithA<Parallel>(kernel, args, th);
-    } else {
-      parallel::GemmRun<Parallel>(kernel, args, th);
-    }
+    parallel::GemmRun<Parallel>(kernel, args, th);
   }
 }
 
@@ -185,6 +157,9 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           ip_add::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
                                                                broadcast_bias, workspace, pth);
+        } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          ip_add::BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
+                                                                broadcast_bias, workspace, pth);
         }
       }
     }

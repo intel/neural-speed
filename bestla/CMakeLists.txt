@@ -40,6 +40,7 @@ if(BTLA_SYCL)
   file(GLOB sycl_headers ${PROJECT_NAME}/sycl/*.h ${PROJECT_NAME}/sycl/*.hpp)
   add_compile_definitions(BTLA_SYCL)
   list(APPEND sycl_libs IntelSYCL::SYCL_CXX)
+  add_compile_options(-march=native)
   #add_link_options(-fsycl-targets=spir64 -Xsycl-target-backend "-options -ze-opt-large-register-file")
 endif(BTLA_SYCL)
 
