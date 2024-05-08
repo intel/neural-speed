@@ -11,7 +11,7 @@ from setuptools.command.build_ext import build_ext
 from cmake import CMAKE_BIN_DIR
 
 
-CMAKE_BUILD_TYPE = os.environ.get("CMAKE_BUILD_TYPE", "Release")
+CMAKE_BUILD_TYPE = os.environ.get("CMAKE_BUILD_TYPE", "Debug")
 """ Whether to build with -O0 / -O3 / -g; could be one of Debug / Release / RelWithDebInfo; default to Release """
 
 CMAKE_GENERATOR = os.environ.get("CMAKE_GENERATOR", "Ninja")

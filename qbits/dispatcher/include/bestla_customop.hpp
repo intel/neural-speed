@@ -22,12 +22,12 @@ template <typename Param, typename DST_T, BTLA_ISA ISA_T>
 inline BTLA_CODE alphabeta_dt_cvt_process(float* tmp_dst, const int cachestep, const int M_offset, const int N_offset,
                                           const int M, const int N, const Param& _param) {
   auto DOffset = M_offset * _param.ldd + N_offset;
-  auto dptr = _param.D + DOffset;
+  auto dptr = reinterpret_cast<float*>(_param.D) + DOffset;
   bestla::kernel::wrapper::AlphaBetaF32F32::template forward<ISA_T>(_param.alpha, tmp_dst, cachestep, _param.beta, dptr,
                                                                     _param.ldd, tmp_dst, cachestep, M, N);
 
   auto COffset = M_offset * _param.ldc + N_offset;
-  auto cptr = _param.C + COffset;
+  auto cptr = reinterpret_cast<DST_T*>(_param.C) + COffset;
   if constexpr (std::is_same_v<DST_T, float>) {
     return bestla::kernel::wrapper::Memcpy2D::template forward<ISA_T, float, DST_T>(tmp_dst, cptr, M, N, cachestep,
                                                                                     _param.ldc, NULL);
@@ -43,12 +43,10 @@ template <BTLA_ISA ISA_T, typename DST_T>
 class AlphaBetaProcess {
  public:
   struct Param {
-    DST_T* C;
-    float* D;
+    void *C, *D;
     int ldc, ldd;
     float alpha, beta;
   };
-  using DstType = DST_T;
   static BTLA_CODE forward(float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M,
                            const int N, const Param& _param, void* tmpcache = nullptr, size_t cachesize = -1) {
     return alphabeta_dt_cvt_process<Param, DST_T, ISA_T>(cacheptr, cachestep, M_offset, N_offset, M, N, _param);

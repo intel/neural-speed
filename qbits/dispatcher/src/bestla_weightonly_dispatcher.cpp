@@ -53,12 +53,13 @@ void dequantize_packed_weight(woq_config_param* p, woq_runtime_ctx* ctx) {
     kernel.unpackTransposeWeight(ctx->deseries_wei->mN, ctx->deseries_wei->mK,
                                  dynamic_cast<bestla::storage::gemm::StorageWeightKBlockNInteger*>(ctx->deseries_wei),
                                  ctx->output->data_ptr<float>(), ctx->deseries_wei->mK,
-                                 &dispatcher_utils::DefaultThreading);
+                                 dispatcher_utils::qbits_threading::get());
 
   } else {
     kernel.unpackWeight(ctx->deseries_wei->mN, ctx->deseries_wei->mK,
                         dynamic_cast<bestla::storage::gemm::StorageWeightKBlockNInteger*>(ctx->deseries_wei),
-                        ctx->output->data_ptr<float>(), ctx->deseries_wei->mN, &dispatcher_utils::DefaultThreading);
+                        ctx->output->data_ptr<float>(), ctx->deseries_wei->mN,
+                        dispatcher_utils::qbits_threading::get());
   }
 }
 
@@ -91,10 +92,10 @@ void quantize_to_packed_weight(woq_config_param* p, woq_runtime_ctx* ctx) {
   packedw.assign(ctx->output->data_ptr<int8_t>());
   if (ctx->transpose) {
     launcher.mProB.packTransposeWeight(ctx->n, ctx->k, ctx->weight->data_ptr<float>(), ctx->k, &packedw,
-                                       &dispatcher_utils::DefaultThreading);
+                                       dispatcher_utils::qbits_threading::get());
   } else {
     launcher.mProB.packWeight(ctx->n, ctx->k, ctx->weight->data_ptr<float>(), ctx->n, &packedw,
-                              &dispatcher_utils::DefaultThreading);
+                              dispatcher_utils::qbits_threading::get());
   }
   if (dispatcher_utils::initer.verbose) {
     dispatcher_utils::timer.stop();
@@ -122,12 +123,7 @@ void do_compute(woq_config_param* p, woq_runtime_ctx* ctx, ParamA param_a) {
   if (dispatcher_utils::initer.verbose) dispatcher_utils::timer.start();
   static Launcher launcher;
   using EpiParam = typename Launcher::EpiParam;
-  EpiParam param_epi = {reinterpret_cast<typename Launcher::Epilogue::DstType*>(ctx->output->data_ptr()),
-                        ctx->bias->data_ptr<float>(),
-                        ctx->ldo,
-                        0,
-                        ctx->alpha,
-                        ctx->beta};
+  EpiParam param_epi = {ctx->output->data_ptr(), ctx->bias->data_ptr(), ctx->ldo, 0, ctx->alpha, ctx->beta};
   using GemmCore = typename Launcher::GemmCore;
   using StorageWeight = typename Launcher::PrologueB::StorageWeight;
   size_t asym_size = 0, shuf_size = 0;
@@ -144,17 +140,17 @@ void do_compute(woq_config_param* p, woq_runtime_ctx* ctx, ParamA param_a) {
     if (packedw->ShfIndice()) {
       param_a.reordered->assign(tmpbuf + dyn_q_size);
       param_a.indices = packedw->ShfIndice();
-      launcher.mProA.quantize(param_a, ctx->m, ctx->deseries_wei->mK, &dispatcher_utils::DefaultThreading);
+      launcher.mProA.quantize(param_a, ctx->m, ctx->deseries_wei->mK, dispatcher_utils::qbits_threading::get());
     }
     typename Launcher::Param args{
         gp, param_a, dynamic_cast<bestla::storage::gemm::StorageWeightKBlockNInteger*>(ctx->deseries_wei), param_epi};
     if (packedw->ShfIndice()) {
-      bestla::parallel::GemmRun<Parallel>(launcher, args, &dispatcher_utils::DefaultThreading);
+      bestla::parallel::GemmRun<Parallel>(launcher, args, dispatcher_utils::qbits_threading::get());
     } else {
-      bestla::parallel::GemmRunWithA<Parallel>(launcher, args, &dispatcher_utils::DefaultThreading);
+      bestla::parallel::GemmRunWithA<Parallel>(launcher, args, dispatcher_utils::qbits_threading::get());
     }
   } else {
-    using Parallel = bestla::parallel::gemm::SchedulerKBlock<GemmCore>;
+    using Parallel = bestla::parallel::gemm::SchedulerBase<GemmCore>;
     StorageWeight* packedw = dynamic_cast<StorageWeight*>(ctx->deseries_wei);
     if (p->asym || packedw->ShfIndice()) {
       if (p->asym) asym_size = param_a.reduce->mSize;
@@ -177,9 +173,9 @@ void do_compute(woq_config_param* p, woq_runtime_ctx* ctx, ParamA param_a) {
         gp, param_a, dynamic_cast<bestla::storage::gemm::StorageWeightKBlockNInteger*>(ctx->deseries_wei), param_epi};
 
     if (p->asym || packedw->ShfIndice()) {
-      bestla::parallel::GemmRunWithA<Parallel>(launcher, args, &dispatcher_utils::DefaultThreading);
+      bestla::parallel::GemmRunWithA<Parallel>(launcher, args, dispatcher_utils::qbits_threading::get());
     } else {
-      bestla::parallel::GemmRun<Parallel>(launcher, args, &dispatcher_utils::DefaultThreading);
+      bestla::parallel::GemmRun<Parallel>(launcher, args, dispatcher_utils::qbits_threading::get());
     }
   }
   if (tmpbuf != woq_workspace && tmpbuf != nullptr) bestla::utils::afree(tmpbuf);

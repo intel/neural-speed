@@ -28,9 +28,9 @@ void execute_qpack(repack_quantized_weight_param* p, repack_quantized_weight_ctx
   *(ctx->output) = torch::empty(qpackw.mSize, torch::kInt8);
   qpackw.assign(ctx->output->data_ptr<int8_t>());
   if (p->enable_act_shuffle)
-    ker.setShuffleIndices(ctx->g_idx->data_ptr<int>(), &qpackw, &dispatcher_utils::DefaultThreading);
+    ker.setShuffleIndices(ctx->g_idx->data_ptr<int>(), &qpackw, dispatcher_utils::qbits_threading::get());
   ker.packQWeight(ctx->n, ctx->k, ctx->qweight->data_ptr<int8_t>(), ctx->n, ctx->scale->data_ptr<float>(),
-                  p->asym ? ctx->zp->data_ptr<int8_t>() : nullptr, &qpackw, &dispatcher_utils::DefaultThreading);
+                  p->asym ? ctx->zp->data_ptr<int8_t>() : nullptr, &qpackw, dispatcher_utils::qbits_threading::get());
 }
 
 std::string get_dtype_str(BTLA_DTYPE dtype) {
