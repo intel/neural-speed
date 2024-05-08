@@ -116,6 +116,13 @@ class JitAvx2 : protected JitAvx {
     vpmovzxwd(dst, addr);
     vpslld(dst, dst, 16);
   }
+
+  void vpdpbusds_(const Xbyak::Xmm& sum4, const Xbyak::Xmm& sum2, const Xbyak::Xmm& x, const Xbyak::Operand& op,
+                  const Xbyak::Xmm& ones) {
+    vpmaddubsw(sum2, x, op);
+    vpmaddwd(sum2, sum2, ones);
+    vpaddd(sum4, sum4, sum2);
+  }
 };
 
 class JitAvx512f : protected JitAvx2 {
