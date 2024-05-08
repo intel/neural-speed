@@ -623,9 +623,15 @@ class StorageQuantActivation : public IActivationKBlockBase {
     mSize = utils::padto(mSize, Alignment);
     return mSize;
   }
+
   template <typename QT_T>
   inline constexpr QT_T* APtr() {
     return mQBuf.get<QT_T>();
+  }
+
+  template <typename T>
+  inline constexpr size_t ASize() {
+    return mQBuf.size<T>();
   }
 
   template <typename QT_T>

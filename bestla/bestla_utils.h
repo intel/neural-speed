@@ -62,7 +62,9 @@
 // Only the ISA you use in your project will be compiled.
 #ifdef __GNUC__
 #define CompileAVX512F() (__GNUC__ >= 6)
+#define CompileAVX512VNNI() (__GNUC__ >= 9)
 #define CompileAVX2() (__GNUC__ >= 5)
+#define CompileAVXVNNI() (__GNUC__ >= 11)
 #define CompileAMX() (__GNUC__ >= 11)
 #define CompileBF16() (__GNUC__ >= 11)
 #define CompileFP16() (__GNUC__ >= 13)
@@ -70,22 +72,26 @@
 #define CompileAMXINT8() (CompileAMX())
 #endif
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__INTEL_LLVM_COMPILER)
 #define CompileAVX512F() _MSC_VER && (_MSC_VER >= 1911)
+#define CompileAVX512VNNI() _MSC_VER && (_MSC_VER >= 1930)  // TODO(Yu) check the minimum version
 #define CompileAVX2() _MSC_VER && (_MSC_VER >= 1900)
-#define CompileAMX() 0
-#define CompileBF16() 0
-#define CompileFP16() 0
-#define CompileAMXBF16() 0
-#define CompileAMXINT8() 0
+#define CompileAVXVNNI() _MSC_VER && (_MSC_VER >= 1930)  // TODO(Yu) check the minimum version
+#define CompileAMX() _MSC_VER && (_MSC_VER >= 1930)      // TODO(Yu) check the minimum version
+#define CompileBF16() _MSC_VER && (_MSC_VER >= 1938)     // TODO(Yu) check the minimum version
+#define CompileFP16() _MSC_VER && (_MSC_VER >= 1938)     // TODO(Yu) check the minimum version
+#define CompileAMXBF16() (CompileAMX())
+#define CompileAMXINT8() (CompileAMX())
 #endif
 
-#ifdef __clang_major__
-#define CompileAVX512F() (__clang_major__ >= 4)
-#define CompileAVX2() (__clang_major__ >= 3)
-#define CompileAMX() (__clang_major__ >= 11)
-#define CompileBF16() (__clang_major__ >= 11)
-#define CompileFP16() (__clang_major__ >= 16)
+#if defined(_MSC_VER) && defined(__INTEL_LLVM_COMPILER)
+#define CompileAVX512F() defined(__AVX512F__)
+#define CompileAVX512VNNI() defined(__AVX512VNNI__)
+#define CompileAVX2() defined(__AVX2__) && defined(__F16C__) && defined(__FMA__)
+#define CompileAVXVNNI() defined(__AVXVNNI__)
+#define CompileAMX() defined(__AMX_TILE__)
+#define CompileBF16() defined(__AVX512BF16__)
+#define CompileFP16() defined(__AVX512FP16__)
 #define CompileAMXBF16() (CompileAMX())
 #define CompileAMXINT8() (CompileAMX())
 #endif
@@ -224,26 +230,26 @@ struct fp16 {
 };
 
 struct bit2x4 {
-  int8_t a : 2;
-  int8_t b : 2;
-  int8_t c : 2;
-  int8_t d : 2;
+  uint8_t a : 2;
+  uint8_t b : 2;
+  uint8_t c : 2;
+  uint8_t d : 2;
 };
 
 struct bit1x8 {
-  int8_t a : 1;
-  int8_t b : 1;
-  int8_t c : 1;
-  int8_t d : 1;
-  int8_t e : 1;
-  int8_t f : 1;
-  int8_t g : 1;
-  int8_t h : 1;
+  uint8_t a : 1;
+  uint8_t b : 1;
+  uint8_t c : 1;
+  uint8_t d : 1;
+  uint8_t e : 1;
+  uint8_t f : 1;
+  uint8_t g : 1;
+  uint8_t h : 1;
 };
 
 struct bit4x2 {
-  int8_t x : 4;
-  int8_t y : 4;
+  uint8_t x : 4;
+  uint8_t y : 4;
   bit4x2(int8_t v) : x(v), y(v) {}
   bit4x2() : x(0), y(0) {}
 };
@@ -253,8 +259,6 @@ struct int4x2 : bit4x2 {
   int4x2() : bit4x2() {}
   static int8_t convert(int8_t src) {
     int32_t dst = src;
-    dst = dst >= 0 ? dst + 8 : dst - 8;
-    dst = dst / 16;
     dst = dst > 7 ? 7 : dst;
     dst = dst < -8 ? -8 : dst;
     return static_cast<int8_t>(dst);
@@ -290,6 +294,24 @@ struct GemmProblem {
     dims[3] = _k;
     dims[4] = _kblock;
   }
+};
+
+template <typename ScaleT>
+struct GemvParamB {
+  uint8_t *b4ptr = 0, *b2ptr = 0, *b1ptr = 0;
+  ScaleT* sptr = 0;
+  int8_t* zpptr = 0;
+  int nbits = 0;
+  int ldzp = 0;
+  int kpad = 0;
+};
+
+struct GemvParamA {
+  uint8_t* aptr = 0;
+  float* sptr = 0;
+  uint8_t* zpptr = 0;
+  int lda = 0;
+  int ldzp = 0;
 };
 
 template <typename T>
@@ -336,6 +358,10 @@ inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
       return "unsigned_int8";
     case BTLA_DTYPE::S4_CLIP:
       return "int4_clip";
+    case BTLA_DTYPE::S3_CLIP:
+      return "int3_clip";
+    case BTLA_DTYPE::S2_CLIP:
+      return "int2_clip";
     case BTLA_DTYPE::F4_E2M1:
       return "fp4_e2m1";
     case BTLA_DTYPE::F4_BNB:
@@ -678,9 +704,11 @@ class timer_statistics_logger {
   float min_val, max_val, avg_val;
 
   void record() {
-    min_val = statis.min_val / log_ratio;
-    max_val = statis.max_val / log_ratio;
-    avg_val = statis.avg_val / log_ratio;
+    if (statis.count) {
+      min_val = statis.min_val / log_ratio;
+      max_val = statis.max_val / log_ratio;
+      avg_val = statis.avg_val / log_ratio;
+    }
   }
 
  private:

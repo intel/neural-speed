@@ -5,6 +5,7 @@ file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
 file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
 option(BTLA_ENABLE_OPENMP "Compile OpenMP thread pool if OMP can be found" OFF)
+option(BTLA_SYCL "Compile OpenMP thread pool if OMP can be found" OFF)
 
 option(BTLA_UT_ALL "Enable all unit tests" OFF)
 option(BTLA_UT_DEBUG "Enable debug unit tests" OFF)
@@ -21,6 +22,10 @@ option(BTLA_UT_NOASAN "Disable sanitize" OFF)
 option(BTLA_UT_BENCHMARK "Benchmark ON may take a long time to finish all tests" OFF)
 option(BTLA_UT_OPENMP "Use OpenMP for UT tests" OFF)
 
+
+
+
+
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(neural_speed::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_include_directories(
@@ -28,7 +33,16 @@ target_include_directories(
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
 	"$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-
+set(sycl_headers)
+set(sycl_libs)
+if(BTLA_SYCL)
+  include(cmake/sycl.cmake)
+  file(GLOB sycl_headers ${PROJECT_NAME}/sycl/*.h ${PROJECT_NAME}/sycl/*.hpp)
+  add_compile_definitions(BTLA_SYCL)
+  list(APPEND sycl_libs IntelSYCL::SYCL_CXX)
+  add_compile_options(-march=native)
+  #add_link_options(-fsycl-targets=spir64 -Xsycl-target-backend "-options -ze-opt-large-register-file")
+endif(BTLA_SYCL)
 
 if(BTLA_ENABLE_OPENMP)
   message(STATUS "BesTLA enable OpenMP ThreadPool")
@@ -69,17 +83,25 @@ function(add_ut_flag UT_OPTION)
 	endif()
 endfunction()
 
+set(benchmark_srcs ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/ut/bestla_benchmark.cpp)
+# list(APPEND benchmark_srcs ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/ut/sycl_benchmark.cpp)
+
+
 if(UT_BUILD)
 	file(GLOB srcs ${PROJECT_NAME}/ut/*.cc ${PROJECT_NAME}/ut/*.cpp) #compile everything even run parts of UTs
-    list(REMOVE_ITEM srcs ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/ut/bestla_benchmark.cpp)
+  file(GLOB sycl_srcs ${PROJECT_NAME}/ut/sycl*)
+  if(NOT BTLA_SYCL)
+    list(REMOVE_ITEM srcs ${sycl_srcs})
+  endif()
+  list(REMOVE_ITEM srcs ${benchmark_srcs})
 	file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
-    include_directories(${PROJECT_NAME})
-	add_executable(${PROJECT_NAME}_ut ${srcs} ${headers} ${ut_headers})
-    if(BTLA_UT_OPENMP)
-      include(FindOpenMP)
-      target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
-      target_link_libraries(${PROJECT_NAME}_ut PRIVATE OpenMP::OpenMP_CXX)
-    endif()
+  include_directories(${PROJECT_NAME})
+	add_executable(${PROJECT_NAME}_ut ${srcs} ${headers} ${sycl_headers} ${ut_headers})
+  if(BTLA_UT_OPENMP)
+    include(FindOpenMP)
+    target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
+    target_link_libraries(${PROJECT_NAME}_ut PRIVATE OpenMP::OpenMP_CXX)
+  endif()
 	if(NOT WIN32)
 		if(NOT BTLA_UT_NOASAN)
 		  target_compile_options(${PROJECT_NAME}_ut PRIVATE -fsanitize=address)
@@ -98,14 +120,16 @@ if(UT_BUILD)
 	add_ut_flag(BTLA_UT_KERNEL_INTRIN)
 	add_ut_flag(BTLA_UT_KERNEL_JIT)
 	add_ut_flag(BTLA_UT_KERNEL_WRAPPER)
-	target_link_libraries(${PROJECT_NAME}_ut PRIVATE ${PROJECT_NAME})
+  if(BTLA_SYCL)
+    add_compile_definitions(BTLA_UT_SYCL)
+  endif()
+	target_link_libraries(${PROJECT_NAME}_ut PRIVATE ${PROJECT_NAME} ${sycl_libs})
 endif(UT_BUILD)
 
 if(BTLA_UT_BENCHMARK)
-  file(GLOB srcs ${PROJECT_NAME}/ut/bestla_benchmark.cpp) #compile everything even run parts of UTs
   file(GLOB ut_headers ${PROJECT_NAME}/ut/*.h)
   include_directories(${PROJECT_NAME})
-	add_executable(${PROJECT_NAME}_benchmark ${srcs} ${headers} ${ut_headers})
+	add_executable(${PROJECT_NAME}_benchmark ${benchmark_srcs} ${headers} ${ut_headers})
   if(BTLA_UT_OPENMP)
     include(FindOpenMP)
     target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_USE_OPENMP)
@@ -114,5 +138,5 @@ if(BTLA_UT_BENCHMARK)
   if(NOT WIN32)
 		target_link_options(${PROJECT_NAME}_benchmark PRIVATE -lpthread)
 	endif()
-  target_link_libraries(${PROJECT_NAME}_benchmark PRIVATE ${PROJECT_NAME})
+  target_link_libraries(${PROJECT_NAME}_benchmark PRIVATE ${PROJECT_NAME} ${sycl_libs})
 endif(BTLA_UT_BENCHMARK)
