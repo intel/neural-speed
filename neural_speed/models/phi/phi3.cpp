@@ -52,7 +52,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
   model_context& lctx = *ctx;
 
   // static batching for now
-  const int64_t N = inputs->n_tokens;
+  const int N = inputs->n_tokens;
   const int n_past = inputs->n_past;
   const int n_total = inputs->n_total;
   const bool shift_roped_k = lctx.shift_roped_k;
