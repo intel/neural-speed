@@ -9004,9 +9004,9 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   const bool skip = mode & 1;
   const bool is_neox = mode & 2;
   const bool is_glm = mode & 4;
-  const bool is_longrope = mode == 16 ? true : false;
   const bool is_shift = n_keep >= 0;
   const bool use_yarn = ((mode & 0x8) != 0);
+  const bool is_longrope = mode & 0x10;
   NE_ASSERT(("RoPE shift not supported!", !is_shift));
 
   NE_ASSERT(ne3 == bs);
@@ -9189,7 +9189,7 @@ static void ne_compute_forward_rope_f16(const struct ne_compute_params* params, 
   const bool skip = mode & 1;
   const bool is_neox = mode & 2;
   const bool is_glm = mode & 4;
-  const bool is_longrope = mode == 16 ? true : false;
+  const bool is_longrope = mode & 0x10;
   NE_ASSERT(("glm mode RoPE is not implemented!", !is_glm));
   const bool is_shift = n_keep >= 0;
   NE_ASSERT(("shift RoPE is only implemented for the vanilla mode", !is_shift || !(is_glm || is_neox || skip)));
