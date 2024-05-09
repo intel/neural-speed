@@ -3,6 +3,8 @@ accelerate
 datasets
 huggingface_hub
 matplotlib
+einops
+gguf
 numpy
 peft
 protobuf<3.20
