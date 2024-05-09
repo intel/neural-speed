@@ -3202,7 +3202,7 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
                                int prompt_size, bool inplace, int n_keep, struct ne_tensor* cossin, int* n_padding,
                                bool padding_left, float freq_base, float freq_scale, int yarn_orig_ctx,
                                float ext_factor, float attn_factor, float beta_fast, float beta_slow,
-                               struct ne_tensor* factor) {
+                               struct ne_tensor* factor, float scale_factor) {
   NE_ASSERT(n_past >= 0 || n_keep >= 0);
   NE_ASSERT(padding_left);
   bool is_node = false;
@@ -3244,7 +3244,8 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 
   /* what the difference of setting parameters in b->data and in op_parameters */
   /* float and int are in different data ?? */
-  float params[] = {freq_base, freq_scale, (float)yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow};
+  float params[] = {freq_base, freq_scale, (float)yarn_orig_ctx, ext_factor, attn_factor,
+                    beta_fast, beta_slow,  scale_factor};
   ne_set_op_params(result, &params, sizeof(params));
 
   result->op = NE_OP_ROPE;
@@ -3260,27 +3261,27 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                           int prompt_size, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, NULL, true, freq_base, freq_scale, 0,
-                      0.0f, 1.0f, 0.0f, 0.0f, NULL);
+                      0.0f, 1.0f, 0.0f, 0.0f, NULL, 0.0f);
 }
 
 struct ne_tensor* ne_rope_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                   int prompt_size, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale, 0,
-                      0.0f, 1.0f, 0.0f, 0.0f, NULL);
+                      0.0f, 1.0f, 0.0f, 0.0f, NULL, 0.0f);
 }
 
 struct ne_tensor* ne_rope_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims, int mode,
                                         int prompt_size, int n_keep, struct ne_tensor* cossin, float freq_base,
                                         float freq_scale) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
-                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f, NULL);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f, NULL, 0.0f);
 }
 
 struct ne_tensor* ne_rope_custom_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                          int prompt_size, float freq_base, float freq_scale, int yarn_orig_ctx,
                                          float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale,
-                      yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow, NULL);
+                      yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow, NULL, 0.0f);
 }
 
 struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_shift, int n_dims,
@@ -3288,7 +3289,7 @@ struct ne_tensor* ne_rope_custom_shift_inplace(struct ne_context* ctx, struct ne
                                                float freq_base, float freq_scale, int yarn_orig_ctx, float ext_factor,
                                                float attn_factor, float beta_fast, float beta_slow) {
   return ne_rope_impl(ctx, a, n_shift, n_dims, mode, prompt_size, true, n_keep, cossin, NULL, true, freq_base,
-                      freq_scale, yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow, NULL);
+                      freq_scale, yarn_orig_ctx, ext_factor, attn_factor, beta_fast, beta_slow, NULL, 0.0f);
 }
 
 // ne_rope_back
@@ -3326,20 +3327,21 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
 struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims, int mode,
                                        int prompt_size, int* n_padding, float freq_base, float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, false, -1, NULL, n_padding, true, freq_base,
-                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f, NULL);
+                      freq_scale, 0, 0.0f, 1.0f, 0.0f, 0.0f, NULL, 0.0f);
 }
 
 struct ne_tensor* ne_rope_with_padding_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_dims,
                                                int mode, int prompt_size, int* n_padding, float freq_base,
                                                float freq_scale) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, n_padding, true, freq_base, freq_scale,
-                      0, 0.0f, 1.0f, 0.0f, 0.0f, NULL);
+                      0, 0.0f, 1.0f, 0.0f, 0.0f, NULL, 0.0f);
 }
 
 struct ne_tensor* ne_longrope_inplace(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* factor, int n_past,
-                                      int n_dims, int mode, int prompt_size, float freq_base, float freq_scale) {
+                                      int n_dims, int mode, int prompt_size, float freq_base, float freq_scale,
+                                      float scale_factor) {
   return ne_rope_impl(ctx, a, n_past, n_dims, mode, prompt_size, true, -1, NULL, NULL, true, freq_base, freq_scale, 0,
-                      0.0f, 1.0f, 0.0f, 0.0f, factor);
+                      0.0f, 1.0f, 0.0f, 0.0f, factor, scale_factor);
 }
 // ne_alibi
 
@@ -8966,6 +8968,7 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
   const float attn_factor = ((float*)(dst->op_params))[4];
   const float beta_fast = ((float*)(dst->op_params))[5];
   const float beta_slow = ((float*)(dst->op_params))[6];
+  const float scale_factor = ((float*)(dst->op_params))[7];
 
   const int64_t n_past = ((int32_t*)src1->data)[ROPE_NPAST_IDX];
   const int64_t n_dims = ((int32_t*)src1->data)[ROPE_NDIMS_IDX];
@@ -9052,7 +9055,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
           // ref:
           // https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt_neox/modeling_gpt_neox.py#LL251C1-L294C28
           theta_base = theta_base * freq_scale;
-          float scale_factor = 1.1902380714238083;
           const float* const longrope_factor = (float*)((char*)dst->opt[1]->data);
           for (int64_t ib = 0; ib < ne0 / n_dims; ++ib) {
             for (int64_t ic = 0; ic < n_dims; ic += 2) {
@@ -9138,6 +9140,7 @@ static void ne_compute_forward_rope_f16(const struct ne_compute_params* params, 
   }
   NE_ASSERT(src1->type == NE_TYPE_I32);
   NE_ASSERT(ne_nelements(src1) == 5);  // 5 params
+  const float scale_factor = ((float*)(dst->op_params))[7];
 
   const int n_past = ((int32_t*)src1->data)[0];
   const int n_dims = ((int32_t*)src1->data)[1];
@@ -9243,7 +9246,6 @@ static void ne_compute_forward_rope_f16(const struct ne_compute_params* params, 
         float theta = freq_scale * (float)p;
 
         if (is_longrope) {
-          float scale_factor = 1.1902380714238083;
           const float* const longrope_factor = (float*)((char*)dst->opt[1]->data);
           for (int64_t ib = 0; ib < ne0 / n_dims; ++ib) {
             for (int64_t ic = 0; ic < n_dims; ic += 2) {

@@ -198,7 +198,8 @@ class phi3_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
     bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
-    if (layername == "model.embed_tokens.weight" || layername == "output.weight" || layername == "lm_head.weight") {
+    if (layername == "model.embed_tokens.weight" || layername == "output.weight" || layername == "lm_head.weight" ||
+        layername == "token_embd.weight") {
       // special layer process, can be loaded by config file
       return quant_params_internal{quant_bits::count};  // return q4_0 to cover the usage of getrow
     }

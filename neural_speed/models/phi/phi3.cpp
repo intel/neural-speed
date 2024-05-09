@@ -178,8 +178,11 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
       // struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
       //                                          Qcur->nb[1], Qcur->nb[2], Qcur->nb[3], 0);
       if (hparams.max_seq_len > 4096) {
-        Qcur = ne_longrope_inplace(ctx0, Qcur, factor, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
-        Kcur = ne_longrope_inplace(ctx0, Kcur, factor, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
+        float scale_factor = sqrtf(1 + log(hparams.max_seq_len / 4096) / log(4096));
+        Qcur = ne_longrope_inplace(ctx0, Qcur, factor, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale,
+                                   scale_factor);
+        Kcur = ne_longrope_inplace(ctx0, Kcur, factor, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale,
+                                   scale_factor);
       } else {
         Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
         Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
