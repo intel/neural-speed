@@ -180,7 +180,7 @@ function main() {
     convert_script="$working_dir/neural_speed/convert/"
     # init params
     precision_list=()
-    requirements_file="requirements.txt" # some models need extra constraints
+    requirements_file="$working_dir/neural_speed/models/requirements/common.txt" # some models need extra constraints
 
     model_name="${model_name_map["$model"]}"
 
