@@ -1,13 +1,11 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 accelerate
 datasets
-einops
-gguf
 numpy
 peft
 protobuf<3.20
 sentencepiece
 tiktoken
-torch==2.1.0+cpu
+torch
 transformers
 transformers_stream_generator
