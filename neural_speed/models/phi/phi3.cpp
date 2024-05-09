@@ -117,6 +117,30 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
     bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
+  struct ne_tensor* factor = ne_new_tensor_1d(ctx0, NE_TYPE_F32, 48, sizeof(float));
+  const float longfactor[48] = {
+      1.0299999713897705, 1.0499999523162842, 1.0499999523162842, 1.0799999237060547, 1.2299998998641968,
+      1.2299998998641968, 1.2999999523162842, 1.4499999284744263, 1.5999999046325684, 1.6499998569488525,
+      1.8999998569488525, 2.859999895095825,  3.68999981880188,   5.419999599456787,  5.489999771118164,
+      5.489999771118164,  9.09000015258789,   11.579999923706055, 15.65999984741211,  15.769999504089355,
+      15.789999961853027, 18.360000610351562, 21.989999771118164, 23.079999923706055, 30.009998321533203,
+      32.35000228881836,  32.590003967285156, 35.56000518798828,  39.95000457763672,  53.840003967285156,
+      56.20000457763672,  57.95000457763672,  59.29000473022461,  59.77000427246094,  59.920005798339844,
+      61.190006256103516, 61.96000671386719,  62.50000762939453,  63.3700065612793,   63.48000717163086,
+      63.48000717163086,  63.66000747680664,  63.850006103515625, 64.08000946044922,  64.760009765625,
+      64.80001068115234,  64.81001281738281,  64.81001281738281};
+  const float shortfactor[48] = {1.04999995, 1.04999995, 1.04999995, 1.10000002, 1.10000002, 1.14999998, 1.20000005,
+                                 1.25000000, 1.29999995, 1.35000002, 1.50000000, 2.00000000, 2.00000000, 2.00000000,
+                                 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.00000000,
+                                 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.00000000,
+                                 2.00000000, 2.00000000, 2.00000000, 2.00000000, 2.04999995, 2.04999995, 2.04999995,
+                                 2.09999990, 2.09999990, 2.09999990, 2.15000010, 2.15000010, 2.34999990, 2.54999995,
+                                 2.59999990, 2.59999990, 2.75000000, 2.84999990, 2.84999990, 2.95000005};
+  if (N <= 4096) {
+    memcpy(static_cast<float*>(factor->data), shortfactor, 48 * ne_element_size(factor));
+  } else {
+    memcpy(static_cast<float*>(factor->data), longfactor, 48 * ne_element_size(factor));
+  }
   // int embd_input[7] = {1, 1183, 1722,  278, 3050,  322, 1074};
   ne_set_name(embd, "embd");
   for (int i = 0; i < batch_size; ++i) {
@@ -154,13 +178,8 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
       // struct ne_tensor* Qcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Qcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
       //                                          Qcur->nb[1], Qcur->nb[2], Qcur->nb[3], 0);
       if (hparams.max_seq_len > 4096) {
-        if (N <= 4096) {
-          Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
-          Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
-        } else {
-          Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 17, 0, hparams.freq_base, hparams.freq_scale);
-          Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 17, 0, hparams.freq_base, hparams.freq_scale);
-        }
+        Qcur = ne_longrope_inplace(ctx0, Qcur, factor, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
+        Kcur = ne_longrope_inplace(ctx0, Kcur, factor, n_past, n_rot, 16, 0, hparams.freq_base, hparams.freq_scale);
       } else {
         Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
         Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
