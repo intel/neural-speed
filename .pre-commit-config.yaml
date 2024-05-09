@@ -1,0 +1,9 @@
+ci:
+  autofix_prs: true
+  autoupdate_schedule: quarterly
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Currently no pre-commit ci of XeTLA configured
