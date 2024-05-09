@@ -1,6 +1,8 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 accelerate
 datasets
+einops
+gguf
 numpy
 peft
 protobuf<3.20
