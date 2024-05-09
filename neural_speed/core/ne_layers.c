@@ -9051,9 +9051,6 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
             dst_data[n_dims / 2 * 3] = x2 * sin_block_theta + x3 * cos_block_theta;
           }
         } else if (is_longrope) {
-          // TODO: this is probably wrong, but I can't figure it out ..
-          // ref:
-          // https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt_neox/modeling_gpt_neox.py#LL251C1-L294C28
           theta_base = theta_base * freq_scale;
           const float* const longrope_factor = (float*)((char*)dst->opt[1]->data);
           for (int64_t ib = 0; ib < ne0 / n_dims; ++ib) {
