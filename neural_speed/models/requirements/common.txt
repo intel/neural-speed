@@ -1,10 +1,10 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 accelerate
 datasets
-huggingface_hub
-matplotlib
 einops
 gguf
+huggingface_hub
+matplotlib
 numpy
 peft
 protobuf<3.20
