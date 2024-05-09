@@ -124,10 +124,10 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
   }
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
-  struct ne_tensor* inpPA;
 
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
+    struct ne_tensor* inpPA;
 
     lctx.use_buf(ctx0, 0);
 

@@ -213,7 +213,7 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
 class stablelm_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
-    bool quantize = layername.rfind("weight") == layername.size() - 6;  // ends with 'weight'?
+    bool quantize = (layername.rfind("weight") == layername.size() - 6) && (layername.find("layernorm") == std::string::npos); // ends with 'weight'?
     if (layername == "model.embed_tokens.weight") {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
