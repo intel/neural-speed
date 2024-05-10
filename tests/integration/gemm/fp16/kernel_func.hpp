@@ -46,7 +46,7 @@ struct fp16_gemm_test_func {
 
   using compute_attr = typename std::conditional<
       (engine == mma_engine::fpu),
-      compute_attr_t<dtype_acc, dtype_acc, dtype_acc>,
+      compute_attr_t<dtype_a, dtype_b, dtype_acc>,
       compute_attr_t<dtype_a, dtype_b, dtype_acc>>::type;
   using perf_tuning_knob =
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;

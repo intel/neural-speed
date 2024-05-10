@@ -414,12 +414,9 @@ tile_load(tile_t& tile, payload_t& payload) {
       auto reg_sub =
           tile.reg.xetla_select<max_load_vec_len * scale_factor, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
-      reg_sub.xetla_format<load_dtype>() = xetla_load_global<
-          load_dtype,
-          max_load_vec_len,
-          data_size::default_size,
-          L1,
-          L2>(payload.base_ptr, payload.base_offset + address_offset);
+      reg_sub.xetla_format<load_dtype>() =
+          xetla_load_global<load_dtype, max_load_vec_len, L1, L2>(
+              payload.base_ptr, payload.base_offset + address_offset);
     }
   }
 
