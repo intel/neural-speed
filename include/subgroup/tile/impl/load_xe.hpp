@@ -31,29 +31,24 @@ struct check_load_type {
   static constexpr bool is_lsc_gather = true;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
-       (payload_t::message_type == msg_type::block_2d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::block_2d));
 
   static constexpr bool is_global_block_1d =
       ((payload_t::memory_space == mem_space::global) &&
        (tile_t::tile_size_y == 1) && (tile_t::block_size_y == 1) &&
-       (payload_t::message_type == msg_type::block_1d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::block_1d));
 
   static constexpr bool is_global_unaligned_2d_xe =
       ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::message_type == msg_type::unaligned_2d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::unaligned_2d));
 
   static constexpr bool is_local_scatter_xe =
       ((payload_t::memory_space == mem_space::local) &&
-       (payload_t::message_type == msg_type::scatter) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::scatter));
 
   static constexpr bool is_local_block_1d_xe =
       ((payload_t::memory_space == mem_space::local) &&
-       (payload_t::message_type == msg_type::block_1d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::block_1d));
 };
 
 } // namespace detail
@@ -79,7 +74,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
-    arch_has_2d_load_store(payload_t::arch_tag)>
+    arch_has_2d_load_store<payload_t::arch_tag>>
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename tile_t::dtype;
   using load_dtype = typename payload_t::mem_dtype;
@@ -460,7 +455,7 @@ template <
 __XETLA_API typename std::enable_if_t<
     detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
     detail::check_load_type<tile_t, payload_t>::is_lsc_gather &&
-    payload_t::arch_tag <= gpu_arch::XeHpg>
+    !arch_has_2d_load_store<payload_t::arch_tag>>
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
@@ -569,7 +564,7 @@ template <
 __XETLA_API typename std::enable_if_t<
     detail::check_load_type<tile_t, payload_t>::is_global_block_2d &&
     !detail::check_load_type<tile_t, payload_t>::is_lsc_gather &&
-    !arch_has_2d_load_store(payload_t::arch_tag)>
+    !arch_has_2d_load_store<payload_t::arch_tag>>
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
@@ -617,7 +612,9 @@ tile_load(tile_t& tile, payload_t& payload) {
     SW_BARRIER();
     vnni_convert(tile);
   }
+
 }
+
 /// @brief This function loads data from unaligned-2D memory surface.
 /// Loads an array of rectangular regions (X,Y)..(X+W,Y+H) from memory into
 /// registers. Each block will be loaded serially by its corresponding payload.

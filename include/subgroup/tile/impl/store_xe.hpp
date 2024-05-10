@@ -30,43 +30,36 @@ template <typename tile_t, typename payload_t>
 struct check_store_type {
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
-       (payload_t::message_type == msg_type::block_2d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::block_2d));
 
   static constexpr bool is_global_block_1d_xe =
       ((payload_t::memory_space == mem_space::global) &&
        (tile_t::tile_size_y == 1) && (tile_t::block_size_y == 1) &&
-       (payload_t::message_type == msg_type::block_1d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::block_1d));
 
   static constexpr bool is_global_unaligned_2d_xe =
       (payload_t::memory_space == mem_space::global &&
-       (payload_t::message_type == msg_type::unaligned_2d) &&
-       (payload_t::arch_tag == gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::unaligned_2d));
 
   static constexpr bool is_global_atomic_xe =
       ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::message_type == msg_type::atomic_add) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::message_type == msg_type::atomic_add));
 
   static constexpr bool is_local_scatter_xe =
       ((payload_t::memory_space == mem_space::local) &&
        (payload_t::message_type == msg_type::scatter) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc) &&
        (payload_t::tile_desc::register_layout == reg_layout::tiled ||
         payload_t::tile_desc::register_layout == reg_layout::vnni_tiled));
 
   static constexpr bool is_local_scatter_vnni_col_xe =
       ((payload_t::memory_space == mem_space::local) &&
        (payload_t::message_type == msg_type::scatter) &&
-       (payload_t::arch_tag == gpu_arch::XeHpc) &&
        (payload_t::tile_desc::register_layout ==
         reg_layout::vnni_tiled_col_major));
 
   static constexpr bool is_local_block_1d_xe =
       ((payload_t::memory_space == mem_space::local) &&
        (payload_t::message_type == msg_type::block_1d) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc) &&
        (payload_t::tile_desc::register_layout == reg_layout::tiled));
 };
 
@@ -91,7 +84,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_store_type<tile_t, payload_t>::is_global_block_2d &&
-    arch_has_2d_load_store(payload_t::arch_tag)>
+    arch_has_2d_load_store<payload_t::arch_tag>>
 tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename tile_t::dtype;
   using tile_desc = typename tile_t::tile_desc;
@@ -462,7 +455,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_store_type<tile_t, payload_t>::is_global_block_2d &&
-    payload_t::arch_tag <= gpu_arch::XeHpg>
+    !arch_has_2d_load_store<payload_t::arch_tag>>
 tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
@@ -615,7 +608,7 @@ tile_store(
             : 1;
         uint64_t address_offset = offset_x * sizeof(dtype) +
             (sub_block_y + offset_y) * payload.pitch_in_bytes;
-        if constexpr (payload_t::arch_tag >= gpu_arch::XeHpc) {
+        if constexpr (arch_has_2d_load_store<payload_t::arch_tag>) {
           xetla_tatomic_store_global<
               dtype,
               payload_t::num_channel,

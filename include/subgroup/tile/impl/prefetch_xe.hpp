@@ -29,23 +29,19 @@ template <typename payload_t>
 struct check_prefetch_type {
   static constexpr bool is_global_2d =
       ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y != 1) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::tile_desc::tile_size_y != 1));
 
-  static constexpr bool is_global_block_1d_xe =
+  static constexpr bool is_global_block_1d =
       ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y == 1) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+       (payload_t::tile_desc::tile_size_y == 1));
 
-  static constexpr bool is_global_unaligned_2d_xe =
+  static constexpr bool is_global_unaligned_2d =
       ((payload_t::memory_space == mem_space::global) &&
        (payload_t::tile_desc::tile_size_y != 1) &&
-       (payload_t::arch_tag -= gpu_arch::XeHpc) &&
        (payload_t::message_type == msg_type::unaligned_2d));
 
-  static constexpr bool is_local_xe =
-      ((payload_t::memory_space == mem_space::local) &&
-       (payload_t::arch_tag <= gpu_arch::XeHpc));
+  static constexpr bool is_local =
+      (payload_t::memory_space == mem_space::local);
 };
 
 } // namespace detail
@@ -66,7 +62,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_prefetch_type<payload_t>::is_global_2d &&
-    payload_t::arch_tag == gpu_arch::XeHpc>
+    arch_has_2d_load_store<payload_t::arch_tag>>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
   static constexpr uint32_t num_tdesc = payload_t::num_tdesc;
@@ -95,7 +91,7 @@ template <
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
     detail::check_prefetch_type<payload_t>::is_global_2d &&
-    payload_t::arch_tag <= gpu_arch::XeHpg>
+    !arch_has_2d_load_store<payload_t::arch_tag>>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
@@ -153,33 +149,31 @@ template <
     cache_hint L2 = cache_hint::cached,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
-    detail::check_prefetch_type<payload_t>::is_global_block_1d_xe>
+    detail::check_prefetch_type<payload_t>::is_global_block_1d>
 tile_prefetch(payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   constexpr uint32_t prefetch_len =
       tile_desc::tile_size_x / payload_t::scale_factor;
-  // TODO (read from arch register info)
-  constexpr uint32_t reg_in_bytes =
-      payload_t::arch_tag == gpu_arch::XeHpc ? 64 : 32;
-  if constexpr (prefetch_len >= reg_in_bytes) {
+  constexpr uint32_t max_prefetch_in_bytes = load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::max_prefetch_vec_len;
+  if constexpr (prefetch_len >= max_prefetch_in_bytes) {
 #pragma unroll
-    for (uint32_t j = 0; j < prefetch_len / reg_in_bytes; j++) {
-      uint32_t offset_x = j * reg_in_bytes * payload_t::scale_factor;
+    for (uint32_t j = 0; j < prefetch_len / max_prefetch_in_bytes; j++) {
+      uint32_t offset_x = j * max_prefetch_in_bytes * payload_t::scale_factor;
       uint32_t address_offset = offset_x * sizeof(dtype);
       xetla_prefetch_global<
           prefetch_dtype,
-          reg_in_bytes,
+          max_prefetch_in_bytes,
           data_size::default_size,
           L1,
           L2>(payload.base_ptr, payload.base_offset + address_offset);
     }
   }
-  constexpr uint32_t tail_len = prefetch_len % reg_in_bytes;
+  constexpr uint32_t tail_len = prefetch_len % max_prefetch_in_bytes;
   uint32_t tail_offset =
-      prefetch_len / reg_in_bytes * reg_in_bytes * payload_t::scale_factor;
-  detail::process_1d_tail<tail_len, reg_in_bytes / 2, L1, L2, payload_t>(
+      prefetch_len / max_prefetch_in_bytes * max_prefetch_in_bytes * payload_t::scale_factor;
+  detail::process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
       payload, tail_offset);
 }
 
@@ -196,7 +190,7 @@ template <
     cache_hint L2 = cache_hint::cached,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
-    detail::check_prefetch_type<payload_t>::is_local_xe>
+    detail::check_prefetch_type<payload_t>::is_local>
 tile_prefetch([[maybe_unused]] payload_t& payload) {}
 
 } // namespace gpu::xetla::subgroup
