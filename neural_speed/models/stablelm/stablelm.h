@@ -27,19 +27,19 @@ enum stablelm_model {
 
 static const model_scratch stablelm_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
-    case 24: // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
+    case 24:  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
       };
-    case 32: // StableLM-3B & Stable-Code-3B
+    case 32:  // StableLM-3B & Stable-Code-3B
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
       };
-    case 40: // StableLM-2-12B
+    case 40:  // StableLM-2-12B
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 2560) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2560) * MB,

@@ -145,7 +145,7 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
     } else if (n_layer == 40) {  // StableLM-2-12B
       layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.q_layernorm.weight", {n_embd_head_k, n_head}, backend);
       layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.k_layernorm.weight", {n_embd_head_k, n_head_kv}, backend);
-    } 
+    }
 
     // Post Attention norm - Only present in 1.6B & 3B
     if (n_layer < 40) {
@@ -165,12 +165,12 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.attn[4]) +
                       ne_nbytes(layer.attn[5]) + ne_nbytes(layer.attn[6]) + ne_nbytes(layer.ffn[0]) +
                       ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
-      } else if (n_layer == 32)  {
+      } else if (n_layer == 32) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.norm[2]) +
                       ne_nbytes(layer.norm[3]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
                       ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.ffn[0]) +
                       ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
-      } else if (n_layer == 40)  {
+      } else if (n_layer == 40) {
         vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.norm[1]) + ne_nbytes(layer.attn[0]) +
                       ne_nbytes(layer.attn[1]) + ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) +
                       ne_nbytes(layer.attn[4]) + ne_nbytes(layer.attn[5]) + ne_nbytes(layer.ffn[0]) +
@@ -205,7 +205,8 @@ void stablelm::load(model_context* ctx, model_progress_callback progress_callbac
 class stablelm_quant_layer : public quant_layer_base {
  public:
   quant_params_internal get_layer_config(std::string layername, std::vector<int64_t> ne, ne_type type) override {
-    bool quantize = (layername.rfind("weight") == layername.size() - 6) && (layername.find("layernorm") == std::string::npos); // ends with 'weight'?
+    bool quantize = (layername.rfind("weight") == layername.size() - 6) &&
+                    (layername.find("layernorm") == std::string::npos);  // ends with 'weight'?
     if (layername == "model.embed_tokens.weight") {
       // special layer process, can be loaded by config file
       return quant_params_internal();  // return q4_0 to cover the usage of getrow
