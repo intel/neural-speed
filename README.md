@@ -93,6 +93,31 @@ streamer = TextStreamer(tokenizer)
 outputs = model.generate(inputs, streamer=streamer, max_new_tokens=300)
 ```
 
+### As an Inference Backend in Neural Chat Server
+`Neural Speed` can be used in [Neural Chat Server](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/neural_chat/server) of `Intel Extension for Transformers`. You can choose to enable it by adding `use_neural_speed: true` in `config.yaml`.
+
+- add `optimization` key section to use `Neural Speed` and its RTN quantization ([example](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/neural_chat/examples/deployment/codegen/backend/pc/woq/codegen.yaml)).
+```yaml
+device: "cpu"
+
+# itrex int4 llm runtime optimization
+optimization:
+    use_neural_speed: true
+    optimization_type: "weight_only"
+    compute_dtype: "fp32"
+    weight_dtype: "int4"
+```
+- add key `use_neural_speed` and key `use_gptq` to use `Neural Speed` and load `GPT-Q` model ([example](https://github.com/intel/intel-extension-for-transformers/blob/main/intel_extension_for_transformers/neural_chat/examples/deployment/codegen/backend/pc/gptq/codegen.yaml)).
+
+```yaml
+device: "cpu"
+use_neural_speed: true
+use_gptq: true
+```
+
+More details please refer to [Neural Chat](https://github.com/intel/intel-extension-for-transformers/tree/main/intel_extension_for_transformers/neural_chat).
+
+
 ## Quick Start (llama.cpp-like usage)
 
 ### Single (One-click) Step
