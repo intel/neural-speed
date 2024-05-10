@@ -290,8 +290,10 @@ Neural Speed supports the following models:
   </tr>
   <tr>
     <td><a href="https://huggingface.co/stabilityai/stablelm-3b-4e1t" target="_blank" rel="noopener noreferrer">StableLM-3B</a>,
-    <a href="https://huggingface.co/stabilityai/stablelm-2-1_6b" target="_blank" rel="noopener noreferrer">StableLM2-1_6B</a>
-    <a href="https://huggingface.co/stabilityai/stablelm-2-zephyr-1_6b" target="_blank" rel="noopener noreferrer">StableLM2-Zephyr-1_6B</a></td>
+    <a href="https://huggingface.co/stabilityai/stablelm-2-1_6b" target="_blank" rel="noopener noreferrer">StableLM-2-1_6B</a>,
+    <a href="https://huggingface.co/stabilityai/stablelm-2-zephyr-1_6b" target="_blank" rel="noopener noreferrer">StableLM-2-Zephyr-1_6B</a>,
+    <a href="https://huggingface.co/stabilityai/stablelm-2-12b" target="_blank" rel="noopener noreferrer">StableLM-2-12B</a>,
+    <a href="https://huggingface.co/stabilityai/stablelm-2-12b-chat" target="_blank" rel="noopener noreferrer">StableLM-2-12B-Chat</a></td>
     <td>✅</td>
     <td> </td>
     <td> </td>
@@ -301,7 +303,7 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td>Latest</td>
-    <td>2048</td>
+    <td>4096</td>
   </tr>
   <tr>
     <td><a href="https://huggingface.co/google/gemma-2b-it" target="_blank" rel="noopener noreferrer">gemma-2b-it </a>,
@@ -372,7 +374,7 @@ Neural Speed supports the following models:
     <td>✅</td>
     <td>Latest</td>
   </tr>
-    <tr>
+  <tr>
     <td><a href="https://huggingface.co/ise-uiuc/Magicoder-S-DS-6.7B" target="_blank" rel="noopener noreferrer">Magicoder-6.7B</td>
     <td>✅</td>
     <td>✅</td>
@@ -396,6 +398,18 @@ Neural Speed supports the following models:
     <td> </td>
     <td> </td>
     <td> </td>
+    <td>Latest</td>
+  </tr>
+  <tr>
+    <td><a href="https://huggingface.co/stabilityai/stable-code-3b" target="_blank" rel="noopener noreferrer">Stable-Code-3B</a></td>
+    <td>✅</td>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td>✅</td>
+    <td></td>
+    <td></td>
+    <td></td>
     <td>Latest</td>
   </tr>
 </tbody>

@@ -149,13 +149,13 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
       struct ne_tensor* Vcur;
       if (n_layer == 24) {  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
         Qcur =
-            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[4]),
                           head_dim, n_head, N, 1);
         Kcur =
-            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), model.layers[il].attn[5]),
                           head_dim, n_head_kv, N, 1);
         Vcur =
-            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[6]),
                           head_dim, n_head_kv, N, 1);
       } else if (n_layer == 32) {  // StableLM-3B & Stable-Code-3B
         Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N, 1);
@@ -303,13 +303,9 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
         cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
       }
 
-      // projection
+      // out projection gemm
       {
-        if (n_layer == 24) {  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
-          cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
-        } else {  // StableLM-3B & Stable-Code-3B & StableLM-2-12B
-          cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
-        }
+        cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
       }
     }
     lctx.use_buf(ctx0, 1);
