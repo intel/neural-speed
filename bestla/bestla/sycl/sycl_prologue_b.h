@@ -85,10 +85,10 @@ class WeightS4 {
                   .B[(helper.item_g_n() + in + (koffset + helper.sg_idx_m() + icp * GemmCoreT::WgM) * _param.ldb) / 2];
           dstptr[(helper.sg_idx_m() + icp * GemmCoreT::WgM) * GemmCoreT::WgNEle +
                  (helper.sg_idx_n() * GemmCoreT::SgSize + helper.sg_id()) * GemmCoreT::TileN + in] =
-              static_cast<int8_t>((tmps8 & 0x0f) << 4) * scale[in];
+              static_cast<int8_t>((tmps8 & 0x0f) - 8) * scale[in];
           dstptr[(helper.sg_idx_m() + icp * GemmCoreT::WgM) * GemmCoreT::WgNEle +
                  (helper.sg_idx_n() * GemmCoreT::SgSize + helper.sg_id()) * GemmCoreT::TileN + in + 1] =
-              static_cast<int8_t>((tmps8 & 0xf0)) * scale[in + 1];
+              static_cast<int8_t>((tmps8 >> 4) - 8) * scale[in + 1];
         }
       }
     }
@@ -132,8 +132,8 @@ class WeightS4 {
                          for (int ik = 0; ik < TileK; ik += 1) {
                            for (int in = 0; in < TileN; in += 2) {
                              uint8_t srcu8 = *(bptr + (ik * ldb + sg_id * TileN + in) / 2);
-                             tmp[ik * TileN + in] = static_cast<int8_t>((srcu8 & 0x0f) << 4) * scale[in];
-                             tmp[ik * TileN + in + 1] = static_cast<int8_t>((srcu8 & 0xf0)) * scale[in + 1];
+                             tmp[ik * TileN + in] = static_cast<int8_t>((srcu8 & 0x0f) - 8) * scale[in];
+                             tmp[ik * TileN + in + 1] = static_cast<int8_t>((srcu8 >> 4) - 8) * scale[in + 1];
                            }
                          }
                          for (int ik = 0; ik < TileK; ik += 1) {
@@ -176,15 +176,15 @@ class WeightS4Trans {
         auto scale = _param.scale[(sgn + icp * GemmCoreT::SgCount) * _param.ldb + koffset / blocksize];
         auto tmps8 = _param.B[((sgn + icp * GemmCoreT::SgCount) * wldb + (koffset + helper.sg_id() * LoadTileK)) / 2];
         if constexpr (std::is_same_v<BType, sycl::half>) {
-          sycl::half2 tmpBf = {static_cast<int8_t>((tmps8 & 0x0f) << 4), static_cast<int8_t>((tmps8 & 0xf0))};
+          sycl::half2 tmpBf = {static_cast<int8_t>((tmps8 & 0x0f) - 8), static_cast<int8_t>((tmps8 >> 4) - 8)};
           tmpBf *= scale;
           dstptr[sg_off + helper.sg_group_id() + icp * GemmCoreT::SgCount] = tmpBf[0];
           dstptr[sg_off + GemmCoreT::WgNEle + helper.sg_group_id() + icp * GemmCoreT::SgCount] = tmpBf[1];
         } else {
           dstptr[sg_off + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
-              static_cast<int8_t>((tmps8 & 0x0f) << 4) * scale;
+              static_cast<int8_t>((tmps8 & 0x0f) - 8) * scale;
           dstptr[sg_off + GemmCoreT::WgNEle + helper.sg_group_id() + icp * GemmCoreT::SgCount] =
-              static_cast<int8_t>((tmps8 & 0xf0)) * scale;
+              static_cast<int8_t>((tmps8 >> 4) - 8) * scale;
         }
       }
     }
@@ -232,8 +232,8 @@ class WeightS4Trans {
               float scale = sptr[(ik * SgSize + sg_id * Unroll) / blocksize];
               for (int ir = 0; ir < Unroll; ir += 2) {
                 uint8_t srcu8 = *(bptr + (ik * SgSize + sg_id * Unroll + ir) / 2);
-                dst[ir] = static_cast<int8_t>((srcu8 & 0x0f) << 4) * scale;
-                dst[ir + 1] = static_cast<int8_t>((srcu8 & 0xf0)) * scale;
+                dst[ir] = static_cast<int8_t>((srcu8 & 0x0f) - 8) * scale;
+                dst[ir + 1] = static_cast<int8_t>((srcu8 >> 4) - 8) * scale;
               }
               *(sycl::vec<float, Unroll>*)&dbptr[ik * SgSize + sg_id * Unroll] = *(sycl::vec<float, Unroll>*)dst;
             }
@@ -342,8 +342,8 @@ class WeightS4Trans {
                          for (int in = 0; in < TileN; in++) {
                            float scale = sptr[sg_id * TileK / blocksize + in * ldb];
                            uint8_t srcu8 = *(bptr + (sg_id * TileK + in * ldbn) / 2);
-                           tmp[in] = high4 ? static_cast<int8_t>((srcu8 & 0xf0)) * scale
-                                           : static_cast<int8_t>((srcu8 & 0x0f) << 4) * scale;
+                           tmp[in] = high4 ? static_cast<int8_t>((srcu8 >> 4) - 8) * scale
+                                           : static_cast<int8_t>((srcu8 & 0x0f) - 8) * scale;
                          }
 
                          float tmpT[TileN];
@@ -400,8 +400,8 @@ class WeightS4Trans {
 #pragma unroll
                   for (int ikk = 0; ikk < TileK; ikk += 2) {
                     sycl::half2 tmpA = *(sycl::half2*)&aptr[sg_id * TileK + ikk];
-                    sycl::half2 tmpB = {static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4),
-                                        static_cast<int8_t>((tmps8[ikk / 2] & 0xf0))};
+                    sycl::half2 tmpB = {static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) - 8),
+                                        static_cast<int8_t>((tmps8[ikk / 2] >> 4) - 8)};
                     tmpAcc += tmpA * tmpB * scale;
                   }
                   sptr += GroupK / blocksize;
@@ -428,9 +428,9 @@ class WeightS4Trans {
 #pragma unroll
                   for (int ikk = 0; ikk < TileK; ikk += 2) {
                     tmpAcc +=
-                        CType(aptr[sg_id * TileK + ikk]) * static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) << 4) * scale;
+                        CType(aptr[sg_id * TileK + ikk]) * static_cast<int8_t>((tmps8[ikk / 2] & 0x0f) - 8) * scale;
                     tmpAcc +=
-                        CType(aptr[sg_id * TileK + ikk + 1]) * static_cast<int8_t>((tmps8[ikk / 2] & 0xf0)) * scale;
+                        CType(aptr[sg_id * TileK + ikk + 1]) * static_cast<int8_t>((tmps8[ikk / 2] >> 4) - 8) * scale;
                   }
                   sptr += GroupK / blocksize;
                   aptr += GroupK;

@@ -129,8 +129,8 @@ class UT_SyclS4SGemm {
       for (int j = 0; j < n; j += 2) {
         auto tmp = srcptr[i * n / 2 + j / 2];
         auto noffset = i / blocksize * n + j;
-        matB[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * B_scale[noffset + 0];
-        matB[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * B_scale[noffset + 1];
+        matB[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * B_scale[noffset + 0];
+        matB[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * B_scale[noffset + 1];
       }
     }
     gemmref_fp32fp32fp32(m, n, k, matA.data(), matB.data(), ref.data(), k, n, n);
@@ -168,8 +168,8 @@ class UT_SyclS4SGemm {
       for (int j = 0; j < k; j += 2) {
         auto tmp = srcptr[i * k / 2 + j / 2];
         auto noffset = i * blks + j / blocksize;
-        matB[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * B_scale[noffset];
-        matB[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * B_scale[noffset];
+        matB[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * B_scale[noffset];
+        matB[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * B_scale[noffset];
       }
     }
     avector<float> matBNT(k * n);
@@ -233,8 +233,8 @@ class UT_SyclS4HGemm {
       for (int j = 0; j < n; j += 2) {
         auto tmp = srcptr[i * n / 2 + j / 2];
         auto noffset = i / blocksize * n + j;
-        matB[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * float(B_scale[noffset + 0]);
-        matB[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * float(B_scale[noffset + 1]);
+        matB[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * float(B_scale[noffset + 0]);
+        matB[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * float(B_scale[noffset + 1]);
       }
     }
     gemmref_fp16fp16fp16(m, n, k, matA.data(), matB.data(), ref.data(), k, n, n);
@@ -269,8 +269,8 @@ class UT_SyclS4HGemm {
       for (int j = 0; j < k; j += 2) {
         auto tmp = srcptr[i * k / 2 + j / 2];
         auto noffset = i * blks + j / blocksize;
-        matB[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * float(B_scale[noffset]);
-        matB[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * float(B_scale[noffset]);
+        matB[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * float(B_scale[noffset]);
+        matB[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * float(B_scale[noffset]);
       }
     }
     avector<utils::fp16> matBNT(k * n);
@@ -317,8 +317,8 @@ class UT_SyclInt4Dequant {
       for (int j = 0; j < n; j += 2) {
         auto tmp = srcptr[i * n / 2 + j / 2];
         auto noffset = i / blocksize * n + j;
-        ref[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset + 0];
-        ref[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset + 1];
+        ref[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset + 0];
+        ref[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scale[noffset + 1];
       }
     }
     using ProB = sycl_prologue_b::WeightS4<sycl_gemm::xve::DefaultSGemmCore, float>;
@@ -349,8 +349,8 @@ class UT_SyclInt4Dequant {
       for (int j = 0; j < k; j += 2) {
         auto tmp = srcptr[i * k / 2 + j / 2];
         auto noffset = i * blks + j / blocksize;
-        ref[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset];
-        ref[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset];
+        ref[i * k + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset];
+        ref[i * k + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scale[noffset];
       }
     }
     using ProB = sycl_prologue_b::WeightS4Trans<sycl_gemm::xve::DefaultSGemmCore, float>;
@@ -411,8 +411,8 @@ class UT_SyclS4Gemv {
       for (int j = 0; j < k; j += 2) {
         auto tmp = srcptr[i * k / 2 + j / 2];
         auto noffset = i * blks + j / blocksize;
-        dqB[i + (j + 0) * n] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset];
-        dqB[i + (j + 1) * n] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset];
+        dqB[i + (j + 0) * n] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset];
+        dqB[i + (j + 1) * n] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scale[noffset];
       }
     }
     gemmref_fp32fp32fp32(1, n, k, A.data(), dqB.data(), refC.data(), k, n, n);
@@ -452,8 +452,8 @@ class UT_SyclS4Gemv {
         auto tmp = srcptr[i * k / 2 + j / 2];
         auto noffset = i * blks + j / blocksize;
         float fscale = float(scale[noffset]);
-        dqB[i + (j + 0) * n] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * fscale;
-        dqB[i + (j + 1) * n] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * fscale;
+        dqB[i + (j + 0) * n] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * fscale;
+        dqB[i + (j + 1) * n] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * fscale;
       }
     }
     gemmref_fp16fp16fp16(1, n, k, A.data(), dqB.data(), refC.data(), k, n, n);

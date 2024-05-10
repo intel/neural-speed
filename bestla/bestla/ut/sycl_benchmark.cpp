@@ -505,8 +505,8 @@ class Benchmark_DequantS4 {
       for (int i = 0; i < k; i += 2) {
         auto tmp = srcptr[i / 2 + j * k / 2];
         auto noffset = i / blocksize + j * blks;
-        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset];
-        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset];
+        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset];
+        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scale[noffset];
       }
     }
     sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);
@@ -557,8 +557,8 @@ class Benchmark_DequantS4 {
         auto tmp = srcptr[i / 2 + j * k / 2];
         auto noffset = i / blocksize + j * blks;
         auto s = float(scale[noffset]);
-        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * s;
-        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * s;
+        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * s;
+        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * s;
       }
     }
     sycl_vector<sycl::half> dS(scale.size(), q), dequantB(n * k, q);
@@ -608,8 +608,8 @@ class Benchmark_DequantS4 {
       for (int i = 0; i < k; i += 2) {
         auto tmp = srcptr[i / 2 + j * k / 2];
         auto noffset = i / blocksize + j * blks;
-        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset];
-        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset];
+        ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset];
+        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8 ) * scale[noffset];
       }
     }
     sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);
@@ -657,8 +657,8 @@ class Benchmark_DequantS4 {
       for (int j = 0; j < n; j += 2) {
         auto tmp = srcptr[i * n / 2 + j / 2];
         auto noffset = i / blocksize * n + j;
-        ref[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) << 4) * scale[noffset + 0];
-        ref[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) << 4) * scale[noffset + 1];
+        ref[i * n + j + 0] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset + 0];
+        ref[i * n + j + 1] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scale[noffset + 1];
       }
     }
     sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);
