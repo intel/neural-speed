@@ -170,6 +170,7 @@ class Model:
         else:
             quant_desc += "_bestla_c" + compute_dtype
             quant_desc += alg
+            quant_desc += "_s" + scale_dtype
             if group_size == -1:
                 quant_desc += "_pc"
             else:
