@@ -169,6 +169,7 @@ class Model:
             quant_desc += "_ggml"
         else:
             quant_desc += "_bestla_c" + compute_dtype
+            quant_desc += alg
             if group_size == -1:
                 quant_desc += "_pc"
             else:
