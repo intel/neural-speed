@@ -69,6 +69,8 @@ def _import_package(model_type):
         import neural_speed.mixtral_cpp as cpp_model
     elif model_type == "grok":
             import neural_speed.grok_cpp as cpp_model
+    elif model_type == "phi3":
+            import neural_speed.phi3_cpp as cpp_model
     else:
         raise TypeError("Unsupported model type {}!".format(model_type))
     return cpp_model

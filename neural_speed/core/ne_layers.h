@@ -446,7 +446,9 @@ NE_API struct ne_tensor* ne_rope_with_padding(struct ne_context* ctx, struct ne_
 NE_API struct ne_tensor* ne_rope_with_padding_inplace(struct ne_context* ctx, struct ne_tensor* a, int n_past,
                                                       int n_dims, int mode, int prompt_size, int* n_padding,
                                                       float freq_base, float freq_scale);
-
+NE_API struct ne_tensor* ne_longrope_inplace(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* factor,
+                                             int n_past, int n_dims, int mode, int prompt_size, float freq_base,
+                                             float freq_scale, float scale_factor);
 // alibi position embedding
 // in-place, returns view(a)
 struct ne_tensor* ne_alibi(struct ne_context* ctx, struct ne_tensor* a, int n_past, int n_head, float bias_max);
