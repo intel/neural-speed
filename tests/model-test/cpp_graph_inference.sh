@@ -167,6 +167,7 @@ model_name_map["phi1.5-gptq"]="phi-1_5-gptq-4bit"
 model_name_map["falcon7b-gptq"]="Falcon-7B-Instruct-GPTQ"
 model_name_map["baichuan13b-gptq"]="Baichuan2-13B-Chat-GPTQ"
 model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
+model_name_map["phi3"]="microsoft/Phi-3-mini-128k-instruct"
 
 
 function main() {
@@ -180,7 +181,7 @@ function main() {
     convert_script="$working_dir/neural_speed/convert/"
     # init params
     precision_list=()
-    requirements_file="requirements.txt" # some models need extra constraints
+    requirements_file="$working_dir/neural_speed/models/requirements/common.txt" # some models need extra constraints
 
     model_name="${model_name_map["$model"]}"
 
@@ -291,6 +292,10 @@ function main() {
         quant_script="./build/bin/quant_phi"
         convert_script="${convert_script}/convert_phi.py"
         infer_cmd="./build/bin/run_phi"
+    elif [[ "${model}" == "phi3" ]]; then
+        quant_script="./build/bin/quant_phi3"
+        convert_script="${convert_script}/convert_phi3.py"
+        infer_cmd="./build/bin/run_phi3"
     elif [[ "${model}" == "stablelm" ]]; then
         quant_script="./build/bin/quant_stablelm"
         convert_script="${convert_script}/convert_stablelm.py"

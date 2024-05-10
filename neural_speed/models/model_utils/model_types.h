@@ -87,7 +87,8 @@ enum model_archs {
   MODEL_GEMMA,
   MODEL_STABLELM,
   MODEL_WHISPER,
-  MODEL_GROK
+  MODEL_GROK,
+  MODEL_PHI3
 };
 
 static const size_t MB = 1024 * 1024;
@@ -498,7 +499,7 @@ class model_name_to_arch {
       {"chatglm", MODEL_CHATGLM}, {"baichuan", MODEL_BAICHUAN}, {"mistral", MODEL_LLAMA},
       {"qwen", MODEL_QWEN},       {"phi", MODEL_PHI},           {"stablelm", MODEL_STABLELM},
       {"whisper", MODEL_WHISPER}, {"chatglm3", MODEL_CHATGLM3}, {"mixtral", MODEL_LLAMA},
-      {"gemma", MODEL_GEMMA},     {"grok", MODEL_GROK}};
+      {"gemma", MODEL_GEMMA},     {"grok", MODEL_GROK},         {"phi3", MODEL_PHI3}};
 };
 
 #ifdef __cplusplus
