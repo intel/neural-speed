@@ -48,8 +48,10 @@ endif ()
 # AOT device
 set(AOT_DEVICE "" CACHE STRING "Set device list for AOT build")
 
-add_compile_options(-fsycl)
-add_link_options(-fsycl)
+include(ProcessorCount)
+ProcessorCount(nproc)
+add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
+add_link_options(-fsycl -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=${nproc})
 if(UNIX)
     if (AOT_DEVICE)
         add_compile_options(-fsycl-targets=spir64_gen)

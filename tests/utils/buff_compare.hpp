@@ -237,6 +237,7 @@ bool _handle_fp_types(
     [[maybe_unused]] std::string name,
     size_t ulp_tol,
     double abs_tol) {
+  const bool verbose = name != "";
   if (std::is_same<remove_const_t<dtype>, gpu::xetla::bf16>::value) {
     if (ulp_tol == 0)
       ulp_tol = 8;
@@ -281,15 +282,17 @@ bool _handle_fp_types(
   size_t aulpidx =
       std::max_element(aulpte.begin(), aulpte.end()) - aulpte.begin();
 
-  std::cout << "\t"
-            << "max absolute ULP diff:\n";
-  std::cout << "\t\t"
-            << "data_idx: " << data.idx_mapping[aulpidx]
-            << " gold_idx: " << other.idx_mapping[aulpidx]
-            << " abserr: " << (float)aulpte[aulpidx] << std::endl;
-  std::cout << "\t\t"
-            << "data_val: " << ulp_data[aulpidx]
-            << " gold_val: " << (float)ulp_other[aulpidx] << std::endl;
+  if (verbose) {
+    std::cout << "\t"
+              << "max absolute ULP diff:\n";
+    std::cout << "\t\t"
+              << "data_idx: " << data.idx_mapping[aulpidx]
+              << " gold_idx: " << other.idx_mapping[aulpidx]
+              << " abserr: " << (float)aulpte[aulpidx] << std::endl;
+    std::cout << "\t\t"
+              << "data_val: " << ulp_data[aulpidx]
+              << " gold_val: " << (float)ulp_other[aulpidx] << std::endl;
+  }
 
   size_t ulp_threshold = ulp_tol;
   double small_num_threshold = abs_tol;
@@ -319,7 +322,8 @@ bool _handle_fp_types(
 
   float fail_rate = diff_elems_count / ((float)ulp_data.size()) * 100;
   float pass_rate = 100 - fail_rate;
-  std::cout << "\tpass rate: " << pass_rate << "%\n";
+  if (verbose || fail_rate != 0)
+    std::cout << "\tpass rate: " << pass_rate << "%\n";
 
   return flag;
 }
@@ -374,6 +378,7 @@ bool xetla_buff_cmp(
     std::cout << "ERROR: buffer size or shape mismatch!\n";
     return false;
   }
+  const bool verbose = name != "";
   using dtype1 = typename T1::type;
   using dtype2 = typename T2::type;
 
@@ -383,26 +388,27 @@ bool xetla_buff_cmp(
       std::max_element(diff.rte.begin(), diff.rte.end()) - diff.rte.begin();
   unsigned aidx =
       std::max_element(diff.ate.begin(), diff.ate.end()) - diff.ate.begin();
-
-  std::cout << name << ":\n";
-  std::cout << "\t"
-            << "max relative diff:\n";
-  std::cout << "\t\t"
-            << "data_idx: " << data.idx_mapping[ridx]
-            << " gold_idx: " << other.idx_mapping[ridx]
-            << " relerr: " << diff.rte[ridx] << std::endl;
-  std::cout << "\t\t"
-            << "data_val: " << data.buff[ridx]
-            << " gold_val: " << other.buff[ridx] << std::endl;
-  std::cout << "\t"
-            << "max absolute diff:\n";
-  std::cout << "\t\t"
-            << "data_idx: " << data.idx_mapping[aidx]
-            << " gold_idx: " << other.idx_mapping[aidx]
-            << " abserr: " << diff.ate[aidx] << std::endl;
-  std::cout << "\t\t"
-            << "data_val: " << data.buff[aidx]
-            << " gold_val: " << other.buff[aidx] << std::endl;
+  if (verbose) {
+    std::cout << name << ":\n";
+    std::cout << "\t"
+              << "max relative diff:\n";
+    std::cout << "\t\t"
+              << "data_idx: " << data.idx_mapping[ridx]
+              << " gold_idx: " << other.idx_mapping[ridx]
+              << " relerr: " << diff.rte[ridx] << std::endl;
+    std::cout << "\t\t"
+              << "data_val: " << data.buff[ridx]
+              << " gold_val: " << other.buff[ridx] << std::endl;
+    std::cout << "\t"
+              << "max absolute diff:\n";
+    std::cout << "\t\t"
+              << "data_idx: " << data.idx_mapping[aidx]
+              << " gold_idx: " << other.idx_mapping[aidx]
+              << " abserr: " << diff.ate[aidx] << std::endl;
+    std::cout << "\t\t"
+              << "data_val: " << data.buff[aidx]
+              << " gold_val: " << other.buff[aidx] << std::endl;
+  }
 
   if constexpr (
       std::is_floating_point_v<dtype1> != 0 ||

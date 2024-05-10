@@ -123,7 +123,7 @@ class fmha_forward_t {
   static constexpr uint32_t kSgHm = fmha_policy::kSgHm;
 
   using comp_attr = std::conditional_t<
-      std::is_same_v<scalar_t, bf16>,
+      std::is_same_v<scalar_t, bf16> && (arch_tag < gpu_arch::XeHpc),
       group::compute_attr_t<accum_t, accum_t, accum_t>,
       group::compute_attr_t<scalar_t, scalar_t, accum_t>>;
   using knobs = group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
