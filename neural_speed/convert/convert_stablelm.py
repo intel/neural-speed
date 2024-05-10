@@ -145,7 +145,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             fout.write(struct.pack("i", len(text)))
             fout.write(text)
             fout.write(struct.pack("f", -10000))
-    
+
     def write_header(name, data, ftype=0):
         str = name.encode('utf-8')
         n_dims = len(data.shape)
@@ -165,7 +165,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
         # Skip some tensors
         if name.endswith((".attention.rotary_emb.inv_freq")):
             continue
-        
+
         data = data_torch.squeeze().numpy()
         old_dtype = data.dtype
         n_dims = len(data.shape)
