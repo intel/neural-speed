@@ -59,7 +59,7 @@ def perplexity(model_name, dataset_name, **kwargs):
     import datasets
     from transformers import AutoConfig, AutoTokenizer
 
-    from neural_speed import Model
+    from neural_speed import Model, _get_model_type
     model_name = try_resolve_dir(model_name)
     dataset_name = try_resolve_dir(dataset_name)
 
@@ -101,7 +101,7 @@ def perplexity(model_name, dataset_name, **kwargs):
         assert pathlib.Path(quantized_weight_path).is_file(), "Quantized weight not exist!"
         model.bin_file = quantized_weight_path
         model.config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-        model.model_type = Model.get_model_type(model.config)
+        model.model_type = _get_model_type(model.config)
         model.tokenizer = tokenizer
     else:
         init_kwargs = {
@@ -130,7 +130,7 @@ def perplexity(model_name, dataset_name, **kwargs):
         cur_input = test_ids[i_sample][:, begin_pos:end_pos]
         cur_target: torch.Tensor = test_ids[i_sample][:, end_pos]
         out = model(cur_input, threads=n_threads, reinit=is_first, **model_kwargs)
-        logsoftmax = torch.from_numpy(out).log_softmax(-1)
+        logsoftmax = torch.from_numpy(out[0,:,:]).log_softmax(-1)
         nll = logsoftmax.take_along_dim(cur_target.view(-1, 1), 1)
         assert len(nll) == 1
         nll_v = -nll.flatten().tolist()[0]

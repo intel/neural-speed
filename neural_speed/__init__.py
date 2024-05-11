@@ -169,6 +169,8 @@ class Model:
             quant_desc += "_ggml"
         else:
             quant_desc += "_bestla_c" + compute_dtype
+            quant_desc += "_" + alg
+            quant_desc += "_s" + scale_dtype
             if group_size == -1:
                 quant_desc += "_pc"
             else:
@@ -217,7 +219,7 @@ class Model:
         assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
-        os.remove(fp32_bin)
+        # os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         if self.module is None:
