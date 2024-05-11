@@ -11,7 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
 import sys
+import shutil
 import argparse
 from ns_evaluator import LMEvalParser
 from accuracy import cli_evaluate
@@ -20,6 +22,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate accuracy for a model")
     parser.add_argument('--model_name', type=str, default="~/Llama-2-7b-chat-hf")
     parser.add_argument('--tasks', type=str, default="lambada_openai")
+    parser.add_argument("--clear", action="store_true")
     parser.add_argument("--use_gptq", action="store_true")
     parser.add_argument("--use_awq", action="store_true")
     parser.add_argument("--use_autoround", action="store_true")
@@ -50,5 +53,7 @@ if __name__ == "__main__":
                         scale_dtype=args.scale_dtype,
                         )
     results = cli_evaluate(eval_args)
-
     print(results)
+
+    if args.clear and os.path.isdir('runtime_outs'):
+        shutil.rmtree('runtime_outs')
