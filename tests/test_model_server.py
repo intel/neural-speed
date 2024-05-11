@@ -68,8 +68,8 @@ class TestModelServer(unittest.TestCase):
             ans = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
             print(ans, flush=True)
             print("================================", flush=True)
+        model_path = model.bin_file
         del model
-        model_path = "./runtime_outs/ne_llama_q_int4_bestla_cint8_g32.bin"
 
         res_collect = []
         # response function (deliver generation results and current remain working size in server)
