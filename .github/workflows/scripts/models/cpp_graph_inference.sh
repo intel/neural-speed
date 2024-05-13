@@ -20,6 +20,7 @@ function main() {
         quant_script="./build/bin/quant_llama"
         infer_cmd="./build/bin/run_llama"
         input_model="/tf_dataset2/models/nlp_toolkit/llama-2-7b-chat/Llama-2-7b-chat-hf"
+        precision_list=("q4_j_b128" "q4_j_b32" "q4_0")
     elif [[ "${model}" == "llama3_8b_instruct-chat" ]]; then
         convert_script="${scripts_dir}/convert_llama.py"
         quant_script="./build/bin/quant_llama"
