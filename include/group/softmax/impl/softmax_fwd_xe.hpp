@@ -53,7 +53,7 @@ class softmax_t<softmax_policy_fwd<dtype_acc_, gpu_arch::XeHpc>, tile_shape_> {
       reduce_op::max,
       wg_size_x,
       true,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using wg_reduce_sum_t = group_reduce_t<
       dtype_acc,
       1,
@@ -61,7 +61,7 @@ class softmax_t<softmax_policy_fwd<dtype_acc_, gpu_arch::XeHpc>, tile_shape_> {
       reduce_op::sum,
       wg_size_x,
       true,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
  public:
   struct get_barrier_count {

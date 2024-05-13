@@ -59,6 +59,7 @@ class gemm_t<
   static constexpr uint32_t sg_tile_n = tile_shape::sg_tile_size_x;
   static constexpr uint32_t wg_size_x = tile_shape::wg_size_x;
   static constexpr uint32_t wg_size_y = tile_shape::wg_size_y;
+  static constexpr uint32_t wg_size = wg_size_x * wg_size_y;
   using work_group_t = typename tile_shape::work_group_t;
 
   constexpr static gpu_arch arch_tag = arch_tag_;
@@ -76,7 +77,7 @@ class gemm_t<
   using dtype_mma_a = typename compute_policy::dtype_mma_a;
   using dtype_mma_b = typename compute_policy::dtype_mma_b;
 
-  using check_dtype = group::gemm<arch_tag_>::default_xmx::
+  using check_dtype = group::gemm<arch_tag>::default_xmx::
       template check_dtype_default<dtype_a, dtype_b, dtype_mma_a, dtype_mma_b>;
 
   /******** set memory attribute **********/
@@ -91,7 +92,7 @@ class gemm_t<
       is_col_major_b ? tdesc_update_dir::x_dir : tdesc_update_dir::y_dir;
 
   using check_memory =
-      group::gemm<arch_tag_>::default_xmx::template check_memory_default<
+      group::gemm<arch_tag>::default_xmx::template check_memory_default<
           mem_layout_a,
           mem_layout_b,
           mem_space_a,
@@ -116,7 +117,7 @@ class gemm_t<
   static constexpr uint32_t block_size_y_b = compute_policy::block_size_y_b;
 
   using check_tile_size =
-      group::gemm<arch_tag_>::default_xmx::template check_tile_size_default<
+      group::gemm<arch_tag>::default_xmx::template check_tile_size_default<
           dtype_mma_a,
           tile_size_x_a,
           tile_size_y_a,
@@ -129,6 +130,9 @@ class gemm_t<
 
   /******** set tile  **********/
   static constexpr reg_layout reg_layout_a = reg_layout::tiled;
+
+  [[maybe_unused]] xetla_nbarrier_t<wg_size, wg_size, arch_tag> barrier_all;
+
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
       tile_size_y_a,
@@ -142,7 +146,7 @@ class gemm_t<
       matA_t,
       mem_layout_a,
       tile_shape::wg_size_x,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using cooperative_tile_desc_A_t =
       typename cooperative_helper_A_t::co_tile_desc_t;
   using partial_matA_t = subgroup::tile_t<dtype_a, cooperative_tile_desc_A_t>;
@@ -184,7 +188,7 @@ class gemm_t<
       matB_t,
       mem_layout_b,
       tile_shape::wg_size_y,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using cooperative_tile_desc_B_t =
       typename cooperative_helper_B_t::co_tile_desc_t;
 
@@ -242,9 +246,11 @@ class gemm_t<
   static constexpr uint32_t slm_size_b = wg_size_x * tile_size_b;
 
  public:
-  static constexpr uint32_t barrier_count = barrier_count_x + barrier_count_y;
+  static constexpr uint32_t barrier_count =
+      arch_has_named_barrier<arch_tag> ? barrier_count_x + barrier_count_y : 0;
 
   static constexpr uint32_t slm_size = (slm_size_a + slm_size_b) * num_cyclic;
+  static_assert(slm_size <= arch_attr_t<arch_tag>::local_mem_size);
   static constexpr uint32_t slm_base_a = 0;
   static constexpr uint32_t slm_base_b = 0 + slm_size_a * num_cyclic;
 
@@ -350,18 +356,16 @@ class gemm_t<
       "If you call this function, please set a free barrier id or make "
       "sure barrier_id 0 is not being occupied and you need to allocate "
       "one more barrier count in addition to the gemm barrier counts.")
-  __XETLA_API static void release(uint8_t nbarrier_id = 0) {
+  __XETLA_API void release(uint8_t nbarrier_id = 0) {
     static constexpr bool need_local_fence =
         (mem_space_a == mem_space::local) || (mem_space_b == mem_space::local);
     if constexpr (need_local_fence) {
       xetla_fence<memory_kind::shared_local>();
     }
     xetla_fence<memory_kind::untyped_global>();
-    static constexpr uint32_t wg_size = wg_size_x * wg_size_y;
     if constexpr (wg_size > 1) {
-      xetla_nbarrier_t<wg_size, wg_size> nbarrier;
-      nbarrier.init_nbarrier(nbarrier_id, nbarrier_role::producer_consumer);
-      nbarrier.arrive_wait();
+      barrier_all.init_nbarrier(nbarrier_id, nbarrier_role::producer_consumer);
+      barrier_all.arrive_wait();
     }
   }
 
@@ -426,10 +430,11 @@ class gemm_t<
     matA_prefetch_payload_t matA_prefetch_payload(args.matA_base_desc, sg_idx);
     matB_prefetch_payload_t matB_prefetch_payload(args.matB_base_desc, sg_idy);
 
-    xetla_nbarrier_t<wg_size_x, wg_size_x> nbarrier_a;
+    xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
     nbarrier_a.init_nbarrier(
         sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
-    xetla_nbarrier_t<wg_size_y, wg_size_y> nbarrier_b;
+
+    xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
     nbarrier_b.init_nbarrier(
         sg_idx + barrier_count_y + nbarrier_base,
         nbarrier_role::producer_consumer);
@@ -444,9 +449,11 @@ class gemm_t<
     matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
     matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
     xetla_fence<memory_kind::shared_local>();
+
     nbarrier_a.arrive();
-    if (arch_tag >= gpu_arch::XeHpc)
+    if constexpr (arch_has_named_barrier<arch_tag>)
       nbarrier_b.arrive();
+
 #pragma unroll
     for (uint32_t i = 1; i < num_cyclic - 1; i++) {
       tile_load(partial_matA, matA_payload);
@@ -469,6 +476,7 @@ class gemm_t<
         matA_t::tile_size_x * (num_cyclic - 1));
     matB_prefetch_payload.template update_tdesc<update_dir_b>(
         matB_t::tile_size_y * (num_cyclic - 1));
+
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -496,7 +504,7 @@ class gemm_t<
       }
 
       nbarrier_a.wait();
-      if (arch_tag >= gpu_arch::XeHpc)
+      if constexpr (arch_has_named_barrier<arch_tag>)
         nbarrier_b.wait();
 
       tile_load(matA, matA_local_ld_payload);
@@ -525,7 +533,7 @@ class gemm_t<
       }
 
       nbarrier_a.arrive();
-      if (arch_tag >= gpu_arch::XeHpc)
+      if constexpr (arch_has_named_barrier<arch_tag>)
         nbarrier_b.arrive();
       SW_BARRIER();
       matA_acc_t matA_acc;
@@ -555,7 +563,7 @@ class gemm_t<
     }
     SW_BARRIER();
     nbarrier_a.wait();
-    if (arch_tag >= gpu_arch::XeHpc)
+    if constexpr (arch_has_named_barrier<arch_tag>)
       nbarrier_b.wait();
   }
 

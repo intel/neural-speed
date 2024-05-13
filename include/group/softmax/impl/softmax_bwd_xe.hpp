@@ -55,7 +55,7 @@ class softmax_t<
       reduce_op::sum,
       wg_size_x,
       true,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
  public:
   struct arguments_t {
@@ -106,7 +106,7 @@ class softmax_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
         subgroup::msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
-        gpu_arch::XeHpc>;
+        arch_tag>;
 
     int32_t sg_idx = g.get_id() % wg_size_x;
     int32_t sg_idy = g.get_id() / wg_size_x;

@@ -31,8 +31,9 @@ template <
     uint32_t N_SG,
     bool is_all_reduce>
 struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
-  group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> sg_reduce{};
-  xetla_nbarrier_t<N_SG, N_SG, gpu_arch::XeHpc> nbarrier;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+  group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, arch_tag> sg_reduce{};
+  xetla_nbarrier_t<N_SG, N_SG, arch_tag> nbarrier;
   uint32_t slm_base;
   uint32_t sg_id;
   using local_st_tile_desc =
@@ -45,12 +46,12 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       local_ld_tile_desc,
       subgroup::msg_type_v<local_ld_tile_desc, mem_space::local>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using local_st_payload_t = subgroup::mem_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       local_st_tile_desc,
       msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   inline group_reduce_t() = default;
   inline group_reduce_t(
       uint32_t sg_id_,

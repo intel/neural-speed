@@ -1020,7 +1020,7 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
     for (uint32_t j = 0; j < store_iter_steps; j++) {
       uint32_t offset_x = j * max_store_vec_len * scale_factor;
-      auto reg_sub = tile.reg.xetla_select<64 * scale_factor, 1>(offset_x);
+      auto reg_sub = tile.reg.xetla_select<max_store_vec_len * scale_factor, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
       xetla_store_local<store_dtype, max_store_vec_len>(
           payload.address + address_offset,

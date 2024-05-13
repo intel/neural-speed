@@ -35,7 +35,7 @@ class epilogue_t<
     epilogue_policy_unaligned<arch_tag_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   using epilogue_policy = epilogue_policy_unaligned<arch_tag_>;
   using tile_shape = tile_shape_;

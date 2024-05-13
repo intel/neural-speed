@@ -103,8 +103,8 @@ struct tile_mma_t<
   static constexpr int32_t num_block_m = matDst_t::num_block_y;
   static constexpr int32_t num_block_k = tile_size_k / block_size_k;
 
-  static constexpr int32_t mma_m =
-      register_attr::acc_reg_in_bytes / (block_size_n * sizeof(dtype_dst));
+  using mma_attr = mma_attr_t<arch_tag_, mma_engine::fpu, tile_size_m>;
+  static constexpr int32_t mma_m = mma_attr::mma_m_in_elem;
 
   template <int blk_m, int blk_n, int blk_k>
   __XETLA_API static void mma_core(
@@ -112,36 +112,39 @@ struct tile_mma_t<
       xetla_vector_ref<dtype_src, blk_m * blk_n> __REF__ src,
       xetla_vector_ref<dtype_b, blk_k * blk_n> __REF__ b_block,
       xetla_vector_ref<dtype_a, blk_m * blk_k> __REF__ a_block) {
+    constexpr uint32_t blk_m_iters = blk_m / mma_m;
+    constexpr uint32_t tail_m = blk_m % mma_m;
     auto dst_blk_2d = dst.xetla_format<dtype_dst, blk_m, blk_n>();
     auto src_blk_2d = src.xetla_format<dtype_src, blk_m, blk_n>();
     auto b_blk_2d = b_block.xetla_format<dtype_b, blk_k, blk_n>();
+    if constexpr (blk_m_iters > 0) {
 #pragma unroll
-    for (uint32_t i = 0; i < blk_m / mma_m; i++) {
-      xetla_vector<dtype_dst, mma_m * blk_n> dst_tmp;
-      auto dst_tmp_2d = dst_tmp.xetla_format<dtype_dst, mma_m, blk_n>();
+      for (uint32_t i = 0; i < blk_m_iters; i++) {
+        xetla_vector<dtype_dst, mma_m * blk_n> dst_tmp;
+        auto dst_tmp_2d = dst_tmp.xetla_format<dtype_dst, mma_m, blk_n>();
 #pragma unroll
-      for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
-        dst_tmp_2d.row(i_acc) = a_block[i_acc + i * mma_m] * b_blk_2d.row(0) +
-            src_blk_2d.row(i_acc + i * mma_m);
-      }
-#pragma unroll
-      for (uint32_t k = 1; k < blk_k - 1; k++) {
         for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
-          int a_offset = k * blk_m + i_acc + i * mma_m;
-          dst_tmp_2d.row(i_acc) += a_block[a_offset] * b_blk_2d.row(k);
+          dst_tmp_2d.row(i_acc) = a_block[i_acc + i * mma_m] * b_blk_2d.row(0) +
+            src_blk_2d.row(i_acc + i * mma_m);
         }
-      }
-      for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
-        int a_offset = (blk_k - 1) * blk_m + i_acc + i * mma_m;
-        dst_blk_2d.row(i_acc + i * mma_m) =
+#pragma unroll
+        for (uint32_t k = 1; k < blk_k - 1; k++) {
+          for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
+            int a_offset = k * blk_m + i_acc + i * mma_m;
+            dst_tmp_2d.row(i_acc) += a_block[a_offset] * b_blk_2d.row(k);
+          }
+        }
+        for (uint32_t i_acc = 0; i_acc < mma_m; i_acc++) {
+          int a_offset = (blk_k - 1) * blk_m + i_acc + i * mma_m;
+          dst_blk_2d.row(i_acc + i * mma_m) =
             a_block[a_offset] * b_blk_2d.row(blk_k - 1) + dst_tmp_2d.row(i_acc);
+        }
+        SW_BARRIER();
       }
-      SW_BARRIER();
     }
 
-    if constexpr ((blk_m % mma_m) != 0) {
-      constexpr uint32_t tail_start_m = blk_m / mma_m * mma_m;
-      constexpr uint32_t tail_m = blk_m % mma_m;
+    if constexpr (tail_m != 0) {
+      constexpr uint32_t tail_start_m = blk_m_iters * mma_m;
       xetla_vector<dtype_dst, tail_m * blk_n> dst_tmp;
       auto dst_tmp_2d = dst_tmp.xetla_format<dtype_dst, tail_m, blk_n>();
 #pragma unroll
@@ -172,20 +175,22 @@ struct tile_mma_t<
       matA_t& a) {
     { // k_blk=0
       auto b_reg = b.reg.xetla_select<b_block_size_y * b_tile_size_x, 1>(0);
+      if constexpr (tile_size_m >= block_size_m) {
 #pragma unroll
-      for (uint32_t i = 0; i < tile_size_m / block_size_m; i++) {
-        auto a_block = a.reg.xetla_select<a_block_elems, 1>(
+        for (uint32_t i = 0; i < tile_size_m / block_size_m; i++) {
+          auto a_block = a.reg.xetla_select<a_block_elems, 1>(
             i * num_block_k * a_block_elems);
 #pragma unroll
-        for (uint32_t j = 0; j < num_block_n; j++) {
-          auto b_block =
+          for (uint32_t j = 0; j < num_block_n; j++) {
+            auto b_block =
               b_reg.xetla_select<b_block_elems, 1>(j * b_block_elems);
-          auto src_block = src.reg.xetla_select<block_elems, 1>(
+            auto src_block = src.reg.xetla_select<block_elems, 1>(
               (i * num_block_n + j) * block_elems);
-          auto dst_block = dst.reg.xetla_select<block_elems, 1>(
+            auto dst_block = dst.reg.xetla_select<block_elems, 1>(
               (i * num_block_n + j) * block_elems);
-          mma_core<block_size_m, block_size_n, block_size_k>(
+            mma_core<block_size_m, block_size_n, block_size_k>(
               dst_block, src_block, b_block, a_block);
+          }
         }
       }
 

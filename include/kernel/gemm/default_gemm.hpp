@@ -37,7 +37,7 @@ template <
     mem_layout mem_layout_c,
     uint32_t alignment_c,
     typename dtype_acc,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 struct default_gemm_config_t
     : param_adaptor<
@@ -69,7 +69,7 @@ template <
     mem_layout mem_layout_c,
     uint32_t alignment_c,
     typename dtype_acc,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 using default_gemm_t = typename default_gemm_config_t<
     dtype_a,
@@ -170,7 +170,7 @@ template <
     typename dtype_acc,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 struct default_gemm_selector_config_t
     : param_adaptor<
@@ -204,7 +204,7 @@ template <
     typename dtype_acc,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 using default_gemm_selector_t = typename default_gemm_selector_config_t<
     dtype_a,
@@ -228,7 +228,7 @@ template <
     mem_space mem_space_c,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 struct default_epilogue_selector_config_t
     : param_adaptor<
@@ -252,7 +252,7 @@ template <
     mem_space mem_space_c,
     typename wg_shape,
     uint32_t wg_tile_k,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     typename tune_option = dict_t<>>
 using default_epilogue_selector_t = typename default_epilogue_selector_config_t<
     dtype_c,

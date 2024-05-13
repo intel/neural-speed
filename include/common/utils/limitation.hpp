@@ -747,7 +747,7 @@ struct check_store {
 } // namespace subgroup
 
 namespace group {
-template <gpu_arch arch = gpu_arch::XeHpc>
+template <gpu_arch arch>
 struct gemm {
   struct default_fpu {
     template <
@@ -876,7 +876,7 @@ struct gemm {
         int block_size_x_b,
         int block_size_y_b>
     struct check_tile_size_default {
-      using mma_attr = mma_attr_t<arch, block_size_y_a>;
+      using mma_attr = mma_attr_t<arch, mma_engine::xmx, tile_size_y_a>;
       static constexpr int32_t mma_m = mma_attr::mma_m_in_elem;
       static constexpr int32_t mma_n = mma_attr::mma_n_in_elem;
       static constexpr int32_t mma_k =

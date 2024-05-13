@@ -57,7 +57,7 @@ class gemm_t<
   static constexpr uint32_t wg_size_y = tile_shape::wg_size_y;
   using work_group_t = typename tile_shape::work_group_t;
 
-  constexpr static gpu_arch arch_tag = compute_policy::arch_tag;
+  constexpr static gpu_arch arch_tag = arch_tag_;
 
   static constexpr mem_layout mem_layout_a = mem_desc_a_t::layout;
   static constexpr mem_layout mem_layout_b = mem_desc_b_t::layout;
@@ -65,6 +65,7 @@ class gemm_t<
   static constexpr bool is_col_major_b = mem_layout_b == mem_layout::col_major;
 
  private:
+  static constexpr uint32_t wg_size = wg_size_x * wg_size_y;
   /******** set data type **********/
   using dtype_a = typename mem_desc_a_t::dtype;
   using dtype_b = typename mem_desc_b_t::dtype;
@@ -186,10 +187,18 @@ class gemm_t<
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
   static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
+  static constexpr bool need_local_fence =
+      (mem_space_a == mem_space::local) || (mem_space_b == mem_space::local);
+
+  [[maybe_unused]] xetla_nbarrier_t<wg_size, wg_size, arch_tag> barrier_all;
+  [[maybe_unused]] xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
+  [[maybe_unused]] xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
 
  public:
   static constexpr uint32_t barrier_count =
-      enable_periodic_sync ? barrier_count_x + barrier_count_y : 0;
+      (enable_periodic_sync && arch_has_named_barrier<arch_tag>)
+      ? barrier_count_x + barrier_count_y
+      : 0;
 
   static constexpr uint32_t slm_size = 0;
 
@@ -269,6 +278,58 @@ class gemm_t<
     }
   };
 
+  inline void periodic_sync_init(
+      [[maybe_unused]] int32_t sg_idx,
+      [[maybe_unused]] int32_t sg_idy,
+      uint32_t nbarrier_base) {
+    if constexpr (enable_periodic_sync) {
+      if constexpr (arch_has_named_barrier<arch_tag>) {
+        nbarrier_a.init_nbarrier(
+            sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
+        nbarrier_b.init_nbarrier(
+            sg_idx + barrier_count_y + nbarrier_base,
+            nbarrier_role::producer_consumer);
+      } else {
+        barrier_all.init_nbarrier(
+            nbarrier_base, nbarrier_role::producer_consumer);
+      }
+    }
+  }
+
+  inline void periodic_sync_arrive(uint32_t iter_num) {
+    if constexpr (enable_periodic_sync) {
+      if ((iter_num % sync_freq) == 0) {
+        if constexpr (arch_has_named_barrier<arch_tag>) {
+          if constexpr (wg_size_x > 1) {
+            nbarrier_a.arrive();
+          }
+          if constexpr (wg_size_y > 1) {
+            nbarrier_b.arrive();
+          }
+        } else {
+          barrier_all.arrive();
+        }
+      }
+    }
+  }
+
+  inline void periodic_sync_wait(uint32_t iter_num) {
+    if constexpr (enable_periodic_sync) {
+      if ((iter_num % sync_freq) == 0) {
+        if constexpr (arch_has_named_barrier<arch_tag>) {
+          if constexpr (wg_size_x > 1) {
+            nbarrier_a.wait();
+          }
+          if constexpr (wg_size_y > 1) {
+            nbarrier_b.wait();
+          }
+        } else {
+          barrier_all.wait();
+        }
+      }
+    }
+  }
+
   /// @brief Gets the subgroup-level tile offset x.
   /// @param g Is the workgroup of the current tile.
   /// @return Subgroup-level tile offset x.
@@ -292,18 +353,14 @@ class gemm_t<
       "If you call this function, please set a free barrier id or make "
       "sure barrier_id 0 is not being occupied and you need to allocate "
       "one more barrier count in addition to the gemm barrier counts.")
-  __XETLA_API static void release(uint8_t nbarrier_id = 0) {
-    static constexpr bool need_local_fence =
-        (mem_space_a == mem_space::local) || (mem_space_b == mem_space::local);
+  __XETLA_API void release(uint8_t nbarrier_id = 0) {
     if constexpr (need_local_fence) {
       xetla_fence<memory_kind::shared_local>();
     }
     xetla_fence<memory_kind::untyped_global>();
-    static constexpr uint32_t wg_size = wg_size_x * wg_size_y;
     if constexpr (wg_size > 1) {
-      xetla_nbarrier_t<wg_size, wg_size, arch_tag> nbarrier;
-      nbarrier.init_nbarrier(nbarrier_id, nbarrier_role::producer_consumer);
-      nbarrier.arrive_wait();
+      barrier_all.init_nbarrier(nbarrier_id, nbarrier_role::producer_consumer);
+      barrier_all.arrive_wait();
     }
   }
 
@@ -324,10 +381,10 @@ class gemm_t<
     int32_t sg_idy = g.get_id() / wg_size_x;
 
     XETLA_ASSERT(
-        g.get_id() < (wg_size_x * wg_size_y),
+        g.get_id() < wg_size,
         "Thread id(%d) should less than wg_size(%d)",
         g.get_id(),
-        wg_size_x * wg_size_y);
+        wg_size);
 
     update_sg_tile_tdesc(args, sg_idx, sg_idy);
     pre_processing_t pre_processing;
@@ -339,13 +396,8 @@ class gemm_t<
     matB_payload_t matB_payload(args.matB_base_desc);
     matA_prefetch_payload_t matA_prefetch_payload(args.matA_base_desc, sg_idx);
     matB_prefetch_payload_t matB_prefetch_payload(args.matB_base_desc, sg_idy);
-    xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
-    nbarrier_a.init_nbarrier(
-        sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
-    xetla_nbarrier_t<wg_size_y, wg_size_y, arch_tag> nbarrier_b;
-    nbarrier_b.init_nbarrier(
-        sg_idx + barrier_count_y + nbarrier_base,
-        nbarrier_role::producer_consumer);
+
+    periodic_sync_init(sg_idx, sg_idy, nbarrier_base);
 
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
@@ -360,17 +412,8 @@ class gemm_t<
     }
 
     for (uint32_t i = 0; i < args.inner_loop_count; i++) {
-      if constexpr (enable_periodic_sync) {
-        if ((i % sync_freq) == 0) {
-          if constexpr (wg_size_x > 1) {
-            nbarrier_a.arrive();
-          }
-          if constexpr (arch_tag >= gpu_arch::XeHpc)
-            if constexpr (wg_size_y > 1) {
-              nbarrier_b.arrive();
-            }
-        }
-      }
+      periodic_sync_arrive(i);
+
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -398,18 +441,9 @@ class gemm_t<
       pre_processing(matA_acc, matB_acc, matA, matB);
       SW_BARRIER();
       tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+
       SW_BARRIER();
-      if constexpr (enable_periodic_sync) {
-        if ((i % sync_freq) == 0) {
-          if constexpr (wg_size_x > 1) {
-            nbarrier_a.wait();
-          }
-          if constexpr (arch_tag >= gpu_arch::XeHpc)
-            if constexpr (wg_size_y > 1) {
-              nbarrier_b.wait();
-            }
-        }
-      }
+      periodic_sync_wait(i);
     }
     SW_BARRIER();
   }

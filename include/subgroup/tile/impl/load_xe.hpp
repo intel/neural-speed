@@ -106,12 +106,11 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   static constexpr bool mem_transform = payload_t::mem_transform;
 
-  using load_store_attr = typename arch_attr_t<
-      arch_tag>::template load_store_attr<msg_type::block_2d>;
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
   static constexpr uint32_t elems_per_CL =
       load_store_attr::cache_line_size_in_bytes / sizeof(dtype);
   static constexpr uint32_t elems_per_reg =
-      arch_attr_t<arch_tag>::template register_attr<>::reg_in_bytes /
+      register_bytes_t<arch_tag>::reg_in_bytes /
       sizeof(dtype);
   static constexpr int32_t max_load_block_height =
       load_store_attr::max_load_height_in_elem;
