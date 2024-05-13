@@ -71,59 +71,26 @@ template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
                      storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK, storage::gemm::IWeightBase* _BV,
                      float* C, const int ldc, int8_t* WorkSpace, parallel::IThreading* th) {
-  if (M <= 16) {
-    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
-    using Launcher = tLauncher_Fp_F32F32<GemmCore_T, Wei_T>;
-    static Launcher kernel;
-    auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
-    auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
-    auto BV = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BV);
-    auto reduceA = kernel.mProA.createStorage(M, K, BQ->mBlockSize);
-    if (BQ->IsAsym()) {
-      reduceA.assign(WorkSpace);
-      WorkSpace += reduceA.mSize;
-    }
-    auto reordA = kernel.mProA.createReorderStorage(M, K, BQ->mBlockSize);
-    if (BQ->ShfIndice()) {
-      reordA.assign(WorkSpace);
-    }
-    auto cstep = static_cast<int>(BQ->CStep());
-    typename Launcher::BEpiParam blkargs[3]{{BQ->template SPtr<int8_t>(), BQ->SDtype(), cstep,
-                                             BQ->template ZPtr<int8_t>(), reduceA.template RPtr<float>(), reduceA.lda},
-                                            {BK->template SPtr<int8_t>(), BK->SDtype(), cstep,
-                                             BK->template ZPtr<int8_t>(), reduceA.template RPtr<float>(), reduceA.lda},
-                                            {BV->template SPtr<int8_t>(), BV->SDtype(), cstep,
-                                             BV->template ZPtr<int8_t>(), reduceA.template RPtr<float>(), reduceA.lda}};
-    utils::GemmProblem gp(1, M, N, K, BQ->mBlockSize);  // If mixed blocksize, change it to three instances.
-    typename Launcher::Param args[3]{
-        {gp, {A, lda, &reduceA, BQ->ShfIndice(), &reordA}, {BQ}, blkargs[0], {C, ldc}},
-        {gp, {A, lda, &reduceA, BK->ShfIndice(), &reordA}, {BK}, blkargs[1], {C + M * ldc, ldc}},
-        {gp, {A, lda, &reduceA, BV->ShfIndice(), &reordA}, {BV}, blkargs[2], {C + M * ldc * 2, ldc}}};
-    if (BQ->IsAsym() || BQ->ShfIndice()) {
-      GemmRunWithA_QKV<Parallel>(&kernel, args, th);
-    } else {
-      GemmRun_QKV<Parallel>(&kernel, args, th);
-    }
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher =
+      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+                                  epilogue::gemm::AccumulatorWriteBackFp32>;
+  static Launcher kernel;
+  auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
+  auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
+  auto BV = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BV);
+  auto reordA = kernel.mProA.createReorderStorage(M, K, BQ->mBlockSize);
+  utils::GemmProblem gpq(1, M, N, K, BQ->mBlockSize);
+  utils::GemmProblem gpk(1, M, N, K, BK->mBlockSize);
+  utils::GemmProblem gpv(1, M, N, K, BV->mBlockSize);
+  typename Launcher::Param args[3]{{gpq, {A, K, nullptr, BQ->ShfIndice(), &reordA}, {BQ}, {C, ldc}},
+                                   {gpk, {A, K, nullptr, BK->ShfIndice(), &reordA}, {BK}, {C + M * ldc, ldc}},
+                                   {gpv, {A, K, nullptr, BV->ShfIndice(), &reordA}, {BV}, {C + M * ldc * 2, ldc}}};
+  if (BQ->ShfIndice()) {
+    reordA.assign(WorkSpace);
+    GemmRunWithA_QKV<Parallel>(&kernel, args, th);
   } else {
-    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32,
-                                    Wei_T, epilogue::gemm::AccumulatorWriteBackFp32>;
-    static Launcher kernel;
-    auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
-    auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
-    auto BV = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BV);
-    auto reordA = kernel.mProA.createReorderStorage(M, K, BQ->mBlockSize);
-    utils::GemmProblem gp(1, M, N, K, BQ->mBlockSize);
-    typename Launcher::Param args[3]{{gp, {A, K, nullptr, BQ->ShfIndice(), &reordA}, {BQ}, {C, ldc}},
-                                     {gp, {A, K, nullptr, BK->ShfIndice(), &reordA}, {BK}, {C + M * ldc, ldc}},
-                                     {gp, {A, K, nullptr, BV->ShfIndice(), &reordA}, {BV}, {C + M * ldc * 2, ldc}}};
-    if (BQ->ShfIndice()) {
-      reordA.assign(WorkSpace);
-      GemmRunWithA_QKV<Parallel>(&kernel, args, th);
-    } else {
-      GemmRun_QKV<Parallel>(&kernel, args, th);
-    }
+    GemmRun_QKV<Parallel>(&kernel, args, th);
   }
 }
 
@@ -245,6 +212,9 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
       } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
         ip_qkv::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
                                                              ldo, workspace, pth);
+      } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+        ip_qkv::BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                              ldo, workspace, pth);
       }
     }
   }

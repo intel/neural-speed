@@ -69,6 +69,8 @@ def _import_package(model_type):
         import neural_speed.mixtral_cpp as cpp_model
     elif model_type == "grok":
             import neural_speed.grok_cpp as cpp_model
+    elif model_type == "phi3":
+            import neural_speed.phi3_cpp as cpp_model
     else:
         raise TypeError("Unsupported model type {}!".format(model_type))
     return cpp_model
@@ -167,6 +169,8 @@ class Model:
             quant_desc += "_ggml"
         else:
             quant_desc += "_bestla_c" + compute_dtype
+            quant_desc += "_" + alg
+            quant_desc += "_s" + scale_dtype
             if group_size == -1:
                 quant_desc += "_pc"
             else:
@@ -215,7 +219,7 @@ class Model:
         assert os.path.exists(quant_bin), "Fail to quantize model"
 
         # clean
-        os.remove(fp32_bin)
+        # os.remove(fp32_bin)
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         if self.module is None:

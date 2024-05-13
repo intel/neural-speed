@@ -35,46 +35,20 @@ template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, const int lda,
                      storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
                      parallel::IThreading* th) {
-  if (M <= 16) {
-    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
-    using Launcher = tLauncher_Fp_F32F32<GemmCore_T, Wei_T>;
-    static Launcher kernel;
-    auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-    utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
-    auto reduceA = kernel.mProA.createReduceStorage(M, K, B->mBlockSize);
-    if (B->IsAsym()) {
-      reduceA.assign(WorkSpace);
-      WorkSpace += reduceA.mSize;
-    }
-    auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-    if (B->ShfIndice()) {
-      reordA.assign(WorkSpace);
-    }
-    typename Launcher::BEpiParam blkargs{
-        B->template SPtr<int8_t>(),     B->SDtype(), B->CStep(), B->template ZPtr<int8_t>(),
-        reduceA.template RPtr<float>(), reduceA.lda};
-    typename Launcher::Param args{gp, {A, K, &reduceA, B->ShfIndice(), &reordA}, {B}, blkargs, {C, N}};
-    if (B->IsAsym() || B->ShfIndice()) {
-      parallel::GemmRunWithA<Parallel>(kernel, args, th);
-    } else {
-      parallel::GemmRun<Parallel>(kernel, args, th);
-    }
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher =
+      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32, Wei_T,
+                                  epilogue::gemm::AccumulatorWriteBackFp32>;
+  static Launcher kernel;
+  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
+  utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
+  auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
+  typename Launcher::Param args{gp, {A, K, nullptr, B->ShfIndice(), &reordA}, {B}, {C, N}};
+  if (B->ShfIndice()) {
+    reordA.assign(WorkSpace);
+    parallel::GemmRunWithA<Parallel>(kernel, args, th);
   } else {
-    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockBaseF32,
-                                    Wei_T, epilogue::gemm::AccumulatorWriteBackFp32>;
-    static Launcher kernel;
-    auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-    utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
-    auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-    typename Launcher::Param args{gp, {A, K, nullptr, B->ShfIndice(), &reordA}, {B}, {C, N}};
-    if (B->ShfIndice()) {
-      reordA.assign(WorkSpace);
-      parallel::GemmRunWithA<Parallel>(kernel, args, th);
-    } else {
-      parallel::GemmRun<Parallel>(kernel, args, th);
-    }
+    parallel::GemmRun<Parallel>(kernel, args, th);
   }
 }
 
@@ -157,6 +131,9 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
           } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+          } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+            BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           }
         }
       }
@@ -223,7 +200,7 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
   // from low precision to high precision
   switch (CompType) {
     case NE_COMP_INT8:
-      if (dtype_type == dtype_int && !isAsym) {  // asym int8 is not optimized, so fall through to others.
+      if (dtype_type == dtype_int && !(QuantType == BTLA_DTYPE::S8 && isAsym)) {
         if (_cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           return BTLABuSize<tLauncher_Int8_F32F32<tAMX_INT8_SS_KBlock, Wei_T>>(
               static_cast<int>(BlkSize), N, K, QuantType, ScaleDtype, isAsym, shuffle_indice);
@@ -235,6 +212,10 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
         if (_cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           return BTLABuSize<tLauncher_Int8_F32F32<tAVX_VNNI_KBlock, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType,
                                                                             ScaleDtype, isAsym, shuffle_indice);
+        }
+        if (_cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          return BTLABuSize<tLauncher_Int8_F32F32<tAVX2_VNNI_KBlock, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType,
+                                                                             ScaleDtype, isAsym, shuffle_indice);
         }
       }
       [[fallthrough]];
@@ -307,7 +288,7 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
   auto constexpr dtype_int = utils::bestla_dtype_type(BTLA_DTYPE::TypeInt);
   switch (CompType) {
     case NE_COMP_INT8:
-      if (dtype_type == dtype_int && !isAsym) {  // asym int8 is not optimized, so fall through to others.
+      if (dtype_type == dtype_int && !(QuantType == BTLA_DTYPE::S8 && isAsym)) {
         if (_cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           BTLAGemmQuantPackB<tLauncher_Int8_F32F32<tAMX_INT8_SS_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
@@ -322,6 +303,12 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
         }
         if (_cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           BTLAGemmQuantPackB<tLauncher_Int8_F32F32<tAVX_VNNI_KBlock, Wei_T>>(
+              PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
+              ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
+          return true;
+        }
+        if (_cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          BTLAGemmQuantPackB<tLauncher_Int8_F32F32<tAVX2_VNNI_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
               ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
           return true;
@@ -412,7 +399,7 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
   }
   switch (CompType) {
     case NE_COMP_INT8:
-      if (dtype_type == dtype_int && !isAsym) {  // asym int8 is not optimized, so fall through to others.
+      if (dtype_type == dtype_int) {
         if (_cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
           BTLAGemmPackBImpl<tLauncher_Int8_F32F32<tAMX_INT8_SS_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
@@ -427,6 +414,12 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
         }
         if (_cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           BTLAGemmPackBImpl<tLauncher_Int8_F32F32<tAVX_VNNI_KBlock, Wei_T>>(
+              PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
+              QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
+          return true;
+        }
+        if (_cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          BTLAGemmPackBImpl<tLauncher_Int8_F32F32<tAVX2_VNNI_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
               QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
           return true;
@@ -521,6 +514,9 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
           } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+          } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+            BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           }
         }
       }

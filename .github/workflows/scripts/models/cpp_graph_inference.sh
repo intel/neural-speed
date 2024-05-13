@@ -72,7 +72,7 @@ function main() {
     cd ..
 
     ## prepare example requirement
-    pip install -r requirements.txt
+    pip install -r neural_speed/models/requirements/common.txt
 
     ## prepare fp32 bin
     python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${input_model}

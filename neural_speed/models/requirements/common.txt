@@ -3,11 +3,14 @@ accelerate
 datasets
 einops
 gguf
+huggingface_hub
+matplotlib
 numpy
 peft
 protobuf<3.20
 sentencepiece
 tiktoken
-torch==2.1.0+cpu
+torch
 transformers
 transformers_stream_generator
+zipfile38

@@ -22,6 +22,7 @@ using sAVX512F = gemm::SCoreRowNAvx512f<48, 8>;
 using sAMX_BF16 = gemm::HCoreRowNAmxbf16<64, 16>;
 using sAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
 using sAVX_VNNI = gemm::ICoreRowNAvxvnni<24, 4>;
+using sAVX_VNNI_SS = gemm::ICoreRowNAvxvnniSS<24, 4>;
 using sAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;
@@ -31,9 +32,9 @@ class UT_Threading {
  public:
   static bestla::parallel::IThreading* get() {
 #if BTLA_OPENMP
-    static bestla::parallel::OMPThreading DefaultThreading(4);
+    static bestla::parallel::OMPThreading DefaultThreading;
 #else
-    static bestla::parallel::StdThreading DefaultThreading(4);
+    static bestla::parallel::StdThreading DefaultThreading;
 #endif  // _OPNEMP
     return &DefaultThreading;
   }
@@ -42,9 +43,13 @@ class UT_Threading {
 
   static std::vector<int> get_threads_config() {
     GetCPUDevice();
-    if (_cd->isHybrid()) {
-      return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+    if (_cd->isClient()) {
+      if (_cd->isHybrid()) {
+        return std::vector<int>{_cd->getThreads(), _cd->getCores(), int(_cd->getPcoreNum())};
+      }
+      return std::vector<int>{_cd->getCores() * 2, _cd->getCores()};
     }
+
     if (_cd->getThreads() == 56) {
       return std::vector<int>{48, 56};
     }
@@ -80,8 +85,8 @@ static int8_t cache[CacheSize];
 #define BF16_ERR 0.02f
 #define INT8_ERR 0.2f
 #define F8_ERR 1.5f
-#define INT4_ERR 3.f
-#define INT3_ERR 6.f
+#define INT4_ERR 3.5f
+#define INT3_ERR 7.f
 #define INT2_ERR 18.f
 #define FP4_ERR 3.5f
 

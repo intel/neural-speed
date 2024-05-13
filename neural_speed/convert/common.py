@@ -684,9 +684,9 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
     write_header(fout, shape[::-1], dst_name, GGML_QJBLAS_TYPE)
 
     if q_config['bits'] == 4:
-        int_weight = (int_weight - 8) * 16
-        gptq_scales = gptq_scales / 16
-        gptq_zeros = (gptq_zeros - 8) * 16
+        int_weight = (int_weight - 8)
+        gptq_scales = gptq_scales
+        gptq_zeros = (gptq_zeros - 8)
     dst = np.zeros((int_weight.shape[0], int_weight.shape[1] * 4), dtype=np.int8)
     int_weight = np.ascontiguousarray(int_weight.numpy())
     gptq_scales = np.ascontiguousarray((gptq_scales.float()).numpy())
@@ -758,14 +758,14 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
     # Int3 is the same as int4, but offset=4, mul scale==32.
     weight_dtype = "int8"
     if q_config['bits'] == 4:
-        int_weight = (int_weight - 8) * 16
-        gptq_scales = gptq_scales / 16
-        gptq_zeros = (gptq_zeros - 8) * 16
+        int_weight = (int_weight - 8)
+        gptq_scales = gptq_scales
+        gptq_zeros = (gptq_zeros - 8)
         weight_dtype = "int4"
     elif q_config['bits'] == 3:
-        int_weight = (int_weight - 4) * 32
-        gptq_scales = gptq_scales / 32
-        gptq_zeros = (gptq_zeros - 4) * 32
+        int_weight = (int_weight - 4)
+        gptq_scales = gptq_scales
+        gptq_zeros = (gptq_zeros - 4)
         weight_dtype = "int3"
     else:
         ValueError(f"Unsupported q_config[bits]: {q_config['bits']}")

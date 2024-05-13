@@ -8,7 +8,13 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NS_PROFILING": "ON",
+        "NS_USE_OMP": "ON",
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_BENCHMARK": "ON"
+      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -108,15 +114,31 @@
       }
     },
     {
-      "name": "x64-release-sycl",
-      "displayName": "x64 Release SYCL",
-      "description": "x64 SYCL",
-      "inherits": "x64-debug",
+      "name": "x64-debug-sycl",
+      "displayName": "x64 Debug SYCL",
+      "description": "x64 Debug SYCL",
+      "inherits": "windows-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
       "cacheVariables": {
-        "CMAKE_CXX_COMPILER": "icx-cl",
-        "CMAKE_C_COMPILER": "icx-cl",
-        "CMAKE_BUILD_TYPE": "Release",
-        "BTLA_UT_ALL": "ON"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BTLA_UT_DEBUG": "ON",
+        "BTLA_UT_ALL": "OFF",
+        "BTLA_SYCL": "ON",
+        "BTLA_UT_BENCHMARK": "ON",
+        "CMAKE_CXX_COMPILER": "icx",
+        "CMAKE_C_COMPILER": "icx"
+      }
+    },
+    {
+      "name": "x64-release-sycl",
+      "displayName": "x64 Release for SYCL",
+      "description": "x64 SYCL",
+      "inherits": "x64-debug-sycl",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ]

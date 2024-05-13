@@ -138,8 +138,13 @@ class UT_S8S8S32 {
   UT_S8S8S32() {
     UT_START();
     GetCPUDevice();
+    if (_cd->AVX_VNNI()) {
+      ut<sAVX_VNNI_SS>(1, 1, 1);
+      ut<sAVX_VNNI_SS>(8, 48, 2);
+      ut<sAVX_VNNI_SS>(8, 4096, 4096);
+      ut<sAVX_VNNI_SS>(384, 768, 768);
+    }
     if (_cd->AMX_INT8()) {
-      request_perm_xtile_data();
       ut<sAMX_INT8_SS>(1, 1, 1);
       ut<sAMX_INT8_SS>(8, 48, 2);
       ut<sAMX_INT8_SS>(8, 4096, 4096);

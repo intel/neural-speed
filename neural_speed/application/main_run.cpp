@@ -69,7 +69,7 @@ void sigint_handler(int signo) {
 int main(int argc, char** argv) {  // NOLINT
   gpt_params params;
 #ifdef _WIN32
-  if (!SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)) {
+  if (!SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS)) {
     auto dwError = GetLastError();
     NE_PRINT_DEBUG("ERR: failed to set Procss Priority\n");
     assert(dwError == ERROR_SUCCESS);
