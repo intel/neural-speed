@@ -135,6 +135,7 @@ class HFLM(TemplateLM):
         use_ggml : bool = False,
         alg : str = "sym",
         scale_dtype : str = "fp32",
+        init_from_bin : str = "default_none",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -255,6 +256,8 @@ class HFLM(TemplateLM):
                 use_ggml=use_ggml,
                 alg=alg,
                 scale_dtype=scale_dtype,
+                init_from_bin=init_from_bin,
+                batch_size=batch_size,
                 **kwargs,
             )
 
@@ -414,10 +417,6 @@ class HFLM(TemplateLM):
     def max_length(self):
         if self._max_length:  # if max length manually set, return it
             return self._max_length
-        seqlen_config_attrs = ("n_positions", "max_position_embeddings", "n_ctx")
-        for attr in seqlen_config_attrs:
-            if hasattr(self.model.config, attr):
-                return getattr(self.model.config, attr)
         if hasattr(self.tokenizer, "model_max_length"):
             if self.tokenizer.model_max_length == 1000000000000000019884624838656:
                 return self._DEFAULT_MAX_LENGTH
@@ -533,6 +532,8 @@ class HFLM(TemplateLM):
         use_ggml : bool = False,
         alg : str = "sym",
         scale_dtype : str = "fp32",
+        init_from_bin : str = "default_none",
+        batch_size : int = 1,
         **kwargs,
     ) -> None:
         """Initializes an HF or HF-compatible PreTrainedModel from scratch
@@ -583,15 +584,18 @@ class HFLM(TemplateLM):
             if self.model_format == "neural_speed":
                 from neural_speed import Model
                 self._model = Model()
-                self._model.init(pretrained, weight_dtype=weight_dtype, compute_dtype=compute_dtype,
-                                    alg=alg,
-                                    use_ggml=use_ggml,
-                                    group_size=group_size,
-                                    scale_dtype=scale_dtype,
-                                    use_quant=self.use_quant,
-                                    use_gptq=use_gptq,
-                                    use_awq=use_awq,
-                                    use_autoround=use_autoround)
+                if init_from_bin != "default_none":
+                    self._model.init_from_bin(model_type= self.config.model_type,model_path=init_from_bin, max_request_num=batch_size)
+                else:
+                    self._model.init(pretrained, weight_dtype=weight_dtype, compute_dtype=compute_dtype,
+                                        alg=alg,
+                                        use_ggml=use_ggml,
+                                        group_size=group_size,
+                                        scale_dtype=scale_dtype,
+                                        use_quant=self.use_quant,
+                                        use_gptq=use_gptq,
+                                        use_awq=use_awq,
+                                        use_autoround=use_autoround)
             elif (
                 self.model_format == "onnx"
                 and self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM

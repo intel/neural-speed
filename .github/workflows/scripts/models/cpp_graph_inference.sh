@@ -20,6 +20,11 @@ function main() {
         quant_script="./build/bin/quant_llama"
         infer_cmd="./build/bin/run_llama"
         input_model="/tf_dataset2/models/nlp_toolkit/llama-2-7b-chat/Llama-2-7b-chat-hf"
+    elif [[ "${model}" == "llama3_8b_instruct-chat" ]]; then
+        convert_script="${scripts_dir}/convert_llama.py"
+        quant_script="./build/bin/quant_llama"
+        infer_cmd="./build/bin/run_llama"
+        input_model="/tf_dataset2/models/pytorch/Meta-Llama-3-8B"
         precision_list=("q4_j_b128" "q4_j_b32" "q4_0")
     elif [[ "${model}" == "gpt-neox-20b" ]]; then
         convert_script="${scripts_dir}/convert_gptneox.py"
@@ -139,6 +144,7 @@ function main() {
                     NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$(($cores_per_instance * 1)) numactl -m 0 -C 0-$(($cores_per_instance * 1 - 1)) \
                         $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c ${ctx} -n ${output} -m ${model}-${precision}.bin -p "$prompt" 2>&1 | tee ${WORKING_DIR}/${logs_file} || true & 
                     monitor
+                    python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks piqa --batch_size 8  2>&1 | tee ${WORKING_DIR}/${logs_file}
                 done
             done
         done

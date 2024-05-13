@@ -33,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_ggml', action="store_true")
     parser.add_argument('--alg', type=str, default="sym")
     parser.add_argument('--scale_dtype', type=str, default="fp32")
+    parser.add_argument('--init_from_bin', type=str, default="default_none")
     args = parser.parse_args()
 
     model_args=f'pretrained={args.model_name},dtype=float32,trust_remote_code=True'
@@ -51,6 +52,7 @@ if __name__ == "__main__":
                         use_ggml=args.use_ggml,
                         alg=args.alg,
                         scale_dtype=args.scale_dtype,
+                        init_from_bin=args.init_from_bin
                         )
     results = cli_evaluate(eval_args)
     print(results)
