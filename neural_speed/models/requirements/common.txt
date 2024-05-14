@@ -4,6 +4,7 @@ datasets
 einops
 gguf
 huggingface_hub
+lm_eval==0.4.2
 matplotlib
 numpy
 peft
@@ -14,4 +15,3 @@ torch
 transformers
 transformers_stream_generator
 zipfile38
-lm_eval==0.4.2
