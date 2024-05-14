@@ -14,3 +14,4 @@ torch
 transformers
 transformers_stream_generator
 zipfile38
+lm_eval==0.4.2
