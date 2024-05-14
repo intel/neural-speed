@@ -61,7 +61,7 @@ if __name__ == "__main__":
     print("P99: {:.2f} ms".format(p99))
     print("average_latency: {:.2f} ms".format(latency_mean))
     print("first_token_latency: {:.2f} ms".format(first_token_latency))
-    print("lambada_openai: {:.2f}".format())
+    print("lambada_openai: {:.2f}".format(accuracy))
 
     memory_values = parse_memory_file(memory_file)
     sorted_memory_values = sorted(memory_values, reverse=True)

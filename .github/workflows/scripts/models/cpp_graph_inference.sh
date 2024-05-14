@@ -151,8 +151,8 @@ function main() {
                         python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 8  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
                     else
                         echo "-------- Inference End --------"
-                    python ${OUT_SCRIPT_PATH}/calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
                     fi
+                    python ${OUT_SCRIPT_PATH}/calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
                 done
             done
         done
