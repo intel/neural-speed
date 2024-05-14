@@ -289,11 +289,9 @@ Neural Speed supports the following models:
     <td>128k</td>
   </tr>
   <tr>
-    <td><a href="https://huggingface.co/stabilityai/stablelm-3b-4e1t" target="_blank" rel="noopener noreferrer">StableLM-3B</a>,
-    <a href="https://huggingface.co/stabilityai/stablelm-2-1_6b" target="_blank" rel="noopener noreferrer">StableLM-2-1_6B</a>,
-    <a href="https://huggingface.co/stabilityai/stablelm-2-zephyr-1_6b" target="_blank" rel="noopener noreferrer">StableLM-2-Zephyr-1_6B</a>,
-    <a href="https://huggingface.co/stabilityai/stablelm-2-12b" target="_blank" rel="noopener noreferrer">StableLM-2-12B</a>,
-    <a href="https://huggingface.co/stabilityai/stablelm-2-12b-chat" target="_blank" rel="noopener noreferrer">StableLM-2-12B-Chat</a></td>
+    <td><a href="https://huggingface.co/stabilityai/stablelm-2-1_6b" target="_blank" rel="noopener noreferrer">StableLM-2-1_6B</a>,
+    <a href="https://huggingface.co/stabilityai/stablelm-3b-4e1t" target="_blank" rel="noopener noreferrer">StableLM-3B</a>,
+    <a href="https://huggingface.co/stabilityai/stablelm-2-12b" target="_blank" rel="noopener noreferrer">StableLM-2-12B</a></td>
     <td>✅</td>
     <td> </td>
     <td> </td>
