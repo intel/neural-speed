@@ -10,7 +10,7 @@ def calculate_mean(data):
 
 def parse_output_file(file_path):
     predictions = []
-    accuracy = []
+    accuracy = 0
     with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
         for line in file:
             match = re.search(r"time: (\d+\.\d+)ms", line)
@@ -20,7 +20,7 @@ def parse_output_file(file_path):
                 predictions.append(prediction_time)
             if accuracy_match:
                 value1 = re.search(r"\d+\.\d+", accuracy_match.group()).group()
-                accuracy.append(value1)
+                accuracy = value1
     return predictions, accuracy
 def parse_memory_file(memory_file):
     memory_values = []
@@ -51,8 +51,6 @@ if __name__ == "__main__":
     model_output = sys.argv[7]
     memory_file = os.environ.get("WORKING_DIR") + "/memory.txt"
     predictions,accuracy = parse_output_file(output_file)
-    if (len(accuracy)==0):
-        accuracy.append("None")
     first_token_latency = predictions[0]
     p90 = calculate_percentile(predictions, 90)
     p99 = calculate_percentile(predictions, 99)
@@ -63,6 +61,7 @@ if __name__ == "__main__":
     print("P99: {:.2f} ms".format(p99))
     print("average_latency: {:.2f} ms".format(latency_mean))
     print("first_token_latency: {:.2f} ms".format(first_token_latency))
+    print("lambada_openai: {:.2f}".format())
 
     memory_values = parse_memory_file(memory_file)
     sorted_memory_values = sorted(memory_values, reverse=True)
@@ -91,6 +90,6 @@ if __name__ == "__main__":
         #f.write(",latency:")
         #for latency in predictions:
         #    f.write(",{:.2f}".format(latency))
-        f.write(accuracy[0])
+        f.write("{:.2f},".format(accuracy))
         f.write("\n")
         f.close()
