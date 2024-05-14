@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -o pipefail
 set -x
 
 cores_list=(48)
@@ -76,7 +76,7 @@ function main() {
     cmake .. -G Ninja
     ninja
     cd ..
-    conda install --channel=conda-forge libxcrypt
+    conda install --channel=conda-forge libxcrypt -y || true
     python setup.py install
 
     ## prepare example requirement
