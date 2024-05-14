@@ -1169,6 +1169,7 @@ cat >> ${WORKSPACE}/report.html << eof
           <th>Precision</th>
           <th>Beam</th>
           <th>VS</th>
+          <th>lambada_openai</th>
           <th>Eval Time per Token</th>
           <th>Memory</th>
           <th>1st Latency</th>
@@ -1201,6 +1202,7 @@ eof
                     fst_latency=$(cat ${cppsummaryLog} |grep "${benchmark_pattern}" |cut -d',' -f10 |awk '!a[$0]++')
                     p90_latency=$(cat ${cppsummaryLog} |grep "${benchmark_pattern}" |cut -d',' -f15 |awk '!a[$0]++')
                     p99_latency=$(cat ${cppsummaryLog} |grep "${benchmark_pattern}" |cut -d',' -f16 |awk '!a[$0]++')
+                    lambada_openai=$(cat ${cppsummaryLog} |grep "${benchmark_pattern}" |cut -d',' -f17 |awk '!a[$0]++')
                     if [ $(cat ${cppsummaryLogLast} |grep -c "${benchmark_pattern}") == 0 ]; then
                         link_last=nan
                         memory_last=nan
@@ -1209,6 +1211,7 @@ eof
                         evaltime_last=nan
                         p90_latency_last=nan
                         p99_latency_last=nan
+                        lambada_openai_last=nan
                     else
                         link_last=$(cat ${cppsummaryLogLast} |grep "${benchmark_pattern}" |cut -d',' -f14 |awk '!a[$0]++')
                         memory_last=$(cat ${cppsummaryLogLast} |grep "${benchmark_pattern}" |cut -d',' -f13 |awk '!a[$0]++')
@@ -1217,6 +1220,7 @@ eof
                         fst_latency_last=$(cat ${cppsummaryLogLast} |grep "${benchmark_pattern}" |cut -d',' -f10 |awk '!a[$0]++')
                         p90_latency_last=$(cat ${cppsummaryLogLast} |grep "${benchmark_pattern}" |cut -d',' -f15 |awk '!a[$0]++')
                         p99_latency_last=$(cat ${cppsummaryLogLast} |grep "${benchmark_pattern}" |cut -d',' -f16 |awk '!a[$0]++')
+                        lambada_openai_last=$(cat ${cppsummaryLogLast} |grep "${benchmark_pattern}" |cut -d',' -f17 |awk '!a[$0]++')
                     fi
                     generate_graph_core
                 done
@@ -1231,7 +1235,7 @@ eof
 function generate_graph_core {
     echo "<tr><td rowspan=3>${model}</td><td rowspan=3>${input_token}</td><td rowspan=3>${output_token}</td><td rowspan=3>${batch_size}</td><td rowspan=3>${cores_per_instance}</td><td rowspan=3>${precision}</td><td rowspan=3>${beam}</td><td>New</td>" >> ${WORKSPACE}/report.html
 
-    echo | awk -v evaltime=${evaltime} -v link=${link} -v mem=${memory} -v tl=${total_latency} -v fl=${fst_latency} -v p90=${p90_latency} -v p99=${p99_latency} -v p90_l=${p90_latency_last} -v p99_l=${p99_latency_last} -v evaltime_l=${evaltime_last} -v mem_l=${memory_last} -v tl_l=${total_latency_last} -v fl_l=${fst_latency_last} -v link_l=${link_last} '
+    echo | awk -v evaltime=${evaltime} -v link=${link} -v mem=${memory} -v tl=${total_latency} -v fl=${fst_latency} -v p90=${p90_latency} -v p99=${p99_latency} -v lambada=${lambada_openai}  -v p90_l=${p90_latency_last} -v p99_l=${p99_latency_last} -v lambada_l=${lambada_openai_last} -v evaltime_l=${evaltime_last} -v mem_l=${memory_last} -v tl_l=${total_latency_last} -v fl_l=${fst_latency_last} -v link_l=${link_last} '
         function show_benchmark(a,b) {
             if(a ~/[1-9]/) {
                     printf("<td><a href=%s>%.2f</a></td>\n",b,a);
@@ -1268,6 +1272,7 @@ function generate_graph_core {
             job_status = "pass"
         }{
             // current
+            show_benchmark(lambada,link)
             show_benchmark(evaltime,link)
             show_benchmark(mem,link)
             show_benchmark(fl,link)
@@ -1277,6 +1282,7 @@ function generate_graph_core {
 
             // Last
             printf("</tr>\n<tr><td>Last</td>")
+            show_benchmark(lambada_l,link_l)
             show_benchmark(evaltime_l,link_l)
             show_benchmark(mem_l,link_l)
             show_benchmark(fl_l,link_l)
@@ -1286,6 +1292,7 @@ function generate_graph_core {
 
             // current vs last
             printf("</tr>\n<tr><td>New/Last</td>");
+            compare_new_last(lambada,lambada_l)
             compare_new_last(evaltime,evaltime_l)
             compare_new_last(mem,mem_l)
             compare_new_last(fl,fl_l)
