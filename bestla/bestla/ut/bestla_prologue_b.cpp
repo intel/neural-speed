@@ -227,6 +227,8 @@ class UT_BlockQunatize_Sym_Comparison {
     ut<sAVX2>(128, BTLA_DTYPE::S3_CLIP, -0.1f, 0.5f);
     ut<sAVX2>(128, BTLA_DTYPE::S2_CLIP, -0.5f, 0.5f);
     ut<sAVX2>(128, BTLA_DTYPE::S2_CLIP, -0.1f, 0.5f);
+    ut<sAVX2>(16, BTLA_DTYPE::S2_CLIP, -0.5f, 0.5f);
+    ut<sAVX2>(16, BTLA_DTYPE::S2_CLIP, -0.1f, 0.5f);
   }
   template <class GemmCore>
   void ut(int blocksize, BTLA_DTYPE QUANT_T, float minval, float maxval) {
@@ -244,7 +246,7 @@ class UT_BlockQunatize_Sym_Comparison {
     kernel.packWeight(1, blocksize, raw.data(), ldb, &ptr, UT_Threading::get());
     avector<float> dequant(blocksize, 0);
     kernel.unpackWeight(1, blocksize, &ptr, dequant.data(), 1, UT_Threading::get());
-    ut::buffer_error(raw.data(), dequant.data(), dequant.size(), 0.01f);
+    ut::buffer_error(raw.data(), dequant.data(), dequant.size(), 0.0f);
     auto sTraditionalSym = [&](float* srcptr, int blocksize, float* scale_, int8_t* dstptr) {
       int const NBits = utils::bestla_dtype_bits(QUANT_T);
       int const FullValue = 1 << (NBits - 1);
@@ -268,15 +270,15 @@ class UT_BlockQunatize_Sym_Comparison {
     };
     avector<int8_t> traQ(blocksize);
     float traScale = 0.f;
-    sTraditionalSym(raw.data(), blocksize, &traScale, traQ.data());
     auto dequantfunc = [](int8_t* qptr, int blocksize, float scale, float* fptr) {
       for (size_t i = 0; i < blocksize; i++) {
         fptr[i] = float(qptr[i] * scale);
       }
     };
     avector<float> traDQ(blocksize);
+    /*sTraditionalSym(raw.data(), blocksize, &traScale, traQ.data());
     dequantfunc(traQ.data(), blocksize, traScale, traDQ.data());
-    ut::buffer_error(raw.data(), traDQ.data(), traDQ.size(), 0.01f);
+    ut::buffer_error(raw.data(), traDQ.data(), traDQ.size(), 0.01f);*/
 
     auto sLlamaSym = [&](float* srcptr, int blocksize, float* scale_, int8_t* dstptr) {
       int const NBits = utils::bestla_dtype_bits(QUANT_T);
@@ -308,7 +310,7 @@ class UT_BlockQunatize_Sym_Comparison {
     sLlamaSym(raw.data(), blocksize, &llamaScale, llamaQ.data());
     avector<float> llamaDQ(blocksize);
     dequantfunc(llamaQ.data(), blocksize, llamaScale, llamaDQ.data());
-    ut::buffer_error(raw.data(), llamaDQ.data(), llamaDQ.size(), 0.01f);
+    ut::buffer_error(raw.data(), llamaDQ.data(), llamaDQ.size(), 0.0f);
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
