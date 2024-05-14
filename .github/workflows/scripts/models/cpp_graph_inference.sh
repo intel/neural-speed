@@ -150,7 +150,8 @@ function main() {
                     if [[ ${precision} == "q4_j_b128" ]]; then
                         python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 8  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
                     else
-                        echo "-------- done --------"
+                        echo "-------- Inference End --------"
+                    python ${OUT_SCRIPT_PATH}/calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
                     fi
                 done
             done
@@ -229,8 +230,7 @@ function monitor() {
     echo "======  Monitor Start ======="
     while true; do
         if [ $(ps -ef | grep "$infer_cmd" | wc -l) -lt 2 ]; then
-            python ${OUT_SCRIPT_PATH}/calculate_percertiles.py ${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
-            sleep 3
+            sleep 1
 
             break
         fi
