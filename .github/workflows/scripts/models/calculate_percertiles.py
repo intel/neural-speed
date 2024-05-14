@@ -10,18 +10,23 @@ def calculate_mean(data):
 
 def parse_output_file(file_path):
     predictions = []
-    accuracy = 0
     with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
         for line in file:
             match = re.search(r"time: (\d+\.\d+)ms", line)
-            accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if match:
                 prediction_time = float(match.group(1))  # Assuming the prediction time is in the second column
                 predictions.append(prediction_time)
+    return predictions
+
+def parse_output_file_acc(file_path):
+    accuracy = 0
+    with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
+        for line in file:
+            accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if accuracy_match:
-                value1 = re.search(r"\d+\.\d+", accuracy_match.group()).group()
-                accuracy = value1
-    return predictions, accuracy
+                accuracy = re.search(r"\d+\.\d+", accuracy_match.group()).group()
+    return accuracy
+
 def parse_memory_file(memory_file):
     memory_values = []
     if os.path.exists(memory_file):
@@ -50,7 +55,8 @@ if __name__ == "__main__":
     model_input = sys.argv[6]
     model_output = sys.argv[7]
     memory_file = os.environ.get("WORKING_DIR") + "/memory.txt"
-    predictions,accuracy = parse_output_file(output_file)
+    predictions = parse_output_file(output_file)
+    accuracy = parse_output_file_acc(output_file)
     first_token_latency = predictions[0]
     p90 = calculate_percentile(predictions, 90)
     p99 = calculate_percentile(predictions, 99)
