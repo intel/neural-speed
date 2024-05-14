@@ -26,7 +26,7 @@ include(CTest)
 enable_testing()
 
 if(UNIX)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
 endif()
 find_package(MKL CONFIG REQUIRED)
 message(STATUS "MKL_VERSION=${MKL_VERSION}")
@@ -35,7 +35,7 @@ message(STATUS "MKL_IMPORTED_TARGETS=${MKL_IMPORTED_TARGETS}")
 # debug option
 message(STATUS "'DEBUG' is set to " ${DEBUG})
 if (${DEBUG})
-add_compile_options(-debug=minimal -Rno-debug-disables-optimization -DDEBUG=${DEBUG})
+    add_compile_options(-debug=minimal -Rno-debug-disables-optimization -DDEBUG=${DEBUG})
 endif ()
 
 # log message print
@@ -45,19 +45,36 @@ if (${LOG} STREQUAL "on")
     add_definitions(-DLOG_PRINT)
 endif ()
 
+# For large registers mode, enable 256 registers for kernels
+set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
+set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
+set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
+# For registers usage verbose at AOT
+set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -printregusage")
+# Enable bank conflict reduction.
+set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -enableBCR")
+# Optimization to reduce the tokens used for DPAS instruction.
+set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -DPASTokenReduction")
+
 # AOT device
-set(AOT_DEVICE "" CACHE STRING "Set device list for AOT build")
+set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build")
+if (USE_AOT_DEVLIST)
+    add_compile_options(-fsycl-targets=spir64_gen)
+    add_link_options(-fsycl-targets=spir64_gen)
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "-options '${XETLA_OFFLINE_OPTIONS}' -device '${USE_AOT_DEVLIST}'")
+else()
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "-options '${XETLA_OFFLINE_OPTIONS}'")
+endif()
+
+add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
+add_compile_options(-fp-model=precise -Wall -Wextra -Werror)
 
 include(ProcessorCount)
 ProcessorCount(nproc)
-add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
 add_link_options(-fsycl -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=${nproc})
+add_link_options(${XETLA_KERNEL_FLAGS})
+
 if(UNIX)
-    if (AOT_DEVICE)
-        add_compile_options(-fsycl-targets=spir64_gen)
-        add_link_options(-fsycl-targets=spir64_gen -Xs "-device ${AOT_DEVICE}") # MTL
-    endif()
-    add_compile_options(-fp-model=precise -Wall -Wextra -Werror)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)
     link_libraries(-lgtest -lgtest_main)
 else() # Windows
