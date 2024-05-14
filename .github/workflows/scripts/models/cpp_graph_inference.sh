@@ -76,7 +76,7 @@ function main() {
     cmake .. -G Ninja
     ninja
     cd ..
-    conda install --channel=conda-forge libxcrypt -y
+    conda install --channel=conda-forge libxcrypt -y || true
     python setup.py install
 
     ## prepare example requirement
