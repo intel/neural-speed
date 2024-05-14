@@ -49,8 +49,6 @@ endif ()
 set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
-# For registers usage verbose at AOT
-set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -printregusage")
 # Enable bank conflict reduction.
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -enableBCR")
 # Optimization to reduce the tokens used for DPAS instruction.
@@ -61,9 +59,11 @@ set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build")
 if (USE_AOT_DEVLIST)
     add_compile_options(-fsycl-targets=spir64_gen)
     add_link_options(-fsycl-targets=spir64_gen)
+    # For registers usage verbose at AOT
+    set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -printregusage")
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "-options '${XETLA_OFFLINE_OPTIONS}' -device '${USE_AOT_DEVLIST}'")
 else()
-    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "-options '${XETLA_OFFLINE_OPTIONS}'")
+    set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "${XETLA_OFFLINE_OPTIONS}")
 endif()
 
 add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
