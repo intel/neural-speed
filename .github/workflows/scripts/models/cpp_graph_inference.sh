@@ -76,6 +76,7 @@ function main() {
     cmake .. -G Ninja
     ninja
     cd ..
+    python setup.py install
 
     ## prepare example requirement
     pip install -r neural_speed/models/requirements/common.txt
@@ -145,7 +146,6 @@ function main() {
                     NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$(($cores_per_instance * 1)) numactl -m 0 -C 0-$(($cores_per_instance * 1 - 1)) \
                         $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c ${ctx} -n ${output} -m ${model}-${precision}.bin -p "$prompt" 2>&1 | tee ${WORKING_DIR}/${logs_file} || true & 
                     monitor
-                    python setup.py install
                     python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 8  2>&1 | tee ${WORKING_DIR}/${logs_file}
                 done
             done
