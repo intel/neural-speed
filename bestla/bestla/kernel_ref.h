@@ -1133,11 +1133,20 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
         minval = std::min(minval, srcptr[(j + ij) * ld_src + i]);
         absmax = std::max(absmax, std::abs(srcptr[(j + ij) * ld_src + i]));
       }
+      auto envstr = std::getenv("CHOICE");
+
       float NVal = GenValue + 0.5f;
       auto sum = maxval + minval;
-      if (fabs(sum) >= (absmax / (FullValue * 2))) {
-        NVal = sum > 0.f ? -FullValue : FullValue;
+      if (envstr) {
+        if (strcmp(envstr, "fullrange") == 0) {
+          NVal = sum > 0.f ? -FullValue : FullValue;
+        }
+      } else {
+        if (fabs(sum) >= (absmax / (FullValue * 2))) {
+          NVal = sum > 0.f ? -FullValue : FullValue;
+        }
       }
+
       float scale = absmax / NVal;
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
