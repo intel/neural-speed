@@ -261,7 +261,7 @@ class llama_quant_layer : public quant_layer_base {
 
     quantize &= (ne.size() == 2);
     if (quantize) {
-      if (mGCfg.bits == quant_bits::q2) {
+      if (mGCfg.bits < quant_bits::q4) {
         auto q4cfg = mGCfg;
         q4cfg.bits = quant_bits::q4;
         q4cfg.alg = quant_alg::asym;

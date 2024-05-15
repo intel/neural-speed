@@ -18,7 +18,7 @@
 #include "core/data_types.h"
 #include "bestla/bestla.h"
 
-enum class quant_bits : int { q4 = 0, q2, q3, q8, fp4_e2m1, nf4, fp8_e4m3, fp8_e5m2, count };
+enum class quant_bits : int { q2 = 0, q3, q4, q8, fp4_e2m1, nf4, fp8_e4m3, fp8_e5m2, count };
 static inline quant_bits parse_bits(const std::string& bits) {
   if (bits == "int3") {
     return quant_bits::q3;
