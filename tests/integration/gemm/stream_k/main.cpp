@@ -206,52 +206,6 @@ class Test6 {
   using data_type_c = bf16;
 };
 
-#ifdef XETLA_EMBARGO
-// Test  2.25 wave on 4 Xecore FS1.  One StreamK wave and one data parallel wave
-// created.
-class Test7 {
- public:
-  // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 768;
-  static constexpr size_t mat_n = 1536;
-  static constexpr size_t mat_k = 1024;
-  static constexpr size_t wg_m = 256;
-  static constexpr size_t wg_n = 512;
-  static constexpr size_t sg_m = 64;
-  static constexpr size_t sg_n = 64;
-  static constexpr size_t sg_k = 32;
-  static constexpr size_t num_xecores = 4;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  static constexpr bool postop_enable = false;
-  using data_type_a = bf16;
-  using data_type_b = bf16;
-  using data_type_c = bf16;
-};
-
-// Test  1.25 wave on 4 Xecore FS1.  One StreamK wave  created.
-class Test8 {
- public:
-  // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1280;
-  static constexpr size_t mat_n = 512;
-  static constexpr size_t mat_k = 1024;
-  static constexpr size_t wg_m = 256;
-  static constexpr size_t wg_n = 512;
-  static constexpr size_t sg_m = 64;
-  static constexpr size_t sg_n = 64;
-  static constexpr size_t sg_k = 64;
-  static constexpr size_t num_xecores = 4;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
-  static constexpr bool postop_enable = false;
-  using data_type_a = bf8;
-  using data_type_b = bf8;
-  using data_type_c = bf8;
-};
-
-#endif
-
 template <class Test>
 void stream_k_gemm_run(uint32_t iter) {
   using namespace gpu;
@@ -372,21 +326,11 @@ void stream_k_gemm_run(uint32_t iter) {
       sg_tile_n,
       avail_xecores);
 
-#ifdef XETLA_EMBARGO
-  setenv(
-      "SYCL_PROGRAM_COMPILE_OPTIONS",
-      " -vc-codegen  -ze-exp-register-file-size=512  "
-      "-vc-disable-indvars-opt "
-      " -Xfinalizer '-printregusage  -hsd2209865465 -scheduleFor2xDpas  "
-      "-enableBCR -DPASTokenReduction '",
-      1);
-#else
   setenv(
       "SYCL_PROGRAM_COMPILE_OPTIONS",
       " -vc-codegen -doubleGRF  -vc-disable-indvars-opt "
       " -Xfinalizer '-printregusage -enableBCR -DPASTokenReduction '",
       1);
-#endif
 
   // Define and initialize the data required for the calculation
   auto A = alloc_device_and_init<data_type_a>(
@@ -599,19 +543,9 @@ TYPED_TEST_P(stream_k_gemm_test, esimd) {
 
 REGISTER_TYPED_TEST_SUITE_P(stream_k_gemm_test, esimd);
 
-#ifdef XETLA_EMBARGO
-using tests_embargo = ::testing::Types<Test7, Test8>;
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    stream_k_gemm_embargo_test_suite,
-    stream_k_gemm_test,
-    tests_embargo);
-
-#else
 using tests = ::testing::Types<Test1, Test2, Test3, Test4, Test5, Test6>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     stream_k_gemm_test_suite,
     stream_k_gemm_test,
     tests);
-
-#endif
