@@ -74,6 +74,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
   const int n_ctx = lctx.n_ctx;
   const int n_keep = lctx.n_keep;
   const int n_head = hparams.n_head;
+  const int n_head_kv = hparams.n_head_kv;
   const int n_vocab = hparams.n_vocab;
   const int n_rot = hparams.n_rot;
   const int head_dim = n_embd / n_head;
@@ -101,7 +102,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
-        /* .heads_kv = */ n_head,
+        /* .heads_kv = */ n_head_kv,
         /* .head_size = */ head_dim,
         /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_past + N,
@@ -110,7 +111,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
     NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
                bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
-        /* .heads_kv = */ static_cast<uint32_t>(n_head),
+        /* .heads_kv = */ static_cast<uint32_t>(n_head_kv),
         /* .head_size = */ static_cast<uint32_t>(head_dim),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
@@ -126,6 +127,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
 
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* cur;
+    struct ne_tensor* inpPA;
 
     lctx.use_buf(ctx0, 0);
 
@@ -133,30 +135,40 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
       // layer_norm
       {
         cur = ne_norm(ctx0, inpL, hparams.norm_eps);
-
         // cur = cur*attention_norm(broadcasted)
         cur = ne_mul(ctx0, cur, model.layers[il].norm[0]);
         cur = ne_add(ctx0, cur, model.layers[il].norm[1]);
       }
 
+      // Store for parallel MLP layer
+      inpPA = cur;
+
       // Compute QKV
       struct ne_tensor* Qcur;
       struct ne_tensor* Kcur;
       struct ne_tensor* Vcur;
-      if (n_layer == 24) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
+      if (n_layer == 24) {  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
         Qcur =
-            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[1]),
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), model.layers[il].attn[4]),
                           head_dim, n_head, N, 1);
         Kcur =
-            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[3]),
-                          head_dim, n_head, N, 1);
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), model.layers[il].attn[5]),
+                          head_dim, n_head_kv, N, 1);
         Vcur =
-            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[4], cur), model.layers[il].attn[5]),
-                          head_dim, n_head, N, 1);
-      } else {  // Stablelm 3B
+            ne_reshape_4d(ctx0, ne_add(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), model.layers[il].attn[6]),
+                          head_dim, n_head_kv, N, 1);
+      } else if (n_layer == 32) {  // StableLM-3B & Stable-Code-3B
         Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N, 1);
-        Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head, N, 1);
-        Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head, N, 1);
+        Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head_kv, N, 1);
+        Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head_kv, N, 1);
+      } else if (n_layer == 40) {  // StableLM-2-12B
+        Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_dim, n_head, N, 1);
+        Qcur = ne_norm(ctx0, Qcur, hparams.norm_eps);
+        Qcur = ne_mul(ctx0, Qcur, model.layers[il].attn[4]);
+        Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_dim, n_head_kv, N, 1);
+        Kcur = ne_norm(ctx0, Kcur, hparams.norm_eps);
+        Kcur = ne_mul(ctx0, Kcur, model.layers[il].attn[5]);
+        Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_dim, n_head_kv, N, 1);
       }
 
       // using mode = 2 for GPT-NeoX mode
@@ -166,7 +178,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
       ne_build_forward_expand(&gf, Qcur_Part);
       ne_set_name(Qcur, "Qcur");
 
-      struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), n_rot, n_head, N, 1,
+      struct ne_tensor* Kcur_Part = ne_view_4d(ctx0, ne_permute(ctx0, Kcur, 0, 2, 1, 3), n_rot, n_head_kv, N, 1,
                                                Kcur->nb[1], Kcur->nb[2], Kcur->nb[3], 0);
       Kcur_Part = ne_rope_inplace(ctx0, Kcur_Part, n_past, n_rot, 2, 0, hparams.freq_base, hparams.freq_scale);
       ne_build_forward_expand(&gf, Kcur_Part);
@@ -184,14 +196,14 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
           for (int i = 0; i < batch_size; ++i) {
             // batch K
             Kcur_bs[i] = ne_permute(ctx0,
-                                    ne_view_4d(ctx0, Kcur, head_dim, n_head, N, 1, ne_element_size(Kcur) * head_dim,
+                                    ne_view_4d(ctx0, Kcur, head_dim, n_head_kv, N, 1, ne_element_size(Kcur) * head_dim,
                                                ne_element_size(Kcur) * n_embd, ne_element_size(Kcur) * n_embd * N,
                                                i * ne_element_size(Kcur) * n_embd * N),
                                     0, 2, 1, 3);
             Kcur_temp = Kcur_bs[i];
             ne_set_name(Kcur_bs[i], "kcur_bs");
             k_bs[i] = ne_view_4d(
-                ctx0, kv_self.k, head_dim, N, n_head, 1, ne_element_size(kv_self.k) * head_dim,
+                ctx0, kv_self.k, head_dim, N, n_head_kv, 1, ne_element_size(kv_self.k) * head_dim,
                 ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd * n_ctx,
                 ((il * n_ctx) * ne_element_size(kv_self.k) * n_embd * kv_n_ctx_block +
                  i * n_ctx * n_embd * ne_element_size(kv_self.k) + head_dim * n_past * ne_element_size(kv_self.k)));
@@ -201,10 +213,10 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
                                     ne_reshape_4d(ctx0,
                                                   ne_view_2d(ctx0, Vcur, n_embd, N, ne_element_size(Vcur) * n_embd,
                                                              i * ne_element_size(Vcur) * n_embd * N),
-                                                  head_dim, n_head, N, 1),
+                                                  head_dim, n_head_kv, N, 1),
                                     1, 2, 0, 3);
             v_bs[i] =
-                ne_view_4d(ctx0, kv_self.v, N, head_dim, n_head, 1, n_ctx * ne_element_size(kv_self.v),
+                ne_view_4d(ctx0, kv_self.v, N, head_dim, n_head_kv, 1, n_ctx * ne_element_size(kv_self.v),
                            n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_embd,
                            ((il * n_ctx) * ne_element_size(kv_self.v) * n_embd * kv_n_ctx_block +
                             i * n_ctx * n_embd * ne_element_size(kv_self.v) + n_past * ne_element_size(kv_self.v)));
@@ -216,17 +228,17 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
         struct ne_tensor* Q = ne_permute(ctx0, ne_reshape_4d(ctx0, Qcur, head_dim, n_head, N, batch_size), 0, 2, 1, 3);
         ne_set_name(Q, "Q");
         // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
-        struct ne_tensor* K =
-            ne_view_4d(ctx0, kv_self.k, head_dim, n_past + N, n_head, batch_size, ne_element_size(kv_self.k) * head_dim,
-                       ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd * n_ctx,
-                       il * n_ctx * ne_element_size(kv_self.k) * n_embd * kv_n_ctx_block);
+        struct ne_tensor* K = ne_view_4d(
+            ctx0, kv_self.k, head_dim, n_past + N, n_head_kv, batch_size, ne_element_size(kv_self.k) * head_dim,
+            ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd * n_ctx,
+            il * n_ctx * ne_element_size(kv_self.k) * n_embd * kv_n_ctx_block);
         ne_set_name(K, "K");
         // K * Q
         struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
 
         // KQ_scaled = KQ / sqrt(n_embd/n_head)
         struct ne_tensor* KQ_scaled =
-            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>((n_embd) / n_head))));
+            ne_scale_inplace(ctx0, KQ, ne_new_f32(ctx0, 1.0f / sqrt(static_cast<float>(head_dim))));
 
         // KQ_masked = mask_past(KQ_scaled)
         struct ne_tensor* KQ_masked = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
@@ -236,7 +248,7 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
 
         // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
         struct ne_tensor* V =
-            ne_view_4d(ctx0, kv_self.v, n_past + N, head_dim, n_head, batch_size, n_ctx * ne_element_size(kv_self.v),
+            ne_view_4d(ctx0, kv_self.v, n_past + N, head_dim, n_head_kv, batch_size, n_ctx * ne_element_size(kv_self.v),
                        n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_embd,
                        il * n_ctx * ne_element_size(kv_self.v) * n_embd * kv_n_ctx_block);
 
@@ -255,15 +267,15 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
 
         // store key and value to memory
         {
-          const auto k_cache = ne_view_3d(ctx0, kv_self.k,          // tensor
-                                          head_dim, n_ctx, n_head,  // ne
-                                          0, 0,                     // nb (bestla managed)
-                                          il * k_size);             // offset
+          const auto k_cache = ne_view_3d(ctx0, kv_self.k,             // tensor
+                                          head_dim, n_ctx, n_head_kv,  // ne
+                                          0, 0,                        // nb (bestla managed)
+                                          il * k_size);                // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, false));
-          const auto v_cache = ne_view_3d(ctx0, kv_self.v,          // tensor
-                                          head_dim, n_ctx, n_head,  // ne
-                                          0, 0,                     // nb (bestla managed)
-                                          il * v_size);             // offset
+          const auto v_cache = ne_view_3d(ctx0, kv_self.v,             // tensor
+                                          head_dim, n_ctx, n_head_kv,  // ne
+                                          0, 0,                        // nb (bestla managed)
+                                          il * v_size);                // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur, n_past, false));
         }
 
@@ -272,14 +284,14 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
 
         struct ne_tensor* K =
             ne_view_3d(ctx0, kv_self.k,                                             // tensor
-                       head_dim, seq_kv, n_head,                                    // ne
+                       head_dim, seq_kv, n_head_kv,                                 // ne
                        kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
                        il * k_size);                                                // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
         ne_set_name(K, "K");
         struct ne_tensor* V =
             ne_view_3d(ctx0, kv_self.v,                                                    // tensor
-                       seq_kv, head_dim, n_head,                                           // ne
+                       seq_kv, head_dim, n_head_kv,                                        // ne
                        kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
                        il * v_size);                                                       // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout
@@ -291,14 +303,8 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
         cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
       }
 
-      // projection
-      {
-        if (n_layer == 24) {  // Stablelm2 1.6B & Stablelm2 Zephyr 1.6B
-          cur = ne_mul_mat(ctx0, model.layers[il].attn[6], cur);
-        } else {  // Stablelm 3B
-          cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
-        }
-      }
+      // out projection gemm
+      { cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur); }
     }
     lctx.use_buf(ctx0, 1);
 
@@ -309,9 +315,13 @@ static bool stablelm_model_eval_internal(model_context* ctx, const model_input* 
     {
       // Post Attention norm
       {
-        cur = ne_norm(ctx0, cur, hparams.norm_eps);
-        cur = ne_mul(ctx0, cur, model.layers[il].norm[2]);
-        cur = ne_add(ctx0, cur, model.layers[il].norm[3]);
+        if (n_layer < 40) {
+          cur = ne_norm(ctx0, cur, hparams.norm_eps);
+          cur = ne_mul(ctx0, cur, model.layers[il].norm[2]);
+          cur = ne_add(ctx0, cur, model.layers[il].norm[3]);
+        } else {
+          cur = inpPA;  // Parallel FFN
+        }
       }
 
       if (bestla_fusion_FFN_SiLu_f32f32_support(model.layers[il].ffn[0]->data, model.layers[il].ffn[1]->data,

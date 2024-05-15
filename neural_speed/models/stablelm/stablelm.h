@@ -20,16 +20,31 @@
 
 enum stablelm_model {
   STABLELM_UNKNOWN,
-  STABLELM_1_6B,
+  STABLELM_2_1_6B,
+  STABLELM_2_12B,
   STABLELM_3B,
 };
 
-static const model_scratch stablelm_mem_req(int n_layers) {
+static const model_scratch stablelm_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
-    case 24:
-      return {512ull * MB, 512ull * MB, 1026ull * MB};  // StableLM2-1.6B & StableLM2-Zephyr-1.6B
-    case 32:
-      return {1024ull * MB, 1024ull * MB, 1026ull * MB};  // StableLM-3B
+    case 24:  // StableLM-2-1.6B & StableLM-2-Zephyr-1.6B
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 512) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+      };
+    case 32:  // StableLM-3B & Stable-Code-3B
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 1024) * MB,
+      };
+    case 40:  // StableLM-2-12B
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 2560) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2560) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 5120) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }
@@ -39,7 +54,7 @@ class stablelm : public IModel {
  private:
   model_archs name = MODEL_STABLELM;
   std::unique_ptr<model_model_loader> ml;
-  uint32_t n_layer, n_embd, n_ff, n_vocab;
+  uint32_t n_layer, n_embd, n_ff, n_vocab, n_head, n_head_kv, n_embd_head_k;
   int n_ctx, n_gpu_layer;
   bool use_mmap, use_mlock, vocab_only;
   model_scratch scratch;

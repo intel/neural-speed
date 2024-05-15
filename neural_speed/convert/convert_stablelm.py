@@ -20,6 +20,7 @@
 # This script is similar to "convert-pt-to-ne.py"
 #
 import os
+import sys
 import struct
 import numpy as np
 from pathlib import Path
@@ -27,7 +28,7 @@ import argparse
 from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, TypeVar,
                     Union)
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import gguf
+import torch
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
@@ -51,123 +52,45 @@ def bytes_to_unicode():
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
-def stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams):
-    print("stablelm.gguf converting: ")
-    list_vars = model.state_dict()
-    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
-    for name in list_vars.keys():
-        print(name, list_vars[name].shape, list_vars[name].dtype)
 
-    print(hparams)
+def stack_qk_norm(block, name, n_head, norms, n_dims, ftype, layer_name="q_layernorm"):
+    datas = []
+    for i in range(n_head):
+        ename = f"model.layers.{block}.self_attn.{layer_name}.norms.{i}.weight"
+        print(f"-----> Merging Tensor {ename} with shape {norms[ename].shape}")
+        datas.append(norms[ename])
+        del norms[ename]
+    data = np.stack(datas, axis=0)
+    merged_name = f"model.layers.{block}.self_attn.{layer_name}.weight"
 
-    gguf_file = fname_out + '.gguf'
-    gguf_writer = gguf.GGUFWriter(gguf_file, "stablelm")
-
-    gguf_writer.add_uint32('magic', 0x67676d66)
-    gguf_writer.add_uint32('version', 1)
-    gguf_writer.add_uint32('n_vocab', hparams["vocab_size"])
-    gguf_writer.add_embedding_length(hparams["hidden_size"])
-    gguf_writer.add_head_count(hparams["num_attention_heads"])
-    gguf_writer.add_head_count_kv(hparams["num_key_value_heads"])
-
-    gguf_writer.add_block_count(hparams["num_hidden_layers"])
-    gguf_writer.add_rope_dimension_count(n_rot)
-    gguf_writer.add_uint32('ftype', ftype)
-    gguf_writer.add_context_length(hparams["max_position_embeddings"])
-    gguf_writer.add_feed_forward_length(hparams["intermediate_size"])
-
-    gguf_writer.add_bos_token_id(hparams["bos_token_id"])
-    gguf_writer.add_eos_token_id(hparams["eos_token_id"])
-    gguf_writer.add_pad_token_id(hparams["pad_token_id"] if hparams["pad_token_id"] else 0)
-    gguf_writer.add_sep_token_id(hparams["sep_token_id"] if hparams["sep_token_id"] else 0)
-
-    def write_vocab_gguf(dir_model, hparams, gguf_writer):
-        tokens: list[bytearray] = []
-        toktypes: list[int] = []
-
-        tokenizer = AutoTokenizer.from_pretrained(dir_model)
-        vocab_size = hparams.get("vocab_size", len(tokenizer.vocab))
-        assert max(tokenizer.vocab.values()) < vocab_size
-
-        reverse_vocab = {id_: encoded_tok for encoded_tok, id_ in tokenizer.vocab.items()}
-        added_vocab = tokenizer.get_added_vocab()
-
-        for i in range(vocab_size):
-            if i not in reverse_vocab:
-                pad_token = f"[PAD{i}]".encode('utf-8')
-                tokens.append(bytearray(pad_token))
-                toktypes.append(gguf.TokenType.USER_DEFINED)
-            elif reverse_vocab[i] in added_vocab:
-                tokens.append(reverse_vocab[i])
-                if tokenizer.added_tokens_decoder[i].special:
-                    toktypes.append(gguf.TokenType.CONTROL)
-                else:
-                    toktypes.append(gguf.TokenType.USER_DEFINED)
-            else:
-                tokens.append(reverse_vocab[i])
-                toktypes.append(gguf.TokenType.NORMAL)
-
-        gguf_writer.add_tokenizer_model("gpt2")
-        gguf_writer.add_token_list(tokens)
-        gguf_writer.add_token_types(toktypes)
-
-        special_vocab = gguf.SpecialVocab(dir_model, load_merges=True)
-        special_vocab.add_to_gguf(gguf_writer)
-
-    write_vocab_gguf(dir_model, hparams, gguf_writer)
-
-    # tensor info
-    print("gguf: get tensor metadata")
-    for name in list_vars.keys():
-        data = list_vars[name].squeeze().numpy()
-
-        print("Processing variable: " + name + " with shape: ", data.shape)
-        if 'inv_freq' in name:
-            continue
-
-        n_dims = len(data.shape)
-
-        # ftype == 0 -> float32, ftype == 1 -> float16
-        ftype_cur = 0
-        if ftype != 0:
-            if name[-7:] == ".weight" and n_dims == 2:
-                print("  Converting to float16")
-                data = data.astype(np.float16)
-                ftype_cur = 1
-            else:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
-                ftype_cur = 0
+    # ftype == 0 -> float32, ftype == 1 -> float16
+    if ftype != 0:
+        if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
+            print("  Converting to float16")
+            data = data.astype(np.float16)
         else:
-            if data.dtype != np.float32:
-                print("  Converting to float32")
-                data = data.astype(np.float32)
-                ftype_cur = 0
+            print("  Converting to float32")
+            data = data.astype(np.float32)
+    else:
+        if data.dtype != np.float32:
+            print("  Converting to float32")
+            data = data.astype(np.float32)
 
-        gguf_writer.add_tensor(name, data)
+    return merged_name, data
 
-    print("gguf: write header")
-    gguf_writer.write_header_to_file()
-    print("gguf: write metadata")
-    gguf_writer.write_kv_data_to_file()
-    print("gguf: write tensors")
-    gguf_writer.write_tensors_to_file()
-
-    gguf_writer.close()
-
-    print("Done. Output file: " + gguf_file)
-    print("")
 
 def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
-    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
-    model.eval()
-    for p in model.parameters():
-        p.requires_grad = False
-    hparams = model.config.to_dict()
+    print("stablelm ne converting: ")
+    list_vars = model.state_dict()
+    n_head = hparams["num_attention_heads"]
+    n_head_kv = hparams["num_key_value_heads"]
+    block_count = hparams["num_hidden_layers"]
     vocab_size = hparams["vocab_size"]
+    n_rot = int(hparams["partial_rotary_factor"] * hparams["hidden_size"] / hparams["num_attention_heads"])
     print("Model loaded: ", dir_model)
 
-    fout = open(fname_out, "wb")
+    ne_file = fname_out + '.bin' if not fname_out.endswith(".bin") else fname_out
+    fout = open(ne_file, "wb")
 
     # 0x67676d6c is unversioned ne
     # 0x67676d66 is versioned ggmf (requires token scores)
@@ -176,11 +99,11 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
     fout.write(struct.pack("i", ne_file_magic))  # magic: ne in hex
     fout.write(struct.pack("i", 1))
-    fout.write(struct.pack("i", hparams["vocab_size"]))
+    fout.write(struct.pack("i", vocab_size))
     fout.write(struct.pack("i", hparams["hidden_size"]))
     fout.write(struct.pack("i", 0))
-    fout.write(struct.pack("i", hparams["num_attention_heads"]))
-    fout.write(struct.pack("i", hparams["num_key_value_heads"]))  # multi-query attention
+    fout.write(struct.pack("i", n_head))
+    fout.write(struct.pack("i", n_head_kv))  # multi-query attention
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
     fout.write(struct.pack("i", n_rot))
     fout.write(struct.pack("i", ftype))
@@ -197,7 +120,7 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
 
     fout.write(struct.pack("i", 0))  # n_experts
     fout.write(struct.pack("i", 0))  # n_expert_used
-    fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
+    fout.write(struct.pack("i", hparams["hidden_size"] // n_head)) # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layer_norm_eps", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", hparams["rope_theta"]))  # freq_base
     fout.write(struct.pack("f", 1.0))  # freq_scale, was removed in config.json (by default=1.0)
@@ -223,45 +146,72 @@ def stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
             fout.write(text)
             fout.write(struct.pack("f", -10000))
 
-    list_vars = model.state_dict()
-
-    print(hparams)
-
-    for name in list_vars.keys():
-        # No gradients for these
-        list_vars[name].requires_grad = False
-        src = name
-        print(src, ' -> ', name)
-        data = list_vars[src].squeeze().numpy()
-        data = data.astype(np.float32)
-
-        n_dims = len(data.shape)
-        print(name, n_dims, data.shape)
-
-        # default type is fp32
-        ftype_cur = 0
-        if ftype == 1 and n_dims > 1:
-            print("  Converting to float16", data.shape, data[:3, :3].tolist())
-            data = data.astype(np.float16)
-            ftype_cur = 1
-        else:
-            print("  Converting to float32", data.shape, data[:3, :3].tolist() if n_dims > 1 else data[:3].tolist())
-            data = data.astype(np.float32)
-
-        # header
+    def write_header(name, data, ftype=0):
         str = name.encode('utf-8')
-        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        n_dims = len(data.shape)
+        fout.write(struct.pack("iii", n_dims, len(str), ftype))
         for i in range(n_dims):
             fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
         print(str)
         fout.write(str)
+
+    print(hparams)
+    q_norms, k_norms = dict(), dict()
+    for name, data_torch in list_vars.items():
+        # Convert any unsupported data types to float32
+        if data_torch.dtype not in (torch.float16, torch.float32):
+            data_torch = data_torch.to(torch.float32)
+
+        # Skip some tensors
+        if name.endswith((".attention.rotary_emb.inv_freq")):
+            continue
+
+        data = data_torch.squeeze().numpy()
+        old_dtype = data.dtype
+        n_dims = len(data.shape)
+        if name.find("q_layernorm.norms") != -1:
+            q_norms[name] = data
+            if len(q_norms) >= (block_count * n_head):
+                for block in range(block_count):
+                    name, data = stack_qk_norm(block, name, n_head, q_norms, n_dims, ftype, layer_name="q_layernorm")
+                    print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                    write_header(name, data)
+                    data.tofile(fout)
+            continue
+        if name.find("k_layernorm.norms") != -1:
+            k_norms[name] = data
+            if len(k_norms) >= (block_count * n_head_kv):
+                for block in range(block_count):
+                    name, data = stack_qk_norm(block, name, n_head_kv, k_norms, n_dims, ftype, layer_name="k_layernorm")
+                    print(f"Processing variable {name} with shape {data.shape}, {old_dtype} --> {data.dtype}")
+                    write_header(name, data)
+                    data.tofile(fout)
+            continue
+
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
+        if ftype != 0:
+            if name.endswith(".weight") and not name.endswith("_norm.weight") and n_dims == 2:
+                print("  Converting to float16")
+                data = data.astype(np.float16)
+                ftype_cur = 1
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+        else:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+
+        # header
+        write_header(name, data, ftype_cur)
 
         # data
         data.tofile(fout)
 
     fout.close()
 
-    print("Done. Output file: " + fname_out)
+    print("Done. Output file: " + ne_file)
     print("")
 
 def main(args_in: Optional[List[str]] = None) -> None:
@@ -281,13 +231,6 @@ def main(args_in: Optional[List[str]] = None) -> None:
         choices=["huggingface","modelscope"],
         default="huggingface",
         help="hub to load model"
-    )
-    parser.add_argument(
-        "--format",
-        type=str,
-        default="NE",
-        choices=["NE", "GGUF"],
-        help="convert to the GGUF or NE format"
     )
     parser.add_argument(
         "model",
@@ -315,11 +258,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     print("Loading model: ", dir_model)
     model = AutoModelForCausalLM.from_pretrained(dir_model, trust_remote_code=True)
     hparams = model.config.to_dict()
-    if args.format == "GGUF":
-        stablelm_convert_gguf(model, tokenizer, dir_model, fname_out, ftype, hparams)
-    else:
-        stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
-
+    stablelm_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
 
 
 if __name__ == '__main__':
