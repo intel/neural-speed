@@ -136,7 +136,7 @@ struct quant_params {
   std::string model_file = "";
   std::string out_file = "";
   std::string config = "";
-  int nthread = 1;
+  int nthread = 0; // use maximum
 
   // [int4, int8, fp8_e5m2, fp8_e4m3, fp4_e2m1, nf4]
   std::string weight_dtype = "int4";
