@@ -14,7 +14,7 @@
  * limitations under the License.
  *******************************************************************************/
 
-#include "utils/utils.hpp"
+#include <utils/utils.hpp>
 #include "xetla.hpp"
 
 using namespace gpu::xetla;
