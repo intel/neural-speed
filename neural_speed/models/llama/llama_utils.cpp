@@ -264,22 +264,14 @@ class llama_quant_layer : public quant_layer_base {
       if (mGCfg.bits == quant_bits::q2) {
         auto q4cfg = mGCfg;
         q4cfg.bits = quant_bits::q4;
-        q4cfg.alg = quant_alg::sym;
+        q4cfg.alg = quant_alg::asym;
+        q4cfg.group_size = 128;
         if (layername.find("attention.wv") != std::string::npos) {
           return q4cfg;
         }
-        /*if (layername.find("attention.wq") != std::string::npos) {
-          return q4cfg;
-        }
-        if (layername.find("attention.wk") != std::string::npos) {
-          return q4cfg;
-        }*/
         if (layername.find("feed_forward.w2") != std::string::npos) {
           return q4cfg;
         }
-        /*if (layername.find("output.weight") != std::string::npos) {
-          return q4cfg;
-        }*/
       }
 
       return mGCfg;  // use global quant config

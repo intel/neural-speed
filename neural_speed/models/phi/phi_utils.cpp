@@ -191,6 +191,18 @@ class phi_quant_layer : public quant_layer_base {
     }
     quantize &= (ne.size() == 2);
     if (quantize) {
+      if (mGCfg.bits == quant_bits::q2) {
+        auto q4cfg = mGCfg;
+        q4cfg.bits = quant_bits::q4;
+        q4cfg.alg = quant_alg::asym;
+        q4cfg.group_size = 128;
+        if (layername.find("self_attn.v_proj.weight") != std::string::npos) {
+          return q4cfg;
+        }
+        if (layername.find("mlp.fc2.weight") != std::string::npos) {
+          return q4cfg;
+        }
+      }
       return mGCfg;  // use global quant config
     } else {
       return quant_params_internal{quant_bits::count};  // non-quant
