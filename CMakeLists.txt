@@ -67,7 +67,7 @@ else()
 endif()
 
 add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
-add_compile_options(-fp-model=precise -Wall -Wextra -Werror)
+add_compile_options(-Wall -Wextra -Werror)
 
 include(ProcessorCount)
 ProcessorCount(nproc)
@@ -75,9 +75,11 @@ add_link_options(-fsycl -fsycl-device-code-split=per_kernel -fsycl-max-parallel-
 add_link_options(${XETLA_KERNEL_FLAGS})
 
 if(UNIX)
+    add_compile_options(-fp-model=precise)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)
     link_libraries(-lgtest -lgtest_main)
 else() # Windows
+    add_compile_options(/fp:precise)
     add_compile_options(/EHsc)
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(/MDd)
