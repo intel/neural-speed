@@ -1192,7 +1192,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       }
     };
 
-    auto s2auto_calc_store_scale_and_quantv_asym = [&](int blocksize) {
+    auto sNauto_calc_store_scale_and_quantv_asym_dynamic = [&](int blocksize) {
       auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
       int constexpr FullValue = 1 << (NBits - 1);
       float maxval = 0.f;
@@ -1201,28 +1201,47 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
         maxval = std::max(maxval, srcptr[(j + ij) * ld_src + i]);
         minval = std::min(minval, srcptr[(j + ij) * ld_src + i]);
       }
-      auto sum = maxval + minval;
-      float absmax = std::max(std::abs(maxval), std::abs(minval));
-      float rscale = 1.f;
-      int bzp = 0;
       auto clip = [&](int s) {
         s = std::max(s, -FullValue);
         s = std::min(s, FullValue - 1);
         return s;
       };
-
-      if ((fabs(sum) < (absmax / (FullValue)))) {
-        float scale = sum > 0.f ? absmax / -FullValue : absmax / FullValue;
-        rscale = 1.f / scale;
-        scales[j / raw_blocksize * ld_dst + i] = scale;
-        bzp = 0;
-      } else {
-        float scale = (maxval - minval) / ((1 << NBits) - 1);
-        rscale = 1.f / scale;
-        scales[j / raw_blocksize * ld_dst + i] = scale;
-        bzp = utils::cast<float, int>((0 - minval) * rscale - FullValue);
-        bzp = clip(bzp);
+      auto sum = maxval + minval;
+      float absmax = std::max(std::abs(minval), std::abs(maxval));
+      float scale0 = sum > 0.f ? absmax / -FullValue : absmax / FullValue;
+      float scale1 = (maxval - minval) / ((1 << NBits) - 1);
+      float rscale0 = 1.f / scale0;
+      float rscale1 = 1.f / scale1;
+      int bzp0 = 0;
+      int bzp1 = std::floor((0 - minval) * rscale1 - FullValue);
+      bzp1 = clip(bzp1);
+      int bzp2 = std::ceil((0 - minval) * rscale1 - FullValue);
+      bzp2 = clip(bzp2);
+      float err0 = 0.f;
+      float err1 = 0.f;
+      float err2 = 0.f;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        auto srcval = srcptr[(j + ij) * ld_src + i];
+        auto tmp = utils::cast<float, int>(srcval * rscale0) + bzp0;
+        tmp = clip(tmp);
+        err0 += std::fabs(tmp * scale0 - srcval);
+        tmp = utils::cast<float, int>(srcval * rscale1) + bzp1;
+        tmp = clip(tmp);
+        err1 += std::fabs((tmp - bzp1) * scale1 - srcval);
+        if (bzp1 != bzp2) {
+          tmp = utils::cast<float, int>(srcval * rscale1) + bzp2;
+          tmp = clip(tmp);
+          err2 += std::fabs((tmp - bzp2) * scale1 - srcval);
+        }
       }
+      float scale = scale0;
+      int bzp = bzp0;
+      if (err1 < err0 || err2 < err0) {
+        scale = scale1;
+        bzp = err1 < err2 ? bzp1 : bzp2;
+      }
+      float rscale = 1.f / scale;
+      scales[j / raw_blocksize * ld_dst + i] = scale;
       zero_points[j / raw_blocksize * ld_dst + i] = static_cast<int8_t>(bzp);
 
       for (size_t ij = 0; ij < blocksize; ij++) {
@@ -1234,19 +1253,13 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
     auto dispatch_calc = [&](int blocksize) {
       switch (QDT_T) {
         case BTLA_DTYPE::S8:
+        case BTLA_DTYPE::S2_CLIP:
         case BTLA_DTYPE::S3_CLIP:
         case BTLA_DTYPE::S4_CLIP:
           if (zero_points == nullptr) {
             sNauto_calc_store_scale_and_quantv_sym(blocksize);
           } else {
-            sNauto_calc_store_scale_and_quantv_asym(blocksize);
-          }
-          break;
-        case BTLA_DTYPE::S2_CLIP:
-          if (zero_points == nullptr) {
-            sNauto_calc_store_scale_and_quantv_sym(blocksize);
-          } else {
-            s2auto_calc_store_scale_and_quantv_asym(blocksize);
+            sNauto_calc_store_scale_and_quantv_asym_dynamic(blocksize);
           }
           break;
         default:
