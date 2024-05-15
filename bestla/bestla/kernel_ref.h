@@ -1234,6 +1234,9 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
           err2 += std::fabs((tmp - bzp2) * scale1 - srcval);
         }
       }
+      if (bzp1 == bzp2) {
+        err2 = err1;
+      }
       float scale = scale0;
       int bzp = bzp0;
       if (err1 < err0 || err2 < err0) {
