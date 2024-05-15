@@ -270,7 +270,7 @@ void stream_k_gemm_run(uint32_t iter) {
       mem_space::global, // memory reading from global mem for B
       8, // leading dimension for A, in unit of element
       8, // leading dimension for B, in unit of element
-      data_type_acc, // accumulator data type for intermediate resutls
+      data_type_acc, // accumulator data type for intermediate results
       tile_shape, // computation tile shape
       sg_tile_k, // elements in each iteration
       mma_engine::xmx, // compute engine
