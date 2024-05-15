@@ -920,7 +920,7 @@ PYBIND11_MODULE(phi3_cpp, m)
       .def_static("quant_model", &Model::quant_model, "Quantize model", py::arg("model_path"), py::arg("out_path"),
                   py::arg("weight_dtype") = "int4", py::arg("alg") = "sym", py::arg("group_size") = 32,
                   py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8", py::arg("use_ggml") = false,
-                  py::arg("threads") = 8)
+                  py::arg("threads") = 0)
       .def("is_token_end", &Model::is_token_end)
       .def("reset_token_end", &Model::reset_token_end)
       .def_static("np_bestla_qpack", &Model::np_bestla_qpack, "QPack tensor to bestla format", py::arg("src_w"),
@@ -930,7 +930,7 @@ PYBIND11_MODULE(phi3_cpp, m)
       .def_static("np_bestla_quantize", &Model::np_bestla_quantize, "Quantize tensor to bestla format",
                   py::arg("src_w"), py::arg("dst"), py::arg("weight_dtype") = "int4", py::arg("alg") = "sym",
                   py::arg("group_size") = 32, py::arg("scale_dtype") = "fp32", py::arg("compute_dtype") = "int8",
-                  py::arg("threads") = 8)
+                  py::arg("threads") = 0)
       .def("print_time", &Model::print_time)
       .def("reset_time", &Model::reset_time)
       .def("get_eos_id", &Model::get_eos_id)
