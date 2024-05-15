@@ -569,7 +569,7 @@ template <
 __XETLA_API typename std::enable_if_t<
     detail::check_store_type<tile_t, payload_t>::is_global_block_2d &&
     !detail::check_store_type<tile_t, payload_t>::is_lsc_scatter &&
-    payload_t::arch_tag <= gpu_arch::XeHpg>
+    !arch_has_2d_load_store<payload_t::arch_tag>>
 tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;

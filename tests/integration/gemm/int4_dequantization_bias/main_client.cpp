@@ -919,11 +919,11 @@ void dequantize_gemm_run(int iter) {
             epilogue_args);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-    // if (!gemm_op_t::can_implement(gemm_arg)) {
-    //   std::cout << "The arguments cannot be supported, aborting ... "
-    //             << std::endl;
-    //   FAIL();
-    // }
+    if (!gemm_op_t::can_implement(gemm_arg)) {
+      std::cout << "The arguments cannot be supported, aborting ... "
+                << std::endl;
+      FAIL();
+    }
 
     size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
     profiling_helper prof("dequantize_gemm", ops, "gflops");
@@ -1024,21 +1024,21 @@ INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test,
     tests);
 
-// template <typename T>
-// class dequantize_gemm_act_shuf_test : public ::testing::Test {};
-// TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test);
+template <typename T>
+class dequantize_gemm_act_shuf_test : public ::testing::Test {};
+TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test);
 
-// TYPED_TEST_P(dequantize_gemm_act_shuf_test, esimd) {
-//   if constexpr (TypeParam::mat_m != 1) {
-//     dequantize_gemm_run<TypeParam, act_shuf_feature_first_token>(ITER);
-//   } else {
-//     dequantize_gemm_run<TypeParam, act_shuf_feature_next_token>(ITER);
-//   }
-// }
+TYPED_TEST_P(dequantize_gemm_act_shuf_test, esimd) {
+  if constexpr (TypeParam::mat_m != 1) {
+    dequantize_gemm_run<TypeParam, act_shuf_feature_first_token>(ITER);
+  } else {
+    dequantize_gemm_run<TypeParam, act_shuf_feature_next_token>(ITER);
+  }
+}
 
-// REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test, esimd);
+REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_act_shuf_test, esimd);
 
-// INSTANTIATE_TYPED_TEST_SUITE_P(
-//     dequantize_gemm_act_shuf_test_suite,
-//     dequantize_gemm_act_shuf_test,
-//     tests);
+INSTANTIATE_TYPED_TEST_SUITE_P(
+    dequantize_gemm_act_shuf_test_suite,
+    dequantize_gemm_act_shuf_test,
+    tests);
