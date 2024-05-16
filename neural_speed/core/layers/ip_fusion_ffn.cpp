@@ -426,6 +426,7 @@ void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, stor
   auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
   auto WS = reinterpret_cast<int8_t*>(workspace);
   quanA1.assign(WS);
+  assert(w1ptr_->mBlockSize == w3ptr_->mBlockSize);
 
   auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
   WS = reinterpret_cast<int8_t*>(workspace);
@@ -451,11 +452,14 @@ bool bestla_fusion_ffn_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int
     if (sameKernel) {
       if (w1tmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
         auto w1ptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(w1tmp);
-        if (w1ptr->ShfIndice()) {
+        auto w2ptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(w2tmp);
+        auto w3ptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(w3tmp);
+        if (w1ptr->ShfIndice() || w2ptr->ShfIndice() || w3ptr->ShfIndice()) {
           return false;  // Do not support 3w ffn fusion for activation shuffle
         }
         constexpr size_t EleNum = sizeof(AllKBlockCores) / sizeof(AllKBlockCores[0]);
         support = contains(w1tmp->mCoreId, AllKBlockCores, EleNum);
+        support &= w1ptr->mBlockSize == w3ptr->mBlockSize;  // share quantization result of input
         support &= hasISA(AllKBlockCores, EleNum);
       } else if (w1tmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNFloat) {
         constexpr size_t EleNum = sizeof(FloatCores) / sizeof(FloatCores[0]);

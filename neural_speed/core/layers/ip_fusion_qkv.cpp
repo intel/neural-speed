@@ -106,6 +106,10 @@ void BTLAGemmCompInt8(const int M, const int N, const int K, const float* A, con
   static Launcher kernel;
   auto quanA = kernel.mProA.createStorage(M, K, BQ->mBlockSize, BQ->IsAsym());
   quanA.assign(WorkSpace);
+  assert(((BQ->mBlockSize == BK->mBlockSize) && (BK->mBlockSize == BV->mBlockSize))); // share quantization result of input
+  assert(BQ->ShfIndice() == nullptr);
+  assert(BK->ShfIndice() == nullptr);
+  assert(BV->ShfIndice() == nullptr);
   WorkSpace += quanA.mSize;
   auto reordA = kernel.mProA.createReorderStorage(M, K, BQ->mBlockSize);
   utils::GemmProblem gp(1, M, N, K, BQ->mBlockSize);  // If mixed blocksize, change it to three instances.
@@ -135,11 +139,15 @@ bool bestla_fusion_QKV_f32f32_support(void* wqptr, void* wkptr, void* wvptr, int
     if (samePackedWeight(wset, 3)) {
       if (wqtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
         auto wqptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(wqtmp);
-        if (wqptr->ShfIndice()) {
+        auto wkptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(wktmp);
+        auto wvptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(wvtmp);
+        if (wqptr->ShfIndice() || wkptr->ShfIndice() || wvptr->ShfIndice()) {
           return false;  // Do not support QKV fusion for activation shuffle
         }
         constexpr size_t EleNum = sizeof(AllKBlockCores) / sizeof(AllKBlockCores[0]);
         support = contains(wqtmp->mCoreId, AllKBlockCores, EleNum);
+        support &= wqptr->mBlockSize == wkptr->mBlockSize;  // share quantization result of input
+        support &= wvptr->mBlockSize == wkptr->mBlockSize;  // share quantization result of input
         support &= hasISA(AllKBlockCores, EleNum);
       } else if (wqtmp->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNFloat) {
         constexpr size_t EleNum = sizeof(FloatCores) / sizeof(FloatCores[0]);
