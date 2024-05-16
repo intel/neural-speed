@@ -156,9 +156,14 @@ class profiling_helper {
       profiling_statistics& stat,
       int scaling_ratio,
       string label = "[kernel time]",
-      string device = "GPU") {
-    vector<double> value = {stat.max, stat.min, stat.median, stat.mean};
-    vector<string> desc = {"minimum ", "maximum ", "median  ", "mean    "};
+      string device = "GPU",
+      bool is_verbose = true) {
+    auto value = is_verbose
+        ? vector<double>{stat.max, stat.min, stat.median, stat.mean}
+        : vector<double>{stat.min}; // min time for max performance
+    auto desc = is_verbose
+        ? vector<string>{"minimum ", "maximum ", "median  ", "mean    "}
+        : vector<string>{"maximum "};
     string unit = "";
     string perf_string = "";
     for (uint32_t i = 0; i < value.size(); i++) {
@@ -181,32 +186,38 @@ class profiling_helper {
       vector<double>& time,
       profiling_statistics stat,
       string label = "[kernel time]",
-      string device = "GPU") {
+      string device = "GPU",
+      bool is_verbose = true) {
     get_statistics(time, stat);
-    std::cout << "============= Profiling for " << label << " "
-              << "=============" << std::endl;
-    print_statistics(kernel_id, stat, label, device);
-    std::cout << "======================================================"
-              << std::endl;
+    if (is_verbose) {
+      std::cout << "============= Profiling for " << label << " "
+                << "=============" << std::endl;
+      print_statistics(kernel_id, stat, label, device);
+      std::cout << "======================================================"
+                << std::endl;
+    }
     if (this->work_amount[kernel_id] != 0) {
-      std::cout << "============== " << label << " " << work_name[kernel_id]
-                << "   ================== " << std::endl;
+      if (is_verbose)
+        std::cout << "============== " << label << " " << work_name[kernel_id]
+                  << "   ================== " << std::endl;
 
       // Different performance data correspond to different scaling ratios
       if (this->work_name[kernel_id] == "gflops") {
-        print_performance(kernel_id, stat, 1000000, label, device);
+        print_performance(kernel_id, stat, 1000000, label, device, is_verbose);
       } else if (this->work_name[kernel_id] == "mhashs") {
-        print_performance(kernel_id, stat, 1000, label, device);
+        print_performance(kernel_id, stat, 1000, label, device, is_verbose);
       } else if (this->work_name[kernel_id] == "GB/s") {
-        print_performance(kernel_id, stat, 1000000, label, device);
+        print_performance(kernel_id, stat, 1000000, label, device, is_verbose);
       } else {
         std::cout << "Not sure how much workload scales" << std::endl;
       }
 
-      std::cout << "======================================================"
-                << std::endl;
+      if (is_verbose)
+        std::cout << "======================================================"
+                  << std::endl;
     }
-    std::cout << std::endl;
+    if (is_verbose)
+      std::cout << std::endl;
   }
 
   void set_time_vecs() {
@@ -288,19 +299,32 @@ class profiling_helper {
     gpu_event_vec[kernel_id].push_back(gpu_event);
   }
 
-  void print_profiling_result(profiling_selector selector) {
+  void print_profiling_result(
+      profiling_selector selector,
+      bool is_verbose = true) {
     write_performance_metrics_into_report();
     for (uint32_t i = 0; i < kernel_nums; i++) {
-      std::cout << "\n***************** PROFILING FOR KERNEL" << i
-                << " ***********************" << std::endl;
+      if (is_verbose)
+        std::cout << "\n***************** PROFILING FOR KERNEL" << i
+                  << " ***********************" << std::endl;
       if (selector != profiling_selector::CPU) {
         get_gpu_time_from_events(i);
         print_profiling_data(
-            i, gpu_time_vec[i], gpu_statistics, "[kernel time]", "GPU");
+            i,
+            gpu_time_vec[i],
+            gpu_statistics,
+            "[kernel time]",
+            "GPU",
+            is_verbose);
       }
       if (selector != profiling_selector::GPU) {
         print_profiling_data(
-            i, cpu_time_vec[i], cpu_statistics, "[Wall time]", "CPU");
+            i,
+            cpu_time_vec[i],
+            cpu_statistics,
+            "[Wall time]",
+            "CPU",
+            is_verbose);
       }
     }
   }

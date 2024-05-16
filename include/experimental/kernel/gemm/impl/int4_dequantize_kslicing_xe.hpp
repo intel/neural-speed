@@ -294,7 +294,6 @@ class gemm_universal_t<
       return *this;
     }
   };
-
   template <>
   struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x

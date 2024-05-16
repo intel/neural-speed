@@ -57,8 +57,7 @@ int gemm_result_validate(
         });
     // BiasAdd
     for (uint32_t i = 0; i < gold_C.size(); ++i) {
-      uint32_t col = gold_C.size() % n;
-      gold_C[i] += D[col];
+      gold_C[i] += D[i % n];
     }
   }
 
@@ -259,7 +258,9 @@ void stream_k_gemm_run(uint32_t iter) {
   static constexpr uint32_t periodic_sync_interval = 4;
   static constexpr uint32_t prefetch_distance = 4;
 
-  // Micro-kernel configuration
+  constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+
+  // Mirco-kernel configuration
   using gemm_config = typename xetla::group::gemm_selector_t<
       data_type_a, // input datatype for A
       data_type_b, // input datatype for B
@@ -273,7 +274,7 @@ void stream_k_gemm_run(uint32_t iter) {
       tile_shape, // computation tile shape
       sg_tile_k, // elements in each iteration
       mma_engine::xmx, // compute engine
-      gpu_arch::XeHpc,
+      arch_tag,
       prefetch_distance,
       periodic_sync_interval> // GPU arch, prefetch stages, periodic sync
                               // frequency
@@ -291,8 +292,7 @@ void stream_k_gemm_run(uint32_t iter) {
   // bias_add_op_t
   using mem_desc_bias_t = xetla::
       mem_desc_t<data_type_bias, mem_layout::row_major, mem_space::global>;
-  using bias_op_t =
-      xetla::subgroup::bias_add_op_t<mem_desc_bias_t, gpu_arch::XeHpc>;
+  using bias_op_t = xetla::subgroup::bias_add_op_t<mem_desc_bias_t, arch_tag>;
   using tile_op_t = xetla::subgroup::chained_tile_op_t<
       xetla::subgroup::relu_op_t, // apply elementwise ReLU
       bias_op_t // apply elementwise BiasAdd
@@ -300,8 +300,8 @@ void stream_k_gemm_run(uint32_t iter) {
 
   using epilogue_policy_t = typename std::conditional<
       postop_enable == 0,
-      xetla::group::epilogue_policy_default<gpu_arch::XeHpc>,
-      xetla::group::epilogue_policy_tile_op<tile_op_t, gpu_arch::XeHpc>>::type;
+      xetla::group::epilogue_policy_default<arch_tag>,
+      xetla::group::epilogue_policy_tile_op<tile_op_t, arch_tag>>::type;
 
   using epilogue_t = xetla::group::epilogue_t<
       epilogue_policy_t,
@@ -309,7 +309,7 @@ void stream_k_gemm_run(uint32_t iter) {
       mem_desc_t<data_type_c, mem_layout::row_major, mem_space::global>>;
 
   using dispatch_stream_k =
-      gpu::xetla::kernel::dispatch_policy_stream_k<gpu_arch::XeHpc>;
+      gpu::xetla::kernel::dispatch_policy_stream_k<arch_tag>;
 
   using gemm_op_t = xetla::kernel::
       gemm_universal_t<dispatch_stream_k, gemm_config, epilogue_t>;
@@ -326,11 +326,12 @@ void stream_k_gemm_run(uint32_t iter) {
       sg_tile_n,
       avail_xecores);
 
-  static const std::string env_set_str =
-      "SYCL_PROGRAM_COMPILE_OPTIONS= -vc-codegen -doubleGRF "
-      "-vc-disable-indvars-opt -Xfinalizer ' -printregusage -enableBCR "
-      "-DPASTokenReduction '";
-  putenv(const_cast<char*>(env_set_str.c_str()));
+  setenv(
+      "SYCL_PROGRAM_COMPILE_OPTIONS",
+      " -vc-codegen -doubleGRF  -vc-disable-indvars-opt "
+      " -Xfinalizer '-printregusage -enableBCR -DPASTokenReduction '",
+      1);
+
   // Define and initialize the data required for the calculation
   auto A = alloc_device_and_init<data_type_a>(
       size_a,
@@ -387,7 +388,7 @@ void stream_k_gemm_run(uint32_t iter) {
 
   using epilogue_args_t = typename epilogue_t::arguments_t;
   uint32_t warmup = 0;
-  int64_t ops = 2 * static_cast<int64_t>(matrix_m) * matrix_n * matrix_k;
+  long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
   profiling_helper prof("stream_k_universal_gemm", ops, "gflops");
 
   if constexpr (postop_enable) {
@@ -410,9 +411,9 @@ void stream_k_gemm_run(uint32_t iter) {
         matrix_k,
         matrix_n,
         A,
-        matrix_k,
+        (mem_layout_a == mem_layout::row_major) ? matrix_k : matrix_m,
         B,
-        matrix_n,
+        (mem_layout_b == mem_layout::row_major) ? matrix_n : matrix_k,
         C,
         matrix_n,
         Acc,
@@ -461,9 +462,9 @@ void stream_k_gemm_run(uint32_t iter) {
         matrix_k,
         matrix_n,
         A,
-        matrix_k,
+        (mem_layout_a == mem_layout::row_major) ? matrix_k : matrix_m,
         B,
-        matrix_n,
+        (mem_layout_b == mem_layout::row_major) ? matrix_n : matrix_k,
         C,
         matrix_n,
         Acc,
@@ -502,8 +503,7 @@ void stream_k_gemm_run(uint32_t iter) {
     }
   }
 
-  static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-  putenv(const_cast<char*>(env_unset_str.c_str()));
+  unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
 
   ASSERT_EQ(
       0,
@@ -542,6 +542,7 @@ TYPED_TEST_P(stream_k_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(stream_k_gemm_test, esimd);
+
 using tests = ::testing::Types<Test1, Test2, Test3, Test4, Test5, Test6>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(

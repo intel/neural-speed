@@ -320,7 +320,7 @@ struct layer_norm_fwd_t<
         itr_count += 1;
         nbarrier.wait();
 
-        xetla_vector<dtype_acc, wg_size_x* 2> mu_m2_vec =
+        xetla_vector<dtype_acc, wg_size_x * 2> mu_m2_vec =
             xetla_load_local<dtype_acc, wg_size_x * 2>(slm_load_base);
         xetla_vector<dtype_acc, wg_size_x> mu_vec =
             mu_m2_vec.xetla_select<wg_size_x, 2>(0);
@@ -338,7 +338,6 @@ struct layer_norm_fwd_t<
           xetla_store_global<
               dtype_acc,
               1,
-              data_size::default_size,
               cache_hint::write_back,
               cache_hint::write_back>(
               args->mu_ptr,
@@ -347,7 +346,6 @@ struct layer_norm_fwd_t<
           xetla_store_global<
               dtype_acc,
               1,
-              data_size::default_size,
               cache_hint::write_back,
               cache_hint::write_back>(
               args->rs_ptr,

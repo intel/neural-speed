@@ -333,13 +333,11 @@ struct layer_norm_bwd_t<
       xetla_vector<dtype_acc, 1> mu_v = xetla_load_global<
           dtype_acc,
           1,
-          data_size::default_size,
           cache_hint::cached,
           cache_hint::cached>(args->mu_ptr, row * sizeof(dtype_acc));
       xetla_vector<dtype_acc, 1> rs_v = xetla_load_global<
           dtype_acc,
           1,
-          data_size::default_size,
           cache_hint::cached,
           cache_hint::cached>(args->rs_ptr, row * sizeof(dtype_acc));
       dtype_acc mu = mu_v[0];

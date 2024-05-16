@@ -255,7 +255,7 @@ struct bias_add_op_t {
     tile_load<cache_hint::cached, cache_hint::cached>(bias, bias_payload);
 
 #pragma unroll
-    for (int i = 0; i < tile_size_y / block_size_y; i++) {
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
         auto dst_reg =
@@ -264,7 +264,7 @@ struct bias_add_op_t {
                     (i * num_block_x + j) * block_elems)
                 .xetla_format<dtype_acc, block_size_y, block_size_x>();
 #pragma unroll
-        for (int row_i = 0; row_i < block_size_y; row_i++) {
+        for (uint32_t row_i = 0; row_i < block_size_y; row_i++) {
           auto src_reg =
               bias.reg.xetla_select<block_size_x, 1>(j * block_size_x);
           dst_reg.row(row_i) =

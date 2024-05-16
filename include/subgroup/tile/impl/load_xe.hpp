@@ -414,12 +414,9 @@ tile_load(tile_t& tile, payload_t& payload) {
       auto reg_sub =
           tile.reg.xetla_select<max_load_vec_len * scale_factor, 1>(offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
-      reg_sub.xetla_format<load_dtype>() = xetla_load_global<
-          load_dtype,
-          max_load_vec_len,
-          data_size::default_size,
-          L1,
-          L2>(payload.base_ptr, payload.base_offset + address_offset);
+      reg_sub.xetla_format<load_dtype>() =
+          xetla_load_global<load_dtype, max_load_vec_len, L1, L2>(
+              payload.base_ptr, payload.base_offset + address_offset);
     }
   }
 
@@ -441,7 +438,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
 /// information. Payload indicates the source of load operation.
 /// @tparam L1 Is the cache hint for L1 cache.
-/// @tparam L3 Is the cache hint for L3 cache.
+/// @tparam L2 Is the cache hint for L2 cache.
 /// @param tile Is the tile object with type tile_t, holds the return data of
 /// the loads.
 /// @param payload Is the payload object with type payload_t. Contains all the
@@ -449,7 +446,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @return No return, update in place.
 template <
     cache_hint L1 = cache_hint::cached,
-    cache_hint L3 = cache_hint::cached,
+    cache_hint L2 = cache_hint::cached,
     typename tile_t,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
@@ -476,7 +473,7 @@ tile_load(tile_t& tile, payload_t& payload) {
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += num_channel) {
         xetla_vector<load_dtype, load_elems> reg_tmp = 0;
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes + (offset_y + 0) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + 0) * payload.pitch_in_bytes;
@@ -499,7 +496,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload_t::simd_exec_size,
             data_size::default_size,
             L1,
-            L3,
+            L2,
             payload_t::num_channel>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
@@ -550,7 +547,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
 /// information. Payload indicates the source of load operation.
 /// @tparam L1 Is the cache hint for L1 cache.
-/// @tparam L3 Is the cache hint for L3 cache.
+/// @tparam L2 Is the cache hint for L2 cache.
 /// @param tile Is the tile object with type tile_t, holds the return data of
 /// the loads.
 /// @param payload Is the payload object with type payload_t. Contains all the
@@ -558,7 +555,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @return No return, update in place.
 template <
     cache_hint L1 = cache_hint::cached,
-    cache_hint L3 = cache_hint::cached,
+    cache_hint L2 = cache_hint::cached,
     typename tile_t,
     typename payload_t>
 __XETLA_API typename std::enable_if_t<
@@ -568,9 +565,7 @@ __XETLA_API typename std::enable_if_t<
 tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   using tile_desc = typename payload_t::tile_desc;
-  using load_dtype = typename payload_t::mem_dtype;
-  constexpr uint32_t load_elems = payload_t::simd_exec_size;
-  constexpr uint32_t pack_factor = payload_t::pack_factor;
+  constexpr uint32_t load_elems = tile_desc::block_size_x;
 
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
@@ -583,23 +578,16 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
            sub_block_y += 1) {
-        xetla_vector<load_dtype, load_elems> reg_tmp = 0;
-        uint32_t address_offset = payload_t::trans
+        uint32_t address_offset = payload_t::mem_transpose
             ? offset_x * payload.pitch_in_bytes +
                 (offset_y + sub_block_y) * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
-        reg_tmp = xetla_load_global<
-            load_dtype,
-            payload_t::simd_exec_size,
-            data_size::default_size,
-            L1,
-            L3>(payload.base_ptr, payload.base_offset + address_offset);
 
-        reg_sub
-            .xetla_select<load_elems * pack_factor, 1>(
-                sub_block_y * tile_desc::block_size_x)
-            .xetla_format<load_dtype>() = reg_tmp;
+        reg_sub.xetla_select<load_elems, 1>(
+            sub_block_y * tile_desc::block_size_x) =
+            xetla_load_global<dtype, load_elems>(
+                (dtype*)payload.base_ptr, payload.base_offset + address_offset);
       }
     }
   }
@@ -612,7 +600,6 @@ tile_load(tile_t& tile, payload_t& payload) {
     SW_BARRIER();
     vnni_convert(tile);
   }
-
 }
 
 /// @brief This function loads data from unaligned-2D memory surface.
@@ -623,7 +610,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @tparam payload_t Is the mem_payload_t struct describing the memory
 /// information. Payload indicates the source of load operation.
 /// @tparam L1 Is the cache hint for L1 cache.
-/// @tparam L3 Is the cache hint for L3 cache.
+/// @tparam L2 Is the cache hint for L2 cache.
 /// @param tile Is the tile object with type tile_t, holds the return data of
 /// the loads.
 /// @param payload Is the payload object with type payload_t. Contains all the
@@ -631,7 +618,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 /// @return No return, update in place.
 template <
     cache_hint L1 = cache_hint::cached,
-    cache_hint L3 = cache_hint::cached,
+    cache_hint L2 = cache_hint::cached,
     typename tile_t,
     typename payload_t,
     typename oob_check_tag = global_atomic_oob_check_on_tag>
@@ -682,7 +669,7 @@ tile_load(
             1,
             data_size::default_size,
             L1,
-            L3,
+            L2,
             load_elems>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
@@ -731,7 +718,7 @@ tile_load(
             1,
             data_size::default_size,
             L1,
-            L3,
+            L2,
             load_elems>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
@@ -828,6 +815,10 @@ tile_load(tile_t& tile, payload_t& payload) {
       }
     }
   }
+  if constexpr (payload_t::reg_transpose) {
+    SW_BARRIER();
+    tile_transpose(tile);
+  }
   if constexpr (mem_transform) {
     SW_BARRIER();
     vnni_convert(tile);
@@ -861,33 +852,42 @@ tile_load(tile_t& tile, payload_t& payload) {
   using load_dtype = typename payload_t::mem_dtype;
 
   constexpr uint32_t scale_factor = payload_t::scale_factor;
-  static constexpr uint32_t load_len = tile_desc::tile_size_x / scale_factor;
-  static constexpr gpu_arch arch_tag = payload_t::arch_tag;
+  constexpr uint32_t load_len = tile_desc::tile_size_x / scale_factor;
+  constexpr gpu_arch arch_tag = payload_t::arch_tag;
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_load_vec_len =
-      load_store_attr::max_load_vec_len;
+  constexpr uint32_t max_load_vec_len = load_store_attr::max_load_vec_len;
 
-  static constexpr uint32_t load_iter_steps = load_len / max_load_vec_len;
-
-  if constexpr (load_len >= max_load_vec_len) {
+  constexpr uint32_t load_iter_steps = load_len / max_load_vec_len;
 #pragma unroll
-    for (uint32_t j = 0; j < load_iter_steps; j++) {
-      uint32_t offset_x = j * max_load_vec_len * scale_factor;
-      auto reg_sub =
-          tile.reg.xetla_select<max_load_vec_len * scale_factor, 1>(offset_x);
-      uint32_t address_offset = offset_x * sizeof(dtype);
-      reg_sub.xetla_format<load_dtype>() = xetla_load_local<
-          load_dtype,
-          max_load_vec_len,
-          data_size::default_size>(payload.address + address_offset);
+  for (uint32_t i = 0; i < tile_desc::tile_size_y; i++) {
+    uint32_t offset_y = i * tile_desc::tile_size_x;
+    uint32_t address_offset_y = i * payload.pitch_in_bytes;
+    if constexpr (load_len >= max_load_vec_len) {
+#pragma unroll
+      for (uint32_t j = 0; j < load_iter_steps; j++) {
+        uint32_t offset_x = j * max_load_vec_len * scale_factor;
+        auto reg_sub =
+            tile.reg.xetla_select<max_load_vec_len * scale_factor, 1>(
+                offset_x + offset_y);
+        uint32_t address_offset = address_offset_y + offset_x * sizeof(dtype);
+        reg_sub.xetla_format<load_dtype>() = xetla_load_local<
+            load_dtype,
+            max_load_vec_len,
+            data_size::default_size>(
+            payload.base_address + payload.address + address_offset);
+      }
     }
+    uint32_t tail_offset =
+        offset_y + load_iter_steps * max_load_vec_len * scale_factor;
+    uint32_t tail_address_offset = address_offset_y +
+        load_iter_steps * max_load_vec_len * scale_factor * sizeof(dtype);
+    detail::process_1d_tail<
+        load_len % max_load_vec_len,
+        (max_load_vec_len >> 1),
+        detail::process_flag::load,
+        L1,
+        L2>(tile, payload, tail_offset, tail_address_offset);
   }
-  detail::process_1d_tail<
-      load_len % max_load_vec_len,
-      (max_load_vec_len >> 1),
-      detail::process_flag::load,
-      L1,
-      L2>(tile, payload, load_iter_steps * max_load_vec_len * scale_factor);
 }
 
 } // namespace gpu::xetla::subgroup

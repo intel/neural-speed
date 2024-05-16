@@ -135,7 +135,6 @@ struct col_major_shuf_t<
       auto gidx = xetla_load_global<
           uint32_t,
           block_size_x,
-          data_size::default_size,
           cache_hint::cached,
           cache_hint::cached>(
           args.gidx_ptr, gidx_payload.base_offset + block_x * block_size_x);
