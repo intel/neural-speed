@@ -1160,6 +1160,49 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
         dstptr[(j + ij) * ld_dst + i] = clip(tmp);
       }
     };
+    auto sNauto_calc_store_scale_and_quantv_sym_dynamic = [&](int blocksize) {
+      auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
+      int constexpr FullValue = 1 << (NBits - 1);
+      int constexpr GenValue = FullValue - 1;
+      float maxval = std::numeric_limits<float>::min();
+      float minval = std::numeric_limits<float>::max();
+      float absmax = 0;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        maxval = std::max(maxval, srcptr[(j + ij) * ld_src + i]);
+        minval = std::min(minval, srcptr[(j + ij) * ld_src + i]);
+        absmax = std::max(absmax, std::abs(srcptr[(j + ij) * ld_src + i]));
+      }
+
+      auto sum = maxval + minval;
+      float scale0 = sum > 0.f ? absmax / -FullValue : absmax / FullValue;
+      float scale1 = absmax / (FullValue - 0.5f);
+      float rscale0 = 1.f / scale0;
+      float rscale1 = 1.f / scale1;
+
+      auto clip = [&](int s) {
+        s = std::max(s, -FullValue);
+        s = std::min(s, FullValue - 1);
+        return s;
+      };
+      float err0 = 0.f;
+      float err1 = 0.f;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        auto srcval = srcptr[(j + ij) * ld_src + i];
+        auto tmp = utils::cast<float, int>(srcval * rscale0);
+        tmp = clip(tmp);
+        err0 += std::fabs(tmp * scale0 - srcval);
+        tmp = utils::cast<float, int>(srcval * rscale1);
+        tmp = clip(tmp);
+        err1 += std::fabs(tmp * scale1 - srcval);
+      }
+      float scale = err0 < err1 ? scale0 : scale1;
+      float rscale = 1.f / scale;
+      scales[j / raw_blocksize * ld_dst + i] = scale;
+      for (size_t ij = 0; ij < blocksize; ij++) {
+        auto tmp = utils::cast<float, int8_t>(srcptr[(j + ij) * ld_src + i] * rscale);
+        dstptr[(j + ij) * ld_dst + i] = clip(tmp);
+      }
+    };
 
     auto sNauto_calc_store_scale_and_quantv_asym = [&](int blocksize) {
       auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
@@ -1210,8 +1253,10 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       float absmax = std::max(std::abs(minval), std::abs(maxval));
       float scale0 = sum > 0.f ? absmax / -FullValue : absmax / FullValue;
       float scale1 = (maxval - minval) / ((1 << NBits) - 1);
+      float scale2 = absmax / (FullValue - 0.5f);
       float rscale0 = 1.f / scale0;
       float rscale1 = 1.f / scale1;
+      float rscale2 = 1.f / scale2;
       int bzp0 = 0;
       int bzp1 = std::floor((0 - minval) * rscale1 - FullValue);
       bzp1 = clip(bzp1);
@@ -1219,10 +1264,11 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       bzp2 = clip(bzp2);
       float err0 = 0.f;
       float err1 = 0.f;
+      float err1_2 = 0.f;
       float err2 = 0.f;
       for (size_t ij = 0; ij < blocksize; ij++) {
         auto srcval = srcptr[(j + ij) * ld_src + i];
-        auto tmp = utils::cast<float, int>(srcval * rscale0) + bzp0;
+        auto tmp = utils::cast<float, int>(srcval * rscale0);
         tmp = clip(tmp);
         err0 += std::fabs(tmp * scale0 - srcval);
         tmp = utils::cast<float, int>(srcval * rscale1) + bzp1;
@@ -1231,17 +1277,25 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
         if (bzp1 != bzp2) {
           tmp = utils::cast<float, int>(srcval * rscale1) + bzp2;
           tmp = clip(tmp);
-          err2 += std::fabs((tmp - bzp2) * scale1 - srcval);
+          err1_2 += std::fabs((tmp - bzp2) * scale1 - srcval);
         }
+        tmp = utils::cast<float, int>(srcval * rscale2);
+        tmp = clip(tmp);
+        err2 += std::fabs(tmp * scale2 - srcval);
       }
       if (bzp1 == bzp2) {
-        err2 = err1;
+        err1_2 = err1;
       }
+      auto minerr = err0;
       float scale = scale0;
       int bzp = bzp0;
-      if (err1 < err0 || err2 < err0) {
+      if (err2 < err0) {
+        scale = scale2;
+        minerr = err2;
+      }
+      if (err1 < minerr || err1_2 < minerr) {
         scale = scale1;
-        bzp = err1 < err2 ? bzp1 : bzp2;
+        bzp = err1 < err1_2 ? bzp1 : bzp2;
       }
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
@@ -1260,7 +1314,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
         case BTLA_DTYPE::S3_CLIP:
         case BTLA_DTYPE::S4_CLIP:
           if (zero_points == nullptr) {
-            sNauto_calc_store_scale_and_quantv_sym(blocksize);
+            sNauto_calc_store_scale_and_quantv_sym_dynamic(blocksize);
           } else {
             sNauto_calc_store_scale_and_quantv_asym_dynamic(blocksize);
           }
