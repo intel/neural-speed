@@ -168,6 +168,7 @@ model_name_map["falcon7b-gptq"]="Falcon-7B-Instruct-GPTQ"
 model_name_map["baichuan13b-gptq"]="Baichuan2-13B-Chat-GPTQ"
 model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
 model_name_map["phi3"]="microsoft/Phi-3-mini-128k-instruct"
+model_name_map["llama3"]="meta-llama/Meta-Llama-3-8B"
 
 
 function main() {
@@ -200,6 +201,10 @@ function main() {
             "q8e4m3_j_f32_g128" "q8e4m3_j_f32_g128_fp8" "q8e5m2_j_f32_g128" "q8e5m2_j_f32_g128_fp8"
             "q4e2m1_j_f32_g128" "nf4_j_f32_g128"
         )
+    if [[ "${model}" == "llama3" ]]; then
+        quant_script="./build/bin/quant_llama"
+        convert_script="${convert_script}/convert_llama.py"
+        infer_cmd="./build/bin/run_llama"
     elif [[ "${model}" == "gptj-6b" ]]; then
         quant_script="./build/bin/quant_gptj"
         convert_script="${convert_script}/convert_gptj.py"
@@ -459,7 +464,11 @@ function main() {
                             $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c $real_ctx -n ${output} -m ${model}-${precision}.bin $extension -p "$prompt" 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
                         fi
                         monitor
-
+                        if [[ ${input} == "1024" ]]; then
+                            python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai,boolq, piqa --batch_size 1  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
+                        else
+                            echo "-------- Accuracy End --------"
+                        fi
                         echo "=======  Inference End  ======="
                         python $script_dir/calculate_percentiles.py ${WORKSPACE}/${logs_file} ${model} ${precision} ${cores_per_instance} ${batch_size} ${input} ${output}
                     fi

@@ -1,30 +1,29 @@
-#  Copyright (c) 2023 Intel Corporation
+#!/bin/bash
+#===============================================================================
+# Copyright (c) 2024 Intel Corporation
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#    http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#===============================================================================
 
 import numpy as np
 import re
 import sys
 import os
-
-
 def calculate_percentile(data, percentile):
     return np.percentile(data, percentile, method="closest_observation")
 
-
 def calculate_mean(data):
     return np.mean(data)
-
 
 def parse_output_file(file_path):
     predictions = []
@@ -36,6 +35,20 @@ def parse_output_file(file_path):
                 predictions.append(prediction_time)
     return predictions
 
+def parse_output_file_acc(file_path):
+    accuracy = []
+    with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
+        for line in file:
+            accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+        if accuracy_match==None:
+                accuracy_match = re.search(r"\|\s+boolq+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+        if accuracy_match==None:
+            accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+        if accuracy_match==None:
+            accuracy_match= re.search(r"\|\s+hellaswag+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+        if accuracy_match:
+            accuracy.append(float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100)
+    return accuracy
 
 def parse_memory_file(memory_file):
     memory_values = []
@@ -64,9 +77,9 @@ if __name__ == "__main__":
     batch_size = sys.argv[5]
     model_input = sys.argv[6]
     model_output = sys.argv[7]
-    memory_file = os.environ.get("WORKSPACE") + "/memory.txt"
+    memory_file = os.environ.get("WORKING_DIR") + "/memory.txt"
     predictions = parse_output_file(output_file)
-    assert len(predictions) > 0, "Model has no output tokens!"
+    accuracy = parse_output_file_acc(output_file)
     first_token_latency = predictions[0]
     p90 = calculate_percentile(predictions, 90)
     p99 = calculate_percentile(predictions, 99)
@@ -77,6 +90,10 @@ if __name__ == "__main__":
     print("P99: {:.2f} ms".format(p99))
     print("average_latency: {:.2f} ms".format(latency_mean))
     print("first_token_latency: {:.2f} ms".format(first_token_latency))
+    print("lambada_openai: {:.2f}".format(accuracy[0]))
+    print("boolq: {:.2f}".format(accuracy[1]))
+    print("piqa: {:.2f}".format(accuracy[2]))
+    print("hellaswag: {:.2f}".format(accuracy[3]))
 
     memory_values = parse_memory_file(memory_file)
     sorted_memory_values = sorted(memory_values, reverse=True)
@@ -84,10 +101,9 @@ if __name__ == "__main__":
     memory_mean = calculate_mean(top_50_percent)
 
     print("Memory Mean (Top 50%): {:.2f}".format(memory_mean))
-    log_file = os.environ.get("WORKSPACE") + "/cpp_graph_summary.log"
-    log_prefix = os.environ.get("log_prefix")
-    link = str(log_prefix) + os.path.basename(output_file)
-    with open(log_file, 'a') as f:
+    log_file = os.environ.get("WORKING_DIR") + "/cpp_graph_summary.log"
+    link = os.environ.get("WORKING_DIR") + os.path.basename(output_file)
+    with open (log_file, 'a') as f:
         f.write("engine,")
         f.write("latency,")
         f.write(model + ",")
@@ -103,8 +119,12 @@ if __name__ == "__main__":
         f.write(link + ",")
         f.write("{:.2f},".format(p90))
         f.write("{:.2f},".format(p99))
-        # f.write(",latency:")
-        # for latency in predictions:
+        #f.write(",latency:")
+        #for latency in predictions:
         #    f.write(",{:.2f}".format(latency))
+        f.write("{:.2f},".format(accuracy[0]))
+        f.write("{:.2f},".format(accuracy[1]))
+        f.write("{:.2f},".format(accuracy[2]))
+        f.write("{:.2f},".format(accuracy[3]))
         f.write("\n")
         f.close()
