@@ -37,14 +37,16 @@ def parse_output_file_acc(file_path):
     with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
         for line in file:
             accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-        if accuracy_match==None:
+            if accuracy_match==None:
                 accuracy_match = re.search(r"\|\s+boolq+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-        if accuracy_match==None:
-            accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-        if accuracy_match==None:
-            accuracy_match= re.search(r"\|\s+hellaswag+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-        if accuracy_match:
-            accuracy.append(float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100)
+            if accuracy_match==None:
+                accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match==None:
+                accuracy_match= re.search(r"\|\s+hellaswag+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy.append(float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100)
+    if len(accuracy)==0:
+        accuracy=[0,0,0,0]
     return accuracy
 
 def parse_memory_file(memory_file):
