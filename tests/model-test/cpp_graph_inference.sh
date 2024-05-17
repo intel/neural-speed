@@ -201,7 +201,7 @@ function main() {
             "q8e4m3_j_f32_g128" "q8e4m3_j_f32_g128_fp8" "q8e5m2_j_f32_g128" "q8e5m2_j_f32_g128_fp8"
             "q4e2m1_j_f32_g128" "nf4_j_f32_g128"
         )
-    if [[ "${model}" == "llama3" ]]; then
+    elif [[ "${model}" == "llama3" ]]; then
         quant_script="./build/bin/quant_llama"
         convert_script="${convert_script}/convert_llama.py"
         infer_cmd="./build/bin/run_llama"
