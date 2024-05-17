@@ -1097,7 +1097,8 @@ struct mem_payload_t<
   static constexpr reg_layout register_layout = tile_desc::register_layout;
   static constexpr bool reg_transpose =
       register_layout == reg_layout::transpose_tiled;
-  static constexpr bool trans = mem_transpose ^ reg_transpose;
+  static constexpr bool trans =
+      mem_transpose ^ reg_transpose && !std::is_same_v<dtype_, int4x2>;
 
   static constexpr bool mem_transform = (sizeof(dtype) < 4) &&
       (register_layout == reg_layout::vnni_tiled ||
