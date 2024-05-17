@@ -466,9 +466,9 @@ function main() {
                         monitor
                         if [[ ${input} == "1024" || ${cores_per_instance} == "32" ]]; then
                             if [[ "${model}" == "llama"* || "${model}" == "gptj-6b" ]]; then
-                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai,boolq,piqa,hellaswage   2>&1 | tee -a ${WORKING_DIR}/${logs_file}
+                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai boolq piqa hellaswag   2>&1 | tee -a ${WORKING_DIR}/${logs_file}
                             else
-                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai,boolq,piqa,hellaswage --batch_size 1  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
+                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai boolq piqa hellaswag --batch_size 1  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
                             fi
                         else
                             echo "-------- Accuracy End --------"
