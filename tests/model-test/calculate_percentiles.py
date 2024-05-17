@@ -77,7 +77,7 @@ if __name__ == "__main__":
     batch_size = sys.argv[5]
     model_input = sys.argv[6]
     model_output = sys.argv[7]
-    memory_file = os.environ.get("WORKING_DIR") + "/memory.txt"
+    memory_file = os.environ.get("WORKSPACE") + "/memory.txt"
     predictions = parse_output_file(output_file)
     accuracy = parse_output_file_acc(output_file)
     first_token_latency = predictions[0]
