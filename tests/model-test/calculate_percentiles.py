@@ -79,6 +79,7 @@ if __name__ == "__main__":
     model_output = sys.argv[7]
     memory_file = os.environ.get("WORKING_DIR") + "/memory.txt"
     predictions = parse_output_file(output_file)
+    assert len(predictions) > 0, "Model has no output tokens!"
     accuracy = parse_output_file_acc(output_file)
     first_token_latency = predictions[0]
     p90 = calculate_percentile(predictions, 90)
@@ -101,9 +102,10 @@ if __name__ == "__main__":
     memory_mean = calculate_mean(top_50_percent)
 
     print("Memory Mean (Top 50%): {:.2f}".format(memory_mean))
-    log_file = os.environ.get("WORKING_DIR") + "/cpp_graph_summary.log"
-    link = os.environ.get("WORKING_DIR") + os.path.basename(output_file)
-    with open (log_file, 'a') as f:
+    log_file = os.environ.get("WORKSPACE") + "/cpp_graph_summary.log"
+    log_prefix = os.environ.get("log_prefix")
+    link = str(log_prefix) + os.path.basename(output_file)
+    with open(log_file, 'a') as f:
         f.write("engine,")
         f.write("latency,")
         f.write(model + ",")
