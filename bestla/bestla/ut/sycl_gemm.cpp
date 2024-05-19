@@ -2,7 +2,7 @@
 #include "sycl_ut.h"
 #include "../sycl/sycl_wrapper.h"
 #include "bestla_prologue_b.h"
-
+#undef BTLA_UT_SYCL
 namespace bestla {
 using namespace ut;
 using namespace utils;

@@ -367,10 +367,17 @@ class WeightKBlockNInteger {
     if (stor->mDType == BTLA_DTYPE::S8) {
       reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
     } else {
-      auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
-      reorderWeight(N, K, B, ldb, reordered, threading);
-      compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
-      utils::afree(reordered);
+      if (_GemmCore_T::ISA < BTLA_ISA::ISA_COUNT) {
+        auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
+        reorderWeight(N, K, B, ldb, reordered, threading);
+        compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
+        utils::afree(reordered);
+      } else {
+        auto transw = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
+        transposeWeight<int8_t, ISA_T>(N, K, B, ldb, transw, K, threading);
+        compressWeight(stor->mKPad, stor->mNPad, transw, stor->mKPad, stor->WPtr<int8_t>(), stor->mDType, threading);
+        utils::afree(transw);
+      }
     }
     reduceWeight(stor, threading);
   }

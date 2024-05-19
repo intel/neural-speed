@@ -64,6 +64,17 @@ class SGemmCoreSharedB {
 
   using SLM_B_Acc = sycl::local_accessor<TB, 1>;
 
+  using AType = typename TA;
+  using BType = typename TB;
+  using CType = typename TC;
+  static auto constexpr NTILE = WgNEle;
+  static auto constexpr MTILE = WgMEle;
+  static auto constexpr KTILE = TileK;
+  static auto constexpr PACK_ROW = 1;
+  static int constexpr PREFERRED_N = NTILE;
+  static auto constexpr ISA = BTLA_ISA::SYCL_XVE;
+  static auto constexpr ID = 0;
+
   static inline void compute(const TA* aptr, int lda, const SLM_B_Acc& bacc, TACC* accptr,
                              const sycl_utils::nd_item_helper<SGemmCoreSharedB<ConfigT>>& helper) {
 #pragma unroll(1)

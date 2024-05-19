@@ -34,6 +34,7 @@ enum class BTLA_ISA : uint8_t {
   AMX_INT8,
   AMX_FP16,
   ISA_COUNT,
+  SYCL_XVE,
 };
 enum class BTLA_DTYPE : uint32_t {
   EleBitsMask = 0xff,
