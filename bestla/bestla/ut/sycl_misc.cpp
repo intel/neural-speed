@@ -106,5 +106,57 @@ class UT_BlockQunatize_S3S4 {
 //
 #endif
 static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
+
+class UT_CompFp32 {
+ public:
+  UT_CompFp32() {
+    UT_START();
+    ut_s4();
+  }
+
+  void ut_s4() {
+    using GemmCore = sycl_gemm::xve::DefaultSGemmCore;
+    ut<GemmCore>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, false);
+  }
+
+  template <class GemmCore_T>
+  void ut(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype, bool isAsym) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
+           bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
+    auto constexpr RuntimeISA = BTLA_ISA::AVX2;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, RuntimeISA>;
+    blocksize = blocksize == -1 ? k : blocksize;
+    PrologueB proB;
+    auto packedw = proB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
+    utils::avector<int8_t> buffer(packedw.mSize);
+    packedw.assign(buffer.data());
+    avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n);
+    fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
+    fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
+    proB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
+    sycl_utils::sycl_vector<float> dC(n, q), dA(k * m, q);
+    q->memcpy(dA.data(), matAf32.data(), matAf32.size() * 4).wait();
+    using ProBTransT = sycl_prologue_b::WeightS4Trans<GemmCore_T, float>;
+    sycl_storage::StorageWeightKBlockNInteger sycl_stor(packedw, q);
+    int blks = updiv(k, blocksize);
+    auto e_esimd =
+        ProBTransT::gemv(dA.data(), {(uint8_t*)sycl_stor.mQBuf.data(), (float*)sycl_stor.mScaleBuf.data(), blks},
+                         dC.data(), n, k, blocksize, q);
+    e_esimd.wait();
+    q->memcpy(matC.data(), dC.data(), matC.size() * 4).wait();
+
+    auto err = get_ut_err(qtype);
+    auto dbits = bestla_dtype_bits(qtype);
+    auto type = bestla_dtype_type(qtype);
+    auto constexpr dtype_int = bestla_dtype_type(BTLA_DTYPE::TypeInt);
+    buffer_error(refC.data(), matC.data(), refC.size(), err);
+  }
+};
+#ifdef BTLA_UT_PROLOGUE_B
+#endif
+static UT_CompFp32 sUT_CompFp32;
 }  // namespace sycl_ut
 }  // namespace bestla
