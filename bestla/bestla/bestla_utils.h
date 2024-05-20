@@ -356,12 +356,20 @@ inline const char* bestla_dtype_str(BTLA_DTYPE dtype) {
       return "signed_int8";
     case BTLA_DTYPE::U8:
       return "unsigned_int8";
+    case BTLA_DTYPE::S7_CLIP:
+      return "int7_clip";
+    case BTLA_DTYPE::S6_CLIP:
+      return "int6_clip";
+    case BTLA_DTYPE::S5_CLIP:
+      return "int5_clip";
     case BTLA_DTYPE::S4_CLIP:
       return "int4_clip";
     case BTLA_DTYPE::S3_CLIP:
       return "int3_clip";
     case BTLA_DTYPE::S2_CLIP:
       return "int2_clip";
+    case BTLA_DTYPE::S1_CLIP:
+      return "int1_clip";
     case BTLA_DTYPE::F4_E2M1:
       return "fp4_e2m1";
     case BTLA_DTYPE::F4_BNB:
