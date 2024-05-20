@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include "bestla_wrapper.h"
 #include "bestla_ut.h"
-
+#undef BTLA_UT_WRAPPER
+#undef BTLA_UT_PROLOGUE_B
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -560,8 +561,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompFp32 sUTWOQ_CompFp32;
 #endif
+static UTWOQ_CompFp32 sUTWOQ_CompFp32;
 
 class UTWOQ_CompBf16 {
  public:
@@ -824,8 +825,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 #endif
+static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 
 #if 0
 typedef struct {
