@@ -2532,6 +2532,129 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   }
   return BTLA_CODE::Success;
 }
+
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_5bit_fp32_fp32(const float* A, int lda, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  int blks = k / blocksize;
+  float accf[NTILE * MTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto b4ptr = reinterpret_cast<utils::bit4x2*>(B.b4ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+  int constexpr KTILE = 1;
+  int constexpr Unroll = 4;
+  assert((blocksize % 4) == 0);
+  assert(tmpsize >= NTILE * Unroll);
+  int8_t UnpackBuf[NTILE * Unroll];
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * B.ldzp;
+    auto bzptr = B.zpptr + ib * B.ldzp;
+    for (int ik = 0; ik < blocksize; ik += Unroll) {
+      decompress_kblock_s5_s8<1, NTILE>(b4ptr, b1ptr, B.zpptr ? bzptr : nullptr, UnpackBuf, blocksize, B.ldzp, 0, 0,
+                                        Unroll, NTILE, tmp, tmpsize);
+      for (int im = 0; im < MTILE; im++) {
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < Unroll; ikt++) {
+            auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+            auto aval = A[ikt + im * lda];
+            accf[im * NTILE + in] += aval * bval;
+          }
+        }
+      }
+      b4ptr += Unroll * NTILE / 2;
+      b1ptr += Unroll * NTILE / 8;
+      A += Unroll;
+    }
+  }
+  for (int im = 0; im < MTILE; im++) {
+    for (int in = 0; in < NTILE; in++) {
+      C[in + im * ldc] = accf[im * NTILE + in];
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_5bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  int blks = k / blocksize;
+  float accf[NTILE * MTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto a8ptr = A.aptr;
+  auto b4ptr = reinterpret_cast<utils::bit4x2*>(B.b4ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+  int constexpr KTILE = 4;
+  int8_t UnpackBuf[NTILE * KTILE];
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * B.ldzp;
+    auto bzptr = B.zpptr + ib * B.ldzp;
+    for (int ik = 0; ik < blocksize; ik += KTILE) {
+      decompress_kblock_s5_s8<4, NTILE>(b4ptr, b1ptr, B.zpptr ? bzptr : nullptr, UnpackBuf, blocksize, B.ldzp, 0, 0,
+                                        KTILE, NTILE, tmp, tmpsize);
+      for (int im = 0; im < MTILE; im++) {
+        float ascale = A.sptr[ib + im * A.ldzp];
+        auto azp = A.zpptr[ib + im * A.ldzp];
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
+            accf[im * NTILE + in] += aval * bval;
+          }
+        }
+      }
+      b4ptr += KTILE * NTILE / 2;
+      b1ptr += KTILE * NTILE / 8;
+      a8ptr += KTILE;
+    }
+  }
+  for (int im = 0; im < MTILE; im++) {
+    for (int in = 0; in < NTILE; in++) {
+      C[in + im * ldc] = accf[im * NTILE + in];
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_5bit_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  int blks = k / blocksize;
+  float accf[NTILE * MTILE];
+  std::memset(accf, 0, sizeof(accf));
+  auto a8ptr = (int8_t*)A.aptr;
+  auto b4ptr = reinterpret_cast<utils::bit4x2*>(B.b4ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+  int constexpr KTILE = 4;
+  int8_t UnpackBuf[NTILE * KTILE];
+  for (int ib = 0; ib < blks; ib += 1) {
+    auto bsptr = B.sptr + ib * B.ldzp;
+    auto bzptr = B.zpptr + ib * B.ldzp;
+    for (int ik = 0; ik < blocksize; ik += KTILE) {
+      decompress_kblock_s5_s8<4, NTILE>(b4ptr, b1ptr, B.zpptr ? bzptr : nullptr, UnpackBuf, blocksize, B.ldzp, 0, 0,
+                                        KTILE, NTILE, tmp, tmpsize);
+      for (int im = 0; im < MTILE; im++) {
+        float ascale = A.sptr[ib + im * A.ldzp];
+        for (int in = 0; in < NTILE; in++) {
+          for (int ikt = 0; ikt < KTILE; ikt++) {
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
+            accf[im * NTILE + in] += aval * bval;
+          }
+        }
+      }
+      b4ptr += KTILE * NTILE / 2;
+      b1ptr += KTILE * NTILE / 8;
+      a8ptr += KTILE;
+    }
+  }
+  for (int im = 0; im < MTILE; im++) {
+    for (int in = 0; in < NTILE; in++) {
+      C[in + im * ldc] = accf[im * NTILE + in];
+    }
+  }
+  return BTLA_CODE::Success;
+}
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla
