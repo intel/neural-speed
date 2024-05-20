@@ -756,7 +756,7 @@ class WeightKBlockNInteger {
         int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
         auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
         assert(elt_offset % 8 == 0);
-        size_t bit1_offset = NPad * KPad;
+        size_t bit1_offset = size_t(NPad) * KPad;
         auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit3_ptr + elt_offset / 4);
         auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit3_ptr + bit1_offset / 4 + elt_offset / 8);
         kernel::wrapper::DecompressKBlockS3Fp<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE, _T>::template forward<ISA_T>(
@@ -782,7 +782,7 @@ class WeightKBlockNInteger {
         int8_t* bit5_ptr = wptr->template WPtr<int8_t>();
         auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
         assert(elt_offset % 8 == 0);
-        size_t bit1_offset = NPad * KPad;
+        size_t bit1_offset = size_t(NPad) * KPad;
         auto bit4ptr = reinterpret_cast<utils::bit4x2*>(bit5_ptr + elt_offset / 2);
         auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit5_ptr + bit1_offset / 2 + elt_offset / 8);
         kernel::wrapper::DecompressKBlockS5Fp<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE, _T>::template forward<ISA_T>(
@@ -834,7 +834,7 @@ class WeightKBlockNInteger {
     auto zpptr = wptr->template ZPtr<int8_t>();
     auto KPad = wptr->mKPad;
     auto NPad = wptr->mNPad;
-    size_t bit1_offset = NPad * KPad;
+    size_t bit1_offset = size_t(NPad) * KPad;
     auto base_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE;
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
       auto elt_offset = base_offset + i * KPad;
@@ -856,7 +856,7 @@ class WeightKBlockNInteger {
     auto zpptr = wptr->template ZPtr<int8_t>();
     auto KPad = wptr->mKPad;
     auto NPad = wptr->mNPad;
-    size_t bit1_offset = NPad * KPad;
+    size_t bit1_offset = size_t(NPad) * KPad;
     auto base_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE;
     for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
       auto elt_offset = base_offset + i * KPad;
