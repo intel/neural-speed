@@ -273,6 +273,15 @@ class CompressFp4 {
   }
 };
 
+class CompressBit6 {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr,
+                                  size_t size) {
+    return ref::compress_6bit(srcptr, bit4ptr, bit2ptr, size);
+  }
+};
+
 class CompressBit5 {
  public:
   template <BTLA_ISA ISA_T>
@@ -441,6 +450,30 @@ class DecompressKBlockS4S8 {
 };
 
 template <int PackRow, int NTILE>
+class DecompressKBlockS6S8 {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(utils::bit4x2* b4ptr, utils::bit2x4* b2ptr, int8_t* zpptr, int8_t* dstptr,
+                                  int blocksize, int ldzp, int n_offset, int k_offset, int row, int col, void* tmp,
+                                  size_t tmpsize) {
+// #if CompileAVX512F()
+//     if constexpr (utils::isa_base<ISA_T>::avx512f) {
+//       return avx512f::decompress_kblock_s5_s8<PackRow, NTILE>(b4ptr, b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
+//                                                               k_offset, row, col, (int8_t*)tmp, tmpsize);
+//     }
+// #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::decompress_kblock_s6_s8<PackRow, NTILE>(b4ptr, b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
+                                                           k_offset, row, col, (int8_t*)tmp, tmpsize);
+    }
+#endif
+    return ref::decompress_kblock_s6_s8<PackRow, NTILE>(b4ptr, b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
+                                                        k_offset, row, col, (int8_t*)tmp, tmpsize);
+  }
+};
+
+template <int PackRow, int NTILE>
 class DecompressKBlockS5S8 {
  public:
   template <BTLA_ISA ISA_T>
@@ -537,6 +570,37 @@ class DecompressKBlockS8Fp {
 #endif
     ret = ref::decompress_kblock_s8_fp<PackRow, NTILE, DstT>(srcptr, dstptr, row, col, scales, sdtype, zero_points,
                                                              k_offset, n_offset, kblock, NPad,
+                                                             reinterpret_cast<int8_t*>(tmp), tmpsize);
+    return ret;
+  }
+};
+
+template <int PackRow, int NTILE, typename DstT>
+class DecompressKBlockS6Fp {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(utils::bit4x2* b4ptr, utils::bit2x4* b2ptr, DstT* dstptr, int row, int col,
+                                  void* scales, BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,
+                                  int kblock, int NPad, void* tmp, size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+    // #if CompileAVX512F()
+    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
+    //       return avx512f::decompress_kblock_s5_fp<PackRow, NTILE, DstT>(b4ptr, b1ptr, dstptr, row, col, scales,
+    //       sdtype,
+    //                                                                     zero_points, k_offset, n_offset, kblock,
+    //                                                                     NPad, reinterpret_cast<int8_t*>(tmp),
+    //                                                                     tmpsize);
+    //     }
+    // #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::decompress_kblock_s6_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, dstptr, row, col, scales, sdtype,
+                                                                 zero_points, k_offset, n_offset, kblock, NPad,
+                                                                 reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
+#endif
+    ret = ref::decompress_kblock_s6_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, dstptr, row, col, scales, sdtype,
+                                                             zero_points, k_offset, n_offset, kblock, NPad,
                                                              reinterpret_cast<int8_t*>(tmp), tmpsize);
     return ret;
   }

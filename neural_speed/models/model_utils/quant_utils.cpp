@@ -309,7 +309,7 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
       quant_type = BTLA_DTYPE::F8_E5M2;
       break;
     default:
-      printf("Unsupported quant bits:%d, set to int4\n", quant_type);
+      printf("Unsupported quant bits:%d, set to int4\n", int(quant_type));
       break;
   }
 

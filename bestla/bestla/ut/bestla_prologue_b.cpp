@@ -171,6 +171,9 @@ class UT_BlockQunatize_SN {
   UT_BlockQunatize_SN() {
     UT_START();
     CheckISA(AVX2);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S6_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S6_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S6_CLIP);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S5_CLIP, true);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S5_CLIP);
     ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S5_CLIP);
