@@ -38,7 +38,7 @@ def parse_output_file_acc(file_path):
         for line in file:
             accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if accuracy_match==None:
-                accuracy_match = re.search(r"\|\s+boolq+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+                accuracy_match = re.search(r"\|\s+boolq+\|\s+2\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if accuracy_match==None:
                 accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if accuracy_match==None:
