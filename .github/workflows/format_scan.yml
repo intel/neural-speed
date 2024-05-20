@@ -39,6 +39,7 @@ jobs:
             "clangtidy",
             # "pydocstyle",
             #"pyspelling",
+            "hadolint"
           ]
       fail-fast: false
     steps:

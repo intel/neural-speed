@@ -22,7 +22,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    SCRIPT_PATH: ${{ github.workspace }}\.github\workflows\script
+    SCRIPT_PATH: ${{ github.workspace }}\.github\workflows\scripts
     WORKING_DIR: ${{ github.workspace }}
 
 jobs:
