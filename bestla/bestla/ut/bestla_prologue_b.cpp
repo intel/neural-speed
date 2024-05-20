@@ -216,7 +216,7 @@ class UT_BlockQunatize_SN {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-// 
+//
 static UT_BlockQunatize_SN sUT_BlockQunatize_SN;
 #endif
 

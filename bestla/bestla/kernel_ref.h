@@ -2533,7 +2533,6 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   return BTLA_CODE::Success;
 }
 
-
 template <typename ScaleT, int NTILE, int MTILE>
 static inline BTLA_CODE gemv_5bit_fp32_fp32(const float* A, int lda, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
