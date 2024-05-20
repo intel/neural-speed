@@ -644,8 +644,11 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
+    ut_s6();
+    
+    /*
     ut_s5();
-    /*ut_s4();
+    ut_s4();
     ut_s2();
     ut_s3();
     ut_s8();
@@ -756,6 +759,24 @@ class UT_CompFp32 {
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
                                                           true);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+  }
+
+  void ut_s6() {
+    CheckISA(AVX2);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
                                                           false);
   }
 
@@ -882,8 +903,11 @@ class UT_CompInt8 {
  public:
   UT_CompInt8() {
     UT_START();
+    ut_s6();
+    
+    /*
     ut_s5();
-    /*ut_s4();
+    ut_s4();
     ut_s2();
     ut_s3();*/
   }
@@ -988,6 +1012,27 @@ class UT_CompInt8 {
     }
   }
 
+  void ut_s6() {
+    GetCPUDevice();
+    if (_cd->AVX2()) {
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+    }
+  }
+
   template <class GemmCore_T>
   void ut_newkblock(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype, bool isAsym = false) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
@@ -1041,8 +1086,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompInt8 sUT_CompInt8;
 #endif
+static UT_CompInt8 sUT_CompInt8;
 
 class UT_CompBf16 {
  public:
