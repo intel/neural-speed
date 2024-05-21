@@ -88,7 +88,11 @@ class UT_BlockQunatize_S3S4 {
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
     kernel.packTransposeWeight(n, k, raw.data(), k, &ptr, UT_Threading::get());
-    sycl_storage::StorageWeightKBlockNInteger sycl_stor(ptr, q);
+    auto transtor = ptr.toTrans();
+    avector<int8_t> buffer1(transtor.mSize);
+    transtor.assign(buffer1.data());
+    kernel.convertTransStorage(ptr, transtor, UT_Threading::get());
+    sycl_storage::StorageWeightKBlockNInteger sycl_stor(transtor, q);
     avector<float> dequant(n * k, 0);
     using ProB = sycl_prologue_b::WeightS4Trans<GemmCore, float>;
     sycl_utils::sycl_vector<float> dequantB(n * k, q);
@@ -141,7 +145,11 @@ class UT_CompFp32 {
     sycl_utils::sycl_vector<float> dC(n, q), dA(k * m, q);
     q->memcpy(dA.data(), matAf32.data(), matAf32.size() * 4).wait();
     using ProBTransT = sycl_prologue_b::WeightS4Trans<GemmCore_T, float>;
-    sycl_storage::StorageWeightKBlockNInteger sycl_stor(packedw, q);
+    auto transtor = packedw.toTrans();
+    avector<int8_t> buffer1(transtor.mSize);
+    transtor.assign(buffer1.data());
+    proB.convertTransStorage(packedw, transtor, UT_Threading::get());
+    sycl_storage::StorageWeightKBlockNInteger sycl_stor(transtor, q);
     int blks = updiv(k, blocksize);
     auto e_esimd =
         ProBTransT::gemv(dA.data(), {(uint8_t*)sycl_stor.mQBuf.data(), (float*)sycl_stor.mScaleBuf.data(), blks},

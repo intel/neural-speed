@@ -126,8 +126,25 @@ class WeightKBlockNInteger {
     return tmp;
   }
 
+  static StorageWeight convertTransStorage(StorageWeight& srcstor, StorageWeight& dststor,
+                                           parallel::IThreading* threading) {
+    auto s8buf = utils::amalloc<int8_t>((size_t)srcstor.mK * srcstor.mN);
+    auto s8transbuf = utils::amalloc<int8_t>((size_t)srcstor.mKPad * srcstor.mNPad);
+    unpackWeight(srcstor.mN, srcstor.mK, &srcstor, s8buf, srcstor.mN, threading);
+    transposeWeight<int8_t, ISA_T>(srcstor.mK, srcstor.mN, s8buf, srcstor.mN, s8transbuf, srcstor.mKPad, threading);
+    compressWeight(srcstor.mKPad, srcstor.mNPad, s8transbuf, srcstor.mKPad, dststor.WPtr<int8_t>(), srcstor.mDType,
+                   threading);
+    int nk_scale = utils::updiv(srcstor.mKPad, srcstor.mBlockSize);
+    if (srcstor.mCorrection.mScaEleSize == 4) {
+      transposeWeight<float, ISA_T>(nk_scale, srcstor.mNPad, srcstor.template SPtr<float>(), srcstor.mNPad,
+                                    dststor.template SPtr<float>(), dststor.CStep(), threading);
+    } else if (srcstor.mCorrection.mScaEleSize == 2) {
+      transposeWeight<uint16_t, ISA_T>(nk_scale, srcstor.mNPad, srcstor.template SPtr<uint16_t>(), srcstor.mNPad,
+                                       dststor.template SPtr<uint16_t>(), dststor.CStep(), threading);
+    }
+  }
   AUTOCALL void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
-                                 utils::aligned_vector<float>* dq_buf) {
+                        utils::aligned_vector<float>* dq_buf) {
     if (qtype == BTLA_DTYPE::DQ8_BNB) {
       dq_buf->resize(utils::updiv(scale_size, dq_blocksize) + 1);  // add 1 for offset.
       kernel::ref::dq8_bnb_double_quant<false>(scale, scale_size, dq_blocksize, dq_buf->data());
@@ -367,17 +384,10 @@ class WeightKBlockNInteger {
     if (stor->mDType == BTLA_DTYPE::S8) {
       reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
     } else {
-      if (_GemmCore_T::ISA < BTLA_ISA::ISA_COUNT) {
-        auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
-        reorderWeight(N, K, B, ldb, reordered, threading);
-        compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
-        utils::afree(reordered);
-      } else {
-        auto transw = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
-        transposeWeight<int8_t, ISA_T>(N, K, B, ldb, transw, K, threading);
-        compressWeight(stor->mKPad, stor->mNPad, transw, stor->mKPad, stor->WPtr<int8_t>(), stor->mDType, threading);
-        utils::afree(transw);
-      }
+      auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
+      reorderWeight(N, K, B, ldb, reordered, threading);
+      compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType, threading);
+      utils::afree(reordered);
     }
     reduceWeight(stor, threading);
   }

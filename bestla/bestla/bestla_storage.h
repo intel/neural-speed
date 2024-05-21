@@ -706,6 +706,22 @@ class StorageWeightKBlockNInteger : public IWeightKBlockBase {
     mPrologueID = BTLA_PROLOGUEB_IDS::WeightKBlockNInteger;
   }
 
+  StorageWeightKBlockNInteger toTrans() {
+    StorageWeightKBlockNInteger trans(-1);
+    trans.mK = mK;
+    trans.mN = mN;
+    trans.mNPad = mNPad;
+    trans.mKPad = mKPad;
+    trans.mBlockSize = mBlockSize;
+    trans.mDType = mDType;
+    trans.mQBuf.resize(mQBuf.size<int8_t>());
+    int nk_scale = utils::updiv(mKPad, mBlockSize);
+    trans.mCorrection.resize(mNPad, nk_scale, mCorrection.mScaT, mCorrection.mZpT, mCorrection.mRedT,
+                             mCorrection.mZpBuf.size<int>() > 0, mCorrection.mRedBuf.size<int>() > 0);
+    trans.update_size();
+    return trans;
+  }
+
   size_t resize(int NPad, int KPad, int Block, int N, int K, BTLA_DTYPE qtype, BTLA_DTYPE scalet, BTLA_DTYPE redt,
                 bool IsAsym) {
     BTLA_DTYPE zpt = BTLA_DTYPE::S8;

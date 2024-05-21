@@ -34,6 +34,7 @@ class StorageWeightKBlockNInteger {
   sycl_utils::sycl_vector<int8_t> mZpBuf, mRedBuf;
   sycl_utils::sycl_vector<int8_t> mDQCorrectionBuf;
   sycl_utils::sycl_vector<int8_t> mShuffleIndices;
+
   StorageWeightKBlockNInteger(bestla::storage::gemm::StorageWeightKBlockNInteger& _hoststor, sycl::queue* queue) {
     mPrologueID = BTLA_PROLOGUEB_IDS::WeightKBlockNInteger;
     mCoreId = 0;
