@@ -645,7 +645,7 @@ class UT_CompFp32 {
   UT_CompFp32() {
     UT_START();
     ut_s6();
-    
+
     /*
     ut_s5();
     ut_s4();
@@ -904,7 +904,7 @@ class UT_CompInt8 {
   UT_CompInt8() {
     UT_START();
     ut_s6();
-    
+
     /*
     ut_s5();
     ut_s4();

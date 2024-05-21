@@ -281,6 +281,9 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
     case quant_bits::q5:
       quant_type = BTLA_DTYPE::S5_CLIP;
       break;
+    case quant_bits::q4:
+      quant_type = BTLA_DTYPE::S4_CLIP;
+      break;
     case quant_bits::q3:
       quant_type = BTLA_DTYPE::S3_CLIP;
       break;

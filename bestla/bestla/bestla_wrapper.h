@@ -35,7 +35,7 @@ class S6 {
     auto bit2_offset = packedW->mNPad * packedW->mKPad / 2;
     utils::GemvParamB<ScaleT> paramB{
         bwptr, bwptr + bit2_offset, nullptr,       packedW->template SPtr<ScaleT>(), isasym ? bzptr : nullptr,
-        NBits, ld_scaleb, packedW->mKPad};
+        NBits, ld_scaleb,           packedW->mKPad};
     return paramB;
   }
   template <typename ScaleT>
