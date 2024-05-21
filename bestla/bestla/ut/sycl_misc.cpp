@@ -117,6 +117,7 @@ class UT_CompFp32 {
   void ut_s4() {
     using GemmCore = sycl_gemm::xve::DefaultSGemmCore;
     ut<GemmCore>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, false);
+    ut<GemmCore>(1, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, false);
   }
 
   template <class GemmCore_T>
