@@ -276,7 +276,7 @@ static inline BTLA_CODE compress_7bit(const int8_t* srcptr, bestla::utils::bit4x
     tmp = tmp >> 4;
     bit2ptr[j / 4 + 1].d = tmp & 0x3;
     tmp = tmp >> 2;
-    bit1ptr[j / 8].f = tmp;
+    bit1ptr[j / 8].h = tmp;
   }
 
   return BTLA_CODE::Success;
