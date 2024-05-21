@@ -647,10 +647,17 @@ class gemm_universal_t<
         args.matA_base,
         {boundary_k, boundary_m, args.matA_ld},
         {start_k, start_m});
-    mem_desc_b.init(
-        args.matB_base,
-        {boundary_n / pack_ratio, boundary_k, args.matB_ld / pack_ratio},
-        {int(start_n / pack_ratio), start_k});
+    if constexpr (gemm_t::is_col_major_b) {
+      mem_desc_b.init(
+          args.matB_base,
+          {boundary_n, boundary_k / pack_ratio, args.matB_ld / pack_ratio},
+          {start_n, int(start_k / pack_ratio)});
+    } else {
+      mem_desc_b.init(
+          args.matB_base,
+          {boundary_n / pack_ratio, boundary_k, args.matB_ld / pack_ratio},
+          {int(start_n / pack_ratio), start_k});
+    }
 
     uint32_t scale_size_y = ((args.matrix_k + dequant_s - 1) / dequant_s);
     mem_desc_scale_t mem_desc_scale(
@@ -658,13 +665,18 @@ class gemm_universal_t<
         {args.matrix_n, scale_size_y, args.scale_ld},
         {start_x_scale, start_y_scale});
 
+    uint32_t inner_loop_start = (start_k + k_stride - 1) / k_stride;
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args;
     if constexpr (
         gemm_t::compute_policy::quant_type ==
         group::quant_mode::S4_FULLRANGE_NO_ZP) {
-      gemm_args =
-          gemm_args_t(mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
+      gemm_args = gemm_args_t(
+          mem_desc_a,
+          mem_desc_b,
+          inner_loop_start,
+          inner_loop_count,
+          mem_desc_scale);
     } else {
       mem_desc_zero_pt_t mem_desc_zero_pt(
           args.zero_pt_base,
@@ -675,6 +687,7 @@ class gemm_universal_t<
       gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,
+          inner_loop_start,
           inner_loop_count,
           mem_desc_scale,
           mem_desc_zero_pt);

@@ -52,16 +52,16 @@ class test_col_major {
  public:
   // Extract the parameters required by different test cases
   static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 16;
-  static constexpr size_t mat_k = 16;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 16 * 1;
+  static constexpr size_t wg_n = 16 * 2;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 16;
-  static constexpr size_t sg_k = 16;
-  static constexpr size_t dequant_s = 16;
+  static constexpr size_t sg_k = 32;
+  static constexpr size_t dequant_s = 128;
 
-  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t local_kslicing = 2;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
@@ -601,8 +601,7 @@ std::vector<data_type_acc_in> dequantize_weight(
     for (uint32_t j = 0; j < width; j += step) {
       int start_b_in = i * width + j;
       int start_zero_pt_in = start_b_in;
-      int start_scale_in =
-          layout_b == mem_layout::row_major ? 0 : start_b_in / step;
+      int start_scale_in = j / step * matrix_n + i;
 
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
@@ -618,6 +617,12 @@ std::vector<data_type_acc_in> dequantize_weight(
       }
     }
   }
+  // for (size_t i = 0; i < matrix_n; i++) {
+  //   for (size_t j = 0; j < matrix_k; j++) {
+  //     std::cout << " " << float(b_out[i * matrix_k + j]);
+  //   }
+  //   std::cout << std::endl;
+  // }
   return b_out;
 }
 
@@ -652,13 +657,13 @@ void dequantize_gemm_run(int iter) {
   constexpr size_t size_a = matrix_m * matrix_k;
   constexpr size_t size_b = matrix_k * matrix_n / 2;
 
-  constexpr size_t size_scale_m = matrix_k / dequant_s;
+  constexpr size_t size_scale_k = matrix_k / dequant_s;
   constexpr size_t size_scale_n = matrix_n;
-  constexpr size_t size_scale = size_scale_m * size_scale_n;
+  constexpr size_t size_scale = size_scale_k * size_scale_n;
 
-  constexpr size_t size_zero_pt_m = matrix_k / dequant_s;
+  constexpr size_t size_zero_pt_k = matrix_k / dequant_s;
   constexpr size_t size_zero_pt_n = matrix_n / 2;
-  constexpr size_t size_zero_pt = size_zero_pt_m * size_zero_pt_n;
+  constexpr size_t size_zero_pt = size_zero_pt_k * size_zero_pt_n;
 
   constexpr size_t size_c = matrix_m * matrix_n;
   constexpr size_t size_bias = matrix_n;
@@ -666,8 +671,10 @@ void dequantize_gemm_run(int iter) {
   uint32_t lda = layout_a == mem_layout::row_major ? matrix_k : matrix_m;
   uint32_t ldb = layout_b == mem_layout::row_major ? matrix_n : matrix_k;
   uint32_t ldc = matrix_n;
-  //     uint32_t ld_scale = size_scale_n;
-  //     uint32_t ld_zero_pt = size_zero_pt_n;
+  uint32_t ld_scale = size_scale_n;
+
+  // uint32_t ld_zero_pt = mem_layout::row_major ? size_zero_pt_n :
+  // size_zero_pt_k;
 
   // Turn on the enable_profiling property to facilitate subsequent profiling
   sycl::property_list properties{
@@ -811,7 +818,7 @@ void dequantize_gemm_run(int iter) {
   for (unsigned i = 0; i < size_scale; ++i) {
     scale_h[i] = random_float();
 #ifdef UT_DEBUG
-    scale_h[i] = i;
+    scale_h[i] = 1.f;
 #endif
   }
 
@@ -896,7 +903,7 @@ void dequantize_gemm_run(int iter) {
             C_d,
             ldc,
             scale_d,
-            matrix_n,
+            ld_scale,
             Acc_d,
             Cnt_d,
             epilogue_args);

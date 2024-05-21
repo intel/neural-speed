@@ -319,6 +319,8 @@ class gemm_t<
     /// @brief Is the memory description of matB, including base, shape and
     /// coordinate.
     mem_desc_b_t matB_base_desc;
+    /// @brief The tile starting from K-dim
+    uint32_t inner_loop_start;
     /// @brief Is the total inner loop count required to compute the entire
     /// K-dim.
     uint32_t inner_loop_count;
@@ -335,11 +337,13 @@ class gemm_t<
     inline arguments_t(
         mem_desc_a_t matA_desc,
         mem_desc_b_t matB_desc,
+        uint32_t loop_start,
         uint32_t loop_count,
         mem_desc_scale_t scale_desc,
         mem_desc_zero_pt_t zero_pt_desc)
         : matA_base_desc(matA_desc),
           matB_base_desc(matB_desc),
+          inner_loop_start(loop_start),
           inner_loop_count(loop_count),
           scale_base_desc(scale_desc),
           zero_pt_base_desc(zero_pt_desc) {}
@@ -347,10 +351,12 @@ class gemm_t<
     inline arguments_t(
         mem_desc_a_t matA_desc,
         mem_desc_b_t matB_desc,
+        uint32_t loop_start,
         uint32_t loop_count,
         mem_desc_scale_t scale_desc)
         : matA_base_desc(matA_desc),
           matB_base_desc(matB_desc),
+          inner_loop_start(loop_start),
           inner_loop_count(loop_count),
           scale_base_desc(scale_desc) {}
     // Be aware of the risks: Rule of three (copy constructor, copy assignment,
@@ -359,12 +365,14 @@ class gemm_t<
     inline arguments_t(const arguments_t& args)
         : matA_base_desc(args.matA_base_desc),
           matB_base_desc(args.matB_base_desc),
+          inner_loop_start(args.inner_loop_start),
           inner_loop_count(args.inner_loop_count),
           scale_base_desc(args.scale_base_desc),
           zero_pt_base_desc(args.zero_pt_base_desc) {}
     inline arguments_t& operator=(const arguments_t& args) {
       this->matA_base_desc = args.matA_base_desc;
       this->matB_base_desc = args.matB_base_desc;
+      this->inner_loop_start = args.inner_loop_start;
       this->inner_loop_count = args.inner_loop_count;
       this->scale_base_desc = args.scale_base_desc;
       this->zero_pt_base_desc = args.zero_pt_base_desc;
@@ -373,11 +381,13 @@ class gemm_t<
     inline void init(
         mem_desc_a_t matA_desc,
         mem_desc_b_t matB_desc,
+        uint32_t loop_start,
         uint32_t loop_count,
         mem_desc_scale_t scale_desc,
         mem_desc_zero_pt_t zero_pt_desc) {
       matA_base_desc = matA_desc;
       matB_base_desc = matB_desc;
+      inner_loop_start = loop_start;
       inner_loop_count = loop_count;
       scale_base_desc = scale_desc;
       zero_pt_base_desc = zero_pt_desc;
@@ -462,8 +472,8 @@ class gemm_t<
         sg_idx + barrier_count_y + nbarrier_base,
         nbarrier_role::producer_consumer);
 
-    int scale_prefetch_addr_i = args.matB_base_desc.coord.y;
-    int scale_load_addr_i = args.matB_base_desc.coord.y;
+    int scale_prefetch_addr_i = args.inner_loop_start;
+    int scale_load_addr_i = args.inner_loop_start;
     SW_BARRIER();
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
@@ -480,7 +490,7 @@ class gemm_t<
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             zero_pt_prefetch_payload);
       }
-      scale_prefetch_addr_i += dequant_s;
+      scale_prefetch_addr_i += k_stride;
       matA_prefetch_payload.template update_tdesc<update_dir_a>(
           matA_t::tile_size_x);
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
@@ -512,13 +522,12 @@ class gemm_t<
           matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           scale, scale_payload);
-      dump_mat(scale);
       if constexpr (
           compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
-      scale_load_addr_i += matB_t::tile_size_y;
+      scale_load_addr_i+= k_stride;
       SW_BARRIER();
       if constexpr (stages != 0) {
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -534,7 +543,7 @@ class gemm_t<
           subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
               zero_pt_prefetch_payload);
         }
-        scale_prefetch_addr_i += dequant_s;
+        scale_prefetch_addr_i += k_stride;
       }
       SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
@@ -542,7 +551,7 @@ class gemm_t<
       if ((scale_load_addr_i % dequant_s) == 0) {
         scale_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             scale_t::tile_size_y);
-        zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+        zero_pt_payload.template update_tdesc<update_dir_b>(
             zero_pt_t::tile_size_y);
       }
       if constexpr (stages != 0) {
@@ -625,12 +634,12 @@ class gemm_t<
               matB_blk.xetla_format<int8_t>() >> 4;
           cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
         }
-
+        constexpr uint32_t step = std::min(matB_acc_t::block_size_y, dequant_s);
 #pragma unroll
-        for (uint32_t k = 0; k < matB_acc_t::block_elems; k += dequant_s) {
-          dst_blk.xetla_select<dequant_s, 1>(k) =
-              cvt_blk_i32.xetla_select<dequant_s, 1>(k) *
-              scale.reg.xetla_select<1, 1>(k / dequant_s);
+        for (uint32_t k = 0; k < matB_acc_t::block_elems; k += step) {
+          dst_blk.xetla_select<step, 1>(k) =
+              cvt_blk_i32.xetla_select<step, 1>(k) *
+              scale.reg.xetla_select<1, 1>(k / step);
         }
       }
     }
