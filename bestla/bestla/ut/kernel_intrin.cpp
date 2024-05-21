@@ -1255,6 +1255,90 @@ class UT_avx2_decompress_s6_s8 {
 static UT_avx2_decompress_s6_s8 sUT_avx2_decompress_s6_s8;
 #endif
 
+class UT_avx2_decompress_s7_s8 {
+ public:
+  UT_avx2_decompress_s7_s8() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<1, 24>(32);
+    ut<4, 24>(32);
+    ut<1, 24>(32, true);
+    ut<2, 24>(32, true);
+    ut<4, 24>(32, true);
+  }
+
+  template <int PackRow, int NTILE>
+  void ut(int blocksize, bool isasym = false) {
+    int row = blocksize * 2;
+    int constexpr col = NTILE;
+    printf("Test Case %s: %d %d %d\n", __FUNCTION__, row, col, blocksize);
+    std::vector<utils::bit4x2> s4_wei(row * col / 2);
+    avector<utils::bit1x8> s1_wei(row * col / 8);
+    avector<utils::bit2x4> s2_wei(row * col / 4);
+
+    std::vector<int8_t> s8_wei(col * row);
+    std::vector<int8_t> s8_ref(col * row);
+    int blks = row / blocksize;
+    int row_offset = 8;
+    assert(blocksize % 8 == 0);
+    std::vector<int8_t> zp(col * blks);
+    fill_buffer_randn(zp.data(), zp.size(), int8_t(-64), int8_t(63));
+    std::vector<int8_t> rev(col * row);
+    fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-64), int8_t(63));
+
+    for (int i = 0; i < col * row; i += 8) {
+      memcpy(&s8_ref[i], &s8_wei[i], 8 * sizeof(int8_t));
+      s4_wei[i / 2].x = (s8_wei[i + 0] + 64) & 0xf;
+      s4_wei[i / 2].y = (s8_wei[i + 1] + 64) & 0xf;
+      s4_wei[i / 2 + 1].x = (s8_wei[i + 2] + 64) & 0xf;
+      s4_wei[i / 2 + 1].y = (s8_wei[i + 3] + 64) & 0xf;
+      s4_wei[i / 2 + 2].x = (s8_wei[i + 4] + 64) & 0xf;
+      s4_wei[i / 2 + 2].y = (s8_wei[i + 5] + 64) & 0xf;
+      s4_wei[i / 2 + 3].x = (s8_wei[i + 6] + 64) & 0xf;
+      s4_wei[i / 2 + 3].y = (s8_wei[i + 7] + 64) & 0xf;
+
+      s2_wei[i / 4].a = ((s8_wei[i + 0] + 64) & 0x30) >> 4;
+      s2_wei[i / 4].b = ((s8_wei[i + 1] + 64) & 0x30) >> 4;
+      s2_wei[i / 4].c = ((s8_wei[i + 2] + 64) & 0x30) >> 4;
+      s2_wei[i / 4].d = ((s8_wei[i + 3] + 64) & 0x30) >> 4;
+      s2_wei[i / 4 + 1].a = ((s8_wei[i + 4] + 64) & 0x30) >> 4;
+      s2_wei[i / 4 + 1].b = ((s8_wei[i + 5] + 64) & 0x30) >> 4;
+      s2_wei[i / 4 + 1].c = ((s8_wei[i + 6] + 64) & 0x30) >> 4;
+      s2_wei[i / 4 + 1].d = ((s8_wei[i + 7] + 64) & 0x30) >> 4;
+
+      s1_wei[i / 8].a = ((s8_wei[i + 0] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].b = ((s8_wei[i + 1] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].c = ((s8_wei[i + 2] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].d = ((s8_wei[i + 3] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].e = ((s8_wei[i + 4] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].f = ((s8_wei[i + 5] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].g = ((s8_wei[i + 6] + 64) & 0x40) >> 6;
+      s1_wei[i / 8].h = ((s8_wei[i + 7] + 64) & 0x40) >> 6;
+    }
+    if (isasym) {
+      for (int i = 0; i < row; i += PackRow) {
+        for (int j = 0; j < NTILE; j++) {
+          for (int ip = 0; ip < PackRow; ip++) {
+            s8_ref[i * NTILE + j * PackRow + ip] -= zp[i / blocksize * NTILE + j];
+          }
+        }
+      }
+    }
+
+    kernel::avx2::decompress_kblock_s7_s8<PackRow, NTILE>(s4_wei.data(), s2_wei.data(), s1_wei.data(),
+                                                         isasym ? zp.data() : nullptr, rev.data(), blocksize, NTILE, 0,
+                                                         0, row_offset, NTILE, cache, CacheSize);
+    kernel::avx2::decompress_kblock_s7_s8<PackRow, NTILE>(
+        s4_wei.data() + row_offset * NTILE / 2, s2_wei.data() + row_offset * NTILE / 4,
+        s1_wei.data() + row_offset * NTILE / 8, isasym ? zp.data() : nullptr, rev.data() + row_offset * NTILE,
+        blocksize, NTILE, 0, row_offset, row - row_offset, NTILE, cache, CacheSize);
+    ut::buffer_error(s8_ref.data(), rev.data(), rev.size(), int8_t(0));
+  }
+};
+#ifdef BTLA_UT_KERNEL_INTRIN
+#endif
+static UT_avx2_decompress_s7_s8 sUT_avx2_decompress_s7_s8;
+
 class UT_avx2_decompress_s5_s8 {
  public:
   UT_avx2_decompress_s5_s8() {

@@ -472,13 +472,12 @@ class DecompressKBlockS7S8 {
     //                                                               k_offset, row, col, (int8_t*)tmp, tmpsize);
     //     }
     // #endif
-    // #if CompileAVX2()
-    //     if constexpr (utils::isa_base<ISA_T>::avx2) {
-    //       return avx2::decompress_kblock_s6_s8<PackRow, NTILE>(b4ptr, b2ptr, zpptr, dstptr, blocksize, ldzp,
-    //       n_offset,
-    //                                                            k_offset, row, col, (int8_t*)tmp, tmpsize);
-    //     }
-    // #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::decompress_kblock_s7_s8<PackRow, NTILE>(b4ptr, b2ptr, b1ptr, zpptr, dstptr, blocksize, ldzp,
+                                                           n_offset, k_offset, row, col, (int8_t*)tmp, tmpsize);
+    }
+#endif
     return ref::decompress_kblock_s7_s8<PackRow, NTILE>(b4ptr, b2ptr, b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
                                                         k_offset, row, col, (int8_t*)tmp, tmpsize);
   }
@@ -627,13 +626,13 @@ class DecompressKBlockS7Fp {
     //                                                                     tmpsize);
     //     }
     // #endif
-    // #if CompileAVX2()
-    //     if constexpr (utils::isa_base<ISA_T>::avx2) {
-    //       return avx2::decompress_kblock_s6_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, dstptr, row, col, scales, sdtype,
-    //                                                                  zero_points, k_offset, n_offset, kblock, NPad,
-    //                                                                  reinterpret_cast<int8_t*>(tmp), tmpsize);
-    //     }
-    // #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::decompress_kblock_s7_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, b1ptr, dstptr, row, col, scales, sdtype,
+                                                                 zero_points, k_offset, n_offset, kblock, NPad,
+                                                                 reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
+#endif
     ret = ref::decompress_kblock_s7_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, b1ptr, dstptr, row, col, scales, sdtype,
                                                              zero_points, k_offset, n_offset, kblock, NPad,
                                                              reinterpret_cast<int8_t*>(tmp), tmpsize);
