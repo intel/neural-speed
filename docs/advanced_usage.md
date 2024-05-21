@@ -6,9 +6,9 @@ Argument description of run.py ([supported MatMul combinations](#supported-matri
 | Argument                    | Description                                                                                                   |
 | --------------              | ---------------------------------------------------------------------                                         |
 | model                       | Directory containing model file or model id: String                                                           |
-| --weight_dtype              | Data type of quantized weight: int4/int8/fp8(=fp8_e4m3)/fp8_e5m2/fp4(=fp4e2m1)/nf4 (default int4)                                                       |
+| --weight_dtype              | Data type of quantized weight: int4/int3/int2/int5/int6/int8/fp8(=fp8_e4m3)/fp8_e5m2/fp4(=fp4e2m1)/nf4 (default int4)                                                       |
 | --alg                       | Quantization algorithm: sym/asym (default sym)                                                                |
-| --group_size                | Group size: Int, 32/128/-1 (per channel) (default: 32)                                                                                 |
+| --group_size                | Group size: Int, 16/32/64/128/-1 (per channel) (default: 32)                                                                                 |
 | --scale_dtype               | Data type of scales: fp32/bf16/fp8 (default fp32)                                                                 |
 | --compute_dtype             | Data type of Gemm computation: int8/bf16/fp16/fp32 (default: fp32)                                                 |
 | --use_ggml                  | Enable ggml for quantization and inference                                                                    |
@@ -60,16 +60,16 @@ Argument description of quantize.py ([supported MatMul combinations](#supported-
 | --build_dir     | Path to the build file: String                               |
 | --config        | Path to the configuration file: String (default: "")         |
 | --nthread       | Number of threads to use: Int (default: 1)                   |
-| --weight_dtype  | Data type of quantized weight: int4/int8/fp8(=fp8_e4m3)/fp8_e5m2/fp4(=fp4_e2m1)/nf4 (default: int4)     |
+| --weight_dtype  | Data type of quantized weight: int4/int3/int2/int5/int6/int8/fp8(=fp8_e4m3)/fp8_e5m2/fp4(=fp4_e2m1)/nf4 (default: int4)     |
 | --alg           | Quantization algorithm to use: sym/asym (default: sym)       |
-| --group_size    | Group size: Int 32/128/-1 (per channel) (default: 32)                                |
+| --group_size    | Group size: Int 16/32/64/128/-1 (per channel) (default: 32)                                |
 | --scale_dtype   | Data type of scales: bf16/fp32/fp8 (default: fp32)               |
 | --compute_dtype | Data type of Gemm computation: int8/bf16/fp16/fp32 (default: fp32)|
 | --use_ggml      | Enable ggml for quantization and inference                   |
 
 #### Supported Matrix Multiplication Data Types Combinations
 
-Our Neural Speed supports  INT4 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 weight-only quantization and FP32 / FP16 / BF16 / INT8 computation forward matmul on the Intel platforms. Here are the all supported data types combinations for matmul operations (quantization and forward).
+Our Neural Speed supports  INT4 / INT3 / INT2 / INT5 / INT6 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 weight-only quantization and FP32 / FP16 / BF16 / INT8 computation forward matmul on the Intel platforms. Here are the all supported data types combinations for matmul operations (quantization and forward).
 > This table will be updated frequently due to active development. For details you can refer to [BesTLA](../bestla#weight-only)
 
 | Weight dtype | Compute dtype (default value) | Scale dtype (default value) | Quantization scheme (default value) |
@@ -77,6 +77,10 @@ Our Neural Speed supports  INT4 / INT8 / FP8 (E4M3, E5M2) / FP4 (E2M1) / NF4 wei
 | FP32 | FP32 | NA | NA |
 | INT8 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
 | INT4 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
+| INT3 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
+| INT2 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
+| INT5 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
+| INT6 | INT8 / BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym / asym (sym) |
 | FP8 (E4M3, E5M2) | BF16 / FP16 / FP32 (FP32) | FP8 (FP8) | sym (sym) |
 | FP4 (E2M1) | BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym (sym) |
 | NF4 | BF16 / FP16 / FP32 (FP32) | BF16 / FP32 (FP32) | sym (sym) |

@@ -274,27 +274,48 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
   auto thdptr = bestla_get_thread_handle();
 
   BTLA_DTYPE quant_type = BTLA_DTYPE::S4_CLIP;
-  if (params.bits == quant_bits::q3) {
-    quant_type = BTLA_DTYPE::S3_CLIP;
+  switch (params.bits) {
+    case quant_bits::q6:
+      quant_type = BTLA_DTYPE::S6_CLIP;
+      break;
+    case quant_bits::q5:
+      quant_type = BTLA_DTYPE::S5_CLIP;
+      break;
+    case quant_bits::q4:
+      quant_type = BTLA_DTYPE::S4_CLIP;
+      break;
+    case quant_bits::q3:
+      quant_type = BTLA_DTYPE::S3_CLIP;
+      break;
+    case quant_bits::q2:
+      quant_type = BTLA_DTYPE::S2_CLIP;
+      break;
+    case quant_bits::q1:
+      quant_type = BTLA_DTYPE::S1_CLIP;
+      break;
+    case quant_bits::q7:
+      quant_type = BTLA_DTYPE::S7_CLIP;
+      break;
+    case quant_bits::q8:
+      quant_type = BTLA_DTYPE::S8;
+      break;
+    case quant_bits::fp4_e2m1:
+      quant_type = BTLA_DTYPE::F4_E2M1;
+      break;
+    case quant_bits::nf4:
+      quant_type = BTLA_DTYPE::F4_NF4;
+      break;
+    case quant_bits::fp8_e4m3:
+      quant_type = BTLA_DTYPE::F8_E4M3;
+      break;
+    case quant_bits::fp8_e5m2:
+      quant_type = BTLA_DTYPE::F8_E5M2;
+      break;
+    default:
+      printf("Unsupported quant bits:%d, set to int4\n", int(quant_type));
+      break;
   }
-  if (params.bits == quant_bits::q2) {
-    quant_type = BTLA_DTYPE::S2_CLIP;
-  }
-  if (params.bits == quant_bits::q8) {
-    quant_type = BTLA_DTYPE::S8;
-  }
-  if (params.bits == quant_bits::fp4_e2m1) {
-    quant_type = BTLA_DTYPE::F4_E2M1;
-  }
-  if (params.bits == quant_bits::nf4) {
-    quant_type = BTLA_DTYPE::F4_NF4;
-  }
-  if (params.bits == quant_bits::fp8_e4m3) {
-    quant_type = BTLA_DTYPE::F8_E4M3;
-  }
-  if (params.bits == quant_bits::fp8_e5m2) {
-    quant_type = BTLA_DTYPE::F8_E5M2;
-  }
+
   auto dtype_type = static_cast<BTLA_DTYPE>(
       bestla::utils::bestla_dtype_get_mask_val(quant_type, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift));
   if (dtype_type == BTLA_DTYPE::TypeFloat) {
@@ -317,6 +338,10 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
       printf("Warning: fp8 weight only supports fp8 / fp32 scale now! Fall back to fp8.\n");
     }
     scale_type = BTLA_DTYPE::F8_E8M0;
+  }
+  if (quant_type == BTLA_DTYPE::S1_CLIP || quant_type == BTLA_DTYPE::S7_CLIP) {
+    printf("Current not support this data type, reset to int4\n");
+    quant_type = BTLA_DTYPE::S4_CLIP;
   }
   auto gsize = params.group_size == -1 ? k : params.group_size;
   auto size = BTLAGemmPackBSize(n, k, gsize, quant_type, scale_type, params.alg == quant_alg::asym, ctype, nullptr);

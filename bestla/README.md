@@ -22,7 +22,11 @@ BesTLA provides weight-only linear computational capabilities for LLM inference.
 | Weight dtype           |   Compute dtype    |    Scale dtype    |    algo    |
 | ---------------------- | :----------------: | :---------------: | :--------: |
 | INT8                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
-| INT4 (CLIP, FULLRANGE) | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT4                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT3                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT2                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT5                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT6                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | FP8 (E4M3, E5M2)       |    BF16 / FP32     | FP32 / FP8 (E8M0) |    sym     |
 | FP4 (E2M1)             |    BF16 / FP32     |    BF16 / FP32    |    sym     |
 | NF4                    |    BF16 / FP32     |    BF16 / FP32    |    sym     |
@@ -47,11 +51,32 @@ BesTLA provides assembly-level postop-fusion through epilogue to minimize the ov
 ## Compilation Requirements and Usage
 Compile: 
 
-- GCC version >=8.5.0 
-- CMake version >=3.5
+- GCC version >= 9.0
+- CMake version >= 3.12
+- MSVC version >= 1900
+- oneAPI version >= 2024.0
+
+Best Performance:
+
+- GCC >= 11.0.0
+- MSVC >= 1930
+- DPCPP >= 2024.0
+
 
 Usage:
 ```cmake
 add_subdirectory(bestla)
 target_link_libraries("${YOUR_PROJECT}" bestla::bestla)
 ```
+
+# Benchmark
+Build with:
+```shell
+mkdir build
+cd build
+cmake .. -DBTLA_UT_BENCHMARK=ON -DBTLA_UT_ALL=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j
+./bestla_benchmark
+```
+
+More template usages, please refer code in [bestla_benchmark](bestla/ut/bestla_benchmark.cpp)

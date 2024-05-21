@@ -166,11 +166,17 @@ class UT_BlockQunatize_F8 {
 static UT_BlockQunatize_F8 sUT_BlockQunatize_F8;
 #endif
 
-class UT_BlockQunatize_S3S4 {
+class UT_BlockQunatize_SN {
  public:
-  UT_BlockQunatize_S3S4() {
+  UT_BlockQunatize_SN() {
     UT_START();
     CheckISA(AVX2);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S6_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S6_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S6_CLIP);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S5_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S5_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S5_CLIP);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP, true);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S4_CLIP);
     ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S4_CLIP);
@@ -213,7 +219,7 @@ class UT_BlockQunatize_S3S4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-// static UT_BlockQunatize_S3S4 sUT_BlockQunatize_S3S4;
+// static UT_BlockQunatize_SN sUT_BlockQunatize_SN;
 #endif
 
 class UT_S3_WOQ {
@@ -637,6 +643,8 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
+    ut_s6();
+    ut_s5();
     ut_s4();
     ut_s2();
     ut_s3();
@@ -645,6 +653,7 @@ class UT_CompFp32 {
     ut_f4();
     ut_f8();
   }
+
   void ut_s2() {
     GetCPUDevice();
     if (_cd->AVX2()) {
@@ -691,6 +700,20 @@ class UT_CompFp32 {
                                                           false);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
                                                           false);
+
+    CheckISA(AVX512F);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                             true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                             true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
+                                                             false);
   }
 
   void ut_f8() {
@@ -705,6 +728,7 @@ class UT_CompFp32 {
     ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F8_E8M0);
     ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F32);
   }
+
   void ut_s4() {
     CheckISA(AVX2);
     ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
@@ -728,6 +752,72 @@ class UT_CompFp32 {
     ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
                                                              false);
     ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16,
+                                                             false);
+  }
+
+  void ut_s5() {
+    CheckISA(AVX2);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    CheckISA(AVX512F);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                             true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                             true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+  }
+
+  void ut_s6() {
+    CheckISA(AVX2);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16,
+                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                          false);
+    CheckISA(AVX512F);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                             true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16,
+                                                             false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
+                                                             true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
                                                              false);
   }
 
@@ -854,6 +944,8 @@ class UT_CompInt8 {
  public:
   UT_CompInt8() {
     UT_START();
+    ut_s6();
+    ut_s5();
     ut_s4();
     ut_s2();
     ut_s3();
@@ -861,6 +953,15 @@ class UT_CompInt8 {
 
   void ut_s2() {
     GetCPUDevice();
+    if (_cd->AVX2()) {
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+    }
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
@@ -882,10 +983,20 @@ class UT_CompInt8 {
       ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
     }
+    if (_cd->AMX_INT8()) {
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+    }
   }
 
   void ut_s3() {
     GetCPUDevice();
+    if (_cd->AVX2()) {
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+    }
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
@@ -899,6 +1010,10 @@ class UT_CompInt8 {
       ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
                                                            true);
       ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AMX_INT8()) {
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
     }
   }
 
@@ -935,6 +1050,67 @@ class UT_CompInt8 {
       ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP,
                                                          BTLA_DTYPE::DQ8_BNB);
+    }
+  }
+
+  void ut_s5() {
+    GetCPUDevice();
+    if (_cd->AVX2()) {
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AVX512_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 11008, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+    }
+
+    if (_cd->AMX_INT8()) {
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
+    }
+  }
+
+  void ut_s6() {
+    GetCPUDevice();
+    if (_cd->AVX2()) {
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AVX_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AVX512_VNNI()) {
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 11008, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+    }
+    if (_cd->AMX_INT8()) {
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
     }
   }
 
