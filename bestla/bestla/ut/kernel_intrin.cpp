@@ -1221,7 +1221,7 @@ class UT_avx2_decompress_s6_s8 {
     fill_buffer_randn(s8_wei.data(), s8_wei.size(), int8_t(-FullRange), int8_t(FullRange - 1));
 
     for (int i = 0; i < col * row; i += 4) {
-      memcpy(&s8_ref[i], &s8_wei[i], 8 * sizeof(int8_t));
+      memcpy(&s8_ref[i], &s8_wei[i], 4 * sizeof(int8_t));
       s4_wei[i / 2].x = (s8_wei[i + 0] + FullRange) & 0xf;
       s4_wei[i / 2].y = (s8_wei[i + 1] + FullRange) & 0xf;
       s4_wei[i / 2 + 1].x = (s8_wei[i + 2] + FullRange) & 0xf;
