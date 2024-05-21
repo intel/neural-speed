@@ -171,6 +171,9 @@ class UT_BlockQunatize_SN {
   UT_BlockQunatize_SN() {
     UT_START();
     CheckISA(AVX2);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S7_CLIP, true);
+    ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S7_CLIP);
+    ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S7_CLIP);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S6_CLIP, true);
     ut<sAVX2>(4096, 4096, 32, BTLA_DTYPE::S6_CLIP);
     ut<sAVX2>(4096, 4096, 128, BTLA_DTYPE::S6_CLIP);
@@ -219,8 +222,9 @@ class UT_BlockQunatize_SN {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 // no proper threshold for this UT
-// static UT_BlockQunatize_SN sUT_BlockQunatize_SN;
+// 
 #endif
+static UT_BlockQunatize_SN sUT_BlockQunatize_SN;
 
 class UT_S3_WOQ {
  public:
