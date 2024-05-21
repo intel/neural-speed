@@ -6119,7 +6119,7 @@ static inline BTLA_CODE gemv_7bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   for (int i = 0; i < NReg * MReg; i++) {
     acc[i] = _mm256_setzero_ps();
   }
-  int constexpr FullRange = 1 << (6 - 1);
+  int constexpr FullRange = 1 << (7 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
   auto vbias = _mm256_set1_epi8(FullRange);

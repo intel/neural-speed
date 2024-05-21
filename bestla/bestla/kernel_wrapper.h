@@ -1216,26 +1216,31 @@ class GEMVWoqNBits {
 #endif
       return ref::gemv_2bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
+    if (B.nbits == 7) {
+// #if CompileAVX512VNNI()
+//       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+//         return avx512f::vnni::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+//                                                                         tmpsize);
+//       }
+// #endif
+#if CompileAVXVNNI()
+      if (ISA_T >= BTLA_ISA::AVX_VNNI) {
+        return avx2::vnni::gemv_7bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
+#if CompileAVX2()
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_7bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
+      return ref::gemv_7bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
     return BTLA_CODE::NotSupport;
   }
 
   template <BTLA_ISA ISA_T, typename ScaleT, int NTILE, int MTILE>
   static inline BTLA_CODE forward_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int ldc, int k, int blocksize, void* tmp, size_t tmpsize) {
-    if (B.nbits == 6) {
-#if CompileAVX512VNNI()
-      if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
-        return avx512f::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
-                                                                        tmpsize);
-      }
-#endif
-#if CompileAVXVNNI()
-      if (ISA_T >= BTLA_ISA::AVX_VNNI) {
-        return avx2::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
-      }
-#endif
-      return ref::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
-    }
     if (B.nbits == 5) {
 #if CompileAVX512VNNI()
       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
@@ -1291,6 +1296,34 @@ class GEMVWoqNBits {
       }
 #endif
       return ref::gemv_2bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    if (B.nbits == 6) {
+#if CompileAVX512VNNI()
+      if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+        return avx512f::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+                                                                        tmpsize);
+      }
+#endif
+#if CompileAVXVNNI()
+      if (ISA_T >= BTLA_ISA::AVX_VNNI) {
+        return avx2::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
+      return ref::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    if (B.nbits == 7) {
+// #if CompileAVX512VNNI()
+//       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+//         return avx512f::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+//                                                                         tmpsize);
+//       }
+// #endif
+#if CompileAVXVNNI()
+      if (ISA_T >= BTLA_ISA::AVX_VNNI) {
+        return avx2::vnni::gemv_7bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
+      return ref::gemv_7bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
   }
@@ -1367,6 +1400,20 @@ class GEMVWoqNBits {
       }
 #endif
       return ref::gemv_2bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    if (B.nbits == 7) {
+//#if CompileAVX512F()
+//      if (ISA_T >= BTLA_ISA::AVX512F) {
+//        return avx512f::gemv_6bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp,
+//                                                                  tmpsize);
+//      }
+//#endif
+#if CompileAVX2()
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_7bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
+      return ref::gemv_7bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
   }

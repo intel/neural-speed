@@ -2704,8 +2704,8 @@ class UT_avx2_gemv {
                                iasym ? bzp.data() : nullptr,
                                7,
                                n};
-    kernel::avx2::vnni::gemv_7bit_s8s8_fp32<float, 24, MTILE>({(uint8_t*)A.data(), scalea.data(), azp.data(), k, blks},
-                                                              B, Cf32.data(), n, k, kblock, cache, CacheSize);
+    kernel::avx2::vnni::gemv_7bit_s8s8_fp32<float, 24, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks}, B,
+                                                              Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 };
