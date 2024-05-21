@@ -213,7 +213,7 @@ class UT_avx512_decompress_s6_s8 {
  public:
   UT_avx512_decompress_s6_s8() {
     UT_START();
-    CheckISA(AVX2);
+    CheckISA(AVX512F);
     ut<1, 48>(32);
     ut<4, 48>(32);
     ut<1, 48>(32, true);
