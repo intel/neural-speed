@@ -628,6 +628,8 @@ class WeightKBlockNInteger {
     if (qtype == BTLA_DTYPE::S4_CLIP) return compressBit4Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::S3_CLIP) return compressBit3Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::S2_CLIP) return compressBit2Weight(N, K, B, dstptr, qtype, threading);
+    if (qtype == BTLA_DTYPE::F4_BNB || qtype == BTLA_DTYPE::F4_NF4 || qtype == BTLA_DTYPE::F4_E2M1)
+      return compressBit4Weight(N, K, B, dstptr, qtype, threading);
   }
 
   template <typename RED_T>

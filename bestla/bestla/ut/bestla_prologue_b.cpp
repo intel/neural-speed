@@ -411,7 +411,7 @@ class UT_TransposeBlockQuantize_F4 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;
+static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4; 
 #endif
 
 class UT_BlockQuantize_INT4 {
