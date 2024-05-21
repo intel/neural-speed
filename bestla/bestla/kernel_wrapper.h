@@ -456,12 +456,12 @@ class DecompressKBlockS6S8 {
   static inline BTLA_CODE forward(utils::bit4x2* b4ptr, utils::bit2x4* b2ptr, int8_t* zpptr, int8_t* dstptr,
                                   int blocksize, int ldzp, int n_offset, int k_offset, int row, int col, void* tmp,
                                   size_t tmpsize) {
-// #if CompileAVX512F()
-//     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-//       return avx512f::decompress_kblock_s5_s8<PackRow, NTILE>(b4ptr, b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
-//                                                               k_offset, row, col, (int8_t*)tmp, tmpsize);
-//     }
-// #endif
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::decompress_kblock_s6_s8<PackRow, NTILE>(b4ptr, b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
+                                                              k_offset, row, col, (int8_t*)tmp, tmpsize);
+    }
+#endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_s6_s8<PackRow, NTILE>(b4ptr, b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
@@ -583,15 +583,13 @@ class DecompressKBlockS6Fp {
                                   void* scales, BTLA_DTYPE sdtype, int8_t* zero_points, int k_offset, int n_offset,
                                   int kblock, int NPad, void* tmp, size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
-    // #if CompileAVX512F()
-    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-    //       return avx512f::decompress_kblock_s5_fp<PackRow, NTILE, DstT>(b4ptr, b1ptr, dstptr, row, col, scales,
-    //       sdtype,
-    //                                                                     zero_points, k_offset, n_offset, kblock,
-    //                                                                     NPad, reinterpret_cast<int8_t*>(tmp),
-    //                                                                     tmpsize);
-    //     }
-    // #endif
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::decompress_kblock_s6_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, dstptr, row, col, scales, sdtype,
+                                                                    zero_points, k_offset, n_offset, kblock, NPad,
+                                                                    reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
+#endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_s6_fp<PackRow, NTILE, DstT>(b4ptr, b2ptr, dstptr, row, col, scales, sdtype,
@@ -1059,12 +1057,12 @@ class GEMVWoqNBits {
   static inline BTLA_CODE forward_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int ldc, int k, int blocksize, void* tmp, size_t tmpsize) {
     if (B.nbits == 6) {
-//#if CompileAVX512VNNI()
-//      if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
-//        return avx512f::vnni::gemv_5bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
-//                                                                        tmpsize);
-//      }
-//#endif
+#if CompileAVX512VNNI()
+      if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+        return avx512f::vnni::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+                                                                        tmpsize);
+      }
+#endif
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
@@ -1160,12 +1158,12 @@ class GEMVWoqNBits {
   static inline BTLA_CODE forward_s8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int ldc, int k, int blocksize, void* tmp, size_t tmpsize) {
     if (B.nbits == 6) {
-//#if CompileAVX512VNNI()
-//      if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
-//        return avx512f::vnni::gemv_5bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
-//                                                                        tmpsize);
-//      }
-//#endif
+#if CompileAVX512VNNI()
+      if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+        return avx512f::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+                                                                        tmpsize);
+      }
+#endif
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_6bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
@@ -1236,12 +1234,12 @@ class GEMVWoqNBits {
   static inline BTLA_CODE forward_fp32_fp32(const float* A, int lda, const utils::GemvParamB<ScaleT>& B, float* C,
                                             int ldc, int k, int blocksize, void* tmp, size_t tmpsize) {
     if (B.nbits == 6) {
-//#if CompileAVX512F()
-//      if (ISA_T >= BTLA_ISA::AVX512F) {
-//        return avx512f::gemv_5bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp,
-//                                                                  tmpsize);
-//      }
-//#endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_6bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp,
+                                                                  tmpsize);
+      }
+#endif
 #if CompileAVX2()
       if (ISA_T >= BTLA_ISA::AVX2) {
         return avx2::gemv_6bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
