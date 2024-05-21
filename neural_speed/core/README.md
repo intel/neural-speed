@@ -24,6 +24,8 @@ dtype | algo | group size
 int4 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int3 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int2 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
+int5 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
+int6 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int8 | symmetric | multiplier of 8, -1<sup>1</sup>
 fp4 | | multiplier of 8
 nf4 | | multiplier of 8
@@ -71,16 +73,16 @@ Referring [the fused-attention doc for details](../docs/fused_attention.md#suppo
     </tbody>
 </table>
 
-## Fastest Configuration for CPUs
+## Recommended Configuration for CPUs
 codename | weight config | runtime ISA
 ---|---|---
-Sapphire Rapids<br>Emerald Rapids | any int4<br>group size=-1<br>compute type=int8 | AMX_INT8
-Ice Lake<br>Cascade Lake<br>Cooper Lake<br>Tiger Lake<br>Rocket Lake | any int4<br>group size=-1<br>compute type=int8 | AVX512_VNNI
-Skylake |  any 4bits<br>group size=-1<br>compute type=fp32 | AVX512F
-Alder Lake (12th Gen)<br>Raptor Lake (13th and 14th Gen)|any 4bits<br>group size=-1<br>compute type=int8 | AVX_VNNI
-Older architecture (before 12th Gen)|  any 4bits<br>group size=-1<br>compute type=int8 | AVX2
+Sapphire Rapids<br>Emerald Rapids | sym int3<br>group size=128<br>compute type=int8 | AMX_INT8
+Ice Lake<br>Cascade Lake<br>Cooper Lake<br>Tiger Lake<br>Rocket Lake | sym int3<br>group size=128<br>compute type=int8 | AVX512_VNNI
+Skylake |  sym int3<br>group size=128<br>compute type=fp32 | AVX512F
+Alder Lake (12th Gen)<br>Raptor Lake (13th and 14th Gen)| sym int3<br>group size=128<br>compute type=int8 | AVX_VNNI
+Older architecture (before 12th Gen)|  sym int3<br>group size=128<br>compute type=int8 | AVX2
 
 NOTE:  
-1. group_size=-1 requires the INC's finetuned model, or it may have lower accuracy than small group sizes.  
+1. group_size=-1 requires the INC's finetuned model, or it may have lower accuracy than small group sizes. It has the smallest model size, and the fastest first-token performance.
 2. group_size=128 is a balance of accuracy and speed if you want RTN quantization only.  
 3. group_size=32, scale_dtype=bf16, compute_dtype=int8, alg=sym equals llama.cpp's Q4_0.
