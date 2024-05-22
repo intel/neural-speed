@@ -591,13 +591,12 @@ class DecompressKBlockS1S8 {
   template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(utils::bit1x8* b1ptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                   int n_offset, int k_offset, int row, int col, void* tmp, size_t tmpsize) {
-    // #if CompileAVX512F()
-    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-    //       return avx512f::decompress_kblock_s2_s8<PackRow, NTILE>(b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
-    //       k_offset,
-    //                                                               row, col, (int8_t*)tmp, tmpsize);
-    //     }
-    // #endif
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::decompress_kblock_s1_s8<PackRow, NTILE>(b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset,
+                                                              row, col, (int8_t*)tmp, tmpsize);
+    }
+#endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_s1_s8<PackRow, NTILE>(b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset,
@@ -822,15 +821,13 @@ class DecompressKBlockS1Fp {
                                   int8_t* zero_points, int k_offset, int n_offset, int kblock, int NPad, void* tmp,
                                   size_t tmpsize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
-    // #if CompileAVX512F()
-    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-    //       return avx512f::decompress_kblock_s3_fp<PackRow, NTILE, DstT>(b2ptr, b1ptr, dstptr, row, col, scales,
-    //       sdtype,
-    //                                                                     zero_points, k_offset, n_offset, kblock,
-    //                                                                     NPad, reinterpret_cast<int8_t*>(tmp),
-    //                                                                     tmpsize);
-    //     }
-    // #endif
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::decompress_kblock_s1_fp<PackRow, NTILE, DstT>(b1ptr, dstptr, row, col, scales, sdtype,
+                                                                    zero_points, k_offset, n_offset, kblock, NPad,
+                                                                    reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
+#endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
       return avx2::decompress_kblock_s1_fp<PackRow, NTILE, DstT>(b1ptr, dstptr, row, col, scales, sdtype, zero_points,
