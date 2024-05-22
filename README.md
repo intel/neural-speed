@@ -3,7 +3,7 @@
 Neural Speed is an innovative library designed to support the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor). The work is inspired by [llama.cpp](https://github.com/ggerganov/llama.cpp) and further optimized for Intel platforms with our innovations in [NeurIPS' 2023](https://arxiv.org/abs/2311.00502)
 
 ## Key Features
-- Highly optimized low-precision kernels on CPUs with ISAs (AMX, VNNI, AVX512F, AVX_VNNI and AVX2). See [details](neural_speed/core/README.md)
+- Highly optimized kernels on CPUs with ISAs (AMX, VNNI, AVX512F, AVX_VNNI and AVX2) for N-bit weight (int1, int2, int3, int4, int5, int6, int7 and int8). See [details](neural_speed/core/README.md)
 - Up to 40x performance speedup on popular LLMs compared with llama.cpp. See [details](https://medium.com/@NeuralCompressor/llm-performance-of-intel-extension-for-transformers-f7d061556176) 
 - Tensor parallelism across sockets/nodes on CPUs. See [details](./docs/tensor_parallelism.md)
 

@@ -88,6 +88,7 @@ static int8_t cache[CacheSize];
 #define INT4_ERR 3.5f
 #define INT3_ERR 7.f
 #define INT2_ERR 18.f
+#define INT1_ERR 1e3f
 #define FP4_ERR 3.5f
 
 static inline float get_ut_err(BTLA_DTYPE qtype) {
@@ -102,6 +103,8 @@ static inline float get_ut_err(BTLA_DTYPE qtype) {
       err = INT3_ERR;
     } else if (dbits == 2) {
       err = INT2_ERR;
+    } else if (dbits == 1) {
+      err = INT1_ERR;
     } else {
       err = INT4_ERR;
     }

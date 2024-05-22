@@ -441,6 +441,7 @@ class UTWOQ_CompFp32 {
  public:
   UTWOQ_CompFp32() {
     UT_START();
+    ut_s1();
     ut_s7();
     ut_s6();
     /*ut_s5();
@@ -449,6 +450,10 @@ class UTWOQ_CompFp32 {
     ut_s3();*/
     // ut_s8();
     // ut_f4();
+  }
+  void ut_s1() {
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S1_CLIP);
   }
   void ut_s2() {
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S2_CLIP);
@@ -691,6 +696,7 @@ class UTWOQ_CompInt8 {
  public:
   UTWOQ_CompInt8() {
     UT_START();
+    ut_s1();
     ut_s7();
     ut_s6();
     /*ut_s5();
@@ -698,6 +704,13 @@ class UTWOQ_CompInt8 {
     ut_s4();
     ut_s3();*/
     //   ut_s8();
+  }
+  void ut_s1() {
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP, true);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S1_CLIP);*/
   }
 
   void ut_s2() {

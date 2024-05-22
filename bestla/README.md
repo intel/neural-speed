@@ -28,6 +28,7 @@ BesTLA provides weight-only linear computational capabilities for LLM inference.
 | INT5                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | INT6                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | INT7                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT1                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | FP8 (E4M3, E5M2)       |    BF16 / FP32     | FP32 / FP8 (E8M0) |    sym     |
 | FP4 (E2M1)             |    BF16 / FP32     |    BF16 / FP32    |    sym     |
 | NF4                    |    BF16 / FP32     |    BF16 / FP32    |    sym     |
@@ -49,6 +50,11 @@ BesTLA provides assembly-level postop-fusion through epilogue to minimize the ov
 - RELU
 - EXP
 - TANH
+
+## Optimized thread pool for hybrid CPUs
+Our thread pool is optimized for hybrid CPUs (client CPUs after Core 11th). It will be much faster than OMP thread pool.
+Recommend to use all threads and cores on hybrid CPU: P cores * 2 + E cores.
+
 ## Compilation Requirements and Usage
 Compile: 
 
@@ -67,7 +73,7 @@ Best Performance:
 Usage:
 ```cmake
 add_subdirectory(bestla)
-target_link_libraries("${YOUR_PROJECT}" bestla::bestla)
+target_link_libraries("${YOUR_PROJECT}" neural_speed::bestla)
 ```
 
 # Benchmark
