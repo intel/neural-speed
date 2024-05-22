@@ -564,6 +564,11 @@ class UT_avx512_gemv {
   UT_avx512_gemv() {
     UT_START();
     CheckISA(AVX512F);
+    ut_1bit_fp32<1>(48, 128, 32, true);
+    ut_1bit_fp32<1>(48, 128, 32, false);
+    ut_1bit_fp32<4>(48, 128, 32, true);
+    ut_1bit_fp32<4>(48, 128, 32, false);
+
     ut_7bit_fp32<1>(48, 128, 32, true);
     ut_7bit_fp32<1>(48, 128, 32, false);
     ut_7bit_fp32<4>(48, 128, 32, true);
@@ -595,6 +600,17 @@ class UT_avx512_gemv {
     ut_2bit_fp32<4>(48, 128, 32, false);
 
     CheckISA(AVX512_VNNI);
+    ut_1bit_u8s8<1>(48, 128, 32, true);
+    ut_1bit_u8s8<1>(48, 128, 32, false);
+    ut_1bit_u8s8<4>(48, 128, 32, true);
+    ut_1bit_u8s8<4>(48, 128, 32, false);
+
+    ut_1bit_s8s8<1>(48, 128, 32, true);
+    ut_1bit_s8s8<1>(48, 128, 32, false);
+    ut_1bit_s8s8<4>(48, 128, 32, true);
+    ut_1bit_s8s8<4>(48, 128, 32, false);
+
+
     ut_4bit<1>(48, 128, 32, true);
     ut_4bit<1>(48, 128, 32, false);
     ut_4bit<4>(48, 128, 32, false);
@@ -654,6 +670,142 @@ class UT_avx512_gemv {
     ut_7bit_u8s8<1>(48, 128, 32, false);
     ut_7bit_u8s8<4>(48, 128, 32, true);
     ut_7bit_u8s8<4>(48, 128, 32, false);
+  }
+
+  template <int MTILE>
+  void ut_1bit_fp32(int n, int k, int kblock, bool iasym) {
+    printf("Test Case %s_%d: %d %d %d Asym:%d\n", __FUNCTION__, MTILE, n, k, kblock, iasym);
+    int blks = k / kblock;
+    avector<bit1x8> b1(n * k / 8);
+    avector<float> scaleb(n * blks), scalea(MTILE * blks);
+    avector<int8_t> bzp(n * blks);
+    avector<float> Af32(MTILE * k), Bf32(n * k), Cf32(MTILE * n), Cref(MTILE * n);
+    fill_buffer_randn((uint8_t*)b1.data(), b1.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(Af32.data(), Af32.size(), -0.5f, 0.5f);
+    fill_buffer_randn(bzp.data(), bzp.size(), int8_t(-1), int8_t(0));
+    fill_buffer_randn(scaleb.data(), scaleb.size(), 0.01f, 0.02f);
+    avector<int8_t> b8(n * k);
+    kernel::ref::decompress_s1_s8(b1.data(), b8.data(), b8.size(), cache, CacheSize);
+    for (int i = 0; i < k; i += 1) {
+      int bid = i / kblock;
+      for (int j = 0; j < n; j += 4) {
+        if (iasym) {
+          Bf32[(i)*n + j + 0] = (b8[(i)*n + j + 0] - bzp[bid * n + j + 0]) * scaleb[bid * n + j + 0];
+          Bf32[(i)*n + j + 1] = (b8[(i)*n + j + 1] - bzp[bid * n + j + 1]) * scaleb[bid * n + j + 1];
+          Bf32[(i)*n + j + 2] = (b8[(i)*n + j + 2] - bzp[bid * n + j + 2]) * scaleb[bid * n + j + 2];
+          Bf32[(i)*n + j + 3] = (b8[(i)*n + j + 3] - bzp[bid * n + j + 3]) * scaleb[bid * n + j + 3];
+        } else {
+          Bf32[(i)*n + j + 0] = (b8[(i)*n + j + 0]) * scaleb[bid * n + j + 0];
+          Bf32[(i)*n + j + 1] = (b8[(i)*n + j + 1]) * scaleb[bid * n + j + 1];
+          Bf32[(i)*n + j + 2] = (b8[(i)*n + j + 2]) * scaleb[bid * n + j + 2];
+          Bf32[(i)*n + j + 3] = (b8[(i)*n + j + 3]) * scaleb[bid * n + j + 3];
+        }
+      }
+    }
+    gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
+    utils::GemvParamB<float> B{nullptr, nullptr, (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr,
+                               1,       n};
+    kernel::avx512f::gemv_1bit_fp32_fp32<float, 48, MTILE>(Af32.data(), k, B, Cf32.data(), n, k, kblock, cache, CacheSize);
+    buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
+  }
+
+  template <int MTILE>
+  void ut_1bit_u8s8(int n, int k, int kblock, bool iasym) {
+    printf("Test Case %s_%d: %d %d %d Asym:%d\n", __FUNCTION__, MTILE, n, k, kblock, iasym);
+    int blks = k / kblock;
+    avector<bit1x8> b1(n * k / 8);
+    avector<float> scaleb(n * blks), scalea(MTILE * blks);
+    avector<int8_t> bzp(n * blks);
+    avector<float> Af32(MTILE * k), Bf32(n * k), Cf32(MTILE * n), Cref(MTILE * n);
+    fill_buffer_randn((uint8_t*)b1.data(), b1.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(bzp.data(), bzp.size(), int8_t(-1), int8_t(0));
+    fill_buffer_randn(scaleb.data(), scaleb.size(), 0.01f, 0.02f);
+    avector<uint8_t> A(MTILE * k), azp(MTILE * blks);
+    fill_buffer_randn(A.data(), A.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(azp.data(), azp.size(), uint8_t(100), uint8_t(150));
+    fill_buffer_randn(scalea.data(), scalea.size(), 0.01f, 0.02f);
+    for (int im = 0; im < MTILE; im++) {
+      for (int i = 0; i < k; i += 4) {
+        int bid = i / kblock + im * blks;
+        for (int j = 0; j < 4; j++) {
+          Af32[im * k + i + j] = (int(A[im * k + i + j]) - azp[bid]) * scalea[bid];
+        }
+      }
+    }
+
+    avector<int8_t> b8(n * k);
+    kernel::ref::decompress_s1_s8(b1.data(), b8.data(), b8.size(), cache, CacheSize);
+    for (int i = 0; i < k; i += 4) {
+      int bid = i / kblock;
+      for (int j = 0; j < n; j += 1) {
+        if (iasym) {
+          Bf32[(i + 0) * n + j] = (int(b8[i * n + j * 4 + 0]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+          Bf32[(i + 1) * n + j] = (int(b8[i * n + j * 4 + 1]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+          Bf32[(i + 2) * n + j] = (int(b8[i * n + j * 4 + 2]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+          Bf32[(i + 3) * n + j] = (int(b8[i * n + j * 4 + 3]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+        } else {
+          Bf32[(i + 0) * n + j] = (int(b8[i * n + j * 4 + 0])) * scaleb[bid * n + j];
+          Bf32[(i + 1) * n + j] = (int(b8[i * n + j * 4 + 1])) * scaleb[bid * n + j];
+          Bf32[(i + 2) * n + j] = (int(b8[i * n + j * 4 + 2])) * scaleb[bid * n + j];
+          Bf32[(i + 3) * n + j] = (int(b8[i * n + j * 4 + 3])) * scaleb[bid * n + j];
+        }
+      }
+    }
+    gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
+    utils::GemvParamB<float> B{nullptr, nullptr, (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr,
+                               2,       n};
+    kernel::avx512f::vnni::gemv_1bit_u8s8_fp32<float, 48, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B,
+                                                              Cf32.data(), n, k, kblock, cache, CacheSize);
+    buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
+  }
+
+  template <int MTILE>
+  void ut_1bit_s8s8(int n, int k, int kblock, bool iasym) {
+    printf("Test Case %s_%d: %d %d %d Asym:%d\n", __FUNCTION__, MTILE, n, k, kblock, iasym);
+    int blks = k / kblock;
+    avector<bit1x8> b1(n * k / 8);
+    avector<float> scaleb(n * blks), scalea(MTILE * blks);
+    avector<int8_t> bzp(n * blks);
+    avector<float> Af32(MTILE * k), Bf32(n * k), Cf32(MTILE * n), Cref(MTILE * n);
+    fill_buffer_randn((uint8_t*)b1.data(), b1.size(), uint8_t(0), uint8_t(255));
+    fill_buffer_randn(bzp.data(), bzp.size(), int8_t(-1), int8_t(0));
+    fill_buffer_randn(scaleb.data(), scaleb.size(), 0.01f, 0.02f);
+    avector<int8_t> A(MTILE * k);
+    fill_buffer_randn(A.data(), A.size(), int8_t(0), int8_t(127));
+    fill_buffer_randn(scalea.data(), scalea.size(), 0.01f, 0.02f);
+    for (int im = 0; im < MTILE; im++) {
+      for (int i = 0; i < k; i += 4) {
+        int bid = i / kblock + im * blks;
+        for (int j = 0; j < 4; j++) {
+          Af32[im * k + i + j] = (int(A[im * k + i + j])) * scalea[bid];
+        }
+      }
+    }
+
+    avector<int8_t> b8(n * k);
+    kernel::ref::decompress_s1_s8(b1.data(), b8.data(), b8.size(), cache, CacheSize);
+    for (int i = 0; i < k; i += 4) {
+      int bid = i / kblock;
+      for (int j = 0; j < n; j += 1) {
+        if (iasym) {
+          Bf32[(i + 0) * n + j] = (int(b8[i * n + j * 4 + 0]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+          Bf32[(i + 1) * n + j] = (int(b8[i * n + j * 4 + 1]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+          Bf32[(i + 2) * n + j] = (int(b8[i * n + j * 4 + 2]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+          Bf32[(i + 3) * n + j] = (int(b8[i * n + j * 4 + 3]) - bzp[bid * n + j]) * scaleb[bid * n + j];
+        } else {
+          Bf32[(i + 0) * n + j] = (int(b8[i * n + j * 4 + 0])) * scaleb[bid * n + j];
+          Bf32[(i + 1) * n + j] = (int(b8[i * n + j * 4 + 1])) * scaleb[bid * n + j];
+          Bf32[(i + 2) * n + j] = (int(b8[i * n + j * 4 + 2])) * scaleb[bid * n + j];
+          Bf32[(i + 3) * n + j] = (int(b8[i * n + j * 4 + 3])) * scaleb[bid * n + j];
+        }
+      }
+    }
+    gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
+    utils::GemvParamB<float> B{nullptr, nullptr, (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr,
+                               2,       n};
+    kernel::avx512f::vnni::gemv_1bit_s8s8_fp32<float, 48, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks}, B,
+                                                              Cf32.data(), n, k, kblock, cache, CacheSize);
+    buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
   template <int MTILE>
