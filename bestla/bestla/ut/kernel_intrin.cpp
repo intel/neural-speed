@@ -592,7 +592,6 @@ class UT_avx512_gemv {
     ut_7bit_u8s8<1>(48, 128, 32, false);
     ut_7bit_u8s8<4>(48, 128, 32, true);
     ut_7bit_u8s8<4>(48, 128, 32, false);
-
   }
 
   template <int MTILE>
@@ -755,7 +754,7 @@ class UT_avx512_gemv {
                                7,
                                n};
     kernel::avx512f::vnni::gemv_7bit_u8s8_fp32<float, 48, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B,
-                                                              Cf32.data(), n, k, kblock, cache, CacheSize);
+                                                                 Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
