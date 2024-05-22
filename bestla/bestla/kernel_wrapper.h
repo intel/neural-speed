@@ -1185,6 +1185,12 @@ class GEMVWoqNBits {
                                                                         tmpsize);
       }
 #endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+                                                                        tmpsize);
+      }
+#endif
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
@@ -1202,6 +1208,11 @@ class GEMVWoqNBits {
       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
         return avx512f::vnni::gemv_5bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
                                                                         tmpsize);
+      }
+#endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_5bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
 #endif
 #if CompileAVXVNNI()
@@ -1223,6 +1234,11 @@ class GEMVWoqNBits {
                                                                         tmpsize);
       }
 #endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_4bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_4bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
@@ -1240,6 +1256,11 @@ class GEMVWoqNBits {
       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
         return avx512f::vnni::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
                                                                         tmpsize);
+      }
+#endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
 #endif
 #if CompileAVXVNNI()
@@ -1261,6 +1282,11 @@ class GEMVWoqNBits {
                                                                         tmpsize);
       }
 #endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_2bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_2bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
@@ -1280,6 +1306,11 @@ class GEMVWoqNBits {
                                                                         tmpsize);
       }
 #endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_7bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
 #if CompileAVXVNNI()
       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
         return avx2::vnni::gemv_7bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
@@ -1297,6 +1328,11 @@ class GEMVWoqNBits {
       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
         return avx512f::vnni::gemv_1bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
                                                                         tmpsize);
+      }
+#endif
+#if CompileAVX512F()
+      if (ISA_T >= BTLA_ISA::AVX512F) {
+        return avx512f::gemv_1bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
 #endif
 #if CompileAVXVNNI()
