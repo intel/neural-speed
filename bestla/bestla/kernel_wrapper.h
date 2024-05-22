@@ -1309,12 +1309,11 @@ class GEMVWoqNBits {
       //         tmpsize);
       //       }
       // #endif
-      // #if CompileAVX2()
-      //       if (ISA_T >= BTLA_ISA::AVX2) {
-      //         return avx2::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
-      //         tmpsize);
-      //       }
-      // #endif
+#if CompileAVX2()
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_1bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
       return ref::gemv_1bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
@@ -1415,12 +1414,11 @@ class GEMVWoqNBits {
       //                                                                         tmpsize);
       //       }
       // #endif
-      // #if CompileAVXVNNI()
-      //       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
-      //         return avx2::vnni::gemv_5bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
-      //         tmpsize);
-      //       }
-      // #endif
+#if CompileAVXVNNI()
+      if (ISA_T >= BTLA_ISA::AVX_VNNI) {
+        return avx2::vnni::gemv_1bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
       return ref::gemv_1bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
@@ -1521,12 +1519,11 @@ class GEMVWoqNBits {
       //                                                                   tmpsize);
       //       }
       // #endif
-      // #if CompileAVX2()
-      //       if (ISA_T >= BTLA_ISA::AVX2) {
-      //         return avx2::gemv_6bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp,
-      //         tmpsize);
-      //       }
-      // #endif
+#if CompileAVX2()
+      if (ISA_T >= BTLA_ISA::AVX2) {
+        return avx2::gemv_1bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+      }
+#endif
       return ref::gemv_1bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
