@@ -2594,7 +2594,7 @@ template <int PackRow, int NTILE>
 inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                          int n_offset, int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::int4x2 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -2816,7 +2816,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8(utils::bit2x4* bit2ptr, int8_t* 
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
                                                 size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -3074,7 +3074,7 @@ static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -3109,6 +3109,257 @@ static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::b
   } else {
     size_t elesize = static_cast<size_t>(row) * col;
     return decompress_s3_s8(bit2ptr, bit1ptr, dstptr, elesize, tmp, tmpsize);
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE decompress_s1_s8(utils::bit1x8* bit1ptr, int8_t* dstptr, size_t unpack_elt, int8_t* tmp,
+                                         size_t tmpsize) {
+  int constexpr VBits = 512;
+  int constexpr VElt = VBits / 8;
+  int i = 0;
+  int constexpr FullRange = 1 << (1 - 1);
+  auto vbias = _mm512_set1_epi8(FullRange);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  for (; i < elt_pad; i += VElt) {
+    auto vb1 = unpack_1bits(bit1ptr + i / 8, zmm_0x00, zmm_0x04);
+    vb1 = _mm512_srli_epi32(vb1, 2);
+    vb1 = _mm512_sub_epi8(vb1, vbias);
+    _mm512_storeu_si512((__m512i*)(dstptr + i), vb1);
+  }
+  if (elt_pad < unpack_elt) {
+    if (unpack_elt >= VElt) {
+      i = unpack_elt - VElt;
+      auto vb1 = unpack_1bits(bit1ptr + i / 8, zmm_0x00, zmm_0x04);
+      vb1 = _mm512_srli_epi32(vb1, 2);
+      vb1 = _mm512_sub_epi8(vb1, vbias);
+      _mm512_storeu_si512((__m512i*)(dstptr + i), vb1);
+    } else {
+      ref::decompress_s1_s8(bit1ptr + i / 8, dstptr + i, unpack_elt - i, tmp, tmpsize);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int NTILE>
+static inline BTLA_CODE decompress_kblock_s1_s8_pack1_row(utils::bit2x4* srcptr, utils::bit1x8* bit1ptr, int8_t* zpptr,
+                                                          int8_t* dstptr, int blocksize, int ldzp, int n_offset,
+                                                          int k_offset, int row, int8_t* tmp, size_t tmpsize) {
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  static_assert((NTILE % VLen) == 0);
+  int constexpr PackRow = 1;
+  int constexpr Unroll = 4;
+  __m512i v_zp_y[NReg];
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vbias = _mm512_set1_epi8(4);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  for (int ir = 0; ir < row; ir += blocksize) {
+    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
+    for (int i = 0; i < Unroll; i++) {
+      memcpy(tmp + i * NTILE, zptr, NTILE * sizeof(int8_t));
+    }
+    for (int i = 0; i < NReg; i++) {
+      v_zp_y[i] = _mm512_loadu_si512((const __m512i*)(tmp + i * 64));
+      v_zp_y[i] = _mm512_add_epi8(v_zp_y[i], vbias);
+    }
+    int k_remain = utils::remainsize(ir, row, blocksize);
+    int k_remain_unrll = utils::padto_le(k_remain, Unroll);
+    int ib = 0;
+    for (; ib < k_remain_unrll; ib += Unroll) {
+      auto b2ptr = srcptr + (ir + ib) * NTILE / 4;
+      auto b1ptr = bit1ptr + (ir + ib) * NTILE / 8;
+      for (int i = 0; i < NReg; i++) {
+        auto v_s8_y = unpack_2bits(b2ptr + i * 16, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+        auto vb1 = unpack_1bits(b1ptr + i * 8, zmm_0x00, zmm_0x04);
+        v_s8_y = _mm512_or_si512(v_s8_y, vb1);
+        v_s8_y = _mm512_sub_epi8(v_s8_y, v_zp_y[i]);
+        _mm512_storeu_si512((__m512i*)(dstptr + i * 64 + (ir + ib) * NTILE), v_s8_y);
+      }
+    }
+
+    int k_tail = k_remain - k_remain_unrll;
+    if (k_tail > 0) {
+      auto tmpb2ptr = tmp;
+      memcpy(tmpb2ptr, srcptr + (ir + ib) * NTILE / 4, k_tail * NTILE / 4);
+      auto tmpb1ptr = tmp + Unroll * NTILE / 2;
+      memcpy(tmpb1ptr, bit1ptr + (ir + ib) * NTILE / 8, k_tail * NTILE / 8);
+      auto tmpout = tmp + Unroll * NTILE;
+      for (int i = 0; i < NReg; i++) {
+        auto v_s8_y = unpack_2bits((utils::bit2x4*)(tmpb2ptr + i * 16), vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+        auto vb1 = unpack_1bits((utils::bit1x8*)(tmpb1ptr + i * 8), zmm_0x00, zmm_0x04);
+        v_s8_y = _mm512_or_si512(v_s8_y, vb1);
+        v_s8_y = _mm512_sub_epi8(v_s8_y, v_zp_y[i]);
+        _mm512_storeu_si512((__m512i*)(tmpout + i * 64), v_s8_y);
+      }
+      memcpy(dstptr + (ir + ib) * NTILE, tmpout, k_tail * NTILE);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int NTILE>
+static inline BTLA_CODE decompress_kblock_s1_s8_pack2_row(utils::bit2x4* srcptr, utils::bit1x8* bit1ptr, int8_t* zpptr,
+                                                          int8_t* dstptr, int blocksize, int ldzp, int n_offset,
+                                                          int k_offset, int row, int8_t* tmp, size_t tmpsize) {
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  static_assert((NTILE % VLen) == 0);
+  int constexpr PackRow = 1;
+  int constexpr Unroll = 4;
+  __m512i v_zp_y[NReg];
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vbias = _mm512_set1_epi8(4);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+
+  const auto vindex = _mm512_set_epi8(14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0, 14, 14, 12, 12, 10, 10, 8,
+                                      8, 6, 6, 4, 4, 2, 2, 0, 0, 14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0,
+                                      14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0);
+  for (int ir = 0; ir < row; ir += blocksize) {
+    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
+    memcpy(tmp, zptr, NTILE * sizeof(int8_t));
+    memcpy(tmp + NTILE, zptr, NTILE * sizeof(int8_t));
+    for (int i = 0; i < NReg; i++) {
+      v_zp_y[i] = load_zp_epi8_broadcast_epi16(tmp + i * 32, vindex);
+      v_zp_y[i] = _mm512_add_epi8(v_zp_y[i], vbias);
+    }
+    int k_remain = utils::remainsize(ir, row, blocksize);
+    int k_remain_unrll = utils::padto_le(k_remain, PackRow * Unroll);
+    int ib = 0;
+    for (; ib < k_remain_unrll; ib += PackRow * Unroll) {
+      auto b2ptr = srcptr + (ir + ib) * NTILE / 4;
+      auto b1ptr = bit1ptr + (ir + ib) * NTILE / 8;
+      for (int i = 0; i < NReg; i++) {
+        auto v_s8_y = unpack_2bits(b2ptr + i * 16, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+        auto vb1 = unpack_1bits(b1ptr + i * 8, zmm_0x00, zmm_0x04);
+        v_s8_y = _mm512_or_si512(v_s8_y, vb1);
+        v_s8_y = _mm512_sub_epi8(v_s8_y, v_zp_y[i]);
+        _mm512_storeu_si512((__m512i*)(dstptr + i * 64 + (ir + ib) * NTILE), v_s8_y);
+      }
+    }
+    int k_tail = k_remain - k_remain_unrll;
+    if (k_tail > 0) {
+      auto tmpb2ptr = tmp;
+      memcpy(tmpb2ptr, srcptr + (ir + ib) * NTILE / 4, k_tail * NTILE / 4);
+      auto tmpb1ptr = tmp + Unroll * NTILE / 2;
+      memcpy(tmpb1ptr, bit1ptr + (ir + ib) * NTILE / 8, k_tail * NTILE / 8);
+      auto tmpout = tmp + Unroll * NTILE;
+      for (int i = 0; i < NReg; i++) {
+        auto v_s8_y = unpack_2bits((utils::bit2x4*)(tmpb2ptr + i * 16), vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+        auto vb1 = unpack_1bits((utils::bit1x8*)(tmpb1ptr + i * 8), zmm_0x00, zmm_0x04);
+        v_s8_y = _mm512_or_si512(v_s8_y, vb1);
+        v_s8_y = _mm512_sub_epi8(v_s8_y, v_zp_y[i]);
+        _mm512_storeu_si512((__m512i*)(tmpout + i * 64), v_s8_y);
+      }
+      memcpy(dstptr + (ir + ib) * NTILE, tmpout, k_tail * NTILE);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int NTILE>
+static inline BTLA_CODE decompress_kblock_s1_s8_pack4_row(utils::bit2x4* srcptr, utils::bit1x8* bit1ptr, int8_t* zpptr,
+                                                          int8_t* dstptr, int blocksize, int ldzp, int n_offset,
+                                                          int k_offset, int row, int8_t* tmp, size_t tmpsize) {
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  static_assert((NTILE % VLen) == 0);
+  int constexpr PackRow = 4;
+  __m512i v_zp_y[NReg];
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vbias = _mm512_set1_epi8(4);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+  for (int ir = 0; ir < row; ir += blocksize) {
+    auto zptr = zpptr + (k_offset + ir) / blocksize * ldzp + n_offset;
+    for (int i = 0; i < NReg; i++) {
+      v_zp_y[i] = load_zp_epi8_broadcast_epi32(zptr + i * 16, vindex);
+      v_zp_y[i] = _mm512_add_epi8(v_zp_y[i], vbias);
+    }
+    int k_remain = utils::remainsize(ir, row, blocksize);
+    for (int ib = 0; ib < k_remain; ib += PackRow) {
+      auto b2ptr = srcptr + (ir + ib) * NTILE / 4;
+      auto b1ptr = bit1ptr + (ir + ib) * NTILE / 8;
+      for (int i = 0; i < NReg; i++) {
+        auto v_s8_y = unpack_2bits(b2ptr + i * 16, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+        auto vb1 = unpack_1bits(b1ptr + i * 8, zmm_0x00, zmm_0x04);
+        v_s8_y = _mm512_or_si512(v_s8_y, vb1);
+        v_s8_y = _mm512_sub_epi8(v_s8_y, v_zp_y[i]);
+        _mm512_storeu_si512((__m512i*)(dstptr + i * 64 + (ir + ib) * NTILE), v_s8_y);
+      }
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <int PackRow, int NTILE>
+static inline BTLA_CODE decompress_kblock_s1_s8(utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr, int blocksize,
+                                                int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
+                                                size_t tmpsize) {
+  if (zpptr) {
+    typedef BTLA_CODE (*decompfunc)(utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
+                                    int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
+    decompfunc func = nullptr;
+    if (col == NTILE) {
+      /*if constexpr (PackRow == 1) {
+        func = &decompress_kblock_s3_s8_pack1_row<NTILE>;
+      }
+      if constexpr (PackRow == 2) {
+        func = &decompress_kblock_s3_s8_pack2_row<NTILE>;
+      }
+      if constexpr (PackRow == 4) {
+        func = &decompress_kblock_s3_s8_pack4_row<NTILE>;
+      }*/
+
+      if (func) {
+        int head_end = utils::padto(k_offset, blocksize);
+        head_end = std::min(head_end, k_offset + row);
+        int head_size = head_end - k_offset;
+        if (head_size > 0) {
+          (*func)(bit1ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset, head_size, tmp, tmpsize);
+        }
+        int body_size = row - head_size;
+        if (body_size > 0) {
+          (*func)(bit1ptr + head_size * NTILE / 8, zpptr, dstptr + head_size * NTILE, blocksize, ldzp, n_offset,
+                  head_end, body_size, tmp, tmpsize);
+        }
+        return BTLA_CODE::Success;
+      }
+    }
+    assert(0);
+    return BTLA_CODE::NotSupport;
+  } else {
+    size_t elesize = static_cast<size_t>(row) * col;
+    return decompress_s1_s8(bit1ptr, dstptr, elesize, tmp, tmpsize);
   }
   return BTLA_CODE::Success;
 }
@@ -3325,7 +3576,7 @@ static inline BTLA_CODE decompress_kblock_s5_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -3639,9 +3890,9 @@ static inline BTLA_CODE decompress_kblock_s7_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp, int n_offset,
                                                 int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr,
-                                    int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp, int n_offset,
-                                    int k_offset, int row, int8_t* tmp, size_t tmpsize);
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                    int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
+                                    int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
       if constexpr (PackRow == 1) {
@@ -3910,7 +4161,7 @@ static inline BTLA_CODE decompress_kblock_s6_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit2x4 * bit2ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
