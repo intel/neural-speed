@@ -27,6 +27,7 @@ BesTLA provides weight-only linear computational capabilities for LLM inference.
 | INT2                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | INT5                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | INT6                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
+| INT7                   | INT8 / BF16 / FP32 |    BF16 / FP32    | sym / asym |
 | FP8 (E4M3, E5M2)       |    BF16 / FP32     | FP32 / FP8 (E8M0) |    sym     |
 | FP4 (E2M1)             |    BF16 / FP32     |    BF16 / FP32    |    sym     |
 | NF4                    |    BF16 / FP32     |    BF16 / FP32    |    sym     |
@@ -76,7 +77,7 @@ mkdir build
 cd build
 cmake .. -DBTLA_UT_BENCHMARK=ON -DBTLA_UT_ALL=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j
-./bestla_benchmark
+./bin/bestla_benchmark
 ```
 
 More template usages, please refer code in [bestla_benchmark](bestla/ut/bestla_benchmark.cpp)
