@@ -32,12 +32,12 @@ int8 | symmetric | multiplier of 8, -1<sup>1</sup>
 fp4 | | multiplier of 8
 nf4 | | multiplier of 8
 
-<sup>1</sup>: group size=-1 means per channel quantization on output channel (or group size equals to input channel size).
+<sup>1</sup>: group size=-1 means per channel quantization on output channel (or group size equals to input channel size).  
 <sup>2</sup>: int7 + asymmetric may cause numeric overflow if the device only has AVX2 without AVX_VNNI.
 
 NOTE:
 1. AMX_INT8 requires group size is aligend to 128 (best hardware efficiency)
-2. int3 and int2 have accuracy loss.
+2. int1, int2 and int3 have accuracy loss using RTN quantization.
 
 ### Hybrid quantization support
 We can support the hybrid quantization combination. E.g. int4 x int2 mixed quantization.   
