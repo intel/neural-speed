@@ -33,20 +33,26 @@ def parse_output_file(file_path):
     return predictions
 
 def parse_output_file_acc(file_path):
-    accuracy = []
+    accuracy=[0,0,0,0]
     with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
         for line in file:
             accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-            if accuracy_match==None:
-                accuracy_match = re.search(r"\|\s+boolq+\|\s+2\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-            if accuracy_match==None:
-                accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
-            if accuracy_match==None:
-                accuracy_match= re.search(r"\|\s+hellaswag+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if accuracy_match:
-                accuracy.append(float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100)
-    if len(accuracy)==0:
-        accuracy=[0,0,0,0]
+                accuracy[0]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+            accuracy_match = re.search(r"\|\s+boolq+\|\s+2\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[1]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue    
+            accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[2]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+            accuracy_match= re.search(r"\|\s+hellaswag+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[3]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+        
     return accuracy
 
 def parse_memory_file(memory_file):
