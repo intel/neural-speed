@@ -339,7 +339,7 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
     }
     scale_type = BTLA_DTYPE::F8_E8M0;
   }
-  if (quant_type == BTLA_DTYPE::S1_CLIP || quant_type == BTLA_DTYPE::S7_CLIP) {
+  if (quant_type == BTLA_DTYPE::S1_CLIP) {
     printf("Current not support this data type, reset to int4\n");
     quant_type = BTLA_DTYPE::S4_CLIP;
   }
