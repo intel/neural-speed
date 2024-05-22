@@ -57,7 +57,8 @@ class UT_avx512_decompress_s1_s8 {
     }
 
     kernel::avx512f::decompress_kblock_s1_s8<PackRow, NTILE>(s1_wei.data(), isasym ? zp.data() : nullptr, rev.data(),
-                                                          blocksize, NTILE, 0, 0, row_offset, NTILE, cache, CacheSize);
+                                                             blocksize, NTILE, 0, 0, row_offset, NTILE, cache,
+                                                             CacheSize);
     kernel::avx512f::decompress_kblock_s1_s8<PackRow, NTILE>(
         s1_wei.data() + row_offset * NTILE / 8, isasym ? zp.data() : nullptr, rev.data() + row_offset * NTILE,
         blocksize, NTILE, 0, row_offset, row - row_offset, NTILE, cache, CacheSize);
@@ -610,7 +611,6 @@ class UT_avx512_gemv {
     ut_1bit_s8s8<4>(48, 128, 32, true);
     ut_1bit_s8s8<4>(48, 128, 32, false);
 
-
     ut_4bit<1>(48, 128, 32, true);
     ut_4bit<1>(48, 128, 32, false);
     ut_4bit<4>(48, 128, 32, false);
@@ -705,7 +705,8 @@ class UT_avx512_gemv {
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{nullptr, nullptr, (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr,
                                1,       n};
-    kernel::avx512f::gemv_1bit_fp32_fp32<float, 48, MTILE>(Af32.data(), k, B, Cf32.data(), n, k, kblock, cache, CacheSize);
+    kernel::avx512f::gemv_1bit_fp32_fp32<float, 48, MTILE>(Af32.data(), k, B, Cf32.data(), n, k, kblock, cache,
+                                                           CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
@@ -755,7 +756,7 @@ class UT_avx512_gemv {
     utils::GemvParamB<float> B{nullptr, nullptr, (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr,
                                2,       n};
     kernel::avx512f::vnni::gemv_1bit_u8s8_fp32<float, 48, MTILE>({A.data(), scalea.data(), azp.data(), k, blks}, B,
-                                                              Cf32.data(), n, k, kblock, cache, CacheSize);
+                                                                 Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
@@ -803,8 +804,8 @@ class UT_avx512_gemv {
     gemmref_fp32fp32fp32(MTILE, n, k, Af32.data(), Bf32.data(), Cref.data(), k, n, n);
     utils::GemvParamB<float> B{nullptr, nullptr, (uint8_t*)b1.data(), scaleb.data(), iasym ? bzp.data() : nullptr,
                                2,       n};
-    kernel::avx512f::vnni::gemv_1bit_s8s8_fp32<float, 48, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks}, B,
-                                                              Cf32.data(), n, k, kblock, cache, CacheSize);
+    kernel::avx512f::vnni::gemv_1bit_s8s8_fp32<float, 48, MTILE>({(uint8_t*)A.data(), scalea.data(), nullptr, k, blks},
+                                                                 B, Cf32.data(), n, k, kblock, cache, CacheSize);
     buffer_error(Cref.data(), Cf32.data(), Cref.size(), FP32_ERR);
   }
 
