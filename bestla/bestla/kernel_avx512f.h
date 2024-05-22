@@ -871,12 +871,15 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym(const float* srcptr, 
   }
   return BTLA_CODE::Success;
 }
-template <BTLA_DTYPE QDT_T>
 static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* srcptr, int8_t* dstptr, int row, int col,
-                                                                int ld_src, int ld_dst, float* scales, int blocksize) {
+                                                                int ld_src, int ld_dst, float* scales, int blocksize,
+                                                                BTLA_DTYPE qtype) {
   int constexpr VLen = 16;
   int col16 = utils::padto_le(col, VLen);
   int i = 0;
+  auto NBits = utils::bestla_dtype_bits(qtype);
+  int FullValue = 1 << (NBits - 1);
+  int SymValue = FullValue - 1;
   auto align_row = row / blocksize * blocksize;
   for (; i < col16; i += VLen) {
     int j = 0;
@@ -898,11 +901,9 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* src
       _mm512_storeu_ps(tmp_min, vminval);
       _mm512_storeu_ps(tmp_max, vmaxval);
       _mm512_storeu_ps(tmp_abs, vabsval);
-      auto constexpr NBits = utils::bestla_dtype_bits(QDT_T);
-      int constexpr FullValue = 1 << (NBits - 1);
-      int constexpr GenValue = FullValue - 1;
+
       for (int iv = 0; iv < VLen; iv++) {
-        int NVal = GenValue;
+        int NVal = SymValue;
         auto sum = tmp_max[iv] + tmp_min[iv];
         if (abs(sum) >= tmp_abs[iv] / FullValue) {
           NVal = sum > 0.f ? -FullValue : FullValue;
@@ -925,8 +926,8 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* src
     for (; j < align_row; j += blocksize) simd_process_block(blocksize);
     if (j < row) simd_process_block(row - align_row);
   }
-  kernel::ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst, scales + i,
-                                                     nullptr, blocksize);
+  kernel::ref::quantize_f32_sign_int_rowblock(srcptr + i, dstptr + i, row, col - i, ld_src, ld_dst, scales + i, nullptr,
+                                              blocksize, qtype);
   return BTLA_CODE::Success;
 }
 
@@ -997,14 +998,13 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_asym(const float* srcptr,
   return BTLA_CODE::Success;
 }
 
-template <BTLA_DTYPE QDT_T>
 static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8_t* dstptr, int row, int col,
                                                        int ld_src, int ld_dst, float* scales, int8_t* zero_points,
-                                                       int blocksize) {
+                                                       int blocksize, BTLA_DTYPE qtype) {
   if (zero_points == nullptr)
-    if constexpr (QDT_T == BTLA_DTYPE::S4_CLIP || QDT_T == BTLA_DTYPE::S3_CLIP) {
-      return quantize_f32_sign_int_rowblock_sym_auto<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
-                                                            blocksize);
+    if (qtype == BTLA_DTYPE::S4_CLIP || qtype == BTLA_DTYPE::S3_CLIP) {
+      return quantize_f32_sign_int_rowblock_sym_auto(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize,
+                                                     qtype);
     } else {
       return quantize_f32_sign_int_rowblock_sym(srcptr, dstptr, row, col, ld_src, ld_dst, scales, blocksize);
     }
@@ -2594,7 +2594,7 @@ template <int PackRow, int NTILE>
 inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                          int n_offset, int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::int4x2 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -2816,7 +2816,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8(utils::bit2x4* bit2ptr, int8_t* 
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
                                                 size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -3074,7 +3074,7 @@ static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -3296,7 +3296,7 @@ static inline BTLA_CODE decompress_kblock_s1_s8(utils::bit1x8* bit1ptr, int8_t* 
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
                                                 size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -3545,7 +3545,7 @@ static inline BTLA_CODE decompress_kblock_s5_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -3859,9 +3859,9 @@ static inline BTLA_CODE decompress_kblock_s7_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp, int n_offset,
                                                 int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr,
-                                    int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp, int n_offset,
-                                    int k_offset, int row, int8_t* tmp, size_t tmpsize);
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                    int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
+                                    int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
       if constexpr (PackRow == 1) {
@@ -4130,7 +4130,7 @@ static inline BTLA_CODE decompress_kblock_s6_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit2x4 * bit2ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
