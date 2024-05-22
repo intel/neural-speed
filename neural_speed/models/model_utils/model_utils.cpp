@@ -915,7 +915,10 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   ctx->generation_conf = params.gen_conf;
 
   ctx->scratch_size_ratio = params.scratch_size_ratio * params.max_request_num * params.beam_size;
-
+#ifdef NS_SYCL
+  ctx->device = bestla_create_device(false);
+  ctx->device_queue = bestla_get_device_queue(ctx->device);
+#endif
   const model_archs arch = params.arch;
 
   // the type so that kv-cache allocated according to this type must be large enough
@@ -999,7 +1002,9 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   return ctx;
 }
 
-void model_free(struct model_context* ctx) { delete ctx; }
+void model_free(struct model_context* ctx) {
+  bestla_release_device(ctx->device);
+  delete ctx; }
 
 int model_apply_lora_from_file_internal(struct model_context* ctx, const char* path_lora, const char* path_base_model,
                                         int n_threads) {

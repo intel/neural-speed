@@ -36,7 +36,11 @@ endif()
 if(NOT WIN32)
   target_link_libraries(ne_layers PUBLIC rt)
 else()
-  target_link_options(ne_layers PUBLIC /STACK:5242880)
+  target_link_options(ne_layers PUBLIC /STACK:5242880 /F5242880)
+endif()
+
+if(NS_SYCL)
+  target_link_libraries(ne_layers PRIVATE IntelSYCL::SYCL_CXX)
 endif()
 
 if (NS_BUILD_TESTS)

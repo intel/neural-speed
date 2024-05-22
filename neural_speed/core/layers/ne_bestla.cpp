@@ -118,9 +118,9 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
 void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out) {
   auto pth = ne_bestla::ne_threading::get();
   int threads = batch <= 4 ? 1 : pth->num_threads();
-  parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
+  parallel::Scheduler2D sch({ threads, batch, vsize, 1, 16 });
   auto threadfunc = [&](int tidx) {
-    parallel::ThreadProblem2D tp{tidx};
+    parallel::ThreadProblem2D tp{ tidx };
     sch.getIndex(tp);
     if (tp.valid) {
       for (size_t i = 0; i < tp.size[0]; i++) {
@@ -130,11 +130,12 @@ void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, 
         auto ret = kernel::wrapper::Mul<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
       }
     }
-  };
+    };
   if (threads == 1) {
     parallel::SingleThread st;
     st.parallel_for(threadfunc);
-  } else {
+  }
+  else {
     pth->parallel_for(threadfunc);
   }
 }
@@ -142,9 +143,9 @@ void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, 
 void bestla_add(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out) {
   auto pth = ne_bestla::ne_threading::get();
   int threads = batch <= 4 ? 1 : pth->num_threads();
-  parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
+  parallel::Scheduler2D sch({ threads, batch, vsize, 1, 16 });
   auto threadfunc = [&](int tidx) {
-    parallel::ThreadProblem2D tp{tidx};
+    parallel::ThreadProblem2D tp{ tidx };
     sch.getIndex(tp);
     if (tp.valid) {
       for (size_t i = 0; i < tp.size[0]; i++) {
@@ -154,11 +155,34 @@ void bestla_add(int batch, int vsize, const float* tensor, const float* vector, 
         auto ret = kernel::wrapper::Add<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
       }
     }
-  };
+    };
   if (threads == 1) {
     parallel::SingleThread st;
     st.parallel_for(threadfunc);
-  } else {
+  }
+  else {
     pth->parallel_for(threadfunc);
   }
 }
+
+#ifdef NS_SYCL
+#include "bestla/sycl/sycl_device.h"
+void* bestla_create_device(bool profile) {
+  auto ptr = new sycl_device::SyclDevice(profile);
+  ptr->print();
+  return ptr;
+}
+void* bestla_get_device_queue(void* device) {
+  if (device) {
+    auto ptr = (sycl_device::SyclDevice*)device;
+    return ptr->getQueue();
+  }
+  return NULL;
+}
+void bestla_release_device(void* device) {
+  if (device) {
+    auto ptr = (sycl_device::SyclDevice*)device;
+    delete ptr;
+  }
+}
+#endif

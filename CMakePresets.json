@@ -138,9 +138,10 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "BTLA_UT_DEBUG": "ON",
         "BTLA_UT_ALL": "OFF",
-        "BTLA_SYCL": "ON",
+        "NS_SYCL": "ON",
         "BTLA_UT_BENCHMARK": "ON",
         "BTLA_UT_OPENMP": "ON",
+        "BTLA_ENABLE_OPENMP": "ON",
         "CMAKE_CXX_COMPILER": "icx",
         "CMAKE_C_COMPILER": "icx"
       }

@@ -350,6 +350,9 @@ struct model_context {
   int buf_last = 0;
   size_t buf_max_size[MODEL_MAX_SCRATCH_BUFFERS] = {0};
 
+  void* device = NULL;
+  void* device_queue = NULL;
+
   void use_buf(struct ne_context* ctx, int i) {
 #if defined(MODEL_USE_SCRATCH)
     size_t last_size = 0;

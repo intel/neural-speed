@@ -98,7 +98,7 @@ struct ne_context;
 
 enum ne_backend {
   NE_BACKEND_CPU = 0,
-  NE_BACKEND_CUDA = 1,
+  NE_BACKEND_SYCL = 1,
 };
 
 // ne object
