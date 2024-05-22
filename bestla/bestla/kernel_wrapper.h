@@ -317,6 +317,14 @@ class CompressBit2 {
   }
 };
 
+class CompressBit1 {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const int8_t* srcptr, bestla::utils::bit1x8* bit1ptr, size_t size) {
+    return ref::compress_1bit(srcptr, bit1ptr, size);
+  }
+};
+
 template <typename _T>
 class Transpose2D {
  public:
@@ -328,9 +336,9 @@ class Transpose2D {
 
 class QuantizeSignIntRowBlock {
  public:
-  template <BTLA_ISA ISA_T, BTLA_DTYPE QDT_T>
+  template <BTLA_ISA ISA_T>
   static inline BTLA_CODE forward(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
-                                  float* scales, int8_t* zero_points, int blocksize) {
+                                  float* scales, int8_t* zero_points, int blocksize, BTLA_DTYPE qtype) {
     // TODO(Yu) simd version for quick quant
     // #if CompileAVX512F()
     //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
@@ -338,8 +346,8 @@ class QuantizeSignIntRowBlock {
     //                                                             zero_points, blocksize);
     //     }
     // #endif
-    return ref::quantize_f32_sign_int_rowblock<QDT_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points,
-                                                      blocksize);
+    return ref::quantize_f32_sign_int_rowblock(srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, blocksize,
+                                               qtype);
   }
 };
 
@@ -577,6 +585,30 @@ class DecompressKBlockS2S8 {
   }
 };
 
+template <int PackRow, int NTILE>
+class DecompressKBlockS1S8 {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(utils::bit1x8* b1ptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
+                                  int n_offset, int k_offset, int row, int col, void* tmp, size_t tmpsize) {
+    // #if CompileAVX512F()
+    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
+    //       return avx512f::decompress_kblock_s2_s8<PackRow, NTILE>(b2ptr, zpptr, dstptr, blocksize, ldzp, n_offset,
+    //       k_offset,
+    //                                                               row, col, (int8_t*)tmp, tmpsize);
+    //     }
+    // #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::decompress_kblock_s1_s8<PackRow, NTILE>(b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset,
+                                                           row, col, (int8_t*)tmp, tmpsize);
+    }
+#endif
+    return ref::decompress_kblock_s1_s8<PackRow, NTILE>(b1ptr, zpptr, dstptr, blocksize, ldzp, n_offset, k_offset, row,
+                                                        col, (int8_t*)tmp, tmpsize);
+  }
+};
+
 template <int PackRow, int NTILE, typename DstT>
 class DecompressKBlockS8Fp {
  public:
@@ -776,6 +808,37 @@ class DecompressKBlockS2Fp {
     }
 #endif
     ret = ref::decompress_kblock_s2_fp<PackRow, NTILE, DstT>(b2ptr, dstptr, row, col, scales, sdtype, zero_points,
+                                                             k_offset, n_offset, kblock, NPad,
+                                                             reinterpret_cast<int8_t*>(tmp), tmpsize);
+    return ret;
+  }
+};
+
+template <int PackRow, int NTILE, typename DstT>
+class DecompressKBlockS1Fp {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(utils::bit1x8* b1ptr, DstT* dstptr, int row, int col, void* scales, BTLA_DTYPE sdtype,
+                                  int8_t* zero_points, int k_offset, int n_offset, int kblock, int NPad, void* tmp,
+                                  size_t tmpsize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+    // #if CompileAVX512F()
+    //     if constexpr (utils::isa_base<ISA_T>::avx512f) {
+    //       return avx512f::decompress_kblock_s3_fp<PackRow, NTILE, DstT>(b2ptr, b1ptr, dstptr, row, col, scales,
+    //       sdtype,
+    //                                                                     zero_points, k_offset, n_offset, kblock,
+    //                                                                     NPad, reinterpret_cast<int8_t*>(tmp),
+    //                                                                     tmpsize);
+    //     }
+    // #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::decompress_kblock_s1_fp<PackRow, NTILE, DstT>(b1ptr, dstptr, row, col, scales, sdtype, zero_points,
+                                                                 k_offset, n_offset, kblock, NPad,
+                                                                 reinterpret_cast<int8_t*>(tmp), tmpsize);
+    }
+#endif
+    ret = ref::decompress_kblock_s1_fp<PackRow, NTILE, DstT>(b1ptr, dstptr, row, col, scales, sdtype, zero_points,
                                                              k_offset, n_offset, kblock, NPad,
                                                              reinterpret_cast<int8_t*>(tmp), tmpsize);
     return ret;
@@ -1232,6 +1295,28 @@ class GEMVWoqNBits {
 #endif
       return ref::gemv_7bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
+    if (B.nbits == 1) {
+      // #if CompileAVX512VNNI()
+      //       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+      //         return avx512f::vnni::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize,
+      //         (int8_t*)tmp,
+      //                                                                         tmpsize);
+      //       }
+      // #endif
+      // #if CompileAVXVNNI()
+      //       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
+      //         return avx2::vnni::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+      //         tmpsize);
+      //       }
+      // #endif
+      // #if CompileAVX2()
+      //       if (ISA_T >= BTLA_ISA::AVX2) {
+      //         return avx2::gemv_3bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+      //         tmpsize);
+      //       }
+      // #endif
+      return ref::gemv_1bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
     return BTLA_CODE::NotSupport;
   }
 
@@ -1322,6 +1407,22 @@ class GEMVWoqNBits {
 #endif
       return ref::gemv_7bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
+    if (B.nbits == 1) {
+      // #if CompileAVX512VNNI()
+      //       if (ISA_T >= BTLA_ISA::AVX512_VNNI) {
+      //         return avx512f::vnni::gemv_5bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize,
+      //         (int8_t*)tmp,
+      //                                                                         tmpsize);
+      //       }
+      // #endif
+      // #if CompileAVXVNNI()
+      //       if (ISA_T >= BTLA_ISA::AVX_VNNI) {
+      //         return avx2::vnni::gemv_5bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
+      //         tmpsize);
+      //       }
+      // #endif
+      return ref::gemv_1bit_s8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
     return BTLA_CODE::NotSupport;
   }
 
@@ -1411,6 +1512,22 @@ class GEMVWoqNBits {
       }
 #endif
       return ref::gemv_7bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
+    }
+    if (B.nbits == 1) {
+      // #if CompileAVX512F()
+      //       if (ISA_T >= BTLA_ISA::AVX512F) {
+      //         return avx512f::gemv_6bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize,
+      //         (int8_t*)tmp,
+      //                                                                   tmpsize);
+      //       }
+      // #endif
+      // #if CompileAVX2()
+      //       if (ISA_T >= BTLA_ISA::AVX2) {
+      //         return avx2::gemv_6bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp,
+      //         tmpsize);
+      //       }
+      // #endif
+      return ref::gemv_1bit_fp32_fp32<ScaleT, NTILE, MTILE>(A, lda, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
     }
     return BTLA_CODE::NotSupport;
   }

@@ -609,6 +609,23 @@ class WeightKBlockNInteger {
     });
   }
 
+  static void compressBit1Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                 parallel::IThreading* threading) {
+    // TODO(zhe): 1D parallel compress
+    parallel::Scheduler2D _para({threading->num_threads(), 1, K * N, 1, 64});
+    auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr);
+    threading->parallel_for([&](int tidx) {
+      parallel::ThreadProblem2D thdp({tidx});
+      _para.getIndex(thdp);
+      if (thdp.valid) {
+        auto ret =
+            kernel::wrapper::CompressBit1::forward<ISA_T>(B + thdp.loc[1], bit1ptr + thdp.loc[1] / 8, thdp.size[1]);
+        assert(ret == BTLA_CODE::Success);
+        (void)ret;
+      }
+    });
+  }
+
   static void compressBit4Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
                                  parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), 1, K * N, 1, 64});
@@ -639,6 +656,7 @@ class WeightKBlockNInteger {
     if (qtype == BTLA_DTYPE::S4_CLIP) return compressBit4Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::S3_CLIP) return compressBit3Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::S2_CLIP) return compressBit2Weight(N, K, B, dstptr, qtype, threading);
+    if (qtype == BTLA_DTYPE::S1_CLIP) return compressBit1Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::F4_BNB || qtype == BTLA_DTYPE::F4_NF4 || qtype == BTLA_DTYPE::F4_E2M1)
       return compressBit4Weight(N, K, B, dstptr, qtype, threading);
   }
@@ -693,6 +711,8 @@ class WeightKBlockNInteger {
       return getQ2Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S7_CLIP) {
       return getQ7Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+    } else if (wptr->mDType == BTLA_DTYPE::S1_CLIP) {
+      return getQ1Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else {
       assert(0);
     }
@@ -838,6 +858,16 @@ class WeightKBlockNInteger {
         kernel::wrapper::DecompressKBlockS7Fp<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE, _T>::template forward<ISA_T>(
             bit4ptr, bit2ptr, bit1ptr, *dstptr + i * k_size, k_size, _GemmCore_T::NTILE, sptr, wptr->SDtype(), zptr,
             k_offset, n_offset + i, wptr->mBlockSize, NPad, tmpcache, cachesize);
+      } else if (wptr->mDType == BTLA_DTYPE::S1_CLIP) {
+        auto sptr = wptr->template SPtr<void>();
+        int8_t* bit1_ptr = wptr->template WPtr<int8_t>();
+        auto elt_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE + i * KPad;
+        assert(elt_offset % 8 == 0);
+        size_t bit1_offset = size_t(NPad) * KPad;
+        auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit1_ptr + elt_offset / 8);
+        kernel::wrapper::DecompressKBlockS1Fp<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE, _T>::template forward<ISA_T>(
+            bit1ptr, *dstptr + i * k_size, k_size, _GemmCore_T::NTILE, sptr, wptr->SDtype(), zptr, k_offset,
+            n_offset + i, wptr->mBlockSize, NPad, tmpcache, cachesize);
       } else {
         assert(0);
       }
@@ -986,34 +1016,32 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
+  static inline BTLA_CODE getQ1Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                      const Param& _param, void* tmpcache, size_t cachesize) {
+    auto wptr = _param.packedW;
+    int8_t* bit1_ptr = wptr->template WPtr<int8_t>();
+    int8_t* zpptr = wptr->template ZPtr<int8_t>();
+    auto KPad = wptr->mKPad;
+    auto NPad = wptr->mNPad;
+    auto base_offset = n_offset * KPad + k_offset * _GemmCore_T::NTILE;
+    for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
+      auto elt_offset = base_offset + i * KPad;
+      assert(elt_offset % 8 == 0);
+      auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit1_ptr + elt_offset / 8);
+      kernel::wrapper::DecompressKBlockS1S8<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE>::template forward<ISA_T>(
+          bit1ptr, wptr->IsAsym() ? zpptr : nullptr, *dstptr + i * k_size, wptr->mBlockSize, wptr->CStep(),
+          n_offset + i, k_offset, k_size, _GemmCore_T::NTILE, tmpcache, cachesize);
+    }
+    *dststep = k_size;
+    return BTLA_CODE::Success;
+  }
+
   virtual inline void quantRowBlock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
                                     float* scales, int8_t* zero_points, void* stor) {
     auto ptr = reinterpret_cast<StorageWeight*>(stor);
     auto quant_dtype = ptr->mDType;
-    if (quant_dtype == BTLA_DTYPE::S8) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S8>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                               scales, zero_points, ptr->mBlockSize);
-    } else if (quant_dtype == BTLA_DTYPE::S6_CLIP) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S6_CLIP>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
-    } else if (quant_dtype == BTLA_DTYPE::S5_CLIP) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S5_CLIP>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
-    } else if (quant_dtype == BTLA_DTYPE::S4_CLIP) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S4_CLIP>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
-    } else if (quant_dtype == BTLA_DTYPE::S3_CLIP) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S3_CLIP>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
-    } else if (quant_dtype == BTLA_DTYPE::S2_CLIP) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S2_CLIP>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
-    } else if (quant_dtype == BTLA_DTYPE::S7_CLIP) {
-      kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T, BTLA_DTYPE::S7_CLIP>(
-          srcptr, dstptr, row, col, ld_src, ld_dst, scales, zero_points, ptr->mBlockSize);
-    } else {
-      assert(0);
-    }
+    kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
+                                                             zero_points, ptr->mBlockSize, quant_dtype);
   }
 };
 
