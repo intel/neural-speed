@@ -490,12 +490,12 @@ class gemm_t<
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             zero_pt_prefetch_payload);
       }
-      scale_prefetch_addr_i += k_stride;
+      scale_prefetch_addr_i++;
       matA_prefetch_payload.template update_tdesc<update_dir_a>(
           matA_t::tile_size_x);
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
           matB_t::tile_size_y);
-      if ((scale_prefetch_addr_i % dequant_s) == 0) {
+      if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
         scale_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             scale_t::tile_size_y);
         zero_pt_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
@@ -527,7 +527,7 @@ class gemm_t<
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
-      scale_load_addr_i+= k_stride;
+      scale_load_addr_i++;
       SW_BARRIER();
       if constexpr (stages != 0) {
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -543,12 +543,12 @@ class gemm_t<
           subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
               zero_pt_prefetch_payload);
         }
-        scale_prefetch_addr_i += k_stride;
+        scale_prefetch_addr_i++;
       }
       SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
-      if ((scale_load_addr_i % dequant_s) == 0) {
+      if ((scale_load_addr_i % scale_addr_update_freq) == 0) {
         scale_payload.template update_tdesc<tdesc_update_dir::y_dir>(
             scale_t::tile_size_y);
         zero_pt_payload.template update_tdesc<update_dir_b>(
@@ -575,11 +575,18 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
-      if constexpr (is_col_major_b) {
-        tile_transpose(matB_acc);
-      }
+      //   if constexpr (is_col_major_b) {
+      //     tile_transpose(matB_acc);
+      //   }
       SW_BARRIER();
-      tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+      XETLA_PRINT<matA_acc>();
+      XETLA_PRINT<matB_acc>();
+      XETLA_PRINT<matAcc>();
+    //   if constexpr (is_col_major_b) {
+    //     tile_mma::mma(matAcc, matAcc, matA_acc, matB_acc);
+    //   } else {
+        tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+    //   }
       SW_BARRIER();
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
