@@ -27,6 +27,7 @@ int2 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int5 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int6 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int7 | symmetric or asymmetric<sup>2</sup> | multiplier of 8, -1<sup>1</sup>
+int1 | symmetric or asymmetric | multiplier of 8, -1<sup>1</sup>
 int8 | symmetric | multiplier of 8, -1<sup>1</sup>
 fp4 | | multiplier of 8
 nf4 | | multiplier of 8
@@ -84,7 +85,10 @@ Skylake |  sym int3<br>group size=128<br>compute type=fp32 | AVX512F
 Alder Lake (12th Gen)<br>Raptor Lake (13th and 14th Gen)| sym int3<br>group size=128<br>compute type=int8 | AVX_VNNI
 Older architecture (before 12th Gen)|  sym int3<br>group size=128<br>compute type=int8 | AVX2
 
+`sym int5 group=-1 comp_dtype=int8` is the fastest configuration for the first-token with good accuracy.  
+`sym int3 group=128 comp_dtype=int8` is the fastest configuration for the next-token with good accuracy.
+
 NOTE:  
-1. group_size=-1 requires the INC's finetuned model, or it may have lower accuracy than small group sizes. It has the smallest model size, and the fastest first-token performance.
+1. group_size=-1 has the smallest model size, and the fastest first-token performance. But it requires the INC's finetuned model, or it may have lower accuracy than small group sizes. It 
 2. group_size=128 is a balance of accuracy and speed if you want RTN quantization only.
 3. group_size=32, scale_dtype=bf16, compute_dtype=int8, alg=sym equals llama.cpp's Q4_0.
