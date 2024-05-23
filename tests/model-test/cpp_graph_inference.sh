@@ -465,10 +465,10 @@ function main() {
                         fi
                         monitor
                         chmod 777 ${WORKSPACE}/${logs_file}
-                        if [[ ${input} == "1024" || ${cores_per_instance} == "32" ]]; then
+                        if [[ ${input} == "1024" && ${cores_per_instance} == "32" ]]; then
                             echo "-------- Accuracy start--------"
                             if [[ "${model}" == "llama"* || "${model}" == "gptj-6b" ]]; then
-                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai,piqa  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
+                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai,piqa
                             else
                                 python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai,boolq,piqa,hellaswag --batch_size 1  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
                             fi
