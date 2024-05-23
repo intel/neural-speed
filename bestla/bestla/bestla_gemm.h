@@ -1228,13 +1228,15 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
   static int constexpr NRegs = _NTILE / RegLen;
+  static int constexpr KeepRegs = std::is_same_v<AT, uint8_t> ? 3 : 5;
   static int constexpr MRegs = _MTILE == 0 ? (RegCount - 1) / NRegs : _MTILE;
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::AVX512F; // Actual is AVX512_BW
-  static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
-  typedef uint8_t AType;
+  static auto constexpr ISA = BTLA_ISA::AVX512BW; // Actual is AVX512_BW
+  static auto constexpr COMPUTE =
+      std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_INT32 : CompType::COMP_INT8_SS_INT32;
+  using AType = AT;
   typedef int8_t BType;
   typedef int32_t CType;
   struct params {
@@ -1247,6 +1249,7 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
     int k;
     int n;
     int init;
+    const int16_t one = 1;
   };
   typedef long long (*func_t)(params*);
 
@@ -1284,7 +1287,12 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
   void assign_regs() {
     CRegCount = MRegs * NRegs;
     ARegCount = 1;
-    BRegCount = RegCount - ARegCount - CRegCount;
+    if (std::is_same_v<AT, int8_t>) {
+      TmpRegCount = 4;
+    } else {
+      TmpRegCount = 2;
+    }
+    BRegCount = RegCount - ARegCount - CRegCount - TmpRegCount;
     if (BRegCount < NRegs) {
       BRegCount = 0;
       ARegCount = BRegCount + 1;
@@ -1296,8 +1304,7 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
     BReg = CReg + CRegCount;
     AReg = BReg + BRegCount;
     TmpReg = AReg + ARegCount;
-    assert(TmpReg <= RegCount);
-    TmpRegCount = RegCount - TmpReg;
+    assert(TmpReg + TmpRegCount <= RegCount);
   }
 
   void generate_mtile(int _mtile) {
@@ -1319,7 +1326,7 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
     reg_ret = rax;
 
     vreg_push(rsp);
-
+    vpbroadcastw(vreg_t(TmpReg + 0), ptr[parambase + OFFSET(one)]);
     load32(reg_ksize, ptr[parambase + OFFSET(k)]);
     load32(reg_nsize, ptr[parambase + OFFSET(n)]);
     xor_(reg_itern, reg_itern);
@@ -1368,7 +1375,6 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
     L(".kend");
     outLocalLabel();
   }
-
   void generate_fma(int _mtile, int _kunroll) {
     for (int kk = 0; kk < _kunroll; kk++) {
       lea(reg_tmp1, ptr[reg_matAptr + kk * AKStepSize]);
@@ -1378,9 +1384,19 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
         }
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
+          if constexpr (std::is_same_v<AType, int8_t>) {
+            vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg), vreg_t(AReg));
+          }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
-            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg), vreg_t(BReg + i));
+            if constexpr (std::is_same_v<AType, uint8_t>) {
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(BReg + i),
+                         vreg_t(TmpReg + 0));
+            } else {
+              vpsignb(vreg_t(TmpReg + 3), vreg_t(BReg + i), vreg_t(AReg));
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
+                         vreg_t(TmpReg + 0));
+            }
           }
         }
       } else if (BRegCount == 0) {
@@ -1388,10 +1404,20 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
           int mm_re = utils::remainsize(mm, _mtile, ARegCount);
           for (int imm = 0; imm < mm_re; imm++) {
             vpbroadcastd(vreg_t(AReg + imm), ptr[reg_tmp1]);
+            if constexpr (std::is_same_v<AType, int8_t>) {
+              vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg + imm), vreg_t(AReg + imm));
+            }
             add(reg_tmp1, reg_astride);
             for (int i = 0; i < NRegs; i++) {
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(AReg + imm),
-                         ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+              if constexpr (std::is_same_v<AType, uint8_t>) {
+                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg + imm),
+                           ptr[reg_matBptr + kk * BKStepSize + i * VecBytes], vreg_t(TmpReg + 0));
+              } else {
+                vmovups(vreg_t(TmpReg + 3), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
+                vpsignb(vreg_t(TmpReg + 3), vreg_t(TmpReg + 3), vreg_t(AReg + imm));
+                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
+                           vreg_t(TmpReg + 0));
+              }
             }
           }
         }
@@ -1400,6 +1426,7 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
       }
     }
   }
+
 
   void init_regs(int _mtile) {
     inLocalLabel();
@@ -1440,6 +1467,12 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
     outLocalLabel();
   }
 };
+
+template <int N, int M>
+using Avx512bwN16P4U8 = Avx512bwN16P4<uint8_t, N, M>;
+
+template <int N, int M>
+using Avx512bwN16P4S8 = Avx512bwN16P4<int8_t, N, M>;
 
 template <typename AT, int _NTILE, int _MTILE = 0>
 class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
