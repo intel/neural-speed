@@ -78,6 +78,9 @@ static bool hasISA(const uint64_t* coreset, size_t len) {
       case BTLA_ISA::AVX512F:
         support |= _cd->AVX512F();
         break;
+      case BTLA_ISA::AVX512BW:
+        support |= _cd->AVX512BW();
+        break;
       case BTLA_ISA::AVX512_VNNI:
         support |= _cd->AVX512_VNNI();
         break;

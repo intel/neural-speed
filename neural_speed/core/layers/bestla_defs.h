@@ -30,6 +30,7 @@ using tLauncher_Int8_F32F32 =
 using tAVX2 = gemm::SCoreRowNAvx2<24, 4>;
 using tAVX_VNNI = gemm::ICoreRowNAvxvnni<24, 4>;
 using tAVX512F = gemm::SCoreRowNAvx512f<48, 8>;
+using tAVX512BW = gemm::ICoreRowNAvx512bw<48, 8>;
 using tAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using tAMX_BF16 = gemm::HCoreRowNAmxbf16<48, 16>;
 using tAVX512_BF16 = gemm::HCoreRowNAvx512bf16<48, 8>;
@@ -39,6 +40,7 @@ using tAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<48, 16>;
 
 using tAVX2_VNNI_KBlock = gemm::ICoreRowNAvx2vnniKBlock<24, 2>;
 using tAVX_VNNI_KBlock = gemm::ICoreRowNAvxvnniKBlock<24, 2>;
+using tAVX512BW_KBlock = gemm::ICoreRowNAvx512bwKBlock<48, 8>;
 using tAVX512_VNNI_KBlock = gemm::ICoreRowNAvx512vnniKBlock<48, 4>;
 using tAMX_INT8_US_KBlock = gemm::ICoreRowNAmxint8KBlock<48, 16>;
 using tAMX_INT8_SS_KBlock = gemm::ICoreRowNAmxint8SSKBlock<48, 16>;
@@ -52,15 +54,18 @@ template <class GC_T, BTLA_ISA ISA_T>
 using tActKBaseF32 = prologue_a::gemm::ShuffleActivationKBlockBaseF32<GC_T, ISA_T>;
 
 constexpr uint64_t Fp32Cores[] = {tAVX2::ID, tAVX512F::ID};
-constexpr uint64_t Bf16Cores[] = {tAMX_BF16::ID};
+constexpr uint64_t Bf16Cores[] = {tAMX_BF16::ID, tAVX512_BF16::ID};
 constexpr uint64_t Fp16Cores[] = {tAVX512_FP16::ID};
-constexpr uint64_t Int8Cores[] = {tAVX_VNNI::ID, tAVX512F::ID, tAVX512_VNNI::ID, tAMX_INT8_US::ID, tAMX_INT8_SS::ID};
+constexpr uint64_t Int8Cores[] = {tAVX2::ID,        tAVX_VNNI::ID,    tAVX2_VNNI_KBlock::ID, tAVX512BW_KBlock::ID,
+                                  tAVX512_VNNI::ID, tAMX_INT8_US::ID, tAMX_INT8_SS::ID};
 constexpr uint64_t FloatCores[] = {tAVX2::ID, tAVX512F::ID, tAMX_BF16::ID, tAVX512_FP16::ID};
 constexpr uint64_t AllKBlockCores[] = {tAVX2::ID,
                                        tAVX512F::ID,
                                        tAMX_BF16::ID,
                                        tAVX512_FP16::ID,
+                                       tAVX2_VNNI_KBlock::ID,
                                        tAVX_VNNI_KBlock::ID,
+                                       tAVX512BW_KBlock::ID,
                                        tAVX512_VNNI_KBlock::ID,
                                        tAMX_INT8_US_KBlock::ID,
                                        tAMX_INT8_SS_KBlock::ID};
