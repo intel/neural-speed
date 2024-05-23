@@ -172,8 +172,7 @@ class Benchmark_U8S8S32 {
                                                          threads);
       }
       if (_cd->AVX512BW()) {
-        benchmark<gemm::ICoreRowNAvx512bw<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
-                                                         threads);
+        benchmark<gemm::ICoreRowNAvx512bw<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
       }
       if (_cd->AVX_VNNI()) {
         benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
@@ -183,8 +182,8 @@ class Benchmark_U8S8S32 {
   }
 };
 #ifdef BTLA_UT_WRAPPER
-#endif
 static Benchmark_U8S8S32 sBenchmark_U8S8S32;
+#endif
 
 class Benchmark_S8S8S32 {
  public:
@@ -859,6 +858,10 @@ class UTWOQ_CompInt8 {
           benchmark<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
+        if (_cd->AVX512_VNNI()) {
+          benchmark<gemm::ICoreRowNAvx512bwKBlock<48, 8>, LOG, Wei, Scale_T>(
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
+        }
         if (_cd->AVX_VNNI()) {
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
@@ -872,8 +875,8 @@ class UTWOQ_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 #endif
+static UTWOQ_CompInt8 sUTWOQ_CompInt8;
 
 #if 0
 typedef struct {
