@@ -23,6 +23,7 @@ using sAMX_BF16 = gemm::HCoreRowNAmxbf16<64, 16>;
 using sAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
 using sAVX_VNNI = gemm::ICoreRowNAvxvnni<24, 4>;
 using sAVX_VNNI_SS = gemm::ICoreRowNAvxvnniSS<24, 4>;
+using sAVX512BW = gemm::ICoreRowNAvx512bw<48, 8>;
 using sAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using sAMX_INT8_US = gemm::ICoreRowNAmxint8<64, 16>;
 using sAMX_INT8_SS = gemm::ICoreRowNAmxint8SS<64, 16>;

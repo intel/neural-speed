@@ -66,8 +66,8 @@ class UT_avx512_decompress_s1_s8 {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 static UT_avx512_decompress_s1_s8 sUT_avx512_decompress_s1_s8;
+#endif
 
 class UT_avx512_decompress_s4_s8 {
  public:
@@ -1663,8 +1663,8 @@ class UT_avx512_gemv {
   }
 };
 #ifdef BTLA_UT_KERNEL_INTRIN
-#endif
 UT_avx512_gemv sUT_avx512_gemv;
+#endif
 #endif
 
 #if CompileAVX2()

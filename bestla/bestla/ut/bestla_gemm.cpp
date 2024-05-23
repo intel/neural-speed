@@ -348,18 +348,19 @@ class UT_GEMM_AVX512BW {
  public:
   UT_GEMM_AVX512BW() {
     UT_START();
-    CheckISA(AVX);
+    CheckISA(AVX512BW);
     ut<32, 0>(4, 64, 12);
     ut<32, 12>(4, 64, 12);
 
     ut<48, 0>(4, 96, 12);
     ut<48, 8>(4, 96, 12);
+
   }
 
   template <int NTile, int MTile>
   void ut(int m, int n, int k) {
     printf("Test Case: %d %d %d\n", m, n, k);
-    using Core = gemm::ICoreRowNAvx512vnni<NTile, MTile>;
+    using Core = gemm::ICoreRowNAvx512bw<NTile, MTile>;
     static Core gemm;
     if (n % Core::Code::NTILE != 0) {
       return;
@@ -370,7 +371,7 @@ class UT_GEMM_AVX512BW {
     avector<uint8_t> A(m * k);
     avector<int8_t> B(k * n);
     avector<int> C(m * n, 0), RefC(m * n, 0);
-    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)255);
+    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)128);
     fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
     ref_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]),
                                 n * sizeof(C[0]), 0);
@@ -379,10 +380,11 @@ class UT_GEMM_AVX512BW {
                  CacheSize);
     ut::buffer_error(RefC.data(), C.data(), RefC.size(), 1);
   }
+
 };
 #ifdef BTLA_UT_GEMM
-#endif
 static UT_GEMM_AVX512BW sUT_GEMM_AVX512BW;
+#endif
 
 class UT_GEMM_AVX512VNNI_KBLOCK {
  public:

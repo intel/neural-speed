@@ -4682,7 +4682,6 @@ static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
   __m512i zero = _mm512_setzero_si512();
   __mmask64 blt0 = _mm512_movepi8_mask(b);
   return _mm512_mask_sub_epi8(a, blt0, zero, a);
-  ;
 }
 
 template <typename ScaleT, int NReg, int MTILE>

@@ -1222,21 +1222,20 @@ class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
   }
 };
 
-template <typename AT, int _NTILE, int _MTILE = 0>
+template <int _NTILE, int _MTILE = 0>
 class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
   static int constexpr NRegs = _NTILE / RegLen;
-  static int constexpr KeepRegs = std::is_same_v<AT, uint8_t> ? 3 : 5;
-  static int constexpr MRegs = _MTILE == 0 ? (RegCount - 1) / NRegs : _MTILE;
+  static int constexpr KeepRegs = 3;
+  static int constexpr MRegs = _MTILE == 0 ? (RegCount - KeepRegs) / NRegs : _MTILE;
   static_assert(NRegs * MRegs <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
-  static auto constexpr ISA = BTLA_ISA::AVX512BW; // Actual is AVX512_BW
-  static auto constexpr COMPUTE =
-      std::is_same_v<AT, uint8_t> ? CompType::COMP_INT8_US_INT32 : CompType::COMP_INT8_SS_INT32;
-  using AType = AT;
+  static auto constexpr ISA = BTLA_ISA::AVX512BW; 
+  static auto constexpr COMPUTE = CompType::COMP_INT8_US_INT32;
+  typedef uint8_t AType;
   typedef int8_t BType;
   typedef int32_t CType;
   struct params {
@@ -1287,11 +1286,8 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
   void assign_regs() {
     CRegCount = MRegs * NRegs;
     ARegCount = 1;
-    if (std::is_same_v<AT, int8_t>) {
-      TmpRegCount = 4;
-    } else {
-      TmpRegCount = 2;
-    }
+    TmpRegCount = 2;
+
     BRegCount = RegCount - ARegCount - CRegCount - TmpRegCount;
     if (BRegCount < NRegs) {
       BRegCount = 0;
@@ -1384,19 +1380,10 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
         }
         for (int mm = 0; mm < _mtile; mm++) {
           vpbroadcastd(vreg_t(AReg), ptr[reg_tmp1]);
-          if constexpr (std::is_same_v<AType, int8_t>) {
-            vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg), vreg_t(AReg));
-          }
           add(reg_tmp1, reg_astride);
           for (int i = 0; i < NRegs; i++) {
-            if constexpr (std::is_same_v<AType, uint8_t>) {
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(BReg + i),
-                         vreg_t(TmpReg + 0));
-            } else {
-              vpsignb(vreg_t(TmpReg + 3), vreg_t(BReg + i), vreg_t(AReg));
-              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
-                         vreg_t(TmpReg + 0));
-            }
+            vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg), vreg_t(BReg + i),
+                       vreg_t(TmpReg + 0));
           }
         }
       } else if (BRegCount == 0) {
@@ -1404,20 +1391,10 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
           int mm_re = utils::remainsize(mm, _mtile, ARegCount);
           for (int imm = 0; imm < mm_re; imm++) {
             vpbroadcastd(vreg_t(AReg + imm), ptr[reg_tmp1]);
-            if constexpr (std::is_same_v<AType, int8_t>) {
-              vpsignb(vreg_t(TmpReg + 2), vreg_t(AReg + imm), vreg_t(AReg + imm));
-            }
             add(reg_tmp1, reg_astride);
             for (int i = 0; i < NRegs; i++) {
-              if constexpr (std::is_same_v<AType, uint8_t>) {
-                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg + imm),
-                           ptr[reg_matBptr + kk * BKStepSize + i * VecBytes], vreg_t(TmpReg + 0));
-              } else {
-                vmovups(vreg_t(TmpReg + 3), ptr[reg_matBptr + kk * BKStepSize + i * VecBytes]);
-                vpsignb(vreg_t(TmpReg + 3), vreg_t(TmpReg + 3), vreg_t(AReg + imm));
-                vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(TmpReg + 2), vreg_t(TmpReg + 3),
-                           vreg_t(TmpReg + 0));
-              }
+              vpdpbusds_(vreg_t(CReg + mm * NRegs + i), vreg_t(TmpReg + 1), vreg_t(AReg + imm),
+                         ptr[reg_matBptr + kk * BKStepSize + i * VecBytes], vreg_t(TmpReg + 0));
             }
           }
         }
@@ -1467,12 +1444,6 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
     outLocalLabel();
   }
 };
-
-template <int N, int M>
-using Avx512bwN16P4U8 = Avx512bwN16P4<uint8_t, N, M>;
-
-template <int N, int M>
-using Avx512bwN16P4S8 = Avx512bwN16P4<int8_t, N, M>;
 
 template <typename AT, int _NTILE, int _MTILE = 0>
 class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
@@ -4384,6 +4355,22 @@ class ICoreRowNAvx2vnniSS : public CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _M
   using Code = typename CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _MTILE>::Code;
 
   void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+    auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
+    if (_m <= Code::MTILE) {
+      this->mCodes[_m - 1].mKernel(&param);
+    } else {
+      assert(0);
+    }
+  }
+};
+
+template <int _NTILE, int _MTILE = 0>
+class ICoreRowNAvx512bw : public CoreCodeBase<code::Avx512bwN16P4, _NTILE, _MTILE> {
+ public:
+  using Code = typename CoreCodeBase<code::Avx512bwN16P4, _NTILE, _MTILE>::Code;
+
+  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
                int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
