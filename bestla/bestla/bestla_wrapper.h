@@ -284,11 +284,12 @@ class LauncherBase {
     template <typename ScaleT, int MTILE, class SNbits>
     static void gemv_kblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
-        auto constexpr TmpSize = 3 * 1024LL;
-        auto constexpr CSize = 1 * 1024LL;
+        auto constexpr TmpSize = 16 * 1024LL;
+        auto constexpr CSize = 8 * 1024LL;
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
+        static_assert(CSize >= (MTILE * GemmCore::NTILE * sizeof(float)));
         utils::GemvParamB<ScaleT> paramB = SNbits::template createB<ScaleT>(_param.paramB.packedW);
         const float* Aptr = _param.paramA.A;
         if constexpr (std::is_same_v<PrologueA,
@@ -689,8 +690,9 @@ class LauncherIntKBlock {
     template <typename ScaleT, int MTILE, class SNbits>
     static void gemv_kblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
-        auto constexpr TmpSize = 3 * 1024LL;
-        auto constexpr CSize = 1 * 1024LL;
+        auto constexpr TmpSize = 16 * 1024LL;
+        auto constexpr CSize = 8 * 1024LL;
+        static_assert(CSize >= (MTILE * GemmCore::NTILE * sizeof(float)));
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
