@@ -1113,6 +1113,18 @@ class UT_CompInt8 {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
     }
+    if (_cd->AVX512BW()) {
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
+                                                           true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
+                                                           true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
+                                                           true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+    }
     if (_cd->AVX512_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
                                                            true);
@@ -1309,8 +1321,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-static UT_CompInt8 sUT_CompInt8;
 #endif
+static UT_CompInt8 sUT_CompInt8;
 
 class UT_CompBf16 {
  public:

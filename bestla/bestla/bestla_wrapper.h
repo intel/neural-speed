@@ -261,7 +261,7 @@ class LauncherBase {
       }
       return false;
     }
-    static int constexpr MaxGemvM = 4;
+    static int constexpr MaxGemvM = GemmCore::ISA >= BTLA_ISA::AVX512F ? 8 : 4;
     static bool implemented(const Param& _param) {
       bool impl = true;
       impl &= _param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP ||
@@ -569,6 +569,14 @@ class LauncherIntKBlock {
         }
 #endif
       }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512BW) {
+#if CompileAVX512F()
+        static_assert(GemmCore::PACK_ROW == 4);
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_FP32) {
+          return true;
+        }
+#endif
+      }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX512_VNNI || GemmCore::ISA == BTLA_ISA::AMX_INT8) {
 #if CompileAVX512VNNI()
         static_assert(GemmCore::PACK_ROW == 4);
@@ -582,7 +590,7 @@ class LauncherIntKBlock {
       }
       return false;
     }
-    static int constexpr MaxGemvM = 4;
+    static int constexpr MaxGemvM = GemmCore::ISA >= BTLA_ISA::AVX512F ? 8 : 4;
 
     static bool implemented(const Param& _param) {
       bool impl = true;
