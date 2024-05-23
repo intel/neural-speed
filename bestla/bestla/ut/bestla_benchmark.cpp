@@ -189,9 +189,9 @@ class Benchmark_S8S8S32 {
  public:
   Benchmark_S8S8S32() {
     UT_START();
-    benchmark_all(1, 4096, 4096);
+    //benchmark_all(1, 4096, 4096);
     benchmark_all(1024, 4096, 4096);
-    benchmark_all(2048, 4096, 4096);
+    //benchmark_all(2048, 4096, 4096);
   }
 
   using AType = int8_t;
@@ -709,10 +709,11 @@ class UTWOQ_CompInt8 {
     //   ut_s8();
   }
   void ut_s1() {
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP, true);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
-    /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP, true);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    //benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    /*
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S1_CLIP);*/
   }
 
