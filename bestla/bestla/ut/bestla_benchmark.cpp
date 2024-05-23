@@ -866,6 +866,8 @@ class UTWOQ_CompInt8 {
         if (_cd->AVX_VNNI()) {
           benchmark<gemm::ICoreRowNAvxvnniKBlock<24, 2>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
+          benchmark<gemm::ICoreRowNAvxvnniKBlock<16, 6>, LOG, Wei, Scale_T>(
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
         if (_cd->AVX2()) {
           benchmark<gemm::ICoreRowNAvx2vnniKBlock<24, 2>, LOG, Wei, Scale_T>(

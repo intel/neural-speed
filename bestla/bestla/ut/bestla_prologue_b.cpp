@@ -1105,13 +1105,13 @@ class UT_CompInt8 {
   void ut_s7() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
     }
     if (_cd->AVX512BW()) {
       ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
