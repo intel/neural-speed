@@ -185,12 +185,10 @@ class DequantInt32ToFp32 {
   }
 };
 
-struct ParamCompInt8BlockEpilogue {
+struct ParamPcKBlockCompInt8Epilogue {
   void* scalesB;
   BTLA_DTYPE scaleBdtype;
-  int ldsb;
   float* scalesA;
-  int ldsa;
   // optional if A asym
   uint8_t* zpA = nullptr;
   void* reduceB = nullptr;
@@ -200,69 +198,66 @@ struct ParamCompInt8BlockEpilogue {
   float* reduceA = nullptr;
   int K = 1;
 };
-template <BTLA_ISA ISA_T>
-class CompInt8BlockEpilogue {
+template <class Fp32Epilogue, BTLA_ISA ISA_T>
+class PcKBlockCompInt8Epilogue {
  public:
-  using Param = ParamCompInt8BlockEpilogue;
-  static BTLA_CODE forward(const int32_t* srcptr, float* dstptr, const int cachestep, const int M_offset,
-                           const int N_offset, const int K_offset, const int M, const int N, const Param& _param,
-                           void* tmpcache, size_t cachesize) {
+  struct Param {
+    ParamPcKBlockCompInt8Epilogue param1;
+    typename Fp32Epilogue::Param param2;
+  };
+  static BTLA_CODE forward(const int32_t* srcptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
     float* scab = nullptr;
     size_t ScaleBTmpSize = N * sizeof(float);
     size_t ReduceBTmpSize = N * sizeof(float);
     assert(cachesize >= (ScaleBTmpSize + ReduceBTmpSize));
-    if (_param.scaleBdtype == BTLA_DTYPE::BF16) {
+    auto& param1 = _param.param1;
+    if (param1.scaleBdtype == BTLA_DTYPE::BF16) {
       auto scache = reinterpret_cast<float*>(tmpcache);
       ret = kernel::wrapper::Memcpy2DBf16CvtFp32::template forward<ISA_T>(
-          reinterpret_cast<utils::bf16*>(_param.scalesB) + N_offset + K_offset * _param.ldsb, scache, 1, N, N, N,
-          false);
+          reinterpret_cast<utils::bf16*>(param1.scalesB) + N_offset, scache, 1, N, N, N, false);
       assert(ret == BTLA_CODE::Success);
       scab = scache;
-    } else if (_param.scaleBdtype == BTLA_DTYPE::F32) {
-      scab = reinterpret_cast<float*>(_param.scalesB) + N_offset + K_offset * _param.ldsb;
+    } else if (param1.scaleBdtype == BTLA_DTYPE::F32) {
+      scab = reinterpret_cast<float*>(param1.scalesB) + N_offset;
     }
     float* redb = nullptr;
-    if (_param.reduceB) {
-      if (_param.reduceBdtype == BTLA_DTYPE::BF16) {
+    if (param1.reduceB) {
+      if (param1.reduceBdtype == BTLA_DTYPE::BF16) {
         auto rcache = reinterpret_cast<float*>(reinterpret_cast<char*>(tmpcache) + ScaleBTmpSize);
         ret = kernel::wrapper::Memcpy2DBf16CvtFp32::template forward<ISA_T>(
-            reinterpret_cast<utils::bf16*>(_param.reduceB) + N_offset + K_offset * _param.ldsb, rcache, 1, N, N, N,
-            false);
+            reinterpret_cast<utils::bf16*>(param1.reduceB) + N_offset, rcache, 1, N, N, N, false);
         assert(ret == BTLA_CODE::Success);
         redb = rcache;
-      } else if (_param.reduceBdtype == BTLA_DTYPE::F32) {
-        redb = reinterpret_cast<float*>(_param.reduceB) + N_offset + K_offset * _param.ldsb;
+      } else if (param1.reduceBdtype == BTLA_DTYPE::F32) {
+        redb = reinterpret_cast<float*>(param1.reduceB) + N_offset;
       }
     }
-    ret = kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(
-        srcptr, cachestep, reinterpret_cast<float*>(const_cast<int32_t*>(srcptr)), cachestep, M, N,
-        _param.scalesA + M_offset * _param.ldsa + K_offset, _param.ldsa, scab);
-    assert(ret == BTLA_CODE::Success);
-    ret = kernel::wrapper::AccumulateFp32::template forward<ISA_T>(reinterpret_cast<const float*>(srcptr), cachestep,
-                                                                   dstptr, cachestep, M, N);
+    auto tmpfp32ptr = reinterpret_cast<float*>(const_cast<int32_t*>(srcptr));
+    ret = kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(srcptr, cachestep, tmpfp32ptr, cachestep, M, N,
+                                                                  param1.scalesA + M_offset, 1, scab);
     assert(ret == BTLA_CODE::Success);
 
-    if (_param.zpA == nullptr) {
-      if (_param.zpB == nullptr) {
-        return ret;
+    if (param1.zpA == nullptr) {
+      if (param1.zpB == nullptr) {
+
       } else {
         ret = kernel::wrapper::RemoveZeroPointBias::template forward_wei<ISA_T>(
-            dstptr, cachestep, M, N, _param.zpB + N_offset + K_offset * _param.ldsb, scab, _param.ldsa,
-            _param.reduceA + M_offset * _param.ldsa + K_offset);
+            tmpfp32ptr, cachestep, M, N, param1.zpB + N_offset, scab, 1, param1.reduceA + M_offset);
       }
     } else {
-      if (_param.zpB == nullptr) {
+      if (param1.zpB == nullptr) {
         ret = kernel::wrapper::RemoveZeroPointBias::template forward_act<ISA_T>(
-            dstptr, cachestep, M, N, _param.zpA + M_offset * _param.ldsa + K_offset,
-            _param.scalesA + M_offset * _param.ldsa + K_offset, _param.ldsa, redb);
+            tmpfp32ptr, cachestep, M, N, param1.zpA + M_offset, param1.scalesA + M_offset, 1, redb);
       } else {
         ret = kernel::wrapper::RemoveZeroPointBias::template forward_both<ISA_T>(
-            dstptr, cachestep, M, N, _param.zpA + M_offset * _param.ldsa + K_offset,
-            _param.zpB + N_offset + K_offset * _param.ldsb, _param.scalesA + M_offset * _param.ldsa + K_offset, scab,
-            _param.ldsa, _param.K, _param.reduceA + M_offset * _param.ldsa + K_offset, redb);
+            tmpfp32ptr, cachestep, M, N, param1.zpA + M_offset, param1.zpB + N_offset, param1.scalesA + M_offset, scab,
+            1, param1.K, param1.reduceA + M_offset, redb);
       }
     }
+    Fp32Epilogue::forward(tmpfp32ptr, cachestep, M_offset, N_offset, M, N, _param.param2, tmpcache, cachesize);
+
     return ret;
   }
 };

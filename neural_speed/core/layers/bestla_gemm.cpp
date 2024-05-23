@@ -51,14 +51,43 @@ void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, cons
     parallel::GemmRun<Parallel>(kernel, args, th);
   }
 }
-
+#if 0
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
+void BTLAGemmCompInt8PC(const int M, const int N, const int K, const float* A, const int lda,
+                        storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
+                        parallel::IThreading* th) {
+  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
+  assert(B->mBlockSize >= K);
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32,
+                                  Wei_T, epilogue::gemm::AccumulatorWriteBackInt32>;
+  utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
+  static Launcher kernel;
+  auto quanA = kernel.mProA.createQuantStorage(M, K, B->mBlockSize, B->IsAsym());
+  quanA.assign(WorkSpace);
+  WorkSpace += quanA.mSize;
+  auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
+  typename Launcher::Param args{gp, {A, K, &quanA, B->ShfIndice(), &reordA}, {B}, {C, N}};
+  if (B->ShfIndice()) {
+    reordA.assign(WorkSpace);
+    kernel.mProA.quantize({A, K, &quanA, B->ShfIndice(), &reordA}, M, K, th);
+    parallel::GemmRun<Parallel>(kernel, args, th);
+  } else {
+    parallel::GemmRunWithA<Parallel>(kernel, args, th);
+  }
+}
+#endif
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompInt8(const int M, const int N, const int K, const float* A, const int lda,
                       storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
                       parallel::IThreading* th) {
+  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
+  //if (B->mBlockSize == K) {
+  //  BTLAGemmCompInt8PC<GemmCore_T, Wei_T>(M, N, K, A, lda, _B, C, ldc, WorkSpace, th);
+  //  return;
+  //}
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher = tLauncher_Int8_F32F32<GemmCore_T, Wei_T>;
-  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
   utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
   static Launcher kernel;
   auto quanA = kernel.mProA.createQuantStorage(M, K, B->mBlockSize, B->IsAsym());
