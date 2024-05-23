@@ -2504,7 +2504,7 @@ class AmxConfigure : protected xbyak::JitAmxtile {
 namespace kblock {
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512vnniN16P4_ : protected bestla::xbyak::JitAvx512vnni {
+class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -2802,7 +2802,7 @@ class Avx512vnniN16P4_ : protected bestla::xbyak::JitAvx512vnni {
 };
 
 template <int _NTILE, int _MTILE = 0>
-class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
+class Avx512vnniN16P4_ : protected bestla::xbyak::JitAvx512vnni {
  public:
   static int constexpr RegLen = 16, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -3391,7 +3391,7 @@ class Avx512bwN16P4 : protected bestla::xbyak::JitAvx512bw {
 };
 
 template <typename AT, int _NTILE, int _MTILE = 0>
-class AvxvnniN8P4_ : protected bestla::xbyak::JitAvxvnni {
+class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
  public:
   static int constexpr RegLen = 8, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -3755,7 +3755,7 @@ class AvxvnniN8P4_ : protected bestla::xbyak::JitAvxvnni {
 
 
 template <typename AT, int _NTILE, int _MTILE = 0>
-class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
+class AvxvnniN8P4_ : protected bestla::xbyak::JitAvxvnni {
  public:
   static int constexpr RegLen = 8, PackRow = 4;
   static_assert(_NTILE % RegLen == 0);
@@ -3794,7 +3794,7 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   typedef long long (*func_t)(params*);
 
   int CRegCount = 0, BRegCount = 0, ARegCount = 0, TmpRegCount = 0;
-  int CReg = 0, CF32Reg = 0, BReg = 0, AReg = 0, TmpReg = 0;
+  int CReg = 0, BReg = 0, AReg = 0, TmpReg = 0;
   static int constexpr BKStepSize = KTILE * NTILE * sizeof(BType);
   static int constexpr AKStepSize = KTILE * sizeof(AType);
 
@@ -3836,13 +3836,12 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
       BRegCount = 0;
     }
     CReg = 0;
-    CF32Reg = CReg + CRegCount;
-    BReg = CF32Reg + CRegCount;
+    BReg = CReg + CRegCount;
     AReg = BReg + BRegCount;
     TmpReg = AReg + ARegCount;
     assert(TmpReg < RegCount);
     TmpRegCount = RegCount - TmpReg;
-    assert(TmpRegCount >= 2);
+    assert(TmpRegCount >= 1);
   }
 
   void generate_mtile(int _mtile) {

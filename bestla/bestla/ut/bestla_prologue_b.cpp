@@ -1105,13 +1105,13 @@ class UT_CompInt8 {
   void ut_s7() {
     GetCPUDevice();
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<16, 6>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
     }
     if (_cd->AVX512BW()) {
       ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
@@ -1126,16 +1126,16 @@ class UT_CompInt8 {
       ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
     }
     if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
                                                            true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
                                                            true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
                                                            true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 8>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
     }
     if (_cd->AMX_INT8()) {
       ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
@@ -1321,8 +1321,8 @@ class UT_CompInt8 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UT_CompInt8 sUT_CompInt8;
+#endif
 
 class UT_CompBf16 {
  public:
