@@ -3753,7 +3753,6 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   }
 };
 
-
 template <typename AT, int _NTILE, int _MTILE = 0>
 class AvxvnniN8P4_ : protected bestla::xbyak::JitAvxvnni {
  public:

@@ -1187,8 +1187,7 @@ class GEMVWoqNBits {
 #endif
 #if CompileAVX512F()
       if (ISA_T >= BTLA_ISA::AVX512BW) {
-        return avx512f::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp,
-                                                                        tmpsize);
+        return avx512f::gemv_6bit_u8s8_fp32<ScaleT, NTILE, MTILE>(A, B, C, ldc, k, blocksize, (int8_t*)tmp, tmpsize);
       }
 #endif
 #if CompileAVXVNNI()

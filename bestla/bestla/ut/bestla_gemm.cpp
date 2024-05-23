@@ -354,7 +354,6 @@ class UT_GEMM_AVX512BW {
 
     ut<48, 0>(4, 96, 12);
     ut<48, 8>(4, 96, 12);
-
   }
 
   template <int NTile, int MTile>
@@ -380,7 +379,6 @@ class UT_GEMM_AVX512BW {
                  CacheSize);
     ut::buffer_error(RefC.data(), C.data(), RefC.size(), 1);
   }
-
 };
 #ifdef BTLA_UT_GEMM
 static UT_GEMM_AVX512BW sUT_GEMM_AVX512BW;

@@ -5408,14 +5408,12 @@ static inline BTLA_CODE gemv_7bit_fp32_fp32(const float* A, int lda, const utils
   return BTLA_CODE::Success;
 }
 
-
 static inline __m512i _mm512_dpbusd_avx512bw_epi32(__m512i& c, const __m512i& a, const __m512i& b) {
   const __m512i dot2 = _mm512_maddubs_epi16(a, b);
   const __m512i ones = _mm512_set1_epi16(1);
   const __m512i sum4 = _mm512_madd_epi16(ones, dot2);
   return _mm512_add_epi32(c, sum4);
 }
-
 
 template <typename ScaleT, int NTILE, int MTILE>
 static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
