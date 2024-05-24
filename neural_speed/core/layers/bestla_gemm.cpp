@@ -113,21 +113,16 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
           }
         }
         if (btype == gemm::CompType::tS8 && PackRow == 4) {
-          // Do we need US for AMX_INT8
           if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-            static_assert(tAMX_INT8_SS_KBlock::NTILE == tAVX512_VNNI_KBlock::NTILE);
-            if (M <= tAVX512_VNNI_KBlock::MTILE) {
-              BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                              DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
-            } else {
-              BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                              DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
-            }
-
+            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                            DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                      BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
                                                             DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+          } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+            BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
@@ -208,6 +203,10 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
         if (_cd->AVX512_VNNI() && BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
           return BTLABuSize<tLauncher_Int8_F32F32<tAVX512_VNNI_KBlock, Wei_T>>(
               static_cast<int>(BlkSize), N, K, QuantType, ScaleDtype, isAsym, shuffle_indice);
+        }
+        if (_cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+          return BTLABuSize<tLauncher_Int8_F32F32<tAVX512BW_KBlock, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType,
+                                                                            ScaleDtype, isAsym, shuffle_indice);
         }
         if (_cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           return BTLABuSize<tLauncher_Int8_F32F32<tAVX_VNNI_KBlock, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType,
@@ -297,6 +296,12 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
         }
         if (_cd->AVX512_VNNI() && BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
           BTLAGemmQuantPackB<tLauncher_Int8_F32F32<tAVX512_VNNI_KBlock, Wei_T>>(
+              PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
+              ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
+          return true;
+        }
+        if (_cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+          BTLAGemmQuantPackB<tLauncher_Int8_F32F32<tAVX512BW_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
               ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
           return true;
@@ -412,6 +417,12 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
               QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
           return true;
         }
+        if (_cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+          BTLAGemmPackBImpl<tLauncher_Int8_F32F32<tAVX512BW_KBlock, Wei_T>>(
+              PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
+              QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
+          return true;
+        }
         if (_cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
           BTLAGemmPackBImpl<tLauncher_Int8_F32F32<tAVX_VNNI_KBlock, Wei_T>>(
               PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
@@ -498,19 +509,16 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
         if (btype == gemm::CompType::tS8 && PackRow == 4) {
           // Do we need US for AMX_INT8
           if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-            static_assert(tAMX_INT8_SS_KBlock::NTILE == tAVX512_VNNI_KBlock::NTILE);
-            if (M <= tAVX512_VNNI_KBlock::MTILE) {
-              BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                              DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
-            } else {
-              BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                              DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
-            }
+            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                            DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
 
           } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                      BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
                                                             DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+          } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+            BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
           } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
             BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
@@ -627,6 +635,9 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
           proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI()) {
           static prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock, tAVX512_VNNI_KBlock::ISA> proB;
+          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+        } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAVX512BW_KBlock, tAVX512BW_KBlock::ISA> proB;
           proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI()) {
           static prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock, tAVX_VNNI_KBlock::ISA> proB;

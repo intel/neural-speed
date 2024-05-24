@@ -171,24 +171,26 @@ class Benchmark_U8S8S32 {
         benchmark<gemm::ICoreRowNAvx512vnni<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime,
                                                          threads);
       }
+      if (_cd->AVX512BW()) {
+        benchmark<gemm::ICoreRowNAvx512bw<48, 8>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
+      }
       if (_cd->AVX_VNNI()) {
-        benchmark<gemm::ICoreRowNAvxvnni<48, 2>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
         benchmark<gemm::ICoreRowNAvxvnni<24, 4>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
       }
     }
   }
 };
 #ifdef BTLA_UT_WRAPPER
-static Benchmark_U8S8S32 sBenchmark_U8S8S32;
 #endif
+static Benchmark_U8S8S32 sBenchmark_U8S8S32;
 
 class Benchmark_S8S8S32 {
  public:
   Benchmark_S8S8S32() {
     UT_START();
-    benchmark_all(1, 4096, 4096);
+    // benchmark_all(1, 4096, 4096);
     benchmark_all(1024, 4096, 4096);
-    benchmark_all(2048, 4096, 4096);
+    // benchmark_all(2048, 4096, 4096);
   }
 
   using AType = int8_t;
@@ -576,8 +578,8 @@ class UTWOQ_CompFp32 {
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
-#endif
 static UTWOQ_CompFp32 sUTWOQ_CompFp32;
+#endif
 
 class UTWOQ_CompBf16 {
  public:
@@ -706,10 +708,11 @@ class UTWOQ_CompInt8 {
     //   ut_s8();
   }
   void ut_s1() {
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP, true);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
-    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
-    /*benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP, true);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, float>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    // benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1, 4096, 4096, BTLA_DTYPE::S1_CLIP);
+    /*
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::S1_CLIP);*/
   }
 
@@ -853,6 +856,10 @@ class UTWOQ_CompInt8 {
         }
         if (_cd->AVX512_VNNI()) {
           benchmark<gemm::ICoreRowNAvx512vnniKBlock<48, 4>, LOG, Wei, Scale_T>(
+              m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
+        }
+        if (_cd->AVX512BW()) {
+          benchmark<gemm::ICoreRowNAvx512bwKBlock<48, 8>, LOG, Wei, Scale_T>(
               m, n, k, batch, blocksize, A.data(), B.data(), C.data(), testtime, threads, qtype, isasym);
         }
         if (_cd->AVX_VNNI()) {

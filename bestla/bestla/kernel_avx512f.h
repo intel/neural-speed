@@ -31,13 +31,7 @@ namespace avx512f {
 #if CompileAVX512F()
 #ifdef __GNUC__
 #pragma GCC push_options
-#pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512vbmi", "avx512dq")
-#if CompileBF16()
-#pragma GCC target("avx512bf16")
-#endif
-#if CompileFP16()
-#pragma GCC target("avx512fp16")
-#endif
+#pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512dq")
 #else
 #endif
 
@@ -46,6 +40,12 @@ inline __m512 zmm_cvt_bf16_fp32(__m256i vbf16) {
   return _mm512_castsi512_ps(_mm512_slli_epi32(vf32, 16));
 }
 
+#ifdef __GNUC__
+#pragma GCC push_options
+#if CompileBF16()
+#pragma GCC target("avx512bf16")
+#endif
+#endif
 inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) {
 #if CompileBF16()
   return (__m256i)_mm512_cvtneps_pbh(vfp32);
@@ -53,6 +53,9 @@ inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) {
   return _mm512_cvtepi32_epi16(_mm512_bsrli_epi128(_mm512_castps_si512(vfp32), 2));
 #endif
 }
+#ifdef __GNUC__
+#pragma GCC pop_options
+#endif
 
 static inline __m512 load_bf16_fp32(const utils::bf16* srcptr) {
   auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr));
@@ -1843,6 +1846,89 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
   return BTLA_CODE::Success;
 }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
+#endif
+// Interleave 2 bf16 zmm vectors inplace
+static inline void interleave_word(std::array<__m512i, 2>& dst) {  // NOLINT [runtime/references]
+  static constexpr uint32_t perm_idx_a[16]{
+      0 | 0,  1 | 0,  2 | 0,  3 | 0,   //
+      0 | 16, 1 | 16, 2 | 16, 3 | 16,  //
+      4 | 0,  5 | 0,  6 | 0,  7 | 0,   //
+      4 | 16, 5 | 16, 6 | 16, 7 | 16,  //
+  };
+  static constexpr uint32_t perm_idx_b[16]{
+      8 | 0,   9 | 0,   10 | 0,  11 | 0,   //
+      8 | 16,  9 | 16,  10 | 16, 11 | 16,  //
+      12 | 0,  13 | 0,  14 | 0,  15 | 0,   //
+      12 | 16, 13 | 16, 14 | 16, 15 | 16,  //
+  };
+  static const auto v_perm_idx_a = _mm512_loadu_si512(perm_idx_a);
+  static const auto v_perm_idx_b = _mm512_loadu_si512(perm_idx_b);
+
+  __m512i tmp[2];
+  tmp[0] = _mm512_unpacklo_epi16(dst[0], dst[1]);
+  tmp[1] = _mm512_unpackhi_epi16(dst[0], dst[1]);
+  dst[0] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_a, tmp[1]);
+  dst[1] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_b, tmp[1]);
+}
+
+// Interleave 16 zmm vectors of dwords inplace
+static inline void tr_x16_dword(std::array<__m512i, 16>& dst) {  // NOLINT [runtime/references]
+  __m512i tmp[16];
+
+  for (int i = 0; i < 8; ++i) {
+    tmp[2 * i] = _mm512_unpacklo_epi32(dst[2 * i], dst[2 * i + 1]);
+    tmp[2 * i + 1] = _mm512_unpackhi_epi32(dst[2 * i], dst[2 * i + 1]);
+  }
+
+  for (int i = 0; i < 4; ++i) {
+    dst[4 * i] = _mm512_unpacklo_epi64(tmp[4 * i], tmp[4 * i + 2]);
+    dst[4 * i + 1] = _mm512_unpackhi_epi64(tmp[4 * i], tmp[4 * i + 2]);
+    dst[4 * i + 2] = _mm512_unpacklo_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
+    dst[4 * i + 3] = _mm512_unpackhi_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
+  }
+
+  for (int i = 0; i < 2; ++i) {
+    tmp[8 * i + 0] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0x88);
+    tmp[8 * i + 1] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0x88);
+    tmp[8 * i + 2] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0x88);
+    tmp[8 * i + 3] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0x88);
+    tmp[8 * i + 4] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0xdd);
+    tmp[8 * i + 5] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0xdd);
+    tmp[8 * i + 6] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0xdd);
+    tmp[8 * i + 7] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0xdd);
+  }
+
+  dst[0] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0x88);
+  dst[1] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0x88);
+  dst[2] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0x88);
+  dst[3] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0x88);
+  dst[4] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0x88);
+  dst[5] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0x88);
+  dst[6] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0x88);
+  dst[7] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0x88);
+  dst[8] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0xdd);
+  dst[9] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0xdd);
+  dst[10] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0xdd);
+  dst[11] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0xdd);
+  dst[12] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0xdd);
+  dst[13] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0xdd);
+  dst[14] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0xdd);
+  dst[15] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0xdd);
+}
+
+#ifdef __GNUC__
+#pragma GCC push_options
+#if CompileBF16()
+#pragma GCC target("avx512bf16")
+#endif
+#if CompileFP16()
+#pragma GCC target("avx512fp16")
+#endif
+#endif
+
 static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
                                                     int src_step, int dst_step, bool zeropadding) {
 #if CompileFP16()
@@ -1921,79 +2007,6 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
   return BTLA_CODE::Success;
-}
-
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
-#endif
-// Interleave 2 bf16 zmm vectors inplace
-static inline void interleave_word(std::array<__m512i, 2>& dst) {  // NOLINT [runtime/references]
-  static constexpr uint32_t perm_idx_a[16]{
-      0 | 0,  1 | 0,  2 | 0,  3 | 0,   //
-      0 | 16, 1 | 16, 2 | 16, 3 | 16,  //
-      4 | 0,  5 | 0,  6 | 0,  7 | 0,   //
-      4 | 16, 5 | 16, 6 | 16, 7 | 16,  //
-  };
-  static constexpr uint32_t perm_idx_b[16]{
-      8 | 0,   9 | 0,   10 | 0,  11 | 0,   //
-      8 | 16,  9 | 16,  10 | 16, 11 | 16,  //
-      12 | 0,  13 | 0,  14 | 0,  15 | 0,   //
-      12 | 16, 13 | 16, 14 | 16, 15 | 16,  //
-  };
-  static const auto v_perm_idx_a = _mm512_loadu_si512(perm_idx_a);
-  static const auto v_perm_idx_b = _mm512_loadu_si512(perm_idx_b);
-
-  __m512i tmp[2];
-  tmp[0] = _mm512_unpacklo_epi16(dst[0], dst[1]);
-  tmp[1] = _mm512_unpackhi_epi16(dst[0], dst[1]);
-  dst[0] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_a, tmp[1]);
-  dst[1] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_b, tmp[1]);
-}
-
-// Interleave 16 zmm vectors of dwords inplace
-static inline void tr_x16_dword(std::array<__m512i, 16>& dst) {  // NOLINT [runtime/references]
-  __m512i tmp[16];
-
-  for (int i = 0; i < 8; ++i) {
-    tmp[2 * i] = _mm512_unpacklo_epi32(dst[2 * i], dst[2 * i + 1]);
-    tmp[2 * i + 1] = _mm512_unpackhi_epi32(dst[2 * i], dst[2 * i + 1]);
-  }
-
-  for (int i = 0; i < 4; ++i) {
-    dst[4 * i] = _mm512_unpacklo_epi64(tmp[4 * i], tmp[4 * i + 2]);
-    dst[4 * i + 1] = _mm512_unpackhi_epi64(tmp[4 * i], tmp[4 * i + 2]);
-    dst[4 * i + 2] = _mm512_unpacklo_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
-    dst[4 * i + 3] = _mm512_unpackhi_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
-  }
-
-  for (int i = 0; i < 2; ++i) {
-    tmp[8 * i + 0] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0x88);
-    tmp[8 * i + 1] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0x88);
-    tmp[8 * i + 2] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0x88);
-    tmp[8 * i + 3] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0x88);
-    tmp[8 * i + 4] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0xdd);
-    tmp[8 * i + 5] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0xdd);
-    tmp[8 * i + 6] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0xdd);
-    tmp[8 * i + 7] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0xdd);
-  }
-
-  dst[0] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0x88);
-  dst[1] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0x88);
-  dst[2] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0x88);
-  dst[3] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0x88);
-  dst[4] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0x88);
-  dst[5] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0x88);
-  dst[6] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0x88);
-  dst[7] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0x88);
-  dst[8] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0xdd);
-  dst[9] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0xdd);
-  dst[10] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0xdd);
-  dst[11] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0xdd);
-  dst[12] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0xdd);
-  dst[13] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0xdd);
-  dst[14] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0xdd);
-  dst[15] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0xdd);
 }
 
 #if CompileBF16() && CompileFP16()
@@ -2080,6 +2093,7 @@ static constexpr decltype(load_maskz_fp16_bf16_tr_x16_dword<1>)* load_maskz_fp16
 };
 #endif
 #ifdef __GNUC__
+#pragma GCC pop_options
 #pragma GCC diagnostic pop
 #endif
 
@@ -4682,7 +4696,6 @@ static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
   __m512i zero = _mm512_setzero_si512();
   __mmask64 blt0 = _mm512_movepi8_mask(b);
   return _mm512_mask_sub_epi8(a, blt0, zero, a);
-  ;
 }
 
 template <typename ScaleT, int NReg, int MTILE>
@@ -5399,6 +5412,866 @@ static inline BTLA_CODE gemv_7bit_fp32_fp32(const float* A, int lda, const utils
         acc[im * NReg + in] = _mm512_fmadd_ps(acc_loc[im * NReg + in], v_b_scale[in], acc[im * NReg + in]);
       }
     }
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline __m512i _mm512_dpbusd_avx512bw_epi32(__m512i& c, const __m512i& a, const __m512i& b) {
+  const __m512i dot2 = _mm512_maddubs_epi16(a, b);
+  const __m512i ones = _mm512_set1_epi16(1);
+  const __m512i sum4 = _mm512_madd_epi16(ones, dot2);
+  return _mm512_add_epi32(c, sum4);
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto& a8ptr = A.aptr;
+  auto& b4ptr = B.b4ptr;
+  auto& asptr = A.sptr;
+  auto& azptr = A.zpptr;
+  int constexpr VLen = 16;
+  int blks = k / blocksize;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  // Initialize accumulator with zeros
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (4 - 1);
+  auto vbias = _mm512_set1_epi8(FullRange);
+  uint32_t mask = 0x0f0f0f0f;
+  auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
+  const __m512i onesu8 = _mm512_set1_epi8(1);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * VLen, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits((void*)(b4ptr + i * 32 + (ib * blocksize + ik) * NTILE / 2), vmask);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits((void*)(b4ptr + i * 32 + (ib * blocksize + ik) * NTILE / 2), vmask);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += 4) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits((void*)(b4ptr + i * 32 + (ib * blocksize + ik) * NTILE / 2), vmask);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(a8ptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits((void*)(b4ptr + i * 32 + (ib * blocksize + ik) * NTILE / 2), vmask);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+          }
+        }
+      }
+    }
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  int constexpr VLen = 16;
+  int blks = k / blocksize;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (2 - 1);
+  auto vbias = _mm512_set1_epi8(FullRange);
+  const auto onesu8 = _mm512_set1_epi8(1);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+  int constexpr KTILE = 4;
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 16, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b2ptr += VLen * KTILE / 4;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b2ptr += VLen * KTILE / 4;
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b2ptr += VLen * KTILE / 4;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b2ptr += VLen * KTILE / 4;
+          }
+        }
+      }
+    }
+
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+
+  int blks = k / blocksize;
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (3 - 1);
+  auto vbias = _mm512_set1_epi8(FullRange);
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+  const auto onesu8 = _mm512_set1_epi8(1);
+  int constexpr KTILE = 4;
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 16, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    }
+
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_1bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+
+  int blks = k / blocksize;
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (1 - 1);
+  auto vbias = _mm512_set1_epi8(FullRange);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+  const auto onesu8 = _mm512_set1_epi8(1);
+  int constexpr KTILE = 4;
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 16, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_srli_epi32(vb1, 2);
+            vb1 = _mm512_sub_epi8(vb1, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb1);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb1);
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_srli_epi32(vb1, 2);
+            vb1 = _mm512_sub_epi8(vb1, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb1);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb1);
+            }
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_srli_epi32(vb1, 2);
+            vb1 = _mm512_sub_epi8(vb1, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb1);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb1);
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_srli_epi32(vb1, 2);
+            vb1 = _mm512_sub_epi8(vb1, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb1);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb1);
+            }
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    }
+
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_5bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto b4ptr = reinterpret_cast<utils::bit4x2*>(B.b4ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+
+  int blks = k / blocksize;
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (5 - 1);
+  uint32_t mask = 0x0f0f0f0f;
+  auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm512_set1_epi8(FullRange);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+  const auto onesu8 = _mm512_set1_epi8(1);
+  int constexpr KTILE = 4;
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 16, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_slli_epi32(vb1, 2);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b4ptr += VLen * KTILE / 2;
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_slli_epi32(vb1, 2);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b4ptr += VLen * KTILE / 2;
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_slli_epi32(vb1, 2);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b4ptr += VLen * KTILE / 2;
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            vb1 = _mm512_slli_epi32(vb1, 2);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b4ptr += VLen * KTILE / 2;
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    }
+
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_6bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto b4ptr = reinterpret_cast<utils::bit4x2*>(B.b4ptr);
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+
+  int blks = k / blocksize;
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (6 - 1);
+  uint32_t mask = 0x0f0f0f0f;
+  auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm512_set1_epi8(FullRange);
+
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+  const auto onesu8 = _mm512_set1_epi8(1);
+  int constexpr KTILE = 4;
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 16, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+          }
+        }
+      }
+    }
+
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
+  }
+
+  for (int j = 0; j < MReg; j++) {
+    for (int i = 0; i < NReg; i++) {
+      _mm512_storeu_ps(C + i * VLen + j * ldc, acc[j * NReg + i]);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename ScaleT, int NTILE, int MTILE>
+static inline BTLA_CODE gemv_7bit_u8s8_fp32(const utils::GemvParamA& A, const utils::GemvParamB<ScaleT>& B, float* C,
+                                            int ldc, int k, int blocksize, int8_t* tmp, size_t tmpsize) {
+  auto b4ptr = reinterpret_cast<utils::bit4x2*>(B.b4ptr);
+  auto b2ptr = reinterpret_cast<utils::bit2x4*>(B.b2ptr);
+  auto b1ptr = reinterpret_cast<utils::bit1x8*>(B.b1ptr);
+
+  int blks = k / blocksize;
+  int constexpr VLen = 16;
+  int constexpr NReg = NTILE / VLen;
+  int constexpr MReg = MTILE;
+  __m512 acc[NReg * MReg];
+  for (int i = 0; i < NReg * MReg; i++) {
+    acc[i] = _mm512_setzero_ps();
+  }
+  int constexpr FullRange = 1 << (7 - 1);
+  uint32_t mask = 0x0f0f0f0f;
+  auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
+  auto vbias = _mm512_set1_epi8(FullRange);
+
+  auto zmm_0x04 = _mm512_set1_epi8(0x04);
+  auto zmm_0x00 = _mm512_set1_epi8(0x00);
+  const auto vindex = _mm512_set_epi8(12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4,
+                                      4, 4, 4, 0, 0, 0, 0, 12, 12, 12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0, 12, 12,
+                                      12, 12, 8, 8, 8, 8, 4, 4, 4, 4, 0, 0, 0, 0);
+
+  uint64_t mask0 = 0x0303030303030303;
+  auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
+  auto vshift_y = _mm512_set_epi32(6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0, 6, 4, 2, 0);
+  auto vsfhl_mask_y = _mm512_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
+                                      13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+                                      15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+  auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+  const auto onesu8 = _mm512_set1_epi8(1);
+  int constexpr KTILE = 4;
+  for (int ib = 0; ib < blks; ib += 1) {
+    __m512i iacc[NReg * MReg];
+    __m512i bacc[NReg];
+    for (int i = 0; i < NReg * MReg; i++) {
+      iacc[i] = _mm512_setzero_si512();
+    }
+    for (int i = 0; i < NReg; i++) {
+      bacc[i] = _mm512_setzero_si512();
+    }
+    if (B.zpptr) {
+      __m512i bzp[NReg];
+      auto bzptr = B.zpptr + ib * B.ldzp;
+      for (int i = 0; i < NReg; i++) {
+        bzp[i] = load_zp_epi8_broadcast_epi32(bzptr + i * 16, vindex);
+        bzp[i] = _mm512_add_epi8(bzp[i], vbias);
+      }
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            auto vb2 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb2 = _mm512_slli_epi32(vb2, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_or_si512(vb, vb2);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            auto vb2 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb2 = _mm512_slli_epi32(vb2, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_or_si512(vb, vb2);
+            vb = _mm512_sub_epi8(vb, bzp[i]);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    } else {
+      for (int ik = 0; ik < blocksize; ik += KTILE) {
+        if constexpr (MTILE == 1) {
+          __m512i va = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik));
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            auto vb2 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb2 = _mm512_slli_epi32(vb2, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_or_si512(vb, vb2);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            iacc[i] = _mm512_dpbusd_avx512bw_epi32(iacc[i], va, vb);
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        } else {
+          __m512i va[MReg];
+          for (int i = 0; i < MReg; i++) {
+            va[i] = _mm512_set1_epi32(*(int*)(A.aptr + ib * blocksize + ik + i * A.lda));
+          }
+          for (int i = 0; i < NReg; i++) {
+            auto vb = unpack_4bits(b4ptr, vmask);
+            auto vb1 = unpack_1bits(b1ptr, zmm_0x00, zmm_0x04);
+            auto vb2 = unpack_2bits(b2ptr, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
+            vb1 = _mm512_slli_epi32(vb1, 4);
+            vb2 = _mm512_slli_epi32(vb2, 4);
+            vb = _mm512_or_si512(vb, vb1);
+            vb = _mm512_or_si512(vb, vb2);
+            vb = _mm512_sub_epi8(vb, vbias);
+            bacc[i] = _mm512_dpbusd_avx512bw_epi32(bacc[i], onesu8, vb);
+            for (int j = 0; j < MReg; j++) {
+              iacc[j * NReg + i] = _mm512_dpbusd_avx512bw_epi32(iacc[j * NReg + i], va[j], vb);
+            }
+            b4ptr += VLen * KTILE / 2;
+            b2ptr += VLen * KTILE / 4;
+            b1ptr += VLen * KTILE / 8;
+          }
+        }
+      }
+    }
+
+    gemv_remove_zp<NReg, MReg>(A.zpptr + ib, A.ldzp, iacc, bacc);
+    gemv_dequant_s32fp32<ScaleT, NReg, MTILE>(A.sptr + ib, A.ldzp, B.sptr + ib * B.ldzp, iacc, acc);
   }
 
   for (int j = 0; j < MReg; j++) {

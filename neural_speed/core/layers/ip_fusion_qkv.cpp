@@ -196,19 +196,15 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
     }
     if (btype == gemm::CompType::tS8 && PackRow == 4) {
       if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-        if (_m <= tAVX512_VNNI_KBlock::MTILE) {
-          static_assert(tAVX512_VNNI_KBlock::NTILE == tAMX_INT8_SS_KBlock::NTILE);
-          ip_qkv::BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                  output, ldo, workspace, pth);
-        } else {
-          ip_qkv::BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                  output, ldo, workspace, pth);
-        }
-
+        ip_qkv::BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
+                                                                output, ldo, workspace, pth);
       } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                  BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
         ip_qkv::BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
                                                                 output, ldo, workspace, pth);
+      } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+        ip_qkv::BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                             ldo, workspace, pth);
       } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
         ip_qkv::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
                                                              ldo, workspace, pth);

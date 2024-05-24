@@ -205,6 +205,7 @@ class isa_base {
   static bool constexpr avx = ISA_T >= BTLA_ISA::AVX;
   static bool constexpr avx2 = ISA_T >= BTLA_ISA::AVX2;
   static bool constexpr avx512f = ISA_T >= BTLA_ISA::AVX512F;
+  static bool constexpr avx512bw = ISA_T >= BTLA_ISA::AVX512BW;
   static bool constexpr avx512_vnni = ISA_T >= BTLA_ISA::AVX512_VNNI;
   static bool constexpr avx512_fp16 = ISA_T >= BTLA_ISA::AVX512_FP16;
   static bool constexpr amx_bf16 = ISA_T >= BTLA_ISA::AMX_BF16;
@@ -224,6 +225,7 @@ class CpuDevice {
   inline bool AVX2() { return mHasAVX2; }
   inline bool AVX_VNNI() { return mHasAVX_VNNI; }
   inline bool AVX512F() { return mHasAVX512F; }
+  inline bool AVX512BW() { return mHasAVX512BW; }
   inline bool AVX512_VNNI() { return mHasAVX512_VNNI; }
   inline bool AMX_INT8() { return mHasAMX_INT8; }
   inline bool AMX_BF16() { return mHasAMX_BF16; }
@@ -242,6 +244,7 @@ class CpuDevice {
     ADD_FLAG(AVX);
     ADD_FLAG(AVX2);
     ADD_FLAG(AVX512F);
+    ADD_FLAG(AVX512BW);
     ADD_FLAG(AVX512_VNNI);
     ADD_FLAG(AVX_VNNI);
     ADD_FLAG(AMX_BF16);
@@ -374,9 +377,10 @@ class CpuDevice {
 
   void print() {
     printf(
-        "AVX:%d AVX2:%d AVX512F:%d AVX_VNNI:%d AVX512_VNNI:%d AMX_INT8:%d AMX_BF16:%d AVX512_BF16:%d AVX512_FP16:%d\n",
-        mHasAVX, mHasAVX2, mHasAVX512F, mHasAVX_VNNI, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512_BF16,
-        mHasAVX512_FP16);
+        "AVX:%d AVX2:%d AVX512F:%d AVX512BW:%d AVX_VNNI:%d AVX512_VNNI:%d AMX_INT8:%d AMX_BF16:%d AVX512_BF16:%d "
+        "AVX512_FP16:%d\n",
+        mHasAVX, mHasAVX2, mHasAVX512F, mHasAVX512BW, mHasAVX_VNNI, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16,
+        mHasAVX512_BF16, mHasAVX512_FP16);
   }
 #undef ADD_FLAG
 
@@ -464,8 +468,8 @@ class CpuDevice {
  protected:
   uint32_t L2Cache, L1Cache, L3Cache;
   bool mHybrid = false, mClient = false;
-  bool mHasAVX2, mHasAVX_VNNI, mHasAVX, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512F, mHasAVX512_BF16,
-      mHasAVX512_FP16;
+  bool mHasAVX2, mHasAVX_VNNI, mHasAVX, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512F, mHasAVX512BW,
+      mHasAVX512_BF16, mHasAVX512_FP16;
   int numcores;
   int numthreads;
   std::vector<int> P_core, E_core, SMT_core;

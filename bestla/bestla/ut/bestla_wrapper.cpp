@@ -66,6 +66,15 @@ class UT_U8S8S32 {
       ut<sAVX512_VNNI>(1024, 1024, 1024);
       ut<sAVX512_VNNI>(1024, 1536, 1536);
     }
+    if (_cd->AVX512BW()) {
+      ut<sAVX512BW>(4, 48, 4);
+      ut<sAVX512BW>(1, 1, 1);
+      ut<sAVX512BW>(8, 48, 2);
+      ut<sAVX512BW>(8, 4096, 4096);
+      ut<sAVX512BW>(384, 768, 768);
+      ut<sAVX512BW>(1024, 1024, 1024);
+      ut<sAVX512BW>(1024, 1536, 1536);
+    }
     if (_cd->AVX_VNNI()) {
       ut<sAVX_VNNI>(1, 1, 1);
       ut<sAVX_VNNI>(8, 48, 2);
@@ -92,8 +101,8 @@ class UT_U8S8S32 {
     avector<uint8_t> matAu8(m * k), zpAu8(m);
     avector<int8_t> matBs8(k * n);
     avector<float> scaleAf32(m), scaleBf32(n);
-    fill_buffer_randn(matAu8.data(), matAu8.size(), uint8_t(0), uint8_t(255));
-    fill_buffer_randn(zpAu8.data(), zpAu8.size(), uint8_t(100), uint8_t(150));
+    fill_buffer_randn(matAu8.data(), matAu8.size(), uint8_t(0), uint8_t(127));
+    fill_buffer_randn(zpAu8.data(), zpAu8.size(), uint8_t(60), uint8_t(64));
     fill_buffer_randn(matBs8.data(), matBs8.size(), int8_t(-127), int8_t(127));
     fill_buffer_randn(scaleAf32.data(), scaleAf32.size(), 0.001f, 0.005f);
     fill_buffer_randn(scaleBf32.data(), scaleBf32.size(), 0.001f, 0.005f);

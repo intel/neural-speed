@@ -26,6 +26,7 @@ enum class BTLA_ISA : uint8_t {
   AVX2,
   AVX_VNNI,
   AVX512F,
+  AVX512BW,
   AVX512_VNNI,
   AMX_BF16,
   AMX_INT8,

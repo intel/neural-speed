@@ -1113,6 +1113,15 @@ class UT_CompInt8 {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
     }
+    if (_cd->AVX512BW()) {
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+    }
     if (_cd->AVX512_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
                                                            true);
@@ -1276,8 +1285,8 @@ class UT_CompInt8 {
     fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     avector<uint8_t> matAu8(m * k), zpAu8(m * kblks);
     avector<float> scaleAf32(m * kblks);
-    fill_buffer_randn(matAu8.data(), matAu8.size(), uint8_t(0), uint8_t(255));
-    fill_buffer_randn(zpAu8.data(), zpAu8.size(), uint8_t(100), uint8_t(150));
+    fill_buffer_randn(matAu8.data(), matAu8.size(), uint8_t(0), uint8_t(127));
+    fill_buffer_randn(zpAu8.data(), zpAu8.size(), uint8_t(60), uint8_t(64));
     fill_buffer_randn(scaleAf32.data(), scaleAf32.size(), 0.001f, 0.005f);
     ut::fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     avector<float> reduceAf32(m * kblks, 0.f);

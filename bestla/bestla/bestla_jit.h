@@ -220,6 +220,16 @@ class JitAvx512f : protected JitAvx2 {
   }
 };
 
+class JitAvx512bw : protected JitAvx512f {
+ protected:
+  void vpdpbusds_(const Xbyak::Xmm& sum4, const Xbyak::Xmm& sum2, const Xbyak::Xmm& x, const Xbyak::Operand& op,
+                  const Xbyak::Xmm& ones) {
+    vpmaddubsw(sum2, x, op);
+    vpmaddwd(sum2, sum2, ones);
+    vpaddd(sum4, sum4, sum2);
+  }
+};
+
 class JitAvx512_bf16 : protected JitAvx512f {};
 
 class JitAvx512_fp16 : protected JitAvx512f {};

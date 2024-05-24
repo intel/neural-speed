@@ -344,6 +344,151 @@ class UT_GEMM_AVX512VNNI {
 static UT_GEMM_AVX512VNNI sUT_GEMM_AVX512VNNI;
 #endif
 
+class UT_GEMM_AVX512BW {
+ public:
+  UT_GEMM_AVX512BW() {
+    UT_START();
+    CheckISA(AVX512BW);
+    ut<32, 0>(4, 64, 12);
+    ut<32, 12>(4, 64, 12);
+
+    ut<48, 0>(4, 96, 12);
+    ut<48, 8>(4, 96, 12);
+  }
+
+  template <int NTile, int MTile>
+  void ut(int m, int n, int k) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx512bw<NTile, MTile>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<uint8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<int> C(m * n, 0), RefC(m * n, 0);
+    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)128);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    ref_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]),
+                                n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), m, n, k, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, cache,
+                 CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 1);
+  }
+};
+#ifdef BTLA_UT_GEMM
+static UT_GEMM_AVX512BW sUT_GEMM_AVX512BW;
+#endif
+
+class UT_GEMM_AVX512BW_KBLOCK {
+ public:
+  UT_GEMM_AVX512BW_KBLOCK() {
+    UT_START();
+    CheckISA(AVX512BW);
+    ut<48, 8>(8, 96, 36, 36);
+    ut<48, 8>(8, 144, 128, 32);
+    ut<48, 8>(8, 144, 128, 128);
+    ut<48, 8>(8, 144, 256, 128);
+    ut_splitblock<48, 8>(8, 144, 128, 128, 64);
+  }
+
+  template <int NTile, int MTile>
+  void ut(int m, int n, int k, int kblock) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx512bwKBlock<NTile, MTile>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<uint8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<float> C(m * n, 0), RefC(m * n, 0);
+    int blk_num = utils::updiv(k, kblock);
+    avector<float> scaleA(blk_num * m), scaleB(blk_num * n), reduceB(blk_num * n, 0.f);
+    avector<uint8_t> zpA(m * blk_num);
+    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)127);
+    fill_buffer_randn(zpA.data(), zpA.size(), (uint8_t)0, (uint8_t)0);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(scaleA.data(), scaleA.size(), 0.003f, 0.005f);
+    fill_buffer_randn(scaleB.data(), scaleB.size(), 0.003f, 0.005f);
+    for (size_t i = 0; i < k; i++) {
+      for (size_t j = 0; j < n; j++) {
+        reduceB[i / kblock * n + j] += B[i * n + j];
+      }
+    }
+    for (size_t i = 0; i < blk_num; i++) {
+      for (size_t j = 0; j < n; j++) {
+        reduceB[i * n + j] *= scaleB[i * n + j];
+      }
+    }
+
+    ref_kblock_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), zpA.data(), scaleA.data(), blk_num,
+                                       scaleB.data(), reduceB.data(), n, m, n, k, kblock, k * sizeof(A[0]),
+                                       k * sizeof(B[0]), n * sizeof(C[0]), 0);
+
+    gemm.forward(A.data(), B.data(), C.data(), zpA.data(), scaleA.data(), blk_num, scaleB.data(), reduceB.data(), n, m,
+                 n, k, kblock, k * sizeof(A[0]), k * sizeof(B[0]), n * sizeof(C[0]), 0, 1.f, cache, CacheSize);
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
+  }
+
+  template <int NTile, int MTile>
+  void ut_splitblock(int m, int n, int k, int kblock, int kstep) {
+    assert(k == kblock);  // for large kblock case
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::ICoreRowNAvx512bwKBlock<NTile, MTile>;
+    Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+    avector<uint8_t> A(m * k);
+    avector<int8_t> B(k * n);
+    avector<float> C(m * n, 0), RefC(m * n, 0);
+    int blk_num = utils::updiv(k, kblock);
+    avector<float> scaleA(blk_num * m), scaleB(blk_num * n), reduceB(blk_num * n, 0.f);
+    avector<uint8_t> zpA(m * blk_num);
+    fill_buffer_randn(A.data(), A.size(), (uint8_t)0, (uint8_t)127);
+    fill_buffer_randn(zpA.data(), zpA.size(), (uint8_t)0, (uint8_t)0);
+    fill_buffer_randn(B.data(), B.size(), (int8_t)-127, (int8_t)127);
+    fill_buffer_randn(scaleA.data(), scaleA.size(), 0.003f, 0.005f);
+    fill_buffer_randn(scaleB.data(), scaleB.size(), 0.003f, 0.005f);
+    for (size_t i = 0; i < k; i++) {
+      for (size_t j = 0; j < n; j++) {
+        reduceB[i / kblock * n + j] += B[i * n + j];
+      }
+    }
+    for (size_t i = 0; i < blk_num; i++) {
+      for (size_t j = 0; j < n; j++) {
+        reduceB[i * n + j] *= scaleB[i * n + j];
+      }
+    }
+
+    ref_kblock_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), zpA.data(), scaleA.data(), blk_num,
+                                       scaleB.data(), reduceB.data(), n, m, n, k, kblock, k * sizeof(A[0]),
+                                       k * sizeof(B[0]), n * sizeof(C[0]), 0);
+    for (size_t i = 0; i < k; i += kstep) {
+      auto k_re = remainsize(i, k, kstep);
+      gemm.forward(A.data() + i, B.data() + i * Core::Code::NTILE, C.data(), zpA.data(), scaleA.data(), blk_num,
+                   scaleB.data(), reduceB.data(), n, m, n, k_re, k_re, k * sizeof(A[0]), k * sizeof(B[0]),
+                   n * sizeof(C[0]), i, k_re / float(k), cache, CacheSize);
+    }
+
+    ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
+  }
+};
+#ifdef BTLA_UT_GEMM
+static UT_GEMM_AVX512BW_KBLOCK sUT_GEMM_AVX512BW_KBLOCK;
+#endif
+
 class UT_GEMM_AVX512VNNI_KBLOCK {
  public:
   UT_GEMM_AVX512VNNI_KBLOCK() {
