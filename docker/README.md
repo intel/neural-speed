@@ -8,7 +8,7 @@ Build or Pull the provided docker images.
 ```bash
 git clone https://github.com/intel/neural-speed.git neuralspeed
 cd neuralspeed
-docker build -f docker/DockerFile neuralspeed:latest .
+docker build -f docker/DockerFile -t neuralspeed:latest .
 ```
 If you need to use proxy, please use the following command
 ```bash
