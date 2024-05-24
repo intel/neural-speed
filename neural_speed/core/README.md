@@ -87,7 +87,7 @@ Skylake<br>Cannon Lake |  symmetric<br>int4<br>group size=128<br>compute type=in
 Alder Lake (12th Gen)<br>Raptor Lake (13th and 14th Gen)| symmetric<br>int4<br>group size=128<br>compute type=int8 | AVX_VNNI
 Older architecture (before 12th Gen)|  symmetric<br>int4<br>group size=128<br>compute type=int8 | AVX2
 
-`sym int4 group=128 comp_dtype=int8` has almost the same accuray as `group=32`, but is much faster (validated with LLaMa2-7B).  
+`sym int4 group=128 comp_dtype=int8` has almost the same accuracy as `group=32`, but is much faster (validated with LLaMa2-7B).  
 `sym int5 group=-1 comp_dtype=int8` is the fastest configuration for the first-token with good accuracy (validated with LLaMa2-7B).  
 `sym int3 group=128 comp_dtype=int8` is the fastest configuration for the next-token with good accuracy (validated with LLaMa2-7B).
 
