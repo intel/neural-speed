@@ -468,9 +468,9 @@ function main() {
                         if [[ ${input} == "1024" && ${cores_per_instance} == "32" ]]; then
                             echo "-------- Accuracy start--------"
                             if [[ "${model}" == "llama"* || "${model}" == "gptj-6b" ]]; then
-                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai 2>&1 | tee  ${WORKSPACE}/accuracy-${logs_file}
+                                OMP_NUM_THREADS=56 numactl -l -C 0-55 python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai 2>&1 | tee  ${WORKSPACE}/accuracy-${logs_file}
                             else
-                                python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 1  2>&1 | tee  ${WORKSPACE}/accuracy-${logs_file}
+                                OMP_NUM_THREADS=56 numactl -l -C 0-55 python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 1  2>&1 | tee  ${WORKSPACE}/accuracy-${logs_file}
                             fi
                         else
                             echo "-------- Accuracy End --------"
