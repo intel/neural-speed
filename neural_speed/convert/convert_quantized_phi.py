@@ -25,7 +25,8 @@ from sentencepiece import SentencePieceProcessor
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config, compute_dtype="fp32"):
+def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config,
+                                   compute_dtype="fp32"):
     list_vars = model
     for name in list_vars.keys():
         print(name)
@@ -171,7 +172,8 @@ def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams
     print(f"Success! saved as {out_path}")
 
 
-def convert_phi2_gptq_to_bestTLA(model_path, model, out_path, hparams, quantize_config, compute_dtype="fp32"):
+def convert_phi2_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config,
+                                 compute_dtype="fp32"):
     list_vars = model
     for name in list_vars.keys():
         print(name)

@@ -195,7 +195,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                     f"transformer.h.{i}.attn.v_proj.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
 
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.out_proj.weight",
-                    f"transformer.h.{i}.attn.out_proj.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
+                    f"transformer.h.{i}.attn.out_proj.weight", list_vars, fout, quantize_config,
+                    compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_in.weight",
                     f"transformer.h.{i}.mlp.fc_in.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_out.weight",
