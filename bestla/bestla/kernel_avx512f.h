@@ -31,13 +31,7 @@ namespace avx512f {
 #if CompileAVX512F()
 #ifdef __GNUC__
 #pragma GCC push_options
-#pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512vbmi", "avx512dq")
-#if CompileBF16()
-#pragma GCC target("avx512bf16")
-#endif
-#if CompileFP16()
-#pragma GCC target("avx512fp16")
-#endif
+#pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512dq")
 #else
 #endif
 
@@ -46,6 +40,12 @@ inline __m512 zmm_cvt_bf16_fp32(__m256i vbf16) {
   return _mm512_castsi512_ps(_mm512_slli_epi32(vf32, 16));
 }
 
+#ifdef __GNUC__
+#pragma GCC push_options
+#if CompileBF16()
+#pragma GCC target("avx512bf16")
+#endif
+#endif
 inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) {
 #if CompileBF16()
   return (__m256i)_mm512_cvtneps_pbh(vfp32);
@@ -53,6 +53,9 @@ inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) {
   return _mm512_cvtepi32_epi16(_mm512_bsrli_epi128(_mm512_castps_si512(vfp32), 2));
 #endif
 }
+#ifdef __GNUC__
+#pragma GCC pop_options
+#endif
 
 static inline __m512 load_bf16_fp32(const utils::bf16* srcptr) {
   auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr));
@@ -1843,6 +1846,89 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
   return BTLA_CODE::Success;
 }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
+#endif
+// Interleave 2 bf16 zmm vectors inplace
+static inline void interleave_word(std::array<__m512i, 2>& dst) {  // NOLINT [runtime/references]
+  static constexpr uint32_t perm_idx_a[16]{
+      0 | 0,  1 | 0,  2 | 0,  3 | 0,   //
+      0 | 16, 1 | 16, 2 | 16, 3 | 16,  //
+      4 | 0,  5 | 0,  6 | 0,  7 | 0,   //
+      4 | 16, 5 | 16, 6 | 16, 7 | 16,  //
+  };
+  static constexpr uint32_t perm_idx_b[16]{
+      8 | 0,   9 | 0,   10 | 0,  11 | 0,   //
+      8 | 16,  9 | 16,  10 | 16, 11 | 16,  //
+      12 | 0,  13 | 0,  14 | 0,  15 | 0,   //
+      12 | 16, 13 | 16, 14 | 16, 15 | 16,  //
+  };
+  static const auto v_perm_idx_a = _mm512_loadu_si512(perm_idx_a);
+  static const auto v_perm_idx_b = _mm512_loadu_si512(perm_idx_b);
+
+  __m512i tmp[2];
+  tmp[0] = _mm512_unpacklo_epi16(dst[0], dst[1]);
+  tmp[1] = _mm512_unpackhi_epi16(dst[0], dst[1]);
+  dst[0] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_a, tmp[1]);
+  dst[1] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_b, tmp[1]);
+}
+
+// Interleave 16 zmm vectors of dwords inplace
+static inline void tr_x16_dword(std::array<__m512i, 16>& dst) {  // NOLINT [runtime/references]
+  __m512i tmp[16];
+
+  for (int i = 0; i < 8; ++i) {
+    tmp[2 * i] = _mm512_unpacklo_epi32(dst[2 * i], dst[2 * i + 1]);
+    tmp[2 * i + 1] = _mm512_unpackhi_epi32(dst[2 * i], dst[2 * i + 1]);
+  }
+
+  for (int i = 0; i < 4; ++i) {
+    dst[4 * i] = _mm512_unpacklo_epi64(tmp[4 * i], tmp[4 * i + 2]);
+    dst[4 * i + 1] = _mm512_unpackhi_epi64(tmp[4 * i], tmp[4 * i + 2]);
+    dst[4 * i + 2] = _mm512_unpacklo_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
+    dst[4 * i + 3] = _mm512_unpackhi_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
+  }
+
+  for (int i = 0; i < 2; ++i) {
+    tmp[8 * i + 0] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0x88);
+    tmp[8 * i + 1] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0x88);
+    tmp[8 * i + 2] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0x88);
+    tmp[8 * i + 3] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0x88);
+    tmp[8 * i + 4] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0xdd);
+    tmp[8 * i + 5] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0xdd);
+    tmp[8 * i + 6] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0xdd);
+    tmp[8 * i + 7] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0xdd);
+  }
+
+  dst[0] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0x88);
+  dst[1] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0x88);
+  dst[2] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0x88);
+  dst[3] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0x88);
+  dst[4] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0x88);
+  dst[5] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0x88);
+  dst[6] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0x88);
+  dst[7] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0x88);
+  dst[8] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0xdd);
+  dst[9] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0xdd);
+  dst[10] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0xdd);
+  dst[11] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0xdd);
+  dst[12] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0xdd);
+  dst[13] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0xdd);
+  dst[14] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0xdd);
+  dst[15] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0xdd);
+}
+
+#ifdef __GNUC__
+#pragma GCC push_options
+#if CompileBF16()
+#pragma GCC target("avx512bf16")
+#endif
+#if CompileFP16()
+#pragma GCC target("avx512fp16")
+#endif
+#endif
+
 static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
                                                     int src_step, int dst_step, bool zeropadding) {
 #if CompileFP16()
@@ -1921,79 +2007,6 @@ static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, 
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
   return BTLA_CODE::Success;
-}
-
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
-#endif
-// Interleave 2 bf16 zmm vectors inplace
-static inline void interleave_word(std::array<__m512i, 2>& dst) {  // NOLINT [runtime/references]
-  static constexpr uint32_t perm_idx_a[16]{
-      0 | 0,  1 | 0,  2 | 0,  3 | 0,   //
-      0 | 16, 1 | 16, 2 | 16, 3 | 16,  //
-      4 | 0,  5 | 0,  6 | 0,  7 | 0,   //
-      4 | 16, 5 | 16, 6 | 16, 7 | 16,  //
-  };
-  static constexpr uint32_t perm_idx_b[16]{
-      8 | 0,   9 | 0,   10 | 0,  11 | 0,   //
-      8 | 16,  9 | 16,  10 | 16, 11 | 16,  //
-      12 | 0,  13 | 0,  14 | 0,  15 | 0,   //
-      12 | 16, 13 | 16, 14 | 16, 15 | 16,  //
-  };
-  static const auto v_perm_idx_a = _mm512_loadu_si512(perm_idx_a);
-  static const auto v_perm_idx_b = _mm512_loadu_si512(perm_idx_b);
-
-  __m512i tmp[2];
-  tmp[0] = _mm512_unpacklo_epi16(dst[0], dst[1]);
-  tmp[1] = _mm512_unpackhi_epi16(dst[0], dst[1]);
-  dst[0] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_a, tmp[1]);
-  dst[1] = _mm512_permutex2var_epi32(tmp[0], v_perm_idx_b, tmp[1]);
-}
-
-// Interleave 16 zmm vectors of dwords inplace
-static inline void tr_x16_dword(std::array<__m512i, 16>& dst) {  // NOLINT [runtime/references]
-  __m512i tmp[16];
-
-  for (int i = 0; i < 8; ++i) {
-    tmp[2 * i] = _mm512_unpacklo_epi32(dst[2 * i], dst[2 * i + 1]);
-    tmp[2 * i + 1] = _mm512_unpackhi_epi32(dst[2 * i], dst[2 * i + 1]);
-  }
-
-  for (int i = 0; i < 4; ++i) {
-    dst[4 * i] = _mm512_unpacklo_epi64(tmp[4 * i], tmp[4 * i + 2]);
-    dst[4 * i + 1] = _mm512_unpackhi_epi64(tmp[4 * i], tmp[4 * i + 2]);
-    dst[4 * i + 2] = _mm512_unpacklo_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
-    dst[4 * i + 3] = _mm512_unpackhi_epi64(tmp[4 * i + 1], tmp[4 * i + 3]);
-  }
-
-  for (int i = 0; i < 2; ++i) {
-    tmp[8 * i + 0] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0x88);
-    tmp[8 * i + 1] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0x88);
-    tmp[8 * i + 2] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0x88);
-    tmp[8 * i + 3] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0x88);
-    tmp[8 * i + 4] = _mm512_shuffle_i32x4(dst[8 * i + 0], dst[8 * i + 4], 0xdd);
-    tmp[8 * i + 5] = _mm512_shuffle_i32x4(dst[8 * i + 1], dst[8 * i + 5], 0xdd);
-    tmp[8 * i + 6] = _mm512_shuffle_i32x4(dst[8 * i + 2], dst[8 * i + 6], 0xdd);
-    tmp[8 * i + 7] = _mm512_shuffle_i32x4(dst[8 * i + 3], dst[8 * i + 7], 0xdd);
-  }
-
-  dst[0] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0x88);
-  dst[1] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0x88);
-  dst[2] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0x88);
-  dst[3] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0x88);
-  dst[4] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0x88);
-  dst[5] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0x88);
-  dst[6] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0x88);
-  dst[7] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0x88);
-  dst[8] = _mm512_shuffle_i32x4(tmp[0], tmp[8], 0xdd);
-  dst[9] = _mm512_shuffle_i32x4(tmp[1], tmp[9], 0xdd);
-  dst[10] = _mm512_shuffle_i32x4(tmp[2], tmp[10], 0xdd);
-  dst[11] = _mm512_shuffle_i32x4(tmp[3], tmp[11], 0xdd);
-  dst[12] = _mm512_shuffle_i32x4(tmp[4], tmp[12], 0xdd);
-  dst[13] = _mm512_shuffle_i32x4(tmp[5], tmp[13], 0xdd);
-  dst[14] = _mm512_shuffle_i32x4(tmp[6], tmp[14], 0xdd);
-  dst[15] = _mm512_shuffle_i32x4(tmp[7], tmp[15], 0xdd);
 }
 
 #if CompileBF16() && CompileFP16()
@@ -2080,6 +2093,7 @@ static constexpr decltype(load_maskz_fp16_bf16_tr_x16_dword<1>)* load_maskz_fp16
 };
 #endif
 #ifdef __GNUC__
+#pragma GCC pop_options
 #pragma GCC diagnostic pop
 #endif
 
@@ -2594,7 +2608,7 @@ template <int PackRow, int NTILE>
 inline BTLA_CODE decompress_kblock_s4_s8(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                          int n_offset, int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::int4x2 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::int4x2* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -2816,7 +2830,7 @@ static inline BTLA_CODE decompress_kblock_s2_s8(utils::bit2x4* bit2ptr, int8_t* 
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
                                                 size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * srcptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* srcptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -3074,7 +3088,7 @@ static inline BTLA_CODE decompress_kblock_s3_s8(utils::bit2x4* bit2ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -3296,7 +3310,7 @@ static inline BTLA_CODE decompress_kblock_s1_s8(utils::bit1x8* bit1ptr, int8_t* 
                                                 int ldzp, int n_offset, int k_offset, int row, int col, int8_t* tmp,
                                                 size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp,
+    typedef BTLA_CODE (*decompfunc)(utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp,
                                     int n_offset, int k_offset, int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
@@ -3545,7 +3559,7 @@ static inline BTLA_CODE decompress_kblock_s5_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit1x8 * bit1ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit1x8* bit1ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
@@ -3859,9 +3873,9 @@ static inline BTLA_CODE decompress_kblock_s7_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp, int n_offset,
                                                 int k_offset, int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit2x4 * bit2ptr, utils::bit1x8 * bit1ptr,
-                                    int8_t * zpptr, int8_t * dstptr, int blocksize, int ldzp, int n_offset,
-                                    int k_offset, int row, int8_t* tmp, size_t tmpsize);
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
+                                    int8_t* zpptr, int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
+                                    int row, int8_t* tmp, size_t tmpsize);
     decompfunc func = nullptr;
     if (col == NTILE) {
       if constexpr (PackRow == 1) {
@@ -4130,7 +4144,7 @@ static inline BTLA_CODE decompress_kblock_s6_s8(utils::bit4x2* bit4ptr, utils::b
                                                 int8_t* dstptr, int blocksize, int ldzp, int n_offset, int k_offset,
                                                 int row, int col, int8_t* tmp, size_t tmpsize) {
   if (zpptr) {
-    typedef BTLA_CODE (*decompfunc)(utils::bit4x2 * bit4ptr, utils::bit2x4 * bit2ptr, int8_t * zpptr, int8_t * dstptr,
+    typedef BTLA_CODE (*decompfunc)(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, int8_t* zpptr, int8_t* dstptr,
                                     int blocksize, int ldzp, int n_offset, int k_offset, int row, int8_t* tmp,
                                     size_t tmpsize);
     decompfunc func = nullptr;
