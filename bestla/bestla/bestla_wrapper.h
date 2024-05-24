@@ -262,7 +262,7 @@ class LauncherBase {
       return false;
     }
     static bool constexpr Reg32 = GemmCore::ISA >= BTLA_ISA::AVX512F;
-    static int constexpr MaxGemvM = Reg32 ? 8 : 4;
+    static int constexpr MaxGemvM = Reg32 ? 4 : 4;
     static bool implemented(const Param& _param) {
       bool impl = true;
       impl &= _param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP ||
@@ -670,7 +670,7 @@ class LauncherIntKBlock {
       return false;
     }
     static bool constexpr Reg32 = GemmCore::ISA >= BTLA_ISA::AVX512F;
-    static int constexpr MaxGemvM = Reg32 ? 8 : 4;
+    static int constexpr MaxGemvM = Reg32 ? 4 : 4;
 
     static bool implemented(const Param& _param) {
       bool impl = true;
