@@ -152,10 +152,22 @@ class gemm_t<
       compute_policy::mma_engine == mma_engine::xmx
       ? ((sizeof(dtype_a) < sizeof(uint32_t)) && is_col_major_a)
       : false;
+
+  static constexpr reg_layout reg_layout_a_ =
+      compute_policy::mma_engine == mma_engine::fpu
+      ? reg_layout::transpose_tiled
+      : is_vnni_tiled_a ? reg_layout::vnni_tiled
+                        : reg_layout::tiled;
+
+  static constexpr reg_layout reg_layout_b_ =
+      compute_policy::mma_engine == mma_engine::fpu ? reg_layout::tiled
+      : (sizeof(dtype_mma_b) < sizeof(uint32_t))    ? reg_layout::vnni_tiled
+                                                    : reg_layout::tiled;
+
   static constexpr reg_layout reg_layout_a =
-      compute_policy::mma_engine == mma_engine::xmx
-      ? (is_vnni_tiled_a ? reg_layout::vnni_tiled : reg_layout::tiled)
-      : reg_layout::transpose_tiled;
+      is_col_major_b ? reg_layout_b_ : reg_layout_a_;
+  static constexpr reg_layout reg_layout_b =
+      is_col_major_b ? reg_layout_a_ : reg_layout_b_;
 
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
@@ -182,13 +194,13 @@ class gemm_t<
           tile_size_y_b / pack_ratio,
           block_size_x_b,
           block_size_y_b / pack_ratio,
-          reg_layout::tiled>,
+          reg_layout_b>,
       subgroup::tile_desc_t<
           tile_size_x_b / pack_ratio,
           tile_size_y_b,
           block_size_x_b / pack_ratio,
           block_size_y_b,
-          reg_layout::tiled>>;
+          reg_layout_b>>;
   using matB_t = subgroup::tile_t<dtype_b, matB_tile_desc_t>;
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
@@ -203,8 +215,7 @@ class gemm_t<
       tile_size_y_b,
       block_size_x_b,
       block_size_y_b,
-      compute_policy::mma_engine == mma_engine::xmx ? reg_layout::vnni_tiled
-                                                    : reg_layout::tiled>;
+      reg_layout_b>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_acc_tile_desc_t>;
 
  public:
@@ -240,15 +251,22 @@ class gemm_t<
       mem_space::global,
       mem_desc_b_t::alignment>;
 
-  using matAcc_tile_desc_t = subgroup::tile_desc_t<
-      tile_size_x_c,
-      tile_size_y_c,
-      block_size_x_b,
-      block_size_y_a,
+  using matC_tile_desc_t = subgroup::tile_desc_t< // M X N (Y x X)
+      tile_size_x_c, // sg_n
+      tile_size_y_c, // sg_m == 1
+      block_size_x_b, //
+      block_size_y_a, // == 1
       reg_layout::tiled>;
-  using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
+  using matC_t = subgroup::tile_t<dtype_mma_acc, matC_tile_desc_t>;
 
  private:
+  using matAcc_tile_desc_t = subgroup::tile_desc_t< // N x K (Y x X)
+      block_size_y_b, // K
+      tile_size_x_b, // N
+      block_size_y_b, // K
+      block_size_x_b, // N
+      reg_layout::tiled>;
+  using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
   using scale_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b,
       tile_size_y_scale,
@@ -264,18 +282,8 @@ class gemm_t<
 
   using zero_pt_tile_desc_t = std::conditional_t<
       is_col_major_b,
-      subgroup::tile_desc_t<
-          tile_size_x_b,
-          (tile_size_y_zero_pt + pack_ratio - 1) / pack_ratio,
-          block_size_x_b,
-          (block_size_y_zero_pt + pack_ratio - 1) / pack_ratio,
-          reg_layout::tiled>,
-      subgroup::tile_desc_t<
-          tile_size_x_b / pack_ratio,
-          tile_size_y_zero_pt,
-          block_size_x_b / pack_ratio,
-          block_size_y_zero_pt,
-          reg_layout::tiled>>;
+      subgroup::tile_desc_t<16, 16, 16, 16, reg_layout::tiled>,
+      subgroup::tile_desc_t<16, 16, 16, 16, reg_layout::tiled>>;
 
   using zero_pt_t = subgroup::tile_t<dtype_zero_pt, zero_pt_tile_desc_t>;
   using zero_pt_payload_t = subgroup::mem_payload_t<
@@ -288,13 +296,22 @@ class gemm_t<
   using zero_pt_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_zero_pt_t, zero_pt_tile_desc_t, 1, arch_tag>;
 
-  using tile_mma = subgroup::tile_mma_t<
-      matAcc_t,
-      matAcc_t,
-      matB_acc_t,
-      matA_acc_t,
-      compute_policy::mma_engine,
-      arch_tag>;
+  using tile_mma = std::conditional_t<
+      is_col_major_b,
+      subgroup::tile_fma_t<
+          matC_t,
+          matC_t,
+          matAcc_t,
+          matB_acc_t,
+          matA_acc_t,
+          arch_tag>,
+      subgroup::tile_mma_t<
+          matC_t,
+          matC_t,
+          matB_acc_t,
+          matA_acc_t,
+          compute_policy::mma_engine,
+          arch_tag>>;
 
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
@@ -311,7 +328,8 @@ class gemm_t<
   static constexpr msg_type msg_type_b = matB_payload_t::message_type;
 
   /// @brief Arguments for gemm.
-  /// User should prepare matA_base_desc, matB_base_desc, inner_loop_count...
+  /// User should prepare matA_base_desc, matB_base_desc,
+  /// inner_loop_start inner_loop_count...
   struct arguments_t {
     /// @brief Is the memory description of matA, including base, shape and
     /// coordinate.
@@ -359,9 +377,9 @@ class gemm_t<
           inner_loop_start(loop_start),
           inner_loop_count(loop_count),
           scale_base_desc(scale_desc) {}
-    // Be aware of the risks: Rule of three (copy constructor, copy assignment,
-    // destructor) Please check if you need to add self-define destructor inline
-    // ~arguments_t(){}
+    // Be aware of the risks: Rule of three (copy constructor, copy
+    // assignment, destructor) Please check if you need to add self-define
+    // destructor inline ~arguments_t(){}
     inline arguments_t(const arguments_t& args)
         : matA_base_desc(args.matA_base_desc),
           matB_base_desc(args.matB_base_desc),
@@ -435,13 +453,13 @@ class gemm_t<
   /// @brief Main execution function for gemm.
   /// The basic process is load data -> matrix multiply.
   /// @param g Is the workgroup of the current tile.
-  /// @param matAcc Is the reference of the accumulation buffer.
+  /// @param matC Is the reference of the accumulation buffer.
   /// @param args Is the gemm::arguments_t.
   /// @param slm_base Is the slm base address.
   /// @param nbarrier_base Is the named barrier base.
   __XETLA_API KERNEL_FUNC void operator()(
       work_group_t& g,
-      matAcc_t& matAcc,
+      matC_t& matC,
       arguments_t args,
       [[maybe_unused]] uint32_t slm_base = 0,
       uint32_t nbarrier_base = 0) {
@@ -453,6 +471,8 @@ class gemm_t<
     matB_t matB;
     scale_t scale;
     zero_pt_t zero_pt;
+    matAcc_t matAcc;
+    matAcc.reg = 0;
 
     matA_payload_t matA_payload(args.matA_base_desc);
     matB_payload_t matB_payload(args.matB_base_desc);
@@ -575,18 +595,16 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
-      //   if constexpr (is_col_major_b) {
-      //     tile_transpose(matB_acc);
-      //   }
+      //   XETLA_PRINT<matB_acc_t>(); // 2 32(K) 2 16(K)
+    //   dump_mat(matB_acc);
+    //   dump_mat(scale);
       SW_BARRIER();
-      XETLA_PRINT<matA_acc>();
-      XETLA_PRINT<matB_acc>();
-      XETLA_PRINT<matAcc>();
-    //   if constexpr (is_col_major_b) {
-    //     tile_mma::mma(matAcc, matAcc, matA_acc, matB_acc);
-    //   } else {
-        tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
-    //   }
+      if constexpr (
+          is_col_major_b && compute_policy::mma_engine == mma_engine::fpu) {
+        tile_mma::fma(matAcc, matAcc, matB_acc, matA_acc);
+      } else {
+        tile_mma::mma(matC, matC, matB_acc, matA_acc);
+      }
       SW_BARRIER();
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
@@ -602,6 +620,10 @@ class gemm_t<
       }
     }
     SW_BARRIER();
+    if constexpr (
+        is_col_major_b && compute_policy::mma_engine == mma_engine::fpu) {
+      tile_mma::reduce_acc_k(matAcc, matC);
+    }
   }
 
  private:
@@ -613,7 +635,6 @@ class gemm_t<
     // no tail, because this is matB
     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
-
 #pragma unroll
     for (uint32_t i = 0; i < num_block_y; ++i) {
 #pragma unroll
@@ -641,12 +662,29 @@ class gemm_t<
               matB_blk.xetla_format<int8_t>() >> 4;
           cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
         }
-        constexpr uint32_t step = std::min(matB_acc_t::block_size_y, dequant_s);
+        constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
+
 #pragma unroll
-        for (uint32_t k = 0; k < matB_acc_t::block_elems; k += step) {
-          dst_blk.xetla_select<step, 1>(k) =
-              cvt_blk_i32.xetla_select<step, 1>(k) *
-              scale.reg.xetla_select<1, 1>(k / step);
+        for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
+          for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+            uint32_t offset_y_in_tile = i * block_size_y_b + ii;
+            uint32_t offset_x_in_tile = j * block_size_x_b + jj;
+
+            uint32_t scale_idx =
+                (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
+                offset_x_in_tile;
+            // uint32_t scale_idx =
+            //     (k + (i * num_block_x + j) * matB_acc_t::block_elems) / step;
+
+            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                cvt_blk_i32.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                scale.reg.xetla_select<1, 1>(scale_idx);
+
+            // sycl::ext::oneapi::experimental::printf(
+            //     "scale[%d] %f \n",
+            //     scale_idx,
+            //     float(sycl::half(scale.reg.xetla_select<1, 1>(scale_idx))));
+          }
         }
       }
     }
@@ -660,8 +698,9 @@ class gemm_t<
   //     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
   //     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
 
-  //     constexpr uint32_t block_b_y_per_scale = dequant_s / block_size_y_b;
-  //     constexpr uint32_t block_b_x_per_scale = dequant_s / block_size_x_b;
+  //     constexpr uint32_t block_b_y_per_scale = dequant_s /
+  //     block_size_y_b; constexpr uint32_t block_b_x_per_scale = dequant_s
+  //     / block_size_x_b;
   // #pragma unroll
   //     for (uint32_t i = 0; i < num_block_y; ++i) {
   // #pragma unroll
@@ -671,29 +710,34 @@ class gemm_t<
   //                             .xetla_select<matB_t::block_elems, 1>(
   //                                 block_id * matB_t::block_elems)
   //                             .xetla_format<int8_t>();
-  //         int scale_block_id = (i / block_b_y_per_scale * num_block_x + j);
-  //         auto scale_vec = scale.reg.xetla_select<scale_t::block_size_x, 1>(
+  //         int scale_block_id = (i / block_b_y_per_scale * num_block_x +
+  //         j); auto scale_vec =
+  //         scale.reg.xetla_select<scale_t::block_size_x, 1>(
   //             scale_block_id * scale_t::block_size_x);
-  //         auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems,
-  //         1>(
+  //         auto dst_blk =
+  //         matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
   //             block_id * matB_acc_t::block_elems);
 
   //         // 2: int8 includes 2 4bits data.
   //         xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
 
-  //         xetla_vector<int32_t, block_size_x_b * block_size_y_b> cvt_blk_i32;
-  //         if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
+  //         xetla_vector<int32_t, block_size_x_b * block_size_y_b>
+  //         cvt_blk_i32; if constexpr (compute_policy::quant_type ==
+  //         quant_mode::S4_ASYM) {
   //           auto zero_pt_vec = zero_pt.reg
-  //                                  .xetla_select<zero_pt_t::block_size_x, 1>(
+  //                                  .xetla_select<zero_pt_t::block_size_x,
+  //                                  1>(
   //                                      scale_block_id *
   //                                      zero_pt_t::block_size_x)
   //                                  .xetla_format<uint8_t>();
   //           cvt_blk.xetla_select<matB_t::block_elems, 2>(0) = matB_blk &
-  //           0x0f; cvt_blk.xetla_select<matB_t::block_elems, 2>(1) = matB_blk
+  //           0x0f; cvt_blk.xetla_select<matB_t::block_elems, 2>(1) =
+  //           matB_blk
   //           >> 4; xetla_vector<uint8_t, block_size_x_b> zero_pt_sub;
   //           zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(0) =
   //               zero_pt_vec & 0x0f;
-  //           zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(1) = zero_pt_vec
+  //           zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(1) =
+  //           zero_pt_vec
   //           >> 4; xetla_vector<uint8_t, block_size_x_b * block_size_y_b>
   //           zero_pt_blk;
   // #pragma unroll
@@ -708,10 +752,12 @@ class gemm_t<
   //                zero_pt_blk.xetla_format<int8_t>());
   //         }
   //         if constexpr (
-  //             compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-  //           xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk_i8;
-  //           cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) = matB_blk &
-  //           0x0f; cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
+  //             compute_policy::quant_type ==
+  //             quant_mode::S4_FULLRANGE_NO_ZP) {
+  //           xetla_vector<int8_t, block_size_x_b * block_size_y_b>
+  //           cvt_blk_i8; cvt_blk_i8.xetla_select<matB_t::block_elems,
+  //           2>(0) = matB_blk & 0x0f;
+  //           cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
   //               cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) << 4;
   //           cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
   //               cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) >> 4;
@@ -724,7 +770,8 @@ class gemm_t<
   //           sizeof(dtype_mma_b); xetla_vector<dtype_mma_b,
   //           matB_acc_t::block_elems * vnni_rows>
   //               temp_blk;
-  //           temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
+  //           temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0)
+  //           =
   //               cvt_blk_i32;
 
   // #pragma unroll
@@ -738,7 +785,8 @@ class gemm_t<
   //             }
   //           }
 
-  //           xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
+  //           xetla_vector<dtype_scale, block_size_x_b * vnni_rows>
+  //           scale_blk;
   // #pragma unroll
   //           for (uint32_t row = 0; row < vnni_rows; row++) {
   //             scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) =
@@ -756,7 +804,8 @@ class gemm_t<
   //         } else {
   // #pragma unroll
   //           for (uint32_t k = 0; k < block_size_y_b; k++) {
-  //             dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
+  //             dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b)
+  //             =
   //                 cvt_blk_i32.xetla_select<block_size_x_b, 1>(
   //                     k * block_size_x_b) *
   //                 scale_vec;
@@ -776,13 +825,11 @@ class gemm_t<
     args.matA_base_desc.update_coord_y(tile_offset_m);
     if constexpr (is_col_major_b) {
       args.matB_base_desc.update_coord_x(tile_offset_n);
-      args.scale_base_desc.update_coord_x(tile_offset_n);
-      args.zero_pt_base_desc.update_coord_x(tile_offset_n);
     } else {
       args.matB_base_desc.update_coord_x(tile_offset_n / pack_ratio);
-      args.scale_base_desc.update_coord_x(tile_offset_n);
-      args.zero_pt_base_desc.update_coord_x(tile_offset_n / pack_ratio);
     }
+    args.scale_base_desc.update_coord_x(tile_offset_n);
+    args.zero_pt_base_desc.update_coord_x(tile_offset_n / pack_ratio);
   }
 };
 /// @} xetla_gemm

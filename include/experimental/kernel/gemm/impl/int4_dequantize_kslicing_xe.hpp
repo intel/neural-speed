@@ -95,7 +95,7 @@ class gemm_universal_t<
   using dtype_c = typename mem_desc_c_t::dtype;
   using dtype_scale = typename mem_desc_scale_t::dtype;
   using dtype_zero_pt = typename mem_desc_zero_pt_t::dtype;
-  using matAcc_t = typename gemm_t::matAcc_t;
+  using matAcc_t = typename gemm_t::matC_t;
   using dtype_acc = typename matAcc_t::dtype;
   using mem_desc_acc_t =
       mem_desc_t<dtype_acc, mem_layout::row_major, mem_space::global>;

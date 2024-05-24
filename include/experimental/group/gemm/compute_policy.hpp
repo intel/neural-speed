@@ -90,13 +90,13 @@ struct compute_policy_int4_dequantize<
   static constexpr uint32_t block_size_y_a = 16;
   using mma_attr = mma_attr_t<arch_tag_, block_size_y_a>;
   static constexpr uint32_t block_bytes_x_a =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 32;
+      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 256;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
   static constexpr uint32_t block_size_x_b =
       (mma_engine == mma_engine::xmx) ? mma_attr::mma_n_in_elem : 32;
   static constexpr uint32_t block_bytes_y_b =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 32;
+      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 256;
   static constexpr uint32_t block_size_y_b =
       block_bytes_y_b / sizeof(dtype_mma_b);
 

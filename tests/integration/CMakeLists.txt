@@ -21,6 +21,7 @@ endfunction()
 
 # add_subdirectory(vector_add)
 add_subdirectory(gemm)
+add_subdirectory(gemv)
 add_subdirectory(row_reduction)
 add_subdirectory(layer_norm)
 add_subdirectory(data_transformer)

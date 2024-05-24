@@ -66,7 +66,7 @@ else()
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "${XETLA_OFFLINE_OPTIONS}")
 endif()
 
-add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
+add_compile_options(-fsycl -fsycl-device-code-split=per_kernel  -ftemplate-backtrace-limit=0)
 add_compile_options(-Wall -Wextra -Werror)
 
 include(ProcessorCount)

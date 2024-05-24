@@ -706,8 +706,8 @@ layout_convert(T_dst& dst, T_src& src) {
 template <typename T>
 void dump_mat(
     T mat,
-    size_t tile_x = T::tile_size_x,
-    size_t tile_y = T::tile_size_y) {
+    size_t tile_x = T::reg_transpose ? T::tile_size_y : T::tile_size_x,
+    size_t tile_y = T::reg_transpose ? T::tile_size_x : T::tile_size_y) {
 #pragma unroll
   for (size_t row = 0; row < tile_y; row++) {
 #pragma unroll
@@ -715,7 +715,7 @@ void dump_mat(
       sycl::ext::oneapi::experimental::printf(
           "%d ", (int)(sycl::half)mat.reg[row * tile_x + col]);
     }
-    sycl::ext::oneapi::experimental::printf("\n ");
+    sycl::ext::oneapi::experimental::printf("\n");
   }
   sycl::ext::oneapi::experimental::printf("\n ");
 }
@@ -728,9 +728,9 @@ void dump_mat_reg(T mat, size_t tile_x, size_t tile_y) {
       sycl::ext::oneapi::experimental::printf(
           "%d ", (int)(sycl::half)mat[row * tile_x + col]);
     }
-    sycl::ext::oneapi::experimental::printf("\n ");
+    sycl::ext::oneapi::experimental::printf("\n");
   }
-  sycl::ext::oneapi::experimental::printf("\n ");
+  sycl::ext::oneapi::experimental::printf("\n");
 }
 
 } // namespace gpu::xetla::subgroup

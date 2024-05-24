@@ -26,9 +26,9 @@
 namespace gpu::xetla::subgroup {
 
 namespace detail {
-template <typename tile_t, typename payload_t>
+template <typename tile_t, typename payload_t, bool is_lsc_gather_ = true>
 struct check_load_type {
-  static constexpr bool is_lsc_gather = true;
+  static constexpr bool is_lsc_gather = is_lsc_gather_;
   static constexpr bool is_global_block_2d =
       (payload_t::memory_space == mem_space::global &&
        (payload_t::message_type == msg_type::block_2d));

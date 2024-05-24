@@ -331,8 +331,12 @@ struct msg_type_query {
              : msg_type::scatter);
 };
 
-template <typename tile_desc_, mem_space memory_space>
-constexpr msg_type msg_type_v = msg_type_query<tile_desc_, memory_space>::value;
+template <
+    typename tile_desc_,
+    mem_space memory_space,
+    mem_layout memory_layout = mem_layout::row_major>
+constexpr msg_type msg_type_v =
+    msg_type_query<tile_desc_, memory_space, memory_layout>::value;
 
 template <
     typename dtype,

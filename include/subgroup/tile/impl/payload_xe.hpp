@@ -436,6 +436,7 @@ struct mem_payload_t<
           (bytes_per_row % sizeof(uint32_t) == 0),
           uint32_t,
           dtype>::type>::type;
+
   static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
 
   uint64_t base_offset;
@@ -1084,11 +1085,6 @@ struct mem_payload_t<
   static constexpr uint32_t block_size_x = tile_desc::block_size_x;
   static constexpr uint32_t block_size_y = tile_desc::block_size_y;
 
-  static constexpr uint32_t block_per_row_bytes =
-      alignment_in_bytes < block_size_x * sizeof(dtype)
-      ? alignment_in_bytes
-      : block_size_x * sizeof(dtype);
-
   using this_payload_t =
       mem_payload_t<mem_desc_t, tile_desc, msg_type::block_2d, arch_tag_>;
 
@@ -1110,6 +1106,11 @@ struct mem_payload_t<
       block_size_x * block_size_y * sizeof(dtype);
 
   //     using mem_dtype = uint32_t;
+
+  static constexpr uint32_t block_per_row_bytes = std::min(
+      (mem_transpose ? block_size_y : block_size_x) * uint32_t(sizeof(dtype)),
+      alignment_in_bytes);
+
   using mem_dtype = typename std::conditional<
       (block_per_row_bytes % sizeof(uint64_t) == 0),
       uint64_t,
