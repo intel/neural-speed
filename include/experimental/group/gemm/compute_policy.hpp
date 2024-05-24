@@ -25,7 +25,7 @@ namespace gpu::xetla::group {
 
 enum quant_mode : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP };
 
-/// @brief Compute policy for unaligned shape and xmx engine.
+/// @brief Compute policy for int4 dequant gemm.
 /// @tparam compute_attr_ Is compute-related attributes.
 /// @tparam perf_tuning_knob_ Is performance-related knobs.
 /// @tparam arch_tag_ Is the HW architecture.
@@ -41,7 +41,7 @@ template <
     typename enable = void>
 struct compute_policy_int4_dequantize {};
 
-/// @brief Specialized for XeHpc and XeHpg architecture.
+/// @brief Specialized for xmx engine.
 template <
     typename compute_attr_,
     typename perf_tuning_knob_,
@@ -60,7 +60,8 @@ struct compute_policy_int4_dequantize<
     dequant_s_,
     mma_engine_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<(
+        arch_tag_ <= gpu_arch::XeHpc && mma_engine_ == mma_engine::xmx)>> {
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
@@ -73,9 +74,7 @@ struct compute_policy_int4_dequantize<
   static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
-  static_assert(
-      !(mma_engine == mma_engine::xmx && arch_tag == gpu_arch::XeLpg),
-      "XeLpg does not support xmx");
+  static_assert(!(arch_tag == gpu_arch::XeLpg), "XeLpg does not support xmx");
 
   static constexpr bool is_int4_matB_policy = true;
 
@@ -89,14 +88,68 @@ struct compute_policy_int4_dequantize<
 
   static constexpr uint32_t block_size_y_a = 16;
   using mma_attr = mma_attr_t<arch_tag_, block_size_y_a>;
-  static constexpr uint32_t block_bytes_x_a =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 256;
+  static constexpr uint32_t block_bytes_x_a = mma_attr::mma_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_x_b =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_n_in_elem : 32;
-  static constexpr uint32_t block_bytes_y_b =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 256;
+  static constexpr uint32_t block_size_x_b = mma_attr::mma_n_in_elem;
+  static constexpr uint32_t block_bytes_y_b = mma_attr::mma_k_in_bytes;
+  static constexpr uint32_t block_size_y_b =
+      block_bytes_y_b / sizeof(dtype_mma_b);
+
+  static_assert(
+      block_bytes_x_a == block_bytes_y_b,
+      "mat_a x need to match with mat_b y");
+};
+
+/// @brief Specialized for fpu engine.
+template <
+    typename compute_attr_,
+    typename perf_tuning_knob_,
+    typename dtype_scale_,
+    typename dtype_zero_pt_,
+    quant_mode quant_type_,
+    int dequant_s_,
+    mma_engine mma_engine_,
+    gpu_arch arch_tag_>
+struct compute_policy_int4_dequantize<
+    compute_attr_,
+    perf_tuning_knob_,
+    dtype_scale_,
+    dtype_zero_pt_,
+    quant_type_,
+    dequant_s_,
+    mma_engine_,
+    arch_tag_,
+    std::enable_if_t<(
+        arch_tag_ <= gpu_arch::XeHpc && mma_engine_ == mma_engine::fpu)>> {
+  using compute_attr = compute_attr_;
+  using dtype_mma_acc = typename compute_attr::dtype_acc;
+  using dtype_mma_a = typename compute_attr::dtype_a;
+  using dtype_mma_b = typename compute_attr::dtype_b;
+
+  using perf_tuning_knob = perf_tuning_knob_;
+  static constexpr int stages = perf_tuning_knob::stages;
+  static constexpr int sync_freq = perf_tuning_knob::sync_freq;
+  static constexpr int k_stride = perf_tuning_knob::k_stride;
+  static constexpr mma_engine mma_engine = mma_engine_;
+  static constexpr gpu_arch arch_tag = arch_tag_;
+
+  static constexpr bool is_int4_matB_policy = true;
+
+  static constexpr uint32_t dequant_s = dequant_s_;
+  static_assert(
+      (dequant_s % (32 / sizeof(dtype_mma_b))) == 0,
+      "dequant_s should be a multiply of 32B");
+  using dtype_scale = dtype_scale_;
+  using dtype_zero_pt = dtype_zero_pt_;
+  static constexpr quant_mode quant_type = quant_type_;
+
+  static constexpr uint32_t block_size_y_a = 16;
+  static constexpr uint32_t block_bytes_x_a = 256;
+  static constexpr uint32_t block_size_x_a =
+      block_bytes_x_a / sizeof(dtype_mma_a);
+  static constexpr uint32_t block_size_x_b = 32;
+  static constexpr uint32_t block_bytes_y_b = 256;
   static constexpr uint32_t block_size_y_b =
       block_bytes_y_b / sizeof(dtype_mma_b);
 

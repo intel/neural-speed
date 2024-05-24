@@ -223,9 +223,6 @@ class gemm_t<
       (k_stride % (block_size_y_b) == 0),
       "k_stride%(block_size_y_b) == 0");
   static_assert(
-      (dequant_s % (block_size_y_b) == 0),
-      "dequant_s%(block_size_y_b) == 0");
-  static_assert(
       (k_stride % (dequant_s) == 0) || (dequant_s % (k_stride) == 0),
       "k_stride should match with dequant_s");
 
@@ -596,8 +593,8 @@ class gemm_t<
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
       //   XETLA_PRINT<matB_acc_t>(); // 2 32(K) 2 16(K)
-    //   dump_mat(matB_acc);
-    //   dump_mat(scale);
+      //   dump_mat(matB_acc);
+      //   dump_mat(scale);
       SW_BARRIER();
       if constexpr (
           is_col_major_b && compute_policy::mma_engine == mma_engine::fpu) {
