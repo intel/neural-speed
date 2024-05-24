@@ -34,7 +34,7 @@ if __name__ == "__main__":
     parser.add_argument('--alg', type=str, default="sym")
     parser.add_argument('--scale_dtype', type=str, default="fp32")
     parser.add_argument('--init_from_bin', type=str, default="default_none")
-    parser.add_argument('--model_format', type=str, default="nueral_speed")
+    parser.add_argument('--model_format', type=str, default="neural_speed")
     args = parser.parse_args()
 
     model_args=f'pretrained={args.model_name},model_format={args.model_format},dtype=float32,trust_remote_code=True'
