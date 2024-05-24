@@ -26,7 +26,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config,
-                                   compute_dtype="fp32"):
+                                   compute_dtype="int8"):
     list_vars = model
     for name in list_vars.keys():
         print(name)
@@ -173,7 +173,7 @@ def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams
 
 
 def convert_phi2_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config,
-                                 compute_dtype="fp32"):
+                                 compute_dtype="int8"):
     list_vars = model
     for name in list_vars.keys():
         print(name)
@@ -323,7 +323,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         help="convert to the GGUF or NE format")
     parser.add_argument("--compute_dtype",
                         choices=["fp32", "bf16", "int8"],
-                        default="fp32",
+                        default="int8",
                         help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)

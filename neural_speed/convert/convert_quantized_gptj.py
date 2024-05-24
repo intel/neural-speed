@@ -23,7 +23,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 
-def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config, compute_dtype="fp32"):
+def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config, compute_dtype="int8"):
     # unpack weight and repack into 3bits / 4bits BestLA format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
@@ -102,7 +102,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="huggingface", help="hub to load model")
     parser.add_argument("--compute_dtype",
                         choices=["fp32", "bf16", "int8"],
-                        default="fp32",
+                        default="int8",
                         help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)

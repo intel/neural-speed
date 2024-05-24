@@ -34,7 +34,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         help="hub to load model")
     parser.add_argument("--compute_dtype",
                         choices=["fp32", "bf16", "int8"],
-                        default="fp32",
+                        default="int8",
                         help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)

@@ -29,7 +29,7 @@ def permute_func(weights, n_head: int, n_head_kv: int):
 
 
 def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None,
-                                compute_dtype="fp32"):
+                                compute_dtype="int8"):
     # unpack weight and repack into jblas format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
@@ -111,7 +111,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         help="hub to load model")
     parser.add_argument("--compute_dtype",
                         choices=["fp32", "bf16", "int8"],
-                        default="fp32",
+                        default="int8",
                         help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)

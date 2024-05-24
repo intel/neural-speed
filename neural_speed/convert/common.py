@@ -647,7 +647,7 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
 
 
 def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None,
-                             compute_dtype="fp32"):
+                             compute_dtype="int8"):
     # unpack weight and repack into jblas format
     import neural_speed.llama_cpp as cpp_model
     qzeros = model[f"{src_name}.qzeros"]
@@ -714,7 +714,7 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
     print(f"converting {dst_name} qauntized tensor to bestla q4 block")
 
 
-def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config, compute_dtype="fp32"):
+def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config, compute_dtype="int8"):
     # unpack weight and repack into 3bits / 4bits BestLA format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
