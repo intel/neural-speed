@@ -148,7 +148,7 @@ function main() {
                         $infer_cmd --seed 1234 -t $cores_per_instance -b 2047 -c ${ctx} -n ${output} -m ${model}-${precision}.bin -p "$prompt" 2>&1 | tee ${WORKING_DIR}/${logs_file} || true & 
                     monitor
                     if [[ ${precision} == "q4_j_b32" ]]&&[[ ${input} == "1024" ]]&&[[ "${model}" == "llama3-8b" ]]; then
-                        python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 8  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
+                        OMP_NUM_THREADS=56 numactl -l -C 0-55 python ./scripts/cal_acc.py --model_name ${input_model} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 8  2>&1 | tee -a ${WORKING_DIR}/${logs_file}
                     else
                         echo "-------- Inference End --------"
                     fi
