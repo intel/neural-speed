@@ -34,9 +34,10 @@ if __name__ == "__main__":
     parser.add_argument('--alg', type=str, default="sym")
     parser.add_argument('--scale_dtype', type=str, default="fp32")
     parser.add_argument('--init_from_bin', type=str, default="default_none")
+    parser.add_argument('--model_format', type=str, default="nueral_speed")
     args = parser.parse_args()
 
-    model_args=f'pretrained={args.model_name},dtype=float32,trust_remote_code=True'
+    model_args=f'pretrained={args.model_name},model_format={args.model_format},dtype=float32,trust_remote_code=True'
     # model_args += f'use_gptq={args.use_gptq},use_awq={args.use_awq},use_autoround={args.use_autoround}'
     eval_args = LMEvalParser(model="hf",
                         model_args=model_args,

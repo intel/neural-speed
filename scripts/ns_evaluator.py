@@ -388,7 +388,6 @@ def evaluate(
     """
 
     eval_logger.setLevel(getattr(logging, f"{verbosity}"))
-
     # tracks all Instances/requests a model must generate output on.
     requests = defaultdict(list)
     # stores the amount to pad out reqs per req. type so that

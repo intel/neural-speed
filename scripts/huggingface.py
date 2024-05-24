@@ -596,6 +596,10 @@ class HFLM(TemplateLM):
                                         use_gptq=use_gptq,
                                         use_awq=use_awq,
                                         use_autoround=use_autoround)
+            elif (self.model_format == "gguf"):
+                assert(init_from_bin!="default_none")
+                from llama_cpp import Llama
+                self._model= Llama(model_path=init_from_bin, logits_all=True)
             elif (
                 self.model_format == "onnx"
                 and self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
@@ -1030,7 +1034,17 @@ class HFLM(TemplateLM):
                     ).logits
             else:
                 assert self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
-                if self.model_format == "neural_speed":
+                if self.model_format == "gguf":
+                    import numpy as np
+                    self._model.eval(inps[0].tolist())
+                    out = np.array(self._model.scores)[:len(inps[0].tolist()),:]
+                    self._model.reset()
+                    self._model._ctx.kv_cache_clear()
+                    self._model.input_ids.fill(0)
+                    self._model.scores.fill(0)
+                    output = torch.from_numpy(out)
+                    output = torch.unsqueeze(output,0)
+                elif self.model_format == "neural_speed":
                     out = self.model(
                         inps, reinit=True, logits_all=True, ignore_padding=True
                     )
