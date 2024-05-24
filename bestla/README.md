@@ -4,13 +4,14 @@ BesTLA is a lightweight, header-only acceleration library for high-performance G
 - `Launcher`: Schedules computation-related template classes, allowing users to specify their own computation-related template classes, including GemmCore, Prologue, and Epilogue.
 - `Parallel`: Specifies data splitting strategy for task distribution among different cores. BesTLA’s default Parallel template class adopts an L2-cache-fusion concept, i.e., each core tries to temporarily store the data it processes in its L2-cache during each round of gemm-tile computation.
 - `GemmCore`: A computation-related template class that provides a micro-kernel for performing a tile gemm computation with a specific ISA. It is the most important template class in BesTLA. Currently, GemmCore supports the following ISAs:
-   - AVX2
-   - AVX_VNNI
-   - AVX512F
-   - AVX512_VNNI
-   - AMX_BF16
-   - AMX_INT8
-   - AVX512_FP16
+   - AVX2: sgemm, u8s8 igemm
+   - AVX_VNNI: u8s8&s8s8 igemm
+   - AVX512F: sgemm
+   - AVX512BW: u8s8 igemm
+   - AVX512_VNNI: u8s8 igemm
+   - AMX_BF16: bf16 hgemm
+   - AMX_INT8: s8s8&u8s8&u8u8&s8u8 igemm
+   - AVX512_FP16: fp16 hgemm
 - `Prologue`: A computation-related template class that preprocesses (such as data type conversion/padding) input data to meet GemmCore’s input data requirements.
 - `Epilogue`: A computation-related template class that post-processes (such as eltwiseop-fusion) the results of gemm-core computations to expand BesTLA’s application scenarios.
 BesTLA supports users to configure thread libraries for multi-core parallelism (e.g. openMP), greatly facilitating user integrate BesTLA into their own projects. BesTLA also supports specifying the number of computing-threads at runtime, making the allocation of computing resources more flexible.
@@ -39,7 +40,7 @@ Config description of the table:
 | Weight dtype  | Data type of quantized weight                       |
 | Compute dtype | Data type of BesTLA internal Gemm computation       |
 | Scale dtype   | Data type of scales                                 |
-| alg           | Quantization algorithm to use(symmetric/asymmetric) |
+| algo          | Quantization algorithm to use(symmetric/asymmetric) |
 
 
 ## Postop-fusion 
