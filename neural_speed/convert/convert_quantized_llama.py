@@ -28,7 +28,8 @@ def permute_func(weights, n_head: int, n_head_kv: int):
                             *weights.shape[1:]).swapaxes(1, 2).reshape(weights.shape))
 
 
-def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
+def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None,
+                                compute_dtype="fp32"):
     # unpack weight and repack into jblas format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
@@ -95,7 +96,7 @@ def convert_to_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_hea
                                                 weight_dtype=weight_dtype,
                                                 group_size=q_config['group_size'],
                                                 alg="sym" if q_config['sym'] else "asym",
-                                                compute_dtype="int8")
+                                                compute_dtype=compute_dtype)
     dst.flatten()[:byte_size].tofile(fout)
     print(f"converting {dst_name} quantized tensor to bestla q4 block")
 
@@ -108,6 +109,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         choices=["huggingface", "modelscope"],
                         default="huggingface",
                         help="hub to load model")
+    parser.add_argument("--compute_dtype",
+                        choices=["fp32", "bf16", "int8"],
+                        default="fp32",
+                        help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -193,13 +198,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
                 f.write(struct.pack("f", score))
 
         # 3. write tensors
+        cmp_dtype = args.compute_dtype
+        print("model compute_dtype is {}".format(cmp_dtype))
         list_vars = model
         convert_to_fp32_tensor("model.embed_tokens.weight", "tok_embeddings.weight", list_vars, f)
         convert_to_fp32_tensor("model.norm.weight", "norm.weight", list_vars, f)
         if list_vars.get("lm_head.qweight") is None:
             convert_to_fp32_tensor("lm_head.weight", "output.weight", list_vars, f)
         else:
-            convert_to_q4_bestla_tensor(f"lm_head.weight", f"output.weight", list_vars, f, quantize_config, n_head)
+            convert_to_q4_bestla_tensor(f"lm_head.weight", f"output.weight", list_vars, f, quantize_config, n_head,
+                                        compute_dtype=cmp_dtype)
 
         for i in range(n_layer):
             convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.q_proj",
@@ -209,7 +217,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                         quantize_config,
                                         n_head,
                                         n_head,
-                                        permute_func=permute_func)
+                                        permute_func=permute_func,
+                                        compute_dtype=cmp_dtype)
             convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.k_proj",
                                         f"layers.{i}.attention.wk.weight",
                                         list_vars,
@@ -217,17 +226,18 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                         quantize_config,
                                         n_head,
                                         n_head_kv,
-                                        permute_func=permute_func)
+                                        permute_func=permute_func,
+                                        compute_dtype=cmp_dtype)
             convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.v_proj", f"layers.{i}.attention.wv.weight",
-                                        list_vars, f, quantize_config, n_head)
+                                        list_vars, f, quantize_config, n_head, compute_dtype=cmp_dtype)
             convert_to_q4_bestla_tensor(f"model.layers.{i}.self_attn.o_proj", f"layers.{i}.attention.wo.weight",
-                                        list_vars, f, quantize_config, n_head)
+                                        list_vars, f, quantize_config, n_head, compute_dtype=cmp_dtype)
             convert_to_q4_bestla_tensor(f"model.layers.{i}.mlp.gate_proj", f"layers.{i}.feed_forward.w1.weight",
-                                        list_vars, f, quantize_config, n_head)
+                                        list_vars, f, quantize_config, n_head, compute_dtype=cmp_dtype)
             convert_to_q4_bestla_tensor(f"model.layers.{i}.mlp.down_proj", f"layers.{i}.feed_forward.w2.weight",
-                                        list_vars, f, quantize_config, n_head)
+                                        list_vars, f, quantize_config, n_head, compute_dtype=cmp_dtype)
             convert_to_q4_bestla_tensor(f"model.layers.{i}.mlp.up_proj", f"layers.{i}.feed_forward.w3.weight",
-                                        list_vars, f, quantize_config, n_head)
+                                        list_vars, f, quantize_config, n_head, compute_dtype=cmp_dtype)
 
             convert_to_fp32_tensor(f"model.layers.{i}.input_layernorm.weight", f"layers.{i}.attention_norm.weight",
                                    list_vars, f)

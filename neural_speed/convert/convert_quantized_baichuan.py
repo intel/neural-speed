@@ -54,6 +54,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         choices=["huggingface", "modelscope"],
                         default="huggingface",
                         help="hub to load model")
+    parser.add_argument("--compute_dtype",
+                        choices=["fp32", "bf16", "int8"],
+                        default="fp32",
+                        help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -168,6 +172,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_qwen_to_fp32_tensor("model.norm.weight", "model.norm.weight", list_vars, fout)
     convert_qwen_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
 
+    cmp_dtype = args.compute_dtype
+    print("model compute_dtype is {}".format(cmp_dtype))
     for i in range(hparams["num_hidden_layers"]):
         prefix = "model.layers." + str(i)
 
@@ -177,17 +183,17 @@ def main(args_in: Optional[List[str]] = None) -> None:
                                     f"{prefix}.post_attention_layernorm.weight", list_vars, fout)
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.W_pack.weight", f"{prefix}.self_attn.W_pack.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.o_proj.weight", f"{prefix}.self_attn.o_proj.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=cmp_dtype)
 
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.gate_proj", f"{prefix}.mlp.gate_proj.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.down_proj", f"{prefix}.mlp.down_proj.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.up_proj", f"{prefix}.mlp.up_proj.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=cmp_dtype)
 
     fout.close()
     print(f"Success! saved as {out_path}")

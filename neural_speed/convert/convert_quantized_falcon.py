@@ -33,6 +33,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         choices=["huggingface", "modelscope"],
                         default="huggingface",
                         help="hub to load model")
+    parser.add_argument("--compute_dtype",
+                        choices=["fp32", "bf16", "int8"],
+                        default="fp32",
+                        help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -142,6 +146,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_to_fp32_tensor("transformer.ln_f.bias", "transformer.ln_f.bias", list_vars, fout)
     convert_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
 
+    cmp_dtype = args.compute_dtype
+    print("model compute_dtype is {}".format(cmp_dtype))
     for i in range(hparams["n_layer"]):
         prefix = "transformer.h." + str(i)
 
@@ -157,15 +163,16 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.self_attention.query_key_value.weight",
-                                    f"{prefix}.self_attention.query_key_value.weight", list_vars, fout, quantize_config)
+                                    f"{prefix}.self_attention.query_key_value.weight", list_vars, fout, quantize_config,
+                                    compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.self_attention.dense.weight", f"{prefix}.self_attention.dense.weight",
-                                    list_vars, fout, quantize_config)
+                                    list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
 
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.dense_h_to_4h", f"{prefix}.mlp.dense_h_to_4h.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.dense_4h_to_h", f"{prefix}.mlp.dense_4h_to_h.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=cmp_dtype)
 
     fout.close()
     print(f"Success! saved as {out_path}")

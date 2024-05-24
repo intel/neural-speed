@@ -23,7 +23,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 
-def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
+def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config, compute_dtype="fp32"):
     # unpack weight and repack into 3bits / 4bits BestLA format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
@@ -89,7 +89,7 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
                                             weight_dtype=weight_dtype,
                                             group_size=q_config['group_size'],
                                             alg="sym" if q_config['sym'] else "asym",
-                                            compute_dtype="int8")
+                                            compute_dtype=compute_dtype)
     dst.flatten()[:byte_size].tofile(fout)
     print(f"converting {dst_name} quantized tensor to bestla q{q_config['bits']} block")
 
@@ -100,6 +100,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
     parser.add_argument("--outfile", type=Path, help="path to write to; default: based on input")
     parser.add_argument("--model_hub", choices=["huggingface","modelscope"],
                         default="huggingface", help="hub to load model")
+    parser.add_argument("--compute_dtype",
+                        choices=["fp32", "bf16", "int8"],
+                        default="fp32",
+                        help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -180,20 +184,22 @@ def main(args_in: Optional[List[str]] = None) -> None:
     convert_to_fp32_tensor("lm_head.bias", "lm_head.bias", list_vars, fout)
     convert_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
 
+    cmp_dtype = args.compute_dtype
+    print("model compute_dtype is {}".format(cmp_dtype))
     for i in tqdm(range(n_layer), desc="Processing layers"):
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.q_proj.weight",
-                    f"transformer.h.{i}.attn.q_proj.weight", list_vars, fout, quantize_config)
+                    f"transformer.h.{i}.attn.q_proj.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.k_proj.weight",
-                    f"transformer.h.{i}.attn.k_proj.weight", list_vars, fout, quantize_config)
+                    f"transformer.h.{i}.attn.k_proj.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.v_proj.weight",
-                    f"transformer.h.{i}.attn.v_proj.weight", list_vars, fout, quantize_config)
+                    f"transformer.h.{i}.attn.v_proj.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
 
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.out_proj.weight",
-                    f"transformer.h.{i}.attn.out_proj.weight", list_vars, fout, quantize_config)
+                    f"transformer.h.{i}.attn.out_proj.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_in.weight",
-                    f"transformer.h.{i}.mlp.fc_in.weight", list_vars, fout, quantize_config)
+                    f"transformer.h.{i}.mlp.fc_in.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
         convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.fc_out.weight",
-                    f"transformer.h.{i}.mlp.fc_out.weight", list_vars, fout, quantize_config)
+                    f"transformer.h.{i}.mlp.fc_out.weight", list_vars, fout, quantize_config, compute_dtype=cmp_dtype)
 
         convert_to_fp32_tensor(f"transformer.h.{i}.mlp.fc_in.bias",
                         f"transformer.h.{i}.mlp.fc_in.bias", list_vars, fout)

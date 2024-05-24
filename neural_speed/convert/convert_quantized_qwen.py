@@ -32,6 +32,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         choices=["huggingface", "modelscope"],
                         default="huggingface",
                         help="hub to load model")
+    parser.add_argument("--compute_dtype",
+                        choices=["fp32", "bf16", "int8"],
+                        default="fp32",
+                        help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -147,6 +151,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         data.tofile(f)
 
     #3. write tensors
+    cmp_dtype = args.compute_dtype
+    print("model compute_dtype is {}".format(cmp_dtype))
     if hparams['model_type'] == 'qwen':
         convert_qwen_to_fp32_tensor("transformer.wte.weight", "transformer.wte.weight", list_vars, f)
         convert_qwen_to_fp32_tensor("transformer.ln_f.weight", "transformer.ln_f.weight", list_vars, f)
@@ -160,19 +166,21 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             # qkv GEMM
             convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_attn.weight",
-                                        f"transformer.h.{i}.attn.c_attn.weight", list_vars, f, quantize_config)
+                                        f"transformer.h.{i}.attn.c_attn.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
             convert_qwen_to_fp32_tensor(f"transformer.h.{i}.attn.c_attn.bias", f"transformer.h.{i}.attn.c_attn.bias",
                                         list_vars, f)
             convert_to_qx_bestla_tensor(f"transformer.h.{i}.attn.c_proj.weight",
-                                        f"transformer.h.{i}.attn.c_proj.weight", list_vars, f, quantize_config)
+                                        f"transformer.h.{i}.attn.c_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
 
             # ffn GEMM
             convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w1.weight", f"transformer.h.{i}.mlp.w1.weight",
-                                        list_vars, f, quantize_config)
+                                        list_vars, f, quantize_config, compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.w2.weight", f"transformer.h.{i}.mlp.w2.weight",
-                                        list_vars, f, quantize_config)
+                                        list_vars, f, quantize_config, compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"transformer.h.{i}.mlp.c_proj.weight", f"transformer.h.{i}.mlp.c_proj.weight",
-                                        list_vars, f, quantize_config)
+                                        list_vars, f, quantize_config, compute_dtype=cmp_dtype)
 
         f.close()
         print(f"Success! saved as {out_path}")
@@ -190,13 +198,17 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             # qkv GEMM
             convert_to_qx_bestla_tensor(f"model.layers.{i}.self_attn.q_proj.weight",
-                                        f"model.layers.{i}.self_attn.q_proj.weight", list_vars, f, quantize_config)
+                                        f"model.layers.{i}.self_attn.q_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"model.layers.{i}.self_attn.k_proj.weight",
-                                        f"model.layers.{i}.self_attn.k_proj.weight", list_vars, f, quantize_config)
+                                        f"model.layers.{i}.self_attn.k_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"model.layers.{i}.self_attn.v_proj.weight",
-                                        f"model.layers.{i}.self_attn.v_proj.weight", list_vars, f, quantize_config)
+                                        f"model.layers.{i}.self_attn.v_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"model.layers.{i}.self_attn.o_proj.weight",
-                                        f"model.layers.{i}.self_attn.o_proj.weight", list_vars, f, quantize_config)
+                                        f"model.layers.{i}.self_attn.o_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
 
             convert_qwen_to_fp32_tensor(f"model.layers.{i}.self_attn.q_proj.bias",
                                         f"model.layers.{i}.self_attn.q_proj.bias", list_vars, f)
@@ -207,11 +219,13 @@ def main(args_in: Optional[List[str]] = None) -> None:
 
             # ffn GEMM
             convert_to_qx_bestla_tensor(f"model.layers.{i}.mlp.down_proj.weight",
-                                        f"model.layers.{i}.mlp.down_proj.weight", list_vars, f, quantize_config)
+                                        f"model.layers.{i}.mlp.down_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"model.layers.{i}.mlp.gate_proj.weight",
-                                        f"model.layers.{i}.mlp.gate_proj.weight", list_vars, f, quantize_config)
+                                        f"model.layers.{i}.mlp.gate_proj.weight", list_vars, f, quantize_config,
+                                        compute_dtype=cmp_dtype)
             convert_to_qx_bestla_tensor(f"model.layers.{i}.mlp.up_proj.weight", f"model.layers.{i}.mlp.up_proj.weight",
-                                        list_vars, f, quantize_config)
+                                        list_vars, f, quantize_config, compute_dtype=cmp_dtype)
 
         f.close()
         print(f"Success! saved as {out_path}")
