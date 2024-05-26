@@ -175,7 +175,8 @@ void* bestla_create_device(bool profile) {
 void* bestla_get_device_queue(void* device) {
   if (device) {
     auto ptr = (sycl_device::SyclDevice*)device;
-    return ptr->getQueue();
+    auto q = ptr->getQueue();
+    return q;
   }
   return NULL;
 }
@@ -193,18 +194,26 @@ size_t bestla_device_gmem_size(void* device) {
   }
 }
 
-void* bestla_device_malloc(size_t size, void* device) {
-  if (device) {
-    auto ptr = (sycl_device::SyclDevice*)device;
-    auto tmp = sycl::malloc_device<char>(size, *(ptr->getQueue()));
+void* bestla_device_malloc(size_t size, void* queue) {
+  if (queue) {
+    auto ptr = (sycl::queue*)queue;
+    auto tmp = sycl::malloc_device<char>(size, *ptr);
     return tmp;
   }
 }
 
-void bestla_device_free(void* obj, void* device) {
-  if (device && obj) {
-    auto ptr = (sycl_device::SyclDevice*)device;
-    sycl::free(obj, *(ptr->getQueue()));
+void bestla_device_free(void* obj, void* queue) {
+  if (queue && obj) {
+    auto ptr = (sycl::queue*)queue;
+    sycl::free(obj, *ptr);
+  }
+}
+
+void bestla_device_memcpy_sync(void* dstptr, const void* srcptr, size_t size, void* queue) {
+  if (queue && srcptr && dstptr) {
+    auto ptr = (sycl::queue*)queue;
+    ptr->memcpy(dstptr, srcptr, size);
+    ptr->wait();
   }
 }
 #endif

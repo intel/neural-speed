@@ -84,8 +84,9 @@ void* bestla_create_device(bool profile);
 void* bestla_get_device_queue(void* device);
 void bestla_release_device(void* device);
 size_t bestla_device_gmem_size(void* device);
-void* bestla_device_malloc(size_t size, void* device);
-void bestla_device_free(void* ptr, void* device);
+void* bestla_device_malloc(size_t size, void* queue);
+void bestla_device_free(void* ptr, void* queue);
+void bestla_device_memcpy_sync(void* dstptr, const void* srcptr, size_t size, void* queue);
 #endif
 #ifdef __cplusplus
 }

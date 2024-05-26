@@ -919,8 +919,8 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   ctx->device = bestla_create_device(false);
   ctx->device_queue = bestla_get_device_queue(ctx->device);
   auto memsize = bestla_device_gmem_size(ctx->device);
-  size_t constexpr Reserve = size_t(500) << 20;
-  ctx->device_buffer_size = memsize - Reserve;
+  size_t constexpr Reserve = size_t(1000) << 20;
+  ctx->device_buffer_size = Reserve;
   ctx->device_buffer = bestla_device_malloc(ctx->device_buffer_size, ctx->device);
   ctx->device_buffer_offs = 0;
 #endif
@@ -1008,8 +1008,10 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
 }
 
 void model_free(struct model_context* ctx) {
+#ifdef NS_SYCL
   bestla_device_free(ctx->device_buffer, ctx->device);
   bestla_release_device(ctx->device);
+#endif
   delete ctx;
 }
 

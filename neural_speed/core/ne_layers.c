@@ -887,8 +887,8 @@ static void ne_set_op_params(struct ne_tensor* tensor, const void* params, size_
   memcpy(tensor->op_params, params, params_size);
 }
 
-struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
-                                     void* data, size_t size) {
+struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
+                                            void* data, size_t size) {
   // always insert objects at the end of the context's memory pool
   struct ne_object* obj_cur = ctx->objects_end;
 
@@ -896,27 +896,24 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
   const size_t cur_size = obj_cur == NULL ? 0 : obj_cur->size;
   const size_t cur_end = cur_offs + cur_size;
 
-  size_t size_needed = 0;
-
-  if (data == NULL && !ctx->no_alloc) {
-    if (type == NE_TYPE_BTLA) {
-      size_needed = size;
-    } else {
-      size_needed += NE_TYPE_SIZE[type] * (ne[0] / NE_BLCK_SIZE[type]);
-      for (int i = 1; i < n_dims; i++) {
-        size_needed *= ne[i];
-      }
-      size_needed = ((size_needed + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN) * NE_MEM_ALIGN;
-    }
-  }
+  size_t size_needed = size;
 
   char* const mem_buffer = (char* const)ctx->mem_buffer;
   struct ne_object* const obj_new = (struct ne_object*)(mem_buffer + cur_end);
 
-  if (ctx->scratch.data == NULL || data != NULL) {
-    size_needed += sizeof(struct ne_tensor);
+  if (ctx->dev_offs + size_needed > ctx->dev_size) {
+    NE_PRINT(
+        "%s: %d device memory pool is not enough(current %zu MB, ctx->scratch.size available %zu MB), please "
+        "increase\n",
+        __func__, __LINE__, (ctx->dev_offs + size_needed) / 1024 / 1024, ctx->dev_size / 1024 / 1024);
+    assert(false);
+    return NULL;
+  }
+  data = (char* const)ctx->dev_mem_buffer + ctx->dev_offs;
+  ctx->dev_offs += size_needed;
 
-    if (cur_end + size_needed + NE_OBJECT_SIZE > ctx->mem_size) {
+  if (ctx->scratch.data == NULL || data != NULL) {
+    if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
       NE_PRINT(
           "%s: %d Context's memory pool is not enough(current %zu MB, ctx->mem_size available %zu MB), please increase "
           "the scratch_size_ratio.\n",
@@ -927,19 +924,10 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
 
     *obj_new = (struct ne_object){
         .offs = cur_end + NE_OBJECT_SIZE,
-        .size = size_needed,
+        .size = sizeof(struct ne_tensor) + NE_OBJECT_SIZE,
         .next = NULL,
     };
   } else {
-    if (ctx->scratch.offs + size_needed > ctx->scratch.size) {
-      NE_PRINT(
-          "%s: %d scratch.size pool is not enough(current %zu MB, ctx->scratch.size available %zu MB), please increase "
-          "the scratch_size_ratio.\n",
-          __func__, __LINE__, (ctx->scratch.offs + size_needed) / 1024 / 1024, ctx->scratch.size / 1024 / 1024);
-      assert(false);
-      return NULL;
-    }
-
     if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
       NE_PRINT("%s: %d not enough space in the context's memory pool (needed %zu, ctx->mem_size available %zu)\n",
                __func__, __LINE__, cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
@@ -947,15 +935,11 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
       return NULL;
     }
 
-    data = (char* const)ctx->scratch.data + ctx->scratch.offs;
-
     *obj_new = (struct ne_object){
         .offs = cur_end + NE_OBJECT_SIZE,
         .size = sizeof(struct ne_tensor),
         .next = NULL,
     };
-
-    ctx->scratch.offs += size_needed;
   }
 
   if (obj_cur != NULL) {
@@ -971,7 +955,7 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
 
   *result = (struct ne_tensor){
       .type = type,
-      .backend = NE_BACKEND_CPU,
+      .backend = NE_BACKEND_SYCL,
       .n_dims = n_dims,
       .ne = {1, 1, 1, 1},
       .nb = {0, 0, 0, 0},
@@ -986,7 +970,7 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
       .perf_runs = 0,
       .perf_cycles = 0,
       .perf_time_us = 0,
-      .data = (data == NULL && !ctx->no_alloc) ? (void*)(result + 1) : data,
+      .data = data,
       .size = size_needed,
       .name = {0},
       .padding = {0},
@@ -994,10 +978,6 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
 
   for (int i = 0; i < n_dims; i++) {
     result->ne[i] = ne[i];
-  }
-  result->nb[0] = NE_TYPE_SIZE[type];
-  if (type != NE_TYPE_BTLA) {
-    result->nb[1] = result->nb[0] * (result->ne[0] / NE_BLCK_SIZE[type]);
   }
 
   for (int i = 2; i < NE_MAX_DIMS; i++) {
@@ -1009,8 +989,11 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
   return result;
 }
 
-struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
-                                            void* data, size_t size) {
+struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
+                                     void* data, size_t size) {
+  if (type == NE_TYPE_BTLA_SYCL) {
+    return ne_new_device_tensor_impl(ctx, type, n_dims, ne, data, size);
+  }
   // always insert objects at the end of the context's memory pool
   struct ne_object* obj_cur = ctx->objects_end;
 
@@ -12333,7 +12316,7 @@ static enum ne_opt_result linesearch_backtracking(struct ne_context* ctx, const 
     } else {
       // Armijo condition is satisfied
       if (params->lbfgs.linesearch == NE_LINESEARCH_BACKTRACKING_ARMIJO) {
-        return ne_opt_result(count);
+        return (enum ne_opt_result)count;
       }
 
       ne_vec_dot_f32(nx, &dg, g, d);
@@ -12344,16 +12327,16 @@ static enum ne_opt_result linesearch_backtracking(struct ne_context* ctx, const 
       } else {
         if (params->lbfgs.linesearch == NE_LINESEARCH_BACKTRACKING_WOLFE) {
           // regular Wolfe conditions
-          return ne_opt_result(count);
+          return (enum ne_opt_result)count;
         }
 
         if (dg > -params->lbfgs.wolfe * dginit) {
           width = dec;
         } else {
           // strong Wolfe condition (NE_LINESEARCH_BACKTRACKING_STRONG_WOLFE)
-          return ne_opt_result(count);
+          return (enum ne_opt_result)count;
         }
-        return ne_opt_result(count);
+        return (enum ne_opt_result)count;
       }
     }
 
@@ -12492,7 +12475,7 @@ static enum ne_opt_result ne_opt_lbfgs(struct ne_context* ctx, struct ne_opt_par
       ne_vec_cpy_f32(nx, x, xp);
       ne_vec_cpy_f32(nx, g, gp);
 
-      return ne_opt_result(ls);
+      return (enum ne_opt_result)ls;
     }
 
     ne_vec_norm_f32(nx, &xnorm, x);

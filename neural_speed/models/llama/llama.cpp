@@ -142,6 +142,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   ctx0->dev_queue = ctx->device_queue;
   ctx0->dev_mem_buffer = ctx->device_buffer;
   ctx0->dev_mem_owned = false;
+  ctx0->dev_size = ctx->device_buffer_size;
   ctx0->dev_offs = ctx->device_buffer_offs;
 
   // for big prompts, if BLAS is enabled, it is better to use only one thread
@@ -174,12 +175,25 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC);
   ne_set_name(embd, "embd");
+
+#ifdef NS_SYCL
+  size_t memsize = size_t(seq_len_sum) * sizeof(model_token);
+  struct ne_tensor* embd_dev = ne_new_tensor_1d(ctx0, NE_TYPE_BTLA_SYCL, seq_len_sum, memsize);
+  int cpy_off = 0;
+  for (int i = 0; i < batch_size; ++i) {
+    bestla_device_memcpy_sync(static_cast<model_token*>(embd_dev->data) + cpy_off, inputs[i].tokens,
+                              n_tokens[i] * ne_element_size(embd), ctx->device_queue);
+    cpy_off += n_tokens[i];
+  }
+  bestla_device_memcpy_sync(static_cast<model_token*>(embd->data), static_cast<model_token*>(embd_dev->data), memsize,
+                            ctx->device_queue);
+#else
   int cpy_off = 0;
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + cpy_off, inputs[i].tokens, n_tokens[i] * ne_element_size(embd));
     cpy_off += n_tokens[i];
   }
-
+#endif
 #ifdef NS_TP_MODEL
   if (enable_tp) {
     // need to broadcast the ids

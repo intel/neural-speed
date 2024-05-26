@@ -139,10 +139,10 @@ struct ne_context {
   struct ne_scratch scratch_save;
 
   void* dev_queue;
-  size_t dev_mem_size;
   void* dev_mem_buffer;
   bool dev_mem_owned;
   bool dev_no_alloc;
+  size_t dev_size;
   size_t dev_offs;
 };
 
