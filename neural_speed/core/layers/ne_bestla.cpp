@@ -216,4 +216,19 @@ void bestla_device_memcpy_sync(void* dstptr, const void* srcptr, size_t size, vo
     ptr->wait();
   }
 }
+
+void bestla_device_memcpy(void* dstptr, const void* srcptr, size_t size, void* queue) {
+  if (queue && srcptr && dstptr) {
+    auto ptr = (sycl::queue*)queue;
+    ptr->memcpy(dstptr, srcptr, size);
+    ptr->wait();
+  }
+}
+
+void bestla_device_sync(void* queue) {
+  if (queue) {
+    auto ptr = (sycl::queue*)queue;
+    ptr->wait();
+  }
+}
 #endif

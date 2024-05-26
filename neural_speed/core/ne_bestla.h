@@ -86,7 +86,9 @@ void bestla_release_device(void* device);
 size_t bestla_device_gmem_size(void* device);
 void* bestla_device_malloc(size_t size, void* queue);
 void bestla_device_free(void* ptr, void* queue);
+void bestla_device_memcpy(void* dstptr, const void* srcptr, size_t size, void* queue);
 void bestla_device_memcpy_sync(void* dstptr, const void* srcptr, size_t size, void* queue);
+void bestla_device_sync(void* queue);
 #endif
 #ifdef __cplusplus
 }

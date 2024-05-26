@@ -178,7 +178,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
 #ifdef NS_SYCL
   size_t memsize = size_t(seq_len_sum) * sizeof(model_token);
-  struct ne_tensor* embd_dev = ne_new_tensor_1d(ctx0, NE_TYPE_BTLA_SYCL, seq_len_sum, memsize);
+  struct ne_tensor* embd_dev = ne_new_dev_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC);
   int cpy_off = 0;
   for (int i = 0; i < batch_size; ++i) {
     bestla_device_memcpy_sync(static_cast<model_token*>(embd_dev->data) + cpy_off, inputs[i].tokens,
