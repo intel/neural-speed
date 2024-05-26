@@ -18,7 +18,7 @@ class UT_SyclDevice {
     dev->print();
   }
 };
-// static UT_SyclDevice sUT_SyclDevice;
+ static UT_SyclDevice sUT_SyclDevice;
 
 class UT_SyclVector {
  public:

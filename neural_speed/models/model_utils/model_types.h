@@ -352,6 +352,9 @@ struct model_context {
 
   void* device = NULL;
   void* device_queue = NULL;
+  void* device_buffer = NULL;
+  size_t device_buffer_size = 0;
+  size_t device_buffer_offs = 0;
 
   void use_buf(struct ne_context* ctx, int i) {
 #if defined(MODEL_USE_SCRATCH)

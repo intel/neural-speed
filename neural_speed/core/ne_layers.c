@@ -813,10 +813,7 @@ struct ne_context* ne_init(struct ne_init_params params) {
                               0,
                               0,
                               NULL,
-                          }
-  };
-
-
+                          }};
 
   NE_ASSERT(ctx->mem_buffer != NULL);
 
@@ -892,6 +889,128 @@ static void ne_set_op_params(struct ne_tensor* tensor, const void* params, size_
 
 struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
                                      void* data, size_t size) {
+  // always insert objects at the end of the context's memory pool
+  struct ne_object* obj_cur = ctx->objects_end;
+
+  const size_t cur_offs = obj_cur == NULL ? 0 : obj_cur->offs;
+  const size_t cur_size = obj_cur == NULL ? 0 : obj_cur->size;
+  const size_t cur_end = cur_offs + cur_size;
+
+  size_t size_needed = 0;
+
+  if (data == NULL && !ctx->no_alloc) {
+    if (type == NE_TYPE_BTLA) {
+      size_needed = size;
+    } else {
+      size_needed += NE_TYPE_SIZE[type] * (ne[0] / NE_BLCK_SIZE[type]);
+      for (int i = 1; i < n_dims; i++) {
+        size_needed *= ne[i];
+      }
+      size_needed = ((size_needed + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN) * NE_MEM_ALIGN;
+    }
+  }
+
+  char* const mem_buffer = (char* const)ctx->mem_buffer;
+  struct ne_object* const obj_new = (struct ne_object*)(mem_buffer + cur_end);
+
+  if (ctx->scratch.data == NULL || data != NULL) {
+    size_needed += sizeof(struct ne_tensor);
+
+    if (cur_end + size_needed + NE_OBJECT_SIZE > ctx->mem_size) {
+      NE_PRINT(
+          "%s: %d Context's memory pool is not enough(current %zu MB, ctx->mem_size available %zu MB), please increase "
+          "the scratch_size_ratio.\n",
+          __func__, __LINE__, (cur_end + size_needed + NE_OBJECT_SIZE) / 1024 / 1024, ctx->mem_size / 1024 / 1024);
+      assert(false);
+      return NULL;
+    }
+
+    *obj_new = (struct ne_object){
+        .offs = cur_end + NE_OBJECT_SIZE,
+        .size = size_needed,
+        .next = NULL,
+    };
+  } else {
+    if (ctx->scratch.offs + size_needed > ctx->scratch.size) {
+      NE_PRINT(
+          "%s: %d scratch.size pool is not enough(current %zu MB, ctx->scratch.size available %zu MB), please increase "
+          "the scratch_size_ratio.\n",
+          __func__, __LINE__, (ctx->scratch.offs + size_needed) / 1024 / 1024, ctx->scratch.size / 1024 / 1024);
+      assert(false);
+      return NULL;
+    }
+
+    if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
+      NE_PRINT("%s: %d not enough space in the context's memory pool (needed %zu, ctx->mem_size available %zu)\n",
+               __func__, __LINE__, cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
+      assert(false);
+      return NULL;
+    }
+
+    data = (char* const)ctx->scratch.data + ctx->scratch.offs;
+
+    *obj_new = (struct ne_object){
+        .offs = cur_end + NE_OBJECT_SIZE,
+        .size = sizeof(struct ne_tensor),
+        .next = NULL,
+    };
+
+    ctx->scratch.offs += size_needed;
+  }
+
+  if (obj_cur != NULL) {
+    obj_cur->next = obj_new;
+  } else {
+    // this is the first object in this context
+    ctx->objects_begin = obj_new;
+  }
+
+  ctx->objects_end = obj_new;
+
+  struct ne_tensor* const result = (struct ne_tensor*)(mem_buffer + obj_new->offs);
+
+  *result = (struct ne_tensor){
+      .type = type,
+      .backend = NE_BACKEND_CPU,
+      .n_dims = n_dims,
+      .ne = {1, 1, 1, 1},
+      .nb = {0, 0, 0, 0},
+      .op = NE_OP_NONE,
+      .is_param = false,
+      .op_params = {0},
+      .grad = NULL,
+      .src0 = NULL,
+      .src1 = NULL,
+      .opt = {NULL},
+      .n_tasks = 0,
+      .perf_runs = 0,
+      .perf_cycles = 0,
+      .perf_time_us = 0,
+      .data = (data == NULL && !ctx->no_alloc) ? (void*)(result + 1) : data,
+      .size = size_needed,
+      .name = {0},
+      .padding = {0},
+  };
+
+  for (int i = 0; i < n_dims; i++) {
+    result->ne[i] = ne[i];
+  }
+  result->nb[0] = NE_TYPE_SIZE[type];
+  if (type != NE_TYPE_BTLA) {
+    result->nb[1] = result->nb[0] * (result->ne[0] / NE_BLCK_SIZE[type]);
+  }
+
+  for (int i = 2; i < NE_MAX_DIMS; i++) {
+    result->nb[i] = result->nb[i - 1] * result->ne[i - 1];
+  }
+
+  ctx->n_objects++;
+
+  return result;
+}
+
+struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
+                                            void* data, size_t size) {
   // always insert objects at the end of the context's memory pool
   struct ne_object* obj_cur = ctx->objects_end;
 

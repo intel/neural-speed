@@ -185,4 +185,26 @@ void bestla_release_device(void* device) {
     delete ptr;
   }
 }
+
+size_t bestla_device_gmem_size(void* device) {
+  if (device) {
+    auto ptr = (sycl_device::SyclDevice*)device;
+    return ptr->getGlobalMemSize();
+  }
+}
+
+void* bestla_device_malloc(size_t size, void* device) {
+  if (device) {
+    auto ptr = (sycl_device::SyclDevice*)device;
+    auto tmp = sycl::malloc_device<char>(size, *(ptr->getQueue()));
+    return tmp;
+  }
+}
+
+void bestla_device_free(void* obj, void* device) {
+  if (device && obj) {
+    auto ptr = (sycl_device::SyclDevice*)device;
+    sycl::free(obj, *(ptr->getQueue()));
+  }
+}
 #endif

@@ -51,6 +51,10 @@ class SyclDevice {
 
   inline std::string getName() { return mQueue.get_device().get_info<sycl::info::device::name>(); };
 
+  size_t getGlobalMemSize() { return mQueue.get_device().get_info<sycl::info::device::global_mem_size>(); }
+
+  double getGlobalMemSizeGB() { return double(getGlobalMemSize()) / 1e9; }
+
   void print() {
     std::cout << "Running on device: " << mQueue.get_device().get_info<sycl::info::device::name>() << "\n";
     std::cout << "EU count:" << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_eu_count>()
@@ -65,6 +69,7 @@ class SyclDevice {
               << "\n";  // 7
     std::cout << "Subslice per slice:"
               << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_subslices_per_slice>() << "\n";  // 8
+    std::cout << "Global Memory size: " << getGlobalMemSizeGB() << "\n";                                           // 8
   }
   sycl::queue mQueue;
 };

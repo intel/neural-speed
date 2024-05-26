@@ -83,6 +83,9 @@ void bestla_add(int batch, int vsize, const float* tensor, const float* vector, 
 void* bestla_create_device(bool profile);
 void* bestla_get_device_queue(void* device);
 void bestla_release_device(void* device);
+size_t bestla_device_gmem_size(void* device);
+void* bestla_device_malloc(size_t size, void* device);
+void bestla_device_free(void* ptr, void* device);
 #endif
 #ifdef __cplusplus
 }

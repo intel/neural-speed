@@ -139,6 +139,10 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   };
 
   struct ne_context* ctx0 = ne_init(params);
+  ctx0->dev_queue = ctx->device_queue;
+  ctx0->dev_mem_buffer = ctx->device_buffer;
+  ctx0->dev_mem_owned = false;
+  ctx0->dev_offs = ctx->device_buffer_offs;
 
   // for big prompts, if BLAS is enabled, it is better to use only one thread
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance

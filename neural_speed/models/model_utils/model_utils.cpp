@@ -918,6 +918,11 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
 #ifdef NS_SYCL
   ctx->device = bestla_create_device(false);
   ctx->device_queue = bestla_get_device_queue(ctx->device);
+  auto memsize = bestla_device_gmem_size(ctx->device);
+  size_t constexpr Reserve = size_t(500) << 20;
+  ctx->device_buffer_size = memsize - Reserve;
+  ctx->device_buffer = bestla_device_malloc(ctx->device_buffer_size, ctx->device);
+  ctx->device_buffer_offs = 0;
 #endif
   const model_archs arch = params.arch;
 
@@ -1003,8 +1008,10 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
 }
 
 void model_free(struct model_context* ctx) {
+  bestla_device_free(ctx->device_buffer, ctx->device);
   bestla_release_device(ctx->device);
-  delete ctx; }
+  delete ctx;
+}
 
 int model_apply_lora_from_file_internal(struct model_context* ctx, const char* path_lora, const char* path_base_model,
                                         int n_threads) {
