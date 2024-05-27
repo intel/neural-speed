@@ -920,8 +920,7 @@ class UT_CompInt8 {
     }
   }
 
-  template <BTLA_ISA ISA_T>
-  using PcWriteBack = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32<ISA_T>, ISA_T>;
+  using PcWriteBack = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32>;
 
   template <class GemmCore_T>
   void ut_newkblock(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype, bool isAsym = false) {

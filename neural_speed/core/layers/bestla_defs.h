@@ -27,8 +27,7 @@ using tLauncher_Int8_F32F32 =
     wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32,
                                      Wei_T, epilogue::gemm::AccumulatorWriteBackFp32>;
 
-template <BTLA_ISA ISA_T>
-using PcWriteBackF32 = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32<ISA_T>, ISA_T>;
+using PcWriteBackF32 = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32>;
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 using tLauncher_Int8Pc_F32F32 =
