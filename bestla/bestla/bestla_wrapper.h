@@ -335,8 +335,8 @@ class LauncherBase {
                 _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
             kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-            Epilogue::Fp32Epi::forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
-                                            _param.paramC.param2, StackTmp, TmpSize);
+            Epilogue::Fp32Epi::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE,
+                                                     GemmCore::NTILE, _param.paramC.param2, StackTmp, TmpSize);
           } else {
             const float* Aptr = _param.paramA.A;
             if constexpr (std::is_same_v<PrologueA,
@@ -347,8 +347,8 @@ class LauncherBase {
             }
             kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-            Epilogue::forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
-                                   _param.paramC, StackTmp, TmpSize);
+            Epilogue::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
+                                            _param.paramC, StackTmp, TmpSize);
           }
           SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
@@ -359,8 +359,8 @@ class LauncherBase {
                 _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
             kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-            Epilogue::Fp32Epi::forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE,
-                                            (_config.size[1] - in), _param.paramC.param2, StackTmp, TmpSize);
+            Epilogue::Fp32Epi::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE,
+                                                     (_config.size[1] - in), _param.paramC.param2, StackTmp, TmpSize);
           } else {
             const float* Aptr = _param.paramA.A;
             if constexpr (std::is_same_v<PrologueA,
@@ -371,8 +371,8 @@ class LauncherBase {
             }
             kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
-            Epilogue::forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
-                                   _param.paramC, StackTmp, TmpSize);
+            Epilogue::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE,
+                                            (_config.size[1] - in), _param.paramC, StackTmp, TmpSize);
           }
         }
       }
@@ -635,8 +635,8 @@ class LauncherBase {
         }
       }
     }
-    Epilogue::forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
-                           blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Epilogue::template forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
+                                    blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
   }
 };
 
@@ -771,8 +771,8 @@ class LauncherIntKBlock {
             kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-          Epilogue::forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
-                                 _param.paramC, StackTmp, TmpSize);
+          Epilogue::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
+                                          _param.paramC, StackTmp, TmpSize);
           SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
@@ -783,8 +783,8 @@ class LauncherIntKBlock {
             kernel::wrapper::GEMVWoqNBits::forward_s8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
           }
-          Epilogue::forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
-                                 _param.paramC, StackTmp, TmpSize);
+          Epilogue::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE,
+                                          (_config.size[1] - in), _param.paramC, StackTmp, TmpSize);
         }
       }
     }
@@ -1078,8 +1078,8 @@ class LauncherIntKBlock {
                           bcache_stride, ccache_stride, iterk, 1.f, tmp_, _config.tmpcachesize);
       }
     }
-    Epilogue::forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
-                           blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Epilogue::template forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
+                                    blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
   }
 
   // _config.block[2]<kblock
@@ -1148,8 +1148,8 @@ class LauncherIntKBlock {
         }
       }
     }
-    Epilogue::forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
-                           blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Epilogue::template forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
+                                    blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
   }
 };
 }  // namespace gemm
