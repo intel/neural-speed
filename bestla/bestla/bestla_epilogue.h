@@ -96,7 +96,8 @@ class PcKBlockCompInt8Epilogue {
             1, param1.K, param1.reduceA + M_offset, redb);
       }
     }
-    Fp32Epilogue::forward<ISA_T>(tmpfp32ptr, cachestep, M_offset, N_offset, M, N, _param.param2, tmpcache, cachesize);
+    Fp32Epilogue::template forward<ISA_T>(tmpfp32ptr, cachestep, M_offset, N_offset, M, N, _param.param2, tmpcache,
+                                          cachesize);
 
     return ret;
   }
