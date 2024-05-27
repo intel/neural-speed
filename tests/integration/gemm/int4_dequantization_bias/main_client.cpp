@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-#define UT_DEBUG 1
+// #define UT_DEBUG 1
 using namespace gpu::xetla;
 // The number of times the kernel is executed
 constexpr int ITER = 200;

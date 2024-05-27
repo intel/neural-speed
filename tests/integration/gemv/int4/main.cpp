@@ -87,19 +87,26 @@ template <
     typename data_type_b,
     typename data_type_scale,
     typename data_type_zero_pt>
-std::tuple<data_type_acc_in, data_type_acc_in> convert_int4(
-    data_type_b int4_data,
+std::vector<fp16> convert_int4(
+    data_type_b data_b,
     data_type_scale scale,
     [[maybe_unused]] data_type_zero_pt zero_pt) {
-  uint8_t data_even = (int4_data & 0x0f) << 4;
-  int8_t data_0;
-  int8_t data_1;
-  memcpy(&data_0, &data_even, 1);
-  memcpy(&data_1, &int4_data, 1);
-  data_0 = data_0 >> 4;
-  data_1 = data_1 >> 4;
-  return std::make_tuple(fp16(data_0) * scale, fp16(data_1) * scale);
+  std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
+
+  using dtype_8bit = std::conditional_t<
+      quant_type == gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      int8_t,
+      uint8_t>;
+
+  for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
+    dtype_8bit dequant_8bit;
+    dequant_8bit = static_cast<dtype_8bit>((data_b & 0xf) << 4) >> 4;
+    dequant_fp16[i] = scale * dequant_8bit;
+    data_b = data_b >> 4;
+  }
+  return dequant_fp16;
 }
+
 template <
     size_t dequant_s,
     mem_layout layout_b = mem_layout::row_major,
@@ -133,22 +140,24 @@ std::vector<data_type_acc_in> dequantize_weight(
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
 
       for (uint32_t jj = 0; jj < step; jj++) {
-        std::tie<data_type_acc_in, data_type_acc_in>(
-            b_out[start_out + pack_radio * jj],
-            b_out[start_out + pack_radio * jj + 1]) =
-            convert_int4<quant_type>(
-                b[start_b_in + jj],
-                scale[start_scale_in],
-                zero_pt[start_zero_pt_in + jj]);
+        std::vector<fp16> dequant_fp16 = convert_int4<quant_type>(
+            b[start_b_in + jj],
+            scale[start_scale_in],
+            zero_pt[start_zero_pt_in + jj]);
+        for (uint32_t jjj = 0; jjj < dequant_fp16.size(); jjj++) {
+          b_out[start_out + pack_radio * jj + jjj] = dequant_fp16[jjj];
+        }
       }
     }
   }
-  //   for (uint32_t i = 0; i < matrix_n; i++) {
-  //     for (uint32_t j = 0; j < matrix_k; j++) {
-  //       std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-  //     }
-  //     std::cout << std::endl;
-  //   }
+#ifdef UT_DEBUG
+  for (uint32_t i = 0; i < matrix_n; i++) {
+    for (uint32_t j = 0; j < matrix_k; j++) {
+      std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+    }
+    std::cout << std::endl;
+  }
+#endif
   return b_out;
 }
 
@@ -171,7 +180,7 @@ void dequantize_gemv_run(int iter) {
   using data_type_a = typename Test::data_type_a;
   using data_type_b = typename Test::data_type_b;
   using data_type_c = typename Test::data_type_c;
-  using data_type_zero_pt = int4x2;
+  using data_type_zero_pt = int4x8;
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
   using data_type_acc = float;
@@ -336,10 +345,12 @@ void dequantize_gemv_run(int iter) {
   }
 
   for (unsigned i = 0; i < size_b; ++i) {
-    B_h[i] = uint8_t(random_uint8());
+    for (unsigned j = 0; j < sizeof(data_type_b); j++) {
+      B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-    B_h[i] = 17;
+      B_h[i] = 0x11;
 #endif
+    }
   }
 
   for (unsigned i = 0; i < size_scale; ++i) {

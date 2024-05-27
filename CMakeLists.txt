@@ -67,7 +67,7 @@ else()
 endif()
 
 add_compile_options(-fsycl -fsycl-device-code-split=per_kernel  -ftemplate-backtrace-limit=0)
-add_compile_options(-Wall -Wextra)
+add_compile_options(-Wall -Wextra -Werror)
 
 include(ProcessorCount)
 ProcessorCount(nproc)
