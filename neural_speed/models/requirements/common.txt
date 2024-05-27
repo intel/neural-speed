@@ -4,6 +4,7 @@ datasets
 einops
 gguf
 huggingface_hub
+lm_eval==0.4.2
 matplotlib
 numpy
 peft

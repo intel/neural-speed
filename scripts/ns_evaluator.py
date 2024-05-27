@@ -85,6 +85,7 @@ def simple_evaluate(
     use_ggml : bool = False,
     alg : str = "sym",
     scale_dtype : str = "fp32",
+    init_from_bin : str = "default_none"
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -207,6 +208,7 @@ def simple_evaluate(
                     "use_ggml" : use_ggml,
                     "alg" : alg,
                     "scale_dtype" : scale_dtype,
+                    "init_from_bin" : init_from_bin
                 },
             )
             lm._model = user_model
@@ -230,6 +232,7 @@ def simple_evaluate(
                     "use_ggml" : use_ggml,
                     "alg" : alg,
                     "scale_dtype" : scale_dtype,
+                    "init_from_bin" : init_from_bin
                 },
             )
         else:
@@ -248,6 +251,7 @@ def simple_evaluate(
                     "use_ggml" : use_ggml,
                     "alg" : alg,
                     "scale_dtype" : scale_dtype,
+                    "init_from_bin" : init_from_bin
                 },
             )
     else:
@@ -384,7 +388,6 @@ def evaluate(
     """
 
     eval_logger.setLevel(getattr(logging, f"{verbosity}"))
-
     # tracks all Instances/requests a model must generate output on.
     requests = defaultdict(list)
     # stores the amount to pad out reqs per req. type so that
@@ -684,6 +687,7 @@ class LMEvalParser:
                  use_ggml=None,
                  alg=None,
                  scale_dtype=None,
+                 init_from_bin=None,
                  trust_remote_code=False
                  ):
         self.model = model
@@ -718,4 +722,5 @@ class LMEvalParser:
         self.use_ggml = use_ggml
         self.alg = alg
         self.scale_dtype = scale_dtype
+        self.init_from_bin = init_from_bin
         self.trust_remote_code = trust_remote_code

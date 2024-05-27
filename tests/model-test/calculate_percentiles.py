@@ -16,15 +16,11 @@ import numpy as np
 import re
 import sys
 import os
-
-
 def calculate_percentile(data, percentile):
     return np.percentile(data, percentile, method="closest_observation")
 
-
 def calculate_mean(data):
     return np.mean(data)
-
 
 def parse_output_file(file_path):
     predictions = []
@@ -36,6 +32,28 @@ def parse_output_file(file_path):
                 predictions.append(prediction_time)
     return predictions
 
+def parse_output_file_acc(file_path):
+    accuracy=[0,0,0,0]
+    with open(file_path, 'r', encoding='UTF-8', errors='ignore') as file:
+        for line in file:
+            accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[0]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+            accuracy_match = re.search(r"\|\s+boolq+\|\s+2\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[1]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+            accuracy_match = re.search(r"\|\s+piqa+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[2]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+            accuracy_match= re.search(r"\|\s+hellaswag+\|\s+1\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[3]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+
+    return accuracy
 
 def parse_memory_file(memory_file):
     memory_values = []
@@ -67,6 +85,7 @@ if __name__ == "__main__":
     memory_file = os.environ.get("WORKSPACE") + "/memory.txt"
     predictions = parse_output_file(output_file)
     assert len(predictions) > 0, "Model has no output tokens!"
+    accuracy = parse_output_file_acc(output_file)
     first_token_latency = predictions[0]
     p90 = calculate_percentile(predictions, 90)
     p99 = calculate_percentile(predictions, 99)
@@ -77,6 +96,10 @@ if __name__ == "__main__":
     print("P99: {:.2f} ms".format(p99))
     print("average_latency: {:.2f} ms".format(latency_mean))
     print("first_token_latency: {:.2f} ms".format(first_token_latency))
+    print("lambada_openai: {:.2f}".format(accuracy[0]))
+    print("boolq: {:.2f}".format(accuracy[1]))
+    print("piqa: {:.2f}".format(accuracy[2]))
+    print("hellaswag: {:.2f}".format(accuracy[3]))
 
     memory_values = parse_memory_file(memory_file)
     sorted_memory_values = sorted(memory_values, reverse=True)
@@ -103,8 +126,12 @@ if __name__ == "__main__":
         f.write(link + ",")
         f.write("{:.2f},".format(p90))
         f.write("{:.2f},".format(p99))
-        # f.write(",latency:")
-        # for latency in predictions:
+        #f.write(",latency:")
+        #for latency in predictions:
         #    f.write(",{:.2f}".format(latency))
+        f.write("{:.2f},".format(accuracy[0]))
+        f.write("{:.2f},".format(accuracy[1]))
+        f.write("{:.2f},".format(accuracy[2]))
+        f.write("{:.2f},".format(accuracy[3]))
         f.write("\n")
         f.close()

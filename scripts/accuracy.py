@@ -188,6 +188,7 @@ def cli_evaluate(args) -> None:
         use_ggml=args.use_ggml,
         alg=args.alg,
         scale_dtype=args.scale_dtype,
+        init_from_bin=args.init_from_bin,
         **request_caching_args,
     )
     if results is not None:
