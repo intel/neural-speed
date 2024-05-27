@@ -519,8 +519,8 @@ class launcher_base_off_t                  //
         }
       }
     }
-    Base::Epilogue::template forward<ISA>(tmpC, _config.block[1], _config.loc[0] + blk_m, _config.loc[1] + blk_n,
-                                          blk_msize, blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Base::Epilogue::template forward<Base::ISA>(tmpC, _config.block[1], _config.loc[0] + blk_m, _config.loc[1] + blk_n,
+                                                blk_msize, blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
   }
 };
 
@@ -603,8 +603,9 @@ class launcher_base_weight_t               //
         }
       }
     }
-    Base::Epilogue::template forward<ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n,
-                                          blk_msize, blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Base::Epilogue::template forward<Base::ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m),
+                                                _config.loc[1] + blk_n, blk_msize, blk_nsize, _param.paramC, tmpcache,
+                                                _config.tmpcachesize);
   }
 };
 
