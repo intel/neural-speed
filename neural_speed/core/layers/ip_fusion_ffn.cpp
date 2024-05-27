@@ -284,12 +284,12 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
+        if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
           if (BlkSize < fin || BlkSize2 < fmid) {
-            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(
+            BTLAGemmCompInt8<tAMX_INT8_US_KBlock, tWeiNInt, epilogue1, epilogue2>(
                 activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
           } else {
-            BTLAGemmCompInt8Pc<tAMX_INT8_SS, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+            BTLAGemmCompInt8Pc<tAMX_INT8_US, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
                                epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
                 activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
           }
@@ -647,13 +647,13 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
+        if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
           if (BlkSize < fin || BlkSize2 < fmid) {
-            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+            BTLAGemmCompInt8<tAMX_INT8_US_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
                                                                                   tmp2, output, seq, fin, fmid, fout,
                                                                                   workspace, pth, epi_args1, epi_args2);
           } else {
-            BTLAGemmCompInt8Pc<tAMX_INT8_SS, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+            BTLAGemmCompInt8Pc<tAMX_INT8_US, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
                                epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
                 activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
                 epi_args2);

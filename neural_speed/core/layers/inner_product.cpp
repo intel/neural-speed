@@ -171,12 +171,12 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
+        if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
           if (BlkSize < _k) {
-            ip_add::BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
+            ip_add::BTLAGemmCompInt8<tAMX_INT8_US_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
                                                                     broadcast_bias, workspace, pth);
           } else {
-            ip_add::BTLAGemmCompInt8Pc<tAMX_INT8_SS, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
+            ip_add::BTLAGemmCompInt8Pc<tAMX_INT8_US, tWeiNInt>(_m, _n, _k, activation, lda, ptr, output, ldo, bias,
                                                                broadcast_bias, workspace, pth);
           }
 
