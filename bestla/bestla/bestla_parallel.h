@@ -212,12 +212,14 @@ class StdThreading : public IThreading {
       memcpy(reinterpret_cast<void*>(core_order.data() + _cd->getPcoreNum() + _cd->getEcoreNum()),
              reinterpret_cast<void*>(_cd->getSMTCores()), _cd->getSMTcoreNum() * sizeof(int));
     } else {
-      core_order.resize(mThreadNum);
+      core_order.resize(_cd->getCores() * 2);  // *2 for SMT
       if (_cd->isClient()) {
-        for (int i = 0; i < std::min(mThreadNum, _cd->getCores()); i++) core_order[i] = 2 * i;
-        for (int i = _cd->getCores(); i < mThreadNum; i++) core_order[i] = 2 * (i - _cd->getCores()) + 1;
+        for (int i = 0; i < _cd->getCores(); i++) {
+          core_order[i] = 2 * i;
+          core_order[i + _cd->getCores()] = 2 * i + 1;
+        }
       } else {
-        for (int i = 0; i < mThreadNum; i++) core_order[i] = i;
+        for (int i = 0; i < _cd->getCores() * 2; i++) core_order[i] = i;
       }
     }
     _cd->core_bond(core_order[0]);
