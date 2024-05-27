@@ -508,6 +508,8 @@ class UTWOQ_CompFp32 {
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
     auto psize = (size_t)m * n * k * 2;
+    int blks = k / blocksize;
+    int nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
@@ -626,6 +628,8 @@ class UTWOQ_CompBf16 {
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
     auto psize = (size_t)m * n * k * 2;
+    int blks = k / blocksize;
+    int nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
