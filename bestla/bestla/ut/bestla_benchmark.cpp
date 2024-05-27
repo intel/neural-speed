@@ -713,8 +713,7 @@ class UTWOQ_CompInt8 {
     benchmark_all<prologue_b::gemm::WeightKBlockNInteger, utils::bf16>(1024, 4096, 4096, qtype);
   }
 
-  template <BTLA_ISA ISA_T>
-  using PcWriteBack = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32<ISA_T>, ISA_T>;
+  using PcWriteBack = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32>;
 
   template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
   void benchmark_pc(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems,
