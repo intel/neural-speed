@@ -239,29 +239,30 @@ class gemm_t<
 
   using mem_desc_scale_t = mem_desc_t<
       dtype_scale,
-      mem_layout::row_major,
-      mem_space::global,
-      mem_desc_b_t::alignment>;
-  using mem_desc_zero_pt_t = mem_desc_t<
-      dtype_zero_pt,
-      mem_layout::row_major,
+      mem_layout_b,
       mem_space::global,
       mem_desc_b_t::alignment>;
 
-  using matC_tile_desc_t = subgroup::tile_desc_t< // M X N (Y x X)
-      tile_size_x_c, // sg_n
-      tile_size_y_c, // sg_m == 1
-      block_size_x_b, //
-      block_size_y_a, // == 1
+  using mem_desc_zero_pt_t = mem_desc_t<
+      dtype_zero_pt,
+      mem_layout_b,
+      mem_space::global,
+      mem_desc_b_t::alignment>;
+
+  using matC_tile_desc_t = subgroup::tile_desc_t<
+      tile_size_x_c,
+      tile_size_y_c,
+      block_size_x_b,
+      block_size_y_a,
       reg_layout::tiled>;
   using matC_t = subgroup::tile_t<dtype_mma_acc, matC_tile_desc_t>;
 
  private:
-  using matAcc_tile_desc_t = subgroup::tile_desc_t< // N x K (Y x X)
-      block_size_y_b, // K
-      tile_size_x_b, // N
-      block_size_y_b, // K
-      block_size_x_b, // N
+  using matAcc_tile_desc_t = subgroup::tile_desc_t<
+      block_size_y_b,
+      tile_size_x_b,
+      block_size_y_b,
+      block_size_x_b,
       reg_layout::tiled>;
   using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
   using scale_tile_desc_t = subgroup::tile_desc_t<
@@ -269,18 +270,31 @@ class gemm_t<
       tile_size_y_scale,
       block_size_x_b,
       block_size_y_scale,
-      reg_layout::tiled>;
+      reg_layout_b>;
   using scale_t = subgroup::tile_t<dtype_scale, scale_tile_desc_t>;
   using scale_payload_t = subgroup::mem_payload_t<
       mem_desc_scale_t,
       scale_tile_desc_t,
-      subgroup::msg_type_v<scale_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<
+          scale_tile_desc_t,
+          mem_space::global,
+          mem_desc_scale_t::layout>,
       arch_tag>;
 
   using zero_pt_tile_desc_t = std::conditional_t<
       is_col_major_b,
-      subgroup::tile_desc_t<16, 16, 16, 16, reg_layout::tiled>,
-      subgroup::tile_desc_t<16, 16, 16, 16, reg_layout::tiled>>;
+      subgroup::tile_desc_t<
+          tile_size_x_b,
+          (tile_size_y_zero_pt + pack_ratio - 1) / pack_ratio,
+          block_size_x_b,
+          (block_size_y_zero_pt + pack_ratio - 1) / pack_ratio,
+          reg_layout_b>,
+      subgroup::tile_desc_t<
+          (tile_size_x_b + pack_ratio - 1) / pack_ratio,
+          tile_size_y_zero_pt,
+          (block_size_x_b + pack_ratio - 1) / pack_ratio,
+          block_size_y_zero_pt,
+          reg_layout_b>>;
 
   using zero_pt_t = subgroup::tile_t<dtype_zero_pt, zero_pt_tile_desc_t>;
   using zero_pt_payload_t = subgroup::mem_payload_t<
@@ -513,9 +527,9 @@ class gemm_t<
       matB_prefetch_payload.template update_tdesc<update_dir_b>(
           matB_t::tile_size_y);
       if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
-        scale_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+        scale_prefetch_payload.template update_tdesc<update_dir_b>(
             scale_t::tile_size_y);
-        zero_pt_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+        zero_pt_prefetch_payload.template update_tdesc<update_dir_b>(
             zero_pt_t::tile_size_y);
       }
     }
@@ -566,8 +580,7 @@ class gemm_t<
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
       if ((scale_load_addr_i % scale_addr_update_freq) == 0) {
-        scale_payload.template update_tdesc<tdesc_update_dir::y_dir>(
-            scale_t::tile_size_y);
+        scale_payload.template update_tdesc<update_dir_b>(scale_t::tile_size_y);
         zero_pt_payload.template update_tdesc<update_dir_b>(
             zero_pt_t::tile_size_y);
       }
@@ -592,9 +605,6 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
-      //   XETLA_PRINT<matB_acc_t>(); // 2 32(K) 2 16(K)
-      //   dump_mat(matB_acc);
-      //   dump_mat(scale);
       SW_BARRIER();
       if constexpr (
           is_col_major_b && compute_policy::mma_engine == mma_engine::fpu) {

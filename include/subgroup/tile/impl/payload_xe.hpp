@@ -397,19 +397,20 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    mem_layout memory_layout_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>,
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
-  static constexpr mem_layout memory_layout = mem_layout::row_major;
+  static constexpr mem_layout memory_layout = memory_layout_;
   static constexpr msg_type message_type = msg_type::block_1d;
   static constexpr uint32_t alignment_in_bytes = mem_desc_t::alignment_in_bytes;
   static constexpr gpu_arch arch_tag = arch_tag_;
@@ -427,7 +428,9 @@ struct mem_payload_t<
       mem_payload_t<mem_desc_t, tile_desc, msg_type::block_1d, arch_tag>;
 
  public:
-  static constexpr uint32_t bytes_per_row = tile_size_x * sizeof(dtype);
+  static constexpr uint32_t bytes_per_row =
+      memory_layout == mem_layout::row_major ? tile_size_x * sizeof(dtype)
+                                             : tile_size_y * sizeof(dtype);
   using mem_dtype = typename std::conditional<
       (bytes_per_row % sizeof(uint64_t) == 0) &&
           (alignment_in_bytes % sizeof(uint64_t) == 0),
