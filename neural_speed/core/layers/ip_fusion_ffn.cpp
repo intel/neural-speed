@@ -513,16 +513,9 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
         if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-          if (seq <= tAVX512_VNNI_KBlock::MTILE) {
-            static_assert(tAVX512_VNNI_KBlock::NTILE == tAMX_INT8_SS_KBlock::NTILE);
-            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
-                                                                                  tmp2, output, seq, fin, fmid, fout,
-                                                                                  workspace, pth, epi_args1, epi_args2);
-          } else {
-            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
-                                                                                  tmp2, output, seq, fin, fmid, fout,
-                                                                                  workspace, pth, epi_args1, epi_args2);
-          }
+          BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+                                                                                tmp2, output, seq, fin, fmid, fout,
+                                                                                workspace, pth, epi_args1, epi_args2);
 
         } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                    BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {

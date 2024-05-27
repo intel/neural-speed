@@ -51,23 +51,30 @@ void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, cons
     parallel::GemmRun<Parallel>(kernel, args, th);
   }
 }
-#if 0
+
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
-void BTLAGemmCompInt8PC(const int M, const int N, const int K, const float* A, const int lda,
+void BTLAGemmCompInt8Pc(const int M, const int N, const int K, const float* A, const int lda,
                         storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
                         parallel::IThreading* th) {
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher =
+      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32,
+                                  Wei_T, PcWriteBackF32>;
   auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
   assert(B->mBlockSize >= K);
-  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32,
-                                  Wei_T, epilogue::gemm::AccumulatorWriteBackInt32>;
   utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
   static Launcher kernel;
   auto quanA = kernel.mProA.createQuantStorage(M, K, B->mBlockSize, B->IsAsym());
   quanA.assign(WorkSpace);
   WorkSpace += quanA.mSize;
   auto reordA = kernel.mProA.createReorderStorage(M, K, B->mBlockSize);
-  typename Launcher::Param args{gp, {A, K, &quanA, B->ShfIndice(), &reordA}, {B}, {C, N}};
+  typename Launcher::Param args{
+      gp,
+      {A, K, &quanA, B->ShfIndice(), &reordA},
+      {B},
+      {{B->template SPtr<char>(), B->SDtype(), quanA.template SPtr<float>(), quanA.template ZPtr<uint8_t>(),
+        B->template RPtr<char>(), B->RDtype(), nullptr, nullptr, K},
+       {C, N}}};
   if (B->ShfIndice()) {
     reordA.assign(WorkSpace);
     kernel.mProA.quantize({A, K, &quanA, B->ShfIndice(), &reordA}, M, K, th);
@@ -76,18 +83,14 @@ void BTLAGemmCompInt8PC(const int M, const int N, const int K, const float* A, c
     parallel::GemmRunWithA<Parallel>(kernel, args, th);
   }
 }
-#endif
+
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompInt8(const int M, const int N, const int K, const float* A, const int lda,
                       storage::gemm::IWeightBase* _B, float* C, const int ldc, int8_t* WorkSpace,
                       parallel::IThreading* th) {
-  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
-  //if (B->mBlockSize == K) {
-  //  BTLAGemmCompInt8PC<GemmCore_T, Wei_T>(M, N, K, A, lda, _B, C, ldc, WorkSpace, th);
-  //  return;
-  //}
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher = tLauncher_Int8_F32F32<GemmCore_T, Wei_T>;
+  auto B = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_B);
   utils::GemmProblem gp(1, M, N, K, B->mBlockSize);
   static Launcher kernel;
   auto quanA = kernel.mProA.createQuantStorage(M, K, B->mBlockSize, B->IsAsym());
@@ -143,21 +146,48 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
         }
         if (btype == gemm::CompType::tS8 && PackRow == 4) {
           if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                            DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            if (bptr->mBlockSize < K) {
+              BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                              DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            } else {
+              BTLAGemmCompInt8Pc<tAMX_INT8_SS, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            }
+
           } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                      BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
-            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                            DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            if (bptr->mBlockSize < K) {
+              BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                              DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            } else {
+              BTLAGemmCompInt8Pc<tAVX512_VNNI, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            }
           } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
-            BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            if (bptr->mBlockSize < K) {
+              BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                           DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            } else {
+              BTLAGemmCompInt8Pc<tAVX512BW, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                      DataParams[i].ldc, WorkSpace, pth);
+            }
+
           } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
-            BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                         DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            if (bptr->mBlockSize < K) {
+              BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                           DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            } else {
+              BTLAGemmCompInt8Pc<tAVX_VNNI, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                      DataParams[i].ldc, WorkSpace, pth);
+            }
           } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
-            BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                          DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            if (bptr->mBlockSize < K) {
+              BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                            DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            } else {
+              BTLAGemmCompInt8Pc<tAVX2_VNNI, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
+                                                       DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
+            }
           }
         }
       }
