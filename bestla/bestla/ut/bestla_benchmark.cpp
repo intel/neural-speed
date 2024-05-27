@@ -508,7 +508,7 @@ class UTWOQ_CompFp32 {
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
     auto psize = (size_t)m * n * k * 2;
-    auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
+    auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
@@ -625,7 +625,7 @@ class UTWOQ_CompBf16 {
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
     auto psize = (size_t)m * n * k * 2;
-    auto memsize = (size_t)packBs[0].mSize + (m * k + m * n) * sizeof(float);
+    auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
       for (int i = 0; i < batch; i++) {
