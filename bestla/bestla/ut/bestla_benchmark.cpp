@@ -525,8 +525,9 @@ class UTWOQ_CompFp32 {
     log.record();
     double flops = double(psize) / log.min_val / 1e6;
     double band = double(memsize) / log.min_val / 1e6;
+    int cores = std::min(threads, device::CpuDevice::getCores());
     printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
-           corestr, log.get_log_str(), flops, flops / threads, band);
+           corestr, log.get_log_str(), flops, flops / cores, band);
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -642,8 +643,9 @@ class UTWOQ_CompBf16 {
     log.record();
     double flops = double(psize) / log.min_val / 1e6;
     double band = double(memsize) / log.min_val / 1e6;
+    int cores = std::min(threads, device::CpuDevice::getCores());
     printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
-           corestr, log.get_log_str(), flops, flops / threads, band);
+           corestr, log.get_log_str(), flops, flops / cores, band);
   }
 
   template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
@@ -766,8 +768,9 @@ class UTWOQ_CompInt8 {
     log.record();
     double flops = double(psize) / log.min_val / 1e6;
     double band = double(memsize) / log.min_val / 1e6;
+    int cores = std::min(threads, device::CpuDevice::getCores());
     printf("Threads %d Block %d %s %s Flops:%.3fG PerCoreFlops:%.3fG MemoryBandwidth:%.3fGB/s\n", threads, blocksize,
-           corestr, log.get_log_str(), flops, flops / threads, band);
+           corestr, log.get_log_str(), flops, flops / cores, band);
   }
 
   template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
