@@ -205,6 +205,7 @@ class PcKBlockCompInt8Epilogue {
     ParamPcKBlockCompInt8Epilogue param1;
     typename Fp32Epilogue::Param param2;
   };
+  using Fp32Epi = Fp32Epilogue;
   static BTLA_CODE forward(const int32_t* srcptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     BTLA_CODE ret = BTLA_CODE::NotSupport;
@@ -241,7 +242,6 @@ class PcKBlockCompInt8Epilogue {
 
     if (param1.zpA == nullptr) {
       if (param1.zpB == nullptr) {
-
       } else {
         ret = kernel::wrapper::RemoveZeroPointBias::template forward_wei<ISA_T>(
             tmpfp32ptr, cachestep, M, N, param1.zpB + N_offset, scab, 1, param1.reduceA + M_offset);

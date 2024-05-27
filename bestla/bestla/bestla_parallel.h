@@ -214,7 +214,7 @@ class StdThreading : public IThreading {
     } else {
       core_order.resize(mThreadNum);
       if (_cd->isClient()) {
-        for (int i = 0; i < _cd->getCores(); i++) core_order[i] = 2 * i;
+        for (int i = 0; i < std::min(mThreadNum, _cd->getCores()); i++) core_order[i] = 2 * i;
         for (int i = _cd->getCores(); i < mThreadNum; i++) core_order[i] = 2 * (i - _cd->getCores()) + 1;
       } else {
         for (int i = 0; i < mThreadNum; i++) core_order[i] = i;

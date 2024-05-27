@@ -649,111 +649,33 @@ class UT_CompFp32 {
  public:
   UT_CompFp32() {
     UT_START();
-    ut_s7();
-    ut_s6();
-    ut_s5();
-    ut_s4();
-    ut_s2();
-    ut_s1();
-    ut_s3();
-    ut_s8();
+    ut_new_type(BTLA_DTYPE::S1_CLIP);
+    ut_new_type(BTLA_DTYPE::S2_CLIP);
+    ut_new_type(BTLA_DTYPE::S3_CLIP);
+    ut_new_type(BTLA_DTYPE::S5_CLIP);
+    ut_new_type(BTLA_DTYPE::S6_CLIP);
+    ut_new_type(BTLA_DTYPE::S7_CLIP);
+    ut_new_type(BTLA_DTYPE::S8);
+    ut_s4_full();
 
     ut_f4();
     ut_f8();
   }
 
-  void ut_s1() {
+  void ut_new_type(BTLA_DTYPE qtype) {
     GetCPUDevice();
     if (_cd->AVX2()) {
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::BF16,
-                                                            false);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                            true);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                            false);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                            false);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                            true);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                            false);
+      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 16, qtype, BTLA_DTYPE::BF16, true);
+      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(4, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, -1, qtype, BTLA_DTYPE::BF16, false);
     }
     if (_cd->AVX512F()) {
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::BF16,
-                                                               false);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                               true);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                               false);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                               false);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                               true);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                               false);
+      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 16, qtype, BTLA_DTYPE::BF16, true);
+      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(4, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, -1, qtype, BTLA_DTYPE::BF16, false);
     }
-  }
-
-  void ut_s2() {
-    GetCPUDevice();
-    if (_cd->AVX2()) {
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16,
-                                                            false);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                            true);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                            false);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                            false);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                            true);
-      ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                            false);
-    }
-    if (_cd->AVX512F()) {
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16,
-                                                               false);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                               true);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                               false);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                               false);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                               true);
-      ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                               false);
-    }
-  }
-
-  void ut_s3() {
-    CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-
-    CheckISA(AVX512F);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                             false);
   }
 
   void ut_f8() {
@@ -769,146 +691,20 @@ class UT_CompFp32 {
     ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F8_E5M2, BTLA_DTYPE::F32);
   }
 
-  void ut_s4() {
+  void ut_s4_full() {
+    BTLA_DTYPE qtype = BTLA_DTYPE::S4_CLIP;
     CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16,
-                                                          false);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 16, qtype, BTLA_DTYPE::BF16, true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(4, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, -1, qtype, BTLA_DTYPE::BF16, false);
 
     CheckISA(AVX512F);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16,
-                                                             false);
-  }
-
-  void ut_s5() {
-    CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    CheckISA(AVX512F);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-  }
-
-  void ut_s6() {
-    CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    CheckISA(AVX512F);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-  }
-
-  void ut_s7() {
-    CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16,
-                                                          false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                          true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                          false);
-    CheckISA(AVX512F);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                             true);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                             false);
-  }
-
-  void ut_s8() {
-    CheckISA(AVX2);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S8, BTLA_DTYPE::BF16, false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S8, BTLA_DTYPE::BF16, true);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S8, BTLA_DTYPE::F32, false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S8, BTLA_DTYPE::F32, false);
-    ut_int<sAVX2, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S8, BTLA_DTYPE::F32, false);
-
-    CheckISA(AVX512F);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S8, BTLA_DTYPE::BF16,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 32, BTLA_DTYPE::S8, BTLA_DTYPE::F32, false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, BTLA_DTYPE::S8, BTLA_DTYPE::F32,
-                                                             false);
-    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, BTLA_DTYPE::S8, BTLA_DTYPE::F32, false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(2, 4096, 4096, -1, qtype, BTLA_DTYPE::F32, false);
+    ut_int<sAVX512F, prologue_b::gemm::WeightKBlockNInteger>(8, 4096, 4096, 32, qtype, BTLA_DTYPE::BF16, false);
   }
 
   void ut_f4() {
@@ -1017,254 +813,110 @@ class UT_CompInt8 {
  public:
   UT_CompInt8() {
     UT_START();
-    ut_s7();
-    ut_s6();
-    ut_s5();
-    ut_s4();
-    ut_s2();
-    ut_s1();
-    ut_s3();
+    ut_s4_full();
+    ut_new_dtype(BTLA_DTYPE::S1_CLIP);
+    ut_new_dtype(BTLA_DTYPE::S2_CLIP);
+    ut_new_dtype(BTLA_DTYPE::S3_CLIP);
+    ut_new_dtype(BTLA_DTYPE::S5_CLIP);
+    ut_new_dtype(BTLA_DTYPE::S6_CLIP);
+    ut_new_dtype(BTLA_DTYPE::S7_CLIP);
   }
 
-  void ut_s2() {
+  void ut_new_dtype(BTLA_DTYPE qtype) {
     GetCPUDevice();
     if (_cd->AVX2()) {
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
     }
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
     }
     if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 16, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S2_CLIP, BTLA_DTYPE::F32);
-    }
-  }
-
-  void ut_s1() {
-    GetCPUDevice();
-    if (_cd->AVX2()) {
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 16, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S1_CLIP, BTLA_DTYPE::F32);
-    }
-  }
-
-  void ut_s7() {
-    GetCPUDevice();
-    if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 4096, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                        true);
-      ut_newkblock_pc<gemm::ICoreRowNAvxvnni<24, 4>>(1, 4096, 4096, 4096, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
     }
     if (_cd->AVX512BW()) {
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 16, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
     }
     if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S7_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(1, 4096, 4096, 64, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(8, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
     }
   }
 
-  void ut_s3() {
+  void ut_s4_full() {
     GetCPUDevice();
+    auto qtype = BTLA_DTYPE::S4_CLIP;
     if (_cd->AVX2()) {
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvx2vnni<24, 4>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvx2vnni<24, 4>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvx2vnniSS<24, 2>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvx2vnniSS<24, 2>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
     }
     if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32,
-                                                           true);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S3_CLIP, BTLA_DTYPE::F32);
-    }
-  }
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvxvnni<24, 4>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvxvnni<24, 4>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
 
-  void ut_s4() {
-    GetCPUDevice();
-    if (_cd->AVX2()) {
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlockSS<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlockSS<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlockSS<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvxvnniKBlockSS<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvxvnniSS<24, 4>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvxvnniSS<24, 4>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
     }
 
     if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 11008, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvx512vnni<48, 8>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvx512vnni<48, 8>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+    }
+
+    if (_cd->AVX512BW()) {
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx512bwKBlock<48, 8>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvx512bw<48, 8>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvx512bw<48, 8>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
     }
 
     if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S4_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S4_CLIP,
-                                                         BTLA_DTYPE::DQ8_BNB);
-    }
-  }
+      ut_newkblock<gemm::ICoreRowNAmxint8SSKBlock<64, 16>>(1, 4096, 4096, 64, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAmxint8SSKBlock<64, 16>>(8, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAmxint8SSKBlock<64, 16>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAmxint8SSKBlock<64, 16>>(1, 4096, 4096, 128, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAmxint8SS<64, 16>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAmxint8SS<64, 16>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
 
-  void ut_s5() {
-    GetCPUDevice();
-    if (_cd->AVX2()) {
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 11008, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-    }
-
-    if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S5_CLIP, BTLA_DTYPE::F32);
-    }
-  }
-
-  void ut_s6() {
-    GetCPUDevice();
-    if (_cd->AVX2()) {
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AVX512_VNNI()) {
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(1, 11008, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(2, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAvx512vnniKBlock<48, 4>>(8, 4096, 4096, 32, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-    }
-    if (_cd->AMX_INT8()) {
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(128, 4096, 4096, 128, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
-      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<48, 16>>(1, 4096, 4096, 64, BTLA_DTYPE::S6_CLIP, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(1, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(1, 4096, 4096, 64, qtype, BTLA_DTYPE::F32);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAmxint8KBlock<64, 16>>(128, 4096, 4096, 128, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAmxint8<64, 16>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAmxint8<64, 16>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
     }
   }
 
@@ -1329,9 +981,7 @@ class UT_CompInt8 {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
     auto constexpr ISA = GemmCore_T::ISA;
-
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-
     using Launcher =
         wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
                                     prologue_b::gemm::WeightKBlockNInteger, PcWriteBack>;
@@ -1366,15 +1016,17 @@ class UT_CompInt8 {
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     GemmProblem gp(1, m, n, k, blocksize);
-    typename Launcher::Param args{gp,
-                                  {matAf32.data(), k, &quanA},
-                                  {&packedw},
-                                  {{packedw.template SPtr<char>(), packedw.SDtype(), quanA.template SPtr<float>(),
-                                    quanA.template ZPtr<uint8_t>(), packedw.template RPtr<char>(), packedw.RDtype(), nullptr, nullptr, k},
-                                   {matC.data(), n}}};
+    typename Launcher::Param args{
+        gp,
+        {matAf32.data(), k, &quanA},
+        {&packedw},
+        {{packedw.template SPtr<char>(), packedw.SDtype(), quanA.template SPtr<float>(), quanA.template ZPtr<uint8_t>(),
+          packedw.template RPtr<char>(), packedw.RDtype(), nullptr, nullptr, k},
+         {matC.data(), n}}};
     parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
+
     if (stype != BTLA_DTYPE::DQ8_BNB) {
       buffer_error(refCupk.data(), matC.data(), refCupk.size(), INT8_ERR);  // dynamic quant error
     } else {

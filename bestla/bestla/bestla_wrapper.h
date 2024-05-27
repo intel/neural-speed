@@ -239,6 +239,9 @@ class LauncherBase {
       if constexpr (!std::is_same_v<PrologueA,
                                     prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>> &&
                     !std::is_same_v<PrologueA, prologue_a::gemm::ActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>> &&
+                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T, _RT_ISA_T>> &&
+                    !std::is_same_v<PrologueA,
+                                    prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T, _RT_ISA_T>> &&
                     !std::is_same_v<PrologueA, prologue_a::gemm::ActivationBase<_GemmCore_T, _RT_ISA_T>>) {
         return false;
       }
@@ -249,12 +252,40 @@ class LauncherBase {
           static_assert(GemmCore::PACK_ROW == 1);
           return true;
         }
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
+          static_assert(GemmCore::PACK_ROW == 4);
+          return true;
+        }
+#endif
+      }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512_VNNI) {
+#if CompileAVX512VNNI()
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
+          static_assert(GemmCore::PACK_ROW == 4);
+          return true;
+        }
+#endif
+      }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX_VNNI) {
+#if CompileAVXVNNI()
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
+          static_assert(GemmCore::PACK_ROW == 4);
+          return true;
+        }
 #endif
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX512F) {
 #if CompileAVX512F()
         if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_FP32) {
           static_assert(GemmCore::PACK_ROW == 1);
+          return true;
+        }
+#endif
+      }
+      if constexpr (GemmCore::ISA == BTLA_ISA::AVX512BW) {
+#if CompileAVX512F()
+        if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
+          static_assert(GemmCore::PACK_ROW == 4);
           return true;
         }
 #endif
@@ -288,16 +319,9 @@ class LauncherBase {
         auto constexpr CSize = 8 * 1024LL;
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
-        auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
+        auto tmpc_ptr = reinterpret_cast<float*>((char*)StackTmp + TmpSize);
         static_assert(CSize >= (MTILE * GemmCore::NTILE * sizeof(float)));
         utils::GemvParamB<ScaleT> paramB = SNbits::template createB<ScaleT>(_param.paramB.packedW);
-        const float* Aptr = _param.paramA.A;
-        if constexpr (std::is_same_v<PrologueA,
-                                     prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
-          if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
-            Aptr = _param.paramA.reordered->template APtr<float>();
-          }
-        }
         int m = _param.problem.dims[1];
         int n = _param.problem.dims[2];
         int k = _param.problem.dims[3];
@@ -306,21 +330,51 @@ class LauncherBase {
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
-          if constexpr (std::is_same_v<AType, float>) {
+          if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
+            utils::GemvParamA paramA{
+                _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
+                _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
+            kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
+                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
+            Epilogue::Fp32Epi::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
+                                       _param.paramC.param2, StackTmp, TmpSize);
+          } else {
+            const float* Aptr = _param.paramA.A;
+            if constexpr (std::is_same_v<PrologueA,
+                                         prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
+              if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
+                Aptr = _param.paramA.reordered->template APtr<float>();
+              }
+            }
             kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
+            Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE, _param.paramC,
+                              StackTmp, TmpSize);
           }
-          Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE, _param.paramC,
-                            StackTmp, TmpSize);
           SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
-          if constexpr (std::is_same_v<AType, float>) {
+          if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
+            utils::GemvParamA paramA{
+                _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
+                _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
+            kernel::wrapper::GEMVWoqNBits::forward_u8s8_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
+                paramA, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
+            Epilogue::Fp32Epi::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
+                                       _param.paramC.param2, StackTmp, TmpSize);
+          } else {
+            const float* Aptr = _param.paramA.A;
+            if constexpr (std::is_same_v<PrologueA,
+                                         prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
+              if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
+                Aptr = _param.paramA.reordered->template APtr<float>();
+              }
+            }
             kernel::wrapper::GEMVWoqNBits::forward_fp32_fp32<_RT_ISA_T, ScaleT, GemmCore::NTILE, MTILE>(
                 Aptr, _param.paramA.lda, paramB, tmpc_ptr, GemmCore::NTILE, k, kblocksize, StackTmp, TmpSize);
+            Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
+                              _param.paramC, StackTmp, TmpSize);
           }
-          Epilogue::forward(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, (_config.size[1] - in),
-                            _param.paramC, StackTmp, TmpSize);
         }
       }
     }
