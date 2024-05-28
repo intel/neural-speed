@@ -18,7 +18,7 @@ class UT_SyclDevice {
     dev->print();
   }
 };
- static UT_SyclDevice sUT_SyclDevice;
+static UT_SyclDevice sUT_SyclDevice;
 
 class UT_SyclVector {
  public:
@@ -56,7 +56,10 @@ class UT_StorageMemCheck {
     packedW.assign(buf0.data());
     auto dev = UT_Device::get();
     auto q = dev->getQueue();
-    sycl_storage::StorageWeightKBlockNInteger sycl_stor(packedW, q);
+    sycl_storage::StorageWeightKBlockNInteger sycl_stor(packedW);
+    sycl_utils::sycl_vector<int8_t> dbuf(sycl_stor.getDeviceSize(), q);
+    sycl_stor.assign(dbuf.data());
+    sycl_stor.fromHost(packedW, q);
     storage::gemm::StorageWeightKBlockNInteger tmp = packedW;
     tmp.assign(buf1.data());
     sycl_stor.toHost(tmp, q);
@@ -92,14 +95,16 @@ class UT_BlockQunatize_S3S4 {
     avector<int8_t> buffer1(transtor.mSize);
     transtor.assign(buffer1.data());
     kernel.convertTransStorage(ptr, transtor, UT_Threading::get());
-    sycl_storage::StorageWeightKBlockNInteger sycl_stor(transtor, q);
+    sycl_storage::StorageWeightKBlockNInteger sycl_stor(transtor);
+    sycl_utils::sycl_vector<int8_t> dbuf(sycl_stor.getDeviceSize(), q);
+    sycl_stor.assign(dbuf.data());
+    sycl_stor.fromHost(transtor, q);
     avector<float> dequant(n * k, 0);
     using ProB = sycl_prologue_b::WeightS4Trans<GemmCore, float>;
     sycl_utils::sycl_vector<float> dequantB(n * k, q);
     int blks = updiv(k, blocksize);
     auto evt = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(
-        n, k, blocksize, {(uint8_t*)sycl_stor.mQBuf.data(), (float*)sycl_stor.mScaleBuf.data(), blks}, dequantB.data(),
-        q);
+        n, k, blocksize, {(uint8_t*)sycl_stor.mQBuf, (float*)sycl_stor.mSBuf, blks}, dequantB.data(), q);
     evt.wait();
     q->memcpy(dequant.data(), dequantB.data(), dequantB.size() * 4).wait();
     ut::buffer_error(raw.data(), dequant.data(), dequant.size(), 0.01f);
@@ -149,11 +154,13 @@ class UT_CompFp32 {
     avector<int8_t> buffer1(transtor.mSize);
     transtor.assign(buffer1.data());
     proB.convertTransStorage(packedw, transtor, UT_Threading::get());
-    sycl_storage::StorageWeightKBlockNInteger sycl_stor(transtor, q);
+    sycl_storage::StorageWeightKBlockNInteger sycl_stor(transtor);
+    sycl_utils::sycl_vector<int8_t> dbuf(sycl_stor.getDeviceSize(), q);
+    sycl_stor.assign(dbuf.data());
+    sycl_stor.fromHost(transtor, q);
     int blks = updiv(k, blocksize);
-    auto e_esimd =
-        ProBTransT::gemv(dA.data(), {(uint8_t*)sycl_stor.mQBuf.data(), (float*)sycl_stor.mScaleBuf.data(), blks},
-                         dC.data(), n, k, blocksize, q);
+    auto e_esimd = ProBTransT::gemv(dA.data(), {(uint8_t*)sycl_stor.mQBuf, (float*)sycl_stor.mSBuf, blks}, dC.data(), n,
+                                    k, blocksize, q);
     e_esimd.wait();
     q->memcpy(matC.data(), dC.data(), matC.size() * 4).wait();
 

@@ -27,15 +27,18 @@ class StorageWeightKBlockNInteger {
   int mN = 0, mK = 0;
   int mBlockSize = 1;
   int mDqBlockSize = 0;
-  size_t mCSize = 0;
   int mCStep = 0;
-  sycl_utils::sycl_vector<int8_t> mQBuf;
-  sycl_utils::sycl_vector<int8_t> mScaleBuf;
-  sycl_utils::sycl_vector<int8_t> mZpBuf, mRedBuf;
-  sycl_utils::sycl_vector<int8_t> mDQCorrectionBuf;
-  sycl_utils::sycl_vector<int8_t> mShuffleIndices;
+  int8_t* mQBuf = nullptr;
+  size_t mWSize = 0;
+  int8_t* mSBuf = nullptr;
+  size_t mCSize = 0;
+  int8_t *mZpBuf = nullptr, *mRedBuf = nullptr;
+  size_t mZpSize = 0, mRedSize = 0;
+  int8_t* mDQCorrectionBuf = nullptr;
+  int8_t* mShuffleIndices = nullptr;
+  size_t mDQCorSize = 0, mShufSize = 0;
 
-  StorageWeightKBlockNInteger(bestla::storage::gemm::StorageWeightKBlockNInteger& _hoststor, sycl::queue* queue) {
+  StorageWeightKBlockNInteger(bestla::storage::gemm::StorageWeightKBlockNInteger& _hoststor) {
     mPrologueID = BTLA_PROLOGUEB_IDS::WeightKBlockNInteger;
     mCoreId = 0;
     mDType = _hoststor.mDType;
@@ -48,40 +51,74 @@ class StorageWeightKBlockNInteger {
     mK = _hoststor.mK;
     mBlockSize = _hoststor.mBlockSize;
     mDqBlockSize = _hoststor.mDqBlockSize;
-    mCSize = _hoststor.CSize();
+    mWSize = _hoststor.template WSize<int8_t>();
+    mCSize = _hoststor.CSize() * utils::bestla_dtype_size(mScaT);
     mCStep = _hoststor.CStep();
-    if (_hoststor.template WPtr<void>()) {
-      mQBuf.resize(_hoststor.template WSize<int8_t>(), queue);
-      queue->memcpy(mQBuf.data(), _hoststor.template WPtr<void>(), mQBuf.size()).wait();
-    }
-    size_t csize = _hoststor.CSize();
-    if (_hoststor.template SPtr<void>()) {
-      mScaleBuf.resize(csize * _hoststor.mCorrection.mScaEleSize, queue);
-      queue->memcpy(mScaleBuf.data(), _hoststor.template SPtr<void>(), mScaleBuf.size()).wait();
-    }
+
     if (_hoststor.template ZPtr<void>()) {
-      mZpBuf.resize(csize * _hoststor.mCorrection.mZpEleSize, queue);
-      queue->memcpy(mZpBuf.data(), _hoststor.template ZPtr<void>(), mZpBuf.size()).wait();
+      mZpSize = mCSize * utils::bestla_dtype_size(mZpT);
     }
     if (_hoststor.template RPtr<void>()) {
-      mRedBuf.resize(csize * _hoststor.mCorrection.mRedEleSize, queue);
-      queue->memcpy(mRedBuf.data(), _hoststor.template RPtr<void>(), mRedBuf.size()).wait();
+      mRedSize = mCSize * utils::bestla_dtype_size(mRedT);
     }
     // TODO DQ,shuffle support
   }
+
+  size_t getDeviceSize() { return mWSize + mCSize + mZpSize + mRedSize + mDQCorSize + mShufSize; }
+
+  void assign(int8_t* dptr) {
+    mQBuf = dptr;
+    dptr += mWSize;
+    mSBuf = dptr;
+    dptr += mCSize;
+    if (mZpSize) {
+      mZpBuf = dptr;
+      dptr += mZpSize;
+    }
+    if (mRedSize) {
+      mRedBuf = dptr;
+      dptr += mRedSize;
+    }
+    if (mDQCorSize) {
+      mDQCorrectionBuf = dptr;
+      dptr += mDQCorSize;
+    }
+    if (mShuffleIndices) {
+      mDQCorrectionBuf = dptr;
+      dptr += mShufSize;
+    }
+  }
+
+  void fromHost(bestla::storage::gemm::StorageWeightKBlockNInteger& _hoststor, sycl::queue* queue) {
+    if (_hoststor.template WPtr<void>() && mQBuf) {
+      queue->memcpy(mQBuf, _hoststor.template WPtr<void>(), mWSize);
+    }
+    if (_hoststor.template SPtr<void>() && mSBuf) {
+      queue->memcpy(mSBuf, _hoststor.template SPtr<void>(), mCSize);
+    }
+    if (_hoststor.template ZPtr<void>() && mZpBuf) {
+      queue->memcpy(mZpBuf, _hoststor.template ZPtr<void>(), mZpSize);
+    }
+    if (_hoststor.template RPtr<void>() && mRedBuf) {
+      queue->memcpy(mRedBuf, _hoststor.template RPtr<void>(), mRedSize);
+    }
+    queue->wait();
+  }
+
   void toHost(bestla::storage::gemm::StorageWeightKBlockNInteger& _hoststor, sycl::queue* queue) {
-    if (mQBuf.data()) {
-      queue->memcpy(_hoststor.template WPtr<void>(), mQBuf.data(), mQBuf.size()).wait();
+    if (mQBuf) {
+      queue->memcpy(_hoststor.template WPtr<void>(), mQBuf, mWSize);
     }
-    if (mScaleBuf.data()) {
-      queue->memcpy(_hoststor.template SPtr<void>(), mScaleBuf.data(), mScaleBuf.size()).wait();
+    if (mSBuf) {
+      queue->memcpy(_hoststor.template SPtr<void>(), mSBuf, mCSize);
     }
-    if (mZpBuf.data()) {
-      queue->memcpy(_hoststor.template ZPtr<void>(), mZpBuf.data(), mZpBuf.size()).wait();
+    if (mZpBuf) {
+      queue->memcpy(_hoststor.template ZPtr<void>(), mZpBuf, mZpSize);
     }
-    if (mRedBuf.data()) {
-      queue->memcpy(_hoststor.template RPtr<void>(), mRedBuf.data(), mRedBuf.size()).wait();
+    if (mRedBuf) {
+      queue->memcpy(_hoststor.template RPtr<void>(), mRedBuf, mRedSize);
     }
+    queue->wait();
   }
 };
 }  // namespace sycl_storage
