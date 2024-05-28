@@ -74,7 +74,7 @@ struct compute_policy_int4_dequantize<
   static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
-  static_assert(!(arch_tag == gpu_arch::XeLpg), "XeLpg does not support xmx");
+  static_assert(arch_has_xmx<arch_tag>(), "XeLpg does not support xmx");
 
   static constexpr bool is_int4_matB_policy = true;
 
