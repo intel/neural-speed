@@ -61,7 +61,7 @@ struct compute_policy_int4_dequantize<
     mma_engine_,
     arch_tag_,
     std::enable_if_t<(
-        arch_tag_ <= gpu_arch::XeHpc && mma_engine_ == mma_engine::xmx)>> {
+        mma_engine_ == mma_engine::xmx)>> {
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
