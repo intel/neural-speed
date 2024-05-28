@@ -20,6 +20,7 @@
 
 enum llama_model {
   LLAMA_UNKNOWN,
+  Tiny_llama,
   LLAMA_7B,
   LLAMA_13B,
   LLAMA_30B,
@@ -28,6 +29,12 @@ enum llama_model {
 
 static const model_scratch llama_mem_req(int n_layers, float scratch_size_ratio = 1.0f) {
   switch (n_layers) {
+    case 22:
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     case 32:
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
