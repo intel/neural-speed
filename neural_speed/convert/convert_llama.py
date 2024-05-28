@@ -1357,7 +1357,7 @@ def load_some_model(path: Path) -> ModelPlus:
     if path.is_dir():
         # Check if it's a set of safetensors files first
         files = list(path.glob("model-00001-of-*.safetensors"))
-        if not files
+        if not files:
             files = list(path.glob("model*.safetensors")) # for only one safetensor
         if not files:
             # Try the PyTorch patterns too, with lower priority
