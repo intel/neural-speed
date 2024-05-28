@@ -200,6 +200,61 @@ class S1 {
   }
 };
 
+class NBitsHelper {
+ public:
+  template <typename ScaleT>
+  static inline utils::GemvParamB<ScaleT> createB(storage::gemm::StorageWeightKBlockNInteger* packedW) {
+    if (packedW->mDType == BTLA_DTYPE::S4_CLIP) {
+      return S4::createB<ScaleT>(packedW);
+    }
+    if (packedW->mDType == BTLA_DTYPE::S3_CLIP) {
+      return S3::createB<ScaleT>(packedW);
+    }
+    if (packedW->mDType == BTLA_DTYPE::S5_CLIP) {
+      return S5::createB<ScaleT>(packedW);
+    }
+    if (packedW->mDType == BTLA_DTYPE::S2_CLIP) {
+      return S2::createB<ScaleT>(packedW);
+    }
+    if (packedW->mDType == BTLA_DTYPE::S6_CLIP) {
+      return S6::createB<ScaleT>(packedW);
+    }
+    if (packedW->mDType == BTLA_DTYPE::S7_CLIP) {
+      return S7::createB<ScaleT>(packedW);
+    }
+    if (packedW->mDType == BTLA_DTYPE::S1_CLIP) {
+      return S1::createB<ScaleT>(packedW);
+    }
+    assert(0);
+    return utils::GemvParamB<ScaleT>();
+  }
+  template <typename ScaleT>
+  static void updateBNStep(utils::GemvParamB<ScaleT>& paramB, int n_offset) {
+    if (paramB.nbits == 4) {
+      return S4::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    if (paramB.nbits == 3) {
+      return S3::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    if (paramB.nbits == 5) {
+      return S5::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    if (paramB.nbits == 2) {
+      return S2::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    if (paramB.nbits == 6) {
+      return S6::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    if (paramB.nbits == 7) {
+      return S7::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    if (paramB.nbits == 1) {
+      return S1::updateBNStep<ScaleT>(paramB, n_offset);
+    }
+    assert(0);
+  }
+};
+
 }  // namespace gemv_nbits
 
 namespace gemm {
@@ -311,7 +366,7 @@ class LauncherBase {
       return impl;
     }
 
-    template <typename ScaleT, int MTILE, class SNbits>
+    template <typename ScaleT, int MTILE>
     static void gemv_kblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
         auto constexpr TmpSize = 16 * 1024LL;
@@ -320,12 +375,12 @@ class LauncherBase {
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<float*>((char*)StackTmp + TmpSize);
         static_assert(CSize >= (MTILE * GemmCore::NTILE * sizeof(float)));
-        utils::GemvParamB<ScaleT> paramB = SNbits::template createB<ScaleT>(_param.paramB.packedW);
+        utils::GemvParamB<ScaleT> paramB = gemv_nbits::NBitsHelper::template createB<ScaleT>(_param.paramB.packedW);
         int m = _param.problem.dims[1];
         int n = _param.problem.dims[2];
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
-        SNbits::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
+        gemv_nbits::NBitsHelper::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
@@ -350,7 +405,7 @@ class LauncherBase {
             Epilogue::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
                                             _param.paramC, StackTmp, TmpSize);
           }
-          SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
+          gemv_nbits::NBitsHelper::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
           if constexpr (GemmCore::COMP == bestla::gemm::CompType::COMP_INT8_US_INT32) {
@@ -382,187 +437,28 @@ class LauncherBase {
       if constexpr (support()) {
         assert(_param.problem.dims[4] > 0);
         auto& m = _param.problem.dims[1];
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S4>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S4>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S4>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S4>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S4>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S4>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S4>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S4>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S4>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S4>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S4>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S4>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S4>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S4>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S4>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S4>(_param, _config);
-            }
+        if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
+          if (m == 1) gemv_kblock<float, 1>(_param, _config);
+          if (m == 2) gemv_kblock<float, 2>(_param, _config);
+          if (m == 3) gemv_kblock<float, 3>(_param, _config);
+          if (m == 4) gemv_kblock<float, 4>(_param, _config);
+          if constexpr (Reg32) {
+            if (m == 5) gemv_kblock<float, 5>(_param, _config);
+            if (m == 6) gemv_kblock<float, 6>(_param, _config);
+            if (m == 7) gemv_kblock<float, 7>(_param, _config);
+            if (m == 8) gemv_kblock<float, 8>(_param, _config);
           }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S5_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S5>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S5>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S5>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S5>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S5>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S5>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S5>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S5>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S5>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S5>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S5>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S5>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S5>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S5>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S5>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S5>(_param, _config);
-            }
+        } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
+          if (m == 1) gemv_kblock<utils::bf16, 1>(_param, _config);
+          if (m == 2) gemv_kblock<utils::bf16, 2>(_param, _config);
+          if (m == 3) gemv_kblock<utils::bf16, 3>(_param, _config);
+          if (m == 4) gemv_kblock<utils::bf16, 4>(_param, _config);
+          if constexpr (Reg32) {
+            if (m == 5) gemv_kblock<utils::bf16, 5>(_param, _config);
+            if (m == 6) gemv_kblock<utils::bf16, 6>(_param, _config);
+            if (m == 7) gemv_kblock<utils::bf16, 7>(_param, _config);
+            if (m == 8) gemv_kblock<utils::bf16, 8>(_param, _config);
           }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S6_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S6>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S6>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S6>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S6>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S6>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S6>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S6>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S6>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S6>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S6>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S6>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S6>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S6>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S6>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S6>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S6>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S7_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S7>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S7>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S7>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S7>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S7>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S7>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S7>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S7>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S7>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S7>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S7>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S7>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S7>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S7>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S7>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S7>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S3_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S3>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S3>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S3>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S3>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S3>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S3>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S3>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S3>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S3>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S3>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S3>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S3>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S3>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S3>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S3>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S3>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S1_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S1>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S1>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S1>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S1>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S1>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S1>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S1>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S1>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S1>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S1>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S1>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S1>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S1>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S1>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S1>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S1>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S2>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S2>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S2>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S2>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S2>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S2>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S2>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S2>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S2>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S2>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S2>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S2>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S2>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S2>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S2>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S2>(_param, _config);
-            }
-          }
-          return;
         }
       }
     }
@@ -742,7 +638,7 @@ class LauncherIntKBlock {
       return impl;
     }
 
-    template <typename ScaleT, int MTILE, class SNbits>
+    template <typename ScaleT, int MTILE>
     static void gemv_kblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
         auto constexpr TmpSize = 16 * 1024LL;
@@ -751,7 +647,7 @@ class LauncherIntKBlock {
         auto StackTmp_ = alloca(TmpSize + CSize);
         auto StackTmp = utils::cpu_pointer_align<void>(StackTmp_);
         auto tmpc_ptr = reinterpret_cast<CType*>((char*)StackTmp + TmpSize);
-        utils::GemvParamB<ScaleT> paramB = SNbits::template createB<ScaleT>(_param.paramB.packedW);
+        utils::GemvParamB<ScaleT> paramB = gemv_nbits::NBitsHelper::template createB<ScaleT>(_param.paramB.packedW);
         utils::GemvParamA paramA{
             _param.paramA.quan->template APtr<uint8_t>(), _param.paramA.quan->template SPtr<float>(),
             _param.paramA.quan->template ZPtr<uint8_t>(), _param.paramA.quan->mKPad, _param.paramA.quan->CStep()};
@@ -760,7 +656,7 @@ class LauncherIntKBlock {
         int n = _param.problem.dims[2];
         int k = _param.problem.dims[3];
         int kblocksize = _param.problem.dims[4];
-        SNbits::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
+        gemv_nbits::NBitsHelper::template updateBNStep<ScaleT>(paramB, _config.loc[1]);
         int size_padded = utils::padto_le(_config.size[1], GemmCore::NTILE);
         int in = 0;
         for (; in < size_padded; in += GemmCore::NTILE) {
@@ -773,7 +669,7 @@ class LauncherIntKBlock {
           }
           Epilogue::template forward<ISA>(tmpc_ptr, GemmCore::NTILE, 0, _config.loc[1] + in, MTILE, GemmCore::NTILE,
                                           _param.paramC, StackTmp, TmpSize);
-          SNbits::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
+          gemv_nbits::NBitsHelper::template updateBNStep<ScaleT>(paramB, GemmCore::NTILE);
         }
         if (size_padded != _config.size[1]) {
           if constexpr (std::is_same_v<AType, uint8_t>) {
@@ -792,190 +688,28 @@ class LauncherIntKBlock {
     static void gemv(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
       if constexpr (support()) {
         auto& m = _param.problem.dims[1];
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S4_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S4>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S4>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S4>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S4>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S4>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S4>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S4>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S4>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S4>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S4>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S4>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S4>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S4>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S4>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S4>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S4>(_param, _config);
-            }
+        if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
+          if (m == 1) gemv_kblock<float, 1>(_param, _config);
+          if (m == 2) gemv_kblock<float, 2>(_param, _config);
+          if (m == 3) gemv_kblock<float, 3>(_param, _config);
+          if (m == 4) gemv_kblock<float, 4>(_param, _config);
+          if constexpr (Reg32) {
+            if (m == 5) gemv_kblock<float, 5>(_param, _config);
+            if (m == 6) gemv_kblock<float, 6>(_param, _config);
+            if (m == 7) gemv_kblock<float, 7>(_param, _config);
+            if (m == 8) gemv_kblock<float, 8>(_param, _config);
           }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S5_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S5>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S5>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S5>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S5>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S5>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S5>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S5>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S5>(_param, _config);
-            }
-
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S5>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S5>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S5>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S5>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S5>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S5>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S5>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S5>(_param, _config);
-            }
+        } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
+          if (m == 1) gemv_kblock<utils::bf16, 1>(_param, _config);
+          if (m == 2) gemv_kblock<utils::bf16, 2>(_param, _config);
+          if (m == 3) gemv_kblock<utils::bf16, 3>(_param, _config);
+          if (m == 4) gemv_kblock<utils::bf16, 4>(_param, _config);
+          if constexpr (Reg32) {
+            if (m == 5) gemv_kblock<utils::bf16, 5>(_param, _config);
+            if (m == 6) gemv_kblock<utils::bf16, 6>(_param, _config);
+            if (m == 7) gemv_kblock<utils::bf16, 7>(_param, _config);
+            if (m == 8) gemv_kblock<utils::bf16, 8>(_param, _config);
           }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S6_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S6>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S6>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S6>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S6>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S6>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S6>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S6>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S6>(_param, _config);
-            }
-
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S6>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S6>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S6>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S6>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S6>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S6>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S6>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S6>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S7_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S7>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S7>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S7>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S7>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S7>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S7>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S7>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S7>(_param, _config);
-            }
-
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S7>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S7>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S7>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S7>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S7>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S7>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S7>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S7>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S3_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S3>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S3>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S3>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S3>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S3>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S3>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S3>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S3>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S3>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S3>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S3>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S3>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S3>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S3>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S3>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S3>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S1_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S1>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S1>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S1>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S1>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S1>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S1>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S1>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S1>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S1>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S1>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S1>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S1>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S1>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S1>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S1>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S1>(_param, _config);
-            }
-          }
-          return;
-        }
-        if (_param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP) {
-          if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F32) {
-            if (m == 1) gemv_kblock<float, 1, gemv_nbits::S2>(_param, _config);
-            if (m == 2) gemv_kblock<float, 2, gemv_nbits::S2>(_param, _config);
-            if (m == 3) gemv_kblock<float, 3, gemv_nbits::S2>(_param, _config);
-            if (m == 4) gemv_kblock<float, 4, gemv_nbits::S2>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<float, 5, gemv_nbits::S2>(_param, _config);
-              if (m == 6) gemv_kblock<float, 6, gemv_nbits::S2>(_param, _config);
-              if (m == 7) gemv_kblock<float, 7, gemv_nbits::S2>(_param, _config);
-              if (m == 8) gemv_kblock<float, 8, gemv_nbits::S2>(_param, _config);
-            }
-          } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::BF16) {
-            if (m == 1) gemv_kblock<utils::bf16, 1, gemv_nbits::S2>(_param, _config);
-            if (m == 2) gemv_kblock<utils::bf16, 2, gemv_nbits::S2>(_param, _config);
-            if (m == 3) gemv_kblock<utils::bf16, 3, gemv_nbits::S2>(_param, _config);
-            if (m == 4) gemv_kblock<utils::bf16, 4, gemv_nbits::S2>(_param, _config);
-            if constexpr (Reg32) {
-              if (m == 5) gemv_kblock<utils::bf16, 5, gemv_nbits::S2>(_param, _config);
-              if (m == 6) gemv_kblock<utils::bf16, 6, gemv_nbits::S2>(_param, _config);
-              if (m == 7) gemv_kblock<utils::bf16, 7, gemv_nbits::S2>(_param, _config);
-              if (m == 8) gemv_kblock<utils::bf16, 8, gemv_nbits::S2>(_param, _config);
-            }
-          }
-          return;
         }
       }
     }
