@@ -25,7 +25,8 @@ from sentencepiece import SentencePieceProcessor
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config):
+def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config,
+                                   compute_dtype="int8"):
     list_vars = model
     for name in list_vars.keys():
         print(name)
@@ -130,6 +131,7 @@ def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams
     convert_qwen_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, fout)
     convert_qwen_to_fp32_tensor("lm_head.bias", "lm_head.bias", list_vars, fout)
 
+    print("model compute_dtype is {}".format(compute_dtype))
     for i in range(hparams["num_hidden_layers"]):
         prefix = "model.layers." + str(i)
         renamed_prefix = "model.layers." + str(i)
@@ -141,13 +143,13 @@ def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams
 
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.q_proj.weight", f"{prefix}.self_attn.q_proj.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=compute_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.k_proj.weight", f"{prefix}.self_attn.k_proj.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=compute_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.v_proj.weight", f"{prefix}.self_attn.v_proj.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=compute_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.self_attn.dense.weight", f"{prefix}.self_attn.dense.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=compute_dtype)
 
         convert_qwen_to_fp32_tensor(f"{prefix}.self_attn.q_proj.bias", f"{prefix}.self_attn.q_proj.bias", list_vars,
                                     fout)
@@ -159,9 +161,9 @@ def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams
 
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc1.weight", f"{renamed_prefix}.mlp.fc1.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=compute_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc2.weight", f"{renamed_prefix}.mlp.fc2.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=compute_dtype)
 
         convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc1.bias", f"{renamed_prefix}.mlp.fc1.bias", list_vars, fout)
         convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc2.bias", f"{renamed_prefix}.mlp.fc2.bias", list_vars, fout)
@@ -170,7 +172,8 @@ def convert_phi1_5_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams
     print(f"Success! saved as {out_path}")
 
 
-def convert_phi2_gptq_to_bestTLA(model_path, model, out_path, hparams, quantize_config):
+def convert_phi2_gptq_to_bestTLA(model_path, out_path, outtype, model, hparams, quantize_config,
+                                 compute_dtype="int8"):
     list_vars = model
     for name in list_vars.keys():
         print(name)
@@ -274,6 +277,7 @@ def convert_phi2_gptq_to_bestTLA(model_path, model, out_path, hparams, quantize_
     convert_qwen_to_fp32_tensor("lm_head.linear.weight", "lm_head.weight", list_vars, fout)
     convert_qwen_to_fp32_tensor("lm_head.linear.bias", "lm_head.bias", list_vars, fout)
 
+    print("model compute_dtype is {}".format(compute_dtype))
     for i in range(hparams["n_layer"]):
         prefix = "transformer.h." + str(i)
         renamed_prefix = "model.layers." + str(i)
@@ -283,19 +287,19 @@ def convert_phi2_gptq_to_bestTLA(model_path, model, out_path, hparams, quantize_
 
         # qkv GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.mixer.Wqkv.weight", f"{renamed_prefix}.mixer.Wqkv.weight", list_vars,
-                                    fout, quantize_config)
+                                    fout, quantize_config, compute_dtype=compute_dtype)
         convert_qwen_to_fp32_tensor(f"{prefix}.mixer.Wqkv.bias", f"{renamed_prefix}.mixer.Wqkv.bias", list_vars, fout)
 
         convert_to_qx_bestla_tensor(f"{prefix}.mixer.out_proj.weight", f"{renamed_prefix}.mixer.out_proj.weight",
-                                    list_vars, fout, quantize_config)
+                                    list_vars, fout, quantize_config, compute_dtype=compute_dtype)
         convert_qwen_to_fp32_tensor(f"{prefix}.mixer.out_proj.bias", f"{renamed_prefix}.mixer.out_proj.bias", list_vars,
                                     fout)
 
         # ffn GEMM
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc1.weight", f"{renamed_prefix}.mlp.fc1.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=compute_dtype)
         convert_to_qx_bestla_tensor(f"{prefix}.mlp.fc2.weight", f"{renamed_prefix}.mlp.fc2.weight", list_vars, fout,
-                                    quantize_config)
+                                    quantize_config, compute_dtype=compute_dtype)
 
         convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc1.bias", f"{renamed_prefix}.mlp.fc1.bias", list_vars, fout)
         convert_qwen_to_fp32_tensor(f"{prefix}.mlp.fc2.bias", f"{renamed_prefix}.mlp.fc2.bias", list_vars, fout)
@@ -317,6 +321,10 @@ def main(args_in: Optional[List[str]] = None) -> None:
                         default="NE",
                         choices=["NE", "GGUF"],
                         help="convert to the GGUF or NE format")
+    parser.add_argument("--compute_dtype",
+                        choices=["fp32", "bf16", "int8"],
+                        default="int8",
+                        help="compute_dtype for model inference")
     parser.add_argument("model", type=Path, help="directory containing model file")
     args = parser.parse_args(args_in)
 
@@ -326,9 +334,11 @@ def main(args_in: Optional[List[str]] = None) -> None:
     model, hparams, quantize_config = load_quantized_safetensors(model_path)
 
     if hparams['model_type'] == "phi":
-        convert_phi1_5_gptq_to_bestTLA(model_path, out_path, args.outtype, model, hparams, quantize_config)
+        convert_phi1_5_gptq_to_bestTLA(model_path, out_path, args.outtype, model, hparams, quantize_config,
+                                       compute_dtype=args.compute_dtype)
     elif hparams['model_type'] == "phi-msft":
-        convert_phi2_gptq_to_bestTLA(model_path, out_path, args.outtype, model, hparams, quantize_config)
+        convert_phi2_gptq_to_bestTLA(model_path, out_path, args.outtype, model, hparams, quantize_config,
+                                     compute_dtype=args.compute_dtype)
 
 
 if __name__ == '__main__':

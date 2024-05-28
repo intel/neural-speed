@@ -646,7 +646,8 @@ def convert_q4_f32_tensor(src_name, dst_name, model, fout, q_config, n_head, n_h
     print(f"converting {dst_name} quantized tensor to fp32 tensor")
 
 
-def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None):
+def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, n_head_kv=0, permute_func=None,
+                             compute_dtype="int8"):
     # unpack weight and repack into jblas format
     import neural_speed.llama_cpp as cpp_model
     qzeros = model[f"{src_name}.qzeros"]
@@ -708,12 +709,12 @@ def convert_q4_bestla_tensor(src_name, dst_name, model, fout, q_config, n_head, 
                                                 weight_dtype="int4" if q_config['bits'] == 4 else "int8",
                                                 group_size=q_config['group_size'],
                                                 alg="sym" if q_config['sym'] else "asym",
-                                                compute_dtype="int8")
+                                                compute_dtype=compute_dtype)
     dst.flatten()[:byte_size].tofile(fout)
     print(f"converting {dst_name} qauntized tensor to bestla q4 block")
 
 
-def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
+def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config, compute_dtype="int8"):
     # unpack weight and repack into 3bits / 4bits BestLA format
     import neural_speed.llama_cpp as cpp_model
     if ".weight" in src_name:
@@ -791,6 +792,6 @@ def convert_to_qx_bestla_tensor(src_name, dst_name, model, fout, q_config):
                                                 weight_dtype=weight_dtype,
                                                 group_size=q_config['group_size'],
                                                 alg="sym" if q_config['sym'] else "asym",
-                                                compute_dtype="int8")
+                                                compute_dtype=compute_dtype)
     dst.flatten()[:byte_size].tofile(fout)
     print(f"convert_to_qx_bestla_tensor: {src_name:>40} -> {dst_name:<40} shape: {shape}, byte_size: {byte_size:<10}")
