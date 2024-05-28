@@ -656,95 +656,58 @@ class gemm_t<
         auto matB_blk = matB.reg
                             .xetla_select<matB_t::block_elems, 1>(
                                 block_id * matB_t::block_elems)
-                            .xetla_format<int8_t>();
+                            .xetla_format<uint8_t>();
 
         auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
             block_id * matB_acc_t::block_elems);
 
-        // 2: int8 includes 2 4bits data.
-        xetla_vector<int32_t, block_size_x_b * block_size_y_b> cvt_blk_i32;
-        if constexpr (
-            compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-          xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk_i8;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) = matB_blk & 0x0f;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
-              cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) << 4;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
-              cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) >> 4;
-          cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(1) =
-              matB_blk.xetla_format<int8_t>() >> 4;
-          cvt_blk_i32 = (cvt_blk_i8.xetla_format<int8_t>());
-        }
-        constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
-
-#pragma unroll
-        for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
-          for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
-            uint32_t offset_y_in_tile = i * block_size_y_b + ii;
-            uint32_t offset_x_in_tile = j * block_size_x_b + jj;
-
-            uint32_t scale_idx =
-                (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
-                offset_x_in_tile;
-            // uint32_t scale_idx =
-            //     (k + (i * num_block_x + j) * matB_acc_t::block_elems) / step;
-
-            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                cvt_blk_i32.xetla_select<step, 1>(jj * block_size_y_b + ii) *
-                scale.reg.xetla_select<1, 1>(scale_idx);
-
-            // sycl::ext::oneapi::experimental::printf(
-            //     "scale[%d] %f \n",
-            //     scale_idx,
-            //     float(sycl::half(scale.reg.xetla_select<1, 1>(scale_idx))));
-          }
-        }
-      }
-    }
-  }
-  /*
-  inline void dequantize(
-      matB_acc_t& matB_acc,
-      matB_t& matB,
-      scale_t& scale,
-      [[maybe_unused]] zero_pt_t& zero_pt) {
-    // no tail, because this is matB
-    constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
-    constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
-#pragma unroll
-    for (uint32_t i = 0; i < num_block_y; ++i) {
-#pragma unroll
-      for (uint32_t j = 0; j < num_block_x; ++j) {
-        int block_id = (i * num_block_x + j);
-        auto matB_blk = matB.reg
-                            .xetla_select<matB_t::block_elems, 1>(
-                                block_id * matB_t::block_elems)
-                            .xetla_format<native_type_t<dtype_b>>();
-
-        auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
-            block_id * matB_acc_t::block_elems);
-
-        // 2: int8 includes 2 4bits data.
+        // int8 includes 2 4bits data.
         using dtype_8bit = std::conditional_t<
             compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP,
             int8_t,
             uint8_t>;
-        xetla_vector<dtype_8bit, matB_acc_t::block_elems> cvt_blk_8bit;
-        if constexpr (
-            compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+        xetla_vector<dtype_8bit, matB_acc_t::block_elems> cvt_blk_i8;
+
 #pragma unroll
-          for (uint32_t shift = 0; shift < sizeof(dtype_b) * 2; shift++) {
-            auto dequant_8bit =
-                cvt_blk_8bit
-                    .xetla_select<matB_t::block_elems, sizeof(dtype_b) * 2>(
-                        shift);
-            dequant_8bit = (matB_blk & 0xf);
-            dequant_8bit = dequant_8bit << 4;
-            dequant_8bit = dequant_8bit >> 4;
-            matB_blk = matB_blk >> 4;
+        for (uint32_t i8_offset = 0; i8_offset < pack_ratio; i8_offset += 2) {
+          uint32_t i4_offset = i8_offset / 2;
+          // lowest 4 bit
+          {
+            auto dequant_i8_low_4bit =
+                cvt_blk_i8.xetla_select<matB_t::block_elems, pack_ratio>(
+                    i8_offset);
+            dequant_i8_low_4bit =
+                matB_blk.xetla_select<matB_t::block_elems, sizeof(dtype_b)>(
+                    i4_offset) &
+                0xf;
+            // Only int8 needs to reserve the sign bit
+            if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+              dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
+              dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
+            }
+          }
+          // highest 4 bit
+          {
+            auto dequant_i8_high_4bit =
+                cvt_blk_i8.xetla_select<matB_t::block_elems, pack_ratio>(
+                    i8_offset + 1);
+            if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+              dequant_i8_high_4bit =
+                  matB_blk
+                      .xetla_select<matB_t::block_elems, sizeof(dtype_b)>(
+                          i4_offset)
+                      .xetla_format<dtype_8bit>() >>
+                  4;
+            } else {
+              dequant_i8_high_4bit =
+                  matB_blk.xetla_select<matB_t::block_elems, sizeof(dtype_b)>(
+                      i4_offset) >>
+                  4;
+            }
           }
         }
 
+        // int8 x scale = fp16
         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
 #pragma unroll
         for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
@@ -759,7 +722,7 @@ class gemm_t<
             //     (k + (i * num_block_x + j) * matB_acc_t::block_elems) / step;
 
             dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                cvt_blk_8bit.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
                 scale.reg.xetla_select<1, 1>(scale_idx);
 
             // sycl::ext::oneapi::experimental::printf(
@@ -771,7 +734,7 @@ class gemm_t<
       }
     }
   }
-  */
+
   /*
   inline void dequantize(
       matB_acc_t & matB_acc,
@@ -784,9 +747,9 @@ class gemm_t<
 
     constexpr uint32_t block_b_y_per_scale = dequant_s / block_size_y_b;
     constexpr uint32_t block_b_x_per_scale = dequant_s / block_size_x_b;
-#pragma unroll
+  #pragma unroll
     for (uint32_t i = 0; i < num_block_y; ++i) {
-#pragma unroll
+  #pragma unroll
       for (uint32_t j = 0; j < num_block_x; ++j) {
         int block_id = (i * num_block_x + j);
         auto matB_blk = matB.reg
@@ -816,7 +779,7 @@ class gemm_t<
           zero_pt_sub.xetla_select<block_size_x_b / 2, 2>(1) =
               zero_pt_vec >> 4;
           xetla_vector<uint8_t, block_size_x_b * block_size_y_b> zero_pt_blk;
-#pragma unroll
+  #pragma unroll
           for (uint32_t row = 0; row < block_size_y_b; row++) {
             zero_pt_blk.xetla_select<block_size_x_b, 1>(row * block_size_x_b)
                 .xetla_format<int8_t>() =
@@ -847,9 +810,9 @@ class gemm_t<
           temp_blk.xetla_select<matB_acc_t::block_elems, vnni_rows>(0) =
               cvt_blk_i32;
 
-#pragma unroll
+  #pragma unroll
           for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
-#pragma unroll
+  #pragma unroll
             for (uint32_t row = 0; row < vnni_rows; row++) {
               temp_blk.xetla_select<block_size_x_b, vnni_rows>(
                   row + block_size_x_b * k * vnni_rows) =
@@ -859,13 +822,13 @@ class gemm_t<
           }
 
           xetla_vector<dtype_scale, block_size_x_b * vnni_rows> scale_blk;
-#pragma unroll
+  #pragma unroll
           for (uint32_t row = 0; row < vnni_rows; row++) {
             scale_blk.xetla_select<block_size_x_b, vnni_rows>(row) =
                 scale_vec;
           }
 
-#pragma unroll
+  #pragma unroll
           for (uint32_t k = 0; k < block_size_y_b; k += vnni_rows) {
             dst_blk.xetla_select<block_size_x_b * vnni_rows, 1>(
                 k * block_size_x_b) =
@@ -874,7 +837,7 @@ class gemm_t<
                 scale_blk;
           }
         } else {
-#pragma unroll
+  #pragma unroll
           for (uint32_t k = 0; k < block_size_y_b; k++) {
             dst_blk.xetla_select<block_size_x_b, 1>(k * block_size_x_b) =
                 cvt_blk_i32.xetla_select<block_size_x_b, 1>(

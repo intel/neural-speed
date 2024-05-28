@@ -32,7 +32,7 @@ class test_col_major {
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024;
-  static constexpr size_t dequant_s = 32;
+  static constexpr size_t dequant_s = 128;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -41,7 +41,7 @@ class test_col_major {
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
-  using data_type_b = int4x2;
+  using data_type_b = int4x8;
   using data_type_c = fp16;
 };
 
@@ -180,7 +180,7 @@ void dequantize_gemv_run(int iter) {
   using data_type_a = typename Test::data_type_a;
   using data_type_b = typename Test::data_type_b;
   using data_type_c = typename Test::data_type_c;
-  using data_type_zero_pt = int4x8;
+  using data_type_zero_pt = data_type_b;
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
   using data_type_acc = float;
@@ -345,10 +345,15 @@ void dequantize_gemv_run(int iter) {
   }
 
   for (unsigned i = 0; i < size_b; ++i) {
-    for (unsigned j = 0; j < sizeof(data_type_b); j++) {
+    if constexpr (std::is_same_v<int4x2, data_type_b>) {
+      B_h[i] = random_uint8();
+#ifdef UT_DEBUG
+      B_h[i] = 0x12;
+#endif
+    } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = 0x11;
+      B_h[i] = 0x01234567;
 #endif
     }
   }
@@ -356,7 +361,7 @@ void dequantize_gemv_run(int iter) {
   for (unsigned i = 0; i < size_scale; ++i) {
     scale_h[i] = random_float();
 #ifdef UT_DEBUG
-    scale_h[i] = i + 1;
+    scale_h[i] = 1;
 #endif
   }
 
