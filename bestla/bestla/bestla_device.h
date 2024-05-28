@@ -20,12 +20,13 @@
 #include "bestla_utils.h"
 #ifdef _WIN32
 #include <windows.h>
+#define FIXED_CACHE 1
 #else
 #include <sched.h>
+#define FIXED_CACHE 0
 #endif
 
 #define FIXED_CACHE_SIZE ((1 << 20) - (128 << 10))
-#define FIXED_CACHE 1
 
 namespace bestla {
 
