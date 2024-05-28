@@ -115,29 +115,25 @@ NE_API size_t ne_used_mem(const struct ne_context* ctx);
 NE_API size_t ne_set_scratch(struct ne_context* ctx, struct ne_scratch scratch);
 
 NE_API struct ne_tensor* ne_new_tensor(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
-                                       size_t size);
+                                       size_t size, enum ne_backend bk);
 
-NE_API struct ne_tensor* ne_new_tensor_1d(struct ne_context* ctx, enum ne_type type, int64_t ne0, size_t size);
+NE_API struct ne_tensor* ne_new_tensor_1d(struct ne_context* ctx, enum ne_type type, int64_t ne0, size_t size,
+                                          enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_new_tensor_2d(struct ne_context* ctx, enum ne_type type, int64_t ne0, int64_t ne1,
-                                          size_t size);
+                                          size_t size, enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_new_tensor_3d(struct ne_context* ctx, enum ne_type type, int64_t ne0, int64_t ne1,
-                                          int64_t ne2, size_t size);
+                                          int64_t ne2, size_t size, enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_new_tensor_4d(struct ne_context* ctx, enum ne_type type, int64_t ne0, int64_t ne1,
-                                          int64_t ne2, int64_t ne3, size_t size);
+                                          int64_t ne2, int64_t ne3, size_t size, enum ne_backend bk);
 
-NE_API struct ne_tensor* ne_new_dev_tensor(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
-                                           size_t size);
-
-NE_API struct ne_tensor* ne_new_dev_tensor_1d(struct ne_context* ctx, enum ne_type type, int64_t ne0, size_t size);
-
-#define d_ne_new_tensor(...) ne_new_tensor(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_1d(...) ne_new_tensor_1d(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_2d(...) ne_new_tensor_2d(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_3d(...) ne_new_tensor_3d(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_4d(...) ne_new_tensor_4d(__VA_ARGS__, NE_SIZE_CALC)
+#define d_ne_new_tensor(...) ne_new_tensor(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_1d(...) ne_new_tensor_1d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_2d(...) ne_new_tensor_2d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_3d(...) ne_new_tensor_3d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_4d(...) ne_new_tensor_4d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
 
 NE_API struct ne_tensor* ne_new_i32(struct ne_context* ctx, int32_t value);
 NE_API struct ne_tensor* ne_new_f32(struct ne_context* ctx, float value);

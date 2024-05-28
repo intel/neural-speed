@@ -1456,13 +1456,13 @@ struct model_model_loader {
     struct ne_tensor* tensor;
     if (lt.ne.size() == 2) {
       if (lt.type == NE_TYPE_BTLA) {
-        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), lt.size);
+        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), lt.size, backend);
       } else {
-        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), NE_SIZE_CALC);
+        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), NE_SIZE_CALC, backend);
       }
     } else {
       MODEL_ASSERT(lt.ne.size() == 1);
-      tensor = ne_new_tensor_1d(ne_ctx, lt.type, lt.ne.at(0), NE_SIZE_CALC);
+      tensor = ne_new_tensor_1d(ne_ctx, lt.type, lt.ne.at(0), NE_SIZE_CALC, backend);
     }
     ne_set_name(tensor, lt.name.c_str());
     MODEL_ASSERT(lt.ne_tensor == nullptr);  // if this fails, we called get_tensor twice on the same tensor

@@ -173,12 +173,12 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
 
-  struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC);
+  struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_CPU);
   ne_set_name(embd, "embd");
 
 #ifdef NS_SYCL
   size_t memsize = size_t(seq_len_sum) * sizeof(model_token);
-  struct ne_tensor* embd_dev = ne_new_dev_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC);
+  struct ne_tensor* embd_dev = ne_new_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_SYCL);
   int cpy_off = 0;
   for (int i = 0; i < batch_size; ++i) {
     bestla_device_memcpy_sync(static_cast<model_token*>(embd_dev->data) + cpy_off, inputs[i].tokens,
@@ -271,7 +271,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     // self-attention
     const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
     struct ne_tensor* KQV_merged_contiguous =
-        ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC);
+        ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_CPU);
     if (!run_mha_reordered) {
       // store key and value to memory
       // important:
@@ -527,7 +527,8 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
         }
       } else {
         // for-loop MOE (deal with sequence one by one)
-        struct ne_tensor* moe_out = ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC);
+        struct ne_tensor* moe_out =
+            ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_CPU);
         size_t off_sl = 0;
         for (int bi = 0; bi < batch_size; ++bi) {
           const int moe_sl = n_tokens[bi];

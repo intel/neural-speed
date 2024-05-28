@@ -109,11 +109,11 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
         k_cache = d_ne_new_tensor_4d(model->ctx, NE_TYPE_F16, head_size, n_ctx, heads_kv, batch_size * beam_size);
         v_cache = d_ne_new_tensor_4d(model->ctx, NE_TYPE_F16, n_ctx, head_size, heads_kv, batch_size * beam_size);
       } else if (wtype == NE_TYPE_BTLA) {
-        k_cache = ne_new_tensor_1d(model->ctx, wtype_alloc, layer_ne_k + NE_ALIGNMENT, NE_SIZE_CALC);
+        k_cache = ne_new_tensor_1d(model->ctx, wtype_alloc, layer_ne_k + NE_ALIGNMENT, NE_SIZE_CALC, NE_BACKEND_CPU);
         const auto k_align_off = reinterpret_cast<uintptr_t>(k_cache->data) % NE_ALIGNMENT;
         k_cache = ne_view_1d(model->ctx, k_cache, layer_ne_k, NE_ALIGNMENT - k_align_off);
         k_cache->type = wtype;
-        v_cache = ne_new_tensor_1d(model->ctx, wtype_alloc, layer_ne_v + NE_ALIGNMENT, NE_SIZE_CALC);
+        v_cache = ne_new_tensor_1d(model->ctx, wtype_alloc, layer_ne_v + NE_ALIGNMENT, NE_SIZE_CALC, NE_BACKEND_CPU);
         const auto v_align_off = reinterpret_cast<uintptr_t>(v_cache->data) % NE_ALIGNMENT;
         v_cache = ne_view_1d(model->ctx, v_cache, layer_ne_v, NE_ALIGNMENT - v_align_off);
         v_cache->type = wtype;
@@ -126,11 +126,13 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
     const bool run_mha_reordered = model->layers[0].k_cache->type == NE_TYPE_BTLA;
     fprintf(stderr, "%s: run_mha_reordered = %d\n", __func__, run_mha_reordered);
   } else {
-    cache.k = ne_new_tensor_1d(cache.ctx, wtype_alloc, n_layer * layer_ne_k + NE_ALIGNMENT, NE_SIZE_CALC);
+    cache.k =
+        ne_new_tensor_1d(cache.ctx, wtype_alloc, n_layer * layer_ne_k + NE_ALIGNMENT, NE_SIZE_CALC, NE_BACKEND_CPU);
     const auto k_align_off = reinterpret_cast<uintptr_t>(cache.k->data) % NE_ALIGNMENT;
     cache.k = ne_view_1d(cache.ctx, cache.k, n_layer * layer_ne_k, NE_ALIGNMENT - k_align_off);
     cache.k->type = wtype;
-    cache.v = ne_new_tensor_1d(cache.ctx, wtype_alloc, n_layer * layer_ne_v + NE_ALIGNMENT, NE_SIZE_CALC);
+    cache.v =
+        ne_new_tensor_1d(cache.ctx, wtype_alloc, n_layer * layer_ne_v + NE_ALIGNMENT, NE_SIZE_CALC, NE_BACKEND_CPU);
     const auto v_align_off = reinterpret_cast<uintptr_t>(cache.v->data) % NE_ALIGNMENT;
     cache.v = ne_view_1d(cache.ctx, cache.v, n_layer * layer_ne_v, NE_ALIGNMENT - v_align_off);
     cache.v->type = wtype;
@@ -140,7 +142,7 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
 
   if (shift_roped_k) {  // prepare rope helper for fused-attention
     const auto cossin_dtype = wtype == NE_TYPE_BTLA ? NE_TYPE_F16 : wtype;
-    cache.cossin = ne_new_tensor_1d(cache.ctx, cossin_dtype, head_size, NE_SIZE_CALC);
+    cache.cossin = ne_new_tensor_1d(cache.ctx, cossin_dtype, head_size, NE_SIZE_CALC, NE_BACKEND_CPU);
     ne_set_name(cache.cossin, "cossin(-1)");
     float freq_base = hparams.freq_base;
     float theta = -1 * hparams.freq_scale;
@@ -1161,7 +1163,7 @@ int model_apply_lora_from_file_internal(struct model_context* ctx, const char* p
     }
     ne_tensor* lora_tensor;
     if (n_dims == 2) {
-      lora_tensor = ne_new_tensor_2d(lora_ctx, wtype, ne[0], ne[1], NE_SIZE_CALC);
+      lora_tensor = ne_new_tensor_2d(lora_ctx, wtype, ne[0], ne[1], NE_SIZE_CALC, NE_BACKEND_CPU);
     } else {
       fprintf(stderr, "%s: unsupported tensor dimension %d\n", __func__, n_dims);
       return 1;
@@ -1490,11 +1492,13 @@ size_t model_copy_state_data(struct model_context* ctx, uint8_t* dst) {
       ne_cgraph gf{};
       gf.n_threads = 1;
 
-      ne_tensor* kout3d = ne_new_tensor_3d(cpy_ctx, kv_self.k->type, n_embd, kv_ntok, n_layer, NE_SIZE_CALC);
+      ne_tensor* kout3d =
+          ne_new_tensor_3d(cpy_ctx, kv_self.k->type, n_embd, kv_ntok, n_layer, NE_SIZE_CALC, NE_BACKEND_CPU);
       kout3d->data = out;
       out += ne_nbytes(kout3d);
 
-      ne_tensor* vout3d = ne_new_tensor_3d(cpy_ctx, kv_self.v->type, kv_ntok, n_embd, n_layer, NE_SIZE_CALC);
+      ne_tensor* vout3d =
+          ne_new_tensor_3d(cpy_ctx, kv_self.v->type, kv_ntok, n_embd, n_layer, NE_SIZE_CALC, NE_BACKEND_CPU);
       vout3d->data = out;
       out += ne_nbytes(vout3d);
 
@@ -1603,11 +1607,13 @@ size_t model_set_state_data(struct model_context* ctx, uint8_t* src) {
       ne_cgraph gf{};
       gf.n_threads = 1;
 
-      ne_tensor* kin3d = ne_new_tensor_3d(cpy_ctx, kv_self.k->type, n_embd, kv_ntok, n_layer, NE_SIZE_CALC);
+      ne_tensor* kin3d =
+          ne_new_tensor_3d(cpy_ctx, kv_self.k->type, n_embd, kv_ntok, n_layer, NE_SIZE_CALC, NE_BACKEND_CPU);
       kin3d->data = reinterpret_cast<void*>(inp);
       inp += ne_nbytes(kin3d);
 
-      ne_tensor* vin3d = ne_new_tensor_3d(cpy_ctx, kv_self.v->type, kv_ntok, n_embd, n_layer, NE_SIZE_CALC);
+      ne_tensor* vin3d =
+          ne_new_tensor_3d(cpy_ctx, kv_self.v->type, kv_ntok, n_embd, n_layer, NE_SIZE_CALC, NE_BACKEND_CPU);
       vin3d->data = reinterpret_cast<void*>(inp);
       inp += ne_nbytes(vin3d);
 
@@ -1957,7 +1963,7 @@ static ne_tensor* ne_model_kv_cache_seq_concat(struct ne_cgraph* cgraph, struct 
       continue;
     } else {
       if (dst == nullptr) {
-        dst = ne_new_tensor_4d(nectx, cache->type, ne0, ne1, ne2, ne3, NE_SIZE_CALC);
+        dst = ne_new_tensor_4d(nectx, cache->type, ne0, ne1, ne2, ne3, NE_SIZE_CALC, NE_BACKEND_CPU);
       }
       struct ne_tensor* dst_i = ne_view_4d(nectx, dst, ne0, ne1, ne2, cont_bs, elem_size * ne0, elem_size * ne0 * ne1,
                                            elem_size * ne0 * ne1 * ne2, dst_off);
