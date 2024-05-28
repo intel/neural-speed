@@ -20,7 +20,7 @@
 
 enum llama_model {
   LLAMA_UNKNOWN,
-  Tiny_llama,
+  TINY_LLAMA,
   LLAMA_7B,
   LLAMA_13B,
   LLAMA_30B,
