@@ -19,7 +19,11 @@
 // #define UT_DEBUG
 using namespace gpu::xetla;
 // The number of times the kernel is executed
+#ifdef UT_DEBUG
+constexpr int ITER = 1;
+#else
 constexpr int ITER = 200;
+#endif
 
 class test_col_major {
  public:
@@ -41,7 +45,7 @@ class test_col_major {
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
-  using data_type_b = int4x8;
+  using data_type_b = int4x2;
   using data_type_c = fp16;
 };
 
@@ -197,7 +201,7 @@ void dequantize_gemv_run(int iter) {
   constexpr size_t size_scale = size_scale_k * size_scale_n;
 
   constexpr size_t size_zero_pt_k = matrix_k / dequant_s;
-  constexpr size_t size_zero_pt_n = matrix_n / 2;
+  constexpr size_t size_zero_pt_n = matrix_n / (2 * sizeof(data_type_zero_pt));
   constexpr size_t size_zero_pt = size_zero_pt_k * size_zero_pt_n;
 
   constexpr size_t size_c = matrix_m * matrix_n;
@@ -225,7 +229,7 @@ void dequantize_gemv_run(int iter) {
   using tile_shape =
       xetla::group::tile_shape_t<wg_tile_n, wg_tile_m, sg_tile_n, sg_tile_m>;
   static constexpr uint32_t periodic_sync_interval = 0;
-  static constexpr uint32_t prefetch_distance = 0;
+  static constexpr uint32_t prefetch_distance = 1;
 
   using mem_desc_a_t = xetla::mem_desc_t<
       data_type_a,
@@ -361,7 +365,7 @@ void dequantize_gemv_run(int iter) {
   for (unsigned i = 0; i < size_scale; ++i) {
     scale_h[i] = random_float();
 #ifdef UT_DEBUG
-    scale_h[i] = 1;
+    scale_h[i] = i + 1;
 #endif
   }
 
@@ -442,7 +446,11 @@ void dequantize_gemv_run(int iter) {
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");
+#ifdef UT_DEBUG
+  int constexpr warm = 0;
+#else
   int constexpr warm = 100;
+#endif
   try {
     for (int i = 0; i < iter + warm; i++) {
       if (i >= warm)

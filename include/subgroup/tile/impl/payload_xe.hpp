@@ -407,7 +407,7 @@ struct mem_payload_t<
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
   using mem_desc_t =
       mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>;
-  using dtype = dtype_;
+  using dtype = native_type_t<dtype_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = memory_layout_;
@@ -422,36 +422,26 @@ struct mem_payload_t<
   static constexpr uint32_t tile_size_x = tile_desc::tile_size_x;
   static constexpr uint32_t tile_size_y = tile_desc::tile_size_y;
   static_assert(
-      tile_size_y == 1,
-      "For tile_size_y > 1 case, please use 2d block message! ");
+      (tile_size_y == 1 && memory_layout == mem_layout::row_major) ||
+          (tile_size_x == 1 && memory_layout == mem_layout::col_major),
+      "For tile_size_y > 1 or tile_size_x > 1 case, please use 2d block message! ");
   using this_payload_t =
       mem_payload_t<mem_desc_t, tile_desc, msg_type::block_1d, arch_tag>;
+  static constexpr bool mem_transpose = memory_layout == mem_layout::col_major;
 
  public:
-  static constexpr uint32_t bytes_per_row =
-      memory_layout == mem_layout::row_major ? tile_size_x * sizeof(dtype)
-                                             : tile_size_y * sizeof(dtype);
-  using mem_dtype = typename std::conditional<
-      (bytes_per_row % sizeof(uint64_t) == 0) &&
-          (alignment_in_bytes % sizeof(uint64_t) == 0),
-      uint64_t,
-      typename std::conditional<
-          (bytes_per_row % sizeof(uint32_t) == 0),
-          uint32_t,
-          dtype>::type>::type;
-
-  static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
-
   uint64_t base_offset;
-  mem_dtype* base_ptr;
+  dtype* base_ptr;
   uint32_t pitch_in_bytes;
 
   inline mem_payload_t(mem_desc_t& mem_tdesc) {
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
-    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
-    base_ptr = (mem_dtype*)mem_tdesc.base.base;
+    base_offset = mem_transpose
+        ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
+        : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+    base_ptr = (dtype*)mem_tdesc.base.base;
   }
 
   inline mem_payload_t(
@@ -464,16 +454,20 @@ struct mem_payload_t<
     pitch_in_bytes = surface_pitch * sizeof(dtype);
     uint32_t offset_x = surface_offset_x;
     uint32_t offset_y = surface_offset_y;
-    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
-    base_ptr = (mem_dtype*)p;
+    base_offset = mem_transpose
+        ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
+        : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+    base_ptr = (dtype*)p;
   }
 
   __XETLA_API void init(mem_desc_t& mem_tdesc) {
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
-    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
-    base_ptr = (mem_dtype*)mem_tdesc.base.base;
+    base_offset = mem_transpose
+        ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
+        : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+    base_ptr = (dtype*)mem_tdesc.base.base;
   }
 
   __XETLA_API void init(
@@ -486,8 +480,10 @@ struct mem_payload_t<
     pitch_in_bytes = surface_pitch * sizeof(dtype);
     uint32_t offset_x = surface_offset_x;
     uint32_t offset_y = surface_offset_y;
-    base_offset = offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
-    base_ptr = (mem_dtype*)p;
+    base_offset = mem_transpose
+        ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
+        : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
+    base_ptr = (dtype*)p;
   }
 
   inline mem_payload_t(const this_payload_t& rhs) {
@@ -1071,8 +1067,7 @@ struct mem_payload_t<
     msg_type::block_2d,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpg)>> {
-  using dtype =
-      std::conditional_t<std::is_same_v<dtype_, int4x2>, uint8_t, dtype_>;
+  using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
   using tile_desc = tile_desc_;

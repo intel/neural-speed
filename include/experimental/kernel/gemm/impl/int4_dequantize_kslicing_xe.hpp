@@ -622,8 +622,8 @@ class gemm_universal_t<
     int start_x_scale = start_n;
     int start_y_scale = start_k / dequant_s;
 
-    int start_x_zero_pt = start_n / pack_ratio;
-    int start_y_zero_pt = start_k / dequant_s;
+    int start_x_zero_pt = start_n;
+    int start_y_zero_pt = start_k / (dequant_s * pack_ratio);
 
     // set up arguments
     uint32_t gemm_slm_base = slm_base;
