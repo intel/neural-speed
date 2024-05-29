@@ -1154,7 +1154,7 @@ class UT_ORT_NBits {
     using Launcher =
         wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
-    using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
+    using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
     Launcher launcher;
     const char *qfile = "int_weight.bin", *sfile = "scales.bin", *zfile = "zeros.bin";
     auto qdata = ut::readFile2Buffer<int8_t>(qfile);

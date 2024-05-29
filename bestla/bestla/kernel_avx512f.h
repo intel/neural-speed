@@ -7784,11 +7784,6 @@ static inline BTLA_CODE gemv_7bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 #endif
 }  // namespace vnni
 
-#ifdef __GNUC__
-#pragma GCC pop_options
-#else
-#endif
-
 template <typename T>
 static inline BTLA_CODE mul(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
   int constexpr VLen = 16;
@@ -7834,6 +7829,10 @@ static inline BTLA_CODE add(const T* src0ptr, const T* src1ptr, T* dstptr, size_
   }
   return BTLA_CODE::Success;
 }
+#ifdef __GNUC__
+#pragma GCC pop_options
+#else
+#endif
 #endif
 }  // namespace avx512f
 }  // namespace kernel
