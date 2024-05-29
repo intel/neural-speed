@@ -634,7 +634,7 @@ class SchedulerKBlockS : public SchedulerBase<_GemmCore_T> {
     } else {
       this->mBlock[1] = this->mThdSize[1];
     }
-    size_t csize = static_cast<size_t>(mBlock[0]) * mBlock[1] * this->mEleSize[2];
+    size_t csize = static_cast<size_t>(this->mBlock[0]) * this->mBlock[1] * this->mEleSize[2];
     auto rawk = static_cast<int>((valid_total - csize) / 2 /
                                  (this->mStep[0] * this->mEleSize[0] +
                                   float(CorSize * (this->mStep[0] + this->mBlock[1])) / this->mKBlock +
