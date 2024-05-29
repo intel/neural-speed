@@ -641,6 +641,14 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   // update kv token count
   lctx.model.kv_self.n = n_cached;
+  float* logptr = NULL;
+  if (inpL->backend == NE_BACKEND_SYCL) {
+    struct ne_tensor* inpL_host = ne_new_tensor_1d(ctx0, NE_TYPE_I8, inpL->size, NE_SIZE_CALC, NE_BACKEND_CPU);
+    logptr = (float*)inpL_host->data;
+    bestla_device_memcpy_sync(logptr, inpL->data, inpL->size, ctx0->dev_queue);
+  } else {
+    logptr = (float*)inpL->data;
+  }
 
   // extract logits
   {
@@ -648,7 +656,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
     if (lctx.logits_all) {
       logits_out.resize(n_vocab * seq_len_sum);
-      memcpy(logits_out.data(), reinterpret_cast<float*>(ne_get_data(inpL)), sizeof(float) * n_vocab * seq_len_sum);
+      memcpy(logits_out.data(), logptr, sizeof(float) * n_vocab * seq_len_sum);
     } else {
       // return result for just the last token
       logits_out.resize(n_vocab * batch_size);
@@ -656,12 +664,12 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
           reinterpret_cast<bestla::parallel::IThreading*>(bestla_get_thread_handle());
       threading->parallel_for_collapse(0, batch_size, 1, [&](int i) {
         size_t bs_off = std::accumulate(n_tokens.begin(), n_tokens.begin() + i, 0) * n_vocab;
-        memcpy(logits_out.data() + (i * n_vocab),
-               reinterpret_cast<float*>(ne_get_data(inpL)) + bs_off + (n_vocab * (n_tokens[i] - 1)),
+        memcpy(logits_out.data() + (i * n_vocab), logptr + bs_off + (n_vocab * (n_tokens[i] - 1)),
                sizeof(float) * n_vocab);
       });
     }
   }
+
   // extract embeddings
   if (!lctx.embedding.empty()) {
     auto& embedding_out = lctx.embedding;

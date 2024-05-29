@@ -16,7 +16,7 @@
 #ifdef BTLA_SYCL
 #include <array>
 
-#include "bestla_utils.h"
+#include "bestla/bestla_utils.h"
 #include <sycl/sycl.hpp>
 
 namespace bestla {

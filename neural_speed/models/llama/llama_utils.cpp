@@ -112,7 +112,10 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   if (!model.ctx) {
     throw format("ne_init() failed");
   }
-
+  ne_ctx->dev_mem_buffer = ctx->device_buffer;
+  ne_ctx->dev_offs = ctx->device_buffer_offs;
+  ne_ctx->dev_size = ctx->device_buffer_size;
+  ne_ctx->dev_queue = ctx->device_queue;
   ml->ne_ctx = ne_ctx;
 
   const int i_gpu_start = n_layer - n_gpu_layer;
@@ -172,7 +175,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
     model.others[0] = ml->get_tensor("tok_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
-                                     n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+                                     n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_SYCL);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
@@ -239,7 +242,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   }
 
   ml->load_all_data(progress_callback, progress_callback_user_data, use_mlock ? &lctx.model.mlock_mmap : nullptr);
-
+  ctx->device_buffer_offs = ml->ne_ctx->dev_offs;
   if (progress_callback) {
     progress_callback(1.0f, progress_callback_user_data);
   }

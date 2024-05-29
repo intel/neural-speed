@@ -56,10 +56,10 @@ class StorageWeightKBlockNInteger {
     mCStep = _hoststor.CStep();
 
     if (_hoststor.template ZPtr<void>()) {
-      mZpSize = mCSize * utils::bestla_dtype_size(mZpT);
+      mZpSize = _hoststor.CSize() * utils::bestla_dtype_size(mZpT);
     }
     if (_hoststor.template RPtr<void>()) {
-      mRedSize = mCSize * utils::bestla_dtype_size(mRedT);
+      mRedSize = _hoststor.CSize() * utils::bestla_dtype_size(mRedT);
     }
     // TODO DQ,shuffle support
   }

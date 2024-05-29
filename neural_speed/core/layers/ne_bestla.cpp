@@ -167,6 +167,7 @@ void bestla_add(int batch, int vsize, const float* tensor, const float* vector, 
 
 #ifdef NS_SYCL
 #include "bestla/sycl/sycl_device.h"
+#include "bestla/sycl/sycl_storage.h"
 void* bestla_create_device(bool profile) {
   auto ptr = new sycl_device::SyclDevice(profile);
   ptr->print();
@@ -229,6 +230,83 @@ void bestla_device_sync(void* queue) {
   if (queue) {
     auto ptr = (sycl::queue*)queue;
     ptr->wait();
+  }
+}
+
+size_t bestla_device_storage_size() { return sizeof(sycl_storage::StorageWeightKBlockNInteger); }
+
+void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, void* device_queue) {
+  auto ptr = storage::gemm::PackedWeightParser::deserialBuffer(const_cast<void*>(hoststor));
+  GetCPUDevice();
+  if (ptr && devstor && deviceptr) {
+    auto dstor = (sycl_storage::StorageWeightKBlockNInteger*)devstor;
+    if (ptr->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
+      auto sptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(ptr);
+      auto transtor = sptr->toTrans();
+      utils::avector<int8_t> buffer1(transtor.mSize);
+      transtor.assign(buffer1.data());
+      auto coretype = sptr->mCoreId;
+      auto NTile = gemm::CoreAttr::get_mask_val(sptr->mCoreId, gemm::CoreAttr::NTILE_MASK, gemm::CoreAttr::NTILE_SHIFT);
+      auto PackRow = gemm::CoreAttr::get_packrow(sptr->mCoreId);
+      auto CType = gemm::CoreAttr::get_comp(sptr->mCoreId);
+      auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));
+      if (btype == gemm::CompType::tFP32 && PackRow == 1) {
+        if (NTile == tAVX512F::NTILE && _cd->AVX512F()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAVX512F, tAVX512F::ISA> proB;
+          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        } else if (NTile == tAVX2::NTILE && _cd->AVX2()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAVX2, tAVX2::ISA> proB;
+          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        }
+      }
+      if (btype == gemm::CompType::tS8 && PackRow == 4) {
+        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAMX_INT8_SS_KBlock, tAMX_INT8_SS_KBlock::ISA> proB;
+          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock, tAVX512_VNNI_KBlock::ISA> proB;
+          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock, tAVX_VNNI_KBlock::ISA> proB;
+          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        }
+      }
+      if (btype == gemm::CompType::tBF16 && PackRow == 2) {
+        if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
+          static prologue_b::gemm::WeightKBlockNInteger<tAMX_BF16, tAMX_BF16::ISA> proB;
+          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        }
+      }
+      *dstor = sycl_storage::StorageWeightKBlockNInteger(transtor);
+      dstor->assign((int8_t*)deviceptr);
+      dstor->fromHost(transtor, (sycl::queue*)device_queue);
+    }
+  }
+}
+
+#include "bestla/sycl/sycl_gemm.h"
+#include "bestla/sycl/sycl_prologue_b.h"
+#include "bestla/sycl/sycl_wrapper.h"
+template <class GCT>
+using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
+template <class GCT>
+using ProBTransT = sycl_prologue_b::WeightS4Trans<GCT, float>;
+template <class GCT>
+using EpiT = sycl_epilogue::OutputBase<GCT, float>;
+void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda,
+                                  int ldo, void* workspace, void* queue) {
+  using GemmCore = sycl_gemm::xve::DefaultSGemmCore;
+  auto dstor = (sycl_storage::StorageWeightKBlockNInteger*)weiptr;
+  if (_m == 1) {
+    using ProB = ProBTransT<GemmCore>;
+    auto e_esimd = ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
+                              dstor->mBlockSize, (sycl::queue*)queue);
+  } else {
+    using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;
+    utils::GemmProblem gp(1, _m, _n, _k);
+    auto e_esimd = KernelTLauncher::compute(
+        (sycl::queue*)queue, _m, _n, _k, dstor->mBlockSize,
+        {{activation, lda}, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, {output, ldo}});
   }
 }
 #endif

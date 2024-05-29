@@ -40,6 +40,7 @@ else()
 endif()
 
 if(NS_SYCL)
+  target_compile_definitions(ne_layers PRIVATE BTLA_SYCL)
   target_link_libraries(ne_layers PRIVATE IntelSYCL::SYCL_CXX)
 endif()
 

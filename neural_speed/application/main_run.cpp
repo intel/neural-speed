@@ -37,6 +37,8 @@
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_utils.h"
 
+#include "core/ne_bestla.h"
+
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <signal.h>
 #include <unistd.h>
@@ -134,7 +136,7 @@ int main(int argc, char** argv) {  // NOLINT
   }
 
   model_init_backend();
-
+  bestla_set_threads(params.n_threads);
   model_context* ctx;
   g_ctx = &ctx;
 

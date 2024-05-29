@@ -1503,16 +1503,22 @@ struct model_model_loader {
 
     size_t done_size = 0;
     for (model_load_tensor& lt : tensors_map.tensors) {
-      if (lt.ne_tensor->backend != NE_BACKEND_CPU) {
-        continue;
-      }
       if (progress_callback) {
         progress_callback((float)done_size / data_size, progress_callback_user_data);
       }
       MODEL_ASSERT(lt.ne_tensor);  // unused tensors should have been caught by load_data already
       lt.data = (uint8_t*)lt.ne_tensor->data;
-      load_data_for(lt);
-      lt.ne_tensor->data = lt.data;
+      if (lt.ne_tensor->backend == NE_BACKEND_CPU) {
+        load_data_for(lt);
+        lt.ne_tensor->data = lt.data;
+      } else {
+        lt.data = bestla::utils::amalloc<uint8_t>(lt.ne_tensor->size);
+        load_data_for(lt);
+        void* dptr = NULL;
+        memcpy(&dptr, lt.ne_tensor->padding, sizeof(dptr));
+        bestla_device_load_storage(lt.data, lt.ne_tensor->data, dptr, ne_ctx->dev_queue);
+        bestla::utils::afree(lt.data);
+      }
       done_size += lt.size;
       if (use_mmap && lmlock) {
         lmlock->grow_to(done_size);

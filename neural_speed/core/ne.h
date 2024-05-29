@@ -204,6 +204,9 @@ struct ne_cgraph {
   size_t work_size;
   struct ne_tensor* work;
 
+  size_t dev_work_size;
+  struct ne_tensor* dev_work;
+
   struct ne_tensor* nodes[NE_MAX_NODES];
   struct ne_tensor* grads[NE_MAX_NODES];
   struct ne_tensor* leafs[NE_MAX_NODES];
@@ -239,6 +242,11 @@ struct ne_compute_params {
   // work buffer for all threads
   size_t wsize;
   void* wdata;
+
+  size_t dev_wsize;
+  void* dev_wdata;
+
+  void* dev_queue;
 };
 
 #ifdef __cplusplus
