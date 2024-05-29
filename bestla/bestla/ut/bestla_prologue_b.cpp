@@ -535,7 +535,7 @@ class UT_ShuffleIndices {
           wrapper::gemm::LauncherBase<GemmCore::ISA, GemmCore, prologue_a::gemm::ShuffleActivationKBlockBaseF32,
                                       prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
       static Launcher kernel;
-      auto rordA = kernel.mProA.createReorderStorage(m, k, blocksize);
+      auto rordA = Launcher::PrologueA::createReorderStorage(m, k, blocksize);
       avector<int8_t> bufA(rordA.mSize);
       rordA.assign(bufA.data());
       typename Launcher::Param args{
@@ -660,7 +660,7 @@ class UT_CompFp32 {
 
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
-    auto reduceA = launcher.mProA.createStorage(m, k, blocksize);
+    auto reduceA = Launcher::PrologueA::createStorage(m, k, blocksize);
     utils::avector<int8_t> bufferA(packedw.mSize);
     reduceA.assign(bufferA.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
@@ -671,7 +671,7 @@ class UT_CompFp32 {
     launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
 
-    launcher.mProA.reduce({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
+    Launcher::PrologueA::reduce<ISA>({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &reduceA}, {&packedw}, {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
@@ -770,12 +770,12 @@ class UT_CompInt8 {
       ut_newkblock_pc<gemm::ICoreRowNAvx2vnni<24, 4>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
       ut_newkblock_pc<gemm::ICoreRowNAvx2vnni<24, 4>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
 
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
-      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
-      ut_newkblock_pc<gemm::ICoreRowNAvx2vnniSS<24, 2>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
-      ut_newkblock_pc<gemm::ICoreRowNAvx2vnniSS<24, 2>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 1>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 1>>(4, 4096, 4096, 64, qtype, BTLA_DTYPE::BF16);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 1>>(8, 4096, 4096, 128, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock<gemm::ICoreRowNAvx2vnniKBlockSS<24, 1>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::DQ8_BNB);
+      ut_newkblock_pc<gemm::ICoreRowNAvx2vnniSS<24, 1>>(1, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
+      ut_newkblock_pc<gemm::ICoreRowNAvx2vnniSS<24, 1>>(8, 4096, 4096, 4096, qtype, BTLA_DTYPE::F32, true);
     }
     if (_cd->AVX_VNNI()) {
       ut_newkblock<gemm::ICoreRowNAvxvnniKBlock<24, 2>>(1, 4096, 4096, 32, qtype, BTLA_DTYPE::F32, true);
@@ -866,7 +866,7 @@ class UT_CompInt8 {
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
-    auto quanA = launcher.mProA.createStorage(m, k, blocksize, isAsym);
+    auto quanA = Launcher::PrologueA::createStorage(m, k, blocksize, isAsym);
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     GemmProblem gp(1, m, n, k, blocksize);
@@ -919,7 +919,7 @@ class UT_CompInt8 {
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
-    auto quanA = launcher.mProA.createStorage(m, k, blocksize, isAsym);
+    auto quanA = Launcher::PrologueA::createStorage(m, k, blocksize, isAsym);
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     GemmProblem gp(1, m, n, k, blocksize);
@@ -1097,7 +1097,7 @@ class UT_ORT_NBits {
     fill_buffer_randn(scalesB.data(), scalesB.size(), 0.001f, 0.005f);
     avector<float> reduceA(m * blks, 0.f);
 
-    auto rA = launcher.mProA.createStorage(m, k, blocksize);
+    auto rA = Launcher::PrologueA::createStorage(m, k, blocksize);
     avector<int8_t> tmpA(rA.mSize);
     if (isasym) {
       for (size_t i = 0; i < m; i++) {
@@ -1106,7 +1106,8 @@ class UT_ORT_NBits {
         }
       }
       rA.assign(tmpA.data());
-      launcher.mProA.reduce({matAf32.data(), k, &rA}, m, k, blocksize, UT_Threading::get());  // for reduce UT
+      Launcher::PrologueA::template reduce<ISA>({matAf32.data(), k, &rA}, m, k, blocksize,
+                                                UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear
     }
@@ -1171,7 +1172,7 @@ class UT_ORT_NBits {
     int blks = updiv(k, blocksize);
     avector<float> reduceA(m * blks, 0.f);
 
-    auto rA = launcher.mProA.createStorage(m, k, blocksize);
+    auto rA = Launcher::PrologueA::createStorage(m, k, blocksize);
     avector<int8_t> tmpA(rA.mSize);
     if (isasym) {
       for (size_t i = 0; i < m; i++) {
@@ -1180,7 +1181,8 @@ class UT_ORT_NBits {
         }
       }
       rA.assign(tmpA.data());
-      launcher.mProA.reduce({matAf32.data(), k, &rA}, m, k, blocksize, UT_Threading::get());  // for reduce UT
+      Launcher::PrologueA::template reduce<ISA>({matAf32.data(), k, &rA}, m, k, blocksize,
+                                                UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear
     }

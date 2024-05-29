@@ -258,13 +258,13 @@ class NBitsHelper {
 }  // namespace gemv_nbits
 
 namespace gemm {
-template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
+template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T> class _PrologueA_T,
           template <class _T, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
 class LauncherBase {
  public:
   using GemmCore = _GemmCore_T;
   static constexpr BTLA_ISA ISA = _RT_ISA_T;
-  using PrologueA = _PrologueA_T<GemmCore, _RT_ISA_T>;
+  using PrologueA = _PrologueA_T<GemmCore>;
   using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
   using Epilogue = _Epilogue_T;
   using AType = typename GemmCore::AType;
@@ -281,7 +281,6 @@ class LauncherBase {
     const EpiParam paramC;
   };
   _GemmCore_T mGemmCore;
-  PrologueA mProA;
   PrologueB mProB;
 
   class GEMVWrapper {
@@ -290,13 +289,11 @@ class LauncherBase {
       if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T, _RT_ISA_T>>) {
         return false;
       }
-      if constexpr (!std::is_same_v<PrologueA,
-                                    prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>> &&
-                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>> &&
-                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T, _RT_ISA_T>> &&
-                    !std::is_same_v<PrologueA,
-                                    prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T, _RT_ISA_T>> &&
-                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationBase<_GemmCore_T, _RT_ISA_T>>) {
+      if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T>> &&
+                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationKBlockBaseF32<_GemmCore_T>> &&
+                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T>> &&
+                    !std::is_same_v<PrologueA, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T>> &&
+                    !std::is_same_v<PrologueA, prologue_a::gemm::ActivationBase<_GemmCore_T>>) {
         return false;
       }
 
@@ -394,8 +391,7 @@ class LauncherBase {
                                                      GemmCore::NTILE, _param.paramC.param2, StackTmp, TmpSize);
           } else {
             const float* Aptr = _param.paramA.A;
-            if constexpr (std::is_same_v<PrologueA,
-                                         prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
+            if constexpr (std::is_same_v<PrologueA, prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T>>) {
               if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
                 Aptr = _param.paramA.reordered->template APtr<float>();
               }
@@ -418,8 +414,7 @@ class LauncherBase {
                                                      (_config.size[1] - in), _param.paramC.param2, StackTmp, TmpSize);
           } else {
             const float* Aptr = _param.paramA.A;
-            if constexpr (std::is_same_v<PrologueA,
-                                         prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T, _RT_ISA_T>>) {
+            if constexpr (std::is_same_v<PrologueA, prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T>>) {
               if (_param.paramA.reordered && _param.paramA.reordered->template APtr<float>()) {
                 Aptr = _param.paramA.reordered->template APtr<float>();
               }
@@ -513,8 +508,8 @@ class LauncherBase {
         if (k_paddedle) {
           AType* aptr_cache = tmpA;
           int acache_step = 0;
-          mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_paddedle,
-                              (blk_m + i + _config.loc[0]), iterk, tmpcache, _config.tmpcachesize);
+          PrologueA::template getActivation<ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain, k_paddedle,
+                                                 (blk_m + i + _config.loc[0]), iterk, tmpcache, _config.tmpcachesize);
           mGemmCore.forward(aptr_cache, bptr_cache, cptr_cache, m_remain, n_padded, k_paddedle,
                             acache_step * sizeof(AType), bcache_stride, ccache_stride, iterk, tmpcache,
                             _config.tmpcachesize);
@@ -523,8 +518,9 @@ class LauncherBase {
         if (k_tail) {
           AType* aptr_cache = tmpA;
           int acache_step = 0;
-          mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_tail, (blk_m + i + _config.loc[0]),
-                              iterk + k_paddedle, tmpcache, _config.tmpcachesize);
+          PrologueA::template getActivation<ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain, k_tail,
+                                                 (blk_m + i + _config.loc[0]), iterk + k_paddedle, tmpcache,
+                                                 _config.tmpcachesize);
           mGemmCore.forward(aptr_cache, bptr_cache + k_paddedle * GemmCore::NTILE, cptr_cache, m_remain, n_padded,
                             GemmCore::KTILE, acache_step * sizeof(AType), bcache_stride, ccache_stride,
                             iterk + k_paddedle, tmpcache, _config.tmpcachesize);
@@ -536,13 +532,13 @@ class LauncherBase {
   }
 };
 
-template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T, BTLA_ISA> class _PrologueA_T,
+template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T> class _PrologueA_T,
           template <class _T, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
 class LauncherIntKBlock {
  public:
   using GemmCore = _GemmCore_T;
   static constexpr BTLA_ISA ISA = _RT_ISA_T;
-  using PrologueA = _PrologueA_T<GemmCore, _RT_ISA_T>;
+  using PrologueA = _PrologueA_T<GemmCore>;
   using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
   using Epilogue = _Epilogue_T;
   using AType = typename GemmCore::AType;
@@ -560,7 +556,6 @@ class LauncherIntKBlock {
     const EpiParam paramC;
   };
   _GemmCore_T mGemmCore;
-  PrologueA mProA;
   PrologueB mProB;
 
   class GEMVWrapper {
@@ -569,9 +564,8 @@ class LauncherIntKBlock {
       if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T, _RT_ISA_T>>) {
         return false;
       }
-      if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T, _RT_ISA_T>> &&
-                    !std::is_same_v<PrologueA,
-                                    prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T, _RT_ISA_T>>) {
+      if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T>> &&
+                    !std::is_same_v<PrologueA, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32<_GemmCore_T>>) {
         return false;
       }
       if constexpr (GemmCore::ISA == BTLA_ISA::AVX_VNNI) {
@@ -801,12 +795,12 @@ class LauncherIntKBlock {
         auto zpA_cache = zpA;
         auto scaleA_cache = scaleA;
         int ldsa_cache = tmp_ldsa;
-        mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_padded, (blk_m + i + _config.loc[0]),
-                            iterk, tmp_, _config.tmpcachesize);
-        mProA.getZp(&zpA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded, (blk_m + i + _config.loc[0]), iterk,
-                    tmp_, _config.tmpcachesize);
-        mProA.getScale(&scaleA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded, (blk_m + i + _config.loc[0]),
-                       iterk, tmp_, _config.tmpcachesize);
+        PrologueA::template getActivation<ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain, k_padded,
+                                               (blk_m + i + _config.loc[0]), iterk, tmp_, _config.tmpcachesize);
+        PrologueA::template getZp<ISA>(&zpA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded,
+                                       (blk_m + i + _config.loc[0]), iterk, tmp_, _config.tmpcachesize);
+        PrologueA::template getScale<ISA>(&scaleA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded,
+                                          (blk_m + i + _config.loc[0]), iterk, tmp_, _config.tmpcachesize);
         mGemmCore.forward(aptr_cache, bptr_cache, cptr_cache, zpA_cache, scaleA_cache, ldsa_cache, scaleB_cache,
                           reduceB_cache, ldsb_cache, m_remain, n_padded, k_padded, KBlock, acache_step * sizeof(AType),
                           bcache_stride, ccache_stride, iterk, 1.f, tmp_, _config.tmpcachesize);
@@ -868,12 +862,12 @@ class LauncherIntKBlock {
           auto zpA_cache = zpA;
           auto scaleA_cache = scaleA;
           int ldsa_cache = tmp_ldsa;
-          mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_padded,
-                              (blk_m + i + _config.loc[0]), iterkk, tmp_, _config.tmpcachesize);
-          mProA.getZp(&zpA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded, (blk_m + i + _config.loc[0]), iterkk,
-                      tmp_, _config.tmpcachesize);
-          mProA.getScale(&scaleA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded, (blk_m + i + _config.loc[0]),
-                         iterkk, tmp_, _config.tmpcachesize);
+          PrologueA::template getActivation<ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain, k_padded,
+                                                 (blk_m + i + _config.loc[0]), iterkk, tmp_, _config.tmpcachesize);
+          PrologueA::template getZp<ISA>(&zpA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded,
+                                         (blk_m + i + _config.loc[0]), iterkk, tmp_, _config.tmpcachesize);
+          PrologueA::template getScale<ISA>(&scaleA_cache, &ldsa_cache, _param.paramA, m_remain, k_padded,
+                                            (blk_m + i + _config.loc[0]), iterkk, tmp_, _config.tmpcachesize);
           auto kscale = k_remain / float(KBlock);
           mGemmCore.forward(aptr_cache, bptr_cache, cptr_cache, zpA_cache, scaleA_cache, ldsa_cache, scaleB_cache,
                             reduceB_cache, ldsb_cache, m_remain, n_padded, k_padded, k_padded,

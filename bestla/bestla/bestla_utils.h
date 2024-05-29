@@ -96,6 +96,14 @@
 #define CompileAMXINT8() (CompileAMX())
 #endif
 
+#define TLACALL             \
+  template <BTLA_ISA ISA_T> \
+  static inline
+
+#define ISACALL             \
+  template <BTLA_ISA ISA_T> \
+  static
+
 #include <immintrin.h>
 
 namespace bestla {

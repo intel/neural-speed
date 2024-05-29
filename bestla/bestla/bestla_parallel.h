@@ -831,7 +831,7 @@ template <class Parallel_T, class Launch_T>
 void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
   gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
-  AParall apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
+  AParall apara = Launch_T::PrologueA::createParallel(th->num_threads(), args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -842,7 +842,7 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
     typename AParall::ThreadProblem thdpA{tidx};
     apara.getIndex(thdpA);
     if (thdpA.valid) {
-      launcher.mProA.run(args.paramA, thdpA);
+      Launch_T::PrologueA::run<Launch_T::ISA>(args.paramA, thdpA);
     }
     th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp{tidx};
