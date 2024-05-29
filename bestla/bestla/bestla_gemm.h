@@ -2510,7 +2510,7 @@ class Avx512vnniN16P4 : protected bestla::xbyak::JitAvx512vnni {
   static_assert(_NTILE % RegLen == 0);
   static int constexpr NRegs = _NTILE / RegLen;
   static int constexpr MRegs = _MTILE == 0 ? (RegCount - 1 - NRegs) / (NRegs * 2) : _MTILE;
-  static_assert(NRegs * MRegs <= RegCount - 1);
+  static_assert(NRegs * MRegs * 2 <= RegCount - 1);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
   static auto constexpr ISA = BTLA_ISA::AVX512_VNNI;
@@ -3397,7 +3397,7 @@ class AvxvnniN8P4 : protected bestla::xbyak::JitAvxvnni {
   static_assert(_NTILE % RegLen == 0);
   static int constexpr NRegs = _NTILE / RegLen;
   static int constexpr MRegs = _MTILE == 0 ? (RegCount - 3) / (NRegs * 2) : _MTILE;
-  static_assert(NRegs * MRegs <= RegCount - 3);
+  static_assert(NRegs * MRegs * 2 <= RegCount - 3);
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
   static auto constexpr ISA = BTLA_ISA::AVX_VNNI;
@@ -4073,7 +4073,7 @@ class Avx2vnniN8P4 : protected bestla::xbyak::JitAvx2 {
   static int constexpr NRegs = _NTILE / RegLen;
   static int constexpr TmpReserve = std::is_same_v<AT, uint8_t> ? 2 : 4;
   static int constexpr MRegs = _MTILE == 0 ? (RegCount - (TmpReserve + 1)) / (NRegs * 2) : _MTILE;
-  static_assert(NRegs * MRegs <= RegCount - (TmpReserve + 1));
+  static_assert(NRegs * MRegs * 2 <= RegCount - (TmpReserve + 1));
   static int constexpr NTILE = RegLen * NRegs, MTILE = MRegs, KTILE = 4;
   static int constexpr KUNROLL = 2;
   static auto constexpr ISA = BTLA_ISA::AVX2;
