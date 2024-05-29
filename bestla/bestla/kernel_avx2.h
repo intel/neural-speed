@@ -6642,26 +6642,42 @@ static inline BTLA_CODE gemv_7bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 template <typename T>
 static inline BTLA_CODE mul(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
   int constexpr VLen = 8;
-  int constexpr Unroll = 2;
-  int constexpr VLenURL = VLen * Unroll;
-  size_t velturl = utils::padto_le(size, VLenURL);
+  size_t velt = utils::padto_le(size, VLen);
   size_t i = 0;
-  auto vfuncurl = [&]() {
+  auto vfunc = [&]() {
     auto v0 = load_T_fp32(src0ptr + i);
-    auto v0_ = load_T_fp32(src0ptr + i + VLen);
     auto v1 = load_T_fp32(src1ptr + i);
-    auto v1_ = load_T_fp32(src1ptr + i + VLen);
     auto out = _mm256_mul_ps(v0, v1);
-    auto out_ = _mm256_mul_ps(v0_, v1_);
     store_fp_T(out, dstptr + i);
-    store_fp_T(out_, dstptr + i + VLen);
   };
-  for (; i < velturl; i += VLen) vfuncurl();
+  for (; i < velt; i += VLen) vfunc();
   if (i < size) {
-    int remain = size - i;
-    if (size >= VLenURL) {
-      i = size - VLenURL;
-      vfuncurl();
+    if (size >= VLen) {
+      i = size - VLen;
+      vfunc();
+    } else {
+      ref::add(src0ptr + i, src1ptr + i, dstptr + i, size - i);
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename T>
+static inline BTLA_CODE add(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
+  int constexpr VLen = 8;
+  size_t velt = utils::padto_le(size, VLen);
+  size_t i = 0;
+  auto vfunc = [&]() {
+    auto v0 = load_T_fp32(src0ptr + i);
+    auto v1 = load_T_fp32(src1ptr + i);
+    auto out = _mm256_add_ps(v0, v1);
+    store_fp_T(out, dstptr + i);
+  };
+  for (; i < velt; i += VLen) vfunc();
+  if (i < size) {
+    if (size >= VLen) {
+      i = size - VLen;
+      vfunc();
     } else {
       ref::mul(src0ptr + i, src1ptr + i, dstptr + i, size - i);
     }

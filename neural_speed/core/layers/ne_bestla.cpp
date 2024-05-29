@@ -138,3 +138,27 @@ void bestla_tensor_mul_vec(int batch, int vsize, const float* tensor, const floa
     pth->parallel_for(threadfunc);
   }
 }
+
+void bestla_tensor_add_vec(int batch, int vsize, const float* tensor, const float* vector, float* out) {
+  auto pth = ne_bestla::ne_threading::get();
+  int threads = batch <= 4 ? 1 : pth->num_threads();
+  parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
+  auto threadfunc = [&](int tidx) {
+    parallel::ThreadProblem2D tp{tidx};
+    sch.getIndex(tp);
+    if (tp.valid) {
+      for (size_t i = 0; i < tp.size[0]; i++) {
+        auto tptr = tensor + (tp.loc[0] + i) * vsize + tp.loc[1];
+        auto vptr = vector + tp.loc[1];
+        auto dstptr = out + (tp.loc[0] + i) * vsize + tp.loc[1];
+        auto ret = kernel::wrapper::Add<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
+      }
+    }
+  };
+  if (threads == 1) {
+    parallel::SingleThread st;
+    st.parallel_for(threadfunc);
+  } else {
+    pth->parallel_for(threadfunc);
+  }
+}

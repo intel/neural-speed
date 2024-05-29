@@ -77,6 +77,7 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
                                float* FpOut);
 
 void bestla_tensor_mul_vec(int batch, int vsize, const float* tensor, const float* vector, float* out);
+void bestla_tensor_add_vec(int batch, int vsize, const float* tensor, const float* vector, float* out);
 #ifdef __cplusplus
 }
 #endif
