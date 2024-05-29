@@ -34,7 +34,7 @@ fp4 | | multiplier of 8
 nf4 | | multiplier of 8
 
 <sup>1</sup>: group size=-1 means per channel quantization on output channel (or group size equals to input channel size).  
-<sup>2</sup>: int7 + asymmetric may cause numeric overflow if the device only has AVX2 without AVX_VNNI or uses AVX512BW to compute.
+<sup>2</sup>: int7 + asymmetric may cause numeric overflow if the device only has AVX2 without AVX_VNNI or uses AVX512BW to compute.  
 <sup>3</sup>: It may cause numeric overflow if the device only has AVX2 without AVX_VNNI or uses AVX512BW to compute.
 
 NOTE:
