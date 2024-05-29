@@ -468,8 +468,10 @@ function main() {
                         chmod 777 ${WORKSPACE}/${logs_file}
                         if [[ ${input} == "1024" && ${cores_per_instance} == "32" ]]; then
                             echo "-------- Accuracy start--------"
-                            if [[ "${model}" == "llama"* || "${model}" == "gptj-6b" ]]; then
+                            if [[ "${model}" == "llama"* || "${model}" == "gptj-6b" || "${model}" == "mistral-7b" ]]; then
                                 OMP_NUM_THREADS=56 numactl -l -C 0-55 python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --batch_size 8 --tasks lambada_openai 2>&1 | tee -a ${WORKSPACE}/${logs_file}
+                            elif [[ "${model}" == *"gptq" ]]; then
+                                OMP_NUM_THREADS=56 numactl -l -C 0-55 python ./scripts/cal_acc.py --model_name ${model_path} --use_gptq --tasks lambada_openai 2>&1 | tee -a ${WORKSPACE}/${logs_file}
                             else
                                 OMP_NUM_THREADS=56 numactl -l -C 0-55 python ./scripts/cal_acc.py --model_name ${model_path} --init_from_bin ${model}-${precision}.bin --tasks lambada_openai --batch_size 1  2>&1 | tee -a ${WORKSPACE}/${logs_file}
                             fi

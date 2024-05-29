@@ -223,6 +223,7 @@ class Model:
 
     def init_from_bin(self, model_type, model_path, **generate_kwargs):
         if self.module is None:
+            model_type = model_maps.get(model_type, model_type)
             self.module = _import_package(model_type)
         self.model = self.module.Model()
         if model_type=="whisper":
