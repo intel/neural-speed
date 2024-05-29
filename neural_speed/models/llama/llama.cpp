@@ -176,24 +176,12 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_CPU);
   ne_set_name(embd, "embd");
 
-#ifdef NS_SYCL
-  size_t memsize = size_t(seq_len_sum) * sizeof(model_token);
-  struct ne_tensor* embd_dev = ne_new_tensor_1d(ctx0, NE_TYPE_I32, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_SYCL);
-  int cpy_off = 0;
-  for (int i = 0; i < batch_size; ++i) {
-    bestla_device_memcpy_sync(static_cast<model_token*>(embd_dev->data) + cpy_off, inputs[i].tokens,
-                              n_tokens[i] * ne_element_size(embd), ctx->device_queue);
-    cpy_off += n_tokens[i];
-  }
-  bestla_device_memcpy_sync(static_cast<model_token*>(embd->data), static_cast<model_token*>(embd_dev->data), memsize,
-                            ctx->device_queue);
-#else
   int cpy_off = 0;
   for (int i = 0; i < batch_size; ++i) {
     memcpy(static_cast<model_token*>(embd->data) + cpy_off, inputs[i].tokens, n_tokens[i] * ne_element_size(embd));
     cpy_off += n_tokens[i];
   }
-#endif
+
 #ifdef NS_TP_MODEL
   if (enable_tp) {
     // need to broadcast the ids
@@ -643,6 +631,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   lctx.model.kv_self.n = n_cached;
   float* logptr = NULL;
   if (inpL->backend == NE_BACKEND_SYCL) {
+    bestla_device_sync(ctx0->dev_queue);
     struct ne_tensor* inpL_host = ne_new_tensor_1d(ctx0, NE_TYPE_I8, inpL->size, NE_SIZE_CALC, NE_BACKEND_CPU);
     logptr = (float*)inpL_host->data;
     bestla_device_memcpy_sync(logptr, inpL->data, inpL->size, ctx0->dev_queue);
