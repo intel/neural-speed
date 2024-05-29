@@ -301,8 +301,6 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
   return 0;
 }
 
-
-
 template <typename T>
 void BTLAGemmQuantPackB(void* PackedBuf, int BlkSize, const float* FpData, int N, int K, BTLA_DTYPE QuantType,
                         BTLA_DTYPE ScaleDtype, bool IsAsym, int ldb, bool IsTrans, void* ThreadPool) {
@@ -395,8 +393,6 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
   }
   return false;
 }
-
-
 
 template <typename T>
 void BTLAGemmPackBImpl(void* PackedBuf, int BlkSize, const int8_t* QData, const float* Scales, const int8_t* Zp, int N,
@@ -500,7 +496,6 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
 }
 
 }  // namespace
-
 
 bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const size_t BatchN,
                          const BTLA_GEMM_DATA_PACKED_PARAMS* DataParams, int8_t* WorkSpace, void* ThreadPool) {
@@ -740,33 +735,23 @@ bool BTLALayerNorm(size_t norm_count, size_t norm_size, bool isrms, float epsilo
   auto pth = reinterpret_cast<parallel::IThreading*>(ThreadPool);
   int threads = inorm_count <= 4 ? 1 : pth->num_threads();
   parallel::Scheduler2D sch({threads, inorm_count, inorm_size, 1, inorm_size});
+  auto threadfunc = [&](int tidx) {
+    parallel::ThreadProblem2D tp{tidx};
+    sch.getIndex(tp);
+    if (tp.valid) {
+      for (size_t i = 0; i < tp.size[0]; i++) {
+        auto srcptr = FpIn + (tp.loc[0] + i) * inorm_size;
+        auto dstptr = FpOut + (tp.loc[0] + i) * inorm_size;
+        auto ret = kernel::wrapper::LayerNormalization::forward_auto<float>(
+            srcptr, nullptr, nullptr, epsilon, inorm_size, dstptr, nullptr, nullptr, isrms);
+      }
+    }
+  };
   if (threads == 1) {
     parallel::SingleThread st;
-    st.parallel_for([&](int tidx) {
-      parallel::ThreadProblem2D tp{tidx};
-      sch.getIndex(tp);
-      if (tp.valid) {
-        for (size_t i = 0; i < tp.size[0]; i++) {
-          auto srcptr = FpIn + (tp.loc[0] + i) * inorm_size;
-          auto dstptr = FpOut + (tp.loc[0] + i) * inorm_size;
-          auto ret = kernel::wrapper::LayerNormalization::forward_auto<float>(
-              srcptr, nullptr, nullptr, epsilon, inorm_size, dstptr, nullptr, nullptr, isrms);
-        }
-      }
-    });
+    st.parallel_for(threadfunc);
   } else {
-    pth->parallel_for([&](int tidx) {
-      parallel::ThreadProblem2D tp{tidx};
-      sch.getIndex(tp);
-      if (tp.valid) {
-        for (size_t i = 0; i < tp.size[0]; i++) {
-          auto srcptr = FpIn + (tp.loc[0] + i) * inorm_size;
-          auto dstptr = FpOut + (tp.loc[0] + i) * inorm_size;
-          auto ret = kernel::wrapper::LayerNormalization::forward_auto<float>(
-              srcptr, nullptr, nullptr, epsilon, inorm_size, dstptr, nullptr, nullptr, isrms);
-        }
-      }
-    });
+    pth->parallel_for(threadfunc);
   }
   return true;
 }

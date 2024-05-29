@@ -75,6 +75,8 @@ void bestla_packweight_copyattr(const float* f32ptr, void* dstpr, int n, int k, 
 
 void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float epsilon, const float* FpIn,
                                float* FpOut);
+
+void bestla_tensor_mul_vec(int batch, int vsize, const float* tensor, const float* vector, float* out);
 #ifdef __cplusplus
 }
 #endif

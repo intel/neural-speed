@@ -1558,6 +1558,36 @@ class GEMVWoqNBits {
   }
 };
 
+template <typename T>
+class Mul {
+ public:
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return avx512f::mul(src0ptr, src1ptr, dstptr, size);
+    }
+#endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return avx2::mul(src0ptr, src1ptr, dstptr, size);
+    }
+#endif
+    return ref::mul(src0ptr, src1ptr, dstptr, size);
+  }
+
+  static inline BTLA_CODE forward_auto(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(src0ptr, src1ptr, dstptr, size);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2>(src0ptr, src1ptr, dstptr, size);
+    }
+    return forward<BTLA_ISA::NoSIMD>(src0ptr, src1ptr, dstptr, size);
+  }
+};
+
 }  // namespace wrapper
 }  // namespace kernel
 }  // namespace bestla
