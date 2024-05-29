@@ -38,12 +38,13 @@ struct softmax_fwd_test_func {
   using work_group_t = typename tile_shape::work_group_t;
   static constexpr uint32_t wg_size_x = tile_shape::wg_size_x;
   static constexpr uint32_t wg_size_y = tile_shape::wg_size_y;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpg;
 
   using in_block_size = subgroup::get_load_block_size_auto<
       dtype_in,
       sg_n,
       sg_m,
-      gpu_arch::XeHpc,
+      arch_tag,
       mem_layout::row_major,
       reg_layout::tiled>;
   static constexpr uint32_t tile_size_x = sg_n;
@@ -64,17 +65,16 @@ struct softmax_fwd_test_func {
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       tile_desc_t,
       subgroup::msg_type_v<tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using mat_out_t = subgroup::tile_t<dtype_in, tile_desc_t>;
   using mat_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
       tile_desc_t,
       (tile_size_y > 1) ? msg_type::block_2d : msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
-  using softmax_fwd_t = group::softmax_t<
-      group::softmax_policy_fwd<dtype_acc, gpu_arch::XeHpc>,
-      tile_shape>;
+  using softmax_fwd_t = group::
+      softmax_t<group::softmax_policy_fwd<dtype_acc, arch_tag>, tile_shape>;
   static constexpr uint32_t barrier_count =
       softmax_fwd_t::get_barrier_count::count;
   static constexpr uint32_t slm_size = softmax_fwd_t::get_slm_size::size;

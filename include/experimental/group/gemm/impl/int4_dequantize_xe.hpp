@@ -176,6 +176,8 @@ class gemm_t<
 
   // note: plane format, row-major
   // note: 4bit x 2, row-major
+  static_assert(tile_size_x_b % pack_ratio == 0);
+  static_assert(block_size_x_b % pack_ratio == 0);
   using matB_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b / pack_ratio,
       tile_size_y_b,

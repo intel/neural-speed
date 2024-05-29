@@ -45,6 +45,11 @@ class epilogue_t<
   static constexpr uint32_t slm_size = mem_desc_c_t::is_local
       ? tile_shape::wg_tile_size_x * tile_shape::wg_tile_size_y
       : 0;
+
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
+  static constexpr bool ldc_align =
+      (mem_desc_c_t::alignment_in_bytes % load_store_attr::alignment_in_bytes ==
+       0);
   /// @brief Epilogue arguments.
   struct arguments_t {};
 
@@ -71,8 +76,9 @@ class epilogue_t<
 
  public:
   static constexpr msg_type msg_type_c =
-      (mem_space_c == mem_space::global ? msg_type::unaligned_2d
-                                        : msg_type::scatter);
+      (mem_space_c == mem_space::global
+           ? (ldc_align ? msg_type::block_2d : msg_type::unaligned_2d)
+           : msg_type::scatter);
 
   /// @brief Default epilogue.
   /// 1) Convert dtype_acc to dtype_c 2) Overwrite to memory.

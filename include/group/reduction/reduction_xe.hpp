@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include <group/reduction/reduction_api.hpp>
-
 namespace gpu::xetla::group {
 
 template <
@@ -29,9 +27,10 @@ template <
     uint32_t N,
     reduce_op Op,
     uint32_t N_SG,
-    bool is_all_reduce>
-struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
-  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+    bool is_all_reduce,
+    gpu_arch arch_tag_>
+struct group_reduce_t {
+  static constexpr gpu_arch arch_tag = arch_tag_;
   group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, arch_tag> sg_reduce{};
   xetla_nbarrier_t<N_SG, N_SG, arch_tag> nbarrier;
   uint32_t slm_base;
@@ -103,8 +102,14 @@ struct group_reduce_t<T, SZ, N, Op, N_SG, is_all_reduce, gpu_arch::XeHpc> {
   }
 };
 
-template <typename T, uint32_t SZ, uint32_t N, reduce_op Op, bool is_all_reduce>
-struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, gpu_arch::XeHpc> {
+template <
+    typename T,
+    uint32_t SZ,
+    uint32_t N,
+    reduce_op Op,
+    bool is_all_reduce,
+    gpu_arch arch_tag_>
+struct group_reduce_t<T, SZ, N, Op, 1, is_all_reduce, arch_tag_> {
   inline group_reduce_t() = default;
   inline group_reduce_t(
       [[maybe_unused]] uint32_t sg_id_,

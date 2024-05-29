@@ -51,7 +51,7 @@ struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc> {
   static constexpr uint32_t special_prefetch_width_in_bytes = 64;
 
   static constexpr uint32_t cache_line_size_in_bytes = 64;
-  static constexpr uint32_t alignment_in_bytes = 8;
+  static constexpr uint32_t alignment_in_bytes = 16;
 };
 
 template <msg_type message_type, gpu_arch arg_tag>
@@ -73,7 +73,7 @@ struct client_load_store_attr_base_t {
   static constexpr uint32_t special_prefetch_width_in_bytes = 64;
 
   static constexpr uint32_t cache_line_size_in_bytes = 64;
-  static constexpr uint32_t alignment_in_bytes = 8;
+  static constexpr uint32_t alignment_in_bytes = 16;
 };
 
 template <>
@@ -198,12 +198,14 @@ struct mma_attr_t<
     m,
     std::enable_if_t<arch_has_xmx<arch_tag>>> {
   using dpas_attr = dpas_attr_t<arch_tag>;
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
   static constexpr uint32_t mma_m_in_elem =
       (m > dpas_attr::rcount_max) ? dpas_attr::rcount_max : m;
   static constexpr uint32_t blk_m_in_elem = 16;
 
   static constexpr uint32_t mma_n_in_elem = dpas_attr::n_in_elem;
-  [[maybe_unused]] static constexpr uint32_t blk_n_in_bytes = 64;
+  [[maybe_unused]] static constexpr uint32_t blk_n_in_bytes =
+      load_store_attr::max_trans_load_width_in_bytes;
 
   static constexpr uint32_t mma_k_in_bytes = dpas_attr::k_in_bytes;
   static constexpr uint32_t blk_k_in_bytes = mma_k_in_bytes;
@@ -224,8 +226,7 @@ struct mma_attr_t<
       load_store_attr::max_trans_load_width_in_bytes;
 
   [[maybe_unused]] static constexpr uint32_t mma_n_in_elem = 16;
-  static constexpr uint32_t blk_n_in_bytes =
-      register_bytes_t<arch_tag>::reg_in_bytes;
+  static constexpr uint32_t blk_n_in_bytes = blk_k_in_bytes;
 };
 
 template <gpu_arch arch_tag>

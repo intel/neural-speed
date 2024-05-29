@@ -48,6 +48,7 @@ struct compute_policy_default_xmx<
     arch_tag_,
     std::enable_if_t<arch_has_xmx<arch_tag_>>> {
   static constexpr gpu_arch arch_tag = arch_tag_;
+  static constexpr mma_engine mma_engine = mma_engine::xmx;
 
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
@@ -59,7 +60,8 @@ struct compute_policy_default_xmx<
   static constexpr int sync_freq = perf_tuning_knob::sync_freq;
   static constexpr int k_stride = perf_tuning_knob::k_stride;
 
-  using mma_attr = mma_attr_t<arch_tag, mma_engine::xmx, 16>;
+  using mma_attr = mma_attr_t<arch_tag, mma_engine, 16>;
+
   static constexpr uint32_t block_size_y_a = mma_attr::blk_m_in_elem;
   static constexpr uint32_t block_bytes_x_a = mma_attr::mma_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
@@ -107,6 +109,7 @@ struct compute_policy_default_fpu<
     arch_tag_,
     std::enable_if_t<arch_has_fpu<arch_tag_>>> {
   static constexpr gpu_arch arch_tag = arch_tag_;
+  static constexpr mma_engine mma_engine = mma_engine::fpu;
 
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
@@ -118,17 +121,26 @@ struct compute_policy_default_fpu<
   static constexpr int sync_freq = perf_tuning_knob::sync_freq;
   static constexpr int k_stride = perf_tuning_knob::k_stride;
 
-  using mma_attr = mma_attr_t<arch_tag, mma_engine::fpu, 16>;
+  using mma_attr = mma_attr_t<arch_tag, mma_engine, 16>;
   static constexpr uint32_t block_size_y_a = mma_attr::blk_m_in_elem;
   static constexpr uint32_t block_bytes_x_a = mma_attr::blk_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
+
   static constexpr uint32_t block_bytes_x_b = mma_attr::blk_n_in_bytes;
   static constexpr uint32_t block_size_x_b =
       block_bytes_x_b / sizeof(dtype_mma_b);
   static constexpr uint32_t block_size_y_b = block_size_x_a;
 };
 
+template <
+    typename compute_attr_,
+    typename perf_tuning_knob_,
+    gpu_arch arch_tag_>
+struct compute_policy_unaligned_fpu : public compute_policy_default_fpu<
+                                          compute_attr_,
+                                          perf_tuning_knob_,
+                                          arch_tag_> {};
 /// @} xetla_gemm
 
 } // namespace gpu::xetla::group

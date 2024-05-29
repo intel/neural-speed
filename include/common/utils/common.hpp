@@ -94,7 +94,7 @@ check_lsc_cache_hint() {
 }
 
 template <cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
-constexpr std::enable_if_t<arch_tag == gpu_arch::XeHpc, uint32_t>
+constexpr std::enable_if_t<arch_has_2d_load_store<arch_tag>, uint32_t>
 get_load_cache_hint_code() {
   check_lsc_cache_hint<lsc_action::load, L1H, L2H, arch_tag>();
   if (L1H == cache_hint::none && L2H == cache_hint::none) {
@@ -126,7 +126,7 @@ get_load_cache_hint_code() {
 }
 
 template <cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
-constexpr std::enable_if_t<arch_tag == gpu_arch::XeHpc, uint32_t>
+constexpr std::enable_if_t<arch_has_2d_load_store<arch_tag>, uint32_t>
 get_prefetch_cache_hint_code() {
   check_lsc_cache_hint<lsc_action::prefetch, L1H, L2H, arch_tag>();
   if (L2H == cache_hint::uncached) {
@@ -153,7 +153,7 @@ get_prefetch_cache_hint_code() {
 }
 
 template <cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
-constexpr std::enable_if_t<arch_tag == gpu_arch::XeHpc, uint32_t>
+constexpr std::enable_if_t<arch_has_2d_load_store<arch_tag>, uint32_t>
 get_store_cache_hint_code() {
   check_lsc_cache_hint<lsc_action::store, L1H, L2H, arch_tag>();
   if (L1H == cache_hint::none && L2H == cache_hint::none) {
@@ -185,7 +185,7 @@ get_store_cache_hint_code() {
 }
 
 template <cache_hint L1H, cache_hint L2H, gpu_arch arch_tag>
-constexpr std::enable_if_t<arch_tag == gpu_arch::XeHpc, uint32_t>
+constexpr std::enable_if_t<arch_has_2d_load_store<arch_tag>, uint32_t>
 get_atomic_cache_hint_code() {
   check_lsc_cache_hint<lsc_action::atomic, L1H, L2H, arch_tag>();
   if (L1H == cache_hint::none && L2H == cache_hint::none) {

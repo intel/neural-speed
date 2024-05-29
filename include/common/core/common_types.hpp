@@ -21,10 +21,10 @@
 #include <cstdint>
 
 namespace gpu::xetla {
-enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2, XeLast };
 
 template <gpu_arch arch_tag>
-inline constexpr bool valid_xe_arch_tag = (arch_tag <= gpu_arch::XeHpc);
+inline constexpr bool valid_xe_arch_tag = (arch_tag < gpu_arch::XeLast);
 
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 

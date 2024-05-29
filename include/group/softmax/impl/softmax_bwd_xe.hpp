@@ -26,15 +26,19 @@
 
 namespace gpu::xetla::group {
 
-template <typename dtype_in_, typename dtype_acc_, typename tile_shape_>
+template <
+    typename dtype_in_,
+    typename dtype_acc_,
+    typename tile_shape_,
+    gpu_arch arch_tag_>
 class softmax_t<
-    softmax_policy_bwd<dtype_in_, dtype_acc_, gpu_arch::XeHpc>,
+    softmax_policy_bwd<dtype_in_, dtype_acc_, arch_tag_>,
     tile_shape_> {
  public:
   using tile_shape = tile_shape_;
   using dtype_in = dtype_in_;
   using dtype_acc = dtype_acc_;
-  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+  static constexpr gpu_arch arch_tag = arch_tag_;
 
  private:
   using mem_desc_in_t =

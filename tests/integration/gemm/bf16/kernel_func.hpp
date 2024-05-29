@@ -37,11 +37,15 @@ template <
     mem_layout layout_b,
     uint32_t global_kslicing,
     uint32_t local_kslicing,
-    mma_engine engine>
+    uint32_t wg_num_n,
+    mma_engine engine,
+    gpu_arch arch_tag>
 struct bf16_gemm_test_func {
   using tile_shape = tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-  static constexpr uint32_t periodic_sync_interval = 8;
-  static constexpr uint32_t prefetch_distance = 3;
+  static constexpr uint32_t periodic_sync_interval =
+      (arch_tag == gpu_arch::XeHpc ? 8 : 0);
+  static constexpr uint32_t prefetch_distance =
+      (arch_tag == gpu_arch::XeHpc ? 3 : 0);
   using gemm_t = typename gemm_selector_t<
       dtype_a,
       dtype_b,
@@ -55,17 +59,17 @@ struct bf16_gemm_test_func {
       tile_shape,
       sg_k,
       engine,
-      gpu_arch::XeHpc,
+      arch_tag,
       prefetch_distance,
       periodic_sync_interval>::gemm;
 
   using epilogue_t = epilogue_t<
-      epilogue_policy_default<gpu_arch::XeHpc>,
+      epilogue_policy_default<arch_tag>,
       tile_shape,
       mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global>>;
 
-  using group_swizzle =
-      gpu::xetla::kernel::group_swizzle_default<gpu_arch::XeHpc>;
+  using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
+  // using group_swizzle = kernel::group_swizzle_snake<wg_num_n, arch_tag>;
 
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, global_kslicing, local_kslicing>;
