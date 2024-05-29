@@ -115,7 +115,7 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
   BTLALayerNorm(norm_count, norm_size, isrms, epsilon, FpIn, FpOut, ne_threading::get());
 }
 
-void bestla_tensor_mul_vec(int batch, int vsize, const float* tensor, const float* vector, float* out) {
+void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out) {
   auto pth = ne_bestla::ne_threading::get();
   int threads = batch <= 4 ? 1 : pth->num_threads();
   parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
@@ -125,7 +125,7 @@ void bestla_tensor_mul_vec(int batch, int vsize, const float* tensor, const floa
     if (tp.valid) {
       for (size_t i = 0; i < tp.size[0]; i++) {
         auto tptr = tensor + (tp.loc[0] + i) * vsize + tp.loc[1];
-        auto vptr = vector + tp.loc[1];
+        auto vptr = vector + (tp.loc[0] + i) * vstep + tp.loc[1];
         auto dstptr = out + (tp.loc[0] + i) * vsize + tp.loc[1];
         auto ret = kernel::wrapper::Mul<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
       }
@@ -139,7 +139,7 @@ void bestla_tensor_mul_vec(int batch, int vsize, const float* tensor, const floa
   }
 }
 
-void bestla_tensor_add_vec(int batch, int vsize, const float* tensor, const float* vector, float* out) {
+void bestla_add(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out) {
   auto pth = ne_bestla::ne_threading::get();
   int threads = batch <= 4 ? 1 : pth->num_threads();
   parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
@@ -149,7 +149,7 @@ void bestla_tensor_add_vec(int batch, int vsize, const float* tensor, const floa
     if (tp.valid) {
       for (size_t i = 0; i < tp.size[0]; i++) {
         auto tptr = tensor + (tp.loc[0] + i) * vsize + tp.loc[1];
-        auto vptr = vector + tp.loc[1];
+        auto vptr = vector + (tp.loc[0] + i) * vstep + tp.loc[1];
         auto dstptr = out + (tp.loc[0] + i) * vsize + tp.loc[1];
         auto ret = kernel::wrapper::Add<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
       }
