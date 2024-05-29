@@ -146,7 +146,7 @@ model_name_map["starcoder-3b"]="bigcode/starcoder"
 model_name_map["bloom-7b"]="bigscience/bloom-7b1"
 model_name_map["opt-1.3b"]="facebook/opt-1.3b"
 model_name_map["dolly-v2-3b"]="databricks/dolly-v2-3b"
-model_name_map["chatglm3"]="THUDM/chatglm3-6b"
+model_name_map["chatglm3-6b"]="THUDM/chatglm3-6b"
 model_name_map["chatglm2"]="THUDM/chatglm2-6b"
 model_name_map["chatglm-6b"]="THUDM/chatglm-6b"
 model_name_map["baichuan2-13b"]="baichuan-inc/Baichuan2-13B-Chat"
@@ -363,6 +363,7 @@ function main() {
     ninja
     cd ..
     pip install -r $working_dir/requirements.txt
+    pip install lm_eval
     python $working_dir/setup.py install
     ## prepare example requirement
     if [[ -f $requirements_file ]]; then
