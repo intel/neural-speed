@@ -467,7 +467,7 @@ class UT_CompFp32 {
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher =
-        wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     Launcher launcher;
@@ -510,7 +510,7 @@ class UT_CompFp32 {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype));
     auto constexpr ISA = GemmCore_T::ISA;
-    using Launcher = wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     Launcher launcher;
@@ -657,7 +657,7 @@ class UT_CompInt8 {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
     auto constexpr ISA = GemmCore_T::ISA;
-    using Launcher = wrapper::gemm::LauncherIntKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
+    using Launcher = wrapper::gemm::LauncherIntKBlock<GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
                                                       prologue_b::gemm::WeightKBlockNInteger,
                                                       epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
@@ -711,9 +711,8 @@ class UT_CompInt8 {
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
-                                    prologue_b::gemm::WeightKBlockNInteger, PcWriteBack>;
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
+                                                 prologue_b::gemm::WeightKBlockNInteger, PcWriteBack>;
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
     int kblks = updiv(k, blocksize);
@@ -819,7 +818,7 @@ class UT_CompBf16 {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), type_str<Scale_T>);
     auto constexpr ISA = GemmCore_T::ISA;
-    using Launcher = wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
@@ -892,7 +891,7 @@ class UT_ORT_NBits {
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), isasym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher =
-        wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     Launcher launcher;
@@ -976,7 +975,7 @@ class UT_ORT_NBits {
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), isasym);
     auto constexpr ISA = GemmCore_T::ISA;
     using Launcher =
-        wrapper::gemm::LauncherBase<ISA, GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
     Launcher launcher;
@@ -1086,7 +1085,7 @@ class UT_CompFp16 {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype),gemm::CoreAttr::to_str(GemmCore_T::ID), type_str<Scale_T>);
     auto constexpr ISA = GemmCore_T::ISA;
-    using Launcher = wrapper::gemm::LauncherKBlock<ISA, GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
+    using Launcher = wrapper::gemm::LauncherKBlock<GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
                                                           epilogue::gemm::CompFp32BlockEpilogue,
                                                           epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;

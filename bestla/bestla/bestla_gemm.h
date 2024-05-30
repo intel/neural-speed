@@ -4819,7 +4819,14 @@ class CoreCodeBase {
   static int constexpr PREFERRED_N = NTILE * 4;
   static auto constexpr ISA = Code::ISA;
   static auto constexpr ID = CoreAttr::make_core_id(NTILE, PACK_ROW, COMP, ISA);
-  void configure(int _M, int _N, int _K) { (void)(0); }
+  static void configure(int _M, int _N, int _K) { (void)(0); }
+
+  static CoreCodeBase<CodeT, _NTILE, _MTILE>* getInstance() {
+    static CoreCodeBase<CodeT, _NTILE, _MTILE> instance;
+    return &instance;
+  }
+
+  std::array<Code, Code::MTILE> mCodes;
 
  protected:
   CoreCodeBase() {
@@ -4827,7 +4834,6 @@ class CoreCodeBase {
       mCodes[i].generate_code(i + 1);
     }
   }
-  std::array<Code, Code::MTILE> mCodes;
 };
 
 template <template <int, int> class CodeT, int _NTILE, int _MTILE = 0>
@@ -4847,24 +4853,31 @@ class CoreCodeBaseAMX {
   static auto constexpr ID = CoreAttr::make_core_id(_NTILE, PACK_ROW, COMP, ISA);
   Xbyak::CodeGenerator cfgcode;
 
+  static CoreCodeBaseAMX<CodeT, _NTILE, _MTILE>* getInstance() {
+    static CoreCodeBaseAMX<CodeT, _NTILE, _MTILE> instance;
+    return &instance;
+  }
+
+  std::array<Code, Code::MRegs> mCodes;
+
  protected:
   CoreCodeBaseAMX() {
     for (int i = 0; i < mCodes.size(); i++) {
       mCodes[i].generate_code((i + 1) * 16);
     }
   }
-  std::array<Code, Code::MRegs> mCodes;
 };
 
 template <int _NTILE, int _MTILE = 0>
 class SCoreRowNAvx2 : public CoreCodeBase<code::Avx2N8P1, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::Avx2N8P1, _NTILE, _MTILE>::Code;
-  void forward(float* matA, float* matB, float* matC, int _m, int _n, int _k, int _astride, int _bstride, int _cstride,
-               int kpos, void* tmpcache, size_t cachesize) {
+  using Base = CoreCodeBase<code::Avx2N8P1, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
+  static void forward(float* matA, float* matB, float* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4874,12 +4887,13 @@ class SCoreRowNAvx2 : public CoreCodeBase<code::Avx2N8P1, _NTILE, _MTILE> {
 template <int _NTILE, int _MTILE = 0>
 class SCoreRowNAvx512f : public CoreCodeBase<code::Avx512fN16P1, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::Avx512fN16P1, _NTILE, _MTILE>::Code;
-  void forward(float* matA, float* matB, float* matC, int _m, int _n, int _k, int _astride, int _bstride, int _cstride,
-               int kpos, void* tmpcache, size_t cachesize) {
+  using Base = CoreCodeBase<code::Avx512fN16P1, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
+  static void forward(float* matA, float* matB, float* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4889,13 +4903,13 @@ class SCoreRowNAvx512f : public CoreCodeBase<code::Avx512fN16P1, _NTILE, _MTILE>
 template <int _NTILE, int _MTILE = 0>
 class HCoreRowNAvx512fp16 : public CoreCodeBase<code::Avx512fp16N32P1, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::Avx512fp16N32P1, _NTILE, _MTILE>::Code;
-
-  void forward(utils::fp16* matA, utils::fp16* matB, utils::fp16* matC, int _m, int _n, int _k, int _astride,
-               int _bstride, int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  using Base = CoreCodeBase<code::Avx512fp16N32P1, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
+  static void forward(utils::fp16* matA, utils::fp16* matB, utils::fp16* matC, int _m, int _n, int _k, int _astride,
+                      int _bstride, int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4905,12 +4919,13 @@ class HCoreRowNAvx512fp16 : public CoreCodeBase<code::Avx512fp16N32P1, _NTILE, _
 template <int _NTILE, int _MTILE = 0>
 class HCoreRowNAvx512bf16 : public CoreCodeBase<code::Avx512bf16N16P2, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::Avx512bf16N16P2, _NTILE, _MTILE>::Code;
-  void forward(utils::bf16* matA, utils::bf16* matB, float* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  using Base = CoreCodeBase<code::Avx512bf16N16P2, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
+  static void forward(utils::bf16* matA, utils::bf16* matB, float* matC, int _m, int _n, int _k, int _astride,
+                      int _bstride, int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4920,23 +4935,25 @@ class HCoreRowNAvx512bf16 : public CoreCodeBase<code::Avx512bf16N16P2, _NTILE, _
 template <int _NTILE, int _MTILE = 0>
 class HCoreRowNAmxbf16 : public CoreCodeBaseAMX<code::Amxbf16N16P2, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBaseAMX<code::Amxbf16N16P2, _NTILE, _MTILE>::Code;
+  using Base = CoreCodeBase<code::Amxbf16N16P2, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
   using CType = typename Code::CType;
 
-  void configure(int _M, int _N, int _K) {
-    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType), this->mCodes[0].ATileCount,
-                                  this->mCodes[0].BTileCount, this->mCodes[0].CTileCount);
+  static void configure(int _M, int _N, int _K) {
+    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType),
+                                  Base::getInstance()->mCodes[0].ATileCount, Base::getInstance()->mCodes[0].BTileCount,
+                                  Base::getInstance()->mCodes[0].CTileCount);
   }
 
-  void forward(AType* matA, BType* matB, CType* matC, int _m, int _n, int _k, int _astride, int _bstride, int _cstride,
-               int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(AType* matA, BType* matB, CType* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param =
         typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0, tmpcache};
     if (_m <= Code::MTILE) {
       int idx = utils::updiv(_m, 16) - 1;
-      this->mCodes[idx].mKernel(&param);
+      Base::getInstance()->mCodes[idx].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4946,12 +4963,13 @@ class HCoreRowNAmxbf16 : public CoreCodeBaseAMX<code::Amxbf16N16P2, _NTILE, _MTI
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx512vnni : public CoreCodeBase<code::Avx512vnniN16P4, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::Avx512vnniN16P4, _NTILE, _MTILE>::Code;
-  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  using Base = CoreCodeBase<code::Avx512vnniN16P4, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
+  static void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4961,15 +4979,16 @@ class ICoreRowNAvx512vnni : public CoreCodeBase<code::Avx512vnniN16P4, _NTILE, _
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx512vnniKBlock : public CoreCodeBase<code::kblock::Avx512vnniN16P4, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::kblock::Avx512vnniN16P4, _NTILE, _MTILE>::Code;
-  void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  using Base = CoreCodeBase<code::kblock::Avx512vnniN16P4, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
+  static void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA,  _astride, matB,    _bstride, matC, _cstride, zpA,     scaleA,
                                        _ldsa, scaleB,   reduceB, _ldsb,    _k,   _n,       _kblock, kpos == 0 ? 1 : 0,
                                        kscale};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4979,13 +4998,14 @@ class ICoreRowNAvx512vnniKBlock : public CoreCodeBase<code::kblock::Avx512vnniN1
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvxvnni : public CoreCodeBase<code::AvxvnniN8P4U8, _NTILE, _MTILE> {
  public:
-  using Code = typename CoreCodeBase<code::AvxvnniN8P4U8, _NTILE, _MTILE>::Code;
+  using Base = CoreCodeBase<code::AvxvnniN8P4U8, _NTILE, _MTILE>;
+  using Code = typename Base::Code;
 
-  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -4995,13 +5015,14 @@ class ICoreRowNAvxvnni : public CoreCodeBase<code::AvxvnniN8P4U8, _NTILE, _MTILE
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvxvnniSS : public CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTILE>::Code;
 
-  void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5011,13 +5032,14 @@ class ICoreRowNAvxvnniSS : public CoreCodeBase<code::AvxvnniN8P4S8, _NTILE, _MTI
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx2vnni : public CoreCodeBase<code::Avx2vnniN8P4U8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::Avx2vnniN8P4U8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::Avx2vnniN8P4U8, _NTILE, _MTILE>::Code;
 
-  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5027,13 +5049,14 @@ class ICoreRowNAvx2vnni : public CoreCodeBase<code::Avx2vnniN8P4U8, _NTILE, _MTI
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx2vnniSS : public CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _MTILE>::Code;
 
-  void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5043,13 +5066,14 @@ class ICoreRowNAvx2vnniSS : public CoreCodeBase<code::Avx2vnniN8P4S8, _NTILE, _M
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx512bw : public CoreCodeBase<code::Avx512bwN16P4, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::Avx512bwN16P4, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::Avx512bwN16P4, _NTILE, _MTILE>::Code;
 
-  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5059,15 +5083,16 @@ class ICoreRowNAvx512bw : public CoreCodeBase<code::Avx512bwN16P4, _NTILE, _MTIL
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvxvnniKBlock : public CoreCodeBase<code::kblock::AvxvnniN8P4U8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::AvxvnniN8P4U8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::kblock::AvxvnniN8P4U8, _NTILE, _MTILE>::Code;
-  void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA,  _astride, matB,    _bstride, matC, _cstride, zpA,     scaleA,
                                        _ldsa, scaleB,   reduceB, _ldsb,    _k,   _n,       _kblock, kpos == 0 ? 1 : 0,
                                        kscale};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5077,15 +5102,16 @@ class ICoreRowNAvxvnniKBlock : public CoreCodeBase<code::kblock::AvxvnniN8P4U8, 
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvxvnniKBlockSS : public CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::kblock::AvxvnniN8P4S8, _NTILE, _MTILE>::Code;
-  void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param =
         typename Code::params{matA,   _astride, matB,  _bstride, matC, _cstride, nullptr,           scaleA, _ldsa,
                               scaleB, reduceB,  _ldsb, _k,       _n,   _kblock,  kpos == 0 ? 1 : 0, kscale};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5095,15 +5121,16 @@ class ICoreRowNAvxvnniKBlockSS : public CoreCodeBase<code::kblock::AvxvnniN8P4S8
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx512bwKBlock : public CoreCodeBase<code::kblock::Avx512bwN16P4, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::Avx512bwN16P4, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::kblock::Avx512bwN16P4, _NTILE, _MTILE>::Code;
-  void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA,  _astride, matB,    _bstride, matC, _cstride, zpA,     scaleA,
                                        _ldsa, scaleB,   reduceB, _ldsb,    _k,   _n,       _kblock, kpos == 0 ? 1 : 0,
                                        kscale};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5113,15 +5140,16 @@ class ICoreRowNAvx512bwKBlock : public CoreCodeBase<code::kblock::Avx512bwN16P4,
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx2vnniKBlock : public CoreCodeBase<code::kblock::Avx2vnniN8P4U8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::Avx2vnniN8P4U8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::kblock::Avx2vnniN8P4U8, _NTILE, _MTILE>::Code;
-  void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA,  _astride, matB,    _bstride, matC, _cstride, zpA,     scaleA,
                                        _ldsa, scaleB,   reduceB, _ldsb,    _k,   _n,       _kblock, kpos == 0 ? 1 : 0,
                                        kscale};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5131,15 +5159,16 @@ class ICoreRowNAvx2vnniKBlock : public CoreCodeBase<code::kblock::Avx2vnniN8P4U8
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAvx2vnniKBlockSS : public CoreCodeBase<code::kblock::Avx2vnniN8P4S8, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::Avx2vnniN8P4S8, _NTILE, _MTILE>;
   using Code = typename CoreCodeBase<code::kblock::Avx2vnniN8P4S8, _NTILE, _MTILE>::Code;
-  void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param =
         typename Code::params{matA,   _astride, matB,  _bstride, matC, _cstride, nullptr,           scaleA, _ldsa,
                               scaleB, reduceB,  _ldsb, _k,       _n,   _kblock,  kpos == 0 ? 1 : 0, kscale};
     if (_m <= Code::MTILE) {
-      this->mCodes[_m - 1].mKernel(&param);
+      Base::getInstance()->mCodes[_m - 1].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5149,22 +5178,24 @@ class ICoreRowNAvx2vnniKBlockSS : public CoreCodeBase<code::kblock::Avx2vnniN8P4
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8 : public CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::Amxint8N16P4US, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
   using CType = typename Code::CType;
-  void configure(int _M, int _N, int _K) {
-    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType), this->mCodes[0].ATileCount,
-                                  this->mCodes[0].BTileCount, this->mCodes[0].CTileCount);
+  static void configure(int _M, int _N, int _K) {
+    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType),
+                                  Base::getInstance()->mCodes[0].ATileCount, Base::getInstance()->mCodes[0].BTileCount,
+                                  Base::getInstance()->mCodes[0].CTileCount);
   }
 
-  void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param =
         typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0, tmpcache};
     if (_m <= Code::MTILE) {
       int idx = utils::updiv(_m, 16) - 1;
-      this->mCodes[idx].mKernel(&param);
+      Base::getInstance()->mCodes[idx].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5174,22 +5205,24 @@ class ICoreRowNAmxint8 : public CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _M
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8SS : public CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::Amxint8N16P4SS, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
   using CType = typename Code::CType;
-  void configure(int _M, int _N, int _K) {
-    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType), this->mCodes[0].ATileCount,
-                                  this->mCodes[0].BTileCount, this->mCodes[0].CTileCount);
+  static void configure(int _M, int _N, int _K) {
+    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType),
+                                  Base::getInstance()->mCodes[0].ATileCount, Base::getInstance()->mCodes[0].BTileCount,
+                                  Base::getInstance()->mCodes[0].CTileCount);
   }
 
-  void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
-               int _cstride, int kpos, void* tmpcache, size_t cachesize) {
+  static void forward(int8_t* matA, int8_t* matB, int32_t* matC, int _m, int _n, int _k, int _astride, int _bstride,
+                      int _cstride, int kpos, void* tmpcache, size_t cachesize) {
     auto param =
         typename Code::params{matA, _astride, matB, _bstride, matC, _cstride, _k, _n, kpos == 0 ? 1 : 0, tmpcache};
     if (_m <= Code::MTILE) {
       int idx = utils::updiv(_m, 16) - 1;
-      this->mCodes[idx].mKernel(&param);
+      Base::getInstance()->mCodes[idx].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5199,24 +5232,26 @@ class ICoreRowNAmxint8SS : public CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, 
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8KBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16P4US, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::Amxint8N16P4US, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::kblock::Amxint8N16P4US, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
   using CType = typename Code::CType;
-  void configure(int _M, int _N, int _K) {
-    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType), this->mCodes[0].ATileCount,
-                                  this->mCodes[0].BTileCount, this->mCodes[0].CTileCount);
+  static void configure(int _M, int _N, int _K) {
+    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType),
+                                  Base::getInstance()->mCodes[0].ATileCount, Base::getInstance()->mCodes[0].BTileCount,
+                                  Base::getInstance()->mCodes[0].CTileCount);
   }
 
-  void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(uint8_t* matA, int8_t* matB, float* matC, uint8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param = typename Code::params{matA,   _astride, matB,    _bstride, matC, _cstride, zpA,     scaleA,
                                        _ldsa,  scaleB,   reduceB, _ldsb,    _k,   _n,       _kblock, kpos == 0 ? 1 : 0,
                                        kscale, tmpcache};
     if (_m <= Code::MTILE) {
       int idx = utils::updiv(_m, 16) - 1;
-      this->mCodes[idx].mKernel(&param);
+      Base::getInstance()->mCodes[idx].mKernel(&param);
     } else {
       assert(0);
     }
@@ -5226,24 +5261,26 @@ class ICoreRowNAmxint8KBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16P4
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8SSKBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE> {
  public:
+  using Base = CoreCodeBase<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
   using CType = typename Code::CType;
-  void configure(int _M, int _N, int _K) {
-    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType), this->mCodes[0].ATileCount,
-                                  this->mCodes[0].BTileCount, this->mCodes[0].CTileCount);
+  static void configure(int _M, int _N, int _K) {
+    code::AmxConfigure::configure(_M < 16 ? _M : 16, 16, Code::KTILE, sizeof(BType),
+                                  Base::getInstance()->mCodes[0].ATileCount, Base::getInstance()->mCodes[0].BTileCount,
+                                  Base::getInstance()->mCodes[0].CTileCount);
   }
 
-  void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
-               float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride, int _cstride,
-               int kpos, float kscale, void* tmpcache, size_t cachesize) {
+  static void forward(int8_t* matA, int8_t* matB, float* matC, int8_t* zpA, float* scaleA, int _ldsa, float* scaleB,
+                      float* reduceB, int _ldsb, int _m, int _n, int _k, int _kblock, int _astride, int _bstride,
+                      int _cstride, int kpos, float kscale, void* tmpcache, size_t cachesize) {
     auto param =
         typename Code::params{matA,   _astride, matB,  _bstride, matC, _cstride, nullptr,           scaleA, _ldsa,
                               scaleB, reduceB,  _ldsb, _k,       _n,   _kblock,  kpos == 0 ? 1 : 0, kscale, tmpcache};
     if (_m <= Code::MTILE) {
       int idx = utils::updiv(_m, 16) - 1;
-      this->mCodes[idx].mKernel(&param);
+      Base::getInstance()->mCodes[idx].mKernel(&param);
     } else {
       assert(0);
     }

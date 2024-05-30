@@ -233,9 +233,9 @@ class CpuDevice {
   inline bool AVX512_BF16() { return mHasAVX512_BF16; }
   inline bool AVX512_FP16() { return mHasAVX512_FP16; }
   inline float* const getPE() { return PE; }
-  inline size_t getPcoreNum() { return P_core.size(); }
-  inline size_t getEcoreNum() { return E_core.size(); }
-  inline size_t getSMTcoreNum() { return SMT_core.size(); }
+  inline int getPcoreNum() { return static_cast<int>(P_core.size()); }
+  inline int getEcoreNum() { return static_cast<int>(E_core.size()); }
+  inline int getSMTcoreNum() { return static_cast<int>(SMT_core.size()); }
   inline int* getPCores() { return P_core.data(); }
   inline int* getECores() { return E_core.data(); }
   inline int* getSMTCores() { return SMT_core.data(); }
@@ -467,15 +467,15 @@ class CpuDevice {
   bool isClient() { return mClient; }
 
  protected:
-  uint32_t L2Cache, L1Cache, L3Cache;
+  uint32_t L2Cache = 0, L1Cache = 0, L3Cache = 0;
   bool mHybrid = false, mClient = false;
-  bool mHasAVX2, mHasAVX_VNNI, mHasAVX, mHasAVX512_VNNI, mHasAMX_INT8, mHasAMX_BF16, mHasAVX512F, mHasAVX512BW,
-      mHasAVX512_BF16, mHasAVX512_FP16;
-  int numcores;
-  int numthreads;
+  bool mHasAVX2 = false, mHasAVX_VNNI = false, mHasAVX = false, mHasAVX512_VNNI = false, mHasAMX_INT8 = false,
+       mHasAMX_BF16 = false, mHasAVX512F = false, mHasAVX512BW, mHasAVX512_BF16 = false, mHasAVX512_FP16 = false;
+  int numcores = 0;
+  int numthreads = 0;
   std::vector<int> P_core, E_core, SMT_core;
-  uint32_t E_L2Cache, E_L1Cache;
-  float PE[int(BTLA_ISA::ISA_COUNT)];
+  uint32_t E_L2Cache = 0, E_L1Cache = 0;
+  float PE[int(BTLA_ISA::ISA_COUNT)] = {1.f};
 };
 
 #define GetCPUDevice() auto _cd = bestla::device::CpuDevice::getInstance();

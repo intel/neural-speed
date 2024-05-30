@@ -33,8 +33,8 @@ class UT_Fp32Fp32 {
     fill_buffer_randn(matB.data(), matB.size(), -0.5f, 0.5f);
     gemmref_fp32fp32fp32(m, n, k, matA.data(), matB.data(), ref.data(), k, n, n);
     using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                    prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
@@ -119,7 +119,7 @@ class UT_U8S8S32 {
       }
     }
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase,
                                                  prologue_b::gemm::WeightPack, epilogue::gemm::ZpDequantInt32ToFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
@@ -186,7 +186,7 @@ class UT_S8S8S32 {
       }
     }
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
+    using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase,
                                                  prologue_b::gemm::WeightPack, epilogue::gemm::DequantInt32ToFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
@@ -223,8 +223,8 @@ class UT_Bf16Bf16Fp32 {
   void ut(int m, int n, int k) {
     printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                    prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp32>;
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     auto packw = Launcher::PrologueB::createStorage(n, k);
@@ -263,8 +263,8 @@ class UT_Fp16Fp16Fp16 {
   void ut(int m, int n, int k) {
     printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
     using Launcher =
-        wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ActivationBase,
-                                    prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp16>;
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     auto packw = Launcher::PrologueB::createStorage(n, k);

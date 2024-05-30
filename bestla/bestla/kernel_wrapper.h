@@ -105,18 +105,20 @@ class Memcpy2D {
       }
     }
     if constexpr (utils::isa_base<ISA_T>::avx2) {
-      auto align_col = col * sizeof(_SRC_T) / 32 * 32 / sizeof(_SRC_T);
+      auto align_col = static_cast<int>(col * sizeof(_SRC_T) / 32 * 32 / sizeof(_SRC_T));
       ret = kernel::jit::JitMemcpy2DAvx2::forward<_SRC_T, _DST_T>(srcptr, dstptr, row, align_col, srcstep, dststep,
                                                                   const_elt_v);
       if (col - align_col > 0)
-        ret = kernel::ref::memcpy2d(srcptr + align_col, dstptr + align_col, row, (col - align_col) * sizeof(_SRC_T),
-                                    srcstep * sizeof(_SRC_T), dststep * sizeof(_DST_T));
+        ret = kernel::ref::memcpy2d(
+            srcptr + align_col, dstptr + align_col, row, static_cast<int>((col - align_col) * sizeof(_SRC_T)),
+            static_cast<int>(srcstep * sizeof(_SRC_T)), static_cast<int>(dststep * sizeof(_DST_T)));
       if (ret == BTLA_CODE::Success) {
         return ret;
       }
     }
-    return kernel::ref::memcpy2d(srcptr, dstptr, row, col * sizeof(_SRC_T), srcstep * sizeof(_SRC_T),
-                                 dststep * sizeof(_DST_T));
+    return kernel::ref::memcpy2d(srcptr, dstptr, row, static_cast<int>(col * sizeof(_SRC_T)),
+                                 static_cast<int>(srcstep * sizeof(_SRC_T)),
+                                 static_cast<int>(dststep * sizeof(_DST_T)));
   }
 
   template <BTLA_ISA ISA_T, typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP OP_T>
@@ -131,13 +133,13 @@ class Memcpy2D {
       }
     }
     if constexpr (utils::isa_base<ISA_T>::avx2) {
-      auto align_col = col * sizeof(_SRC_T) / 32 * 32 / sizeof(_SRC_T);
+      auto align_col = static_cast<int>(col * sizeof(_SRC_T) / 32 * 32 / sizeof(_SRC_T));
       ret = kernel::jit::JitMemcpy2DAvx2::forward1<_SRC_T, _DST_T, OP_T>(srcptr, dstptr, row, align_col, srcstep,
                                                                          dststep, const_elt_v);
       if (col - align_col > 0)
         ret = kernel::ref::memcpy2d_withop<_SRC_T, _DST_T, OP_T>(
-            srcptr + align_col, dstptr + align_col, row, (col - align_col) * sizeof(_SRC_T), srcstep * sizeof(_SRC_T),
-            dststep * sizeof(_DST_T), const_elt_v);
+            srcptr + align_col, dstptr + align_col, row, static_cast<int>((col - align_col) * sizeof(_SRC_T)),
+            static_cast<int>(srcstep * sizeof(_SRC_T)), static_cast<int>(dststep * sizeof(_DST_T)), const_elt_v);
       if (ret == BTLA_CODE::Success) {
         return ret;
       }
@@ -368,7 +370,7 @@ class CompressBit1 {
 template <typename _T>
 class Transpose2D {
  public:
-  TLACALL inline BTLA_CODE forward(const _T* srcptr, _T* dstptr, int row, int col, int ld_src, int ld_dst) {
+  TLACALL BTLA_CODE forward(const _T* srcptr, _T* dstptr, int row, int col, int ld_src, int ld_dst) {
     return ref::transpose2d(srcptr, dstptr, row, col, ld_src, ld_dst);
   }
 

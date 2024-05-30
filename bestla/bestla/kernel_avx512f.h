@@ -3601,7 +3601,7 @@ static inline BTLA_CODE decompress_s7_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                          int8_t* dstptr, size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (7 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
@@ -3916,7 +3916,7 @@ static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (6 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));

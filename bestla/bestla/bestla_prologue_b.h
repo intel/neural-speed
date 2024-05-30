@@ -355,7 +355,7 @@ class WeightKBlockNInteger {
       _para.getIndex(thdp);
       if (thdp.valid) {
         auto siptr = stor->ShfIndice();
-        for (size_t i = 0; i < stor->mK; i++) {
+        for (int i = 0; i < stor->mK; i++) {
           if (groupindices[i] >= thdp.loc[1] && groupindices[i] < thdp.loc[1] + thdp.size[1]) {
             siptr[groupindices[i] * stor->mBlockSize + countptr[groupindices[i]]] = i;
             countptr[groupindices[i]]++;
@@ -761,7 +761,7 @@ class WeightKBlockNInteger {
     if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
       auto aptr = wptr->template SPtr<uint8_t>();
       auto internal_k_offset = k_offset / wptr->mBlockSize;
-      auto dq_offset_idx = wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1;
+      auto dq_offset_idx = static_cast<int>(wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1);
       kernel::wrapper::Dq8GetScale::template forward<ISA_T>(
           aptr + internal_k_offset * wptr->CStep() + n_offset, *dstptr, utils::updiv(k_size, wptr->mBlockSize), n_size,
           internal_k_offset * wptr->mN + n_offset, wptr->mDqBlockSize, dq_offset_idx, wptr->DQPtr<float>(),
@@ -1066,7 +1066,7 @@ struct ParamWeightKBlockNFloat {
 template <class _GemmCore_T>
 class WeightKBlockNFloat {
  public:
-  using Param = ParamWeightKBlockNInteger;  // NFloat storage Param same with NInteger storage.
+  using Param = ParamWeightKBlockNFloat;  // NFloat storage Param same with NInteger storage.
   using StorageWeight = storage::gemm::StorageWeightKBlockNFloat;
   using QuantBaseT = WeightKBlockNInteger<_GemmCore_T>;
   AUTOCALL StorageWeight createStorage(const int N, const int K, int blocksize, BTLA_DTYPE fT, BTLA_DTYPE scaT) {

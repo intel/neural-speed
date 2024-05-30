@@ -70,7 +70,7 @@ static inline int auto_batch(size_t memsize) {
   auto L3 = _cd->getL3CacheSize();
   size_t constexpr Enlarge = 4;
   size_t constexpr TargetMem = 1LL << 30;
-  auto batch = std::max(L3 * Enlarge, TargetMem) / memsize;
+  auto batch = static_cast<int>(std::max(L3 * Enlarge, TargetMem) / memsize);
   return batch > 1 ? batch : 2;
 }
 
