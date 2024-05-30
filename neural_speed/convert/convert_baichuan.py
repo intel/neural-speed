@@ -144,7 +144,10 @@ def baichuan13B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
     fout.write(struct.pack("i", 0))
     fout.write(struct.pack("i", ftype))
-    fout.write(struct.pack("i", hparams["model_max_length"]))
+    if "max_position_embeddings" in hparams:
+        fout.write(struct.pack("i", hparams["max_position_embeddings"]))
+    else:
+        fout.write(struct.pack("i", hparams["model_max_length"]))
     fout.write(struct.pack("f", 0))
     fout.write(struct.pack("f", 0))
     fout.write(struct.pack("i", 0))
@@ -248,7 +251,10 @@ def baichuan7B_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", hparams["num_hidden_layers"]))
     fout.write(struct.pack("i", 128))
     fout.write(struct.pack("i", ftype))
-    fout.write(struct.pack("i", hparams["model_max_length"]))
+    if "max_position_embeddings" in hparams:
+        fout.write(struct.pack("i", hparams["max_position_embeddings"]))
+    else:
+        fout.write(struct.pack("i", hparams["model_max_length"]))
     fout.write(struct.pack("f", 0))
     fout.write(struct.pack("f", 0))
     fout.write(struct.pack("i", 0))
