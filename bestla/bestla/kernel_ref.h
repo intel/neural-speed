@@ -991,7 +991,7 @@ static inline float f8_to_fp32(utils::f8 v, BTLA_DTYPE f8_t) {
   auto mantissabit = 7 - ebits;
   e_revert &= 0x7f;
   e_revert >>= mantissabit;
-  e_revert = e_revert - std::powf(2, ebits - 1) + 1 + 127;
+  e_revert = e_revert - std::pow(2, ebits - 1) + 1 + 127;
   e_revert <<= 23;
   mantissa_revert <<= (23 - mantissabit);
   mantissa_revert &= 0x007fffff;
@@ -1012,7 +1012,7 @@ static inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstpt
       float scale;
       if constexpr (std::is_same_v<_S_T, utils::f8>) {
         int shared_exp = sptr[j / _PACK_ROW].x;
-        scale = std::powf(2, shared_exp);
+        scale = std::pow(2, shared_exp);
       } else if constexpr (std::is_same_v<_S_T, float>) {
         scale = scales[j / _PACK_ROW];
       } else {
@@ -1599,7 +1599,7 @@ static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int r
   auto col_elt = col / sizeof(utils::f8);
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col_elt; j++) {
-      f32_v[i * f32_stride + j] = std::powf(2, f8_v[i * f8_stride + j].x);
+      f32_v[i * f32_stride + j] = std::pow(2, f8_v[i * f8_stride + j].x);
     }
   }
   return BTLA_CODE::Success;
@@ -1722,23 +1722,23 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
 template <BTLA_DTYPE F8_T>
 static inline int8_t f8_mx_quantize(float v, float scale, BTLA_DTYPE scale_dtype) {
   if (scale_dtype == BTLA_DTYPE::F8_E8M0) {
-    v /= std::powf(2, scale);
+    v /= std::pow(2, scale);
   } else {
     v /= scale;
   }
   auto ebits = utils::bestla_dtype_get_f8_ebits(F8_T);
   auto quant_mantissa = utils::bestla_dtype_get_f8_quant_mbits(F8_T);
   auto store_mantissa = 7 - ebits;
-  auto private_exp = std::floorf(std::log2(std::abs(v == 0 ? v + 1 : v)));
-  auto min_exp = -1 * (std::powf(2, ebits - 1)) + 2;
+  auto private_exp = std::floor(std::log2(std::abs(v == 0 ? v + 1 : v)));
+  auto min_exp = -1 * (std::pow(2, ebits - 1)) + 2;
   private_exp = private_exp < min_exp ? min_exp : private_exp;
 
   // Scale up so appropriate number of bits are in the integer portion of the number
-  v = v / std::powf(2, private_exp) * std::powf(2, quant_mantissa - 2);
+  v = v / std::pow(2, private_exp) * std::pow(2, quant_mantissa - 2);
   auto sign = v > 0 ? 1 : -1;
-  v = sign * std::floorf(std::abs(v) + 0.5);
+  v = sign * std::floor(std::abs(v) + 0.5);
   // Undo scaling
-  v = v / std::powf(2, quant_mantissa - 2) * std::powf(2, private_exp);
+  v = v / std::pow(2, quant_mantissa - 2) * std::pow(2, private_exp);
 
   // saturate normals.
   auto max_norm = utils::get_mxfp_maxnorm(F8_T, ebits, quant_mantissa);
@@ -1749,7 +1749,7 @@ static inline int8_t f8_mx_quantize(float v, float scale, BTLA_DTYPE scale_dtype
   uint8_t store_signbit = (*(p + 3) & 0x80);
   *shift_v <<= 1;
   uint8_t store_ebit = (*(p + 3) & 0xFF);
-  store_ebit = store_ebit - 127 + std::powf(2, ebits - 1) - 1;
+  store_ebit = store_ebit - 127 + std::pow(2, ebits - 1) - 1;
   if (store_ebit > 15 && F8_T == BTLA_DTYPE::F8_E4M3) store_ebit = 0;
   if (store_ebit > 31 && F8_T == BTLA_DTYPE::F8_E5M2) store_ebit = 0;
   store_ebit <<= store_mantissa;
@@ -1777,10 +1777,10 @@ static inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, in
         if (scale == 0) scale += std::abs(std::numeric_limits<float>::min());
         scale = std::floor(std::log2(scale));
         auto ebits = utils::bestla_dtype_get_f8_ebits(F8_T);
-        auto emax = std::powf(2, ebits - 1);
+        auto emax = std::pow(2, ebits - 1);
         if (F8_T == BTLA_DTYPE::F8_E5M2) emax -= 1;
         scale -= emax;
-        auto scale_max = std::powf(2, 7) - 1;  // e8m0 scale type.
+        auto scale_max = std::pow(2, 7) - 1;  // e8m0 scale type.
         scale = scale < (-1 * scale_max) ? (-1 * scale_max) : scale;
       } else if (scale_dtype == BTLA_DTYPE::F32) {
         scale /= utils::get_mxfp_maxnorm(F8_T, utils::bestla_dtype_get_f8_ebits(F8_T),
@@ -2019,7 +2019,7 @@ static inline BTLA_CODE accum_alphaN_f32_f32(const SCA_T* alpha, const float* sr
         dstptr[i * dststep + j] = static_cast<float>(alpha[j]) * srcptr[i * srcstep + j] + dstptr[i * dststep + j];
       } else {
         dstptr[i * dststep + j] =
-            std::powf(2, alpha[j].x) * srcptr[i * srcstep + j] + dstptr[i * dststep + j];  // e8m0 scale.
+            std::pow(2, alpha[j].x) * srcptr[i * srcstep + j] + dstptr[i * dststep + j];  // e8m0 scale.
       }
     }
   }
@@ -2258,7 +2258,7 @@ inline float exp_ps_0_1(float x) {
   const float z = std::floor(x1);
   const float f = x1 - z;
   constexpr std::array<float, 3> coeff{0.240226507f, 0.452920674f, 0.713483036f};
-  // same as a * std::powf(2, z) but more precise
+  // same as a * std::pow(2, z) but more precise
   return ldexpf(coeff[0] * f * f + coeff[1] * f + coeff[2], static_cast<int>(z));
 }
 

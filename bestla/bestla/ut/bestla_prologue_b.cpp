@@ -928,8 +928,8 @@ class UT_ORT_NBits {
         }
       }
       rA.assign(tmpA.data());
-      Launcher::PrologueA::template reduce({matAf32.data(), k, &rA}, m, k, blocksize,
-                                           UT_Threading::get());  // for reduce UT
+      Launcher::PrologueA::reduce({matAf32.data(), k, &rA}, m, k, blocksize,
+                                  UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear
     }
