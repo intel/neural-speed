@@ -5442,13 +5442,13 @@ static void ne_compute_forward_mul_f32(const struct ne_compute_params* params, c
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
-  if ((ne_nrows(src1) == 1 || ne_nrows(src1) == ne_nrows(src0)) && ne10 == ne00) {
+  /*if ((ne_nrows(src1) == 1 || ne_nrows(src1) == ne_nrows(src0)) && ne10 == ne00) {
     if (nb10 == sizeof(float)) {
       int step1 = ne11 == 1 ? 0 : ne10;
       bestla_mul(nr, ne00, (const float*)src0->data, (const float*)src1->data, step1, (float*)dst->data);
       return;
     }
-  }
+  }*/
   NE_ASSERT(nb0 == sizeof(float));
   NE_ASSERT(nb00 == sizeof(float));
   NE_ASSERT(ne00 == ne10);
