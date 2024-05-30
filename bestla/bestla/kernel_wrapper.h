@@ -377,11 +377,11 @@ class QuantizeF4RowBlock {
   }
 };
 
+template <typename SRC_T>
 class QuantizeU8ColBlock {
  public:
-  template <BTLA_ISA ISA_T, typename SRC_T>
-  static inline BTLA_CODE forward(int row, int col, const SRC_T* srcptr, int ld_src, uint8_t* dstptr, int ld_dst,
-                                  float* scales, int ld_scale, uint8_t* zps, int blocksize, float* blkreduce) {
+  TLACALL BTLA_CODE forward(int row, int col, const SRC_T* srcptr, int ld_src, uint8_t* dstptr, int ld_dst,
+                            float* scales, int ld_scale, uint8_t* zps, int blocksize, float* blkreduce) {
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return avx512f::quantize_fp_u8_colblock<SRC_T>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, zps,
@@ -397,13 +397,28 @@ class QuantizeU8ColBlock {
     return ref::quantize_fp_u8_colblock(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, zps, blocksize,
                                         blkreduce);
   }
+
+  AUTOCALL BTLA_CODE forward_auto(int row, int col, const SRC_T* srcptr, int ld_src, uint8_t* dstptr, int ld_dst,
+                                  float* scales, int ld_scale, uint8_t* zps, int blocksize, float* blkreduce) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, zps, blocksize,
+                                        blkreduce);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, zps, blocksize,
+                                     blkreduce);
+    }
+    return forward<BTLA_ISA::NoSIMD>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, zps, blocksize,
+                                     blkreduce);
+  }
 };
 
+template <typename SRC_T>
 class QuantizeS8ColBlock {
  public:
-  template <BTLA_ISA ISA_T, typename SRC_T>
-  static inline BTLA_CODE forward(int row, int col, const SRC_T* srcptr, int ld_src, int8_t* dstptr, int ld_dst,
-                                  float* scales, int ld_scale, int blocksize, float* reduce) {
+  TLACALL BTLA_CODE forward(int row, int col, const SRC_T* srcptr, int ld_src, int8_t* dstptr, int ld_dst,
+                            float* scales, int ld_scale, int blocksize, float* reduce) {
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return avx512f::quantize_fp_s8_colblock<SRC_T>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale,
@@ -411,6 +426,18 @@ class QuantizeS8ColBlock {
     }
 #endif
     return ref::quantize_fp_s8_colblock(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, blocksize, reduce);
+  }
+
+  AUTOCALL BTLA_CODE forward_auto(int row, int col, const SRC_T* srcptr, int ld_src, int8_t* dstptr, int ld_dst,
+                                  float* scales, int ld_scale, int blocksize, float* reduce) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, blocksize, reduce);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, blocksize, reduce);
+    }
+    return forward<BTLA_ISA::NoSIMD>(row, col, srcptr, ld_src, dstptr, ld_dst, scales, ld_scale, blocksize, reduce);
   }
 };
 
@@ -1069,11 +1096,10 @@ class RowReduceSum {
   }
 };
 
+template <typename SRC_T>
 class ColBlockReduceSum {
  public:
-  template <BTLA_ISA ISA_T, typename SRC_T>
-  static inline BTLA_CODE forward(const SRC_T* srcptr, int ldsrc, int row, int col, int blocksize, float* reduce,
-                                  int ldr) {
+  TLACALL BTLA_CODE forward(const SRC_T* srcptr, int ldsrc, int row, int col, int blocksize, float* reduce, int ldr) {
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<SRC_T, float>) {
       return avx512f::col_block_reduce_sum<SRC_T>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
@@ -1085,6 +1111,18 @@ class ColBlockReduceSum {
     }
 #endif
     return ref::col_block_reduce_sum<SRC_T>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
+  }
+
+  AUTOCALL BTLA_CODE forward_auto(const SRC_T* srcptr, int ldsrc, int row, int col, int blocksize, float* reduce,
+                                  int ldr) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
+    }
+    return forward<BTLA_ISA::NoSIMD>(srcptr, ldsrc, row, col, blocksize, reduce, ldr);
   }
 };
 

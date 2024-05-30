@@ -96,6 +96,7 @@
 #define CompileAMXINT8() (CompileAMX())
 #endif
 
+// called by launcher, time critical functions
 #define TLACALL             \
   template <BTLA_ISA ISA_T> \
   static inline
@@ -103,6 +104,9 @@
 #define ISACALL             \
   template <BTLA_ISA ISA_T> \
   static
+
+// runtime auto-dispatch ISA, not time critical functions
+#define AUTOCALL static
 
 #include <immintrin.h>
 

@@ -112,7 +112,7 @@ class ActivationKBlockQuantize {
   using Parallel = parallel::Scheduler2D;
   using ThreadProblem = parallel::ThreadProblem2D;
 
-  static Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
+  AUTOCALL Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
     return Parallel({
         nthreads, prbm.dims[1],  // m
         prbm.dims[3],            // k
@@ -121,7 +121,7 @@ class ActivationKBlockQuantize {
     });
   }
 
-  static QParam createStorage(int m, int k, int kblock, bool hasreduce) {
+  AUTOCALL QParam createStorage(int m, int k, int kblock, bool hasreduce) {
     QParam tmp;
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
@@ -130,7 +130,7 @@ class ActivationKBlockQuantize {
     return tmp;
   }
 
-  ISACALL void run(const Param& _param, ThreadProblem& thdp) {
+  AUTOCALL void run(const Param& _param, ThreadProblem& thdp) {
     auto quan = _param.quan;
     if (thdp.valid) {
       // min max
@@ -141,24 +141,24 @@ class ActivationKBlockQuantize {
       auto thdzptr = quan->template ZPtr<AType>() + blk_offset;
       auto thdrptr = quan->template RPtr<float>() == nullptr ? nullptr : quan->template RPtr<float>() + blk_offset;
       if constexpr (std::is_same_v<AType, uint8_t>) {
-        kernel::wrapper::QuantizeU8ColBlock::template forward<ISA_T, SRC_T>(
-            thdp.size[0], thdp.size[1], srcptr, _param.lda, thdqptr, quan->mKPad, thdsptr, quan->CStep(), thdzptr,
-            quan->mBlockSize, thdrptr);
+        kernel::wrapper::QuantizeU8ColBlock<SRC_T>::forward_auto(thdp.size[0], thdp.size[1], srcptr, _param.lda,
+                                                                 thdqptr, quan->mKPad, thdsptr, quan->CStep(), thdzptr,
+                                                                 quan->mBlockSize, thdrptr);
       }
       if constexpr (std::is_same_v<AType, int8_t>) {
-        kernel::wrapper::QuantizeS8ColBlock::template forward<ISA_T, SRC_T>(thdp.size[0], thdp.size[1], srcptr,
-                                                                            _param.lda, thdqptr, quan->mKPad, thdsptr,
-                                                                            quan->CStep(), quan->mBlockSize, thdrptr);
+        kernel::wrapper::QuantizeS8ColBlock<SRC_T>::forward_auto(thdp.size[0], thdp.size[1], srcptr, _param.lda,
+                                                                 thdqptr, quan->mKPad, thdsptr, quan->CStep(),
+                                                                 quan->mBlockSize, thdrptr);
       }
     }
   }
 
-  ISACALL BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
+  AUTOCALL BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
     auto paral = Parallel({threading->num_threads(), m, k, 1, _param.quan->mBlockSize});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
-      if (thdp.valid) run<ISA_T>(_param, thdp);
+      if (thdp.valid) run(_param, thdp);
     });
     return BTLA_CODE::Success;
   }
@@ -232,7 +232,7 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, SRC_T> {
   using Parallel = parallel::Scheduler2D;
   using ThreadProblem = parallel::ThreadProblem2D;
 
-  static Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
+  AUTOCALL Parallel createParallel(int nthreads, const utils::GemmProblem& prbm) {
     return Parallel({
         nthreads, prbm.dims[1],  // m
         prbm.dims[3],            // k
@@ -240,31 +240,31 @@ class ActivationKBlockBase : public ActivationConverter<_GemmCore_T, SRC_T> {
         prbm.dims[4]  // kblock
     });
   }
-  static SType createStorage(int m, int k, int kblock) {
+  AUTOCALL SType createStorage(int m, int k, int kblock) {
     SType tmp;
     tmp.resize(m, k, kblock == -1 ? k : kblock, BTLA_DTYPE::F32);
     return tmp;
   }
 
-  ISACALL void run(const Param& _param, ThreadProblem& thdp) {
+  AUTOCALL void run(const Param& _param, ThreadProblem& thdp) {
     auto stor = _param.reduce;
     if (thdp.valid) {
       // min max
       auto srcptr = const_cast<SRC_T*>(_param.A) + thdp.loc[0] * _param.lda + thdp.loc[1];
       auto blk_offset = thdp.loc[0] * stor->lda + thdp.loc[1] / stor->kblock;
       auto thdrptr = stor->template RPtr<float>() + blk_offset;
-      auto ret = kernel::wrapper::ColBlockReduceSum::template forward<ISA_T, SRC_T>(
-          srcptr, _param.lda, thdp.size[0], thdp.size[1], stor->kblock, thdrptr, stor->lda);
+      auto ret = kernel::wrapper::ColBlockReduceSum<SRC_T>::forward_auto(srcptr, _param.lda, thdp.size[0], thdp.size[1],
+                                                                         stor->kblock, thdrptr, stor->lda);
       assert(ret == BTLA_CODE::Success);
     }
   }
 
-  ISACALL BTLA_CODE reduce(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
+  AUTOCALL BTLA_CODE reduce(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
     auto paral = Parallel({threading->num_threads(), m, k, 1, kblock});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
-      if (thdp.valid) run<ISA_T>(_param, thdp);
+      if (thdp.valid) run(_param, thdp);
     });
     return BTLA_CODE::Success;
   }
@@ -319,7 +319,7 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, SRC
     return tmp;
   }
 
-  ISACALL void run(const Param& _param, ThreadProblem& thdp) {
+  AUTOCALL void run(const Param& _param, ThreadProblem& thdp) {
     auto stor = _param.reduce;
     auto reordered = _param.reordered;
     if (thdp.valid) {
@@ -335,19 +335,19 @@ class ShuffleActivationKBlockBase : public ActivationKBlockBase<_GemmCore_T, SRC
         // min max
         auto blk_offset = thdp.loc[0] * stor->lda + thdp.loc[1] / stor->kblock;
         auto thdrptr = stor->template RPtr<float>() + blk_offset;
-        auto ret = kernel::wrapper::ColBlockReduceSum::template forward<ISA_T, SRC_T>(
+        auto ret = kernel::wrapper::ColBlockReduceSum<SRC_T>::forward_auto(
             srcptr, _param.lda, thdp.size[0], thdp.size[1], stor->kblock, thdrptr, stor->lda);
         assert(ret == BTLA_CODE::Success);
       }
     }
   }
 
-  ISACALL BTLA_CODE preprocess(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
+  AUTOCALL BTLA_CODE preprocess(const Param& _param, int m, int k, int kblock, parallel::IThreading* threading) {
     auto paral = Parallel({threading->num_threads(), m, k, 1, kblock});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
       paral.getIndex(thdp);
-      run<ISA_T>(_param, thdp);
+      run(_param, thdp);
     });
     return BTLA_CODE::Success;
   }
@@ -387,7 +387,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
   using Parallel = parallel::Scheduler2D;
   using ThreadProblem = parallel::ThreadProblem2D;
 
-  static QParam createQuantStorage(int m, int k, int kblock, bool hasreduce) {
+  AUTOCALL QParam createQuantStorage(int m, int k, int kblock, bool hasreduce) {
     QParam tmp;
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
@@ -396,7 +396,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
     return tmp;
   }
 
-  static RAType createReorderStorage(int m, int k, int kblock) {
+  AUTOCALL RAType createReorderStorage(int m, int k, int kblock) {
     RAType tmp(_GemmCore_T::ID);
     int kpad = utils::padto(k, _GemmCore_T::KTILE);
     int mpad = utils::padto(m, _GemmCore_T::MTILE);
@@ -404,7 +404,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
     return tmp;
   }
 
-  ISACALL BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
+  AUTOCALL BTLA_CODE quantize(const Param& _param, int m, int k, parallel::IThreading* threading) {
     auto srcptr = const_cast<SRC_T*>(_param.A);
     if (_param.indices) {
       auto shuffle_src = _param.reordered->template APtr<SRC_T>();
@@ -417,7 +417,7 @@ class ShuffleActivationKBlockQuantize : public ActivationKBlockQuantize<_GemmCor
       });
       srcptr = shuffle_src;
     }
-    ActivationKBlockQuantize<_GemmCore_T, SRC_T>::template quantize<ISA_T>({srcptr, k, _param.quan}, m, k, threading);
+    ActivationKBlockQuantize<_GemmCore_T, SRC_T>::quantize({srcptr, k, _param.quan}, m, k, threading);
     return BTLA_CODE::Success;
   }
 };

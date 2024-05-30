@@ -671,7 +671,7 @@ class UT_CompFp32 {
     launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
 
-    Launcher::PrologueA::reduce<ISA>({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
+    Launcher::PrologueA::reduce({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &reduceA}, {&packedw}, {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
@@ -1106,7 +1106,7 @@ class UT_ORT_NBits {
         }
       }
       rA.assign(tmpA.data());
-      Launcher::PrologueA::template reduce<ISA>({matAf32.data(), k, &rA}, m, k, blocksize,
+      Launcher::PrologueA::template reduce({matAf32.data(), k, &rA}, m, k, blocksize,
                                                 UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear

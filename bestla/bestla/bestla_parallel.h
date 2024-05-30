@@ -842,7 +842,7 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
     typename AParall::ThreadProblem thdpA{tidx};
     apara.getIndex(thdpA);
     if (thdpA.valid) {
-      Launch_T::PrologueA::run<Launch_T::ISA>(args.paramA, thdpA);
+      Launch_T::PrologueA::run(args.paramA, thdpA);
     }
     th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp{tidx};
