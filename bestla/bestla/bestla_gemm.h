@@ -4935,7 +4935,7 @@ class HCoreRowNAvx512bf16 : public CoreCodeBase<code::Avx512bf16N16P2, _NTILE, _
 template <int _NTILE, int _MTILE = 0>
 class HCoreRowNAmxbf16 : public CoreCodeBaseAMX<code::Amxbf16N16P2, _NTILE, _MTILE> {
  public:
-  using Base = CoreCodeBase<code::Amxbf16N16P2, _NTILE, _MTILE>;
+  using Base = CoreCodeBaseAMX<code::Amxbf16N16P2, _NTILE, _MTILE>;
   using Code = typename Base::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
@@ -5178,7 +5178,7 @@ class ICoreRowNAvx2vnniKBlockSS : public CoreCodeBase<code::kblock::Avx2vnniN8P4
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8 : public CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _MTILE> {
  public:
-  using Base = CoreCodeBase<code::Amxint8N16P4US, _NTILE, _MTILE>;
+  using Base = CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
@@ -5205,7 +5205,7 @@ class ICoreRowNAmxint8 : public CoreCodeBaseAMX<code::Amxint8N16P4US, _NTILE, _M
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8SS : public CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, _MTILE> {
  public:
-  using Base = CoreCodeBase<code::Amxint8N16P4SS, _NTILE, _MTILE>;
+  using Base = CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
@@ -5232,7 +5232,7 @@ class ICoreRowNAmxint8SS : public CoreCodeBaseAMX<code::Amxint8N16P4SS, _NTILE, 
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8KBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16P4US, _NTILE, _MTILE> {
  public:
-  using Base = CoreCodeBase<code::kblock::Amxint8N16P4US, _NTILE, _MTILE>;
+  using Base = CoreCodeBaseAMX<code::kblock::Amxint8N16P4US, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::kblock::Amxint8N16P4US, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
@@ -5261,7 +5261,7 @@ class ICoreRowNAmxint8KBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16P4
 template <int _NTILE, int _MTILE = 0>
 class ICoreRowNAmxint8SSKBlock : public CoreCodeBaseAMX<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE> {
  public:
-  using Base = CoreCodeBase<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE>;
+  using Base = CoreCodeBaseAMX<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE>;
   using Code = typename CoreCodeBaseAMX<code::kblock::Amxint8N16P4SS, _NTILE, _MTILE>::Code;
   using AType = typename Code::AType;
   using BType = typename Code::BType;
