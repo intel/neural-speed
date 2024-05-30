@@ -543,7 +543,7 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
-using tests = ::testing::Types<test_col_major_2>;
+using tests = ::testing::Types<test_col_major_1>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemv_test_suite,
