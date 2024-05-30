@@ -4397,13 +4397,13 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
   NE_ASSERT(nb0 == sizeof(float));
   NE_ASSERT(nb00 == sizeof(float));
   NE_ASSERT(ne00 == ne10);
-  if ((ne_nrows(src1) == 1 || ne_nrows(src0) == ne_nrows(src1)) && ne10 == ne00) {
+  /*if ((ne_nrows(src1) == 1 || ne_nrows(src0) == ne_nrows(src1)) && ne10 == ne00) {
     if (nb10 == sizeof(float)) {
       int step1 = ne11 == 1 ? 0 : ne10;
       bestla_add(nr, ne00, (const float*)src0->data, (const float*)src1->data, step1, (float*)dst->data);
       return;
     }
-  }
+  }*/
   if (nb10 == sizeof(float)) {
     for (int64_t ir = ith; ir < nr; ir += nth) {
       // src0 and dst are same shape => same indices
