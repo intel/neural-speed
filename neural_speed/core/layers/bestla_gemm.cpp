@@ -225,8 +225,7 @@ size_t BTLABuSize(int block_size, size_t N, size_t K, BTLA_DTYPE QuantType, BTLA
                   int* shuffle_indice) {
   using WType = typename T::PrologueB::StorageWeight;
   WType stor(0);
-  if constexpr (std::is_same_v<typename T::PrologueB,
-                               prologue_b::gemm::WeightKBlockNInteger<typename T::GemmCore>>) {
+  if constexpr (std::is_same_v<typename T::PrologueB, prologue_b::gemm::WeightKBlockNInteger<typename T::GemmCore>>) {
     stor = T::PrologueB::createStorage(N, K, block_size, QuantType, ScaleDtype, BTLA_DTYPE::BF16, isAsym);
     if (shuffle_indice != nullptr) {
       T::PrologueB::enableShuffle(&stor);
@@ -300,8 +299,7 @@ void BTLAGemmQuantPackB(void* PackedBuf, int BlkSize, const float* FpData, int N
                         BTLA_DTYPE ScaleDtype, bool IsAsym, int ldb, bool IsTrans, void* ThreadPool) {
   using WType = typename T::PrologueB::StorageWeight;
   WType stor(0);
-  if constexpr (std::is_same_v<typename T::PrologueB,
-                               prologue_b::gemm::WeightKBlockNInteger<typename T::GemmCore>>) {
+  if constexpr (std::is_same_v<typename T::PrologueB, prologue_b::gemm::WeightKBlockNInteger<typename T::GemmCore>>) {
     stor = T::PrologueB::createStorage(N, K, BlkSize, QuantType, ScaleDtype, BTLA_DTYPE::BF16, IsAsym);
   } else {
     stor = T::PrologueB::createStorage(N, K, BlkSize, QuantType, ScaleDtype);
@@ -394,8 +392,7 @@ void BTLAGemmPackBImpl(void* PackedBuf, int BlkSize, const int8_t* QData, const 
   using WType = typename T::PrologueB::StorageWeight;
   auto pth = reinterpret_cast<parallel::IThreading*>(ThreadPool);
   WType stor(0);
-  if constexpr (std::is_same_v<typename T::PrologueB,
-                               prologue_b::gemm::WeightKBlockNInteger<typename T::GemmCore>>) {
+  if constexpr (std::is_same_v<typename T::PrologueB, prologue_b::gemm::WeightKBlockNInteger<typename T::GemmCore>>) {
     stor = T::PrologueB::createStorage(N, K, BlkSize, QuantType, ScaleDtype, BTLA_DTYPE::BF16, IsAsym);
     if (shuffle_indice != nullptr) {
       T::PrologueB::enableShuffle(&stor);
