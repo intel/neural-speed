@@ -403,28 +403,29 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr uint32_t load_len = tile_size_x / scale_factor;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_load_vec_len =
-      load_store_attr::max_load_vec_len;
+  static constexpr uint32_t max_load_vec_in_elems =
+      load_store_attr::max_load_vec_in_bytes / sizeof(load_dtype);
 
-  static constexpr uint32_t load_iter_steps = load_len / max_load_vec_len;
-  if constexpr (load_len >= max_load_vec_len) {
+  static constexpr uint32_t load_iter_steps = load_len / max_load_vec_in_elems;
+  if constexpr (load_len >= max_load_vec_in_elems) {
 #pragma unroll
     for (uint32_t i = 0; i < load_iter_steps; i++) {
-      uint32_t offset_x = i * max_load_vec_len * scale_factor;
+      uint32_t offset_x = i * max_load_vec_in_elems * scale_factor;
       auto reg_sub =
-          tile.reg.xetla_select<max_load_vec_len * scale_factor, 1>(offset_x);
+          tile.reg.xetla_select<max_load_vec_in_elems * scale_factor, 1>(
+              offset_x);
       uint32_t address_offset = offset_x * sizeof(dtype);
       reg_sub.xetla_format<load_dtype>() =
-          xetla_load_global<load_dtype, max_load_vec_len, L1, L2>(
+          xetla_load_global<load_dtype, max_load_vec_in_elems, L1, L2>(
               payload.base_ptr, payload.base_offset + address_offset);
     }
   }
 
-  constexpr uint32_t tail_len = load_len % max_load_vec_len;
-  uint32_t tail_offset = load_iter_steps * max_load_vec_len * scale_factor;
+  constexpr uint32_t tail_len = load_len % max_load_vec_in_elems;
+  uint32_t tail_offset = load_iter_steps * max_load_vec_in_elems * scale_factor;
   detail::process_1d_tail<
       tail_len,
-      (max_load_vec_len >> 1),
+      (max_load_vec_in_elems >> 1),
       detail::process_flag::load,
       L1,
       L2>(tile, payload, tail_offset);
@@ -855,35 +856,36 @@ tile_load(tile_t& tile, payload_t& payload) {
   constexpr uint32_t load_len = tile_desc::tile_size_x / scale_factor;
   constexpr gpu_arch arch_tag = payload_t::arch_tag;
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  constexpr uint32_t max_load_vec_len = load_store_attr::max_load_vec_len;
+  constexpr uint32_t max_load_vec_in_elems =
+      load_store_attr::max_load_vec_in_bytes / sizeof(load_dtype);
 
-  constexpr uint32_t load_iter_steps = load_len / max_load_vec_len;
+  constexpr uint32_t load_iter_steps = load_len / max_load_vec_in_elems;
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::tile_size_y; i++) {
     uint32_t offset_y = i * tile_desc::tile_size_x;
     uint32_t address_offset_y = i * payload.pitch_in_bytes;
-    if constexpr (load_len >= max_load_vec_len) {
+    if constexpr (load_len >= max_load_vec_in_elems) {
 #pragma unroll
       for (uint32_t j = 0; j < load_iter_steps; j++) {
-        uint32_t offset_x = j * max_load_vec_len * scale_factor;
+        uint32_t offset_x = j * max_load_vec_in_elems * scale_factor;
         auto reg_sub =
-            tile.reg.xetla_select<max_load_vec_len * scale_factor, 1>(
+            tile.reg.xetla_select<max_load_vec_in_elems * scale_factor, 1>(
                 offset_x + offset_y);
         uint32_t address_offset = address_offset_y + offset_x * sizeof(dtype);
         reg_sub.xetla_format<load_dtype>() = xetla_load_local<
             load_dtype,
-            max_load_vec_len,
+            max_load_vec_in_elems,
             data_size::default_size>(
             payload.base_address + payload.address + address_offset);
       }
     }
     uint32_t tail_offset =
-        offset_y + load_iter_steps * max_load_vec_len * scale_factor;
+        offset_y + load_iter_steps * max_load_vec_in_elems * scale_factor;
     uint32_t tail_address_offset = address_offset_y +
-        load_iter_steps * max_load_vec_len * scale_factor * sizeof(dtype);
+        load_iter_steps * max_load_vec_in_elems * scale_factor * sizeof(dtype);
     detail::process_1d_tail<
-        load_len % max_load_vec_len,
-        (max_load_vec_len >> 1),
+        load_len % max_load_vec_in_elems,
+        (max_load_vec_in_elems >> 1),
         detail::process_flag::load,
         L1,
         L2>(tile, payload, tail_offset, tail_address_offset);

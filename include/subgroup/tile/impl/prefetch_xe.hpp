@@ -150,7 +150,9 @@ tile_prefetch(payload_t& payload) {
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   constexpr uint32_t prefetch_len =
       tile_desc::tile_size_x / payload_t::scale_factor;
-  constexpr uint32_t max_prefetch_in_bytes = load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::max_prefetch_vec_len;
+  constexpr uint32_t max_prefetch_in_bytes =
+      load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::
+          max_prefetch_vec_in_bytes;
   if constexpr (prefetch_len >= max_prefetch_in_bytes) {
 #pragma unroll
     for (uint32_t j = 0; j < prefetch_len / max_prefetch_in_bytes; j++) {
@@ -165,10 +167,11 @@ tile_prefetch(payload_t& payload) {
     }
   }
   constexpr uint32_t tail_len = prefetch_len % max_prefetch_in_bytes;
-  uint32_t tail_offset =
-      prefetch_len / max_prefetch_in_bytes * max_prefetch_in_bytes * payload_t::scale_factor;
-  detail::process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
-      payload, tail_offset);
+  uint32_t tail_offset = prefetch_len / max_prefetch_in_bytes *
+      max_prefetch_in_bytes * payload_t::scale_factor;
+  detail::
+      process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
+          payload, tail_offset);
 }
 
 /// @brief Is prefetch data func.
@@ -183,8 +186,8 @@ template <
     cache_hint L1 = cache_hint::cached,
     cache_hint L2 = cache_hint::cached,
     typename payload_t>
-__XETLA_API typename std::enable_if_t<
-    detail::check_prefetch_type<payload_t>::is_local>
-tile_prefetch([[maybe_unused]] payload_t& payload) {}
+__XETLA_API
+    typename std::enable_if_t<detail::check_prefetch_type<payload_t>::is_local>
+    tile_prefetch([[maybe_unused]] payload_t& payload) {}
 
 } // namespace gpu::xetla::subgroup
