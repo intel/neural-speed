@@ -664,32 +664,32 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
       auto sptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(ptr);
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX512F> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAVX512F>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
+                                                                         FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX2::NTILE && _cd->AVX2()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX2> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAVX2>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
+                                                                      FpData, static_cast<int>(ldb), pth);
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
         if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAMX_INT8_US_KBlock> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAMX_INT8_US_KBlock>::unpackWeight(
+              static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock>::unpackWeight(
+              static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX512BW_KBlock> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAVX512BW_KBlock>::unpackWeight(
+              static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock>::unpackWeight(
+              static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
         }
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAMX_BF16> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNInteger<tAMX_BF16>::unpackWeight(static_cast<int>(N), static_cast<int>(K),
+                                                                          sptr, FpData, static_cast<int>(ldb), pth);
         }
       }
     }
@@ -697,17 +697,17 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
       auto sptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNFloat*>(ptr);
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F()) {
-          static prologue_b::gemm::WeightKBlockNFloat<tAVX512F> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNFloat<tAVX512F>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
+                                                                       FpData, static_cast<int>(ldb), pth);
         } else if (NTile == tAVX2::NTILE && _cd->AVX2()) {
-          static prologue_b::gemm::WeightKBlockNFloat<tAVX2> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNFloat<tAVX2>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
+                                                                    FpData, static_cast<int>(ldb), pth);
         }
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
-          static prologue_b::gemm::WeightKBlockNFloat<tAMX_BF16> proB;
-          proB.unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr, FpData, static_cast<int>(ldb), pth);
+          prologue_b::gemm::WeightKBlockNFloat<tAMX_BF16>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
+                                                                        FpData, static_cast<int>(ldb), pth);
         }
       }
     }
