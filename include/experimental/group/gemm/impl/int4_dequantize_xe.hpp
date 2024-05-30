@@ -655,10 +655,9 @@ class gemm_t<
 #pragma unroll
       for (uint32_t j = 0; j < num_block_x; ++j) {
         int block_id = (i * num_block_x + j);
-        auto matB_blk = matB.reg
-                            .xetla_select<matB_t::block_elems, 1>(
-                                block_id * matB_t::block_elems)
-                            .xetla_format<uint8_t>();
+        auto matB_blk = matB.reg.xetla_format<uint8_t>()
+                            .xetla_select<matB_acc_t::block_elems / 2, 1>(
+                                block_id * matB_acc_t::block_elems / 2);
 
         auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
             block_id * matB_acc_t::block_elems);
@@ -670,45 +669,24 @@ class gemm_t<
             uint8_t>;
         xetla_vector<dtype_8bit, matB_acc_t::block_elems> cvt_blk_i8;
 
-#pragma unroll
-        for (uint32_t i8_offset = 0; i8_offset < pack_ratio; i8_offset += 2) {
-          uint32_t i4_offset = i8_offset / 2;
-          // lowest 4 bit
-          {
-            auto dequant_i8_low_4bit =
-                cvt_blk_i8.xetla_select<matB_t::block_elems, pack_ratio>(
-                    i8_offset);
-            dequant_i8_low_4bit =
-                matB_blk.xetla_select<matB_t::block_elems, sizeof(dtype_b)>(
-                    i4_offset) &
-                0xf;
-            // Only int8 needs to reserve the sign bit
-            if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
-              dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
-              dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
-            }
-          }
-          // highest 4 bit
-          {
-            auto dequant_i8_high_4bit =
-                cvt_blk_i8.xetla_select<matB_t::block_elems, pack_ratio>(
-                    i8_offset + 1);
-            if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
-              dequant_i8_high_4bit =
-                  matB_blk
-                      .xetla_select<matB_t::block_elems, sizeof(dtype_b)>(
-                          i4_offset)
-                      .xetla_format<dtype_8bit>() >>
-                  4;
-            } else {
-              dequant_i8_high_4bit =
-                  matB_blk.xetla_select<matB_t::block_elems, sizeof(dtype_b)>(
-                      i4_offset) >>
-                  4;
-            }
-          }
+        // lowest 4 bit
+        auto dequant_i8_low_4bit =
+            cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0);
+        dequant_i8_low_4bit = matB_blk & 0xf;
+        // Only int8 needs to reserve the sign bit
+        if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+          dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
+          dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
         }
-
+        // highest 4 bit
+        auto dequant_i8_high_4bit =
+            cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1);
+        if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+          dequant_i8_high_4bit = matB_blk.xetla_format<dtype_8bit>() >> 4;
+        } else {
+          dequant_i8_high_4bit = matB_blk >> 4;
+        }
+        
         // int8 x scale = fp16
         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
 #pragma unroll

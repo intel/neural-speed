@@ -45,7 +45,7 @@ class test_col_major_1 {
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
-  using data_type_b = int4x2;
+  using data_type_b = int4x8;
   using data_type_c = fp16;
 };
 class test_col_major_2 {
