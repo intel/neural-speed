@@ -135,9 +135,9 @@ class UT_PaddingTransInterleaveMN {
     aligned_vector<T_DST> dst(col_pad * row_pad), ref(col_pad * row_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::NoSIMD>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack, T_SRC, T_DST>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::AVX512_FP16>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack, T_SRC, T_DST>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size(), T_DST(100));
   }

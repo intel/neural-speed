@@ -817,7 +817,7 @@ class SchedulerDispatcher<Scheduler2D> {
 }  // namespace gemm
 
 template <class Parallel_T, class Launch_T>
-void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
+void GemmRun(const typename Launch_T::Param& args, parallel::IThreading* th) {
   gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   static bool flag = false;
   if (flag) {
@@ -829,13 +829,13 @@ void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel:
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {
-      launcher.run(args, thdp);
+      Launch_T::run(args, thdp);
     }
   });
 }
 
 template <class Parallel_T, class Launch_T>
-void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
+void GemmRunWithA(const typename Launch_T::Param& args, parallel::IThreading* th) {
   gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
   AParall apara = Launch_T::PrologueA::createParallel(th->num_threads(), args.problem);
@@ -855,7 +855,7 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {
-      launcher.run(args, thdp);
+      Launch_T::run(args, thdp);
     }
   });
 }

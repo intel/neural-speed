@@ -470,7 +470,7 @@ class UT_CompFp32 {
         wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    Launcher launcher;
+
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Launcher::PrologueB::StorageWeight;
     WType packedw(0);
@@ -496,7 +496,7 @@ class UT_CompFp32 {
     Launcher::PrologueA::reduce({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &reduceA}, {&packedw}, {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
+    parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     auto dbits = bestla_dtype_bits(qtype);
     auto type = bestla_dtype_type(qtype);
@@ -513,7 +513,7 @@ class UT_CompFp32 {
     using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    Launcher launcher;
+
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T>::StorageWeight;
     WType packedw(0);
@@ -529,7 +529,7 @@ class UT_CompFp32 {
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k}, {&packedw}, {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
+    parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
@@ -661,7 +661,7 @@ class UT_CompInt8 {
                                                       prologue_b::gemm::WeightKBlockNInteger,
                                                       epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
-    Launcher launcher;
+
     blocksize = blocksize == -1 ? k : blocksize;
     int kblks = updiv(k, blocksize);
     using WType = typename Launcher::PrologueB::StorageWeight;
@@ -693,7 +693,7 @@ class UT_CompInt8 {
     quanA.assign(bufferA.data());
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &quanA}, {&packedw}, {matC.data(), n}};
-    parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
+    parallel::GemmRunWithA<Parallel, Launcher>(args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     if (stype != BTLA_DTYPE::DQ8_BNB) {
@@ -713,7 +713,7 @@ class UT_CompInt8 {
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationF32KBlockQuantize,
                                                  prologue_b::gemm::WeightKBlockNInteger, PcWriteBack>;
-    Launcher launcher;
+
     blocksize = blocksize == -1 ? k : blocksize;
     int kblks = updiv(k, blocksize);
     using WType = typename Launcher::PrologueB::StorageWeight;
@@ -751,7 +751,7 @@ class UT_CompInt8 {
         {{packedw.template SPtr<char>(), packedw.SDtype(), quanA.template SPtr<float>(), quanA.template ZPtr<uint8_t>(),
           packedw.template RPtr<char>(), packedw.RDtype(), nullptr, nullptr, k},
          {matC.data(), n}}};
-    parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
+    parallel::GemmRunWithA<Parallel, Launcher>(args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
 
@@ -822,7 +822,6 @@ class UT_CompBf16 {
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
-    Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T>::StorageWeight;
     WType packedw(0);
@@ -851,7 +850,7 @@ class UT_CompBf16 {
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {&packedw}, {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
+    parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
     auto err = get_ut_err(qtype);
     buffer_error(refC.data(), matC.data(), refC.size(), err);
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.05f);
@@ -894,7 +893,7 @@ class UT_ORT_NBits {
         wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    Launcher launcher;
+
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = storage::gemm::StorageWeightKBlockNInteger;
     WType packedw(0);
@@ -957,9 +956,9 @@ class UT_ORT_NBits {
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &rA}, {&packedw}, {matC.data(), n}};
     if (isasym) {
-      parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
+      parallel::GemmRunWithA<Parallel, Launcher>(args, UT_Threading::get());
     } else {
-      parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
+      parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
     }
     auto err = INT4_ERR;
     buffer_error(refC.data(), matC.data(), refC.size(), err);
@@ -978,7 +977,7 @@ class UT_ORT_NBits {
         wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationKBlockBaseF32,
                                     prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
-    Launcher launcher;
+
     const char *qfile = "int_weight.bin", *sfile = "scales.bin", *zfile = "zeros.bin";
     auto qdata = ut::readFile2Buffer<int8_t>(qfile);
     auto sdata = readFile2Buffer<float>(sfile);
@@ -1030,9 +1029,9 @@ class UT_ORT_NBits {
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k, &rA}, {&packedw}, {matC.data(), n}};
     if (isasym) {
-      parallel::GemmRunWithA<Parallel>(launcher, args, UT_Threading::get());
+      parallel::GemmRunWithA<Parallel, Launcher>(args, UT_Threading::get());
     } else {
-      parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
+      parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
     }
     auto err = INT4_ERR;
     buffer_error(refC.data(), matC.data(), refC.size(), err);
@@ -1089,7 +1088,7 @@ class UT_CompFp16 {
                                                           epilogue::gemm::CompFp32BlockEpilogue,
                                                           epilogue::gemm::AccumulatorWriteBackFp32>;
     using Parallel = parallel::gemm::SchedulerKBlock<GemmCore_T>;
-    Launcher launcher;
+    
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
@@ -1127,7 +1126,7 @@ class UT_CompFp16 {
                                   {&packedw},
                                   {packedw.template SPtr<int8_t>(), packedw.SDtype(), packedw.CStep()},
                                   {matC.data(), n}};
-    parallel::GemmRun<Parallel>(launcher, args);
+    parallel::GemmRun<Parallel,Launcher>(args);
     auto err = INT8_ERR;
     if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
       err = INT4_ERR;

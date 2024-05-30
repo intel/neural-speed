@@ -29,14 +29,14 @@ unsigned long long bestla_fusion_FFN_f32f32_get_workspace_size(int seq, int fin,
 namespace ffn_2w {
 
 template <class Parallel_T, class Launch_T1, class Launch_T2>
-void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Launch_T1::Param& args1,
-                      const typename Launch_T2::Param& args2, parallel::IThreading* th) {
+void GemmRunWithA_ffn(const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
+                      parallel::IThreading* th) {
   parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th, args1.problem});
   parallel::gemm::SchedulerDispatcher<Parallel_T> para2({th, args2.problem});
   using AParall1 = typename Launch_T1::PrologueA::Parallel;
   using AParall2 = typename Launch_T2::PrologueA::Parallel;
-  auto apara1 = launcher1->mProA.createParallel(th->num_threads(), args1.problem);
-  auto apara2 = launcher2->mProA.createParallel(th->num_threads(), args2.problem);
+  auto apara1 = Launch_T1::PrologueA::createParallel(th->num_threads(), args1.problem);
+  auto apara2 = Launch_T2::PrologueA::createParallel(th->num_threads(), args2.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -48,32 +48,32 @@ void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename
     typename AParall1::ThreadProblem thdpA1{tidx};
     apara1.getIndex(thdpA1);
     if (thdpA1.valid) {
-      launcher1->mProA.run(args1.paramA, thdpA1);
+      Launch_T1::PrologueA::run(args1.paramA, thdpA1);
     }
     th->sync(tidx, 0);
     typename Parallel_T::ThreadProblem thdp1{tidx};
     para1.getIndex(thdp1);
     if (thdp1.valid) {
-      launcher1->run(args1, thdp1);
+      Launch_T1::run(args1, thdp1);
     }
     th->sync(tidx, 1);
     typename AParall2::ThreadProblem thdpA2{tidx};
     apara2.getIndex(thdpA2);
     if (thdpA2.valid) {
-      launcher2->mProA.run(args2.paramA, thdpA2);
+      Launch_T2::PrologueA::run(args2.paramA, thdpA2);
     }
     th->sync(tidx, 2);
     typename Parallel_T::ThreadProblem thdp2{tidx};
     para2.getIndex(thdp2);
     if (thdp2.valid) {
-      launcher2->run(args2, thdp2);
+      Launch_T2::run(args2, thdp2);
     }
   });
 }
 
 template <class Parallel_T, class Launch_T1, class Launch_T2>
-void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Launch_T1::Param& args1,
-                 const typename Launch_T2::Param& args2, parallel::IThreading* th) {
+void GemmRun_ffn(const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
+                 parallel::IThreading* th) {
   parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th, args1.problem});
   parallel::gemm::SchedulerDispatcher<Parallel_T> para2({th, args2.problem});
   static bool flag = false;
@@ -87,33 +87,30 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Laun
     typename Parallel_T::ThreadProblem thdp1{tidx};
     para1.getIndex(thdp1);
     if (thdp1.valid) {
-      launcher1->run(args1, thdp1);
+      Launch_T1::run(args1, thdp1);
     }
     th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp2{tidx};
     para2.getIndex(thdp2);
     if (thdp2.valid) {
-      launcher2->run(args2, thdp2);
+      Launch_T2::run(args2, thdp2);
     }
   });
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <class, BTLA_ISA> class Act_T,
-          class Epi_T1, class Epi_T2>
+template <class GemmCore_T, template <class> class Wei_T, template <class> class Act_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                      float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
                      parallel::IThreading* th, typename Epi_T1::Param epi_prama1, typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T1>;
-  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T2>;
+  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T, Act_T, Wei_T, Epi_T1>;
+  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, Act_T, Wei_T, Epi_T2>;
   auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
   auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
   utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
   utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
-  static Launcher_epi kernel_epi;
-  static Launcher kernel;
-  auto reordA1 = kernel_epi.mProA.createReorderStorage(seq, fin, w1ptr_->mBlockSize);
-  auto reordA2 = kernel_epi.mProA.createReorderStorage(seq, fin, w2ptr_->mBlockSize);
+  auto reordA1 = Launcher_epi::PrologueA::createReorderStorage(seq, fin, w1ptr_->mBlockSize);
+  auto reordA2 = Launcher::PrologueA::createReorderStorage(seq, fin, w2ptr_->mBlockSize);
   typename Launcher_epi::Param args1{
       gp1, {activation, fin, nullptr, w1ptr_->ShfIndice(), &reordA1}, {w1ptr_}, epi_prama1};
   typename Launcher::Param args2{gp2, {tmp, fmid, nullptr, w2ptr_->ShfIndice(), &reordA2}, {w2ptr_}, epi_prama2};
@@ -121,44 +118,41 @@ void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, stora
   if (w1ptr_->ShfIndice()) {
     reordA1.assign(WS);
     reordA2.assign(WS);
-    GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel, args1, args2, th);
+    GemmRunWithA_ffn<Parallel, Launcher_epi, Launcher>(args1, args2, th);
   } else {
-    GemmRun_ffn<Parallel>(&kernel_epi, &kernel, args1, args2, th);
+    GemmRun_ffn<Parallel, Launcher_epi, Launcher>(args1, args2, th);
   }
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
+template <class GemmCore_T, template <class> class Wei_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompInt8Pc(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                         float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
                         parallel::IThreading* th, typename Epi_T1::Fp32Param epi_prama1,
                         typename Epi_T2::Fp32Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-
-  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
-                                                   prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
-  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
-                                               prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
+  using Launcher_epi =
+      wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
+  using Launcher =
+      wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
   auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
   auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
   utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
   utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
   assert(w1ptr_->mBlockSize >= fin);
   assert(w2ptr_->mBlockSize >= fmid);
-  static Launcher_epi kernel_epi;
-  static Launcher kernel;
   auto WS = reinterpret_cast<int8_t*>(workspace);
-  auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
+  auto quanA1 = Launcher_epi::PrologueA::createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
   quanA1.assign(WS);
   WS += quanA1.mSize;
-  auto reordA1 = kernel_epi.mProA.createReorderStorage(seq, fin, w1ptr_->mBlockSize);
+  auto reordA1 = Launcher_epi::PrologueA::createReorderStorage(seq, fin, w1ptr_->mBlockSize);
   if (w1ptr_->ShfIndice()) {
     reordA1.assign(WS);
   }
   WS = reinterpret_cast<int8_t*>(workspace);
-  auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
+  auto quanA2 = Launcher::PrologueA::createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
   quanA2.assign(WS);
   WS += quanA2.mSize;
-  auto reordA2 = kernel_epi.mProA.createReorderStorage(seq, fin, w2ptr_->mBlockSize);
+  auto reordA2 = Launcher::PrologueA::createReorderStorage(seq, fin, w2ptr_->mBlockSize);
   if (w2ptr_->ShfIndice()) {
     reordA2.assign(WS);
   }
@@ -176,46 +170,42 @@ void BTLAGemmCompInt8Pc(float* activation, storage::gemm::IWeightBase* w1ptr, st
       {{w2ptr_->template SPtr<char>(), w2ptr_->SDtype(), quanA2.template SPtr<float>(), quanA2.template ZPtr<uint8_t>(),
         w2ptr_->template RPtr<char>(), w2ptr_->RDtype(), nullptr, nullptr, fmid},
        epi_prama2}};
-  GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel, args1, args2, th);
+  GemmRunWithA_ffn<Parallel, Launcher_epi, Launcher>(args1, args2, th);
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
+template <class GemmCore_T, template <class> class Wei_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                       float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
                       parallel::IThreading* th, typename Epi_T1::Param epi_prama1, typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher_epi =
-      wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
-                                       prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
+      wrapper::gemm::LauncherIntKBlock<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
   using Launcher =
-      wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
-                                       prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
+      wrapper::gemm::LauncherIntKBlock<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
   auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
   auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
   utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
   utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
-  static Launcher_epi kernel_epi;
-  static Launcher kernel;
   auto WS = reinterpret_cast<int8_t*>(workspace);
-  auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
+  auto quanA1 = Launcher_epi::PrologueA::createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
   quanA1.assign(WS);
   WS += quanA1.mSize;
-  auto reordA1 = kernel_epi.mProA.createReorderStorage(seq, fin, w1ptr_->mBlockSize);
+  auto reordA1 = Launcher_epi::PrologueA::createReorderStorage(seq, fin, w1ptr_->mBlockSize);
   if (w1ptr_->ShfIndice()) {
     reordA1.assign(WS);
   }
   WS = reinterpret_cast<int8_t*>(workspace);
-  auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
+  auto quanA2 = Launcher::PrologueA::createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
   quanA2.assign(WS);
   WS += quanA2.mSize;
-  auto reordA2 = kernel_epi.mProA.createReorderStorage(seq, fin, w2ptr_->mBlockSize);
+  auto reordA2 = Launcher::PrologueA::createReorderStorage(seq, fin, w2ptr_->mBlockSize);
   if (w2ptr_->ShfIndice()) {
     reordA2.assign(WS);
   }
   typename Launcher_epi::Param args1{
       gp1, {activation, fin, &quanA1, w1ptr_->ShfIndice(), &reordA1}, {w1ptr_}, epi_prama1};
   typename Launcher::Param args2{gp2, {tmp, fmid, &quanA2, w2ptr_->ShfIndice(), &reordA2}, {w2ptr_}, epi_prama2};
-  GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel, args1, args2, th);
+  GemmRunWithA_ffn<Parallel, Launcher_epi, Launcher>(args1, args2, th);
 }
 
 bool bestla_fusion_ffn_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin, int fmid, int fout) {
@@ -371,15 +361,14 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
 namespace ffn_3w {
 
 template <class Parallel_T, class Launch_T1, class Launch_T2, class Launch_T3>
-void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher3,
-                      const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
+void GemmRunWithA_ffn(const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
                       const typename Launch_T3::Param& args3, parallel::IThreading* th) {
   parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th, args1.problem});
   parallel::gemm::SchedulerDispatcher<Parallel_T> para3({th, args3.problem});
   using AParall1 = typename Launch_T1::PrologueA::Parallel;
   using AParall3 = typename Launch_T3::PrologueA::Parallel;
-  auto apara1 = launcher1->mProA.createParallel(th->num_threads(), args1.problem);
-  auto apara3 = launcher3->mProA.createParallel(th->num_threads(), args3.problem);
+  auto apara1 = Launch_T1::PrologueA::createParallel(th->num_threads(), args1.problem);
+  auto apara3 = Launch_T3::PrologueA::createParallel(th->num_threads(), args3.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -391,33 +380,32 @@ void GemmRunWithA_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* lau
     typename AParall1::ThreadProblem thdpA1{tidx};
     apara1.getIndex(thdpA1);
     if (thdpA1.valid) {
-      launcher1->mProA.run(args1.paramA, thdpA1);
+      Launch_T1::PrologueA::run(args1.paramA, thdpA1);
     }
     th->sync(tidx, 0);
     typename Parallel_T::ThreadProblem thdp1{tidx};
     para1.getIndex(thdp1);
     if (thdp1.valid) {
-      launcher1->run(args1, thdp1);
-      launcher2->run(args2, thdp1);
+      Launch_T1::run(args1, thdp1);
+      Launch_T2::run(args2, thdp1);
     }
     th->sync(tidx, 1);
     typename AParall3::ThreadProblem thdpA3{tidx};
     apara3.getIndex(thdpA3);
     if (thdpA3.valid) {
-      launcher3->mProA.run(args3.paramA, thdpA3);
+      Launch_T3::PrologueA::run(args3.paramA, thdpA3);
     }
     th->sync(tidx, 2);
     typename Parallel_T::ThreadProblem thdp3{tidx};
     para3.getIndex(thdp3);
     if (thdp3.valid) {
-      launcher3->run(args3, thdp3);
+      Launch_T3::run(args3, thdp3);
     }
   });
 }
 
 template <class Parallel_T, class Launch_T1, class Launch_T2, class Launch_T3>
-void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher3,
-                 const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
+void GemmRun_ffn(const typename Launch_T1::Param& args1, const typename Launch_T2::Param& args2,
                  const typename Launch_T3::Param& args3, parallel::IThreading* th) {
   parallel::gemm::SchedulerDispatcher<Parallel_T> para1({th, args1.problem});
   parallel::gemm::SchedulerDispatcher<Parallel_T> para3({th, args3.problem});
@@ -432,29 +420,27 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher
     typename Parallel_T::ThreadProblem thdp1{tidx};
     para1.getIndex(thdp1);
     if (thdp1.valid) {
-      launcher1->run(args1, thdp1);
-      launcher2->run(args2, thdp1);
+      Launch_T1::run(args1, thdp1);
+      Launch_T2::run(args2, thdp1);
     }
     th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp3{tidx};
     para3.getIndex(thdp3);
     if (thdp3.valid) {
-      launcher3->run(args3, thdp3);
+      Launch_T3::run(args3, thdp3);
     }
   });
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <class, BTLA_ISA> class Act_T,
-          class Epi_T1, class Epi_T2>
+template <class GemmCore_T, template <class> class Wei_T, template <class> class Act_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                      storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
                      int fmid, int fout, void* workspace, parallel::IThreading* th, typename Epi_T1::Param epi_prama1,
                      typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T1>;
-  using Launcher_mul =
-      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, custom::epilogue::MulFp32>;
-  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T2>;
+  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T, Act_T, Wei_T, Epi_T1>;
+  using Launcher_mul = wrapper::gemm::LauncherBase<GemmCore_T, Act_T, Wei_T, custom::epilogue::MulFp32>;
+  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T, Act_T, Wei_T, Epi_T2>;
   auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
   auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
   auto w3ptr_ = reinterpret_cast<typename Launcher_mul::PrologueB::StorageWeight*>(w3ptr);
@@ -464,42 +450,36 @@ void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, stora
   utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
   utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
   utils::GemmProblem gp3(1, seq, fmid, fin, w3ptr_->mBlockSize);
-  static Launcher_epi kernel_epi;
-  static Launcher_mul kernel_mul;
-  static Launcher kernel;
   typename Launcher_epi::Param args1{gp1, {activation, fin, nullptr}, {w1ptr_}, epi_prama1};
   typename Launcher::Param args2{gp2, {tmp2, fmid, nullptr}, {w2ptr_}, epi_prama2};
   typename Launcher_mul::Param args3{gp3, {activation, fin, nullptr}, {w3ptr_}, {tmp2, tmp1, fmid, fmid}};
-  GemmRun_ffn<Parallel>(&kernel_epi, &kernel_mul, &kernel, args1, args3, args2, th);
+  GemmRun_ffn<Parallel, Launcher_epi, Launcher_mul, Launcher>(args1, args3, args2, th);
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
+template <class GemmCore_T, template <class> class Wei_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompInt8Pc(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                         storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
                         int fmid, int fout, void* workspace, parallel::IThreading* th,
                         typename Epi_T1::Fp32Param epi_prama1, typename Epi_T2::Fp32Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
-                                                   prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
+  using Launcher_epi =
+      wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
   using Launcher_mul =
-      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32,
-                                  Wei_T, epilogue::gemm::PcKBlockCompInt8Epilogue<custom::epilogue::MulFp32>>;
-  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
-                                               prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
+      wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T,
+                                  epilogue::gemm::PcKBlockCompInt8Epilogue<custom::epilogue::MulFp32>>;
+  using Launcher =
+      wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
   auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
   auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
   auto w3ptr_ = reinterpret_cast<typename Launcher_mul::PrologueB::StorageWeight*>(w3ptr);
   utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
   utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
   utils::GemmProblem gp3(1, seq, fmid, fin, w3ptr_->mBlockSize);
-  static Launcher_epi kernel_epi;
-  static Launcher_mul kernel_mul;
-  static Launcher kernel;
-  auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
+  auto quanA1 = Launcher_epi::PrologueA::createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
   auto WS = reinterpret_cast<int8_t*>(workspace);
   quanA1.assign(WS);
 
-  auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
+  auto quanA2 = Launcher::PrologueA::createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
   WS = reinterpret_cast<int8_t*>(workspace);
   quanA2.assign(WS);
   assert(w1ptr_->ShfIndice() == nullptr);
@@ -526,38 +506,33 @@ void BTLAGemmCompInt8Pc(float* activation, storage::gemm::IWeightBase* w1ptr, st
       {{w3ptr_->template SPtr<char>(), w3ptr_->SDtype(), quanA1.template SPtr<float>(), quanA1.template ZPtr<uint8_t>(),
         w3ptr_->template RPtr<char>(), w3ptr_->RDtype(), nullptr, nullptr, fin},
        {tmp2, tmp1, fmid, fmid}}};
-  GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel_mul, &kernel, args1, args3, args2, th);
+  GemmRunWithA_ffn<Parallel, Launcher_epi, Launcher_mul, Launcher>(args1, args3, args2, th);
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
+template <class GemmCore_T, template <class> class Wei_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                       storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
                       int fmid, int fout, void* workspace, parallel::IThreading* th, typename Epi_T1::Param epi_prama1,
                       typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher_epi =
-      wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
-                                       prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
-  using Launcher_mul = wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
-                                                        prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T,
-                                                        custom::epilogue::MulFp32>;
+      wrapper::gemm::LauncherIntKBlock<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
+  using Launcher_mul =
+      wrapper::gemm::LauncherIntKBlock<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T,
+                                       custom::epilogue::MulFp32>;
   using Launcher =
-      wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
-                                       prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
+      wrapper::gemm::LauncherIntKBlock<GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
   auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
   auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
   auto w3ptr_ = reinterpret_cast<typename Launcher_mul::PrologueB::StorageWeight*>(w3ptr);
   utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
   utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
   utils::GemmProblem gp3(1, seq, fmid, fin, w3ptr_->mBlockSize);
-  static Launcher_epi kernel_epi;
-  static Launcher_mul kernel_mul;
-  static Launcher kernel;
-  auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
+  auto quanA1 = Launcher_epi::PrologueA::createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
   auto WS = reinterpret_cast<int8_t*>(workspace);
   quanA1.assign(WS);
 
-  auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
+  auto quanA2 = Launcher::PrologueA::createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
   WS = reinterpret_cast<int8_t*>(workspace);
   quanA2.assign(WS);
   assert(w1ptr_->ShfIndice() == nullptr);
@@ -566,7 +541,7 @@ void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, stor
   typename Launcher_epi::Param args1{gp1, {activation, fin, &quanA1}, {w1ptr_}, epi_prama1};
   typename Launcher::Param args2{gp2, {tmp2, fmid, &quanA2}, {w2ptr_}, epi_prama2};
   typename Launcher_mul::Param args3{gp3, {activation, fin, &quanA1}, {w3ptr_}, {tmp2, tmp1, fmid, fmid}};
-  GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel_mul, &kernel, args1, args3, args2, th);
+  GemmRunWithA_ffn<Parallel, Launcher_epi, Launcher_mul, Launcher>(args1, args3, args2, th);
 }
 
 bool bestla_fusion_ffn_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int seq, int fin, int fmid, int fout) {

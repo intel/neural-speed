@@ -298,7 +298,7 @@ class storage_packed_weight_batch_t : public storage::gemm::IWeightBase {
  * @brief An weight Prologue that Packs transposed Bf16 weight; optimized for runtime packing. It is the base type of
  * that for transposed / non-transposed source
  */
-template <class GemmCore_T, BTLA_ISA ISA_T, bool IsTrans, typename T_SRC = typename GemmCore_T::BType>
+template <class GemmCore_T, bool IsTrans, typename T_SRC = typename GemmCore_T::BType>
 class weight_pack_batch_bf16_base_t {
  public:
   using WType = typename GemmCore_T::BType;           // weight type
@@ -311,10 +311,11 @@ class weight_pack_batch_bf16_base_t {
     const StorageType* packedW;
   };
 
-  BTLA_CODE getWeight(...) = delete;
+  TLACALL BTLA_CODE getWeight(...) = delete;
 
-  BTLA_CODE getWeight(WType** dstptr, int* dststep, int /* b_size */, int /* k_size */, int /* n_size */, int b_offset,
-                      int k_offset, int n_offset, const Param& param, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL BTLA_CODE getWeight(WType** dstptr, int* dststep, int /* b_size */, int /* k_size */, int /* n_size */,
+                              int b_offset, int k_offset, int n_offset, const Param& param, void* /* tmpcache */,
+                              size_t /* cachesize */) {
     const auto wptr = param.packedW;
     if (!wptr) return BTLA_CODE::InvalidParam;
     assert(k_offset % GemmCore_T::KTILE == 0);
@@ -326,17 +327,17 @@ class weight_pack_batch_bf16_base_t {
     return BTLA_CODE::Success;
   }
 
-  BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                      const Param& param, void* tmpcache, size_t cachesize) {
-    return getWeight(dstptr, dststep, 1, k_size, n_size, 0, k_offset, n_offset, param, tmpcache, cachesize);
+  TLACALL BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                              const Param& param, void* tmpcache, size_t cachesize) {
+    return getWeight<ISA_T>(dstptr, dststep, 1, k_size, n_size, 0, k_offset, n_offset, param, tmpcache, cachesize);
   }
 
-  BTLA_CODE packWeight(...) = delete;
+  TLACALL BTLA_CODE packWeight(...) = delete;
 };
 
-template <class GemmCore_T, BTLA_ISA ISA_T, typename T_SRC = typename GemmCore_T::BType>
-class weight_pack_batch_bf16_trans_t : public weight_pack_batch_bf16_base_t<GemmCore_T, ISA_T, true, T_SRC> {
-  using Base = weight_pack_batch_bf16_base_t<GemmCore_T, ISA_T, true, T_SRC>;
+template <class GemmCore_T, typename T_SRC = typename GemmCore_T::BType>
+class weight_pack_batch_bf16_trans_t : public weight_pack_batch_bf16_base_t<GemmCore_T, true, T_SRC> {
+  using Base = weight_pack_batch_bf16_base_t<GemmCore_T, true, T_SRC>;
 
  public:
   using typename Base::Param;
@@ -345,7 +346,7 @@ class weight_pack_batch_bf16_trans_t : public weight_pack_batch_bf16_base_t<Gemm
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
+  AUTOCALL void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -362,23 +363,23 @@ class weight_pack_batch_bf16_trans_t : public weight_pack_batch_bf16_base_t<Gemm
     assert(padto(pw->mK, GemmCore_T::KTILE) == KPad);
 
     using KernInterleave = typename kernel::wrapper::PaddingTransInterleaveMN<  //
-        GemmCore_T::NTILE, GemmCore_T::PACK_ROW>;
+        GemmCore_T::NTILE, GemmCore_T::PACK_ROW, T_SRC, WType>;
 
     for (int ibat = y; ibat < y + ny; ++ibat) {
-      const auto forward_stat = KernInterleave::template forward<ISA_T, T_SRC, WType>(  //
-          p.B + step_batch(ibat) + x * p.ldb,                                           //
-          pw->template WPtr<WType>() + ibat * KPad * NPad + x * KPad,                   //
-          nx, pw->mK,                                                                   // size
-          nx_pad, KPad,                                                                 // padded size
-          p.ldb, KPad);                                                                 // step
+      const auto forward_stat = KernInterleave::forward_auto(          //
+          p.B + step_batch(ibat) + x * p.ldb,                          //
+          pw->template WPtr<WType>() + ibat * KPad * NPad + x * KPad,  //
+          nx, pw->mK,                                                  // size
+          nx_pad, KPad,                                                // padded size
+          p.ldb, KPad);                                                // step
       assert(forward_stat == BTLA_CODE::Success);
     }
   }
 };
 
-template <class GemmCore_T, BTLA_ISA ISA_T, typename T_SRC = typename GemmCore_T::BType>
-class weight_pack_batch_bf16_non_tr_t : public weight_pack_batch_bf16_base_t<GemmCore_T, ISA_T, false, T_SRC> {
-  using Base = weight_pack_batch_bf16_base_t<GemmCore_T, ISA_T, false, T_SRC>;
+template <class GemmCore_T, typename T_SRC = typename GemmCore_T::BType>
+class weight_pack_batch_bf16_non_tr_t : public weight_pack_batch_bf16_base_t<GemmCore_T, false, T_SRC> {
+  using Base = weight_pack_batch_bf16_base_t<GemmCore_T, false, T_SRC>;
 
  public:
   using typename Base::Param;
@@ -387,7 +388,7 @@ class weight_pack_batch_bf16_non_tr_t : public weight_pack_batch_bf16_base_t<Gem
   using typename Base::WType;
 
   /// Reorder job of a thread
-  void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
+  AUTOCALL void run(const Param& p, const parallel::ThreadProblem2D& thdp, const std::function<int(int)>& step_batch) {
     if (!thdp.valid) return;
     const auto pw = dynamic_cast<const StorageType*>(p.packedW);
     assert(pw != nullptr);
@@ -402,21 +403,21 @@ class weight_pack_batch_bf16_non_tr_t : public weight_pack_batch_bf16_base_t<Gem
     const auto nx_pad = utils::padto(nx, GemmCore_T::KTILE);
 
     using KernInterleave = typename kernel::wrapper::PaddingInterleaveMN<  //
-        GemmCore_T::NTILE, GemmCore_T::PACK_ROW>;
+        GemmCore_T::NTILE, GemmCore_T::PACK_ROW, T_SRC, WType>;
 
     for (int ibat = y; ibat < y + ny; ++ibat) {
-      const auto forward_stat = KernInterleave::template forward<ISA_T, T_SRC, WType>(  //
-          p.B + step_batch(ibat) + x * p.ldb,                                           //
-          pw->template WPtr<WType>() + ibat * KPad * NPad + x * GemmCore_T::NTILE,      //
-          nx, pw->mN,                                                                   // size
-          nx_pad, NPad,                                                                 // padded size
-          p.ldb, KPad);                                                                 // stride
+      const auto forward_stat = KernInterleave::forward_auto(                       //
+          p.B + step_batch(ibat) + x * p.ldb,                                       //
+          pw->template WPtr<WType>() + ibat * KPad * NPad + x * GemmCore_T::NTILE,  //
+          nx, pw->mN,                                                               // size
+          nx_pad, NPad,                                                             // padded size
+          p.ldb, KPad);                                                             // stride
       assert(forward_stat == BTLA_CODE::Success);
     }
   }
 };
 
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class activation_identity_t {
  public:
   using AType = typename _GemmCore_T::AType;
@@ -426,8 +427,8 @@ class activation_identity_t {
   };
   activation_identity_t() = default;
 
-  BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size, int m_offset,
-                          int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL BTLA_CODE getActivation(AType** dstptr, int* dststep, const Param& _param, int m_size, int k_size,
+                                  int m_offset, int k_offset, void* /* tmpcache */, size_t /* cachesize */) {
     auto aptr = const_cast<AType*>(_param.A);
     *dstptr = aptr + m_offset * _param.lda + k_offset;
     *dststep = _param.lda;
@@ -438,13 +439,13 @@ class activation_identity_t {
 /**
  * @brief LauncherBase with addition input as packed weight offset
  */
-template <BTLA_ISA RT_ISA_, class _GemmCore_T, template <class, BTLA_ISA> class _PrologueA_T,
-          template <class, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
+template <class _GemmCore_T, template <class> class _PrologueA_T, template <class> class _PrologueB_T,
+          class _Epilogue_T>
 class launcher_base_off_t                  //
     : public wrapper::gemm::LauncherBase<  //
-          RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
+          _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
   using Base = wrapper::gemm::LauncherBase<  //
-      RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T>;
+      _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T>;
 
  public:
   using typename Base::GemmCore;
@@ -452,12 +453,12 @@ class launcher_base_off_t                  //
   using AType = typename Base::AType;
   using BType = typename Base::BType;
   using CType = typename Base::CType;
-  static constexpr auto RT_ISA = RT_ISA_;
+  static constexpr auto RT_ISA = Base::ISA;
 
-  void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config,
-           int w_offset /* weight offset for batching */) {
+  static void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config,
+                  int w_offset /* weight offset for batching */) {
     // TO(Yi) temporarily configure to max tiling size
-    this->mGemmCore.configure(16, 16, 16);  // Need 'this->' here; See：https://stackoverflow.com/questions/11405
+    Base::GemmCore::configure(16, 16, 16);  // Need 'this->' here; See：https://stackoverflow.com/questions/11405
     auto StackTmp = alloca(_config.stacksize);
     auto tmpB = reinterpret_cast<BType*>(StackTmp);
     tmpB = utils::cpu_pointer_align(tmpB);
@@ -478,9 +479,9 @@ class launcher_base_off_t                  //
   }
 
  protected:
-  void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config,
-                 int w_offset /* weight offset for batching */, int blk_m, int blk_n, int blk_msize, int blk_nsize,
-                 AType* tmpA, BType* /*tmpB*/, CType* tmpC, void* tmpcache) {
+  static void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config,
+                        int w_offset /* weight offset for batching */, int blk_m, int blk_n, int blk_msize,
+                        int blk_nsize, AType* tmpA, BType* /*tmpB*/, CType* tmpC, void* tmpcache) {
     int n_padded = padto(blk_nsize, GemmCore::NTILE);
     for (int iterk = 0; iterk < _param.problem.dims[3]; iterk += _config.block[2]) {
       int k_remain = utils::remainsize(iterk, _param.problem.dims[3], _config.block[2]);
@@ -488,10 +489,11 @@ class launcher_base_off_t                  //
       int k_paddedle = padto_le(k_remain, GemmCore::KTILE);
       BType* bptr_cache = nullptr;
       int bcache_step = 0;
-      this->mProB.getWeight(&bptr_cache, &bcache_step,      // See：https://stackoverflow.com/questions/11405
-                            k_padded, n_padded,             //
-                            iterk, _config.loc[1] + blk_n,  //
-                            _param.paramB, tmpcache, _config.tmpcachesize);
+      Base::PrologueB::template getWeight<Base::ISA>(&bptr_cache,
+                                                     &bcache_step,  // See：https://stackoverflow.com/questions/11405
+                                                     k_padded, n_padded,             //
+                                                     iterk, _config.loc[1] + blk_n,  //
+                                                     _param.paramB, tmpcache, _config.tmpcachesize);
       bptr_cache += w_offset;
       int bcache_stride = bcache_step * sizeof(BType);
       for (int i = 0; i < blk_msize; i += GemmCore::MTILE) {
@@ -502,18 +504,20 @@ class launcher_base_off_t                  //
         int acache_step = 0;
         if (k_paddedle) {
           AType* aptr_cache = tmpA;
-          this->mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_paddedle,
-                                    blk_m + i + _config.loc[0], iterk, tmpcache, _config.tmpcachesize);
-          this->mGemmCore.forward(aptr_cache, bptr_cache, cptr_cache, m_remain, n_padded, k_paddedle,
+          Base::PrologueA::template getActivation<Base::ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain,
+                                                             k_paddedle, blk_m + i + _config.loc[0], iterk, tmpcache,
+                                                             _config.tmpcachesize);
+          Base::GemmCore::forward(aptr_cache, bptr_cache, cptr_cache, m_remain, n_padded, k_paddedle,
                                   acache_step * sizeof(AType), bcache_stride, ccache_stride, iterk, tmpcache,
                                   _config.tmpcachesize);
         }
         int k_tail = k_remain - k_paddedle;
         if (k_tail) {
           AType* aptr_cache = tmpA;
-          this->mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_tail,
-                                    blk_m + i + _config.loc[0], iterk + k_paddedle, tmpcache, _config.tmpcachesize);
-          this->mGemmCore.forward(aptr_cache, bptr_cache + k_paddedle * GemmCore::NTILE, cptr_cache, m_remain, n_padded,
+          Base::PrologueA::template getActivation<Base::ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain, k_tail,
+                                                             blk_m + i + _config.loc[0], iterk + k_paddedle, tmpcache,
+                                                             _config.tmpcachesize);
+          Base::GemmCore::forward(aptr_cache, bptr_cache + k_paddedle * GemmCore::NTILE, cptr_cache, m_remain, n_padded,
                                   GemmCore::KTILE, acache_step * sizeof(AType), bcache_stride, ccache_stride,
                                   iterk + k_paddedle, tmpcache, _config.tmpcachesize);
         }
@@ -527,13 +531,13 @@ class launcher_base_off_t                  //
 /**
  * @brief LauncherBase with addition input as packed weight offset
  */
-template <BTLA_ISA RT_ISA_, class _GemmCore_T, template <class, BTLA_ISA> class _PrologueA_T,
-          template <class, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
+template <class _GemmCore_T, template <class> class _PrologueA_T, template <class> class _PrologueB_T,
+          class _Epilogue_T>
 class launcher_base_weight_t               //
     : public wrapper::gemm::LauncherBase<  //
-          RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
+          _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
   using Base = wrapper::gemm::LauncherBase<  //
-      RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T>;
+      _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T>;
 
  public:
   using typename Base::GemmCore;
@@ -541,10 +545,10 @@ class launcher_base_weight_t               //
   using AType = typename Base::AType;
   using BType = typename Base::BType;
   using CType = typename Base::CType;
-  static constexpr auto RT_ISA = RT_ISA_;
+  static constexpr auto RT_ISA = Base::ISA;
 
-  void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
-    this->mGemmCore.configure(16, 16, 16);  // Need 'this->' here; See：https://stackoverflow.com/questions/11405
+  static void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+    Base::GemmCore::configure(16, 16, 16);  // Need 'this->' here; See：https://stackoverflow.com/questions/11405
     auto StackTmp = alloca(_config.stacksize);
     auto tmpB = reinterpret_cast<BType*>(StackTmp);
     tmpB = utils::cpu_pointer_align(tmpB);
@@ -565,8 +569,8 @@ class launcher_base_weight_t               //
   }
 
  protected:
-  void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
-                 int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, CType* tmpC, void* tmpcache) {
+  static void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
+                        int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, CType* tmpC, void* tmpcache) {
     int n_padded = padto(blk_nsize, GemmCore::NTILE);
     for (int iterk = 0; iterk < _param.problem.dims[3]; iterk += _config.block[2]) {
       int k_remain = remainsize(iterk, _param.problem.dims[3], _config.block[2]);
@@ -575,8 +579,8 @@ class launcher_base_weight_t               //
       auto bptr_cache = tmpB;
       int bcache_step = 0;
 
-      this->mProB.getWeight(&bptr_cache, &bcache_step, _param.paramB, k_padded, blk_nsize, iterk,
-                            _config.loc[1] + blk_n, tmpcache, _config.tmpcachesize);
+      Base::PrologueB::template getWeight<Base::ISA>(&bptr_cache, &bcache_step, _param.paramB, k_padded, blk_nsize,
+                                                     iterk, _config.loc[1] + blk_n, tmpcache, _config.tmpcachesize);
       int bcache_stride = bcache_step * sizeof(BType);
       for (int i = 0; i < blk_msize; i += GemmCore::MTILE) {
         int m_remain = remainsize(i, blk_msize, GemmCore::MTILE);
@@ -586,18 +590,20 @@ class launcher_base_weight_t               //
         int acache_step = 0;
         if (k_paddedle) {
           AType* aptr_cache = tmpA;
-          this->mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_paddedle,
-                                    (blk_m + i + _config.loc[0]), iterk, tmpcache, _config.tmpcachesize);
-          this->mGemmCore.forward(aptr_cache, bptr_cache, cptr_cache, m_remain, n_padded, k_paddedle,
+          Base::PrologueA::template getActivation<Base::ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain,
+                                                             k_paddedle, (blk_m + i + _config.loc[0]), iterk, tmpcache,
+                                                             _config.tmpcachesize);
+          Base::GemmCore::forward(aptr_cache, bptr_cache, cptr_cache, m_remain, n_padded, k_paddedle,
                                   acache_step * sizeof(AType), bcache_stride, ccache_stride, iterk, tmpcache,
                                   _config.tmpcachesize);
         }
         int k_tail = k_remain - k_paddedle;
         if (k_tail) {
           AType* aptr_cache = tmpA;
-          this->mProA.getActivation(&aptr_cache, &acache_step, _param.paramA, m_remain, k_tail,
-                                    (blk_m + i + _config.loc[0]), iterk + k_paddedle, tmpcache, _config.tmpcachesize);
-          this->mGemmCore.forward(aptr_cache, bptr_cache + k_paddedle * GemmCore::NTILE, cptr_cache, m_remain, n_padded,
+          Base::PrologueA::template getActivation<Base::ISA>(&aptr_cache, &acache_step, _param.paramA, m_remain, k_tail,
+                                                             (blk_m + i + _config.loc[0]), iterk + k_paddedle, tmpcache,
+                                                             _config.tmpcachesize);
+          Base::GemmCore::forward(aptr_cache, bptr_cache + k_paddedle * GemmCore::NTILE, cptr_cache, m_remain, n_padded,
                                   GemmCore::KTILE, acache_step * sizeof(AType), bcache_stride, ccache_stride,
                                   iterk + k_paddedle, tmpcache, _config.tmpcachesize);
         }
@@ -701,7 +707,7 @@ class mha_interface_t {
       {  // reorder K & V
         ThreadProblem2D thdpK{tid};
         schK.getIndex(thdpK);
-        l_expsum.mProB.run(  // pack K
+        PrologueK::run(  // pack K
             QKProKArgs{
                 /* .B = */ p.K,
                 /* .ldb = */ p.step_k_sl * p.step_k_head_size,  //  use the non-one step
@@ -711,7 +717,7 @@ class mha_interface_t {
 
         ThreadProblem2D thdpV{tid};
         schV.getIndex(thdpV);
-        l_scale.mProB.run(  // pack V
+        PrologueV::run(  // pack V
             PVProVArgs{
                 /* .B = */ p.V,
                 /* .ldb = */ p.step_v_sl,
@@ -761,7 +767,7 @@ class mha_interface_t {
               /* .tmpcachesize = */ _cd->getL2CacheSize(),
           };
           const auto bf16_tmp = reinterpret_cast<bf16*>(tmp);
-          l_expsum.run(  // QxK => S ==exp==> P
+          L_ExpSum::run(  // QxK => S ==exp==> P
               QKArgs{
                   utils::GemmProblem{
                       /* .batch */ 1,
@@ -791,7 +797,7 @@ class mha_interface_t {
               /* .stacksize = */ _cd->getL2CacheSize(),
               /* .tmpcachesize = */ _cd->getL2CacheSize(),
           };
-          l_scale.run(  // PxV => O
+          L_Scale::run(  // PxV => O
               PVArgs{
                   utils::GemmProblem{
                       /* .batch */ 1,
@@ -817,10 +823,6 @@ class mha_interface_t {
     utils::afree(bufferV);
     return BTLA_CODE::Success;
   }
-
- protected:
-  L_ExpSum l_expsum;
-  L_Scale l_scale;
 };
 
 /**
@@ -1126,7 +1128,7 @@ class scale_track_max_t<int32_t, float> {
 };
 using ScaleTrackMaxS32Fp32 = scale_track_max_t<int32_t, float>;
 
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class weight_base_t {
  public:
   using BType = typename _GemmCore_T::BType;
@@ -1137,8 +1139,8 @@ class weight_base_t {
     bool is_padded;
   };
   weight_base_t() = default;
-  BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                      int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
+                              int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     if ((n_size % _GemmCore_T::NTILE == 0) && std::is_same<SType, BType>::value &&
         0) {  // TODO(Yi) : use a gemm core accept step for K or reorder at runtime
       *dst_ptr = const_cast<SType*>(p.B) + k_offset * p.ldb + n_offset;
@@ -1159,7 +1161,7 @@ class weight_base_t {
     }
   }
 };
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class weight_forward_n_tile48_t {
  public:
   using BType = typename _GemmCore_T::BType;
@@ -1170,8 +1172,8 @@ class weight_forward_n_tile48_t {
     bool is_padded;
   };
   weight_forward_n_tile48_t() = default;
-  BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                      int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
+                              int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);
     *dst_ptr = const_cast<SType*>(p.B) + k_offset * 48 + n_offset * p.ldb;
     *dst_step = p.ldb;
@@ -1179,7 +1181,7 @@ class weight_forward_n_tile48_t {
   }
 };
 #if CompileAVX512F()
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class weight_cvt_bf16_ntile48_t {
  public:
   using BType = typename _GemmCore_T::BType;
@@ -1190,8 +1192,8 @@ class weight_cvt_bf16_ntile48_t {
     bool is_padded;
   };
   weight_cvt_bf16_ntile48_t() = default;
-  TARGET_512 BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                                 int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL TARGET_512 BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size,
+                                         int k_offset, int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);
     const auto src = const_cast<SType*>(p.B) + k_offset * 48 + n_offset * p.ldb;
     const auto dst = *dst_ptr;
@@ -1221,7 +1223,7 @@ class weight_cvt_bf16_ntile48_t {
 #endif
 
 #if CompileAVX2()
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class weight_cvt_f16_n_tile24_t {  // convert fp16 weight to fp32 using F16C
  public:
   using BType = typename _GemmCore_T::BType;
@@ -1232,8 +1234,8 @@ class weight_cvt_f16_n_tile24_t {  // convert fp16 weight to fp32 using F16C
     bool is_padded;
   };
   weight_cvt_f16_n_tile24_t() = default;
-  BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                      int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
+                              int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
     assert(p.is_padded);
     const auto src = const_cast<SType*>(p.B) + k_offset * 24 + n_offset * p.ldb;
     const auto dst = *dst_ptr;
@@ -1807,20 +1809,18 @@ class mha_stable_interface_t {
 template <typename Q_T, typename K_T, typename V_T, typename DST_T>
 inline void bestla_fusion_attn_forward(const attn_fwd_args_t<Q_T, K_T, V_T, DST_T>& params) = delete;
 
-template <class GEMM_T, BTLA_ISA ISA_T>
-using WeightPackBatchBf16Bf16NonTr = weight_pack_batch_bf16_non_tr_t<GEMM_T, ISA_T, bf16>;
-template <class GEMM_T, BTLA_ISA ISA_T>
-using WeightPackBatchBf16Bf16Trans = weight_pack_batch_bf16_trans_t<GEMM_T, ISA_T, bf16>;
+template <class GEMM_T>
+using WeightPackBatchBf16Bf16NonTr = weight_pack_batch_bf16_non_tr_t<GEMM_T, bf16>;
+template <class GEMM_T>
+using WeightPackBatchBf16Bf16Trans = weight_pack_batch_bf16_trans_t<GEMM_T, bf16>;
 template <>
 inline void bestla_fusion_attn_forward<bf16, bf16, bf16, bf16>(const attn_fwd_args_t<bf16, bf16, bf16, bf16>& p) {
   using GemmKernelBF16ExpSum = mha::launcher_base_off_t<  //
-      BTLA_ISA::AMX_BF16,                                 //
       gemm::HCoreRowNAmxbf16<64, 16>,                     //
       prologue_a::gemm::ActivationBase,                   //
       WeightPackBatchBf16Bf16Trans,                       //
       mha::ScaleExpAccSumFp32Bf16>;                       //
   using GemmKernelBF16 = mha::launcher_base_off_t<        //
-      BTLA_ISA::AMX_BF16,                                 //
       gemm::HCoreRowNAmxbf16<64, 16>,                     //
       prologue_a::gemm::ActivationBase,                   //
       WeightPackBatchBf16Bf16NonTr,                       //
@@ -1831,10 +1831,10 @@ inline void bestla_fusion_attn_forward<bf16, bf16, bf16, bf16>(const attn_fwd_ar
   assert(ret == BTLA_CODE::Success);
 }
 
-template <class GEMM_T, BTLA_ISA ISA_T>
-using WeightPackBatchFp16Bf16NonTr = weight_pack_batch_bf16_non_tr_t<GEMM_T, ISA_T, fp16>;
-template <class GEMM_T, BTLA_ISA ISA_T>
-using WeightPackBatchFp16Bf16Trans = weight_pack_batch_bf16_trans_t<GEMM_T, ISA_T, fp16>;
+template <class GEMM_T>
+using WeightPackBatchFp16Bf16NonTr = weight_pack_batch_bf16_non_tr_t<GEMM_T, fp16>;
+template <class GEMM_T>
+using WeightPackBatchFp16Bf16Trans = weight_pack_batch_bf16_trans_t<GEMM_T, fp16>;
 template <>
 inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
     const attn_fwd_args_t<float, fp16, fp16, float>& params) {
@@ -1843,13 +1843,11 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
   if (MHA_PREFER_AVX512FP16 && _cd->AVX512_FP16() && params.step_k_sl == 1) {
 #if CompileAVX512F()
     using GemmKernelFP16TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AVX512_FP16,                                   //
         gemm::HCoreRowNAvx512fp16<64, 8>,                        //
         prologue_a::gemm::ActivationConverterFp32,               //
         mha::weight_base_t,                                      //
         mha::ScaleTrackMaxFp16Fp32>;                             //
     using GemmKernelFP16 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AVX512_FP16,                                   //
         gemm::HCoreRowNAvx512fp16<64, 8>,                        //
         prologue_a::gemm::ActivationBase,                        //
         mha::weight_base_t,                                      //
@@ -1866,13 +1864,11 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
 #if CompileBF16()
     if (params.step_k_head_size == 1) {
       using GemmKernelFP32FP16BF16ExpSum = mha::launcher_base_off_t<  //
-          BTLA_ISA::AMX_BF16,                                         //
           gemm::HCoreRowNAmxbf16<64, 16>,                             //
           prologue_a::gemm::ActivationConverterFp32,                  //
           WeightPackBatchFp16Bf16Trans,                               //
           mha::ScaleExpAccSumFp32Bf16>;                               //
       using GemmKernelBF16FP16FP32 = mha::launcher_base_off_t<        //
-          BTLA_ISA::AMX_BF16,                                         //
           gemm::HCoreRowNAmxbf16<64, 16>,                             //
           prologue_a::gemm::ActivationBase,                           //
           WeightPackBatchFp16Bf16NonTr,                               //
@@ -1882,13 +1878,11 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
       assert(ret == BTLA_CODE::Success);
     } else if (params.step_k_sl == 1) {
       using GemmKernelFP32FP16BF16ExpSum = mha::launcher_base_off_t<  //
-          BTLA_ISA::AMX_BF16,                                         //
           gemm::HCoreRowNAmxbf16<64, 16>,                             //
           prologue_a::gemm::ActivationConverterFp32,                  //
           WeightPackBatchFp16Bf16NonTr,                               //
           mha::ScaleExpAccSumFp32Bf16>;                               //
       using GemmKernelBF16FP16FP32 = mha::launcher_base_off_t<        //
-          BTLA_ISA::AMX_BF16,                                         //
           gemm::HCoreRowNAmxbf16<64, 16>,                             //
           prologue_a::gemm::ActivationBase,                           //
           WeightPackBatchFp16Bf16NonTr,                               //
@@ -1905,13 +1899,11 @@ inline void bestla_fusion_attn_forward<float, fp16, fp16, float>(
              params.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1) {
 #if CompileAVX2()
     using GemmKernelTrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AVX2,                                      //
         gemm::SCoreRowNAvx2<24, 4>,                          //
         prologue_a::gemm::ActivationBase,                    //
         mha::weight_cvt_f16_n_tile24_t,                      //
         mha::ScaleTrackMaxFp32Fp32>;                         //
     using GemmKernelId = mha::launcher_base_weight_t<        //
-        BTLA_ISA::AVX2,                                      //
         gemm::SCoreRowNAvx2<24, 4>,                          //
         mha::activation_identity_t,                          // pretty sure we have enough paddings for P-matrix
         mha::weight_cvt_f16_n_tile24_t,                      //
@@ -1933,13 +1925,11 @@ inline void bestla_fusion_attn_forward<fp16, fp16, fp16, fp16>(const attn_fwd_ar
   const auto pth = ne_threading::get();
   if (_cd->AMX_BF16()) {
     using GemmKernelFP16TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AVX512_FP16,                                   //
         gemm::HCoreRowNAvx512fp16<64, 8>,                        //
         prologue_a::gemm::ActivationBase,                        //
         mha::weight_base_t,                                      //
         mha::ScaleTrackMaxFp16Fp32>;                             //
     using GemmKernelFP16 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AVX512_FP16,                                   //
         gemm::HCoreRowNAvx512fp16<64, 8>,                        //
         prologue_a::gemm::ActivationBase,                        //
         mha::weight_base_t,                                      //
@@ -1959,13 +1949,11 @@ inline void bestla_fusion_attn_forward<int8_t, int8_t, int8_t, int8_t>(
   const auto pth = ne_threading::get();
   if (/* params.sl_q > 4 &&  */ _cd->AMX_INT8()) {                // TODO(Yi): add vnni impl
     using GemmKernelInt32TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AMX_INT8,                                       //
         gemm::ICoreRowNAmxint8SS<48, 16>,                         //
         prologue_a::gemm::ActivationBase,                         //
         mha::weight_forward_n_tile48_t,                           //
         mha::ScaleTrackMaxS32Fp32>;                               //
     using GemmKernelInt32 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AMX_INT8,                                       //
         gemm::ICoreRowNAmxint8<48, 16>,                           //
         prologue_a::gemm::ActivationBase,                         //
         mha::weight_forward_n_tile48_t,                           //
@@ -2004,13 +1992,11 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
       ((_cd->AMX_BF16() && (params.attn_flags & NE_ATTN_FLAG_PREFER_FP32) != 0) || !_cd->AMX_BF16())) {
 #if CompileAVX512F()
     using GemmKernelBF16TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
         prologue_a::gemm::ActivationBase,                        //
         mha::weight_cvt_bf16_ntile48_t,                          //
         mha::ScaleTrackMaxFp32Fp32>;                             //
     using GemmKernelBF16 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AVX512F,                                       //
         gemm::SCoreRowNAvx512f<48, 8>,                           //
         mha::activation_identity_t,                              // pretty sure we have enough paddings for P-matrix
         mha::weight_cvt_bf16_ntile48_t,                          //
@@ -2024,13 +2010,11 @@ inline void bestla_fusion_attn_forward<float, bf16, bf16, float>(
   } else if (/* params.sl_q > 4 &&  */ _cd->AMX_BF16()) {  // TODO(Yi): add vdpbf16ps impl
 #if CompileBF16()
     using GemmKernelBF16TrackMax = mha::launcher_base_weight_t<  //
-        BTLA_ISA::AMX_BF16,                                      //
         gemm::HCoreRowNAmxbf16<48, 16>,                          //
         prologue_a::gemm::ActivationConverterFp32,               //
         mha::weight_forward_n_tile48_t,                          //
         mha::ScaleTrackMaxFp32Fp32>;                             //
     using GemmKernelBF16 = mha::launcher_base_weight_t<          //
-        BTLA_ISA::AMX_BF16,                                      //
         gemm::HCoreRowNAmxbf16<48, 16>,                          //
         mha::activation_identity_t,                              // pretty sure we have enough paddings for P-matrix
         mha::weight_forward_n_tile48_t,                          //

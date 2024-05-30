@@ -456,7 +456,7 @@ class LauncherBase {
     }
   };
 
-  void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+  static void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
     if (GEMVWrapper::support() && GEMVWrapper::implemented(_param)) {
       GEMVWrapper::gemv(_param, _config);
     } else {
@@ -465,7 +465,7 @@ class LauncherBase {
   }
 
  protected:
-  void gemm(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+  static void gemm(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
     GemmCore::configure(_config.size[0], _config.size[1], _param.problem.dims[3]);
     auto StackTmp = alloca(_config.stacksize);
     auto tmpB = reinterpret_cast<BType*>(StackTmp);
@@ -485,8 +485,8 @@ class LauncherBase {
     }
   }
 
-  void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
-                 int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, CType* tmpC, void* tmpcache) {
+  static void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
+                        int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, CType* tmpC, void* tmpcache) {
     int n_padded = utils::padto(blk_nsize, GemmCore::NTILE);
     auto& K = _param.problem.dims[3];
     for (int iterk = 0; iterk < _param.problem.dims[3]; iterk += _config.block[2]) {
@@ -703,7 +703,7 @@ class LauncherIntKBlock {
     }
   };
 
-  void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+  static void run(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
     if (GEMVWrapper::support() && GEMVWrapper::implemented(_param)) {
       GEMVWrapper::gemv(_param, _config);
     } else {
@@ -712,7 +712,7 @@ class LauncherIntKBlock {
   }
 
  protected:
-  void gemm(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
+  static void gemm(const Param& _param, const parallel::gemm::ThreadProblemBase& _config) {
     GemmCore::configure(_config.size[0], _config.size[1], _param.problem.dims[3]);
     auto StackTmp = alloca(_config.stacksize);
     auto tmpB = reinterpret_cast<BType*>(StackTmp);
@@ -739,8 +739,8 @@ class LauncherIntKBlock {
 
   // _config.block[2]%kblock==0
   // _config.block[2]>=kblock
-  void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
-                 int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, AccType* tmpC, int8_t* tmpcache) {
+  static void run_block(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
+                        int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, AccType* tmpC, int8_t* tmpcache) {
     int n_padded = utils::padto(blk_nsize, GemmCore::NTILE);
     auto& K = _param.problem.dims[3];
     auto& KBlock = _param.problem.dims[4];
@@ -805,8 +805,9 @@ class LauncherIntKBlock {
   }
 
   // _config.block[2]<kblock
-  void run_largekblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m, int blk_n,
-                       int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, AccType* tmpC, int8_t* tmpcache) {
+  static void run_largekblock(const Param& _param, const parallel::gemm::ThreadProblemBase& _config, int blk_m,
+                              int blk_n, int blk_msize, int blk_nsize, AType* tmpA, BType* tmpB, AccType* tmpC,
+                              int8_t* tmpcache) {
     int n_padded = utils::padto(blk_nsize, GemmCore::NTILE);
     auto& K = _param.problem.dims[3];
     auto& KBlock = _param.problem.dims[4];

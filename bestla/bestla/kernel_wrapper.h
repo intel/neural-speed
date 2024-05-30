@@ -71,14 +71,13 @@ class RevertPaddingInterleaveMN {
   }
 };
 
-template <int MTile, int ColPack>
+template <int MTile, int ColPack, typename T_SRC, typename T_DST = T_SRC>
 class PaddingTransInterleaveMN {
   // row and cols are in terms of src
   // M x N ===> M/MTile x N/ColPack x MTile x ColPack (leading dim stride = MTile * dststride)
  public:
-  template <BTLA_ISA ISA_T, typename T_SRC, typename T_DST = T_SRC>
-  static BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
-                           int dst_step) {
+  TLACALL BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
+                            int dst_step) {
 #if CompileAVX512F()
     // Note: rows/cols and i/j are in terms of src
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
@@ -88,6 +87,15 @@ class PaddingTransInterleaveMN {
     }
 #endif
     return ref::padding_trans_interleave(src, dst, row, col, row_pad, col_pad, src_step, dst_step, MTile, ColPack);
+  }
+
+  AUTOCALL BTLA_CODE forward_auto(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad,
+                                  int src_step, int dst_step) {
+    GetCPUDevice();
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
+    }
+    return forward<BTLA_ISA::NoSIMD>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
   }
 };
 
