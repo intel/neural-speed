@@ -38,10 +38,10 @@ class UT_Fp32Fp32 {
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
-    auto packw = launcher.mProB.createStorage(n, k);
+    auto packw = Launcher::PrologueB::createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
-    launcher.mProB.packWeight(n, k, {matB.data(), n, &packw}, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, {matB.data(), n, &packw}, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matA.data(), k}, {matB.data(), n, &packw}, {matC.data(), n}};
     parallel::GemmRun<Parallel>(launcher, args, UT_Threading::get());
@@ -124,10 +124,10 @@ class UT_U8S8S32 {
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
-    auto packw = launcher.mProB.createStorage(n, k);
+    auto packw = Launcher::PrologueB::createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
-    launcher.mProB.packWeight(n, k, {matBs8.data(), n, &packw}, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, {matBs8.data(), n, &packw}, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{
         gp,
@@ -191,10 +191,10 @@ class UT_S8S8S32 {
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
 
-    auto packw = launcher.mProB.createStorage(n, k);
+    auto packw = Launcher::PrologueB::createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
-    launcher.mProB.packWeight(n, k, {matBs8.data(), n, &packw}, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, {matBs8.data(), n, &packw}, UT_Threading::get());
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{
         gp, {matAu8.data(), k}, {matBs8.data(), n, &packw}, {matC.data(), n, 1, scaleAf32.data(), scaleBf32.data()}};
@@ -227,14 +227,14 @@ class UT_Bf16Bf16Fp32 {
                                     prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp32>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    auto packw = launcher.mProB.createStorage(n, k);
+    auto packw = Launcher::PrologueB::createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
     avector<utils::bf16> matAbf16(m * k), matBbf16(k * n);
     fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
     fill_buffer_randn(matBbf16.data(), matBbf16.size(), utils::bf16(-0.5f), utils::bf16(0.5f));
     avector<float> matC(m * n), refC(m * n);
-    launcher.mProB.packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
     utils::GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};
@@ -267,13 +267,13 @@ class UT_Fp16Fp16Fp16 {
                                     prologue_b::gemm::WeightPack, epilogue::gemm::AccumulatorWriteBackFp16>;
     Launcher launcher;
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
-    auto packw = launcher.mProB.createStorage(n, k);
+    auto packw = Launcher::PrologueB::createStorage(n, k);
     avector<int8_t> buffer(packw.mSize);
     packw.assign(buffer.data());
     avector<utils::fp16> matAbf16(m * k), matBbf16(k * n), matC(m * n), refC(m * n);
     fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
     fill_buffer_randn(matBbf16.data(), matBbf16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
-    launcher.mProB.packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
     gemmref_fp16fp16fp16(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
     GemmProblem gp(1, m, n, k);
     typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};

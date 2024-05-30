@@ -63,14 +63,14 @@ class UT_BlockQunatize_INT8 {
     }
 
     auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
-    PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>>;
+    auto ptr =
+        PrologueB::createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
-    kernel.packWeight(n, k, dequanRef.data(), ldb, &ptr, UT_Threading::get());
+    PrologueB::packWeight(n, k, dequanRef.data(), ldb, &ptr, UT_Threading::get());
     avector<float> dequant(n * k);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
+    PrologueB::unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
     ut::buffer_error(dequanRef.data(), dequant.data(), dequanRef.size(), 0.01f);
   }
 
@@ -110,60 +110,21 @@ class UT_BlockQunatize_INT8 {
     }
 
     auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
-    PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx512f<48, 8>>;
+    auto ptr =
+        PrologueB::createStorage(n, k, blocksize, BTLA_DTYPE::S8, bestla_dtype<float>, bestla_dtype<float>, asym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
-    kernel.packTransposeWeight(n, k, dequanT.data(), k, &ptr, UT_Threading::get());
+    PrologueB::packTransposeWeight(n, k, dequanT.data(), k, &ptr, UT_Threading::get());
     avector<float> dequant(n * k), tardequanT(k * n);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
-    kernel.unpackTransposeWeight(n, k, &ptr, tardequanT.data(), k, UT_Threading::get());
+    PrologueB::unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
+    PrologueB::unpackTransposeWeight(n, k, &ptr, tardequanT.data(), k, UT_Threading::get());
     ut::buffer_error(dequanT.data(), tardequanT.data(), tardequanT.size(), 0.01f);
     ut::buffer_error(dequanRef.data(), dequant.data(), dequanRef.size(), 0.01f);
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_BlockQunatize_INT8 sUT_BlockQunatize_INT8;
-#endif
-
-class UT_BlockQunatize_F8 {
- public:
-  UT_BlockQunatize_F8() {
-    UT_START();
-    CheckISA(AVX512F);
-    ut(127, 1023, 32, BTLA_DTYPE::F8_E4M3);
-    ut(127, 1023, 32, BTLA_DTYPE::F8_E5M2);
-  }
-
-  void ut(int n, int k, int blocksize, BTLA_DTYPE QUANT_T) {
-    printf("%s: %d %d %d\n", __FUNCTION__, n, k, blocksize);
-    int ldb = n;
-    utils::aligned_vector<float> raw(n * k);
-    ut::fill_buffer_randn(raw.data(), raw.size(), -3.f, 3.f);
-
-    auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
-    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
-    using refPorB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, BTLA_ISA::NoSIMD>;
-    PrologueB kernel;
-    refPorB ref_ker;
-    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F8_E8M0);
-    auto ref_ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F8_E8M0);
-    avector<int8_t> buffer(ptr.mSize);
-    avector<int8_t> ref_buffer(ptr.mSize);
-    ptr.assign(buffer.data());
-    ref_ptr.assign(ref_buffer.data());
-    kernel.packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
-    ref_ker.packWeight(n, k, raw.data(), ldb, &ref_ptr, UT_Threading::get());
-    avector<float> dequant(n * k, 0);
-    avector<float> ref_dequant(n * k, 0);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
-    ref_ker.unpackWeight(n, k, &ref_ptr, ref_dequant.data(), n, UT_Threading::get());
-    ut::buffer_error(ref_dequant.data(), dequant.data(), dequant.size(), 0.01f);
-  }
-};
-#ifdef BTLA_UT_PROLOGUE_B
-static UT_BlockQunatize_F8 sUT_BlockQunatize_F8;
 #endif
 
 class UT_BlockQunatize_SN {
@@ -212,14 +173,13 @@ class UT_BlockQunatize_SN {
     int ldb = n;
     utils::aligned_vector<float> raw(n * k);
     ut::fill_buffer_randn(raw.data(), raw.size(), -0.5f, 0.5f);
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, RuntimeISA>;
-    PrologueB kernel;
-    auto ptr = kernel.createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, isAsym);
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore>;
+    auto ptr = PrologueB::createStorage(n, k, blocksize, QUANT_T, BTLA_DTYPE::F32, BTLA_DTYPE::F32, isAsym);
     avector<int8_t> buffer(ptr.mSize);
     ptr.assign(buffer.data());
-    kernel.packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
+    PrologueB::packWeight(n, k, raw.data(), ldb, &ptr, UT_Threading::get());
     avector<float> dequant(n * k, 0);
-    kernel.unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
+    PrologueB::unpackWeight(n, k, &ptr, dequant.data(), n, UT_Threading::get());
     ut::buffer_error(raw.data(), dequant.data(), dequant.size(), 0.01f);
   }
 };
@@ -303,17 +263,16 @@ class UT_TransposeBlockQuantize_F4 {
     }
 
     auto constexpr RuntimeISA = BTLA_ISA::AVX512F;
-    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>, RuntimeISA>;
-    PrologueB kernel;
-    auto packedW = kernel.createStorage(n, k, blocksize, F4_T, SCA_T);
-    auto packedW1 = kernel.createStorage(n, k, blocksize, F4_T, SCA_T);
+    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<gemm::SCoreRowNAvx512f<48, 8>>;
+    auto packedW = PrologueB::createStorage(n, k, blocksize, F4_T, SCA_T);
+    auto packedW1 = PrologueB::createStorage(n, k, blocksize, F4_T, SCA_T);
     avector<int8_t> buf(packedW.mSize), buf1(packedW1.mSize);
     packedW.assign(buf.data());
     packedW1.assign(buf1.data());
-    kernel.packTransposeWeight(n, k, dequanRef.data(), k, &packedW, UT_Threading::get());
-    kernel.packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &packedW1, UT_Threading::get());
+    PrologueB::packTransposeWeight(n, k, dequanRef.data(), k, &packedW, UT_Threading::get());
+    PrologueB::packQWeight(n, k, quanW.data(), ldb, scales.data(), nullptr, &packedW1, UT_Threading::get());
     avector<float> dequant(n * k);
-    kernel.unpackTransposeWeight(n, k, &packedW1, dequant.data(), k, UT_Threading::get());
+    PrologueB::unpackTransposeWeight(n, k, &packedW1, dequant.data(), k, UT_Threading::get());
     if (SCA_T != BTLA_DTYPE::DQ8_BNB) {
       ut::buffer_error(packedW.SPtr<float>(), packedW1.SPtr<float>(), packedW1.CSize());
       ut::buffer_error(dequanRef.data(), dequant.data(), dequant.size());
@@ -326,106 +285,6 @@ class UT_TransposeBlockQuantize_F4 {
 };
 #ifdef BTLA_UT_PROLOGUE_B
 static UT_TransposeBlockQuantize_F4 sUT_TransposeBlockQuantize_F4;
-#endif
-
-class UT_BlockQuantize_INT4 {
- public:
-  UT_BlockQuantize_INT4() {
-    UT_START();
-    CheckISA(AVX2);
-    CheckISA(AVX512F);
-    ut_2(4096, 4096, 128, BTLA_DTYPE::S4_CLIP, false);
-    CheckISA(AVX512F);
-    ut_512vnni(4096, 4096, 128, BTLA_DTYPE::S4_CLIP, false);
-    ut_512vnni(4096, 4096, 128, BTLA_DTYPE::S4_CLIP, true);
-  }
-  void ut_2(int n, int k, int blocksize, BTLA_DTYPE qtype, bool asym = false) {
-    printf("Test Case: %d %d %d %s\n", n, k, blocksize, asym ? "asym" : "sym");
-    int ldb = n;
-    int kblk_num = utils::updiv(k, blocksize);
-    utils::aligned_vector<float> scales(kblk_num * n);
-    ut::fill_buffer_randn(scales.data(), scales.size(), 0.005f, 0.01f);
-    utils::aligned_vector<int8_t> zero_points(kblk_num * n);
-    ut::fill_buffer_randn(zero_points.data(), zero_points.size(), (int8_t)(-5), (int8_t)(5));
-    ut::UT_vector_s8 quanW;
-    quanW.resize(k * n);
-    quanW.fill_rand(-127, 127);
-    avector<float> dequant(quanW.size());
-    avector<float> reduce(scales.size(), 0.f);
-    for (int i = 0; i < k; i++) {
-      for (int j = 0; j < n; j++) {
-        quanW.data()[i * n + j] = quanW.data()[i * n + j] & 0xf0;
-        if (!asym) {
-          dequant[i * n + j] = quanW.data()[i * n + j] * scales[i / blocksize * n + j];
-        } else {
-          dequant[i * n + j] =
-              float(quanW.data()[i * n + j] - zero_points[i / blocksize * n + j]) * scales[i / blocksize * n + j];
-        }
-        reduce[i / blocksize * n + j] += dequant[i * n + j];
-      }
-    }
-
-    auto constexpr RuntimeISA = BTLA_ISA::AVX2;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx2<48, 2>, BTLA_ISA::AVX2>;
-    using PrologueB512 = prologue_b::gemm::WeightKBlockNInteger<gemm::SCoreRowNAvx2<48, 2>, BTLA_ISA::AVX512F>;
-    PrologueB kernel;
-    PrologueB512 kernel512;
-    utils::aligned_vector<int8_t> retW(n * k);
-    auto packedW = kernel.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<float>, asym);
-    avector<int8_t> buffer(packedW.mSize);
-    packedW.assign(buffer.data());
-    kernel.packWeight(n, k, dequant.data(), ldb, &packedW, UT_Threading::get());
-    avector<float> unpackf32(dequant.size());
-    avector<float> unpack512f32(dequant.size());
-    kernel.unpackWeight(n, k, &packedW, unpackf32.data(), n, UT_Threading::get());
-    kernel512.unpackWeight(n, k, &packedW, unpack512f32.data(), n, UT_Threading::get());
-    ut::buffer_error(unpackf32.data(), unpack512f32.data(), unpackf32.size(), 0.01f);
-  }
-  void ut_512vnni(int n, int k, int blocksize, BTLA_DTYPE qtype, bool asym = false) {
-    printf("Test Case: %d %d %d %s\n", n, k, blocksize, asym ? "asym" : "sym");
-    int ldb = n;
-    int kblk_num = utils::updiv(k, blocksize);
-    utils::aligned_vector<float> scales(kblk_num * n);
-    ut::fill_buffer_randn(scales.data(), scales.size(), 0.005f, 0.01f);
-    utils::aligned_vector<int8_t> zero_points(kblk_num * n);
-    ut::fill_buffer_randn(zero_points.data(), zero_points.size(), (int8_t)(-5), (int8_t)(5));
-    ut::UT_vector_s8 quanW;
-    quanW.resize(k * n);
-    quanW.fill_rand(-127, 127);
-    avector<float> dequant(quanW.size());
-    avector<float> reduce(scales.size(), 0.f);
-    for (int i = 0; i < k; i++) {
-      for (int j = 0; j < n; j++) {
-        // quanW.data()[i * n + j] = quanW.data()[i * n + j] & 0xf0; //anyway there will be a float-rounding error
-        // about 1 LSB.
-        if (!asym) {
-          dequant[i * n + j] = quanW.data()[i * n + j] * scales[i / blocksize * n + j];
-        } else {
-          dequant[i * n + j] =
-              float(quanW.data()[i * n + j] - zero_points[i / blocksize * n + j]) * scales[i / blocksize * n + j];
-        }
-        reduce[i / blocksize * n + j] += dequant[i * n + j];
-      }
-    }
-
-    auto constexpr RuntimeISA = BTLA_ISA::AVX512_VNNI;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<gemm::ICoreRowNAvx512vnni<48, 8>, RuntimeISA>;
-
-    PrologueB kernel;
-    utils::aligned_vector<int8_t> retW(n * k);
-    auto packedW = kernel.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<float>, asym);
-    avector<int8_t> buffer(packedW.mSize);
-    packedW.assign(buffer.data());
-    kernel.packWeight(n, k, dequant.data(), ldb, &packedW, UT_Threading::get());
-    avector<float> unpackf32(dequant.size());
-    kernel.unpackWeight(n, k, &packedW, unpackf32.data(), n, UT_Threading::get());
-    int lsb = 16;
-    float err_thres = lsb * 0.01f;  // lsb*max_scale
-    ut::buffer_error(dequant.data(), unpackf32.data(), dequant.size(), err_thres);
-  }
-};
-#ifdef BTLA_UT_PROLOGUE_B
-static UT_BlockQuantize_INT4 sUT_BlockQuantize_INT4;
 #endif
 
 class UT_StorageMemCheck {
@@ -443,10 +302,10 @@ class UT_StorageMemCheck {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = gemm::SCoreRowNAvx512f<48, 8>;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, BTLA_ISA::AVX2>;
-    PrologueB ProWei;
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore>;
 
-    auto packedW = ProWei.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
+    auto packedW =
+        PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());
     storage::gemm::StorageWeightKBlockNInteger tmp(GemmCore::ID);
@@ -460,10 +319,9 @@ class UT_StorageMemCheck {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = gemm::HCoreRowNAmxbf16<64, 16>;
-    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<GemmCore, BTLA_ISA::AMX_BF16>;
-    PrologueB ProWei;
+    using PrologueB = prologue_b::gemm::WeightKBlockNFloat<GemmCore>;
 
-    auto packedW = ProWei.createStorage(n, k, blocksize, qtype, bestla_dtype<float>);
+    auto packedW = PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>);
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());
     storage::gemm::StorageWeightKBlockNFloat tmp(GemmCore::ID);
@@ -490,10 +348,10 @@ class UT_ShuffleIndices {
     int ldb = n;
     int kblk_num = utils::updiv(k, blocksize);
     using GemmCore = gemm::SCoreRowNAvx2<24, 4>;
-    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore, BTLA_ISA::AVX2>;
-    PrologueB ProWei;
-    auto packedW = ProWei.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
-    ProWei.enableShuffle(&packedW);
+    using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore>;
+    auto packedW =
+        PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
+    PrologueB::enableShuffle(&packedW);
     avector<int> groupindices(k, 0);
     auto groupsize = utils::updiv(k, blocksize);
     avector<int> reflut(k, 0);
@@ -504,49 +362,13 @@ class UT_ShuffleIndices {
     }
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());
-    ProWei.setShuffleIndices(groupindices.data(), &packedW, UT_Threading::get());
+    PrologueB::setShuffleIndices(groupindices.data(), &packedW, UT_Threading::get());
     buffer_error(reflut.data(), packedW.ShfIndice(), reflut.size());
 
     storage::gemm::StorageWeightKBlockNInteger tmp(GemmCore::ID);
     tmp.deserialize(buf0.data());
     tmp.serialize(buf1.data());
     buffer_error(buf0.data(), buf1.data(), buf0.size());
-  }
-
-  void ut_file() {
-    int n = 14336;
-    int m = 8;
-    int k = 4096;
-    int blocksize = 32;
-    bool constexpr blauncher = true;
-    auto qtype = BTLA_DTYPE::S4_CLIP;
-    bool asym = true;
-    auto warray = ut::readFile2Buffer<int8_t>("src0_data.bin");
-    auto aarray = ut::readFile2Buffer<float>("src1_data.bin");
-    auto oarray = ut::readFile2Buffer<float>("tensor_data.bin");
-    auto refoarray = ut::readFile2Buffer<float>("tensor_data_ref.bin");
-    auto wptr = storage::gemm::PackedWeightParser::deserialBuffer(warray.data());
-    using GemmCore = gemm::SCoreRowNAvx512f<48, 8>;
-    auto wptr_ = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(wptr);
-    utils::GemmProblem gp(1, m, n, k, blocksize);
-    avector<float> output(m * n);
-    if constexpr (blauncher) {
-      using Launcher =
-          wrapper::gemm::LauncherBase<GemmCore::ISA, GemmCore, prologue_a::gemm::ShuffleActivationKBlockBaseF32,
-                                      prologue_b::gemm::WeightKBlockNInteger, epilogue::gemm::AccumulatorWriteBackFp32>;
-      static Launcher kernel;
-      auto rordA = Launcher::PrologueA::createReorderStorage(m, k, blocksize);
-      avector<int8_t> bufA(rordA.mSize);
-      rordA.assign(bufA.data());
-      typename Launcher::Param args{
-          gp, {aarray.data(), k, nullptr, wptr_->ShfIndice(), &rordA}, {wptr_}, {output.data(), n}};
-      parallel::GemmRunWithA<parallel::gemm::SchedulerBase<GemmCore>>(kernel, args, UT_Threading::get());
-    }
-
-    ut::buffer_error(output.data(), oarray.data(), output.size());
-    ut::buffer_error(output.data(), refoarray.data(), output.size());
-
-    delete wptr;
   }
 };
 #ifdef BTLA_UT_PROLOGUE_B
@@ -639,7 +461,7 @@ class UT_CompFp32 {
     ut<sAVX512F, prologue_b::gemm::WeightKBlockNFloat>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4, BTLA_DTYPE::BF16);
   }
 
-  template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei>
+  template <class GemmCore_T, template <class _T> class Wei>
   void ut_int(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype, bool isAsym) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s Asym:%d\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype), isAsym);
@@ -650,12 +472,12 @@ class UT_CompFp32 {
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
-    using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
+    using WType = typename Launcher::PrologueB::StorageWeight;
     WType packedw(0);
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNFloat<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype);
+    if constexpr (std::is_same_v<Wei<GemmCore_T>, prologue_b::gemm::WeightKBlockNInteger<GemmCore_T>>) {
+      packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
+    } else if constexpr (std::is_same_v<Wei<GemmCore_T>, prologue_b::gemm::WeightKBlockNFloat<GemmCore_T>>) {
+      packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, stype);
     }
 
     utils::avector<int8_t> buffer(packedw.mSize);
@@ -666,9 +488,9 @@ class UT_CompFp32 {
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
     fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
 
     Launcher::PrologueA::reduce({matAf32.data(), k, &reduceA}, m, k, blocksize, UT_Threading::get());
@@ -683,7 +505,7 @@ class UT_CompFp32 {
     buffer_error(refCupk.data(), matC.data(), refCupk.size(), 0.001f);
   }
 
-  template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei>
+  template <class GemmCore_T, template <class _T> class Wei>
   void ut(int m, int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE stype) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), bestla_dtype_str(stype));
@@ -693,17 +515,17 @@ class UT_CompFp32 {
     using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
-    using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
+    using WType = typename Wei<GemmCore_T>::StorageWeight;
     WType packedw(0);
-    packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype);
+    packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, stype);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
     fill_buffer_randn(matBf32.data(), matBf32.size(), -0.5f, 0.5f);
     fill_buffer_randn(matAf32.data(), matAf32.size(), -0.5f, 0.5f);
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
     typename Launcher::Param args{gp, {matAf32.data(), k}, {&packedw}, {matC.data(), n}};
@@ -843,7 +665,7 @@ class UT_CompInt8 {
     blocksize = blocksize == -1 ? k : blocksize;
     int kblks = updiv(k, blocksize);
     using WType = typename Launcher::PrologueB::StorageWeight;
-    WType packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
+    WType packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
@@ -862,9 +684,9 @@ class UT_CompInt8 {
         reduceAf32[i * kblks + j / blocksize] += matAf32[i * k + j];
       }
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     auto quanA = Launcher::PrologueA::createStorage(m, k, blocksize, isAsym);
     utils::avector<int8_t> bufferA(quanA.mSize);
@@ -896,7 +718,7 @@ class UT_CompInt8 {
     blocksize = blocksize == -1 ? k : blocksize;
     int kblks = updiv(k, blocksize);
     using WType = typename Launcher::PrologueB::StorageWeight;
-    WType packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
+    WType packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, stype, bestla_dtype<float>, isAsym);
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
     avector<float> matBf32(k * n), matAf32(m * k), matC(m * n), refC(m * n), refCupk(m * n);
@@ -915,9 +737,9 @@ class UT_CompInt8 {
         reduceAf32[i * kblks + j / blocksize] += matAf32[i * k + j];
       }
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refCupk.data(), k, n, n);
     auto quanA = Launcher::PrologueA::createStorage(m, k, blocksize, isAsym);
     utils::avector<int8_t> bufferA(quanA.mSize);
@@ -992,7 +814,7 @@ class UT_CompBf16 {
     ut<sAMX_BF16, prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2, 4096, 4096, 32, BTLA_DTYPE::F4_NF4);
   }
 
-  template <class GemmCore_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <class GemmCore_T, template <class _T> class Wei, typename Scale_T>
   void ut(int m, int n, int k, int blocksize, BTLA_DTYPE qtype) {
     printf("Test Case %s: %d %d %d-%d type:%s core:%s scaletype:%s\n", __FUNCTION__, m, n, k, blocksize,
            bestla_dtype_str(qtype), gemm::CoreAttr::to_str(GemmCore_T::ID), type_str<Scale_T>);
@@ -1003,12 +825,13 @@ class UT_CompBf16 {
 
     Launcher launcher;
     blocksize = blocksize == -1 ? k : blocksize;
-    using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
+    using WType = typename Wei<GemmCore_T>::StorageWeight;
     WType packedw(0);
-    if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNInteger<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
-    } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockNFloat<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
+    if constexpr (std::is_same_v<Wei<GemmCore_T>, prologue_b::gemm::WeightKBlockNInteger<GemmCore_T>>) {
+      packedw =
+          Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+    } else if constexpr (std::is_same_v<Wei<GemmCore_T>, prologue_b::gemm::WeightKBlockNFloat<GemmCore_T>>) {
+      packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
 
     utils::avector<int8_t> buffer(packedw.mSize);
@@ -1020,9 +843,9 @@ class UT_CompBf16 {
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBf32[i] = matBbf16[i];
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBbf16[i] = static_cast<utils::bf16>(matBf32[i]);
     }
@@ -1076,8 +899,8 @@ class UT_ORT_NBits {
     blocksize = blocksize == -1 ? k : blocksize;
     using WType = storage::gemm::StorageWeightKBlockNInteger;
     WType packedw(0);
-    packedw =
-        launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, isasym);
+    packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>,
+                                                 isasym);
 
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
@@ -1107,7 +930,7 @@ class UT_ORT_NBits {
       }
       rA.assign(tmpA.data());
       Launcher::PrologueA::template reduce({matAf32.data(), k, &rA}, m, k, blocksize,
-                                                UT_Threading::get());  // for reduce UT
+                                           UT_Threading::get());  // for reduce UT
       buffer_error(reduceA.data(), rA.template RPtr<float>(), reduceA.size(), FP32_ERR);
       memset(tmpA.data(), 0, tmpA.size());  // clear
     }
@@ -1124,12 +947,12 @@ class UT_ORT_NBits {
             zpBs8[i * blks + j / blocksize] | zpBs8[i * blks + j / blocksize + 1] << 4;
       }
     }
-    launcher.mProB.packNbitsWeightQ4(n, k, isasym, (uint8_t*)matBs4.data(), k, scalesB.data(), (uint8_t*)zpBs4.data(),
-                                     &packedw, UT_Threading::get());
-    launcher.mProB.reduceWeight(&packedw, UT_Threading::get());
+    Launcher::PrologueB::packNbitsWeightQ4(n, k, isasym, (uint8_t*)matBs4.data(), k, scalesB.data(),
+                                           (uint8_t*)zpBs4.data(), &packedw, UT_Threading::get());
+    Launcher::PrologueB::reduceWeight(&packedw, UT_Threading::get());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     avector<float> revB(matBf32.size());
-    launcher.mProB.unpackWeight(n, k, &packedw, revB.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, revB.data(), n, UT_Threading::get());
     buffer_error(matBf32.data(), revB.data(), revB.size(), FP32_ERR);
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), revB.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
@@ -1162,8 +985,8 @@ class UT_ORT_NBits {
     auto sdata = readFile2Buffer<float>(sfile);
     auto zdata = readFile2Buffer<int8_t>(zfile);
     using WType = storage::gemm::StorageWeightKBlockNInteger;
-    WType packedw =
-        launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, isasym);
+    WType packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>,
+                                                       bestla_dtype<utils::bf16>, isasym);
 
     utils::avector<int8_t> buffer(packedw.mSize);
     packedw.assign(buffer.data());
@@ -1192,7 +1015,7 @@ class UT_ORT_NBits {
       }
     }
 
-    launcher.mProB.packQWeight(n, k, qdata.data(), n, sdata.data(), zdata.data(), &packedw, UT_Threading::get());
+    Launcher::PrologueB::packQWeight(n, k, qdata.data(), n, sdata.data(), zdata.data(), &packedw, UT_Threading::get());
 
     auto bfile = readFile2Buffer<int8_t>("bestla_w3.weight.bin");
     WType packedfile(0);
@@ -1202,7 +1025,7 @@ class UT_ORT_NBits {
     buffer_error(packedw.ZPtr<int8_t>(), packedfile.ZPtr<int8_t>(), packedw.CSize());
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), matBf32.data(), refC.data(), k, n, n);
     avector<float> revB(matBf32.size());
-    launcher.mProB.unpackWeight(n, k, &packedw, revB.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, revB.data(), n, UT_Threading::get());
     buffer_error(matBf32.data(), revB.data(), revB.size(), FP32_ERR);
     gemmref_fp32fp32fp32(m, n, k, matAf32.data(), revB.data(), refCupk.data(), k, n, n);
     GemmProblem gp(1, m, n, k, blocksize);
@@ -1272,13 +1095,13 @@ class UT_CompFp16 {
     using WType = typename Wei<GemmCore_T, ISA>::StorageWeight;
     WType packedw(0);
     if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>, prologue_b::gemm::WeightKBlockS8<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+      packedw = Launcher::PrologueB::createStorage(n, k, blocksize, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
     } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
                                         prologue_b::gemm::WeightKBlockS4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+      packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
     } else if constexpr (std::is_same_v<Wei<GemmCore_T, ISA>,
                                         prologue_b::gemm::WeightKBlockF4<GemmCore_T, ISA>>) {
-      packedw = launcher.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
+      packedw = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
 
     utils::avector<int8_t> buffer(packedw.mSize);
@@ -1290,9 +1113,9 @@ class UT_CompFp16 {
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBf32[i] = matBbf16[i];
     }
-    launcher.mProB.packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, matBf32.data(), n, &packedw, UT_Threading::get());
     gemmref_bf16bf16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
-    launcher.mProB.unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
+    Launcher::PrologueB::unpackWeight(n, k, &packedw, matBf32.data(), n, UT_Threading::get());
     for (size_t i = 0; i < matBf32.size(); i++) {
       matBbf16[i] = static_cast<utils::bf16>(matBf32[i]);
     }

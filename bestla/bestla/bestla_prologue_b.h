@@ -23,7 +23,7 @@ namespace bestla {
 namespace prologue_b {
 namespace gemm {
 
-template <typename WT, BTLA_ISA ISA_T>
+template <typename WT>
 static inline void transposeWeight(const int Row, const int Col, const WT* src, const int ld_src, WT* dst,
                                    const int ld_dst, parallel::IThreading* threading) {
   bestla::parallel::Scheduler2D _para;
@@ -32,9 +32,9 @@ static inline void transposeWeight(const int Row, const int Col, const WT* src, 
     bestla::parallel::ThreadProblem2D thdp{tidx};
     _para.getIndex(thdp);
     if (thdp.valid) {
-      kernel::wrapper::Transpose2D<WT>::template forward<ISA_T>(src + thdp.loc[0] * ld_src + thdp.loc[1],
-                                                                dst + thdp.loc[0] + thdp.loc[1] * ld_dst, thdp.size[0],
-                                                                thdp.size[1], ld_src, ld_dst);
+      kernel::wrapper::Transpose2D<WT>::forward_auto(src + thdp.loc[0] * ld_src + thdp.loc[1],
+                                                     dst + thdp.loc[0] + thdp.loc[1] * ld_dst, thdp.size[0],
+                                                     thdp.size[1], ld_src, ld_dst);
     }
   });
 }
@@ -45,14 +45,14 @@ struct ParamWeightPack {
   storage::gemm::StoragePackedWeight* packedW;
 };
 
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class WeightPack {
  public:
   using WType = typename _GemmCore_T::BType;
   using StorageType = storage::gemm::StoragePackedWeight;
   using Param = ParamWeightPack<WType>;
 
-  StorageType createStorage(int n, int k) {
+  AUTOCALL StorageType createStorage(int n, int k) {
     int KPad = utils::padto(k, _GemmCore_T::KTILE);
     int NPad = utils::padto(n, _GemmCore_T::NTILE);
     StorageType tmp(_GemmCore_T::ID);
@@ -60,15 +60,15 @@ class WeightPack {
     return tmp;
   }
 
-  void packWeightTranspose(const int N, const int K, const Param& _param, parallel::IThreading* threading) {
+  AUTOCALL void packWeightTranspose(const int N, const int K, const Param& _param, parallel::IThreading* threading) {
     auto B_NT = utils::amalloc<WType>(static_cast<size_t>(N) * K);
-    transposeWeight<WType, ISA_T>(N, K, _param.B, _param.ldb, B_NT, N, threading);
+    transposeWeight<WType>(N, K, _param.B, _param.ldb, B_NT, N, threading);
     packWeight(N, K, {B_NT, N, _param.packedW}, threading);
     utils::afree(B_NT);
   }
 
   // from KxN int8 symmetric weight to packed N//NtilexKPadxNTile int4 weight
-  void packWeight(const int N, const int K, const Param& _param, parallel::IThreading* threading) {
+  AUTOCALL void packWeight(const int N, const int K, const Param& _param, parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
@@ -79,21 +79,22 @@ class WeightPack {
     });
   }
 
-  void run(const Param& _param, parallel::ThreadProblem2D& thdp) {
+  AUTOCALL void run(const Param& _param, parallel::ThreadProblem2D& thdp) {
     auto packedw = _param.packedW;
     auto rowpadded = utils::padto(thdp.size[0], _GemmCore_T::KTILE);
     auto colpadded = utils::padto(thdp.size[1], _GemmCore_T::NTILE);
     const auto src = _param.B + thdp.loc[0] * _param.ldb + thdp.loc[1];
     const auto dst = packedw->template WPtr<WType>() + thdp.loc[0] * _GemmCore_T::NTILE + thdp.loc[1] * packedw->mKPad;
-    using PaddingInterleaveMNWType = kernel::wrapper::PaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW>;
-    auto ret = PaddingInterleaveMNWType::template forward<ISA_T>(  //
+    using PaddingInterleaveMNWType =
+        kernel::wrapper::PaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, WType>;
+    auto ret = PaddingInterleaveMNWType::forward_auto(  //
         src, dst, thdp.size[0], thdp.size[1], rowpadded, colpadded, _param.ldb, packedw->mKPad);
     assert(ret == BTLA_CODE::Success);
     (void)ret;
   }
 
-  inline BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                             const Param param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getWeight(WType** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                              const Param param, void* tmpcache, size_t cachesize) {
     auto wptr = param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<WType>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
@@ -109,15 +110,15 @@ struct ParamWeightKBlockNInteger {
   storage::gemm::StorageWeightKBlockNInteger* packedW;
 };
 
-template <class _GemmCore_T, BTLA_ISA ISA_T>
+template <class _GemmCore_T>
 class WeightKBlockNInteger {
  public:
   using StorageWeight = storage::gemm::StorageWeightKBlockNInteger;
   using BType = typename _GemmCore_T::BType;
   using Param = ParamWeightKBlockNInteger;
 
-  static StorageWeight createStorage(int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE scat, BTLA_DTYPE redt,
-                                     bool is_asym) {
+  AUTOCALL StorageWeight createStorage(int n, int k, int blocksize, BTLA_DTYPE qtype, BTLA_DTYPE scat, BTLA_DTYPE redt,
+                                       bool is_asym) {
     int KPad = utils::padto(k, _GemmCore_T::KTILE);
     int NPad = utils::padto(n, _GemmCore_T::NTILE);
     StorageWeight tmp(_GemmCore_T::ID);
@@ -125,8 +126,8 @@ class WeightKBlockNInteger {
     return tmp;
   }
 
-  void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
-                        utils::aligned_vector<float>* dq_buf) {
+  AUTOCALL void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
+                                 utils::aligned_vector<float>* dq_buf) {
     if (qtype == BTLA_DTYPE::DQ8_BNB) {
       dq_buf->resize(utils::updiv(scale_size, dq_blocksize) + 1);  // add 1 for offset.
       kernel::ref::dq8_bnb_double_quant<false>(scale, scale_size, dq_blocksize, dq_buf->data());
@@ -135,7 +136,7 @@ class WeightKBlockNInteger {
     }
   }
 
-  void setDoubleQuantCorrection(utils::avector<float>* dq_buf, StorageWeight* ptr) {
+  AUTOCALL void setDoubleQuantCorrection(utils::avector<float>* dq_buf, StorageWeight* ptr) {
     if (ptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
       auto packw_dqbuf_ptr = ptr->DQPtr<float>();
       memcpy(packw_dqbuf_ptr, dq_buf->data(), dq_buf->size() * sizeof(float));
@@ -144,8 +145,9 @@ class WeightKBlockNInteger {
     }
   }
 
-  static void enableShuffle(StorageWeight* stor) { stor->enable_shuffle(); }
-  void setDoubleQuantBlkSize(StorageWeight* stor, BTLA_DTYPE stype, int dq_blksize) {
+  AUTOCALL void enableShuffle(StorageWeight* stor) { stor->enable_shuffle(); }
+
+  AUTOCALL void setDoubleQuantBlkSize(StorageWeight* stor, BTLA_DTYPE stype, int dq_blksize) {
     stor->mDqBlockSize = dq_blksize;
     auto nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
     if (stor->IsAsym() || dq_blksize % 8 != 0) assert(0);
@@ -153,26 +155,26 @@ class WeightKBlockNInteger {
     stor->update_size();
   }
 
-  void packTransposeWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* stor,
-                           parallel::IThreading* threading) {
+  AUTOCALL void packTransposeWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* stor,
+                                    parallel::IThreading* threading) {
     auto B_NT = utils::amalloc<float>(static_cast<size_t>(N) * K);
-    transposeWeight<float, ISA_T>(N, K, B, ldb, B_NT, N, threading);
+    transposeWeight<float>(N, K, B, ldb, B_NT, N, threading);
     packWeight(N, K, B_NT, N, stor, threading);
     utils::afree(B_NT);
   }
 
   // from packed N//NtilexKPadxNTile int8 weight to KxN f32 weight
-  void unpackTransposeWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
-                             parallel::IThreading* threading) {
+  AUTOCALL void unpackTransposeWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
+                                      parallel::IThreading* threading) {
     auto B_NT = utils::amalloc<float>(static_cast<size_t>(N) * K);
     unpackWeight(N, K, stor, B_NT, N, threading);
-    transposeWeight<float, ISA_T>(K, N, B_NT, N, B, ldb, threading);
+    transposeWeight<float>(K, N, B_NT, N, B, ldb, threading);
     utils::afree(B_NT);
   }
 
   // from KxN f32 weight to packed N//NtilexKPadxNTile int8 weight
-  void packWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* ptr,
-                  parallel::IThreading* threading) {
+  AUTOCALL void packWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* ptr,
+                           parallel::IThreading* threading) {
     auto tmpq = utils::amalloc<int8_t>(static_cast<size_t>(N) * K);
     int nk_scale = utils::updiv(K, ptr->mBlockSize);
     auto ssize = static_cast<size_t>(N) * nk_scale;
@@ -185,8 +187,8 @@ class WeightKBlockNInteger {
     utils::afree(Tzps);
   }
 
-  void unpackWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
-                    parallel::IThreading* threading) {
+  AUTOCALL void unpackWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
+                             parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
@@ -199,16 +201,26 @@ class WeightKBlockNInteger {
         int dststep = 0;
         size_t constexpr CacheSize = size_t(100) << 10;
         int8_t tmpcache[CacheSize];
-        getWeight(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache, CacheSize);
-        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW>::template forward<ISA_T>(
+        GetCPUDevice();
+        if (_cd->AVX512F()) {
+          getWeight<BTLA_ISA::AVX512F>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                       CacheSize);
+        } else if (_cd->AVX2()) {
+          getWeight<BTLA_ISA::AVX2>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                    CacheSize);
+        } else {
+          getWeight<BTLA_ISA::NoSIMD>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                      CacheSize);
+        }
+        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, float>::forward_auto(
             dstptr, B + thdp.loc[0] * ldb + thdp.loc[1], thdp.size[0], thdp.size[1], rowpad, colpad, dststep, ldb);
         utils::afree(dequant);
       }
     });
   }
 
-  static void unpackWeight(const int N, const int K, StorageWeight* stor, int8_t* B, const int ldb,
-                           parallel::IThreading* threading) {
+  AUTOCALL void unpackWeight(const int N, const int K, StorageWeight* stor, int8_t* B, const int ldb,
+                             parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp{tidx};
@@ -221,16 +233,26 @@ class WeightKBlockNInteger {
         int dststep = 0;
         size_t constexpr CacheSize = size_t(100) << 10;
         int8_t tmpcache[CacheSize];
-        getWeight(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache, CacheSize);
-        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW>::template forward<ISA_T>(
+        GetCPUDevice();
+        if (_cd->AVX512F()) {
+          getWeight<BTLA_ISA::AVX512F>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                       CacheSize);
+        } else if (_cd->AVX2()) {
+          getWeight<BTLA_ISA::AVX2>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                    CacheSize);
+        } else {
+          getWeight<BTLA_ISA::NoSIMD>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                      CacheSize);
+        }
+        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, int8_t>::forward_auto(
             dstptr, B + thdp.loc[0] * ldb + thdp.loc[1], thdp.size[0], thdp.size[1], rowpad, colpad, dststep, ldb);
         utils::afree(dequant);
       }
     });
   }
 
-  static void setQuantCorrection(const int N, const int K, const int8_t* zero_points, const float* scales,
-                                 StorageWeight* stor, parallel::IThreading* threading) {
+  AUTOCALL void setQuantCorrection(const int N, const int K, const int8_t* zero_points, const float* scales,
+                                   StorageWeight* stor, parallel::IThreading* threading) {
     int rawnk_scale = utils::updiv(K, stor->mBlockSize);
     int nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
     parallel::Scheduler2D _para({threading->num_threads(), 1, nk_scale, 1, 1});
@@ -323,7 +345,7 @@ class WeightKBlockNInteger {
     }
   }
 
-  static void setShuffleIndices(const int* groupindices, StorageWeight* stor, parallel::IThreading* threading) {
+  AUTOCALL void setShuffleIndices(const int* groupindices, StorageWeight* stor, parallel::IThreading* threading) {
     auto groupsize = utils::updiv(stor->mK, stor->mBlockSize);
     parallel::Scheduler2D _para({threading->num_threads(), 1, groupsize, 1, 1});
     auto countptr = utils::amalloc<int>(groupsize);
@@ -344,8 +366,8 @@ class WeightKBlockNInteger {
     utils::afree(countptr);
   }
 
-  static void setTransposeQuantCorrection(const int N, const int K, const int8_t* zero_points, const float* scales,
-                                          StorageWeight* stor, parallel::IThreading* threading) {
+  AUTOCALL void setTransposeQuantCorrection(const int N, const int K, const int8_t* zero_points, const float* scales,
+                                            StorageWeight* stor, parallel::IThreading* threading) {
     int rawnk_scale = utils::updiv(K, stor->mBlockSize);
     int nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
     parallel::Scheduler2D _para({threading->num_threads(), 1, nk_scale, 1, 1});
@@ -424,8 +446,8 @@ class WeightKBlockNInteger {
       });
   }
 
-  void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
-                   const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
+  AUTOCALL void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
+                            const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
     if (stor->SDtype() == BTLA_DTYPE::DQ8_BNB) assert(stor->mDqBlockSize != 0);
     if (stor->IsDoubleQuant()) {
       int nk_scale = utils::updiv(K, stor->mBlockSize);
@@ -435,7 +457,7 @@ class WeightKBlockNInteger {
       setDoubleQuantCorrection(&dq_buf, stor);
     }
     setQuantCorrection(N, K, zero_points, scales, stor, threading);
-    if (stor->mDType == BTLA_DTYPE::S8 || stor->mDType == BTLA_DTYPE::F8_E4M3 || stor->mDType == BTLA_DTYPE::F8_E5M2) {
+    if (stor->mDType == BTLA_DTYPE::S8) {
       reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
     } else {
       auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
@@ -446,9 +468,9 @@ class WeightKBlockNInteger {
     reduceWeight(stor, threading);
   }
 
-  virtual void packNbitsWeightQ4(const int N, const int K, bool isasym, const uint8_t* B, const int ldb,
-                                 const float* scales, const uint8_t* zero_points, void* ptr,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void packNbitsWeightQ4(const int N, const int K, bool isasym, const uint8_t* B, const int ldb,
+                                  const float* scales, const uint8_t* zero_points, void* ptr,
+                                  parallel::IThreading* threading) {
     auto stor = reinterpret_cast<StorageWeight*>(ptr);
     auto tmp = utils::amalloc<float>(static_cast<size_t>(stor->mKPad) * stor->mNPad);
     auto blks = utils::updiv(K, stor->mBlockSize);
@@ -500,7 +522,7 @@ class WeightKBlockNInteger {
     utils::afree(tmp);
   }
 
-  void reduceWeight(StorageWeight* stor, parallel::IThreading* threading) {
+  AUTOCALL void reduceWeight(StorageWeight* stor, parallel::IThreading* threading) {
     if (stor->HasReduce()) {
       auto deq = utils::amalloc<float>((size_t)stor->mK * stor->mN);
       unpackWeight(stor->mN, stor->mK, stor, deq, stor->mN, threading);
@@ -517,8 +539,8 @@ class WeightKBlockNInteger {
     }
   }
 
-  void quantizeWeight(const int N, const int K, const float* B, const int ldb, int8_t* qB, float* scales,
-                      int8_t* zero_points, void* stor, parallel::IThreading* threading) {
+  AUTOCALL void quantizeWeight(const int N, const int K, const float* B, const int ldb, int8_t* qB, float* scales,
+                               int8_t* zero_points, void* stor, parallel::IThreading* threading) {
     auto ptr = reinterpret_cast<StorageWeight*>(stor);
     int bsize = ptr->mBlockSize == -1 ? K : ptr->mBlockSize;
     parallel::Scheduler2D _para({threading->num_threads(), K, N, bsize, 16});
@@ -526,15 +548,17 @@ class WeightKBlockNInteger {
       parallel::ThreadProblem2D thdp({tidx});
       _para.getIndex(thdp);
       if (thdp.valid) {
-        quantRowBlock(B + thdp.loc[0] * ldb + thdp.loc[1], qB + thdp.loc[0] * N + thdp.loc[1], thdp.size[0],
-                      thdp.size[1], ldb, N, scales + thdp.loc[0] / bsize * N + thdp.loc[1],
-                      zero_points == nullptr ? zero_points : zero_points + thdp.loc[0] / bsize * N + thdp.loc[1], ptr);
+        kernel::wrapper::QuantizeSignIntRowBlock::forward_auto(
+            B + thdp.loc[0] * ldb + thdp.loc[1], qB + thdp.loc[0] * N + thdp.loc[1], thdp.size[0], thdp.size[1], ldb, N,
+            scales + thdp.loc[0] / bsize * N + thdp.loc[1],
+            zero_points == nullptr ? zero_points : zero_points + thdp.loc[0] / bsize * N + thdp.loc[1], ptr->mBlockSize,
+            ptr->mDType);
       }
     });
   }
 
-  static void reorderWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
-                            parallel::IThreading* threading) {
+  AUTOCALL void reorderWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
+                              parallel::IThreading* threading) {
     int KPad = utils::padto(K, _GemmCore_T::KTILE);
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
@@ -546,8 +570,8 @@ class WeightKBlockNInteger {
         const auto src = B + thdp.loc[0] * ldb + thdp.loc[1];
         const auto dst = dstptr + thdp.loc[0] * _GemmCore_T::NTILE + thdp.loc[1] * KPad;
         using PaddingInterleaveMNWType =
-            kernel::wrapper::PaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW>;
-        auto ret = PaddingInterleaveMNWType::template forward<ISA_T>(  //
+            kernel::wrapper::PaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, int8_t>;
+        auto ret = PaddingInterleaveMNWType::forward_auto(  //
             src, dst, thdp.size[0], thdp.size[1], rowpadded, colpadded, ldb, KPad);
         assert(ret == BTLA_CODE::Success);
         (void)ret;
@@ -555,45 +579,45 @@ class WeightKBlockNInteger {
     });
   }
 
-  static void compressBit3Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit3Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     auto bit1_offset = size_t(N) * K;
     auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
     auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + bit1_offset / 4);
-    auto ret = kernel::wrapper::CompressBit3::forward<ISA_T>(B, bit2ptr, bit1ptr, bit1_offset);
+    auto ret = kernel::wrapper::CompressBit3::forward_auto(B, bit2ptr, bit1ptr, bit1_offset);
     assert(ret == BTLA_CODE::Success);
   }
 
-  static void compressBit5Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit5Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     auto bit1_offset = size_t(N) * K;
     auto bit4ptr = reinterpret_cast<utils::bit4x2*>(dstptr);
     auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr + bit1_offset / 2);
-    auto ret = kernel::wrapper::CompressBit5::forward<ISA_T>(B, bit4ptr, bit1ptr, bit1_offset);
+    auto ret = kernel::wrapper::CompressBit5::forward_auto(B, bit4ptr, bit1ptr, bit1_offset);
     assert(ret == BTLA_CODE::Success);
   }
 
-  static void compressBit6Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit6Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     auto bit2_offset = size_t(N) * K;
     auto bit4ptr = reinterpret_cast<utils::bit4x2*>(dstptr);
     auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr + bit2_offset / 2);
-    auto ret = kernel::wrapper::CompressBit6::forward<ISA_T>(B, bit4ptr, bit2ptr, bit2_offset);
+    auto ret = kernel::wrapper::CompressBit6::forward_auto(B, bit4ptr, bit2ptr, bit2_offset);
     assert(ret == BTLA_CODE::Success);
   }
 
-  static void compressBit7Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit7Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     auto eltsize = size_t(N) * K;
     auto bit4ptr = reinterpret_cast<utils::bit4x2*>(dstptr);
     auto bit2ptr = reinterpret_cast<utils::bit2x4*>(bit4ptr + eltsize / 2);
     auto bit1ptr = reinterpret_cast<utils::bit1x8*>(bit2ptr + eltsize / 4);
-    auto ret = kernel::wrapper::CompressBit7::forward<ISA_T>(B, bit4ptr, bit2ptr, bit1ptr, eltsize);
+    auto ret = kernel::wrapper::CompressBit7::forward_auto(B, bit4ptr, bit2ptr, bit1ptr, eltsize);
     assert(ret == BTLA_CODE::Success);
   }
 
-  static void compressBit2Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit2Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     // TODO(zhe): 1D parallel compress
     parallel::Scheduler2D _para({threading->num_threads(), 1, K * N, 1, 64});
     auto bit2ptr = reinterpret_cast<utils::bit2x4*>(dstptr);
@@ -602,15 +626,15 @@ class WeightKBlockNInteger {
       _para.getIndex(thdp);
       if (thdp.valid) {
         auto ret =
-            kernel::wrapper::CompressBit2::forward<ISA_T>(B + thdp.loc[1], bit2ptr + thdp.loc[1] / 4, thdp.size[1]);
+            kernel::wrapper::CompressBit2::forward_auto(B + thdp.loc[1], bit2ptr + thdp.loc[1] / 4, thdp.size[1]);
         assert(ret == BTLA_CODE::Success);
         (void)ret;
       }
     });
   }
 
-  static void compressBit1Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit1Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     // TODO(zhe): 1D parallel compress
     parallel::Scheduler2D _para({threading->num_threads(), 1, K * N, 1, 64});
     auto bit1ptr = reinterpret_cast<utils::bit1x8*>(dstptr);
@@ -619,15 +643,15 @@ class WeightKBlockNInteger {
       _para.getIndex(thdp);
       if (thdp.valid) {
         auto ret =
-            kernel::wrapper::CompressBit1::forward<ISA_T>(B + thdp.loc[1], bit1ptr + thdp.loc[1] / 8, thdp.size[1]);
+            kernel::wrapper::CompressBit1::forward_auto(B + thdp.loc[1], bit1ptr + thdp.loc[1] / 8, thdp.size[1]);
         assert(ret == BTLA_CODE::Success);
         (void)ret;
       }
     });
   }
 
-  static void compressBit4Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
-                                 parallel::IThreading* threading) {
+  AUTOCALL void compressBit4Weight(const int N, const int K, const int8_t* B, int8_t* dstptr, BTLA_DTYPE qtype,
+                                   parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), 1, K * N, 1, 64});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp({tidx});
@@ -636,10 +660,10 @@ class WeightKBlockNInteger {
         BTLA_CODE ret = BTLA_CODE::NotSupport;
         if (qtype == BTLA_DTYPE::S4_CLIP) {
           auto bit4ptr = reinterpret_cast<utils::int4x2*>(dstptr);
-          ret = kernel::wrapper::CompressS8S4::forward<ISA_T>(B + thdp.loc[1], bit4ptr + thdp.loc[1] / 2, thdp.size[1]);
+          ret = kernel::wrapper::CompressS8S4::forward_auto(B + thdp.loc[1], bit4ptr + thdp.loc[1] / 2, thdp.size[1]);
         } else if (qtype == BTLA_DTYPE::F4_BNB || qtype == BTLA_DTYPE::F4_NF4 || qtype == BTLA_DTYPE::F4_E2M1) {
           auto bit4ptr = reinterpret_cast<utils::f4x2*>(dstptr);
-          ret = kernel::wrapper::CompressFp4::forward<ISA_T>(B + thdp.loc[1], bit4ptr + thdp.loc[1] / 2, thdp.size[1]);
+          ret = kernel::wrapper::CompressFp4::forward_auto(B + thdp.loc[1], bit4ptr + thdp.loc[1] / 2, thdp.size[1]);
         } else {
           assert(0);
         }
@@ -648,8 +672,8 @@ class WeightKBlockNInteger {
       }
     });
   }
-  static void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr, BTLA_DTYPE qtype,
-                             parallel::IThreading* threading) {
+  AUTOCALL void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
+                               BTLA_DTYPE qtype, parallel::IThreading* threading) {
     if (qtype == BTLA_DTYPE::S7_CLIP) return compressBit7Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::S6_CLIP) return compressBit6Weight(N, K, B, dstptr, qtype, threading);
     if (qtype == BTLA_DTYPE::S5_CLIP) return compressBit5Weight(N, K, B, dstptr, qtype, threading);
@@ -662,8 +686,8 @@ class WeightKBlockNInteger {
   }
 
   template <typename RED_T>
-  static void reduce(const int N, const int K, const int KBlock, const float* B, const int ldb, RED_T* rptr,
-                     const int ldr, parallel::IThreading* threading) {
+  AUTOCALL void reduce(const int N, const int K, const int KBlock, const float* B, const int ldb, RED_T* rptr,
+                       const int ldr, parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), K, N, KBlock, 16});
     threading->parallel_for([&](int tidx) {
       parallel::ThreadProblem2D thdp({tidx});
@@ -674,8 +698,7 @@ class WeightKBlockNInteger {
         using RowReduceSum = kernel::wrapper::RowReduceSum<RED_T>;
         for (int i = 0; i < thdp.size[0]; i += KBlock) {
           int rowremain = utils::remainsize(thdp.loc[0] + i, K, KBlock);
-          auto ret = RowReduceSum::template forward<ISA_T>(  //
-              src + i * ldb, ldb, rowremain, thdp.size[1], dst + i / KBlock * ldr);
+          auto ret = RowReduceSum::forward_auto(src + i * ldb, ldb, rowremain, thdp.size[1], dst + i / KBlock * ldr);
           assert(ret == BTLA_CODE::Success);
           (void)ret;
         }
@@ -684,43 +707,42 @@ class WeightKBlockNInteger {
   }
 
  public:
-  virtual inline BTLA_CODE getWeight(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                     const Param& _param, void* tmpcache, size_t cachesize) {
-    return getFpWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
-  }
-
-  virtual inline BTLA_CODE getWeight(utils::bf16** dstptr, int* dststep, int k_size, int n_size, int k_offset,
-                                     int n_offset, const Param& _param, void* tmpcache, size_t cachesize) {
-    return getFpWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
-  }
-
-  static inline BTLA_CODE getWeight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+  template <BTLA_ISA ISA_T, typename _T>
+  static inline BTLA_CODE getWeight(_T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
                                     const Param& _param, void* tmpcache, size_t cachesize) {
+    if constexpr (std::is_same_v<_T, int8_t>) {
+      return getQWeight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+    }
+    return getFpWeight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+  }
+
+  TLACALL BTLA_CODE getQWeight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                               const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     if (wptr->mDType == BTLA_DTYPE::S8) {
-      return getQ8Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ8Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S6_CLIP) {
-      return getQ6Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ6Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S5_CLIP) {
-      return getQ5Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ5Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
-      return getQ4Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ4Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S3_CLIP) {
-      return getQ3Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ3Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S2_CLIP) {
-      return getQ2Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ2Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S7_CLIP) {
-      return getQ7Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ7Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else if (wptr->mDType == BTLA_DTYPE::S1_CLIP) {
-      return getQ1Weight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+      return getQ1Weight<ISA_T>(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
     } else {
       assert(0);
     }
     return BTLA_CODE::NotSupport;
   }
 
-  static inline BTLA_CODE getScale(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                   const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getScale(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                             const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     if (wptr->SDtype() == BTLA_DTYPE::F32) {
       auto aptr = wptr->template SPtr<float>();
@@ -748,8 +770,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getReduce(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                    const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getReduce(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                              const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     if (wptr->RDtype() == BTLA_DTYPE::F32) {
       auto aptr = wptr->template RPtr<float>();
@@ -769,7 +791,7 @@ class WeightKBlockNInteger {
   }
 
  protected:
-  template <typename _T>
+  template <BTLA_ISA ISA_T, typename _T>
   static inline BTLA_CODE getFpWeight(_T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
                                       const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
@@ -876,8 +898,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ8Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ8Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<int8_t>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
@@ -888,8 +910,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ4Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ4Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     auto KPad = wptr->mKPad;
     auto bptr = wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2;
@@ -907,8 +929,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ3Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ3Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     int8_t* bit3_ptr = wptr->template WPtr<int8_t>();
     auto zpptr = wptr->template ZPtr<int8_t>();
@@ -929,8 +951,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ5Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ5Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     int8_t* bit5_ptr = wptr->template WPtr<int8_t>();
     auto zpptr = wptr->template ZPtr<int8_t>();
@@ -951,8 +973,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ6Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ6Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     int8_t* bit6_ptr = wptr->template WPtr<int8_t>();
     auto zpptr = wptr->template ZPtr<int8_t>();
@@ -973,8 +995,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ7Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ7Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     int8_t* bit6_ptr = wptr->template WPtr<int8_t>();
     auto zpptr = wptr->template ZPtr<int8_t>();
@@ -996,8 +1018,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ2Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ2Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     int8_t* bit2_ptr = wptr->template WPtr<int8_t>();
     int8_t* zpptr = wptr->template ZPtr<int8_t>();
@@ -1016,8 +1038,8 @@ class WeightKBlockNInteger {
     return BTLA_CODE::Success;
   }
 
-  static inline BTLA_CODE getQ1Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                      const Param& _param, void* tmpcache, size_t cachesize) {
+  TLACALL BTLA_CODE getQ1Weight(int8_t** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = _param.packedW;
     int8_t* bit1_ptr = wptr->template WPtr<int8_t>();
     int8_t* zpptr = wptr->template ZPtr<int8_t>();
@@ -1035,27 +1057,19 @@ class WeightKBlockNInteger {
     *dststep = k_size;
     return BTLA_CODE::Success;
   }
-
-  virtual inline void quantRowBlock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
-                                    float* scales, int8_t* zero_points, void* stor) {
-    auto ptr = reinterpret_cast<StorageWeight*>(stor);
-    auto quant_dtype = ptr->mDType;
-    kernel::wrapper::QuantizeSignIntRowBlock::forward<ISA_T>(srcptr, dstptr, row, col, ld_src, ld_dst, scales,
-                                                             zero_points, ptr->mBlockSize, quant_dtype);
-  }
 };
 
 struct ParamWeightKBlockNFloat {
   storage::gemm::StorageWeightKBlockNFloat* packedW;
 };
 
-template <class _GemmCore_T, BTLA_ISA ISA_T>
-class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
+template <class _GemmCore_T>
+class WeightKBlockNFloat {
  public:
   using Param = ParamWeightKBlockNInteger;  // NFloat storage Param same with NInteger storage.
   using StorageWeight = storage::gemm::StorageWeightKBlockNFloat;
-
-  StorageWeight createStorage(const int N, const int K, int blocksize, BTLA_DTYPE fT, BTLA_DTYPE scaT) {
+  using QuantBaseT = WeightKBlockNInteger<_GemmCore_T>;
+  AUTOCALL StorageWeight createStorage(const int N, const int K, int blocksize, BTLA_DTYPE fT, BTLA_DTYPE scaT) {
     int KPad = utils::padto(K, _GemmCore_T::KTILE);
     int NPad = utils::padto(N, _GemmCore_T::NTILE);
     StorageWeight tmp(_GemmCore_T::ID);
@@ -1063,19 +1077,196 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
     return tmp;
   }
 
-  inline BTLA_CODE getWeight(float** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                             const Param& _param, void* tmpcache, size_t cachesize) override {
-    return getFpWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+  AUTOCALL void packTransposeWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* stor,
+                                    parallel::IThreading* threading) {
+    auto B_NT = utils::amalloc<float>(static_cast<size_t>(N) * K);
+    transposeWeight<float>(N, K, B, ldb, B_NT, N, threading);
+    packWeight(N, K, B_NT, N, stor, threading);
+    utils::afree(B_NT);
   }
 
-  inline BTLA_CODE getWeight(utils::bf16** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                             const Param& _param, void* tmpcache, size_t cachesize) override {
-    return getFpWeight(dstptr, dststep, k_size, n_size, k_offset, n_offset, _param, tmpcache, cachesize);
+  // from KxN f32 weight to packed N//NtilexKPadxNTile int8 weight
+  AUTOCALL void packWeight(const int N, const int K, const float* B, const int ldb, StorageWeight* ptr,
+                           parallel::IThreading* threading) {
+    auto tmpq = utils::amalloc<int8_t>(static_cast<size_t>(N) * K);
+    int nk_scale = utils::updiv(K, ptr->mBlockSize);
+    auto ssize = static_cast<size_t>(N) * nk_scale;
+    auto Tscales = utils::amalloc<float>(ssize);
+    auto Tzps = utils::amalloc<int8_t>(ptr->IsAsym() ? ssize : 0);
+    quantizeWeight(N, K, B, ldb, tmpq, Tscales, Tzps, ptr, threading);
+    packQWeight(N, K, tmpq, N, Tscales, Tzps, ptr, threading);
+    utils::afree(tmpq);
+    utils::afree(Tscales);
+    utils::afree(Tzps);
   }
 
-  template <typename _DST_T>
-  inline BTLA_CODE getFpWeight(_DST_T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                               const Param& _param, void* tmpcache, size_t cachesize) {
+  AUTOCALL void quantizeWeight(const int N, const int K, const float* B, const int ldb, int8_t* qB, float* scales,
+                               int8_t* zero_points, void* stor, parallel::IThreading* threading) {
+    auto ptr = reinterpret_cast<StorageWeight*>(stor);
+    int bsize = ptr->mBlockSize == -1 ? K : ptr->mBlockSize;
+    parallel::Scheduler2D _para({threading->num_threads(), K, N, bsize, 16});
+    threading->parallel_for([&](int tidx) {
+      parallel::ThreadProblem2D thdp({tidx});
+      _para.getIndex(thdp);
+      if (thdp.valid) {
+        quantRowBlock(B + thdp.loc[0] * ldb + thdp.loc[1], qB + thdp.loc[0] * N + thdp.loc[1], thdp.size[0],
+                      thdp.size[1], ldb, N, scales + thdp.loc[0] / bsize * N + thdp.loc[1], ptr);
+      }
+    });
+  }
+
+  // from packed N//NtilexKPadxNTile int8 weight to KxN f32 weight
+  AUTOCALL void unpackTransposeWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
+                                      parallel::IThreading* threading) {
+    auto B_NT = utils::amalloc<float>(static_cast<size_t>(N) * K);
+    unpackWeight(N, K, stor, B_NT, N, threading);
+    transposeWeight<float>(K, N, B_NT, N, B, ldb, threading);
+    utils::afree(B_NT);
+  }
+
+  AUTOCALL void unpackWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
+                             parallel::IThreading* threading) {
+    parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
+    threading->parallel_for([&](int tidx) {
+      parallel::ThreadProblem2D thdp{tidx};
+      _para.getIndex(thdp);
+      if (thdp.valid) {
+        auto rowpad = utils::padto(thdp.size[0], _GemmCore_T::KTILE);
+        auto colpad = utils::padto(thdp.size[1], _GemmCore_T::NTILE);
+        auto dequant = utils::amalloc<float>((size_t)rowpad * colpad);
+        auto dstptr = dequant;
+        int dststep = 0;
+        size_t constexpr CacheSize = size_t(100) << 10;
+        int8_t tmpcache[CacheSize];
+        GetCPUDevice();
+        if (_cd->AVX512F()) {
+          getWeight<BTLA_ISA::AVX512F>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                       CacheSize);
+        } else if (_cd->AVX2()) {
+          getWeight<BTLA_ISA::AVX2>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                    CacheSize);
+        } else {
+          getWeight<BTLA_ISA::NoSIMD>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
+                                      CacheSize);
+        }
+        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, float>::forward_auto(
+            dstptr, B + thdp.loc[0] * ldb + thdp.loc[1], thdp.size[0], thdp.size[1], rowpad, colpad, dststep, ldb);
+        utils::afree(dequant);
+      }
+    });
+  }
+
+  AUTOCALL void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
+                            const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
+    setQuantCorrection(N, K, zero_points, scales, stor, threading);
+    if (stor->mDType == BTLA_DTYPE::F8_E4M3 || stor->mDType == BTLA_DTYPE::F8_E5M2) {
+      QuantBaseT::reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
+    } else {
+      auto reordered = utils::amalloc<int8_t>((size_t)stor->mKPad * stor->mNPad);
+      QuantBaseT::reorderWeight(N, K, B, ldb, reordered, threading);
+      QuantBaseT::compressWeight(stor->mNPad, stor->mKPad, reordered, stor->mNPad, stor->WPtr<int8_t>(), stor->mDType,
+                                 threading);
+      utils::afree(reordered);
+    }
+  }
+
+  AUTOCALL void setQuantCorrection(const int N, const int K, const int8_t* zero_points, const float* scales,
+                                   StorageWeight* stor, parallel::IThreading* threading) {
+    int rawnk_scale = utils::updiv(K, stor->mBlockSize);
+    int nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
+    parallel::Scheduler2D _para({threading->num_threads(), 1, nk_scale, 1, 1});
+    if (stor->SDtype() == BTLA_DTYPE::F32) {  // fp32 to fp32 direct copy
+      threading->parallel_for([&](int tidx) {
+        parallel::ThreadProblem2D thdp{tidx};
+        _para.getIndex(thdp);
+        if (thdp.valid) {
+          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
+            if (i < rawnk_scale) {
+              if (scales != nullptr)
+                std::memcpy(stor->template SPtr<float>() + i * stor->mNPad, scales + i * N, N * sizeof(scales[0]));
+              if (zero_points != nullptr)
+                std::memcpy(stor->template ZPtr<int8_t>() + i * stor->mNPad, zero_points + i * N,
+                            N * sizeof(zero_points[0]));
+            } else {
+              if (scales != nullptr)
+                std::memset(stor->template SPtr<float>() + i * stor->mNPad, 0, stor->mNPad * sizeof(float));
+              if (zero_points != nullptr)
+                std::memset(stor->template ZPtr<int8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(zero_points[0]));
+            }
+          }
+        }
+      });
+    } else if (stor->SDtype() == BTLA_DTYPE::BF16) {
+      threading->parallel_for([&](int tidx) {
+        parallel::ThreadProblem2D thdp{tidx};
+        _para.getIndex(thdp);
+        if (thdp.valid) {
+          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
+            if (i < rawnk_scale) {
+              if (scales != nullptr) {
+                for (size_t j = 0; j < N; j++) {
+                  stor->template SPtr<utils::bf16>()[j + i * stor->mNPad] = static_cast<utils::bf16>(scales[i * N + j]);
+                }
+              }
+              if (zero_points != nullptr) {
+                std::memcpy(stor->template ZPtr<int8_t>() + i * stor->mNPad, zero_points + i * N,
+                            N * sizeof(zero_points[0]));
+              }
+            } else {
+              if (scales != nullptr)
+                std::memset(stor->template SPtr<utils::bf16>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::bf16));
+              if (zero_points != nullptr)
+                std::memset(stor->template ZPtr<int8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(zero_points[0]));
+            }
+          }
+        }
+      });
+    } else if (stor->SDtype() == BTLA_DTYPE::F8_E8M0) {
+      threading->parallel_for([&](int tidx) {
+        parallel::ThreadProblem2D thdp{tidx};
+        _para.getIndex(thdp);
+        if (thdp.valid) {
+          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
+            if (i < rawnk_scale) {
+              if (scales != nullptr) {
+                for (size_t j = 0; j < N; j++) {
+                  stor->template SPtr<utils::f8>()[j + i * stor->mNPad] = static_cast<int8_t>(scales[i * N + j]);
+                }
+              }
+            } else {
+              if (scales != nullptr)
+                std::memset(stor->template SPtr<utils::f8>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::f8));
+            }
+          }
+        }
+      });
+    } else if (stor->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+      threading->parallel_for([&](int tidx) {
+        parallel::ThreadProblem2D thdp{tidx};
+        _para.getIndex(thdp);
+        if (thdp.valid) {
+          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
+            if (i < rawnk_scale) {
+              if (scales != nullptr) {
+                for (size_t j = 0; j < N; j++) {
+                  stor->template SPtr<uint8_t>()[j + i * stor->mNPad] = static_cast<uint8_t>(scales[i * N + j]);
+                }
+              }
+            } else {
+              if (scales != nullptr)
+                std::memset(stor->template SPtr<uint8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(uint8_t));
+            }
+          }
+        }
+      });
+    } else {
+      assert(0);
+    }
+  }
+
+  template <BTLA_ISA ISA_T, typename _T>
+  static inline BTLA_CODE getWeight(_T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
+                                    const Param& _param, void* tmpcache, size_t cachesize) {
     auto wptr = reinterpret_cast<StorageWeight*>(_param.packedW);
     auto NPad = wptr->mNPad;
     auto KPad = wptr->mKPad;
@@ -1104,18 +1295,18 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
               ColSize, ColSize, ColSize, sptr, k_offset / _GemmCore_T::PACK_ROW,
               wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, wptr->mDType);
         } else if (wptr->mDType == BTLA_DTYPE::F4_NF4) {
-          kernel::wrapper::DecompressKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
-                                                                                                 BTLA_DTYPE::F4_NF4>(
+          kernel::wrapper::DecompressKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
+                                                                                             BTLA_DTYPE::F4_NF4>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else if (wptr->mDType == BTLA_DTYPE::F4_E2M1) {
-          kernel::wrapper::DecompressKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
-                                                                                                 BTLA_DTYPE::F4_E2M1>(
+          kernel::wrapper::DecompressKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
+                                                                                             BTLA_DTYPE::F4_E2M1>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else if (wptr->mDType == BTLA_DTYPE::F4_BNB) {
-          kernel::wrapper::DecompressKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
-                                                                                                 BTLA_DTYPE::F4_BNB>(
+          kernel::wrapper::DecompressKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, float,
+                                                                                             BTLA_DTYPE::F4_BNB>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else {
@@ -1126,18 +1317,18 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
         auto f4ptr = reinterpret_cast<utils::f4x2*>(bptr + i * KPad / 2);
         auto fp_ptr = *dstptr + i * k_size;
         if (wptr->mDType == BTLA_DTYPE::F4_NF4) {
-          kernel::wrapper::DecompressKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
-                                                                                                 BTLA_DTYPE::F4_NF4>(
+          kernel::wrapper::DecompressKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
+                                                                                             BTLA_DTYPE::F4_NF4>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else if (wptr->mDType == BTLA_DTYPE::F4_E2M1) {
-          kernel::wrapper::DecompressKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
-                                                                                                 BTLA_DTYPE::F4_E2M1>(
+          kernel::wrapper::DecompressKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
+                                                                                             BTLA_DTYPE::F4_E2M1>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else if (wptr->mDType == BTLA_DTYPE::F4_BNB) {
-          kernel::wrapper::DecompressKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
-                                                                                                 BTLA_DTYPE::F4_BNB>(
+          kernel::wrapper::DecompressKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T, utils::bf16,
+                                                                                             BTLA_DTYPE::F4_BNB>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, sptr,
               k_offset / _GemmCore_T::PACK_ROW, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, tmpcache, cachesize);
         } else {
@@ -1151,8 +1342,8 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
         auto internal_kblock = wptr->mBlockSize / _GemmCore_T::PACK_ROW;
         auto dq_offset_idx = static_cast<int>(wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1);
         if (wptr->mDType == BTLA_DTYPE::F4_NF4) {
-          kernel::wrapper::DecompressDqKBlockF4Fp<_DST_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
-                                                                                                   BTLA_DTYPE::F4_NF4>(
+          kernel::wrapper::DecompressDqKBlockF4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
+                                                                                               BTLA_DTYPE::F4_NF4>(
               f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, wptr->template SPtr<uint8_t>(),
               wptr->template DQPtr<float>(), internal_k_offset, internal_n_offset, internal_kblock, wptr->mDqBlockSize,
               dq_offset_idx, NPad, wptr->mN, tmpcache, cachesize);
@@ -1167,65 +1358,25 @@ class WeightKBlockNFloat : public WeightKBlockNInteger<_GemmCore_T, ISA_T> {
     return BTLA_CODE::Success;
   }
 
-  template <typename T>
-  static inline BTLA_CODE getKBlockWeight(T** dstptr, int* dststep, int k_size, int n_size, int k_offset, int n_offset,
-                                          const Param& _param, void* tmpcache, size_t cachesize) {
-    auto wptr = reinterpret_cast<StorageWeight*>(_param.packedW);
-    auto NPad = wptr->mNPad;
-    auto KPad = wptr->mKPad;
-    char* bptr;
-    if (wptr->mDType == BTLA_DTYPE::F8_E4M3 || wptr->mDType == BTLA_DTYPE::F8_E5M2) {
-      bptr = wptr->template WPtr<char>() + n_offset * KPad + k_offset * _GemmCore_T::NTILE;
-    } else {
-      bptr = wptr->template WPtr<char>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2;
-    }
-    int constexpr ColSize = _GemmCore_T::NTILE * _GemmCore_T::PACK_ROW;
-    for (int i = 0; i < n_size; i += _GemmCore_T::NTILE) {
-      if (wptr->mDType == BTLA_DTYPE::F8_E4M3 || wptr->mDType == BTLA_DTYPE::F8_E5M2) {
-        kernel::wrapper::DecompressKBlockF8FpNoScale<T>::template forward<ISA_T>(
-            reinterpret_cast<utils::f8*>(bptr) + i * KPad, *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW,
-            ColSize, ColSize, ColSize, tmpcache, cachesize, wptr->mDType);
-      } else {
-        auto f4ptr = reinterpret_cast<utils::f4x2*>(bptr + i * KPad / 2);
-        auto fp_ptr = *dstptr + i * k_size;
-        if (wptr->mDType == BTLA_DTYPE::F4_NF4) {
-          kernel::wrapper::DecompressKBlockF4FpNoscale<T>::template forward<ISA_T, BTLA_DTYPE::F4_NF4>(
-              f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::F4_E2M1) {
-          kernel::wrapper::DecompressKBlockF4FpNoscale<T>::template forward<ISA_T, BTLA_DTYPE::F4_E2M1>(
-              f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else if (wptr->mDType == BTLA_DTYPE::F4_BNB) {
-          kernel::wrapper::DecompressKBlockF4FpNoscale<T>::template forward<ISA_T, BTLA_DTYPE::F4_BNB>(
-              f4ptr, fp_ptr, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize, tmpcache, cachesize);
-        } else {
-          assert(0);
-        }
-      }
-    }
-    *dststep = k_size;
-    return BTLA_CODE::Success;
-  }
-
  protected:
-  void quantRowBlock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst, float* scales,
-                     int8_t* zero_points, void* stor) override {
-    auto ptr = reinterpret_cast<StorageWeight*>(stor);
+  AUTOCALL void quantRowBlock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
+                              float* scales, StorageWeight* ptr) {
     auto quant_dtype = ptr->mDType;
     if (quant_dtype == BTLA_DTYPE::F8_E4M3) {
-      kernel::wrapper::QuantizeF8RowBlock::forward<ISA_T, BTLA_DTYPE::F8_E4M3>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                               scales, ptr->mBlockSize, ptr->SDtype());
+      kernel::wrapper::QuantizeF8RowBlock<BTLA_DTYPE::F8_E4M3>::forward_auto(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                             scales, ptr->mBlockSize, ptr->SDtype());
     } else if (quant_dtype == BTLA_DTYPE::F8_E5M2) {
-      kernel::wrapper::QuantizeF8RowBlock::forward<ISA_T, BTLA_DTYPE::F8_E5M2>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                               scales, ptr->mBlockSize, ptr->SDtype());
+      kernel::wrapper::QuantizeF8RowBlock<BTLA_DTYPE::F8_E5M2>::forward_auto(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                             scales, ptr->mBlockSize, ptr->SDtype());
     } else if (quant_dtype == BTLA_DTYPE::F4_BNB) {
-      kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_BNB>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                              scales, zero_points, ptr->mBlockSize);
+      kernel::wrapper::QuantizeF4RowBlock<BTLA_DTYPE::F4_BNB>::forward_auto(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                            scales, ptr->mBlockSize);
     } else if (quant_dtype == BTLA_DTYPE::F4_E2M1) {
-      kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_E2M1>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                               scales, zero_points, ptr->mBlockSize);
+      kernel::wrapper::QuantizeF4RowBlock<BTLA_DTYPE::F4_E2M1>::forward_auto(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                             scales, ptr->mBlockSize);
     } else if (quant_dtype == BTLA_DTYPE::F4_NF4) {
-      kernel::wrapper::QuantizeF4RowBlock::forward<ISA_T, BTLA_DTYPE::F4_NF4>(srcptr, dstptr, row, col, ld_src, ld_dst,
-                                                                              scales, zero_points, ptr->mBlockSize);
+      kernel::wrapper::QuantizeF4RowBlock<BTLA_DTYPE::F4_NF4>::forward_auto(srcptr, dstptr, row, col, ld_src, ld_dst,
+                                                                            scales, ptr->mBlockSize);
     } else {
       assert(0);
     }

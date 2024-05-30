@@ -259,13 +259,13 @@ class NBitsHelper {
 
 namespace gemm {
 template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T> class _PrologueA_T,
-          template <class _T, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
+          template <class _T> class _PrologueB_T, class _Epilogue_T>
 class LauncherBase {
  public:
   using GemmCore = _GemmCore_T;
   static constexpr BTLA_ISA ISA = _RT_ISA_T;
   using PrologueA = _PrologueA_T<GemmCore>;
-  using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
+  using PrologueB = _PrologueB_T<GemmCore>;
   using Epilogue = _Epilogue_T;
   using AType = typename GemmCore::AType;
   using AParam = typename PrologueA::Param;
@@ -281,12 +281,11 @@ class LauncherBase {
     const EpiParam paramC;
   };
   _GemmCore_T mGemmCore;
-  PrologueB mProB;
 
   class GEMVWrapper {
    public:
     static constexpr bool support() {
-      if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T, _RT_ISA_T>>) {
+      if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T>>) {
         return false;
       }
       if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ShuffleActivationKBlockBaseF32<_GemmCore_T>> &&
@@ -498,8 +497,8 @@ class LauncherBase {
       int k_paddedle = utils::padto_le(k_remain, GemmCore::KTILE);
       auto bptr_cache = tmpB;
       int bcache_step = 0;
-      mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB,
-                      tmpcache, _config.tmpcachesize);
+      PrologueB::template getWeight<ISA>(&bptr_cache, &bcache_step, k_padded, n_padded, iterk, _config.loc[1] + blk_n,
+                                         _param.paramB, tmpcache, _config.tmpcachesize);
       int bcache_stride = bcache_step * sizeof(BType);
       for (int i = 0; i < blk_msize; i += GemmCore::MTILE) {
         int m_remain = utils::remainsize(i, blk_msize, GemmCore::MTILE);
@@ -533,13 +532,13 @@ class LauncherBase {
 };
 
 template <BTLA_ISA _RT_ISA_T, class _GemmCore_T, template <class _T> class _PrologueA_T,
-          template <class _T, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
+          template <class _T> class _PrologueB_T, class _Epilogue_T>
 class LauncherIntKBlock {
  public:
   using GemmCore = _GemmCore_T;
   static constexpr BTLA_ISA ISA = _RT_ISA_T;
   using PrologueA = _PrologueA_T<GemmCore>;
-  using PrologueB = _PrologueB_T<GemmCore, _RT_ISA_T>;
+  using PrologueB = _PrologueB_T<GemmCore>;
   using Epilogue = _Epilogue_T;
   using AType = typename GemmCore::AType;
   using AParam = typename PrologueA::Param;
@@ -556,12 +555,11 @@ class LauncherIntKBlock {
     const EpiParam paramC;
   };
   _GemmCore_T mGemmCore;
-  PrologueB mProB;
 
   class GEMVWrapper {
    public:
     static constexpr bool support() {
-      if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T, _RT_ISA_T>>) {
+      if constexpr (!std::is_same_v<PrologueB, prologue_b::gemm::WeightKBlockNInteger<_GemmCore_T>>) {
         return false;
       }
       if constexpr (!std::is_same_v<PrologueA, prologue_a::gemm::ActivationF32KBlockQuantize<_GemmCore_T>> &&
@@ -779,12 +777,12 @@ class LauncherIntKBlock {
       int ldsb_cache = tmp_ldsb;
       auto scaleB_cache = scaleB;
       auto reduceB_cache = reduceB;
-      mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB, tmp_,
-                      _config.tmpcachesize);
-      mProB.getScale(&scaleB_cache, &ldsb_cache, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB, tmp_,
-                     _config.tmpcachesize);
-      mProB.getReduce(&reduceB_cache, &ldsb_cache, k_padded, n_padded, iterk, _config.loc[1] + blk_n, _param.paramB,
-                      tmp_, _config.tmpcachesize);
+      PrologueB::template getWeight<ISA>(&bptr_cache, &bcache_step, k_padded, n_padded, iterk, _config.loc[1] + blk_n,
+                                         _param.paramB, tmp_, _config.tmpcachesize);
+      PrologueB::template getScale<ISA>(&scaleB_cache, &ldsb_cache, k_padded, n_padded, iterk, _config.loc[1] + blk_n,
+                                        _param.paramB, tmp_, _config.tmpcachesize);
+      PrologueB::template getReduce<ISA>(&reduceB_cache, &ldsb_cache, k_padded, n_padded, iterk, _config.loc[1] + blk_n,
+                                         _param.paramB, tmp_, _config.tmpcachesize);
       int bcache_stride = bcache_step * sizeof(BType);
       for (int i = 0; i < blk_msize; i += GemmCore::MTILE) {
         int m_remain = utils::remainsize(i, blk_msize, GemmCore::MTILE);
@@ -845,12 +843,12 @@ class LauncherIntKBlock {
         int ldsb_cache = tmp_ldsb;
         auto scaleB_cache = scaleB;
         auto reduceB_cache = reduceB;
-        mProB.getWeight(&bptr_cache, &bcache_step, k_padded, n_padded, iterkk, _config.loc[1] + blk_n, _param.paramB,
-                        tmp_, _config.tmpcachesize);
-        mProB.getScale(&scaleB_cache, &ldsb_cache, k_padded, n_padded, iterkk, _config.loc[1] + blk_n, _param.paramB,
-                       tmp_, _config.tmpcachesize);
-        mProB.getReduce(&reduceB_cache, &ldsb_cache, k_padded, n_padded, iterkk, _config.loc[1] + blk_n, _param.paramB,
-                        tmp_, _config.tmpcachesize);
+        PrologueB::template getWeight<ISA>(&bptr_cache, &bcache_step, k_padded, n_padded, iterkk,
+                                           _config.loc[1] + blk_n, _param.paramB, tmp_, _config.tmpcachesize);
+        PrologueB::template getScale<ISA>(&scaleB_cache, &ldsb_cache, k_padded, n_padded, iterkk,
+                                          _config.loc[1] + blk_n, _param.paramB, tmp_, _config.tmpcachesize);
+        PrologueB::template getReduce<ISA>(&reduceB_cache, &ldsb_cache, k_padded, n_padded, iterkk,
+                                           _config.loc[1] + blk_n, _param.paramB, tmp_, _config.tmpcachesize);
 
         int bcache_stride = bcache_step * sizeof(BType);
         for (int i = 0; i < blk_msize; i += GemmCore::MTILE) {

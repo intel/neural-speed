@@ -1801,7 +1801,7 @@ static inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, in
 
 template <BTLA_DTYPE F4_T>
 static inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                                 int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
+                                                 int ld_dst, float* scales, int blocksize) {
   int raw_blocksize = blocksize;
   for (int i = 0; i < col; i++) {
     int align_row_loop = row / blocksize * blocksize;
@@ -1816,30 +1816,8 @@ static inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* ds
         dstptr[(j + ij) * ld_dst + i] = f4_quantize<F4_T>(srcptr[(j + ij) * ld_src + i] * (1.f / absmax));
       }
     };
-    auto calc_store_scale_and_quantv_asym = [&](int blocksize) {
-      float amax = 0;
-      float amin = 0;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        amax = std::max(amax, srcptr[(j + ij) * ld_src + i]);
-        amin = std::max(amax, srcptr[(j + ij) * ld_src + i]);
-      }
-      float scale = (amax - amin) / 2;
-      scales[j / raw_blocksize * ld_dst + i] = scale;
-      float fmedium = (amax + amin) / 2;
-      zero_points[j / raw_blocksize * ld_dst + i] = f4_quantize<F4_T>((0 - fmedium) * (1.f / scale));
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        dstptr[(j + ij) * ld_dst + i] = f4_quantize<F4_T>((srcptr[(j + ij) * ld_src + i] - fmedium) * (1.f / scale));
-      }
-    };
-    auto dispatch_calc = [&](int blocksize) {
-      if (zero_points == nullptr) {
-        calc_store_scale_and_quantv_sym(blocksize);
-      } else {
-        calc_store_scale_and_quantv_asym(blocksize);
-      }
-    };
-    for (; j < align_row_loop; j += blocksize) dispatch_calc(blocksize);
-    if (j < row) dispatch_calc(row - align_row_loop);
+    for (; j < align_row_loop; j += blocksize) calc_store_scale_and_quantv_sym(blocksize);
+    if (j < row) calc_store_scale_and_quantv_sym(row - align_row_loop);
   }
   return BTLA_CODE::Success;
 }
