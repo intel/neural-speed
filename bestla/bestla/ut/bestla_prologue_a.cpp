@@ -2,7 +2,6 @@
 #include "bestla_ut.h"
 #include "kernel_avx512f.h"
 
-#ifdef BTLA_UT_PROLOGUE_A
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -134,7 +133,7 @@ class UT_ActivationU8KBlockQuantize {
     auto quanAct = ProA::createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
-    ProA::template quantize({raw.data(), lda, &quanAct}, m, k, UT_Threading::get());
+    ProA::quantize({raw.data(), lda, &quanAct}, m, k, UT_Threading::get());
 
     ut::buffer_error(q.data(), quanAct.template APtr<uint8_t>(), q.size(), uint8_t(1));
     ut::buffer_error(zp.data(), quanAct.template ZPtr<uint8_t>(), zp.size(), uint8_t(1));
@@ -190,7 +189,7 @@ class UT_ActivationS8KBlockQuantize {
     auto constexpr ISA = BTLA_ISA::AVX512F;
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
-    ProA::template quantize({raw.data(), k, &quanAct}, m, k, UT_Threading::get());
+    ProA::quantize({raw.data(), k, &quanAct}, m, k, UT_Threading::get());
     ut::buffer_error(q.data(), quanAct.template APtr<int8_t>(), q.size(), int8_t(1));
     if (hasreduce) {
       avector<float> redref(reduce.size(), 0.f), redqref(reduce.size(), 0.f);
@@ -241,8 +240,7 @@ class UT_ShuffleActivationKblock {
     auto reordA = ProA::createReorderStorage(m, k, 32);
     avector<int8_t> bufA(reordA.mSize);
     reordA.assign(bufA.data());
-    ProA::template preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32,
-                                       UT_Threading::get());
+    ProA::preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32, UT_Threading::get());
 
     ProA::template getActivation<GC::ISA>(&dstptr, &dststride, {src.data(), k, nullptr, indices.data(), &reordA}, m,
                                           kpad, 0, 0, cache, CacheSize);
@@ -301,4 +299,3 @@ static UT_ShuffleActivationKblock sUT_ShuffleActivationKblock;
 #endif
 }  // namespace ut
 }  // namespace bestla
-#endif
