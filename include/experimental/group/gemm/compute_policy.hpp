@@ -60,8 +60,7 @@ struct compute_policy_int4_dequantize<
     dequant_s_,
     mma_engine_,
     arch_tag_,
-    std::enable_if_t<(
-        mma_engine_ == mma_engine::xmx)>> {
+    std::enable_if_t<mma_engine_ == mma_engine::xmx>> {
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
@@ -120,8 +119,7 @@ struct compute_policy_int4_dequantize<
     dequant_s_,
     mma_engine_,
     arch_tag_,
-    std::enable_if_t<(
-        arch_tag_ <= gpu_arch::XeHpc && mma_engine_ == mma_engine::fpu)>> {
+    std::enable_if_t<mma_engine_ == mma_engine::fpu>> {
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
@@ -144,11 +142,11 @@ struct compute_policy_int4_dequantize<
   using dtype_zero_pt = dtype_zero_pt_;
   static constexpr quant_mode quant_type = quant_type_;
 
-  static constexpr uint32_t block_size_y_a = 16;
+  static constexpr uint32_t block_size_y_a = 1;
   static constexpr uint32_t block_bytes_x_a = 256;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_x_b = 32;
+  static constexpr uint32_t block_size_x_b = 1;
   static constexpr uint32_t block_bytes_y_b = 256;
   static constexpr uint32_t block_size_y_b =
       block_bytes_y_b / sizeof(dtype_mma_b);

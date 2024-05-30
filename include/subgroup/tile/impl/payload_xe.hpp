@@ -1618,8 +1618,10 @@ struct prefetch_payload_t<
     arch_tag_,
     std::enable_if_t<(
         arch_tag_ <= gpu_arch::XeHpg &&
-        (tile_size_y_ != 1 || block_size_y_ != 1))>> {
-  using dtype = dtype_;
+        ((tile_size_y_ != 1 || block_size_y_ != 1) ||
+         ((tile_size_x_ != 1 || block_size_x_ != 1) &&
+          reg_layout_ == reg_layout::transpose_tiled)))>> {
+  using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
   using tile_desc = tile_desc_t<
@@ -1653,7 +1655,8 @@ struct prefetch_payload_t<
   static constexpr reg_layout register_layout = tile_desc::register_layout;
   static constexpr bool reg_transpose =
       register_layout == reg_layout::transpose_tiled;
-  static constexpr bool trans = mem_transpose ^ reg_transpose;
+  static constexpr bool trans = mem_transpose ^ reg_transpose &&
+      !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
   using prefetch_dtype = typename std::conditional<
       (alignment_in_bytes % (sizeof(uint64_t)) == 0),
@@ -1665,12 +1668,22 @@ struct prefetch_payload_t<
   static constexpr uint32_t pack_factor =
       sizeof(prefetch_dtype) / sizeof(dtype);
 
+  static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
+  static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
+  static constexpr uint32_t simd_channel =
+      ((tile_bytes % max_store_bytes) == 0 &&
+       (block_bytes % max_store_bytes) == 0)
+      ? 32
+      : 16;
+  static constexpr uint32_t num_channel = mem_transpose
+      ? (simd_channel >= block_size_x) ? block_size_x : simd_channel
+      : (simd_channel >= block_size_y) ? block_size_y
+                                       : simd_channel;
+
   static constexpr uint32_t simd_exec_size =
       (mem_transpose ? block_size_y : block_size_x) >= pack_factor
       ? (mem_transpose ? block_size_y : block_size_x) / pack_factor
       : 1;
-  static constexpr uint32_t num_channel =
-      mem_transpose ? block_size_x : block_size_y;
 
   static constexpr uint32_t mem_tile_size_w =
       mem_transpose ? tile_size_y : tile_size_x;
@@ -2125,6 +2138,7 @@ struct prefetch_payload_t<
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
   // CL aligned, so we can use uint64_t
   using prefetch_dtype = uint64_t;
+  static constexpr msg_type message_type = msg_type::block_1d;
   using tile_desc = tile_desc_t<tile_size_x_, 1, block_size_x_, 1, reg_layout_>;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;

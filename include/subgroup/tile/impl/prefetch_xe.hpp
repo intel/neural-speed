@@ -28,17 +28,16 @@ namespace detail {
 template <typename payload_t>
 struct check_prefetch_type {
   static constexpr bool is_global_2d =
-      ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y != 1));
+      (payload_t::memory_space == mem_space::global &&
+       payload_t::message_type == msg_type::block_2d);
 
   static constexpr bool is_global_block_1d =
-      ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y == 1));
+      (payload_t::memory_space == mem_space::global &&
+       payload_t::message_type == msg_type::block_1d);
 
   static constexpr bool is_global_unaligned_2d =
-      ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y != 1) &&
-       (payload_t::message_type == msg_type::unaligned_2d));
+      (payload_t::memory_space == mem_space::global &&
+       payload_t::message_type == msg_type::unaligned_2d);
 
   static constexpr bool is_local =
       (payload_t::memory_space == mem_space::local);
@@ -104,26 +103,25 @@ tile_prefetch(payload_t& payload) {
 #pragma unroll
     for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
       uint32_t offset_x = j * tile_desc::block_size_x;
-#pragma unroll
-      for (uint32_t sub_block_y = 0; sub_block_y < tile_desc::block_size_y;
-           sub_block_y += num_channel) {
-        uint32_t address_offset = payload_t::mem_transpose
-            ? offset_x * payload.pitch_in_bytes +
-                (offset_y + sub_block_y) * sizeof(dtype)
-            : offset_x * sizeof(dtype) +
-                (offset_y + sub_block_y) * payload.pitch_in_bytes;
+      // #pragma unroll
+      //       for (uint32_t sub_block_y = 0; sub_block_y <
+      //       tile_desc::block_size_y;
+      //            sub_block_y += num_channel) {
+      uint32_t address_offset = payload_t::mem_transpose
+          ? offset_x * payload.pitch_in_bytes + (offset_y + 0) * sizeof(dtype)
+          : offset_x * sizeof(dtype) + (offset_y + 0) * payload.pitch_in_bytes;
 
-        xetla_prefetch_global<
-            prefetch_dtype,
-            payload_t::simd_exec_size,
-            data_size::default_size,
-            L1,
-            L2,
-            payload_t::num_channel>(
-            payload.base_ptr,
-            payload.channel_offset + payload.base_offset + address_offset,
-            1);
-      }
+      xetla_prefetch_global<
+          prefetch_dtype,
+          payload_t::simd_exec_size,
+          data_size::default_size,
+          L1,
+          L2,
+          num_channel>(
+          payload.base_ptr,
+          payload.channel_offset + payload.base_offset + address_offset,
+          1);
+      //   }
     }
   }
 }
@@ -150,7 +148,9 @@ tile_prefetch(payload_t& payload) {
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   constexpr uint32_t prefetch_len =
       tile_desc::tile_size_x / payload_t::scale_factor;
-  constexpr uint32_t max_prefetch_in_bytes = load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::max_prefetch_vec_len;
+  constexpr uint32_t max_prefetch_in_bytes =
+      load_store_attr_t<msg_type::block_1d, payload_t::arch_tag>::
+          max_prefetch_vec_len;
   if constexpr (prefetch_len >= max_prefetch_in_bytes) {
 #pragma unroll
     for (uint32_t j = 0; j < prefetch_len / max_prefetch_in_bytes; j++) {
@@ -165,10 +165,11 @@ tile_prefetch(payload_t& payload) {
     }
   }
   constexpr uint32_t tail_len = prefetch_len % max_prefetch_in_bytes;
-  uint32_t tail_offset =
-      prefetch_len / max_prefetch_in_bytes * max_prefetch_in_bytes * payload_t::scale_factor;
-  detail::process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
-      payload, tail_offset);
+  uint32_t tail_offset = prefetch_len / max_prefetch_in_bytes *
+      max_prefetch_in_bytes * payload_t::scale_factor;
+  detail::
+      process_1d_tail<tail_len, max_prefetch_in_bytes / 2, L1, L2, payload_t>(
+          payload, tail_offset);
 }
 
 /// @brief Is prefetch data func.
@@ -183,8 +184,8 @@ template <
     cache_hint L1 = cache_hint::cached,
     cache_hint L2 = cache_hint::cached,
     typename payload_t>
-__XETLA_API typename std::enable_if_t<
-    detail::check_prefetch_type<payload_t>::is_local>
-tile_prefetch([[maybe_unused]] payload_t& payload) {}
+__XETLA_API
+    typename std::enable_if_t<detail::check_prefetch_type<payload_t>::is_local>
+    tile_prefetch([[maybe_unused]] payload_t& payload) {}
 
 } // namespace gpu::xetla::subgroup

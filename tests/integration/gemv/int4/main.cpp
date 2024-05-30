@@ -25,10 +25,33 @@ constexpr int ITER = 1;
 constexpr int ITER = 200;
 #endif
 
-class test_col_major {
+class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
   static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 1;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 1;
+  static constexpr size_t sg_k = 1024;
+  static constexpr size_t dequant_s = 128;
+
+  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::col_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+class test_col_major_2 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 32;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 1;
@@ -229,7 +252,7 @@ void dequantize_gemv_run(int iter) {
   using tile_shape =
       xetla::group::tile_shape_t<wg_tile_n, wg_tile_m, sg_tile_n, sg_tile_m>;
   static constexpr uint32_t periodic_sync_interval = 0;
-  static constexpr uint32_t prefetch_distance = 1;
+  static constexpr uint32_t prefetch_distance = 0;
 
   using mem_desc_a_t = xetla::mem_desc_t<
       data_type_a,
@@ -520,7 +543,7 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
-using tests = ::testing::Types<test_col_major>;
+using tests = ::testing::Types<test_col_major_2>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemv_test_suite,

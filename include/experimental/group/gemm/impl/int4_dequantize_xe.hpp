@@ -519,28 +519,31 @@ class gemm_t<
     for (uint32_t i = 0; i < stages; i++) {
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           matA_prefetch_payload);
-    //   subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-    //       matB_prefetch_payload);
+      subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+          matB_prefetch_payload);
       // TODO 1D prefetch need pack to U32/U64
-    //   subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-    //       scale_prefetch_payload);
-    //   if constexpr (
-    //       compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
-    //     // TODO 1D prefetch need pack to U32/U64
-    //     subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-    //         zero_pt_prefetch_payload);
-    //   }
-    //   scale_prefetch_addr_i++;
+      subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+          scale_prefetch_payload);
+      if constexpr (
+          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+        // TODO 1D prefetch need pack to U32/U64
+        subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+            zero_pt_prefetch_payload);
+      }
+      scale_prefetch_addr_i++;
       matA_prefetch_payload.template update_tdesc<update_dir_a>(
           matA_t::tile_size_x);
-    //   matB_prefetch_payload.template update_tdesc<update_dir_b>(
-    //       matB_t::tile_size_y);
-    //   if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
-    //     scale_prefetch_payload.template update_tdesc<update_dir_b>(
-    //         scale_t::tile_size_y);
-    //     zero_pt_prefetch_payload.template update_tdesc<update_dir_b>(
-    //         zero_pt_t::tile_size_y);
-    //   }
+      matB_prefetch_payload.template update_tdesc<update_dir_b>(
+          matB_t::tile_size_y);
+      if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
+        scale_prefetch_payload.template update_tdesc<update_dir_b>(
+            scale_t::tile_size_y);
+        if constexpr (
+            compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+          zero_pt_prefetch_payload.template update_tdesc<update_dir_b>(
+              zero_pt_t::tile_size_y);
+        }
+      }
     }
 
     for (uint32_t i = 0; i < args.inner_loop_count; i++) {
@@ -572,18 +575,18 @@ class gemm_t<
       if constexpr (stages != 0) {
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             matA_prefetch_payload);
-        // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-        //     matB_prefetch_payload);
-        // // TODO 1D prefetch need pack to U32/U64
-        // subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-        //     scale_prefetch_payload);
-        // if constexpr (
-        //     compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
-        //   // TODO 1D prefetch need pack to U32/U64
-        //   subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
-        //       zero_pt_prefetch_payload);
-        // }
-        // scale_prefetch_addr_i++;
+        subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+            matB_prefetch_payload);
+        // TODO 1D prefetch need pack to U32/U64
+        subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+            scale_prefetch_payload);
+        if constexpr (
+            compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+          // TODO 1D prefetch need pack to U32/U64
+          subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
+              zero_pt_prefetch_payload);
+        }
+        scale_prefetch_addr_i++;
       }
       SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
@@ -614,7 +617,6 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
-      //   dump_mat(matB_acc);
       SW_BARRIER();
       if constexpr (
           is_col_major_b && compute_policy::mma_engine == mma_engine::fpu) {
