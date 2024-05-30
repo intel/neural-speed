@@ -189,8 +189,8 @@ bool Cont_batch_gen_worker::update_seqs(std::vector<sequence>* seqs, const int& 
     }
     if (!m_ctx->beam_search) {
       if (next_tokens.size() != n_input) {
-        fprintf(stderr, "%s: error: wrong next_tokens size %ld, which should be %d.\n", __func__, next_tokens.size(),
-                n_input);
+        fprintf(stderr, "%s: error: wrong next_tokens size %d, which should be %d.\n", __func__,
+                static_cast<int>(next_tokens.size()), n_input);
         return false;
       }
       seqs->at(ni).generated_ids.emplace_back(next_tokens[ni]);

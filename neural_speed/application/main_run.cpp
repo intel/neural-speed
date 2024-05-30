@@ -353,8 +353,8 @@ int main(int argc, char** argv) {  // NOLINT
           params.repeat_last_n, params.repeat_penalty, params.presence_penalty, params.frequency_penalty, params.top_k,
           params.tfs_z, params.top_p, params.typical_p, params.temp, params.mirostat, params.mirostat_eta,
           params.mirostat_tau);
-  fprintf(stderr, "generate: n_ctx = %d, tokens_length = %ld, n_batch = %d, n_predict = %d, n_keep = %d\n", n_ctx,
-          embd_inp.size(), params.n_batch, params.n_predict, params.n_keep);
+  fprintf(stderr, "generate: n_ctx = %d, tokens_length = %d, n_batch = %d, n_predict = %d, n_keep = %d\n", n_ctx,
+          static_cast<int>(embd_inp.size()), params.n_batch, params.n_predict, params.n_keep);
   fprintf(stderr, "\n\n");
 
   // TODO(Bo): replace with ring-buffer
