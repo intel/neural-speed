@@ -16,8 +16,9 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-// #define UT_DEBUG
+#define UT_DEBUG
 using namespace gpu::xetla;
+using namespace gpu::xetla::group;
 // The number of times the kernel is executed
 #ifdef UT_DEBUG
 constexpr int ITER = 1;
@@ -29,14 +30,16 @@ class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
   static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096;
-  static constexpr size_t mat_k = 4096;
+  static constexpr size_t mat_n = 1;
+  static constexpr size_t mat_k = 128;
   static constexpr size_t wg_m = 1;
   static constexpr size_t wg_n = 1;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024;
-  static constexpr size_t dequant_s = 128;
+  static constexpr size_t sg_k = 128;
+  static constexpr size_t dequant_s = 16;
+  static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
+  // static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -45,7 +48,7 @@ class test_col_major_1 {
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
-  using data_type_b = int4x8;
+  using data_type_b = int4x2;
   using data_type_c = fp16;
 };
 class test_col_major_2 {
@@ -108,8 +111,7 @@ int gemm_result_validate(
 }
 
 template <
-    gpu::xetla::group::quant_mode quant_type =
-        gpu::xetla::group::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -119,16 +121,20 @@ std::vector<fp16> convert_int4(
     data_type_scale scale,
     [[maybe_unused]] data_type_zero_pt zero_pt) {
   std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
-
   using dtype_8bit = std::conditional_t<
-      quant_type == gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      quant_type == quant_mode::S4_FULLRANGE_NO_ZP,
       int8_t,
       uint8_t>;
 
+  uint8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     dtype_8bit dequant_8bit;
     dequant_8bit = static_cast<dtype_8bit>((data_b & 0xf) << 4) >> 4;
-    dequant_fp16[i] = scale * dequant_8bit;
+    if constexpr (quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+      dequant_fp16[i] = scale * dequant_8bit;
+    } else {
+      dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
+    }
     data_b = data_b >> 4;
   }
   return dequant_fp16;
@@ -137,8 +143,7 @@ std::vector<fp16> convert_int4(
 template <
     size_t dequant_s,
     mem_layout layout_b = mem_layout::row_major,
-    gpu::xetla::group::quant_mode quant_type =
-        gpu::xetla::group::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -159,9 +164,8 @@ std::vector<data_type_acc_in> dequantize_weight(
   for (uint32_t i = 0; i < height; i++) {
     for (uint32_t j = 0; j < width; j += step) {
       int start_b_in = i * width + j;
-      int start_zero_pt_in = start_b_in;
-
       int start_scale_in = start_b_in / step;
+      int start_zero_pt_in = start_scale_in / pack_radio;
 
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
@@ -170,7 +174,7 @@ std::vector<data_type_acc_in> dequantize_weight(
         std::vector<fp16> dequant_fp16 = convert_int4<quant_type>(
             b[start_b_in + jj],
             scale[start_scale_in],
-            zero_pt[start_zero_pt_in + jj]);
+            zero_pt[start_zero_pt_in] >> (4 * (start_scale_in % pack_radio)));
         for (uint32_t jjj = 0; jjj < dequant_fp16.size(); jjj++) {
           b_out[start_out + pack_radio * jj + jjj] = dequant_fp16[jjj];
         }
@@ -204,6 +208,7 @@ void dequantize_gemv_run(int iter) {
   constexpr size_t sg_tile_n = Test::sg_n;
   constexpr size_t sg_tile_k = Test::sg_k;
   constexpr size_t dequant_s = Test::dequant_s;
+  constexpr quant_mode quant_type = Test::quant_type;
   using data_type_a = typename Test::data_type_a;
   using data_type_b = typename Test::data_type_b;
   using data_type_c = typename Test::data_type_c;
@@ -224,7 +229,7 @@ void dequantize_gemv_run(int iter) {
   constexpr size_t size_scale = size_scale_k * size_scale_n;
 
   constexpr size_t size_zero_pt_k = matrix_k / dequant_s;
-  constexpr size_t size_zero_pt_n = matrix_n / (2 * sizeof(data_type_zero_pt));
+  constexpr size_t size_zero_pt_n = matrix_n;
   constexpr size_t size_zero_pt = size_zero_pt_k * size_zero_pt_n;
 
   constexpr size_t size_c = matrix_m * matrix_n;
@@ -236,8 +241,8 @@ void dequantize_gemv_run(int iter) {
   uint32_t ld_scale =
       layout_b == mem_layout::row_major ? size_scale_n : size_scale_k;
 
-  // uint32_t ld_zero_pt = mem_layout::row_major ? size_zero_pt_n :
-  // size_zero_pt_k;
+  uint32_t ld_zero_pt =
+      layout_b == mem_layout::row_major ? size_zero_pt_n : size_zero_pt_k;
 
   // Turn on the enable_profiling property to facilitate subsequent profiling
   sycl::property_list properties{
@@ -286,7 +291,7 @@ void dequantize_gemv_run(int iter) {
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
+      quant_type,
       dequant_s,
       Test::mma_eng,
       Test::arch>;
@@ -375,12 +380,12 @@ void dequantize_gemv_run(int iter) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       B_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      B_h[i] = 0x12;
+      B_h[i] = 0x22;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = 0x01234567;
+      B_h[i] = 0x22222222;
 #endif
     }
   }
@@ -388,12 +393,23 @@ void dequantize_gemv_run(int iter) {
   for (unsigned i = 0; i < size_scale; ++i) {
     scale_h[i] = random_float();
 #ifdef UT_DEBUG
-    scale_h[i] = i + 1;
+    scale_h[i] = 1;
 #endif
   }
 
   for (unsigned i = 0; i < size_zero_pt; ++i) {
-    zero_pt_h[i] = 0;
+    if constexpr (std::is_same_v<int4x2, data_type_b>) {
+      zero_pt_h[i] = random_uint8();
+#ifdef UT_DEBUG
+      zero_pt_h[i] = zero_pt_h[i] << 4 + i % 8;
+      zero_pt_h[i] = 0x33;
+#endif
+    } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
+      zero_pt_h[i] = random_uint32();
+#ifdef UT_DEBUG
+      zero_pt_h[i] = 0x01234567;
+#endif
+    }
   }
 
   for (unsigned i = 0; i < size_c; ++i) {
@@ -444,22 +460,44 @@ void dequantize_gemv_run(int iter) {
       {// epilogue_args init list
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg(
-      matrix_m,
-      matrix_k,
-      matrix_n,
-      A_d,
-      lda,
-      B_d,
-      ldb,
-      C_d,
-      ldc,
-      scale_d,
-      ld_scale,
-      Acc_d,
-      Cnt_d,
-      epilogue_args);
-
+  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg;
+  if constexpr (compute_policy::quant_type == S4_FULLRANGE_NO_ZP) {
+    gemm_arg =
+        typename gemm_op_t::template arguments_t<compute_policy::quant_type>(
+            matrix_m,
+            matrix_k,
+            matrix_n,
+            A_d,
+            lda,
+            B_d,
+            ldb,
+            C_d,
+            ldc,
+            scale_d,
+            ld_scale,
+            Acc_d,
+            Cnt_d,
+            epilogue_args);
+  } else if constexpr (compute_policy::quant_type == S4_ASYM) {
+    gemm_arg =
+        typename gemm_op_t::template arguments_t<compute_policy::quant_type>(
+            matrix_m,
+            matrix_k,
+            matrix_n,
+            A_d,
+            lda,
+            B_d,
+            ldb,
+            C_d,
+            ldc,
+            scale_d,
+            ld_scale,
+            zero_pt_d,
+            ld_zero_pt,
+            Acc_d,
+            Cnt_d,
+            epilogue_args);
+  }
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
   // if (!gemm_op_t::can_implement(gemm_arg)) {
   //   std::cout << "The arguments cannot be supported, aborting ... "
@@ -501,7 +539,7 @@ void dequantize_gemv_run(int iter) {
   prof.print_profiling_result(profiling_selector::GPU);
   // check result
   std::vector<typename Test::data_type_a> dequantize_b =
-      dequantize_weight<dequant_s, layout_b>(
+      dequantize_weight<dequant_s, layout_b, compute_policy::quant_type>(
           matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
 
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();

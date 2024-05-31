@@ -239,6 +239,10 @@ class gemm_t<
   static constexpr uint32_t scale_addr_update_freq =
       (k_stride < dequant_s) ? dequant_s / k_stride : 1;
 
+  static constexpr uint32_t zero_pt_addr_update_freq =
+      (k_stride < dequant_s * pack_ratio) ? (dequant_s * pack_ratio) / k_stride
+                                          : 1;
+
   using mem_desc_scale_t = mem_desc_t<
       dtype_scale,
       mem_layout_b,
@@ -505,7 +509,7 @@ class gemm_t<
         nbarrier_role::producer_consumer);
 
     int scale_prefetch_addr_i = args.inner_loop_start;
-    int scale_load_addr_i = args.inner_loop_start;
+    int tile_k_idx = args.inner_loop_start;
     SW_BARRIER();
 #pragma unroll
     for (uint32_t i = 0; i < stages; i++) {
@@ -562,7 +566,7 @@ class gemm_t<
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
-      scale_load_addr_i++;
+      tile_k_idx++;
       SW_BARRIER();
       if constexpr (stages != 0) {
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
@@ -583,10 +587,15 @@ class gemm_t<
       SW_BARRIER();
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
       matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
-      if ((scale_load_addr_i % scale_addr_update_freq) == 0) {
+      if (tile_k_idx % scale_addr_update_freq == 0) {
         scale_payload.template update_tdesc<update_dir_b>(scale_t::tile_size_y);
-        zero_pt_payload.template update_tdesc<update_dir_b>(
-            zero_pt_t::tile_size_y);
+      }
+      if constexpr (
+          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+        if (tile_k_idx % zero_pt_addr_update_freq == 0) {
+          zero_pt_payload.template update_tdesc<update_dir_b>(
+              zero_pt_t::tile_size_y);
+        }
       }
       if constexpr (stages != 0) {
         matA_prefetch_payload.template update_tdesc<update_dir_a>(
@@ -596,9 +605,12 @@ class gemm_t<
         if ((scale_prefetch_addr_i % scale_addr_update_freq) == 0) {
           scale_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
               scale_t::tile_size_y);
-          zero_pt_prefetch_payload
-              .template update_tdesc<tdesc_update_dir::y_dir>(
-                  zero_pt_t::tile_size_y);
+          if constexpr (
+              compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+            zero_pt_prefetch_payload
+                .template update_tdesc<tdesc_update_dir::y_dir>(
+                    zero_pt_t::tile_size_y);
+          }
         }
       }
       SW_BARRIER();
@@ -609,6 +621,7 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
+      dump_mat(matB_acc);
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
@@ -667,7 +680,7 @@ class gemm_t<
         using dtype_8bit = std::conditional_t<
             compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP,
             int8_t,
-            uint8_t>;
+            int8_t>;
         xetla_vector<dtype_8bit, matB_acc_t::block_elems> cvt_blk_i8;
 
         // lowest 4 bit
@@ -692,23 +705,38 @@ class gemm_t<
           }
         }
 
-        // int8 x scale = fp16
+        // (b_i8 -  zero_pt_i8) x scale = fp16
         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
 #pragma unroll
-        for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
-          for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+        for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+          for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
             uint32_t offset_y_in_tile = i * block_size_y_b + ii;
             uint32_t offset_x_in_tile = j * block_size_x_b + jj;
 
             uint32_t scale_idx =
                 (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
                 offset_x_in_tile;
-            // uint32_t scale_idx =
-            //     (k + (i * num_block_x + j) * matB_acc_t::block_elems) / step;
 
-            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
-                scale.reg.xetla_select<1, 1>(scale_idx);
+            if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
+              uint32_t zero_pt_idx = offset_y_in_tile /
+                      (dequant_s * pack_ratio) * zero_pt_t::block_size_x +
+                  offset_x_in_tile;
+              native_type_t<dtype_b> zero_pt_pack = zero_pt.reg[zero_pt_idx];
+
+              uint8_t zero_pt_u8 =
+                  (zero_pt_pack >> (4 * (scale_idx % pack_ratio))) & 0xf;
+
+              cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
+                  zero_pt_u8;
+              dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                  scale.reg[scale_idx];
+            } else {
+              dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                  scale.reg[scale_idx];
+            }
 
             // sycl::ext::oneapi::experimental::printf(
             //     "scale[%d] %f \n",
