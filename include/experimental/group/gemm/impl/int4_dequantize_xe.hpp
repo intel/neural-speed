@@ -655,6 +655,7 @@ class gemm_t<
 #pragma unroll
       for (uint32_t j = 0; j < num_block_x; ++j) {
         int block_id = (i * num_block_x + j);
+        // Must be little-endian
         auto matB_blk = matB.reg.xetla_format<uint8_t>()
                             .xetla_select<matB_acc_t::block_elems / 2, 1>(
                                 block_id * matB_acc_t::block_elems / 2);
@@ -670,23 +671,27 @@ class gemm_t<
         xetla_vector<dtype_8bit, matB_acc_t::block_elems> cvt_blk_i8;
 
         // lowest 4 bit
-        auto dequant_i8_low_4bit =
-            cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0);
-        dequant_i8_low_4bit = matB_blk & 0xf;
-        // Only int8 needs to reserve the sign bit
-        if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
-          dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
-          dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
+        {
+          auto dequant_i8_low_4bit =
+              cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0);
+          dequant_i8_low_4bit = matB_blk & 0xf;
+          // Only int8 needs to reserve the sign bit
+          if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+            dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
+            dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
+          }
         }
         // highest 4 bit
-        auto dequant_i8_high_4bit =
-            cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1);
-        if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
-          dequant_i8_high_4bit = matB_blk.xetla_format<dtype_8bit>() >> 4;
-        } else {
-          dequant_i8_high_4bit = matB_blk >> 4;
+        {
+          auto dequant_i8_high_4bit =
+              cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1);
+          if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+            dequant_i8_high_4bit = matB_blk.xetla_format<dtype_8bit>() >> 4;
+          } else {
+            dequant_i8_high_4bit = matB_blk >> 4;
+          }
         }
-        
+
         // int8 x scale = fp16
         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
 #pragma unroll

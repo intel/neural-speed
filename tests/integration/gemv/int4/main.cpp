@@ -211,7 +211,7 @@ void dequantize_gemv_run(int iter) {
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
   using data_type_acc = float;
-  using data_type_bias = float;
+  using data_type_bias = data_type_a;
 
   constexpr mem_layout layout_a = Test::layout_a;
   constexpr mem_layout layout_b = Test::layout_b;

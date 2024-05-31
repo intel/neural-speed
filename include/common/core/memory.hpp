@@ -355,7 +355,13 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
-  return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
+  if constexpr (sizeof(T) * N < sizeof(uint32_t)) {
+    auto padding_load = __ESIMD_NS::block_load<T, sizeof(uint32_t) / sizeof(T)>(
+        ptr, byte_offset, props);
+    return padding_load.xetla_select<N, 1>(0);
+  } else {
+    return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
+  }
 }
 
 /// @brief Stateless scattered load.

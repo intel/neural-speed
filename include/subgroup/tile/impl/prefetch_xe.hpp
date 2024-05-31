@@ -28,16 +28,17 @@ namespace detail {
 template <typename payload_t>
 struct check_prefetch_type {
   static constexpr bool is_global_2d =
-      (payload_t::memory_space == mem_space::global &&
-       payload_t::message_type == msg_type::block_2d);
+      ((payload_t::memory_space == mem_space::global) &&
+       (payload_t::tile_desc::tile_size_y != 1));
 
   static constexpr bool is_global_block_1d =
-      (payload_t::memory_space == mem_space::global &&
-       payload_t::message_type == msg_type::block_1d);
+      ((payload_t::memory_space == mem_space::global) &&
+       (payload_t::tile_desc::tile_size_y == 1));
 
   static constexpr bool is_global_unaligned_2d =
-      (payload_t::memory_space == mem_space::global &&
-       payload_t::message_type == msg_type::unaligned_2d);
+      ((payload_t::memory_space == mem_space::global) &&
+       (payload_t::tile_desc::tile_size_y != 1) &&
+       (payload_t::message_type == msg_type::unaligned_2d));
 
   static constexpr bool is_local =
       (payload_t::memory_space == mem_space::local);
