@@ -1124,7 +1124,6 @@ class WeightKBlockNFloat {
     });
   }
 
-  
   AUTOCALL void setDoubleQuantCorrection(utils::avector<float>* dq_buf, StorageWeight* ptr) {
     if (ptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
       auto packw_dqbuf_ptr = ptr->DQPtr<float>();
