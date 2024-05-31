@@ -143,7 +143,7 @@ alignas(32) const uint32_t mask8[9][8]{
  * @brief An Epilogue that optionally apply a casual mask and scale the fp32 result, performing exp, accumulating sum of
  * each line of exp, and storing exp as bf16 results
  */
-template <BTLA_ISA ISA_T, typename T_DST>
+template <typename T_DST>
 class scale_exp_acc_sum_fp32_t {
  public:
   struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
@@ -154,10 +154,10 @@ class scale_exp_acc_sum_fp32_t {
     int causal_offset;  // offset for causal mask; negative value for disabling causal mask
     float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
   };
-
-  TARGET_512 BTLA_CODE forward(const float* src, const int src_step, const int M_offset, const int N_offset,
-                               const int M, const int N, const Param& p, void* /* tmpcache */,
-                               size_t /* cachesize */) const {
+  template <BTLA_ISA ISA_T>
+  TARGET_512 static BTLA_CODE forward(const float* src, const int src_step, const int M_offset, const int N_offset,
+                                      const int M, const int N, const Param& p, void* /* tmpcache */,
+                                      size_t /* cachesize */) {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_sum = p.dst_sum + M_offset;
@@ -204,13 +204,12 @@ class scale_exp_acc_sum_fp32_t {
     return BTLA_CODE::Success;
   }
 };
-template <BTLA_ISA ISA_T>
-using ScaleExpAccSumFp32Bf16 = scale_exp_acc_sum_fp32_t<ISA_T, bf16>;
+using ScaleExpAccSumFp32Bf16 = scale_exp_acc_sum_fp32_t<bf16>;
 
 /**
  * @brief An Epilogue that scale the fp32 result, convert to bf16 and write back to memory
  */
-template <BTLA_ISA ISA_T, typename T_SRC, typename T_DST>
+template <typename T_SRC, typename T_DST>
 class scale_write_back_t {
  public:
   using SType = T_SRC;
@@ -220,9 +219,9 @@ class scale_write_back_t {
     DType* dst;
     int ld_dst;
   };
-
-  BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
+  template <BTLA_ISA ISA_T>
+  static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                           const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto scale = p.scale + M_offset;
     // TODO(Yi): high performance implementation
@@ -233,12 +232,9 @@ class scale_write_back_t {
     return BTLA_CODE::Success;
   }
 };
-template <BTLA_ISA ISA_T>
-using ScaleWriteBackFp32Bf16 = scale_write_back_t<ISA_T, float, bf16>;
-template <BTLA_ISA ISA_T>
-using ScaleWriteBackFp32Fp32 = scale_write_back_t<ISA_T, float, float>;
-template <BTLA_ISA ISA_T>
-using ScaleWriteBackS32S8 = scale_write_back_t<ISA_T, int32_t, int8_t>;
+using ScaleWriteBackFp32Bf16 = scale_write_back_t<float, bf16>;
+using ScaleWriteBackFp32Fp32 = scale_write_back_t<float, float>;
+using ScaleWriteBackS32S8 = scale_write_back_t<int32_t, int8_t>;
 
 /**
  * @brief PackedWeight(Default) with batch
@@ -443,7 +439,7 @@ class activation_identity_t {
  * @brief LauncherBase with addition input as packed weight offset
  */
 template <BTLA_ISA RT_ISA_, class _GemmCore_T, template <class, BTLA_ISA> class _PrologueA_T,
-          template <class, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
+          template <class, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
 class launcher_base_off_t                  //
     : public wrapper::gemm::LauncherBase<  //
           RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
@@ -523,8 +519,8 @@ class launcher_base_off_t                  //
         }
       }
     }
-    this->mEpilogue.forward(tmpC, _config.block[1], _config.loc[0] + blk_m, _config.loc[1] + blk_n, blk_msize,
-                            blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Base::Epilogue::template forward<Base::ISA>(tmpC, _config.block[1], _config.loc[0] + blk_m, _config.loc[1] + blk_n,
+                                                blk_msize, blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
   }
 };
 
@@ -532,7 +528,7 @@ class launcher_base_off_t                  //
  * @brief LauncherBase with addition input as packed weight offset
  */
 template <BTLA_ISA RT_ISA_, class _GemmCore_T, template <class, BTLA_ISA> class _PrologueA_T,
-          template <class, BTLA_ISA> class _PrologueB_T, template <BTLA_ISA> class _Epilogue_T>
+          template <class, BTLA_ISA> class _PrologueB_T, class _Epilogue_T>
 class launcher_base_weight_t               //
     : public wrapper::gemm::LauncherBase<  //
           RT_ISA_, _GemmCore_T, _PrologueA_T, _PrologueB_T, _Epilogue_T> {
@@ -607,8 +603,9 @@ class launcher_base_weight_t               //
         }
       }
     }
-    this->mEpilogue.forward(tmpC, _config.block[1], (_config.loc[0] + blk_m), _config.loc[1] + blk_n, blk_msize,
-                            blk_nsize, _param.paramC, tmpcache, _config.tmpcachesize);
+    Base::Epilogue::template forward<Base::ISA>(tmpC, _config.block[1], (_config.loc[0] + blk_m),
+                                                _config.loc[1] + blk_n, blk_msize, blk_nsize, _param.paramC, tmpcache,
+                                                _config.tmpcachesize);
   }
 };
 
@@ -830,21 +827,21 @@ class mha_interface_t {
  * @brief An Epilogue that optionally apply a casual mask (but may not filling zero) and scale the fp32 result, update
  * the maximum of each line of the result, and storing exp as bf16 results
  */
-template <BTLA_ISA ISA_T, typename T_SRC, typename T_DST>
+template <typename T_SRC, typename T_DST>
 class scale_track_max_t {
  public:
   using DType = T_DST;
   using SType = T_SRC;
   struct Param;
-
-  BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& p) const {
+  template <BTLA_ISA ISA_T>
+  static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                           const int N, const Param& p) {
     assert(false);
     return BTLA_CODE::NotSupport;
   }
 };
-template <BTLA_ISA ISA_T>
-class scale_track_max_t<ISA_T, fp16, float> {
+template <>
+class scale_track_max_t<fp16, float> {
  public:
   using DType = float;
   using SType = fp16;
@@ -858,9 +855,10 @@ class scale_track_max_t<ISA_T, fp16, float> {
     float tanh_scale;
   };
 
-  TARGET_512 BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                               const int M, const int N, const Param& p, void* /* tmpcache */,
-                               size_t /* cachesize */) const {
+  template <BTLA_ISA ISA_T>
+  TARGET_512 static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
+                                      const int M, const int N, const Param& p, void* /* tmpcache */,
+                                      size_t /* cachesize */) {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
@@ -905,18 +903,16 @@ class scale_track_max_t<ISA_T, fp16, float> {
         memset(dst + i * p.ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
     }
 #endif
-
     return BTLA_CODE::Success;
 #else
     return BTLA_CODE::NotSupport;
 #endif
   }
 };
-template <BTLA_ISA ISA_T>
-using ScaleTrackMaxFp16Fp32 = scale_track_max_t<ISA_T, fp16, float>;
+using ScaleTrackMaxFp16Fp32 = scale_track_max_t<fp16, float>;
 
-template <BTLA_ISA ISA_T>
-class scale_track_max_t<ISA_T, float, float> {
+template <>
+class scale_track_max_t<float, float> {
  public:
   using DType = float;
   using SType = float;
@@ -931,22 +927,23 @@ class scale_track_max_t<ISA_T, float, float> {
   };
   static constexpr float seq15[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
-  BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                    const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) const {
+  template <BTLA_ISA ISA_T>
+  static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                           const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
     if (p.alibi_slope == 0 && p.tanh_scale == 0)
-      return forward_<false, false>(src, src_step, M_offset, N_offset, M, N, p);
+      return forward_<ISA_T, false, false>(src, src_step, M_offset, N_offset, M, N, p);
     else if (p.alibi_slope == 0 && p.tanh_scale != 0)
-      return forward_<false, true>(src, src_step, M_offset, N_offset, M, N, p);
+      return forward_<ISA_T, false, true>(src, src_step, M_offset, N_offset, M, N, p);
     else if (p.alibi_slope != 0 && p.tanh_scale == 0)
-      return forward_<true, false>(src, src_step, M_offset, N_offset, M, N, p);
+      return forward_<ISA_T, true, false>(src, src_step, M_offset, N_offset, M, N, p);
     else
       return BTLA_CODE::NotSupport;
   }
 
 #if CompileAVX512F()
   template <bool HAS_ALIBI, bool HAS_TANH>
-  TARGET_512 BTLA_CODE forward_512(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                                   const int M, const int N, const Param& p) const {
+  TARGET_512 static BTLA_CODE forward_512(const SType* src, const int src_step, const int M_offset, const int N_offset,
+                                          const int M, const int N, const Param& p) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
     const auto v_scale = _mm512_set1_ps(p.scale);
@@ -997,8 +994,8 @@ class scale_track_max_t<ISA_T, float, float> {
 #endif
 #if CompileAVX2()
   template <bool HAS_ALIBI, bool HAS_TANH>
-  BTLA_CODE forward_avx2(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                         const int N, const Param& p) const {
+  static BTLA_CODE forward_avx2(const SType* src, const int src_step, const int M_offset, const int N_offset,
+                                const int M, const int N, const Param& p) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
     const auto v_scale = _mm256_set1_ps(p.scale);
@@ -1038,9 +1035,9 @@ class scale_track_max_t<ISA_T, float, float> {
     return BTLA_CODE::Success;
   }
 #endif
-  template <bool HAS_ALIBI, bool HAS_TANH>
-  BTLA_CODE forward_(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                     const int N, const Param& p) const {
+  template <BTLA_ISA ISA_T, bool HAS_ALIBI, bool HAS_TANH>
+  static BTLA_CODE forward_(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                            const int N, const Param& p) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
 #if MHA_2ND_EXP
@@ -1071,11 +1068,10 @@ class scale_track_max_t<ISA_T, float, float> {
     return BTLA_CODE::Success;
   }
 };
-template <BTLA_ISA ISA_T>
-using ScaleTrackMaxFp32Fp32 = scale_track_max_t<ISA_T, float, float>;
+using ScaleTrackMaxFp32Fp32 = scale_track_max_t<float, float>;
 
-template <BTLA_ISA ISA_T>
-class scale_track_max_t<ISA_T, int32_t, float> {
+template <>
+class scale_track_max_t<int32_t, float> {
  public:
   using DType = float;
   using SType = int32_t;
@@ -1089,9 +1085,10 @@ class scale_track_max_t<ISA_T, int32_t, float> {
     float tanh_scale;
   };
 
-  TARGET_512 BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                               const int M, const int N, const Param& p, void* /* tmpcache */,
-                               size_t /* cachesize */) const {
+  template <BTLA_ISA ISA_T>
+  TARGET_512 static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
+                                      const int M, const int N, const Param& p, void* /* tmpcache */,
+                                      size_t /* cachesize */) {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto dst_max = p.dst_max + M_offset;
@@ -1127,8 +1124,7 @@ class scale_track_max_t<ISA_T, int32_t, float> {
 #endif
   }
 };
-template <BTLA_ISA ISA_T>
-using ScaleTrackMaxS32Fp32 = scale_track_max_t<ISA_T, int32_t, float>;
+using ScaleTrackMaxS32Fp32 = scale_track_max_t<int32_t, float>;
 
 template <class _GemmCore_T, BTLA_ISA ISA_T>
 class weight_base_t {

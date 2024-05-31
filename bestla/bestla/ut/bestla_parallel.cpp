@@ -5,7 +5,6 @@
 #include "bestla_ut.h"
 #include "bestla_prologue_a.h"
 
-#ifdef BTLA_UT_PARALLEL
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -39,7 +38,7 @@ class UT_OMPThreading {
     buffer_error(ref.data(), dst.data(), ref.size());
   }
 };
-#ifdef JBLAS_UT_PARALLEL
+#ifdef BTLA_UT_PARALLEL
 static UT_OMPThreading sUT_OMPThreading;
 #endif
 #endif
@@ -73,7 +72,7 @@ class UT_StdThreading {
     buffer_error(ref.data(), dst.data(), ref.size());
   }
 };
-#ifdef JBLAS_UT_PARALLEL
+#ifdef BTLA_UT_PARALLEL
 static UT_StdThreading sUT_StdThreading;
 #endif
 
@@ -97,7 +96,7 @@ class UT_Scheduler2D {
     prb.print();
   }
 };
-#ifdef JBLAS_UT_PARALLEL
+#ifdef BTLA_UT_PARALLEL
 static UT_Scheduler2D sUT_Scheduler2D;
 #endif
 
@@ -105,9 +104,10 @@ class UT_SchedulerGemmBase {
  public:
   UT_SchedulerGemmBase() {
     UT_START();
+    ut<gemm::ICoreRowNAmxint8<64, 16>>(2024, 11008, 4096, 48, 2048 * 1024, 32 * 1024);
     ut<gemm::ICoreRowNAmxint8<48, 16>>(2048, 4096, 4096, 48, 2048 * 1024, 32 * 1024);
-    ut<gemm::SCoreRowNAvx512f<48, 8>>(1, 4096, 4096, 24);
     ut<gemm::ICoreRowNAmxint8SS<32, 32>>(2048, 4096, 4096, 24);
+    ut<gemm::SCoreRowNAvx512f<48, 8>>(1, 4096, 4096, 24);
     ut<gemm::ICoreRowNAmxint8SS<32, 32>>(4, 4096, 4096, 48);
   }
 
@@ -125,46 +125,8 @@ class UT_SchedulerGemmBase {
     prb.print();
   }
 };
-#ifdef JBLAS_UT_PARALLEL
+#ifdef BTLA_UT_PARALLEL
 static UT_SchedulerGemmBase sUT_SchedulerGemmBase;
-#endif
-
-class UT_SchedulerGemmKBlock {
- public:
-  UT_SchedulerGemmKBlock() {
-    UT_START();
-    ut<gemm::SCoreRowNAvx512f<48, 8>>(1, 4096, 4096, 32, 24);
-    ut<gemm::SCoreRowNAvx512f<48, 8>>(1, 4096, 4096, 64, 22, 32 * 1024);
-    ut<gemm::SCoreRowNAvx512f<48, 8>>(1, 4096, 4096, 128, 24);
-    ut<gemm::SCoreRowNAvx512f<48, 8>>(1, 4096, 4096, 1024, 24);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(1, 4096, 4096, 64, 24, 32 * 1024);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 64, 24);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 4096, 24);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 4096, 48);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 4096, 56);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 32, 56);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(4, 4096, 4096, 128, 48);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(4, 4096, 3072, 32, 48);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 3072, 3072, 48);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 3072, 32, 56);
-  }
-
-  template <class GemmCore_T>
-  void ut(int m, int n, int k, int kblock, int threads, size_t l1cache = 0) {
-    printf("%s %d %d %d %d %d core:%s\n", __FUNCTION__, m, n, k, kblock, threads,
-           gemm::CoreAttr::to_str(GemmCore_T::ID));
-    parallel::gemm::SchedulerKBlock<GemmCore_T> sch;
-    GetCPUDevice();
-    utils::GemmProblem gp(1, m, n, k, kblock);
-    sch.update({threads, gp, 0, 0, _cd->getL2CacheSize(), l1cache == 0 ? _cd->getL1CacheSize() : l1cache});
-    sch.print();
-    parallel::gemm::ThreadProblemBase prb{sch.valid_theads() - 1};
-    sch.getIndex(prb);
-    prb.print();
-  }
-};
-#ifdef JBLAS_UT_PARALLEL
-static UT_SchedulerGemmKBlock sUT_SchedulerGemmKBlock;
 #endif
 
 class UT_SchedulerGemmKBlockNew {
@@ -203,9 +165,8 @@ class UT_SchedulerGemmKBlockNew {
     prb.print();
   }
 };
-#ifdef JBLAS_UT_PARALLEL
+#ifdef BTLA_UT_PARALLEL
 static UT_SchedulerGemmKBlockNew sUT_SchedulerGemmKBlockNew;
 #endif
 }  // namespace ut
 }  // namespace bestla
-#endif

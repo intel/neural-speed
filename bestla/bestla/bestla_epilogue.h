@@ -23,6 +23,86 @@ namespace bestla {
 namespace epilogue {
 namespace gemm {
 
+struct ParamPcKBlockCompInt8Epilogue {
+  void* scalesB;
+  BTLA_DTYPE scaleBdtype;
+  float* scalesA;
+  // optional if A asym
+  uint8_t* zpA = nullptr;
+  void* reduceB = nullptr;
+  BTLA_DTYPE reduceBdtype = BTLA_DTYPE::F32;
+  // optional if B asym
+  int8_t* zpB = nullptr;
+  float* reduceA = nullptr;
+  int K = 1;
+};
+template <class Fp32Epilogue>
+class PcKBlockCompInt8Epilogue {
+ public:
+  using Fp32Param = typename Fp32Epilogue::Param;
+  struct Param {
+    ParamPcKBlockCompInt8Epilogue param1;
+    Fp32Param param2;
+  };
+  using Fp32Epi = Fp32Epilogue;
+  template <BTLA_ISA ISA_T>
+  static BTLA_CODE forward(const int32_t* srcptr, const int cachestep, const int M_offset, const int N_offset,
+                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+    BTLA_CODE ret = BTLA_CODE::NotSupport;
+    float* scab = nullptr;
+    size_t ScaleBTmpSize = N * sizeof(float);
+    size_t ReduceBTmpSize = N * sizeof(float);
+    assert(cachesize >= (ScaleBTmpSize + ReduceBTmpSize));
+    auto& param1 = _param.param1;
+    if (param1.scaleBdtype == BTLA_DTYPE::BF16) {
+      auto scache = reinterpret_cast<float*>(tmpcache);
+      ret = kernel::wrapper::Memcpy2DBf16CvtFp32::template forward<ISA_T>(
+          reinterpret_cast<utils::bf16*>(param1.scalesB) + N_offset, scache, 1, N, N, N, false);
+      assert(ret == BTLA_CODE::Success);
+      scab = scache;
+    } else if (param1.scaleBdtype == BTLA_DTYPE::F32) {
+      scab = reinterpret_cast<float*>(param1.scalesB) + N_offset;
+    }
+    float* redb = nullptr;
+    if (param1.reduceB) {
+      if (param1.reduceBdtype == BTLA_DTYPE::BF16) {
+        auto rcache = reinterpret_cast<float*>(reinterpret_cast<char*>(tmpcache) + ScaleBTmpSize);
+        ret = kernel::wrapper::Memcpy2DBf16CvtFp32::template forward<ISA_T>(
+            reinterpret_cast<utils::bf16*>(param1.reduceB) + N_offset, rcache, 1, N, N, N, false);
+        assert(ret == BTLA_CODE::Success);
+        redb = rcache;
+      } else if (param1.reduceBdtype == BTLA_DTYPE::F32) {
+        redb = reinterpret_cast<float*>(param1.reduceB) + N_offset;
+      }
+    }
+    auto tmpfp32ptr = reinterpret_cast<float*>(const_cast<int32_t*>(srcptr));
+    ret = kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(srcptr, cachestep, tmpfp32ptr, cachestep, M, N,
+                                                                  param1.scalesA + M_offset, 1, scab);
+    assert(ret == BTLA_CODE::Success);
+
+    if (param1.zpA == nullptr) {
+      if (param1.zpB == nullptr) {
+      } else {
+        ret = kernel::wrapper::RemoveZeroPointBias::template forward_wei<ISA_T>(
+            tmpfp32ptr, cachestep, M, N, param1.zpB + N_offset, scab, 1, param1.reduceA + M_offset);
+      }
+    } else {
+      if (param1.zpB == nullptr) {
+        ret = kernel::wrapper::RemoveZeroPointBias::template forward_act<ISA_T>(
+            tmpfp32ptr, cachestep, M, N, param1.zpA + M_offset, param1.scalesA + M_offset, 1, redb);
+      } else {
+        ret = kernel::wrapper::RemoveZeroPointBias::template forward_both<ISA_T>(
+            tmpfp32ptr, cachestep, M, N, param1.zpA + M_offset, param1.zpB + N_offset, param1.scalesA + M_offset, scab,
+            1, param1.K, param1.reduceA + M_offset, redb);
+      }
+    }
+    Fp32Epilogue::template forward<ISA_T>(tmpfp32ptr, cachestep, M_offset, N_offset, M, N, _param.param2, tmpcache,
+                                          cachesize);
+
+    return ret;
+  }
+};
+
 template <typename DT>
 struct ParamAccumulatorWriteBack {
   DT* C;
@@ -30,13 +110,15 @@ struct ParamAccumulatorWriteBack {
   void* elt_const_v;
 };
 
-template <BTLA_ISA ISA_T, typename _SRC_T, typename _DST_T>
+template <typename _SRC_T, typename _DST_T>
 class AccumulatorWriteBack {
  public:
   using SType = _SRC_T;
   using DType = _DST_T;
   using Param = ParamAccumulatorWriteBack<DType>;
+  using PcCompInt8Epi = bestla::epilogue::gemm::PcKBlockCompInt8Epilogue<AccumulatorWriteBack<_SRC_T, _DST_T>>;
 
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const _SRC_T* cacheptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
@@ -52,10 +134,13 @@ class AccumulatorWriteBack {
   }
 };
 
-template <BTLA_ISA ISA_T, typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP _OP>
+template <typename _SRC_T, typename _DST_T, BTLA_ELTWISEOP _OP>
 class CustomAccumulatorWriteBackWithEltop {
  public:
+  using PcCompInt8Epi =
+      bestla::epilogue::gemm::PcKBlockCompInt8Epilogue<CustomAccumulatorWriteBackWithEltop<_SRC_T, _DST_T, _OP>>;
   using Param = ParamAccumulatorWriteBack<_DST_T>;
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const _SRC_T* cacheptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
@@ -68,27 +153,17 @@ class CustomAccumulatorWriteBackWithEltop {
     }
   }
 };
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackFp32 = AccumulatorWriteBack<ISA_T, float, float>;
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackInt32 = AccumulatorWriteBack<ISA_T, int, int>;
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackBf16 = AccumulatorWriteBack<ISA_T, utils::bf16, utils::bf16>;
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackFp16 = AccumulatorWriteBack<ISA_T, utils::fp16, utils::fp16>;
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackBf16Fp32 = AccumulatorWriteBack<ISA_T, utils::bf16, float>;
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackFp16Fp32 = AccumulatorWriteBack<ISA_T, utils::fp16, float>;
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackFp32Bf16 = AccumulatorWriteBack<ISA_T, float, utils::bf16>;
+using AccumulatorWriteBackFp32 = AccumulatorWriteBack<float, float>;
+using AccumulatorWriteBackInt32 = AccumulatorWriteBack<int, int>;
+using AccumulatorWriteBackBf16 = AccumulatorWriteBack<utils::bf16, utils::bf16>;
+using AccumulatorWriteBackFp16 = AccumulatorWriteBack<utils::fp16, utils::fp16>;
+using AccumulatorWriteBackBf16Fp32 = AccumulatorWriteBack<utils::bf16, float>;
+using AccumulatorWriteBackFp16Fp32 = AccumulatorWriteBack<utils::fp16, float>;
+using AccumulatorWriteBackFp32Bf16 = AccumulatorWriteBack<float, utils::bf16>;
 
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackWithGeluFp32 = CustomAccumulatorWriteBackWithEltop<ISA_T, float, float, BTLA_ELTWISEOP::GELU>;
+using AccumulatorWriteBackWithGeluFp32 = CustomAccumulatorWriteBackWithEltop<float, float, BTLA_ELTWISEOP::GELU>;
 
-template <BTLA_ISA ISA_T>
-using AccumulatorWriteBackWithSwishFp32 =
-    CustomAccumulatorWriteBackWithEltop<ISA_T, float, float, BTLA_ELTWISEOP::SWISH>;
+using AccumulatorWriteBackWithSwishFp32 = CustomAccumulatorWriteBackWithEltop<float, float, BTLA_ELTWISEOP::SWISH>;
 
 template <typename DT>
 struct ParamAlphaBetaProcess {
@@ -96,11 +171,11 @@ struct ParamAlphaBetaProcess {
   int ldc, ldd;
   float alpha, beta;
 };
-template <BTLA_ISA ISA_T>
 class AlphaBetaProcessFp32 {
  public:
   using Param = ParamAlphaBetaProcess<float>;
 
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto DOffset = M_offset * _param.ldd + N_offset;
@@ -120,10 +195,10 @@ struct ParamCompFp32BlockEpilogue {
   float* reduce = nullptr;
   int ldra;
 };
-template <BTLA_ISA ISA_T>
 class CompFp32BlockEpilogue {
  public:
   using Param = ParamCompFp32BlockEpilogue;
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const float* srcptr, float* dstptr, const int cachestep, const int M_offset,
                            const int N_offset, const int K_offset, const int M, const int N, const Param& _param,
                            void* tmpcache, size_t cachesize) {
@@ -171,10 +246,10 @@ struct ParamDequantInt32ToFp32 {
   float* scalesA;
   float* scalesB;
 };
-template <BTLA_ISA ISA_T>
 class DequantInt32ToFp32 {
  public:
   using Param = ParamDequantInt32ToFp32;
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
@@ -182,88 +257,6 @@ class DequantInt32ToFp32 {
     return kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(cacheptr, cachestep, cptr, _param.ldc, M, N,
                                                                    _param.scalesA + M_offset * _param.ldsa, _param.ldsa,
                                                                    _param.scalesB + N_offset);
-  }
-};
-
-struct ParamCompInt8BlockEpilogue {
-  void* scalesB;
-  BTLA_DTYPE scaleBdtype;
-  int ldsb;
-  float* scalesA;
-  int ldsa;
-  // optional if A asym
-  uint8_t* zpA = nullptr;
-  void* reduceB = nullptr;
-  BTLA_DTYPE reduceBdtype = BTLA_DTYPE::F32;
-  // optional if B asym
-  int8_t* zpB = nullptr;
-  float* reduceA = nullptr;
-  int K = 1;
-};
-template <BTLA_ISA ISA_T>
-class CompInt8BlockEpilogue {
- public:
-  using Param = ParamCompInt8BlockEpilogue;
-  static BTLA_CODE forward(const int32_t* srcptr, float* dstptr, const int cachestep, const int M_offset,
-                           const int N_offset, const int K_offset, const int M, const int N, const Param& _param,
-                           void* tmpcache, size_t cachesize) {
-    BTLA_CODE ret = BTLA_CODE::NotSupport;
-    float* scab = nullptr;
-    size_t ScaleBTmpSize = N * sizeof(float);
-    size_t ReduceBTmpSize = N * sizeof(float);
-    assert(cachesize >= (ScaleBTmpSize + ReduceBTmpSize));
-    if (_param.scaleBdtype == BTLA_DTYPE::BF16) {
-      auto scache = reinterpret_cast<float*>(tmpcache);
-      ret = kernel::wrapper::Memcpy2DBf16CvtFp32::template forward<ISA_T>(
-          reinterpret_cast<utils::bf16*>(_param.scalesB) + N_offset + K_offset * _param.ldsb, scache, 1, N, N, N,
-          false);
-      assert(ret == BTLA_CODE::Success);
-      scab = scache;
-    } else if (_param.scaleBdtype == BTLA_DTYPE::F32) {
-      scab = reinterpret_cast<float*>(_param.scalesB) + N_offset + K_offset * _param.ldsb;
-    }
-    float* redb = nullptr;
-    if (_param.reduceB) {
-      if (_param.reduceBdtype == BTLA_DTYPE::BF16) {
-        auto rcache = reinterpret_cast<float*>(reinterpret_cast<char*>(tmpcache) + ScaleBTmpSize);
-        ret = kernel::wrapper::Memcpy2DBf16CvtFp32::template forward<ISA_T>(
-            reinterpret_cast<utils::bf16*>(_param.reduceB) + N_offset + K_offset * _param.ldsb, rcache, 1, N, N, N,
-            false);
-        assert(ret == BTLA_CODE::Success);
-        redb = rcache;
-      } else if (_param.reduceBdtype == BTLA_DTYPE::F32) {
-        redb = reinterpret_cast<float*>(_param.reduceB) + N_offset + K_offset * _param.ldsb;
-      }
-    }
-    ret = kernel::wrapper::DequanS32Fp32::template forward<ISA_T>(
-        srcptr, cachestep, reinterpret_cast<float*>(const_cast<int32_t*>(srcptr)), cachestep, M, N,
-        _param.scalesA + M_offset * _param.ldsa + K_offset, _param.ldsa, scab);
-    assert(ret == BTLA_CODE::Success);
-    ret = kernel::wrapper::AccumulateFp32::template forward<ISA_T>(reinterpret_cast<const float*>(srcptr), cachestep,
-                                                                   dstptr, cachestep, M, N);
-    assert(ret == BTLA_CODE::Success);
-
-    if (_param.zpA == nullptr) {
-      if (_param.zpB == nullptr) {
-        return ret;
-      } else {
-        ret = kernel::wrapper::RemoveZeroPointBias::template forward_wei<ISA_T>(
-            dstptr, cachestep, M, N, _param.zpB + N_offset + K_offset * _param.ldsb, scab, _param.ldsa,
-            _param.reduceA + M_offset * _param.ldsa + K_offset);
-      }
-    } else {
-      if (_param.zpB == nullptr) {
-        ret = kernel::wrapper::RemoveZeroPointBias::template forward_act<ISA_T>(
-            dstptr, cachestep, M, N, _param.zpA + M_offset * _param.ldsa + K_offset,
-            _param.scalesA + M_offset * _param.ldsa + K_offset, _param.ldsa, redb);
-      } else {
-        ret = kernel::wrapper::RemoveZeroPointBias::template forward_both<ISA_T>(
-            dstptr, cachestep, M, N, _param.zpA + M_offset * _param.ldsa + K_offset,
-            _param.zpB + N_offset + K_offset * _param.ldsb, _param.scalesA + M_offset * _param.ldsa + K_offset, scab,
-            _param.ldsa, _param.K, _param.reduceA + M_offset * _param.ldsa + K_offset, redb);
-      }
-    }
-    return ret;
   }
 };
 
@@ -282,10 +275,10 @@ struct ParamZpDequantInt32ToFp32 {
   float* reduceA = nullptr;
   int K = 1;
 };
-template <BTLA_ISA ISA_T>
 class ZpDequantInt32ToFp32 {
  public:
   using Param = ParamZpDequantInt32ToFp32;
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
@@ -323,10 +316,10 @@ struct ParamAlphaBetaProcessS32U8 {
   float scaleAcc, scaleC;
   int zpC;
 };
-template <BTLA_ISA ISA_T>
 class AlphaBetaProcessS32U8 {
  public:
   using Param = ParamAlphaBetaProcessS32U8;
+  template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const int32_t* cacheptr, const int cachestep, const int M_offset, const int N_offset,
                            const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;

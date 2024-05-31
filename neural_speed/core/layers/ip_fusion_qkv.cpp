@@ -95,6 +95,46 @@ void BTLAGemmCompF32(const int M, const int N, const int K, const float* A, cons
 }
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
+void BTLAGemmCompInt8Pc(const int M, const int N, const int K, const float* A, const int lda,
+                        storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK,
+                        storage::gemm::IWeightBase* _BV, float* C, const int ldc, int8_t* WorkSpace,
+                        parallel::IThreading* th) {
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher = tLauncher_Int8Pc_F32F32<GemmCore_T, Wei_T>;
+  auto BQ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BQ);
+  auto BK = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BK);
+  auto BV = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(_BV);
+  static Launcher kernel;
+  auto quanA = kernel.mProA.createStorage(M, K, BQ->mBlockSize, BQ->IsAsym());
+  quanA.assign(WorkSpace);
+  WorkSpace += quanA.mSize;
+  auto reordA = kernel.mProA.createReorderStorage(M, K, BQ->mBlockSize);
+  utils::GemmProblem gp(1, M, N, K, BQ->mBlockSize);
+  assert(BQ->mBlockSize == BK->mBlockSize);
+  assert(BQ->mBlockSize == BV->mBlockSize);
+  typename Launcher::Param args[3]{
+      {gp,
+       {A, K, &quanA, BQ->ShfIndice(), &reordA},
+       {BQ},
+       {{BQ->template SPtr<char>(), BQ->SDtype(), quanA.template SPtr<float>(), quanA.template ZPtr<uint8_t>(),
+         BQ->template RPtr<char>(), BQ->RDtype(), nullptr, nullptr, K},
+        {C, N}}},
+      {gp,
+       {A, K, &quanA, BK->ShfIndice(), &reordA},
+       {BK},
+       {{BK->template SPtr<char>(), BK->SDtype(), quanA.template SPtr<float>(), quanA.template ZPtr<uint8_t>(),
+         BK->template RPtr<char>(), BK->RDtype(), nullptr, nullptr, K},
+        {C + M * ldc, N}}},
+      {gp,
+       {A, K, &quanA, BV->ShfIndice(), &reordA},
+       {BV},
+       {{BV->template SPtr<char>(), BV->SDtype(), quanA.template SPtr<float>(), quanA.template ZPtr<uint8_t>(),
+         BV->template RPtr<char>(), BV->RDtype(), nullptr, nullptr, K},
+        {C + M * ldc * 2, N}}}};
+  GemmRunWithA_QKV<Parallel>(&kernel, args, th);
+}
+
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T>
 void BTLAGemmCompInt8(const int M, const int N, const int K, const float* A, const int lda,
                       storage::gemm::IWeightBase* _BQ, storage::gemm::IWeightBase* _BK, storage::gemm::IWeightBase* _BV,
                       float* C, const int ldc, int8_t* WorkSpace, parallel::IThreading* th) {
@@ -195,22 +235,48 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
       }
     }
     if (btype == gemm::CompType::tS8 && PackRow == 4) {
-      if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-        ip_qkv::BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                output, ldo, workspace, pth);
+      if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
+        if (BlkSize < _k) {
+          ip_qkv::BTLAGemmCompInt8<tAMX_INT8_US_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
+                                                                  output, ldo, workspace, pth);
+        } else {
+          ip_qkv::BTLAGemmCompInt8Pc<tAMX_INT8_US, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                             ldo, workspace, pth);
+        }
+
       } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                  BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
-        ip_qkv::BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
-                                                                output, ldo, workspace, pth);
+        if (BlkSize < _k) {
+          ip_qkv::BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
+                                                                  output, ldo, workspace, pth);
+        } else {
+          ip_qkv::BTLAGemmCompInt8Pc<tAVX512_VNNI, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                             ldo, workspace, pth);
+        }
       } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
-        ip_qkv::BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                             ldo, workspace, pth);
+        if (BlkSize < _k) {
+          ip_qkv::BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                               ldo, workspace, pth);
+        } else {
+          ip_qkv::BTLAGemmCompInt8Pc<tAVX512BW, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
+                                                          workspace, pth);
+        }
       } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
-        ip_qkv::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                             ldo, workspace, pth);
+        if (BlkSize < _k) {
+          ip_qkv::BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                               ldo, workspace, pth);
+        } else {
+          ip_qkv::BTLAGemmCompInt8Pc<tAVX_VNNI, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
+                                                          workspace, pth);
+        }
       } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
-        ip_qkv::BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                              ldo, workspace, pth);
+        if (BlkSize < _k) {
+          ip_qkv::BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp,
+                                                                output, ldo, workspace, pth);
+        } else {
+          ip_qkv::BTLAGemmCompInt8Pc<tAVX2_VNNI, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
+                                                           ldo, workspace, pth);
+        }
       }
     }
   }

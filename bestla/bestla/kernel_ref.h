@@ -3392,6 +3392,23 @@ static inline BTLA_CODE gemv_7bit_s8s8_fp32(const utils::GemvParamA& A, const ut
   return BTLA_CODE::Success;
 }
 
+template <typename T>
+static inline BTLA_CODE mul(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
+  for (size_t i = 0; i < size; i++) {
+    float tmp = float(src0ptr[i]) * float(src1ptr[i]);
+    dstptr[i] = tmp;
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename T>
+static inline BTLA_CODE add(const T* src0ptr, const T* src1ptr, T* dstptr, size_t size) {
+  for (size_t i = 0; i < size; i++) {
+    float tmp = float(src0ptr[i]) + float(src1ptr[i]);
+    dstptr[i] = tmp;
+  }
+  return BTLA_CODE::Success;
+}
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla

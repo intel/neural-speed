@@ -4397,7 +4397,15 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
   NE_ASSERT(nb0 == sizeof(float));
   NE_ASSERT(nb00 == sizeof(float));
   NE_ASSERT(ne00 == ne10);
-
+  if (ne_is_contiguous(src0) && ne_is_contiguous(src1)) {
+    if ((ne_nrows(src1) == 1 || ne_nrows(src1) == ne_nrows(src0)) && ne10 == ne00) {
+      if (nb10 == sizeof(float)) {
+        int step1 = ne11 == 1 ? 0 : ne10;
+        bestla_add(nr, ne00, (const float*)src0->data, (const float*)src1->data, step1, (float*)dst->data);
+        return;
+      }
+    }
+  }
   if (nb10 == sizeof(float)) {
     for (int64_t ir = ith; ir < nr; ir += nth) {
       // src0 and dst are same shape => same indices
@@ -5407,6 +5415,7 @@ static void ne_compute_forward_mul_f32(const struct ne_compute_params* params, c
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }
+
   const int ith = params->ith;
   const int nth = params->nth;
 
@@ -5435,6 +5444,15 @@ static void ne_compute_forward_mul_f32(const struct ne_compute_params* params, c
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
+  if (ne_is_contiguous(src0) && ne_is_contiguous(src1)) {
+    if ((ne_nrows(src1) == 1 || ne_nrows(src1) == ne_nrows(src0)) && ne10 == ne00) {
+      if (nb10 == sizeof(float)) {
+        int step1 = ne11 == 1 ? 0 : ne10;
+        bestla_mul(nr, ne00, (const float*)src0->data, (const float*)src1->data, step1, (float*)dst->data);
+        return;
+      }
+    }
+  }
 
   NE_ASSERT(nb0 == sizeof(float));
   NE_ASSERT(nb00 == sizeof(float));
@@ -11405,7 +11423,14 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 
           work_size = MAX(work_size, cur);
         } break;
-        case NE_OP_ADD:
+        case NE_OP_ADD: {
+          if (ne_is_contiguous(node->src1) && ne_is_contiguous(node->src0) &&
+              (ne_nrows(node->src1) == 1 || ne_nrows(node->src1) == ne_nrows(node->src0)) &&
+              node->src0->ne[0] == node->src1->ne[0] && node->nb[0] == sizeof(float)) {
+            node->n_tasks = 1;
+            break;
+          }
+        }
         case NE_OP_ADD1: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;
@@ -11439,6 +11464,14 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_TANH: {
           node->n_tasks = 1;
         } break;
+        case NE_OP_MUL: {
+          if (ne_is_contiguous(node->src1) && ne_is_contiguous(node->src0) &&
+              (ne_nrows(node->src1) == 1 || ne_nrows(node->src1) == ne_nrows(node->src0)) &&
+              node->src0->ne[0] == node->src1->ne[0] && node->nb[0] == sizeof(float)) {
+            node->n_tasks = 1;
+            break;
+          }
+        }
         case NE_OP_SQR:
         case NE_OP_SQRT:
         case NE_OP_LOG:
@@ -11448,7 +11481,6 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
         case NE_OP_SGN:
         case NE_OP_NEG:
         case NE_OP_STEP:
-        case NE_OP_MUL:
         case NE_OP_RELU: {
           if (node->src0->ne[1] > 4) {
             node->n_tasks = n_threads;

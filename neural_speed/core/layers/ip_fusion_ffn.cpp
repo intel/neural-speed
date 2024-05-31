@@ -99,11 +99,10 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, const typename Laun
 }
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <class, BTLA_ISA> class Act_T,
-          template <BTLA_ISA> class Epi_T1, template <BTLA_ISA> class Epi_T2>
+          class Epi_T1, class Epi_T2>
 void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                      float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
-                     parallel::IThreading* th, typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                     typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                     parallel::IThreading* th, typename Epi_T1::Param epi_prama1, typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
   using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T1>;
   using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T2>;
@@ -128,12 +127,62 @@ void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, stora
   }
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <BTLA_ISA> class Epi_T1,
-          template <BTLA_ISA> class Epi_T2>
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
+void BTLAGemmCompInt8Pc(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
+                        float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
+                        parallel::IThreading* th, typename Epi_T1::Fp32Param epi_prama1,
+                        typename Epi_T2::Fp32Param epi_prama2) {
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+
+  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
+                                                   prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
+  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
+                                               prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
+  auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
+  auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
+  utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
+  utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
+  assert(w1ptr_->mBlockSize >= fin);
+  assert(w2ptr_->mBlockSize >= fmid);
+  static Launcher_epi kernel_epi;
+  static Launcher kernel;
+  auto WS = reinterpret_cast<int8_t*>(workspace);
+  auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
+  quanA1.assign(WS);
+  WS += quanA1.mSize;
+  auto reordA1 = kernel_epi.mProA.createReorderStorage(seq, fin, w1ptr_->mBlockSize);
+  if (w1ptr_->ShfIndice()) {
+    reordA1.assign(WS);
+  }
+  WS = reinterpret_cast<int8_t*>(workspace);
+  auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
+  quanA2.assign(WS);
+  WS += quanA2.mSize;
+  auto reordA2 = kernel_epi.mProA.createReorderStorage(seq, fin, w2ptr_->mBlockSize);
+  if (w2ptr_->ShfIndice()) {
+    reordA2.assign(WS);
+  }
+  typename Launcher_epi::Param args1{
+      gp1,
+      {activation, fin, &quanA1, w1ptr_->ShfIndice(), &reordA1},
+      {w1ptr_},
+      {{w1ptr_->template SPtr<char>(), w1ptr_->SDtype(), quanA1.template SPtr<float>(), quanA1.template ZPtr<uint8_t>(),
+        w1ptr_->template RPtr<char>(), w1ptr_->RDtype(), nullptr, nullptr, fin},
+       epi_prama1}};
+  typename Launcher::Param args2{
+      gp2,
+      {tmp, fmid, &quanA2, w2ptr_->ShfIndice(), &reordA2},
+      {w2ptr_},
+      {{w2ptr_->template SPtr<char>(), w2ptr_->SDtype(), quanA2.template SPtr<float>(), quanA2.template ZPtr<uint8_t>(),
+        w2ptr_->template RPtr<char>(), w2ptr_->RDtype(), nullptr, nullptr, fmid},
+       epi_prama2}};
+  GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel, args1, args2, th);
+}
+
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                       float* tmp, float* output, int seq, int fin, int fmid, int fout, void* workspace,
-                      parallel::IThreading* th, typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                      typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                      parallel::IThreading* th, typename Epi_T1::Param epi_prama1, typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher_epi =
       wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
@@ -193,8 +242,7 @@ bool bestla_fusion_ffn_f32f32_support(void* w1ptr, void* w2ptr, int seq, int fin
   return support;
 }
 
-template <template <BTLA_ISA> class epilogue1, template <BTLA_ISA> class epilogue2, typename Epi_args1,
-          typename Epi_args2>
+template <class epilogue1, class epilogue2, typename Epi_args1, typename Epi_args2>
 void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, float* tmp, float* output, int seq,
                                       int fin, int fmid, int fout, void* workspace, Epi_args1 epi_args1,
                                       Epi_args2 epi_args2) {
@@ -211,7 +259,9 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
     auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));
     if (ptr1->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
       auto bptr = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(ptr1);
+      auto bptr2 = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(ptr2);
       auto BlkSize = bptr->mBlockSize;
+      auto BlkSize2 = bptr2->mBlockSize;
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
           BTLAGemmCompF32<tAVX512F, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
@@ -234,22 +284,53 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(
-              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+        if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAMX_INT8_US_KBlock, tWeiNInt, epilogue1, epilogue2>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAMX_INT8_US, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          }
+
         } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                    BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
-              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX512_VNNI, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          }
         } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt, epilogue1, epilogue2>(
-              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt, epilogue1, epilogue2>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX512BW, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          }
         } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
-              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX_VNNI, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          }
         } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
-              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX2_VNNI, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+          }
         }
       }
     }
@@ -364,12 +445,11 @@ void GemmRun_ffn(Launch_T1* launcher1, Launch_T2* launcher2, Launch_T3* launcher
 }
 
 template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <class, BTLA_ISA> class Act_T,
-          template <BTLA_ISA> class Epi_T1, template <BTLA_ISA> class Epi_T2>
+          class Epi_T1, class Epi_T2>
 void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                      storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
-                     int fmid, int fout, void* workspace, parallel::IThreading* th,
-                     typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                     typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                     int fmid, int fout, void* workspace, parallel::IThreading* th, typename Epi_T1::Param epi_prama1,
+                     typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
   using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, Act_T, Wei_T, Epi_T1>;
   using Launcher_mul =
@@ -393,13 +473,67 @@ void BTLAGemmCompF32(float* activation, storage::gemm::IWeightBase* w1ptr, stora
   GemmRun_ffn<Parallel>(&kernel_epi, &kernel_mul, &kernel, args1, args3, args2, th);
 }
 
-template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, template <BTLA_ISA> class Epi_T1,
-          template <BTLA_ISA> class Epi_T2>
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
+void BTLAGemmCompInt8Pc(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
+                        storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
+                        int fmid, int fout, void* workspace, parallel::IThreading* th,
+                        typename Epi_T1::Fp32Param epi_prama1, typename Epi_T2::Fp32Param epi_prama2) {
+  using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+  using Launcher_epi = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
+                                                   prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T1>;
+  using Launcher_mul =
+      wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T, prologue_a::gemm::ShuffleActivationKBlockQuantizeF32,
+                                  Wei_T, epilogue::gemm::PcKBlockCompInt8Epilogue<custom::epilogue::MulFp32>>;
+  using Launcher = wrapper::gemm::LauncherBase<GemmCore_T::ISA, GemmCore_T,
+                                               prologue_a::gemm::ShuffleActivationKBlockQuantizeF32, Wei_T, Epi_T2>;
+  auto w1ptr_ = reinterpret_cast<typename Launcher_epi::PrologueB::StorageWeight*>(w1ptr);
+  auto w2ptr_ = reinterpret_cast<typename Launcher::PrologueB::StorageWeight*>(w2ptr);
+  auto w3ptr_ = reinterpret_cast<typename Launcher_mul::PrologueB::StorageWeight*>(w3ptr);
+  utils::GemmProblem gp1(1, seq, fmid, fin, w1ptr_->mBlockSize);
+  utils::GemmProblem gp2(1, seq, fout, fmid, w2ptr_->mBlockSize);
+  utils::GemmProblem gp3(1, seq, fmid, fin, w3ptr_->mBlockSize);
+  static Launcher_epi kernel_epi;
+  static Launcher_mul kernel_mul;
+  static Launcher kernel;
+  auto quanA1 = kernel_epi.mProA.createStorage(seq, fin, w1ptr_->mBlockSize, w1ptr_->IsAsym());
+  auto WS = reinterpret_cast<int8_t*>(workspace);
+  quanA1.assign(WS);
+
+  auto quanA2 = kernel.mProA.createStorage(seq, fmid, w2ptr_->mBlockSize, w2ptr_->IsAsym());
+  WS = reinterpret_cast<int8_t*>(workspace);
+  quanA2.assign(WS);
+  assert(w1ptr_->ShfIndice() == nullptr);
+  assert(w2ptr_->ShfIndice() == nullptr);
+  assert(w3ptr_->ShfIndice() == nullptr);
+  typename Launcher_epi::Param args1{
+      gp1,
+      {activation, fin, &quanA1},
+      {w1ptr_},
+      {{w1ptr_->template SPtr<char>(), w1ptr_->SDtype(), quanA1.template SPtr<float>(), quanA1.template ZPtr<uint8_t>(),
+        w1ptr_->template RPtr<char>(), w1ptr_->RDtype(), nullptr, nullptr, fin},
+       epi_prama1}};
+  typename Launcher::Param args2{
+      gp2,
+      {tmp2, fmid, &quanA2},
+      {w2ptr_},
+      {{w2ptr_->template SPtr<char>(), w2ptr_->SDtype(), quanA2.template SPtr<float>(), quanA2.template ZPtr<uint8_t>(),
+        w2ptr_->template RPtr<char>(), w2ptr_->RDtype(), nullptr, nullptr, fmid},
+       epi_prama2}};
+  typename Launcher_mul::Param args3{
+      gp3,
+      {activation, fin, &quanA1},
+      {w3ptr_},
+      {{w3ptr_->template SPtr<char>(), w3ptr_->SDtype(), quanA1.template SPtr<float>(), quanA1.template ZPtr<uint8_t>(),
+        w3ptr_->template RPtr<char>(), w3ptr_->RDtype(), nullptr, nullptr, fin},
+       {tmp2, tmp1, fmid, fmid}}};
+  GemmRunWithA_ffn<Parallel>(&kernel_epi, &kernel_mul, &kernel, args1, args3, args2, th);
+}
+
+template <class GemmCore_T, template <class, BTLA_ISA> class Wei_T, class Epi_T1, class Epi_T2>
 void BTLAGemmCompInt8(float* activation, storage::gemm::IWeightBase* w1ptr, storage::gemm::IWeightBase* w2ptr,
                       storage::gemm::IWeightBase* w3ptr, float* tmp1, float* tmp2, float* output, int seq, int fin,
-                      int fmid, int fout, void* workspace, parallel::IThreading* th,
-                      typename Epi_T1<GemmCore_T::ISA>::Param epi_prama1,
-                      typename Epi_T2<GemmCore_T::ISA>::Param epi_prama2) {
+                      int fmid, int fout, void* workspace, parallel::IThreading* th, typename Epi_T1::Param epi_prama1,
+                      typename Epi_T2::Param epi_prama2) {
   using Parallel = parallel::gemm::SchedulerKBlockS<GemmCore_T>;
   using Launcher_epi =
       wrapper::gemm::LauncherIntKBlock<GemmCore_T::ISA, GemmCore_T,
@@ -466,8 +600,7 @@ bool bestla_fusion_ffn_f32f32_support(void* w1ptr, void* w2ptr, void* w3ptr, int
   return support;
 }
 
-template <template <BTLA_ISA> class epilogue1, template <BTLA_ISA> class epilogue2, typename Epi_args1,
-          typename Epi_args2>
+template <class epilogue1, class epilogue2, typename Epi_args1, typename Epi_args2>
 void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2ptr, void* w3ptr, float* tmp1,
                                       float* tmp2, float* output, int seq, int fin, int fmid, int fout, void* workspace,
                                       Epi_args1 epi_args1, Epi_args2 epi_args2) {
@@ -485,7 +618,9 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
     auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));
     if (ptr1->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
       auto bptr = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(ptr1);
+      auto bptr2 = reinterpret_cast<storage::gemm::IWeightKBlockBase*>(ptr2);
       auto BlkSize = bptr->mBlockSize;
+      auto BlkSize2 = bptr2->mBlockSize;
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
         if (NTile == tAVX512F::NTILE && _cd->AVX512F() && BlkSize % tAVX512F::KTILE == 0) {
           BTLAGemmCompF32<tAVX512F, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
@@ -512,35 +647,63 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_SS_KBlock::KTILE == 0) {
-          if (seq <= tAVX512_VNNI_KBlock::MTILE) {
-            static_assert(tAVX512_VNNI_KBlock::NTILE == tAMX_INT8_SS_KBlock::NTILE);
-            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+        if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAMX_INT8_US_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
                                                                                   tmp2, output, seq, fin, fmid, fout,
                                                                                   workspace, pth, epi_args1, epi_args2);
           } else {
-            BTLAGemmCompInt8<tAMX_INT8_SS_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
-                                                                                  tmp2, output, seq, fin, fmid, fout,
-                                                                                  workspace, pth, epi_args1, epi_args2);
+            BTLAGemmCompInt8Pc<tAMX_INT8_US, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+                epi_args2);
           }
 
         } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI() &&
                    BlkSize % tAVX512_VNNI_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX512_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
+                                                                                  tmp2, output, seq, fin, fmid, fout,
+                                                                                  workspace, pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX512_VNNI, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+                epi_args2);
+          }
+        } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
+                                                                               output, seq, fin, fmid, fout, workspace,
+                                                                               pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX512BW, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+                epi_args2);
+          }
+        } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
+                                                                               output, seq, fin, fmid, fout, workspace,
+                                                                               pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX_VNNI, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+                epi_args2);
+          }
+        } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
+          if (BlkSize < fin || BlkSize2 < fmid) {
+            BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1,
                                                                                 tmp2, output, seq, fin, fmid, fout,
                                                                                 workspace, pth, epi_args1, epi_args2);
-        } else if (NTile == tAVX512BW_KBlock::NTILE && _cd->AVX512BW() && BlkSize % tAVX512BW_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX512BW_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
-                                                                             output, seq, fin, fmid, fout, workspace,
-                                                                             pth, epi_args1, epi_args2);
-        } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI() && BlkSize % tAVX_VNNI_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
-                                                                             output, seq, fin, fmid, fout, workspace,
-                                                                             pth, epi_args1, epi_args2);
-        } else if (NTile == tAVX2_VNNI_KBlock::NTILE && _cd->AVX2() && BlkSize % tAVX2_VNNI_KBlock::KTILE == 0) {
-          BTLAGemmCompInt8<tAVX2_VNNI_KBlock, tWeiNInt, epilogue1, epilogue2>(activation, ptr1, ptr2, ptr3, tmp1, tmp2,
-                                                                              output, seq, fin, fmid, fout, workspace,
-                                                                              pth, epi_args1, epi_args2);
+          } else {
+            BTLAGemmCompInt8Pc<tAVX2_VNNI, tWeiNInt, epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue1>,
+                               epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue2>>(
+                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+                epi_args2);
+          }
         }
       }
     }

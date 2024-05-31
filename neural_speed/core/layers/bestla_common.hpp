@@ -122,85 +122,92 @@ struct ParamAdd {
   _T *C, *D;
   int ldc, ldd;
 };
-template <BTLA_ISA ISA_T, typename _T>
+template <typename _T>
 class Add {
  public:
   using Param = ParamAdd<_T>;
 
-  static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
-                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                                  const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
     auto dptr = _param.D + DOffset;
-    // for (int i = 0; i < M; i++) {
-    //   ne_vec_add_f32(N, cptr + i * _param.ldc,dptr + i * _param.ldd, cacheptr + i * cachestep);
-    // }
-    for (int i = 0; i < M; i++) {
-      for (int j = 0; j < N; j++) {
-        cptr[i * _param.ldc + j] = dptr[i * _param.ldd + j] + cacheptr[i * cachestep + j];
+    if constexpr (std::is_same_v<_T, float>) {
+      for (int i = 0; i < M; i++) {
+        bestla::kernel::wrapper::Add<_T>::template forward<ISA_T>(dptr + i * _param.ldd, cacheptr + i * cachestep,
+                                                                  cptr + i * _param.ldc, N);
       }
+      return BTLA_CODE::Success;
+    } else {
+      return BTLA_CODE::NotSupport;
     }
-    return BTLA_CODE::Success;
   }
 };
-template <BTLA_ISA ISA_T>
-using AddFp32 = Add<ISA_T, float>;
+using AddFp32 = Add<float>;
 
 template <typename _T>
 struct ParamMul {
   _T *C, *D;
   int ldc, ldd;
 };
-template <BTLA_ISA ISA_T, typename _T>
+template <typename _T>
 class Mul {
  public:
   using Param = ParamMul<_T>;
-  static BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
-                           const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(const float* cacheptr, const int cachestep, const int M_offset, const int N_offset,
+                                  const int M, const int N, const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
     auto dptr = _param.D + DOffset;
-    for (int i = 0; i < M; i++) {
-      for (int j = 0; j < N; j++) {
-        cptr[i * _param.ldc + j] = dptr[i * _param.ldd + j] * cacheptr[i * cachestep + j];
+    if constexpr (std::is_same_v<_T, float>) {
+      for (int i = 0; i < M; i++) {
+        bestla::kernel::wrapper::Mul<_T>::template forward<ISA_T>(dptr + i * _param.ldd, cacheptr + i * cachestep,
+                                                                  cptr + i * _param.ldc, N);
       }
+      return BTLA_CODE::Success;
+    } else {
+      return BTLA_CODE::NotSupport;
     }
-    return BTLA_CODE::Success;
   }
 };
-template <BTLA_ISA ISA_T>
-using MulFp32 = Mul<ISA_T, float>;
+using MulFp32 = Mul<float>;
 
 template <typename _T>
 struct ParamAdd_Gelu {
   _T *C, *D;
   int ldc, ldd;
 };
-template <BTLA_ISA ISA_T, typename _T>
+template <typename _T>
 class Add_Gelu {
  public:
   using Param = ParamAdd_Gelu<_T>;
-  static BTLA_CODE forward(  // NOLINT [build/include_what_you_use]
+  template <BTLA_ISA ISA_T>
+  static inline BTLA_CODE forward(  // NOLINT [build/include_what_you_use]
       const float* cacheptr, const int cachestep, const int M_offset, const int N_offset, const int M, const int N,
       const Param& _param, void* tmpcache, size_t cachesize) {
     auto COffset = M_offset * _param.ldc + N_offset;
     auto DOffset = M_offset * _param.ldd + N_offset;
     auto cptr = _param.C + COffset;
     auto dptr = _param.D + DOffset;
-    for (int i = 0; i < M; i++) {
-      ne_vec_add_f32(N, cptr + i * _param.ldc, dptr + i * _param.ldd, cacheptr + i * cachestep);
+    if constexpr (std::is_same_v<_T, float>) {
+      for (int i = 0; i < M; i++) {
+        bestla::kernel::wrapper::Add<_T>::template forward<ISA_T>(dptr + i * _param.ldd, cacheptr + i * cachestep,
+                                                                  cptr + i * _param.ldc, N);
+      }
+      using GeluKernel = bestla::epilogue::gemm::AccumulatorWriteBackWithGeluFp32;
+      typename GeluKernel::Param param{_param.C, _param.ldc, nullptr};
+      auto ret = GeluKernel::forward<ISA_T>(cptr, _param.ldc, M_offset, N_offset, M, N, param, tmpcache, cachesize);
+      return ret;
+    } else {
+      return BTLA_CODE::NotSupport;
     }
-    using GeluKernel = bestla::epilogue::gemm::AccumulatorWriteBackWithGeluFp32<ISA_T>;
-    static GeluKernel ker;
-    typename GeluKernel::Param param{_param.C, _param.ldc, nullptr};
-    auto ret = ker.forward(cptr, _param.ldc, M_offset, N_offset, M, N, param, tmpcache, cachesize);
-    return ret;
   }
 };
-template <BTLA_ISA ISA_T>
-using Add_GeluFp32 = Add_Gelu<ISA_T, float>;
+using Add_GeluFp32 = Add_Gelu<float>;
 
 }  // namespace epilogue
 }  // namespace custom

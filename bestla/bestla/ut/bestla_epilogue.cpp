@@ -35,11 +35,11 @@ class UT_AccumulatorWriteBack {
     std::vector<bf16> src(_M * _N);
     for (int i = 0; i < _M * _N; i++) src[i].fromfloat(i);
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
-    epilogue::gemm::AccumulatorWriteBackBf16Fp32<_RT_ISA_T> ker;
-    epilogue::gemm::AccumulatorWriteBackBf16Fp32<BTLA_ISA::NoSIMD> kerref;
 
-    kerref.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstref.data(), _N}, cache, CacheSize);
-    ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
+    epilogue::gemm::AccumulatorWriteBackBf16Fp32::template forward<BTLA_ISA::NoSIMD>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstref.data(), _N}, cache, CacheSize);
+    epilogue::gemm::AccumulatorWriteBackBf16Fp32::template forward<_RT_ISA_T>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
     ut::buffer_error(dstref.data(), dstker.data(), dstref.size());
   }
   template <BTLA_ISA _RT_ISA_T>
@@ -48,13 +48,13 @@ class UT_AccumulatorWriteBack {
     std::vector<float> src(_M * _N);
     for (int i = 0; i < _M * _N; i++) src[i] = float(i);
     std::vector<uint16_t> dstref(_M * _N, 0), dstker(_M * _N, 0);
-    epilogue::gemm::AccumulatorWriteBackFp32Bf16<_RT_ISA_T> ker;
-    epilogue::gemm::AccumulatorWriteBackFp32Bf16<BTLA_ISA::NoSIMD> kerref;
 
-    kerref.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {reinterpret_cast<bf16*>(dstref.data()), _N},
-                   cache, CacheSize);
-    ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {reinterpret_cast<bf16*>(dstker.data()), _N},
-                cache, CacheSize);
+    epilogue::gemm::AccumulatorWriteBackFp32Bf16::template forward<BTLA_ISA::NoSIMD>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {reinterpret_cast<bf16*>(dstref.data()), _N}, cache,
+        CacheSize);
+    epilogue::gemm::AccumulatorWriteBackFp32Bf16::template forward<_RT_ISA_T>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {reinterpret_cast<bf16*>(dstker.data()), _N}, cache,
+        CacheSize);
     ut::buffer_error<uint16_t>(dstref.data(), dstker.data(), dstref.size());
   }
   template <BTLA_ISA _RT_ISA_T>
@@ -63,11 +63,11 @@ class UT_AccumulatorWriteBack {
     std::vector<float> src(_M * _N);
     for (int i = 0; i < _M * _N; i++) src[i] = float(i);
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
-    epilogue::gemm::AccumulatorWriteBackFp32<_RT_ISA_T> ker;
-    epilogue::gemm::AccumulatorWriteBackFp32<BTLA_ISA::NoSIMD> kerref;
 
-    kerref.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstref.data(), _N}, cache, CacheSize);
-    ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
+    epilogue::gemm::AccumulatorWriteBackFp32::template forward<BTLA_ISA::NoSIMD>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstref.data(), _N}, cache, CacheSize);
+    epilogue::gemm::AccumulatorWriteBackFp32::template forward<_RT_ISA_T>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
     ut::buffer_error<float>(dstref.data(), dstker.data(), dstref.size());
   }
   template <BTLA_ISA _RT_ISA_T>
@@ -76,8 +76,8 @@ class UT_AccumulatorWriteBack {
     std::vector<float> src(_M * _N);
     for (int i = 0; i < _M * _N; i++) src[i] = float(i);
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
-    epilogue::gemm::AccumulatorWriteBackWithGeluFp32<_RT_ISA_T> ker;
-    ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
+    epilogue::gemm::AccumulatorWriteBackWithGeluFp32 ::template forward<_RT_ISA_T>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N}, cache, CacheSize);
     auto gelu = [&](float x) {
       return 0.5f * x * (1.f + tanhf(0.7978845834732056f * (x + 0.044714998453855515f * x * x * x)));
     };
@@ -92,9 +92,8 @@ class UT_AccumulatorWriteBack {
     for (int i = 0; i < _M * _N; i++) src[i] = float(i);
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
     float elt_const_v[] = {-1.0f};
-    epilogue::gemm::AccumulatorWriteBackWithSwishFp32<_RT_ISA_T> ker;
-    ker.forward(src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N, elt_const_v}, cache,
-                CacheSize);
+    epilogue::gemm::AccumulatorWriteBackWithSwishFp32::template forward<_RT_ISA_T>(
+        src.data(), _N, _M_offset, _N_offset, _cpy_M, _cpy_N, {dstker.data(), _N, elt_const_v}, cache, CacheSize);
     auto swish = [&](float x) { return x / (1 + exp(-x)); };
     for (int i = 0; i < _M * _N; i++) src[i] = swish(src[i]);
     ut::buffer_error<float>(src.data(), dstker.data(), dstker.size(), 0.2f);  // swish use low lprecision exp
@@ -125,12 +124,13 @@ class UT_AlphaBetaProcessFp32 {
     for (int i = 0; i < src.size(); i++) {
       src[i] = float(i);
     }
-    epilogue::gemm::AlphaBetaProcessFp32<BTLA_ISA::NoSIMD> kernref;
-    epilogue::gemm::AlphaBetaProcessFp32<BTLA_ISA::AVX512F> kern0;
-    kernref.forward(src.data(), _srcstep, 0, 0, _M, _N, {dstref.data(), src1.data(), _dststep, _src1step, alpha, beta},
-                    cache, CacheSize);
-    kern0.forward(src.data(), _srcstep, 0, 0, _M, _N, {dst.data(), src1.data(), _dststep, _src1step, alpha, beta},
-                  cache, CacheSize);
+    using Epi = epilogue::gemm::AlphaBetaProcessFp32;
+    Epi::template forward<BTLA_ISA::NoSIMD>(src.data(), _srcstep, 0, 0, _M, _N,
+                                            {dstref.data(), src1.data(), _dststep, _src1step, alpha, beta}, cache,
+                                            CacheSize);
+    Epi::template forward<BTLA_ISA::AVX512F>(src.data(), _srcstep, 0, 0, _M, _N,
+                                             {dst.data(), src1.data(), _dststep, _src1step, alpha, beta}, cache,
+                                             CacheSize);
     ut::buffer_error<float>(dstref.data(), dst.data(), dstref.size());
   }
 };

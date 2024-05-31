@@ -96,6 +96,7 @@ endif()
 
 if (MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX)
+    add_compile_options(/bigobj)
     if (BUILD_SHARED_LIBS)
         set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     endif()
