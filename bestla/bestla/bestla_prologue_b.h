@@ -186,8 +186,8 @@ class WeightKBlockNInteger {
     utils::afree(Tscales);
     utils::afree(Tzps);
   }
-
-  AUTOCALL void unpackWeight(const int N, const int K, StorageWeight* stor, float* B, const int ldb,
+  template <typename T>
+  AUTOCALL void unpackWeight(const int N, const int K, StorageWeight* stor, T* B, const int ldb,
                              parallel::IThreading* threading) {
     parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
     threading->parallel_for([&](int tidx) {
@@ -196,7 +196,7 @@ class WeightKBlockNInteger {
       if (thdp.valid) {
         auto rowpad = utils::padto(thdp.size[0], _GemmCore_T::KTILE);
         auto colpad = utils::padto(thdp.size[1], _GemmCore_T::NTILE);
-        auto dequant = utils::amalloc<float>((size_t)rowpad * colpad);
+        auto dequant = utils::amalloc<T>((size_t)rowpad * colpad);
         auto dstptr = dequant;
         int dststep = 0;
         size_t constexpr CacheSize = size_t(100) << 10;
@@ -212,39 +212,7 @@ class WeightKBlockNInteger {
           getWeight<BTLA_ISA::NoSIMD>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
                                       CacheSize);
         }
-        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, float>::forward_auto(
-            dstptr, B + thdp.loc[0] * ldb + thdp.loc[1], thdp.size[0], thdp.size[1], rowpad, colpad, dststep, ldb);
-        utils::afree(dequant);
-      }
-    });
-  }
-
-  AUTOCALL void unpackWeight(const int N, const int K, StorageWeight* stor, int8_t* B, const int ldb,
-                             parallel::IThreading* threading) {
-    parallel::Scheduler2D _para({threading->num_threads(), K, N, _GemmCore_T::KTILE, _GemmCore_T::NTILE});
-    threading->parallel_for([&](int tidx) {
-      parallel::ThreadProblem2D thdp{tidx};
-      _para.getIndex(thdp);
-      if (thdp.valid) {
-        auto rowpad = utils::padto(thdp.size[0], _GemmCore_T::KTILE);
-        auto colpad = utils::padto(thdp.size[1], _GemmCore_T::NTILE);
-        auto dequant = utils::amalloc<int8_t>((size_t)rowpad * colpad);
-        auto dstptr = dequant;
-        int dststep = 0;
-        size_t constexpr CacheSize = size_t(100) << 10;
-        int8_t tmpcache[CacheSize];
-        GetCPUDevice();
-        if (_cd->AVX512F()) {
-          getWeight<BTLA_ISA::AVX512F>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
-                                       CacheSize);
-        } else if (_cd->AVX2()) {
-          getWeight<BTLA_ISA::AVX2>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
-                                    CacheSize);
-        } else {
-          getWeight<BTLA_ISA::NoSIMD>(&dstptr, &dststep, rowpad, colpad, thdp.loc[0], thdp.loc[1], {stor}, tmpcache,
-                                      CacheSize);
-        }
-        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, int8_t>::forward_auto(
+        kernel::wrapper::RevertPaddingInterleaveMN<_GemmCore_T::NTILE, _GemmCore_T::PACK_ROW, T>::forward_auto(
             dstptr, B + thdp.loc[0] * ldb + thdp.loc[1], thdp.size[0], thdp.size[1], rowpad, colpad, dststep, ldb);
         utils::afree(dequant);
       }
@@ -1156,8 +1124,25 @@ class WeightKBlockNFloat {
     });
   }
 
+  
+  AUTOCALL void setDoubleQuantCorrection(utils::avector<float>* dq_buf, StorageWeight* ptr) {
+    if (ptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
+      auto packw_dqbuf_ptr = ptr->DQPtr<float>();
+      memcpy(packw_dqbuf_ptr, dq_buf->data(), dq_buf->size() * sizeof(float));
+    } else {
+      assert(0);
+    }
+  }
+
   AUTOCALL void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
                             const int8_t* zero_points, StorageWeight* stor, parallel::IThreading* threading) {
+    if (stor->IsDoubleQuant()) {
+      int nk_scale = utils::updiv(K, stor->mBlockSize);
+      auto ssize = static_cast<size_t>(N) * nk_scale;
+      utils::avector<float> dq_buf;
+      QuantBaseT::doubleQuantScale(const_cast<float*>(scales), ssize, stor->mDqBlockSize, stor->SDtype(), &dq_buf);
+      setDoubleQuantCorrection(&dq_buf, stor);
+    }
     setQuantCorrection(N, K, zero_points, scales, stor, threading);
     if (stor->mDType == BTLA_DTYPE::F8_E4M3 || stor->mDType == BTLA_DTYPE::F8_E5M2) {
       QuantBaseT::reorderWeight(N, K, B, ldb, stor->WPtr<int8_t>(), threading);
