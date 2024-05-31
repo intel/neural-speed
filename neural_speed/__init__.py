@@ -19,7 +19,7 @@ import os
 import torch
 from neural_speed.convert import convert_model
 
-model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder"}
+model_maps = {"gpt_neox": "gptneox", "gpt_bigcode": "starcoder", "tinyllama": "llama"}
 vocab_size_map = {"llama3": 128256}
 max_request_num_default = 1
 
