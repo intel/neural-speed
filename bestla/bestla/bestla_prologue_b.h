@@ -347,7 +347,7 @@ class WeightKBlockNInteger {
           if (scales) {
             for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
               if (i < rawnk_scale) {
-                for (size_t j = 0; j < N; j++) {
+                for (int j = 0; j < N; j++) {
                   stor->template SPtr<float>()[i * stor->mNPad + j] = scales[j * rawnk_scale + i];
                 }
               } else {
@@ -365,7 +365,7 @@ class WeightKBlockNInteger {
           if (scales) {
             for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
               if (i < rawnk_scale) {
-                for (size_t j = 0; j < N; j++) {
+                for (int j = 0; j < N; j++) {
                   stor->template SPtr<utils::bf16>()[i * stor->mNPad + j] = utils::bf16(scales[j * rawnk_scale + i]);
                 }
               } else {
@@ -383,7 +383,7 @@ class WeightKBlockNInteger {
           if (scales) {
             for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
               if (i < rawnk_scale) {
-                for (size_t j = 0; j < N; j++) {
+                for (int j = 0; j < N; j++) {
                   stor->template SPtr<utils::f8>()[i * stor->mNPad + j] = scales[j * rawnk_scale + i];
                 }
               } else {
@@ -403,7 +403,7 @@ class WeightKBlockNInteger {
         if (thdp.valid) {
           for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
             if (i < rawnk_scale) {
-              for (size_t j = 0; j < N; j++) {
+              for (int j = 0; j < N; j++) {
                 stor->template ZPtr<int8_t>()[i * stor->mNPad + j] = zero_points[j * rawnk_scale + i];
               }
             } else {
@@ -1189,7 +1189,7 @@ class WeightKBlockNFloat {
           for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
             if (i < rawnk_scale) {
               if (scales != nullptr) {
-                for (size_t j = 0; j < N; j++) {
+                for (int j = 0; j < N; j++) {
                   stor->template SPtr<utils::bf16>()[j + i * stor->mNPad] = static_cast<utils::bf16>(scales[i * N + j]);
                 }
               }
@@ -1214,7 +1214,7 @@ class WeightKBlockNFloat {
           for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
             if (i < rawnk_scale) {
               if (scales != nullptr) {
-                for (size_t j = 0; j < N; j++) {
+                for (int j = 0; j < N; j++) {
                   stor->template SPtr<utils::f8>()[j + i * stor->mNPad] = static_cast<int8_t>(scales[i * N + j]);
                 }
               }
@@ -1233,7 +1233,7 @@ class WeightKBlockNFloat {
           for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
             if (i < rawnk_scale) {
               if (scales != nullptr) {
-                for (size_t j = 0; j < N; j++) {
+                for (int j = 0; j < N; j++) {
                   stor->template SPtr<uint8_t>()[j + i * stor->mNPad] = static_cast<uint8_t>(scales[i * N + j]);
                 }
               }
