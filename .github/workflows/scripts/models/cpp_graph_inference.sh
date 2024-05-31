@@ -26,7 +26,7 @@ function main() {
         quant_script="./build/bin/quant_llama"
         infer_cmd="./build/bin/run_llama"
         input_model="/tf_dataset2/models/pytorch/Meta-Llama-3-8B"
-        precision_list=("q4_j_b128" "q4_j_b32" "q4_0")
+        precision_list=("q4_j_b128" "q4_j_b32" "q4_0" "q5_j_i8_pc_asym" "q3_j_i8_b128_asym")
     elif [[ "${model}" == "gpt-neox-20b" ]]; then
         convert_script="${scripts_dir}/convert_gptneox.py"
         quant_script="./build/bin/quant_gptneox"
@@ -129,6 +129,10 @@ function main() {
                             ${quant_script} --model_file ${working_dir}/${model}-fp32.bin --out_file ${working_dir}/${model}-${precision}.bin --nthread $cores_per_instance --weight_dtype int4 --group_size 32 --scale_dtype fp32 --compute_dtype fp32 --alg sym
                         elif [[ ${precision} == "q4_j_b128" ]]; then
                             ${quant_script} --model_file ${working_dir}/${model}-fp32.bin --out_file ${working_dir}/${model}-${precision}.bin --nthread $cores_per_instance --weight_dtype int4 --group_size 128 --scale_dtype fp32 --compute_dtype fp32 --alg sym
+                        elif [[ ${precision} == "q3_j_i8_b128_asym" ]]; then
+                            ${quant_script} --model_file ${working_dir}/${model}-fp32.bin --out_file ${working_dir}/${model}-${precision}.bin --nthread $cores_per_instance --weight_dtype int3 --group_size 128 --scale_dtype fp32 --compute_dtype int8 --alg asym
+                        elif [[ ${precision} == "q5_j_i8_pc_asym" ]]; then
+                            ${quant_script} --model_file ${working_dir}/${model}-fp32.bin --out_file ${working_dir}/${model}-${precision}.bin --nthread $cores_per_instance --weight_dtype int5 --group_size -1 --scale_dtype fp32 --compute_dtype int8 --alg asym
                         elif [[ ${precision} == "q4_j_b128_asym" ]]; then
                             ${quant_script} --model_file ${working_dir}/${model}-fp32.bin --out_file ${working_dir}/${model}-${precision}.bin --nthread $cores_per_instance --weight_dtype int4 --group_size 128 --scale_dtype fp32 --compute_dtype fp32 --alg asym
                         elif [[ ${precision} == "q4_0" ]]; then
