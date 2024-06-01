@@ -631,10 +631,14 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   lctx.model.kv_self.n = n_cached;
   float* logptr = NULL;
   if (inpL->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     bestla_device_sync(ctx0->dev_queue);
     struct ne_tensor* inpL_host = ne_new_tensor_1d(ctx0, NE_TYPE_I8, inpL->size, NE_SIZE_CALC, NE_BACKEND_CPU);
     logptr = (float*)inpL_host->data;
     bestla_device_memcpy_sync(logptr, inpL->data, inpL->size, ctx0->dev_queue);
+#else
+    NE_ASSERT(false);
+#endif
   } else {
     logptr = (float*)inpL->data;
   }

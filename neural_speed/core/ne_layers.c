@@ -887,6 +887,7 @@ static void ne_set_op_params(struct ne_tensor* tensor, const void* params, size_
   memcpy(tensor->op_params, params, params_size);
 }
 
+#ifdef NS_SYCL
 struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
                                             void* data, size_t size) {
   // always insert objects at the end of the context's memory pool
@@ -1015,11 +1016,17 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
 
   return result;
 }
+#endif
 
 struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
                                      void* data, size_t size, enum ne_backend bk) {
   if (bk == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     return ne_new_device_tensor_impl(ctx, type, n_dims, ne, data, size);
+#else
+    NE_ASSERT(0);
+    return NULL;
+#endif
   }
   // always insert objects at the end of the context's memory pool
   struct ne_object* obj_cur = ctx->objects_end;
@@ -7144,6 +7151,7 @@ static void ne_compute_forward_mul_mat_q_f32_bestla(const struct ne_compute_para
     return;
   }
   if (dst->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     float* actptr = (float*)src1->data;
     int8_t* devwptr = (int8_t*)params->dev_wdata;
     if (src1->backend == NE_BACKEND_CPU) {
@@ -7153,6 +7161,9 @@ static void ne_compute_forward_mul_mat_q_f32_bestla(const struct ne_compute_para
     }
     bestla_device_f32f32_forward(actptr, src0->data, (float*)dst->data, ne1, ne0, ne10, nb11 / ne_element_size(src1),
                                  nb1 / ne_element_size(dst), devwptr, params->dev_queue);
+#else
+    NE_ASSERT(0);
+#endif
   } else {
     bestla_f32f32_forward((float*)src1->data, src0->data, (float*)dst->data, ne1, ne0, ne10,
                           nb11 / ne_element_size(src1), nb1 / ne_element_size(dst), params->wdata);
@@ -11647,8 +11658,12 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
 
           work_size = MAX(work_size, cur);
 
-          if (node->backend != node->src1->backend && node->src1->backend == NE_BACKEND_CPU) {
-            dev_work_size = node->src1->size;
+          if (node->backend != node->src1->backend) {
+            if (node->src1->backend == NE_BACKEND_CPU) {
+              dev_work_size = node->src1->size;
+            } else {
+              work_size += node->src1->size;
+            }
           }
         } break;
         case NE_OP_MUL_FFN_SILU:
