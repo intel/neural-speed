@@ -106,9 +106,9 @@ class UT_PaddingInterleaveMN {
     aligned_vector<T_DST> dst(row_pad * col_pad), ref(row_pad * col_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLA_ISA::NoSIMD>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack, T_SRC, T_DST>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack>::template forward<BTLA_ISA::AVX512_FP16>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, RowPack, T_SRC, T_DST>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size(), T_DST(100));
   }
@@ -135,9 +135,9 @@ class UT_PaddingTransInterleaveMN {
     aligned_vector<T_DST> dst(col_pad * row_pad), ref(col_pad * row_pad);
     for (size_t i = 0; i < src.size(); i++) src[i] = static_cast<T_SRC>(float(i));
 
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::NoSIMD>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack, T_SRC, T_DST>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), ref.data(), row, col, row_pad, col_pad, row_pad, col);
-    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack>::template forward<BTLA_ISA::AVX512_FP16>(
+    kernel::wrapper::PaddingTransInterleaveMN<MTile, ColPack, T_SRC, T_DST>::template forward<BTLA_ISA::AVX512_FP16>(
         src.data(), dst.data(), row, col, row_pad, col_pad, col, row_pad);
     ut::buffer_error(dst.data(), ref.data(), dst.size(), T_DST(100));
   }
@@ -164,9 +164,9 @@ class UT_RevertPaddingInterleaveMN {
       src[i] = static_cast<T>(i);
     }
     aligned_vector<T> reverted(row * col);
-    kernel::wrapper::PaddingInterleaveMN<NTile, PackRow>::template forward<BTLA_ISA::NoSIMD>(
+    kernel::wrapper::PaddingInterleaveMN<NTile, PackRow, T>::template forward<BTLA_ISA::NoSIMD>(
         src.data(), packed.data(), row, col, rowpad, colpad, col, rowpad);
-    kernel::wrapper::RevertPaddingInterleaveMN<NTile, PackRow>::template forward<BTLA_ISA::NoSIMD>(
+    kernel::wrapper::RevertPaddingInterleaveMN<NTile, PackRow, T>::template forward<BTLA_ISA::NoSIMD>(
         packed.data(), reverted.data(), row, col, rowpad, colpad, rowpad, col);
     ut::buffer_error(src.data(), reverted.data(), reverted.size());
   }

@@ -144,11 +144,11 @@ class UT_SchedulerGemmKBlockNew {
     ut<gemm::ICoreRowNAmxint8SS<64, 16>>(1, 4096, 4096, 64, 24, 32 * 1024);
     ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 64, 24);
     ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 4096, 56);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 32, 56);
+    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 4096, 64, 56);
     ut<gemm::ICoreRowNAmxint8SS<64, 16>>(4, 4096, 4096, 128, 48);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(4, 4096, 3072, 32, 48);
+    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(4, 4096, 3072, 64, 48);
     ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 3072, 3072, 48);
-    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 3072, 32, 56);
+    ut<gemm::ICoreRowNAmxint8SS<64, 16>>(2048, 4096, 3072, 64, 56);
   }
 
   template <class GemmCore_T>

@@ -40,6 +40,18 @@
       }
     },
     {
+      "name": "linux-release-ut-thread",
+      "displayName": "Linux Release Thread Pool for UTs",
+      "description": "Release",
+      "inherits": "linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NS_USE_OMP": "OFF",
+        "BTLA_UT_ALL": "ON",
+        "BTLA_UT_BENCHMARK": "ON"
+      }
+    },
+    {
       "name": "windows-base",
       "description": "Target Windows with the Visual Studio development environment.",
       "hidden": true,

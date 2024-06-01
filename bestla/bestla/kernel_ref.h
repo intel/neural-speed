@@ -409,8 +409,8 @@ static inline void convert_s4_s8_8(int8_t* dstptr, int8_t* srcptr) {
   dstptr[7] = static_cast<int8_t>(tmp);
 }
 
-static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, int8_t* dstptr, int unpack_elt,
-                                         int8_t* tmp, size_t tmpsize) {
+static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, int8_t* dstptr,
+                                         size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr FullRange = 1 << (6 - 1);
   for (size_t i = 0; i < unpack_elt; i += 4) {
     auto bit2 = bit2ptr[i / 4];
@@ -424,8 +424,8 @@ static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* bit1ptr, int8_t* dstptr, int unpack_elt,
-                                         int8_t* tmp, size_t tmpsize) {
+static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* bit1ptr, int8_t* dstptr,
+                                         size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr FullRange = 1 << (5 - 1);
   for (size_t i = 0; i < unpack_elt; i += 8) {
     auto bit1 = bit1ptr[i / 8];
@@ -446,7 +446,7 @@ static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* 
 }
 
 static inline BTLA_CODE decompress_s7_s8(utils::bit4x2* bit4ptr, utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr,
-                                         int8_t* dstptr, int unpack_elt, int8_t* tmp, size_t tmpsize) {
+                                         int8_t* dstptr, size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr FullRange = 1 << (7 - 1);
   for (size_t i = 0; i < unpack_elt; i += 8) {
     auto bit2 = bit2ptr[i / 4];
@@ -478,8 +478,8 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* dstptr, int unpack_elt,
-                                         int8_t* tmp, size_t tmpsize) {
+static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* bit1ptr, int8_t* dstptr,
+                                         size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   for (size_t i = 0; i < unpack_elt; i += 8) {
     auto bit1 = bit1ptr[i / 8];
     auto tmp = bit2ptr[i / 4];
@@ -508,7 +508,7 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* srcptr, int8_t* dstptr, 
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE decompress_s1_s8(utils::bit1x8* bit1ptr, int8_t* dstptr, int unpack_elt, int8_t* tmp,
+static inline BTLA_CODE decompress_s1_s8(utils::bit1x8* bit1ptr, int8_t* dstptr, size_t unpack_elt, int8_t* tmp,
                                          size_t tmpsize) {
   int8_t constexpr FullRange = 1 << (1 - 1);
   for (size_t i = 0; i < unpack_elt; i += 8) {
@@ -1037,7 +1037,7 @@ inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, DST_T* dstptr, int row,
         auto zp = zero_points ? zero_points[kpos + j] : 0;
         for (int ir = 0; ir < PackRow; ir++) {
           float tmp = static_cast<float>(srcptr[i * col + j * PackRow + ir] - zp) * scale;
-          dstptr[i * col + j * PackRow + ir] = tmp;
+          dstptr[i * col + j * PackRow + ir] = static_cast<DST_T>(tmp);
         }
       }
     } else if (sdtype == BTLA_DTYPE::BF16) {
@@ -1047,7 +1047,7 @@ inline BTLA_CODE decompress_kblock_s8_fp(int8_t* srcptr, DST_T* dstptr, int row,
         auto zp = zero_points ? zero_points[kpos + j] : 0;
         for (int ir = 0; ir < PackRow; ir++) {
           float tmp = static_cast<float>(srcptr[i * col + j * PackRow + ir] - zp) * scale;
-          dstptr[i * col + j * PackRow + ir] = tmp;
+          dstptr[i * col + j * PackRow + ir] = static_cast<DST_T>(tmp);
         }
       }
     }
@@ -1233,7 +1233,7 @@ static inline float fp4_bnb_dequantize(uint8_t val, float absmax) { return fp4_b
 
 static inline int8_t fp4_bnb_quantize(float x) {
   int sign = x < 0 ? 0b1000 : 0b0000;
-  x = fabsf(x);
+  x = fabs(x);
   if (x > 0.29166667f)
     if (x > 0.583333f)
       if (x > 0.8333333f)
@@ -1269,7 +1269,7 @@ static inline int8_t fp4_e2m1_quantize(float x) {
   // 0b111 = 6
 
   int sign = x < 0 ? 0b1000 : 0b0000;
-  x = fabsf(x);
+  x = fabs(x);
   if (x > 1.75f / 6) {
     if (x > 3.5f / 6) {
       if (x > 5.f / 6)
@@ -1801,7 +1801,7 @@ static inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, in
 
 template <BTLA_DTYPE F4_T>
 static inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src,
-                                                 int ld_dst, float* scales, int8_t* zero_points, int blocksize) {
+                                                 int ld_dst, float* scales, int blocksize) {
   int raw_blocksize = blocksize;
   for (int i = 0; i < col; i++) {
     int align_row_loop = row / blocksize * blocksize;
@@ -1816,30 +1816,8 @@ static inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* ds
         dstptr[(j + ij) * ld_dst + i] = f4_quantize<F4_T>(srcptr[(j + ij) * ld_src + i] * (1.f / absmax));
       }
     };
-    auto calc_store_scale_and_quantv_asym = [&](int blocksize) {
-      float amax = 0;
-      float amin = 0;
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        amax = std::max(amax, srcptr[(j + ij) * ld_src + i]);
-        amin = std::max(amax, srcptr[(j + ij) * ld_src + i]);
-      }
-      float scale = (amax - amin) / 2;
-      scales[j / raw_blocksize * ld_dst + i] = scale;
-      float fmedium = (amax + amin) / 2;
-      zero_points[j / raw_blocksize * ld_dst + i] = f4_quantize<F4_T>((0 - fmedium) * (1.f / scale));
-      for (size_t ij = 0; ij < blocksize; ij++) {
-        dstptr[(j + ij) * ld_dst + i] = f4_quantize<F4_T>((srcptr[(j + ij) * ld_src + i] - fmedium) * (1.f / scale));
-      }
-    };
-    auto dispatch_calc = [&](int blocksize) {
-      if (zero_points == nullptr) {
-        calc_store_scale_and_quantv_sym(blocksize);
-      } else {
-        calc_store_scale_and_quantv_asym(blocksize);
-      }
-    };
-    for (; j < align_row_loop; j += blocksize) dispatch_calc(blocksize);
-    if (j < row) dispatch_calc(row - align_row_loop);
+    for (; j < align_row_loop; j += blocksize) calc_store_scale_and_quantv_sym(blocksize);
+    if (j < row) calc_store_scale_and_quantv_sym(row - align_row_loop);
   }
   return BTLA_CODE::Success;
 }

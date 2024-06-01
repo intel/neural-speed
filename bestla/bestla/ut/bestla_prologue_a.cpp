@@ -2,7 +2,6 @@
 #include "bestla_ut.h"
 #include "kernel_avx512f.h"
 
-#ifdef BTLA_UT_PROLOGUE_A
 namespace bestla {
 using namespace utils;
 namespace ut {
@@ -25,15 +24,16 @@ class UT_ActivationBase {
     for (int i = 0; i < src.size(); i++) {
       src[i] = static_cast<BType>(i);
     }
-    prologue_a::gemm::ActivationBase<_T, BTLA_ISA::NoSIMD> reorderref;
-    prologue_a::gemm::ActivationBase<_T, BTLA_ISA::AVX512F> reorderavx512;
+    using ProA = prologue_a::gemm::ActivationBase<_T>;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();
     int dststride = 0;
-    reorderref.getActivation(&dstrefptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
+    ProA::template getActivation<BTLA_ISA::NoSIMD>(&dstrefptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache,
+                                                   CacheSize);
     GetCPUDevice();
     if (_cd->AVX512F()) {
-      reorderavx512.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
+      ProA::template getActivation<BTLA_ISA::AVX512F>(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache,
+                                                      CacheSize);
       ut::buffer_error(dst.data(), dstref.data(), dst.size());
     }
   }
@@ -64,14 +64,15 @@ class UT_ActivationConverter {
     for (int i = 0; i < src.size(); i++) {
       src[i] = static_cast<SrcType>(float(i));
     }
-    prologue_a::gemm::ActivationConverter<_T, BTLA_ISA::NoSIMD, SRC_T> reorderref;
-    prologue_a::gemm::ActivationConverter<_T, BTLA_ISA::AVX512F, SRC_T> reorderavx512;
+    using ProA = prologue_a::gemm::ActivationConverter<_T, SRC_T>;
     auto dstptr = dstref.data();
     int dststride = 0;
-    auto ret = reorderref.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
+    auto ret = ProA::template getActivation<BTLA_ISA::NoSIMD>(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache,
+                                                              CacheSize);
     assert(ret == BTLA_CODE::Success);
     dstptr = dst.data();
-    ret = reorderavx512.getActivation(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache, CacheSize);
+    ret = ProA::template getActivation<BTLA_ISA::AVX512F>(&dstptr, &dststride, {src.data(), lda}, m, k, 0, 0, cache,
+                                                          CacheSize);
     assert(ret == BTLA_CODE::Success);
     ut::buffer_error(dst.data(), dstref.data(), dst.size(), AType{0});
     aligned_vector<SrcType> revert(dst.size());
@@ -127,11 +128,12 @@ class UT_ActivationU8KBlockQuantize {
 
     kernel::ref::quantize_fp_u8_colblock(m, k, raw.data(), lda, q.data(), lda, scales.data(), kcount, zp.data(), kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    prologue_a::gemm::ActivationF32KBlockQuantize<_T, _T::ISA> actA;
-    auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
+    using ProA = prologue_a::gemm::ActivationF32KBlockQuantize<_T>;
+    auto constexpr ISA = _T::ISA;
+    auto quanAct = ProA::createStorage(m, k, kblock, hasreduce);
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
-    actA.quantize({raw.data(), lda, &quanAct}, m, k, UT_Threading::get());
+    ProA::quantize({raw.data(), lda, &quanAct}, m, k, UT_Threading::get());
 
     ut::buffer_error(q.data(), quanAct.template APtr<uint8_t>(), q.size(), uint8_t(1));
     ut::buffer_error(zp.data(), quanAct.template ZPtr<uint8_t>(), zp.size(), uint8_t(1));
@@ -182,11 +184,12 @@ class UT_ActivationS8KBlockQuantize {
     q.resize(m * lda);
     kernel::ref::quantize_fp_s8_colblock(m, k, raw.data(), k, q.data(), lda, scales.data(), kcount, kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    prologue_a::gemm::ActivationF32KBlockQuantize<_T, BTLA_ISA::AVX512F> actA;
-    auto quanAct = actA.createStorage(m, k, kblock, hasreduce);
+    using ProA = prologue_a::gemm::ActivationF32KBlockQuantize<_T>;
+    auto quanAct = ProA::createStorage(m, k, kblock, hasreduce);
+    auto constexpr ISA = BTLA_ISA::AVX512F;
     avector<int8_t> bufA(quanAct.mSize);
     quanAct.assign(bufA.data());
-    actA.quantize({raw.data(), k, &quanAct}, m, k, UT_Threading::get());
+    ProA::quantize({raw.data(), k, &quanAct}, m, k, UT_Threading::get());
     ut::buffer_error(q.data(), quanAct.template APtr<int8_t>(), q.size(), int8_t(1));
     if (hasreduce) {
       avector<float> redref(reduce.size(), 0.f), redqref(reduce.size(), 0.f);
@@ -210,8 +213,10 @@ class UT_ShuffleActivationKblock {
  public:
   UT_ShuffleActivationKblock() {
     UT_START();
+    CheckISA(AVX2);
     ut<float, gemm::SCoreRowNAvx2<48, 2>>(15, 63);
     ut<bf16, gemm::SCoreRowNAvx2<48, 2>>(15, 63);
+    CheckISA(AMX_BF16);
     ut<float, gemm::HCoreRowNAmxbf16<64, 16>>(15, 63);
     ut<bf16, gemm::HCoreRowNAmxbf16<64, 16>>(15, 63);
     dynamic_ut(15, 63, 2, true);
@@ -228,17 +233,17 @@ class UT_ShuffleActivationKblock {
       indices[i] = i % 2 == 0 ? (i + 1) == indices.size() ? i : i + 1 : i - 1;
     }
     for (int i = 0; i < src.size(); i++) src[i] = static_cast<_SRC_T>(i);
-    prologue_a::gemm::ShuffleActivationKBlockBase<GC, BTLA_ISA::NoSIMD, _SRC_T> kernel;
+    using ProA = prologue_a::gemm::ShuffleActivationKBlockBase<GC, _SRC_T>;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();
     int dststride = 0;
-    auto reordA = kernel.createReorderStorage(m, k, 32);
+    auto reordA = ProA::createReorderStorage(m, k, 32);
     avector<int8_t> bufA(reordA.mSize);
     reordA.assign(bufA.data());
-    kernel.preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32, UT_Threading::get());
+    ProA::preprocess({src.data(), k, nullptr, indices.data(), &reordA}, m, k, 32, UT_Threading::get());
 
-    kernel.getActivation(&dstptr, &dststride, {src.data(), k, nullptr, indices.data(), &reordA}, m, kpad, 0, 0, cache,
-                         CacheSize);
+    ProA::template getActivation<GC::ISA>(&dstptr, &dststride, {src.data(), k, nullptr, indices.data(), &reordA}, m,
+                                          kpad, 0, 0, cache, CacheSize);
     for (int i = 0; i < m; i++) {
       int j = 0;
       for (; j < k; j++) dstrefptr[i * kpad + j] = static_cast<BType>(src[i * k + indices[j]]);
@@ -266,13 +271,14 @@ class UT_ShuffleActivationKblock {
     kernel::ref::shuffle_activation(raw_cp.data(), raw.data(), m, k, 0, 0, indices.data(), k, k);
     kernel::ref::quantize_fp_s8_colblock(m, k, raw.data(), k, q.data(), lda, scales.data(), kcount, kblock,
                                          hasreduce ? reduce.data() : nullptr);
-    prologue_a::gemm::ShuffleActivationKBlockQuantize<GC, BTLA_ISA::NoSIMD, float> actA;
-    auto quanAct = actA.createQuantStorage(m, k, kblock, hasreduce);
-    auto reordAct = actA.createReorderStorage(m, k, kblock);
+    using ProA = prologue_a::gemm::ShuffleActivationKBlockQuantize<GC, float>;
+    auto constexpr RunISA = BTLA_ISA::NoSIMD;
+    auto quanAct = ProA::createQuantStorage(m, k, kblock, hasreduce);
+    auto reordAct = ProA::createReorderStorage(m, k, kblock);
     avector<int8_t> bufA(quanAct.mSize + reordAct.mSize);
     quanAct.assign(bufA.data());
     reordAct.assign(bufA.data() + quanAct.mSize);
-    actA.quantize({raw_cp.data(), k, &quanAct, indices.data(), &reordAct}, m, k, UT_Threading::get());
+    ProA::quantize({raw_cp.data(), k, &quanAct, indices.data(), &reordAct}, m, k, UT_Threading::get());
     ut::buffer_error(quanAct.template APtr<int8_t>(), q.data(), q.size(), int8_t(1));
     if (hasreduce) {
       avector<float> redref(reduce.size(), 0.f), redqref(reduce.size(), 0.f);
@@ -293,4 +299,3 @@ static UT_ShuffleActivationKblock sUT_ShuffleActivationKblock;
 #endif
 }  // namespace ut
 }  // namespace bestla
-#endif

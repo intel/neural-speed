@@ -1159,7 +1159,7 @@ constexpr auto broadcast_F4_E2M1_quantv = broadcast_N_2_Nx16<8>(F4_E2M1_simd_qua
 
 template <BTLA_DTYPE F4_T>
 inline BTLA_CODE quantize_f32_f4_rowblock(const float* srcptr, int8_t* dstptr, int row, int col, int ld_src, int ld_dst,
-                                          float* scales, int8_t* zero_points, int blocksize) {
+                                          float* scales, int blocksize) {
   // assert(col % 16 == 0);
   auto align_row = row / blocksize * blocksize;
   auto align_blk = blocksize / 4 * 4;
@@ -3601,7 +3601,7 @@ static inline BTLA_CODE decompress_s7_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                          int8_t* dstptr, size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (7 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
@@ -3916,7 +3916,7 @@ static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (6 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));

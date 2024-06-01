@@ -21,20 +21,19 @@ class Benchmark_Fp32Fp32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
-                                    epilogue::gemm::AccumulatorWriteBackFp32>;
-    Launcher kernel;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                                 epilogue::gemm::AccumulatorWriteBackFp32>;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    auto tmpB = kernel.mProB.createStorage(n, k);
+    auto tmpB = Launcher::PrologueB::createStorage(n, k);
     std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
+      Launcher::PrologueB::packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -43,7 +42,7 @@ class Benchmark_Fp32Fp32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -103,20 +102,18 @@ class Benchmark_U8S8S32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
-                                    epilogue::gemm::AccumulatorWriteBackInt32>;
-    static Launcher kernel;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                                 epilogue::gemm::AccumulatorWriteBackInt32>;
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    auto tmpB = kernel.mProB.createStorage(n, k);
+    auto tmpB = Launcher::PrologueB::createStorage(n, k);
     std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
+      Launcher::PrologueB::packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -125,7 +122,7 @@ class Benchmark_U8S8S32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -197,20 +194,19 @@ class Benchmark_S8S8S32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
-                                    epilogue::gemm::AccumulatorWriteBackInt32>;
-    Launcher kernel;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                                 epilogue::gemm::AccumulatorWriteBackInt32>;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    auto tmpB = kernel.mProB.createStorage(n, k);
+    auto tmpB = Launcher::PrologueB::createStorage(n, k);
     std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
+      Launcher::PrologueB::packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -219,7 +215,7 @@ class Benchmark_S8S8S32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -291,20 +287,19 @@ class Benchmark_Bf16Bf16Fp32 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
-                                    epilogue::gemm::AccumulatorWriteBackFp32>;
-    Launcher kernel;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                                 epilogue::gemm::AccumulatorWriteBackFp32>;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    auto tmpB = kernel.mProB.createStorage(n, k);
+    auto tmpB = Launcher::PrologueB::createStorage(n, k);
     std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
+      Launcher::PrologueB::packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -313,7 +308,7 @@ class Benchmark_Bf16Bf16Fp32 {
         log.start();
         utils::GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -372,20 +367,19 @@ class Benchmark_Fp16Fp16Fp16 {
   void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher =
-        wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
-                                    epilogue::gemm::AccumulatorWriteBackFp16>;
-    Launcher kernel;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                                 epilogue::gemm::AccumulatorWriteBackFp16>;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    auto tmpB = kernel.mProB.createStorage(n, k);
+    auto tmpB = Launcher::PrologueB::createStorage(n, k);
     std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
-      kernel.mProB.packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
+      Launcher::PrologueB::packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
     }
     auto psize = (size_t)m * n * k * 2;
     tm.start();
@@ -394,7 +388,7 @@ class Benchmark_Fp16Fp16Fp16 {
         log.start();
         GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -475,26 +469,25 @@ class UTWOQ_CompFp32 {
     benchmark_all<prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(1024, 4096, 4096, BTLA_DTYPE::F4_BNB);
   }
 
-  template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <typename Core_T, typename LOG_T, template <class _T> class Wei, typename Scale_T>
   void benchmark(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems, int threads,
                  BTLA_DTYPE qtype, bool isasym) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationBase, Wei,
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
-    Launcher kernel;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
+    using WType = typename Wei<Core_T>::StorageWeight;
     WType tmpB(0);
-    if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isasym);
+    if constexpr (std::is_same_v<Wei<Core_T>, prologue_b::gemm::WeightKBlockNInteger<Core_T>>) {
+      tmpB = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>,
+                                                isasym);
 
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
+    } else if constexpr (std::is_same_v<Wei<Core_T>, prologue_b::gemm::WeightKBlockNFloat<Core_T>>) {
+      tmpB = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
     std::vector<WType> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
@@ -502,7 +495,7 @@ class UTWOQ_CompFp32 {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
     }
-    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
@@ -517,7 +510,7 @@ class UTWOQ_CompFp32 {
         log.start();
         GemmProblem gp(1, m, n, k, blocksize);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {&packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -532,7 +525,7 @@ class UTWOQ_CompFp32 {
            corestr, log.get_log_str(), flops, flops / cores, band);
   }
 
-  template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <template <class _T> class Wei, typename Scale_T>
   void benchmark_all(int m, int n, int k, BTLA_DTYPE qtype, bool isasym = false) {
     auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, qtype, BTLA_DTYPE::F32);
     int batch = auto_batch(memsize);
@@ -595,26 +588,25 @@ class UTWOQ_CompBf16 {
     benchmark_all<prologue_b::gemm::WeightKBlockNFloat, utils::bf16>(2048, 4096, 4096, BTLA_DTYPE::F4_BNB);
   }
 
-  template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <typename Core_T, typename LOG_T, template <class _T> class Wei, typename Scale_T>
   void benchmark(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems, int threads,
                  BTLA_DTYPE qtype) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationConverterFp32, Wei,
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationConverterFp32, Wei,
                                                  epilogue::gemm::AccumulatorWriteBackFp32>;
-    Launcher kernel;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
+    using WType = typename Wei<Core_T>::StorageWeight;
     WType tmpB(0);
-    if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                 prologue_b::gemm::WeightKBlockNInteger<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
+    if constexpr (std::is_same_v<Wei<Core_T>, prologue_b::gemm::WeightKBlockNInteger<Core_T>>) {
+      tmpB =
+          Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, false);
 
-    } else if constexpr (std::is_same_v<Wei<Core_T, Core_T::ISA>,
-                                        prologue_b::gemm::WeightKBlockNFloat<Core_T, Core_T::ISA>>) {
-      tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
+    } else if constexpr (std::is_same_v<Wei<Core_T>, prologue_b::gemm::WeightKBlockNFloat<Core_T>>) {
+      tmpB = Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>);
     }
     std::vector<WType> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
@@ -622,7 +614,7 @@ class UTWOQ_CompBf16 {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
     }
-    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
@@ -637,7 +629,7 @@ class UTWOQ_CompBf16 {
         log.start();
         GemmProblem gp(1, m, n, k);
         typename Launcher::Param args{gp, {A + i * m * k, k}, {&packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRun<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -652,7 +644,7 @@ class UTWOQ_CompBf16 {
            corestr, log.get_log_str(), flops, flops / cores, band);
   }
 
-  template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <template <class _T> class Wei, typename Scale_T>
   void benchmark_all(int m, int n, int k, BTLA_DTYPE qtype) {
     auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, qtype, BTLA_DTYPE::F32);
     int batch = auto_batch(memsize);
@@ -715,31 +707,32 @@ class UTWOQ_CompInt8 {
 
   using PcWriteBack = epilogue::gemm::PcKBlockCompInt8Epilogue<epilogue::gemm::AccumulatorWriteBackFp32>;
 
-  template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <typename Core_T, typename LOG_T, template <class _T> class Wei, typename Scale_T>
   void benchmark_pc(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems,
                     int threads, BTLA_DTYPE qtype, bool isasym) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerBase<Core_T>;
-    using Launcher = wrapper::gemm::LauncherBase<Core_T::ISA, Core_T, prologue_a::gemm::ActivationF32KBlockQuantize,
-                                                 Wei, PcWriteBack>;
-    Launcher kernel;
+    using Launcher =
+        wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationF32KBlockQuantize, Wei, PcWriteBack>;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
-    WType tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isasym);
+    using WType = typename Wei<Core_T>::StorageWeight;
+    WType tmpB =
+        Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isasym);
     std::vector<WType> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
     }
-    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
-    auto quanA = kernel.mProA.createStorage(m, k, blocksize, false);
+    auto quanA = Launcher::PrologueA::createStorage(m, k, blocksize, false);
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
@@ -761,7 +754,7 @@ class UTWOQ_CompInt8 {
             {{packBs[i].template SPtr<char>(), packBs[i].SDtype(), quanA.template SPtr<float>(),
               quanA.template ZPtr<uint8_t>(), packBs[i].template RPtr<char>(), packBs[i].RDtype(), nullptr, nullptr, k},
              {C + i * m * n, n}}};
-        parallel::GemmRunWithA<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRunWithA<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -776,32 +769,32 @@ class UTWOQ_CompInt8 {
            corestr, log.get_log_str(), flops, flops / cores, band);
   }
 
-  template <typename Core_T, typename LOG_T, template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <typename Core_T, typename LOG_T, template <class _T> class Wei, typename Scale_T>
   void benchmark(int m, int n, int k, int batch, int blocksize, float* A, float* B, float* C, float timems, int threads,
                  BTLA_DTYPE qtype, bool isasym) {
     LOG_T log;
     using Parallel = parallel::gemm::SchedulerKBlockS<Core_T>;
-    using Launcher =
-        wrapper::gemm::LauncherIntKBlock<Core_T::ISA, Core_T, prologue_a::gemm::ActivationF32KBlockQuantize, Wei,
-                                         epilogue::gemm::AccumulatorWriteBackFp32>;
-    Launcher kernel;
+    using Launcher = wrapper::gemm::LauncherIntKBlock<Core_T, prologue_a::gemm::ActivationF32KBlockQuantize, Wei,
+                                                      epilogue::gemm::AccumulatorWriteBackFp32>;
+
     UT_Threading::set_threads(threads);
     auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
     utils::timer<std::chrono::milliseconds> tm;
-    using WType = typename Wei<Core_T, Core_T::ISA>::StorageWeight;
-    WType tmpB = kernel.mProB.createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isasym);
+    using WType = typename Wei<Core_T>::StorageWeight;
+    WType tmpB =
+        Launcher::PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<Scale_T>, bestla_dtype<float>, isasym);
     std::vector<WType> packBs(batch, 0);
     avector<int8_t> bufB(tmpB.mSize * batch);
     for (size_t i = 0; i < batch; i++) {
       packBs[i] = tmpB;
       packBs[i].assign(bufB.data() + i * tmpB.mSize);
     }
-    kernel.mProB.packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
+    Launcher::PrologueB::packWeight(n, k, B, n, &packBs[0], UT_Threading::get());
     for (size_t i = 1; i < batch; i++) {
       memcpy(packBs[i].template WPtr<void>(), packBs[0].template WPtr<void>(), packBs[0].template WSize<char>());
       memcpy(packBs[i].template SPtr<void>(), packBs[0].template SPtr<void>(), packBs[0].CSize() * sizeof(Scale_T));
     }
-    auto quanA = kernel.mProA.createStorage(m, k, blocksize, false);
+    auto quanA = Launcher::PrologueA::createStorage(m, k, blocksize, false);
     utils::avector<int8_t> bufferA(quanA.mSize);
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
@@ -817,7 +810,7 @@ class UTWOQ_CompInt8 {
         log.start();
         GemmProblem gp(1, m, n, k, blocksize);
         typename Launcher::Param args{gp, {A + i * m * k, k, &quanA}, {&packBs[i]}, {C + i * m * n, n}};
-        parallel::GemmRunWithA<Parallel>(kernel, args, UT_Threading::get());
+        parallel::GemmRunWithA<Parallel, Launcher>(args, UT_Threading::get());
         log.stop();
         if (tm.stop() >= timems) {
           break;
@@ -831,7 +824,7 @@ class UTWOQ_CompInt8 {
            corestr, log.get_log_str(), flops, flops / threads, band);
   }
 
-  template <template <class _T, BTLA_ISA> class Wei, typename Scale_T>
+  template <template <class _T> class Wei, typename Scale_T>
   void benchmark_all(int m, int n, int k, BTLA_DTYPE qtype, bool isasym = false) {
     auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F32, qtype, BTLA_DTYPE::F32);
     int batch = auto_batch(memsize);

@@ -68,8 +68,8 @@ class IThreading {
   virtual std::pair<float, float> get_PEtime() const { return {0.0f, 0.0f}; };
 
  protected:
-  int mThreadNum;
-  const bool isSupportPE;
+  int mThreadNum = 0;
+  const bool isSupportPE = false;
 };
 
 #if BTLA_OPENMP
@@ -107,7 +107,14 @@ class OMPThreading : public IThreading {
 class StdThreading : public IThreading {
  public:
   using Timer_T = utils::timer<utils::microseconds>;
-  explicit StdThreading() : IThreading(true) { cr = nullptr; }
+  explicit StdThreading() : IThreading(true) {
+    cr = nullptr;
+    memset(func_, 0, sizeof(func_));
+    memset(flag, 0, sizeof(flag));
+    stop = true;
+    time_per_p = -1.f;
+    time_per_e = -1.f;
+  }
 
   void parallel_for(const thread_func& func) override {
     time_per_p = 0;
@@ -117,7 +124,7 @@ class StdThreading : public IThreading {
       running.store(mThreadNum - 1);
       for (int i = 0; i < 10; i++) flag[i].store(mThreadNum);
       if (cr->mHybrid) {
-        int time_p = 0, time_e = 0;
+        int64_t time_p = 0, time_e = 0;
 
         for (size_t i = 0; i < mThreadNum - 1; i++) func_[i] = &func;
         thread_time[0] = 0;
@@ -135,8 +142,8 @@ class StdThreading : public IThreading {
             time_e += thread_time[i];
           else
             time_p += thread_time[i];
-        time_per_p = (time_p) / (1.0 * (mThreadNum - cr->E_core_num));
-        time_per_e = (time_e) / (1.0 * cr->E_core_num);
+        time_per_p = (time_p) / (1.0f * (mThreadNum - cr->E_core_num));
+        time_per_e = (time_e) / (1.0f * cr->E_core_num);
         // printf("%d %d %f %f\n", time_p, time_e, time_per_p, time_per_e);
       } else {
         for (size_t i = 0; i < mThreadNum - 1; i++) {
@@ -810,7 +817,7 @@ class SchedulerDispatcher<Scheduler2D> {
 }  // namespace gemm
 
 template <class Parallel_T, class Launch_T>
-void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
+void GemmRun(const typename Launch_T::Param& args, parallel::IThreading* th) {
   gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   static bool flag = false;
   if (flag) {
@@ -822,16 +829,16 @@ void GemmRun(Launch_T& launcher, const typename Launch_T::Param& args, parallel:
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {
-      launcher.run(args, thdp);
+      Launch_T::run(args, thdp);
     }
   });
 }
 
 template <class Parallel_T, class Launch_T>
-void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, parallel::IThreading* th) {
+void GemmRunWithA(const typename Launch_T::Param& args, parallel::IThreading* th) {
   gemm::SchedulerDispatcher<Parallel_T> para(th, args.problem);
   using AParall = typename Launch_T::PrologueA::Parallel;
-  AParall apara = launcher.mProA.createParallel(th->num_threads(), args.problem);
+  AParall apara = Launch_T::PrologueA::createParallel(th->num_threads(), args.problem);
   static bool flag = false;
   if (flag) {
     printf("%s\n", __FUNCTION__);
@@ -842,13 +849,13 @@ void GemmRunWithA(Launch_T& launcher, const typename Launch_T::Param& args, para
     typename AParall::ThreadProblem thdpA{tidx};
     apara.getIndex(thdpA);
     if (thdpA.valid) {
-      launcher.mProA.run(args.paramA, thdpA);
+      Launch_T::PrologueA::run(args.paramA, thdpA);
     }
     th->sync(tidx);
     typename Parallel_T::ThreadProblem thdp{tidx};
     para.getIndex(thdp);
     if (thdp.valid) {
-      launcher.run(args, thdp);
+      Launch_T::run(args, thdp);
     }
   });
 }
