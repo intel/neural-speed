@@ -897,7 +897,7 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
   const size_t cur_size = obj_cur == NULL ? 0 : obj_cur->size;
   const size_t cur_end = cur_offs + cur_size;
 
-  size_t size_needed = size;
+  size_t size_needed = 0;
   assert(data == NULL);
   assert(!ctx->no_alloc);
   char* const mem_buffer = (char* const)ctx->mem_buffer;
