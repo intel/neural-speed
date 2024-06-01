@@ -118,9 +118,9 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
 void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out) {
   auto pth = ne_bestla::ne_threading::get();
   int threads = batch <= 4 ? 1 : pth->num_threads();
-  parallel::Scheduler2D sch({ threads, batch, vsize, 1, 16 });
+  parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
   auto threadfunc = [&](int tidx) {
-    parallel::ThreadProblem2D tp{ tidx };
+    parallel::ThreadProblem2D tp{tidx};
     sch.getIndex(tp);
     if (tp.valid) {
       for (size_t i = 0; i < tp.size[0]; i++) {
@@ -130,12 +130,11 @@ void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, 
         auto ret = kernel::wrapper::Mul<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
       }
     }
-    };
+  };
   if (threads == 1) {
     parallel::SingleThread st;
     st.parallel_for(threadfunc);
-  }
-  else {
+  } else {
     pth->parallel_for(threadfunc);
   }
 }
@@ -143,9 +142,9 @@ void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, 
 void bestla_add(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out) {
   auto pth = ne_bestla::ne_threading::get();
   int threads = batch <= 4 ? 1 : pth->num_threads();
-  parallel::Scheduler2D sch({ threads, batch, vsize, 1, 16 });
+  parallel::Scheduler2D sch({threads, batch, vsize, 1, 16});
   auto threadfunc = [&](int tidx) {
-    parallel::ThreadProblem2D tp{ tidx };
+    parallel::ThreadProblem2D tp{tidx};
     sch.getIndex(tp);
     if (tp.valid) {
       for (size_t i = 0; i < tp.size[0]; i++) {
@@ -155,12 +154,11 @@ void bestla_add(int batch, int vsize, const float* tensor, const float* vector, 
         auto ret = kernel::wrapper::Add<float>::forward_auto(tptr, vptr, dstptr, tp.size[1]);
       }
     }
-    };
+  };
   if (threads == 1) {
     parallel::SingleThread st;
     st.parallel_for(threadfunc);
-  }
-  else {
+  } else {
     pth->parallel_for(threadfunc);
   }
 }
@@ -251,30 +249,30 @@ void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, 
       auto CType = gemm::CoreAttr::get_comp(sptr->mCoreId);
       auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));
       if (btype == gemm::CompType::tFP32 && PackRow == 1) {
-        if (NTile == tAVX512F::NTILE && _cd->AVX512F()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX512F, tAVX512F::ISA> proB;
-          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
-        } else if (NTile == tAVX2::NTILE && _cd->AVX2()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX2, tAVX2::ISA> proB;
-          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        if (NTile == tAVX512F::NTILE) {
+          prologue_b::gemm::WeightKBlockNInteger<tAVX512F>::convertTransStorage(*sptr, transtor,
+                                                                                ne_bestla::ne_threading::get());
+        } else if (NTile == tAVX2::NTILE) {
+          prologue_b::gemm::WeightKBlockNInteger<tAVX2>::convertTransStorage(*sptr, transtor,
+                                                                             ne_bestla::ne_threading::get());
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE && _cd->AMX_INT8()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAMX_INT8_SS_KBlock, tAMX_INT8_SS_KBlock::ISA> proB;
-          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
-        } else if (NTile == tAVX512_VNNI_KBlock::NTILE && _cd->AVX512_VNNI()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock, tAVX512_VNNI_KBlock::ISA> proB;
-          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
-        } else if (NTile == tAVX_VNNI_KBlock::NTILE && _cd->AVX_VNNI()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock, tAVX_VNNI_KBlock::ISA> proB;
-          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        if (NTile == tAMX_INT8_SS_KBlock::NTILE) {
+          prologue_b::gemm::WeightKBlockNInteger<tAMX_INT8_SS_KBlock>::convertTransStorage(
+              *sptr, transtor, ne_bestla::ne_threading::get());
+        } else if (NTile == tAVX512_VNNI_KBlock::NTILE) {
+          prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock>::convertTransStorage(
+              *sptr, transtor, ne_bestla::ne_threading::get());
+        } else if (NTile == tAVX_VNNI_KBlock::NTILE) {
+          prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock>::convertTransStorage(*sptr, transtor,
+                                                                                        ne_bestla::ne_threading::get());
         }
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
-        if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
-          static prologue_b::gemm::WeightKBlockNInteger<tAMX_BF16, tAMX_BF16::ISA> proB;
-          proB.convertTransStorage(*sptr, transtor, ne_bestla::ne_threading::get());
+        if (NTile == tAMX_BF16::NTILE) {
+          prologue_b::gemm::WeightKBlockNInteger<tAMX_BF16>::convertTransStorage(*sptr, transtor,
+                                                                                 ne_bestla::ne_threading::get());
         }
       }
       *dstor = sycl_storage::StorageWeightKBlockNInteger(transtor);

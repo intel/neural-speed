@@ -126,20 +126,20 @@ class WeightKBlockNInteger {
     return tmp;
   }
 
-  static StorageWeight convertTransStorage(StorageWeight& srcstor, StorageWeight& dststor,
+  AUTOCALL StorageWeight convertTransStorage(StorageWeight& srcstor, StorageWeight& dststor,
                                            parallel::IThreading* threading) {
     auto s8buf = utils::amalloc<int8_t>((size_t)srcstor.mK * srcstor.mN);
     auto s8transbuf = utils::amalloc<int8_t>((size_t)srcstor.mKPad * srcstor.mNPad);
     unpackWeight(srcstor.mN, srcstor.mK, &srcstor, s8buf, srcstor.mN, threading);
-    transposeWeight<int8_t, ISA_T>(srcstor.mK, srcstor.mN, s8buf, srcstor.mN, s8transbuf, srcstor.mKPad, threading);
+    transposeWeight<int8_t>(srcstor.mK, srcstor.mN, s8buf, srcstor.mN, s8transbuf, srcstor.mKPad, threading);
     compressWeight(srcstor.mKPad, srcstor.mNPad, s8transbuf, srcstor.mKPad, dststor.WPtr<int8_t>(), srcstor.mDType,
                    threading);
     int nk_scale = utils::updiv(srcstor.mKPad, srcstor.mBlockSize);
     if (srcstor.mCorrection.mScaEleSize == 4) {
-      transposeWeight<float, ISA_T>(nk_scale, srcstor.mNPad, srcstor.template SPtr<float>(), srcstor.mNPad,
+      transposeWeight<float>(nk_scale, srcstor.mNPad, srcstor.template SPtr<float>(), srcstor.mNPad,
                                     dststor.template SPtr<float>(), dststor.CStep(), threading);
     } else if (srcstor.mCorrection.mScaEleSize == 2) {
-      transposeWeight<uint16_t, ISA_T>(nk_scale, srcstor.mNPad, srcstor.template SPtr<uint16_t>(), srcstor.mNPad,
+      transposeWeight<uint16_t>(nk_scale, srcstor.mNPad, srcstor.template SPtr<uint16_t>(), srcstor.mNPad,
                                        dststor.template SPtr<uint16_t>(), dststor.CStep(), threading);
     }
   }
