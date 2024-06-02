@@ -79,7 +79,6 @@ void bestla_device_memcpy(void* dstptr, const void* srcptr, size_t size, void* q
   if (queue && srcptr && dstptr) {
     auto ptr = (sycl::queue*)queue;
     ptr->memcpy(dstptr, srcptr, size);
-    ptr->wait();
   }
 }
 

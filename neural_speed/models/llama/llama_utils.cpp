@@ -212,7 +212,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
           layer.ffn_gate_exp[x] =
               ml->get_tensor(layers_i + ".ffn_gate." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
           layer.ffn_down_exp[x] =
-              ml->get_tensor(layers_i + ".ffn_down." + std::to_string(x) + ".weight", {n_ff, n_embd}, backend);
+              ml->get_tensor(layers_i + ".ffn_down." + std::to_string(x) + ".weight", {n_ff, n_embd}, NE_BACKEND_SYCL);
           layer.ffn_up_exp[x] =
               ml->get_tensor(layers_i + ".ffn_up." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
         }
