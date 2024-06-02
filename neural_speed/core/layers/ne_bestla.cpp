@@ -163,148 +163,89 @@ void bestla_add(int batch, int vsize, const float* tensor, const float* vector, 
   }
 }
 
-#ifdef NS_SYCL
-#include "bestla/sycl/sycl_device.h"
-#include "bestla/sycl/sycl_storage.h"
-void* bestla_create_device(bool profile) {
-  auto ptr = new sycl_device::SyclDevice(profile);
-  ptr->print();
-  return ptr;
-}
-void* bestla_get_device_queue(void* device) {
-  if (device) {
-    auto ptr = (sycl_device::SyclDevice*)device;
-    auto q = ptr->getQueue();
-    return q;
-  }
-  return NULL;
-}
-void bestla_release_device(void* device) {
-  if (device) {
-    auto ptr = (sycl_device::SyclDevice*)device;
-    delete ptr;
-  }
+static inline bool ne_is_contiguous(const struct ne_tensor* tensor) {
+  static_assert(NE_MAX_DIMS == 4, "NE_MAX_DIMS is not 4 - update this function");
+  return tensor->nb[0] <= tensor->nb[1] && tensor->nb[1] <= tensor->nb[2] && tensor->nb[2] <= tensor->nb[3];
 }
 
-size_t bestla_device_gmem_size(void* device) {
-  if (device) {
-    auto ptr = (sycl_device::SyclDevice*)device;
-    return ptr->getGlobalMemSize();
-  }
+static inline int ne_nrows(const struct ne_tensor* tensor) {
+  static_assert(NE_MAX_DIMS == 4, "NE_MAX_DIMS is not 4 - update this function");
+  return tensor->ne[1] * tensor->ne[2] * tensor->ne[3];
 }
 
-void* bestla_device_malloc(size_t size, void* queue) {
-  if (queue) {
-    auto ptr = (sycl::queue*)queue;
-    auto tmp = sycl::malloc_device<char>(size, *ptr);
-    return tmp;
-  }
-}
-
-void bestla_device_free(void* obj, void* queue) {
-  if (queue && obj) {
-    auto ptr = (sycl::queue*)queue;
-    sycl::free(obj, *ptr);
-  }
-}
-
-void bestla_device_memcpy_sync(void* dstptr, const void* srcptr, size_t size, void* queue) {
-  if (queue && srcptr && dstptr) {
-    auto ptr = (sycl::queue*)queue;
-    ptr->memcpy(dstptr, srcptr, size);
-    ptr->wait();
-  }
-}
-
-void bestla_device_memcpy(void* dstptr, const void* srcptr, size_t size, void* queue) {
-  if (queue && srcptr && dstptr) {
-    auto ptr = (sycl::queue*)queue;
-    ptr->memcpy(dstptr, srcptr, size);
-    ptr->wait();
-  }
-}
-
-void bestla_device_sync(void* queue) {
-  if (queue) {
-    auto ptr = (sycl::queue*)queue;
-    ptr->wait();
-  }
-}
-
-size_t bestla_device_storage_size() { return sizeof(sycl_storage::StorageWeightKBlockNInteger); }
-
-void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, void* device_queue) {
-  auto ptr = storage::gemm::PackedWeightParser::deserialBuffer(const_cast<void*>(hoststor));
-  GetCPUDevice();
-  if (ptr && devstor && deviceptr) {
-    auto dstor = (sycl_storage::StorageWeightKBlockNInteger*)devstor;
-    if (ptr->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNInteger) {
-      auto sptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNInteger*>(ptr);
-      auto transtor = sptr->toTrans();
-      utils::avector<int8_t> buffer1(transtor.mSize);
-      transtor.assign(buffer1.data());
-      auto coretype = sptr->mCoreId;
-      auto NTile = gemm::CoreAttr::get_mask_val(sptr->mCoreId, gemm::CoreAttr::NTILE_MASK, gemm::CoreAttr::NTILE_SHIFT);
-      auto PackRow = gemm::CoreAttr::get_packrow(sptr->mCoreId);
-      auto CType = gemm::CoreAttr::get_comp(sptr->mCoreId);
-      auto btype = static_cast<gemm::CompType>(gemm::CompTypeHelper::get_B(CType));
-      if (btype == gemm::CompType::tFP32 && PackRow == 1) {
-        if (NTile == tAVX512F::NTILE) {
-          prologue_b::gemm::WeightKBlockNInteger<tAVX512F>::convertTransStorage(*sptr, transtor,
-                                                                                ne_bestla::ne_threading::get());
-        } else if (NTile == tAVX2::NTILE) {
-          prologue_b::gemm::WeightKBlockNInteger<tAVX2>::convertTransStorage(*sptr, transtor,
-                                                                             ne_bestla::ne_threading::get());
-        }
+bool bestla_sycl_support(struct ne_tensor* node) {
+  bool support = false;
+  switch (node->op) {
+    case NE_OP_MUL_MAT: {
+      struct ne_tensor* wei = node->src0;
+      if (node->src0->type == NE_TYPE_BTLA) {
+        support = true;
       }
-      if (btype == gemm::CompType::tS8 && PackRow == 4) {
-        if (NTile == tAMX_INT8_SS_KBlock::NTILE) {
-          prologue_b::gemm::WeightKBlockNInteger<tAMX_INT8_SS_KBlock>::convertTransStorage(
-              *sptr, transtor, ne_bestla::ne_threading::get());
-        } else if (NTile == tAVX512_VNNI_KBlock::NTILE) {
-          prologue_b::gemm::WeightKBlockNInteger<tAVX512_VNNI_KBlock>::convertTransStorage(
-              *sptr, transtor, ne_bestla::ne_threading::get());
-        } else if (NTile == tAVX_VNNI_KBlock::NTILE) {
-          prologue_b::gemm::WeightKBlockNInteger<tAVX_VNNI_KBlock>::convertTransStorage(*sptr, transtor,
-                                                                                        ne_bestla::ne_threading::get());
-        }
-      }
-      if (btype == gemm::CompType::tBF16 && PackRow == 2) {
-        if (NTile == tAMX_BF16::NTILE) {
-          prologue_b::gemm::WeightKBlockNInteger<tAMX_BF16>::convertTransStorage(*sptr, transtor,
-                                                                                 ne_bestla::ne_threading::get());
-        }
-      }
-      *dstor = sycl_storage::StorageWeightKBlockNInteger(transtor);
-      dstor->assign((int8_t*)deviceptr);
-      dstor->fromHost(transtor, (sycl::queue*)device_queue);
-    }
+    } break;
+    default:
+      break;
   }
+  return support;
 }
 
-#include "bestla/sycl/sycl_gemm.h"
-#include "bestla/sycl/sycl_prologue_b.h"
-#include "bestla/sycl/sycl_wrapper.h"
-template <class GCT>
-using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
-template <class GCT>
-using ProBTransT = sycl_prologue_b::WeightS4Trans<GCT, float>;
-template <class GCT>
-using EpiT = sycl_epilogue::OutputBase<GCT, float>;
-void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda,
-                                  int ldo, void* workspace, void* queue) {
-  using GemmCore = sycl_gemm::xve::DefaultSGemmCore;
-  auto dstor = (sycl_storage::StorageWeightKBlockNInteger*)weiptr;
-  if (_m == 1) {
-    using ProB = ProBTransT<GemmCore>;
-    auto e_esimd = ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
-                              dstor->mBlockSize, (sycl::queue*)queue);
-  } else {
-    using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;
-    utils::GemmProblem gp(1, _m, _n, _k);
-    auto e_esimd = KernelTLauncher::compute(
-        (sycl::queue*)queue, _m, _n, _k, dstor->mBlockSize,
-        {{activation, lda}, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, {output, ldo}});
+bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t* dev_workspace) {
+  size_t ws_h = 0;
+  size_t ws_d = 0;
+  bool support = false;
+  switch (node->op) {
+    case NE_OP_MUL_MAT: {
+      struct ne_tensor* wei = node->src0;
+      if (node->src0->type == NE_TYPE_BTLA) {
+        if (node->src0->backend == NE_BACKEND_CPU) {
+          ws_h = bestla_f32f32_get_workspace_size(node->src1->ne[1], wei->ne[1], node->src1->ne[0], wei->data);
+        }
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL:
+    case NE_OP_ADD: {
+      if (ne_is_contiguous(node->src1) && ne_is_contiguous(node->src0) &&
+          (ne_nrows(node->src1) == 1 || ne_nrows(node->src1) == ne_nrows(node->src0)) &&
+          node->src0->ne[0] == node->src1->ne[0] && node->nb[0] == sizeof(float)) {
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL_FFN_SILU:
+    case NE_OP_MUL_FFN_GELU:
+    case NE_OP_MUL_FFN_GELU_MUL:
+    case NE_OP_MUL_FFN_ADD_GELU: {
+      if (node->src0->backend == NE_BACKEND_CPU) {
+        ws_h = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->src1->ne[1],
+                                                           node->opt[0]->ne[1], node->src1->data, node->opt[0]->data);
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL_ID_FFN_GELU:
+    case NE_OP_MUL_ID_FFN_SILU: {
+      if (node->src0->backend == NE_BACKEND_CPU) {
+        ws_h = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->opt[0]->ne[1],
+                                                           node->opt[9]->ne[1], node->opt[0]->data, node->opt[9]->data);
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL_QKV: {
+      ws_h = bestla_fusion_QKV_f32f32_get_workspace_size(node->src0->ne[1], node->src1->ne[1], node->src1->ne[0],
+                                                         node->src1->data);
+      support = true;
+    } break;
+    case NE_OP_NORM:
+    case NE_OP_RMS_NORM: {
+      if (ne_is_contiguous(node->src0)) {
+        support = true;
+      }
+    } break;
+    default:
+      break;
   }
+  if (support) {
+    node->n_tasks = 1;
+  }
+  *workspace = ws_h;
+  *dev_workspace = ws_d;
+  return support;
 }
-#endif

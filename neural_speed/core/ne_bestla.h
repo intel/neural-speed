@@ -79,6 +79,9 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
 void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out);
 void bestla_add(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out);
 
+bool bestla_sycl_support(struct ne_tensor* node);
+bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t* dev_workspace);
+
 #ifdef NS_SYCL
 void* bestla_create_device(bool profile);
 void* bestla_get_device_queue(void* device);
