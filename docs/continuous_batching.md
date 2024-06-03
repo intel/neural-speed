@@ -50,6 +50,7 @@ You can use below codes to get the `token/second` metric if you care about the t
 ```python
 from transformers import AutoTokenizer
 from neural_speed import Model
+import time
 
 model_name = "meta-llama/Llama-2-7b-hf"
 prompts = [
