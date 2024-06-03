@@ -39,12 +39,25 @@ target_include_directories(
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
 	"$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
+
+function(add_isa_def ARG)
+	if(${${ARG}_FOUND})
+    target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_${ARG}_FOUND=1)
+  else()
+    target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_${ARG}_FOUND=0)
+	endif()
+endfunction()
+
+foreach (ISA ${ISA_SET})
+  add_isa_def(${ISA})
+endforeach()
+
 set(sycl_headers)
 set(sycl_libs)
 if(BTLA_SYCL)
   include(cmake/sycl.cmake)
   file(GLOB sycl_headers ${PROJECT_NAME}/sycl/*.h ${PROJECT_NAME}/sycl/*.hpp)
-  add_compile_definitions(BTLA_SYCL)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_SYCL)
   list(APPEND sycl_libs IntelSYCL::SYCL_CXX)
   add_compile_options(-march=native)
   #add_link_options(-fsycl-targets=spir64 -Xsycl-target-backend "-options -ze-opt-large-register-file")

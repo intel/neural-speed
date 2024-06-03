@@ -135,19 +135,9 @@ macro(check_isa type)
     mark_as_advanced(${type}_FOUND ${type}_FLAGS)
 endmacro()
 
-function(add_isa_def ARG)
-	if(${${ARG}_FOUND})
-    add_compile_definitions(BTLA_${ARG}_FOUND=1)
-  else()
-    add_compile_definitions(BTLA_${ARG}_FOUND=0)
-	endif()
-endfunction()
-
-# flags are for MSVC only!
 set(ISA_SET AVX2 AVX512 AVX512_VNNI AVX_VNNI AVX512_BF16 AVX512_FP16 AMX_BF16 AMX_INT8 AMX_FP16)
 foreach (ISA ${ISA_SET})
   check_isa(${ISA})
-  add_isa_def(${ISA})
 endforeach()
 
 
