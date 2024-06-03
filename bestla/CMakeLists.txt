@@ -22,11 +22,16 @@ option(BTLA_UT_NOASAN "Disable sanitize" OFF)
 option(BTLA_UT_BENCHMARK "Benchmark ON may take a long time to finish all tests" OFF)
 option(BTLA_UT_OPENMP "Use OpenMP for UT tests" OFF)
 
-
-
-
+include(FetchContent)
+FetchContent_Declare(
+    xbyak
+    GIT_REPOSITORY https://github.com/herumi/xbyak.git
+    GIT_TAG v7.06
+)
+FetchContent_MakeAvailable(xbyak)
 
 add_library(${PROJECT_NAME} INTERFACE)
+target_link_libraries(${PROJECT_NAME} INTERFACE xbyak)
 add_library(neural_speed::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_include_directories(
 	${PROJECT_NAME} INTERFACE

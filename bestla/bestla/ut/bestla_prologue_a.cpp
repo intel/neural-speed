@@ -232,7 +232,7 @@ class UT_ShuffleActivationKblock {
     for (int i = 0; i < indices.size(); i++) {
       indices[i] = i % 2 == 0 ? (i + 1) == indices.size() ? i : i + 1 : i - 1;
     }
-    for (int i = 0; i < src.size(); i++) src[i] = static_cast<_SRC_T>(i);
+    fill_buffer_randn(src.data(), src.size(), _SRC_T(0), _SRC_T(100));
     using ProA = prologue_a::gemm::ShuffleActivationKBlockBase<GC, _SRC_T>;
     auto dstrefptr = dstref.data();
     auto dstptr = dst.data();

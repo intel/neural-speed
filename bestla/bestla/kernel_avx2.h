@@ -539,7 +539,8 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
       vout_y = _mm256_sub_epi8(vout_y, vbias);
       _mm256_storeu_si256((__m256i*)(dstptr + i), vout_y);
     } else {
-      ref::decompress_kblock_s4_s8<1, 1>(srcptr + i / 2, nullptr, dstptr + i, 0, 0, 0, 0, 1, elesize - i, nullptr, 0);
+      ref::decompress_kblock_s4_s8<1, 1>(srcptr + i / 2, nullptr, dstptr + i, 0, 0, 0, 0, 1,
+                                         static_cast<int>(elesize - i), nullptr, 0);
     }
   }
   return BTLA_CODE::Success;
@@ -732,7 +733,7 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* bit2ptr, int8_t* dstptr,
                                          size_t tmpsize) {
   int constexpr VBits = 256;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
   auto vbias = _mm256_set1_epi8(2);
@@ -740,7 +741,7 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* bit2ptr, int8_t* dstptr,
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_2bits(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
     vout = _mm256_sub_epi8(vout, vbias);
@@ -981,7 +982,7 @@ static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 256;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm256_set_epi64x(*(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0, *(int64_t*)&mask0);
   auto vbias = _mm256_set1_epi8(4);
@@ -994,7 +995,7 @@ static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* 
   const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
   const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
   const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_2bits(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
     auto vb1 = unpack_1bits(bit1ptr + i / 8, bit1Shift_1, bit1Mask, bit1Shift_2, highMask);
@@ -1213,7 +1214,7 @@ static inline BTLA_CODE decompress_s1_s8(utils::bit1x8* bit1ptr, int8_t* dstptr,
                                          size_t tmpsize) {
   int constexpr VBits = 256;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (1 - 1);
   auto vbias = _mm256_set1_epi8(FullRange);
 
@@ -1221,7 +1222,7 @@ static inline BTLA_CODE decompress_s1_s8(utils::bit1x8* bit1ptr, int8_t* dstptr,
   const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
   const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
   const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vb1 = unpack_1bits(bit1ptr + i / 8, bit1Shift_1, bit1Mask, bit1Shift_2, highMask);
     vb1 = _mm256_srli_epi32(vb1, 2);
@@ -1460,7 +1461,7 @@ static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 256;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (5 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
@@ -1470,7 +1471,7 @@ static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* 
   const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
   const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
   const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_4bits(bit4ptr + i / 2, vmask);
     auto vb1 = unpack_1bits(bit1ptr + i / 8, bit1Shift_1, bit1Mask, bit1Shift_2, highMask);
@@ -1760,7 +1761,7 @@ static inline BTLA_CODE decompress_s7_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                          int8_t* dstptr, size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 256;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (7 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
@@ -1777,7 +1778,7 @@ static inline BTLA_CODE decompress_s7_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
   const __m256i bit1Mask = _mm256_set1_epi32(0x0F);
   const __m256i bit1Shift_1 = _mm256_set_epi32(28, 24, 20, 16, 12, 8, 4, 0);
   const __m256i bit1Shift_2 = _mm256_set1_epi32((1 << 23) + (1 << 16) + (1 << 9) + (1 << 2));
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_4bits(bit4ptr + i / 2, vmask);
     auto vb1 = unpack_1bits(bit1ptr + i / 8, bit1Shift_1, bit1Mask, bit1Shift_2, highMask);
@@ -2035,7 +2036,7 @@ static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 256;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (6 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm256_set1_epi32(*reinterpret_cast<int*>(&mask));
@@ -2047,7 +2048,7 @@ static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
   auto vsfhl_mask_y = _mm256_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2,
                                       13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm256_set_epi32(1, 1, 1, 1, 0, 0, 0, 0);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_4bits(bit4ptr + i / 2, vmask);
     auto vb1 = unpack_2bits(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
@@ -3474,8 +3475,8 @@ inline __m256 exp_ps_0_1(const __m256 x) {
   static const auto log2e = _mm256_set1_ps(v_log2e);
   static const auto half = _mm256_set1_ps(.5f);
 
-  static const auto upper_bound = _mm256_set1_ps(88.722838);   // log(max_positive_float)
-  static const auto lower_bound = _mm256_set1_ps(-87.336549);  // log(min_positive_float)
+  static const auto upper_bound = _mm256_set1_ps(88.722838f);   // log(max_positive_float)
+  static const auto lower_bound = _mm256_set1_ps(-87.336549f);  // log(min_positive_float)
   __m256 x1 = _mm256_min_ps(x, upper_bound);
   x1 = _mm256_max_ps(x1, lower_bound);
 

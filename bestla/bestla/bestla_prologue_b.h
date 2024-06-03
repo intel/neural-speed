@@ -384,7 +384,8 @@ class WeightKBlockNInteger {
             for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
               if (i < rawnk_scale) {
                 for (int j = 0; j < N; j++) {
-                  stor->template SPtr<utils::f8>()[i * stor->mNPad + j] = scales[j * rawnk_scale + i];
+                  stor->template SPtr<utils::f8>()[i * stor->mNPad + j] =
+                      static_cast<int>(scales[j * rawnk_scale + i]);
                 }
               } else {
                 std::memset(stor->template SPtr<utils::f8>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::f8));
@@ -771,6 +772,7 @@ class WeightKBlockNInteger {
       if (wptr->mDType == BTLA_DTYPE::S4_CLIP) {
         if (wptr->SDtype() == BTLA_DTYPE::DQ8_BNB) {
           auto internal_n_offset = n_offset + i;
+          int dq_offset = static_cast<int>(wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1);
           kernel::wrapper::DecompressDQKBlockS4Fp<_T, _GemmCore_T::PACK_ROW>::template forward<ISA_T,
                                                                                                BTLA_DTYPE::S4_CLIP>(
               wptr->template WPtr<utils::int4x2>() + n_offset * KPad / 2 + k_offset * _GemmCore_T::NTILE / 2 +
@@ -778,7 +780,7 @@ class WeightKBlockNInteger {
               *dstptr + i * k_size, k_size / _GemmCore_T::PACK_ROW, ColSize, ColSize, ColSize,
               wptr->template SPtr<uint8_t>(), wptr->template DQPtr<float>(), k_offset / _GemmCore_T::PACK_ROW,
               internal_n_offset, wptr->mBlockSize / _GemmCore_T::PACK_ROW, NPad, wptr->mN, wptr->mDqBlockSize,
-              wptr->mCorrection.mDQCorrectionBuf.mBufSize / sizeof(float) - 1, tmpcache, cachesize);
+              dq_offset, tmpcache, cachesize);
         } else {
           auto sptr = wptr->template SPtr<void>();
           kernel::wrapper::DecompressKBlockS4Fp<_GemmCore_T::PACK_ROW, _GemmCore_T::NTILE, _T>::template forward<ISA_T>(
