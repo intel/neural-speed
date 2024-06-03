@@ -39,7 +39,5 @@ jobs:
         - name: Binary build
           shell: cmd
           run: |
-            SET HTTP_PROXY=${{ vars.HTTP_PROXY_WINDOWS }}
-            SET HTTPS_PROXY=${{ vars.HTTP_PROXY_WINDOWS }}
             cd ${{ github.workspace }}\a\.github\workflows\scripts
             prepare_env_with_conda.bat
