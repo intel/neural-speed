@@ -462,6 +462,7 @@ class LauncherBase {
     } else {
       gemm(_param, _config);
     }
+    bestla::kernel::wrapper::ZeroReg::forward();
   }
 
  protected:
@@ -709,6 +710,7 @@ class LauncherIntKBlock {
     } else {
       gemm(_param, _config);
     }
+    bestla::kernel::wrapper::ZeroReg::forward();
   }
 
  protected:
