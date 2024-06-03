@@ -16,10 +16,10 @@ CALL pip uninstall neural-speed -y
 echo "pip list all the components------------->"
 CALL pip list
 CALL pip config set global.proxy proxy-prc.intel.com:913
-CALL pip install -U pip --proxy=proxy-prc.intel.com:913
+CALL pip install -U pip
 echo "Installing requirements for validation scripts..."
-CALL pip install  -i https://pypi.python.org/simple setuptools_scm --proxy=proxy-prc.intel.com:913
-CALL pip install -r requirements.txt --proxy=proxy-prc.intel.com:913
+CALL pip install  -i https://pypi.python.org/simple setuptools_scm
+CALL pip install -r requirements.txt
 echo "pip list all the components------------->"
 CALL pip list
 echo "------------------------------------------"
