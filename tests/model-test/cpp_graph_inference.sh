@@ -206,11 +206,16 @@ function main() {
         quant_script="./build/bin/quant_llama"
         convert_script="${convert_script}/convert_llama.py"
         infer_cmd="./build/bin/run_llama"
+        precision_list+=("q5_j_i8_g128" "q3_j_i8_g128" "q5_j_i8_g128_asym" "q3_j_i8_g128_asym"
+            "q3_j_i8_pc_asym" "q5_j_i8_pc_asym"
+        )
     elif [[ "${model}" == "gptj-6b" ]]; then
         quant_script="./build/bin/quant_gptj"
         convert_script="${convert_script}/convert_gptj.py"
         infer_cmd="./build/bin/run_gptj"
-        precision_list+=("q4_j1_i8_g128" "q4_j1_bf16_pc")
+        precision_list+=("q4_j1_i8_g128" "q4_j1_bf16_pc" "q5_j_i8_g128" "q3_j_i8_g128" "q5_j_i8_g128_asym" "q3_j_i8_g128_asym"
+            "q3_j_i8_pc_asym" "q5_j_i8_pc_asym"
+            )
     elif [[ "${model}" == "gpt-neox-20b" ]]; then
         quant_script="./build/bin/quant_gptneox"
         convert_script="${convert_script}/convert_gptneox.py"
@@ -421,6 +426,18 @@ function main() {
                             eval "$quant_script_prologue --weight_dtype int4 --group_size 32 --compute_dtype int8 --scale_dtype fp32 --alg sym"
                         elif [[ ${precision} == "q4_j_f32_g128" ]]; then
                             eval "$quant_script_prologue --weight_dtype int4 --group_size 128 --compute_dtype fp32 --scale_dtype fp32 --alg sym"
+                        elif [[ ${precision} == "q3_j_i8_g128" ]]; then
+                            eval "$quant_script_prologue --weight_dtype int3 --group_size 128 --compute_dtype int8 --scale_dtype fp32 --alg sym"
+                        elif [[ ${precision} == "q5_j_i8_g128" ]]; then
+                            eval "$quant_script_prologue --weight_dtype int5 --group_size 128 --compute_dtype int8 --scale_dtype fp32 --alg sym"
+                        elif [[ ${precision} == "q3_j_i8_g128_asym" ]]; then
+                            eval "$quant_script_prologue --weight_dtype int3 --group_size 128 --compute_dtype int8 --scale_dtype fp32 --alg asym"
+                        elif [[ ${precision} == "q5_j_i8_g128_asym" ]]; then
+                            eval "$quant_script_prologue --weight_dtype int5 --group_size 128 --compute_dtype int8 --scale_dtype fp32 --alg asym"
+                        elif [[ ${precision} == "q3_j_i8_pc_asym" ]]; then
+                            eval "$quant_script_prologue --weight_dtype int3 --group_size -1 --compute_dtype int8 --scale_dtype fp32 --alg asym"
+                        elif [[ ${precision} == "q5_j_i8_pc_asym" ]]; then
+                            eval "$quant_script_prologue --weight_dtype int5 --group_size -1 --compute_dtype int8 --scale_dtype fp32 --alg asym"
                         elif [[ ${precision} == "q4_j1_i8_g128" ]]; then
                             eval "$quant_script_prologue --weight_dtype int4 --group_size 128 --compute_dtype int8 --scale_dtype fp32 --alg asym"
                         elif [[ ${precision} == "q4_j1_bf16_pc" ]]; then
