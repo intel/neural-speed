@@ -7,7 +7,7 @@ set(AVX2_CODE "
     {
       __m128i raw_data = _mm_set1_epi32(1); // sse2
       __m256i ymm0 = _mm256_cvtepu8_epi16(raw_data); // avx2
-      __m256 ymm1 = _mm256_castsi256_ps(ymm0); 
+      __m256 ymm1 = _mm256_castsi256_ps(ymm0);
       ymm1 = _mm256_fmadd_ps(ymm1, ymm1, ymm1); // fma
       __m128i xmm = _mm256_cvtps_ph(ymm1, _MM_FROUND_TO_NEAREST_INT); // f16c
       return 0;
