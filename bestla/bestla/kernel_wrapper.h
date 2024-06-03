@@ -27,6 +27,16 @@
 namespace bestla {
 namespace kernel {
 namespace wrapper {
+
+class ZeroReg {
+ public:
+  static void forward() {
+#if CompileAVX2()
+    avx2::zero_reg();
+#endif
+  }
+};
+
 template <int NTILE, int RowPack, typename T_SRC, typename T_DST = T_SRC>
 class PaddingInterleaveMN {
   // M x N ===> N/NTile x M/RowPack x NTile x RowPack (leading dim stride = NTile * dststride)

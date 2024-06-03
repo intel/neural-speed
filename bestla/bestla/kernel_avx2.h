@@ -30,6 +30,8 @@ namespace avx2 {
 #pragma clang attribute push(__attribute__((target("avx,avx2,fma"))), apply_to = function)
 #endif
 
+static inline void zero_reg() { _mm256_zeroupper(); }
+
 static inline __m256i unpack_4bits(void* srcptr, __m256i mask) {
   auto raw_data = _mm_loadu_si128(reinterpret_cast<__m128i*>(srcptr));
   auto ymm0 = _mm256_cvtepu8_epi16(raw_data);

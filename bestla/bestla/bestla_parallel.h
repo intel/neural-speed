@@ -831,6 +831,7 @@ void GemmRun(const typename Launch_T::Param& args, parallel::IThreading* th) {
     if (thdp.valid) {
       Launch_T::run(args, thdp);
     }
+    kernel::wrapper::ZeroReg::forward();
   });
 }
 
@@ -857,6 +858,7 @@ void GemmRunWithA(const typename Launch_T::Param& args, parallel::IThreading* th
     if (thdp.valid) {
       Launch_T::run(args, thdp);
     }
+    kernel::wrapper::ZeroReg::forward();
   });
 }
 
