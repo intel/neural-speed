@@ -14,6 +14,8 @@ set(AVX2_CODE "
     }
 ")
 
+set(AVX2_FLAGS "-mavx2 -mfma -mf16c")
+
 # "avx512f", "avx512bw", "avx512vl", "avx512dq"
 set(AVX512_CODE "
     #include <immintrin.h>
@@ -30,6 +32,8 @@ set(AVX512_CODE "
     }
 ")
 
+set(AVX512_FLAGS "-mavx512f -mavx512bw -mavx512vl -mavx512dq")
+
 # "avx512_vnni"
 set(AVX512_VNNI_CODE "
     #include <immintrin.h>
@@ -40,6 +44,7 @@ set(AVX512_VNNI_CODE "
         return 0;
     }
 ")
+set(AVX512_VNNI_FLAGS "-mavx512f -mavx512vnni")
 
 # "avx512_vnni"
 set(AVX_VNNI_CODE "
@@ -51,6 +56,7 @@ set(AVX_VNNI_CODE "
         return 0;
     }
 ")
+set(AVX_VNNI_FLAGS "-mavx -mavxvnni")
 
 # "amx_tile", "amx_bf16"
 set(AMX_BF16_CODE "
@@ -61,6 +67,7 @@ set(AMX_BF16_CODE "
         return 0;
     }
 ")
+set(AMX_BF16_FLAGS " ")
 
 # "amx_tile", "amx_int8"
 set(AMX_INT8_CODE "
@@ -71,6 +78,7 @@ set(AMX_INT8_CODE "
         return 0;
     }
 ")
+set(AMX_INT8_FLAGS " ")
 
 # "amx_tile", "amx_fp16"
 set(AMX_FP16_CODE "
@@ -81,6 +89,7 @@ set(AMX_FP16_CODE "
         return 0;
     }
 ")
+set(AMX_FP16_FLAGS " ")
 
 # "avx512_fp16"
 set(AVX512_FP16_CODE "
@@ -92,6 +101,7 @@ set(AVX512_FP16_CODE "
         return 0;
     }
 ")
+set(AVX512_FP16_FLAGS "-mavx512f -mavx512fp16")
 
 # "avx512_bf16"
 set(AVX512_BF16_CODE "
@@ -103,21 +113,18 @@ set(AVX512_BF16_CODE "
         return 0;
     }
 ")
+set(AVX512_BF16_FLAGS "-mavx512f -mavx512bf16")
 
-macro(check_isa type flags)
-    set(__FLAG_I 1)
+macro(check_isa type)
     set(CMAKE_REQUIRED_FLAGS_SAVE ${CMAKE_REQUIRED_FLAGS})
-    foreach (__FLAG ${flags})
-        if (NOT ${type}_FOUND)
-            set(CMAKE_REQUIRED_FLAGS ${__FLAG})
-            check_c_source_compiles("${${type}_CODE}" HAS_${type}_${__FLAG_I})
-            if (HAS_${type}_${__FLAG_I})
-                set(${type}_FOUND TRUE CACHE BOOL "${type} support")
-                set(${type}_FLAGS "${__FLAG}" CACHE STRING "${type} flags")
-            endif()
-            math(EXPR __FLAG_I "${__FLAG_I}+1")
+    if (NOT ${type}_FOUND)
+        set(CMAKE_REQUIRED_FLAGS ${${type}_FLAGS})
+        check_c_source_compiles("${${type}_CODE}" HAS_${type})
+        if (HAS_${type})
+            set(${type}_FOUND TRUE CACHE BOOL "${type} support")
+            set(${type}_FLAGS "${${type}_FLAGS}" CACHE STRING "${type} flags")
         endif()
-    endforeach()
+    endif()
     set(CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS_SAVE})
 
     if (NOT ${type}_FOUND)
@@ -139,7 +146,7 @@ endfunction()
 # flags are for MSVC only!
 set(ISA_SET AVX2 AVX512 AVX512_VNNI AVX_VNNI AVX512_BF16 AVX512_FP16 AMX_BF16 AMX_INT8 AMX_FP16)
 foreach (ISA ${ISA_SET})
-  check_isa(${ISA} " ")
+  check_isa(${ISA})
   add_isa_def(${ISA})
 endforeach()
 
