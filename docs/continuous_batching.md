@@ -50,6 +50,7 @@ You can use below codes to get the `token/second` metric if you care about the t
 ```python
 from transformers import AutoTokenizer
 from neural_speed import Model
+import time
 
 model_name = "meta-llama/Llama-2-7b-hf"
 prompts = [
@@ -64,6 +65,8 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, pa
 # if the tokenizer has no pad_token, you can specify it.
 tokenizer.pad_token = tokenizer.eos_token
 pad_token_id = tokenizer.pad_token_id
+bs = len(prompts)
+print("batch_size is {}.".format(bs))
 inputs = tokenizer(prompts, padding=True, return_tensors='pt').input_ids
 
 model = Model()
