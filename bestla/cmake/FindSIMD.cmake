@@ -1,4 +1,4 @@
-include(CheckCSourceCompiles)
+include(CheckCXXSourceCompiles)
 
 # "avx2", "fma", "f16c"
 set(AVX2_CODE "
@@ -119,7 +119,7 @@ macro(check_isa type)
     set(CMAKE_REQUIRED_FLAGS_SAVE ${CMAKE_REQUIRED_FLAGS})
     if (NOT ${type}_FOUND)
         set(CMAKE_REQUIRED_FLAGS ${${type}_FLAGS})
-        check_c_source_compiles("${${type}_CODE}" HAS_${type})
+        check_cxx_source_compiles("${${type}_CODE}" HAS_${type})
         if (HAS_${type})
             set(${type}_FOUND TRUE CACHE BOOL "${type} support")
             set(${type}_FLAGS "${${type}_FLAGS}" CACHE STRING "${type} flags")
