@@ -39,7 +39,9 @@ jobs:
         - name: Binary build
           shell: cmd
           run: |
-            SET HTTP_PROXY=${{ vars.HTTP_PROXY_WINDOWS }}
-            SET HTTPS_PROXY=${{ vars.HTTP_PROXY_WINDOWS }}
+            SET HTTP_PROXY=http://proxy-dmz.intel.com:912
+            SET HTTPS_PROXY=http://proxy-dmz.intel.com:912
+            SET http_proxy=http://proxy-dmz.intel.com:912
+            SET https_proxy=http://proxy-dmz.intel.com:912
             cd ${{ github.workspace }}\a\.github\workflows\scripts
             prepare_env_with_conda.bat
