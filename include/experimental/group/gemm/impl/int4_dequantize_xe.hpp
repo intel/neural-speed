@@ -621,7 +621,6 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
       dequantize(matB_acc, matB, scale, zero_pt);
-      dump_mat(matB_acc);
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
@@ -677,11 +676,7 @@ class gemm_t<
             block_id * matB_acc_t::block_elems);
 
         // int8 includes 2 4bits data.
-        using dtype_8bit = std::conditional_t<
-            compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP,
-            int8_t,
-            int8_t>;
-        xetla_vector<dtype_8bit, matB_acc_t::block_elems> cvt_blk_i8;
+        xetla_vector<int8_t, matB_acc_t::block_elems> cvt_blk_i8;
 
         // lowest 4 bit
         {
@@ -689,7 +684,8 @@ class gemm_t<
               cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0);
           dequant_i8_low_4bit = matB_blk & 0xf;
           // Only int8 needs to reserve the sign bit
-          if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
+          if constexpr (
+              compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
             dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
             dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
           }
@@ -698,8 +694,9 @@ class gemm_t<
         {
           auto dequant_i8_high_4bit =
               cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1);
-          if constexpr (std::is_same_v<dtype_8bit, int8_t>) {
-            dequant_i8_high_4bit = matB_blk.xetla_format<dtype_8bit>() >> 4;
+          if constexpr (
+              compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+            dequant_i8_high_4bit = matB_blk.xetla_format<int8_t>() >> 4;
           } else {
             dequant_i8_high_4bit = matB_blk >> 4;
           }
@@ -723,12 +720,12 @@ class gemm_t<
                   offset_x_in_tile;
               native_type_t<dtype_b> zero_pt_pack = zero_pt.reg[zero_pt_idx];
 
-              uint8_t zero_pt_u8 =
+              int8_t zero_pt_i8 =
                   (zero_pt_pack >> (4 * (scale_idx % pack_ratio))) & 0xf;
 
               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
-                  zero_pt_u8;
+                  zero_pt_i8;
               dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
                   scale.reg[scale_idx];

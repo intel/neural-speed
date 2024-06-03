@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-#define UT_DEBUG
+// #define UT_DEBUG
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;
 // The number of times the kernel is executed
@@ -30,14 +30,14 @@ class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
   static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 1;
-  static constexpr size_t mat_k = 128;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 1;
   static constexpr size_t wg_n = 1;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 128;
-  static constexpr size_t dequant_s = 16;
+  static constexpr size_t sg_k = 1024;
+  static constexpr size_t dequant_s = 128;
   static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
   // static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
 
@@ -48,7 +48,7 @@ class test_col_major_1 {
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
-  using data_type_b = int4x2;
+  using data_type_b = int4x8;
   using data_type_c = fp16;
 };
 class test_col_major_2 {
@@ -121,16 +121,14 @@ std::vector<fp16> convert_int4(
     data_type_scale scale,
     [[maybe_unused]] data_type_zero_pt zero_pt) {
   std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
-  using dtype_8bit = std::conditional_t<
-      quant_type == quant_mode::S4_FULLRANGE_NO_ZP,
-      int8_t,
-      uint8_t>;
 
-  uint8_t zero_pt_i8 = zero_pt & 0xf;
+  int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
-    dtype_8bit dequant_8bit;
-    dequant_8bit = static_cast<dtype_8bit>((data_b & 0xf) << 4) >> 4;
+    int8_t dequant_8bit;
+    dequant_8bit = data_b & 0xf;
     if constexpr (quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+      dequant_8bit = dequant_8bit << 4;
+      dequant_8bit = dequant_8bit >> 4;
       dequant_fp16[i] = scale * dequant_8bit;
     } else {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
