@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
-
+include(cmake/FindSIMD.cmake)
 project(bestla LANGUAGES CXX VERSION 0.1.0)
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
-file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
 option(BTLA_ENABLE_OPENMP "Compile OpenMP thread pool if OMP can be found" OFF)
 option(BTLA_SYCL "Compile OpenMP thread pool if OMP can be found" OFF)
