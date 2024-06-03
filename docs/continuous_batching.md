@@ -16,7 +16,7 @@ We only support multi-batch inference in concatenating & splitting input sequenc
 
 The code example is like:
 ```python
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
 from neural_speed import Model
 
 model_name = "meta-llama/Llama-2-7b-hf"
@@ -32,7 +32,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, pa
 # if the tokenizer has no pad_token, you can specify it.
 tokenizer.pad_token = tokenizer.eos_token
 pad_token_id = tokenizer.pad_token_id
-inputs = tokenizer(ps, padding=True, return_tensors='pt').input_ids
+inputs = tokenizer(prompts, padding=True, return_tensors='pt').input_ids
 
 model = Model()
 model.init(model_name, use_quant=True, weight_dtype="int4", compute_dtype="int8")
@@ -45,6 +45,49 @@ for a in ans:
     print("===========================")
 ```
 > Note: Not every model supports multi-batching inference and most of them are under construction, please refer to [Supported Models](#supported-models).
+
+You can use below codes to get the `token/second` metric if you care about the throughput of batching inference.
+```python
+from transformers import AutoTokenizer
+from neural_speed import Model
+
+model_name = "meta-llama/Llama-2-7b-hf"
+prompts = [
+            "Tell me an interesting fact about llamas.",
+            "What is the best way to cook a steak?",
+            "Are you familiar with the Special Theory of Relativity and can you explain it to me?",
+            "Recommend some interesting books to read.",
+            "What is the best way to learn a new language?",
+            ]
+
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, padding_side="left")
+# if the tokenizer has no pad_token, you can specify it.
+tokenizer.pad_token = tokenizer.eos_token
+pad_token_id = tokenizer.pad_token_id
+inputs = tokenizer(prompts, padding=True, return_tensors='pt').input_ids
+
+model = Model()
+model.init(model_name, use_quant=True, weight_dtype="int4", compute_dtype="int8")
+# greedy search example, top_k_top_p sampling and beam_search also supported
+# do not forget to pass pad_token_id
+# warmup
+outputs = model.generate(inputs,
+                         max_new_tokens=4,
+                         do_sample=False,
+                         pad_token=pad_token_id,
+                         ignore_prompt=True,
+                         max_request_num=bs)
+t0 = time.time()
+outputs = model.generate(inputs,
+                         max_new_tokens=128,
+                         do_sample=False,
+                         pad_token=pad_token_id,
+                         ignore_prompt=True,
+                         max_request_num=bs)
+duration = time.time() - t0
+total_tokens = sum([len(a) for a in outputs])
+print("throughput is {} token/second.".format(total_tokens / duration))
+```
 
 ## Server
 We supply a corresponding [script](../scripts/python_api_example_for_model_server.py) for server usage.

@@ -361,7 +361,7 @@ class Model:
             self.model.reinit()
             self.generate_round = 0
 
-        ret = [[]]
+        ret = [[] for _ in range(input_ids.shape[0])]
         if self.generate_round == 0 and not ignore_prompt:
             ret = input_ids.tolist()
 
