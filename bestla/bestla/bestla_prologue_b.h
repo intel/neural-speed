@@ -384,8 +384,7 @@ class WeightKBlockNInteger {
             for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
               if (i < rawnk_scale) {
                 for (int j = 0; j < N; j++) {
-                  stor->template SPtr<utils::f8>()[i * stor->mNPad + j] =
-                      static_cast<int>(scales[j * rawnk_scale + i]);
+                  stor->template SPtr<utils::f8>()[i * stor->mNPad + j] = static_cast<int>(scales[j * rawnk_scale + i]);
                 }
               } else {
                 std::memset(stor->template SPtr<utils::f8>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::f8));
