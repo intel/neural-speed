@@ -39,5 +39,7 @@ jobs:
         - name: Binary build
           shell: cmd
           run: |
+            SET HTTP_PROXY=http://proxy-prc.intel.com:913
+            SET HTTPS_PROXY=$http://proxy-prc.intel.com:913
             cd ${{ github.workspace }}\a\.github\workflows\scripts
             prepare_env_with_conda.bat
