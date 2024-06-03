@@ -15,6 +15,7 @@ CALL conda activate %conda_env_name%
 CALL pip uninstall neural-speed -y
 echo "pip list all the components------------->"
 CALL pip list
+CALL pip config set global.proxy proxy-prc.intel.com:913
 CALL pip install -U pip --proxy=proxy-prc.intel.com:913
 echo "Installing requirements for validation scripts..."
 CALL pip install -r requirements.txt --proxy=proxy-prc.intel.com:913
