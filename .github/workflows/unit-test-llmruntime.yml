@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - neural_speed/**
+      - bestla/** 
       - tests/**
       - .github/workflows/unit-test-llmruntime.yml
       - .github/workflows/unitTest/**
