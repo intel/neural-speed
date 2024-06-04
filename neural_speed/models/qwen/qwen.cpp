@@ -102,6 +102,8 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
   const int n_vocab = hparams.n_vocab;
   const int n_rot = hparams.n_rot;
   const int head_dim = n_embd / n_head;
+  const int n_head_kv = hparams.n_head_kv;
+  const int n_embd_gqa = head_dim * n_head_kv;
   int qwen_version = 0;
   if (hparams.max_seq_len == 8192) {
     qwen_version = 1;
@@ -132,7 +134,7 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
     attn_shape_t attn_shape = {
         /* .batch_size = */ 1,
         /* .head_num = */ n_head,
-        /* .heads_kv = */ n_head,
+        /* .heads_kv = */ n_head_kv,
         /* .head_size = */ head_dim,
         /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
         /* .sl_kv = */ n_past + N,
@@ -141,7 +143,7 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
     NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
                bestla_reordered_attn_fp32_support(&attn_shape)));
     kv_shape_t kv_shape{
-        /* .heads_kv = */ static_cast<uint32_t>(n_head),
+        /* .heads_kv = */ static_cast<uint32_t>(n_head_kv),
         /* .head_size = */ static_cast<uint32_t>(head_dim),
         /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
     };
@@ -194,11 +196,11 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 
         Kcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
         Kcur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[3], Kcur), Kcur);
-        Kcur = ne_reshape_3d(ctx0, Kcur, head_dim, n_head, N);
+        Kcur = ne_reshape_3d(ctx0, Kcur, head_dim, n_head_kv, N);
 
         Vcur = ne_mul_mat(ctx0, model.layers[il].attn[4], cur);
         Vcur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[5], Vcur), Vcur);
-        Vcur = ne_reshape_3d(ctx0, Vcur, head_dim, n_head, N);
+        Vcur = ne_reshape_3d(ctx0, Vcur, head_dim, n_head_kv, N);
       }
 
       // using mode = 2 for GPT-NeoX mode
@@ -216,29 +218,31 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
           std::vector<ne_tensor*> v_bs(batch_size);
           for (int i = 0; i < batch_size; ++i) {
             // batch K
-            Kcur_bs[i] = ne_permute(ctx0,
-                                    ne_view_4d(ctx0, Kcur, head_dim, n_head, N, 1, ne_element_size(Kcur) * head_dim,
-                                               ne_element_size(Kcur) * n_embd, ne_element_size(Kcur) * n_embd * N,
-                                               i * ne_element_size(Kcur) * n_embd * N),
-                                    0, 2, 1, 3);
+            Kcur_bs[i] =
+                ne_permute(ctx0,
+                           ne_view_4d(ctx0, Kcur, head_dim, n_head_kv, N, 1, ne_element_size(Kcur) * head_dim,
+                                      ne_element_size(Kcur) * n_embd_gqa, ne_element_size(Kcur) * n_embd_gqa * N,
+                                      i * ne_element_size(Kcur) * n_embd_gqa * N),
+                           0, 2, 1, 3);
             k_bs[i] = ne_view_4d(
-                ctx0, kv_self.k, head_dim, N, n_head, 1, ne_element_size(kv_self.k) * head_dim,
-                ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd * n_ctx,
-                ((il * n_ctx) * ne_element_size(kv_self.k) * n_embd * kv_n_ctx_block +
-                 i * n_ctx * n_embd * ne_element_size(kv_self.k) + head_dim * n_past * ne_element_size(kv_self.k)));
+                ctx0, kv_self.k, head_dim, N, n_head_kv, 1, ne_element_size(kv_self.k) * head_dim,
+                ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd_gqa * n_ctx,
+                ((il * n_ctx) * ne_element_size(kv_self.k) * n_embd_gqa * kv_n_ctx_block +
+                 i * n_ctx * n_embd_gqa * ne_element_size(kv_self.k) + head_dim * n_past * ne_element_size(kv_self.k)));
 
             // batch V
-            Vcur_bs[i] = ne_permute(ctx0,
-                                    ne_reshape_4d(ctx0,
-                                                  ne_view_2d(ctx0, Vcur, n_embd, N, ne_element_size(Vcur) * n_embd,
-                                                             i * ne_element_size(Vcur) * n_embd * N),
-                                                  head_dim, n_head, N, 1),
-                                    1, 2, 0, 3);
-            v_bs[i] =
-                ne_view_4d(ctx0, kv_self.v, N, head_dim, n_head, 1, n_ctx * ne_element_size(kv_self.v),
-                           n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_embd,
-                           ((il * n_ctx) * ne_element_size(kv_self.v) * n_embd * kv_n_ctx_block +
-                            i * n_ctx * n_embd * ne_element_size(kv_self.v) + n_past * ne_element_size(kv_self.v)));
+            Vcur_bs[i] =
+                ne_permute(ctx0,
+                           ne_reshape_4d(ctx0,
+                                         ne_view_2d(ctx0, Vcur, n_embd_gqa, N, ne_element_size(Vcur) * n_embd_gqa,
+                                                    i * ne_element_size(Vcur) * n_embd_gqa * N),
+                                         head_dim, n_head_kv, N, 1),
+                           1, 2, 0, 3);
+            v_bs[i] = ne_view_4d(
+                ctx0, kv_self.v, N, head_dim, n_head_kv, 1, n_ctx * ne_element_size(kv_self.v),
+                n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_embd_gqa,
+                ((il * n_ctx) * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block +
+                 i * n_ctx * n_embd_gqa * ne_element_size(kv_self.v) + n_past * ne_element_size(kv_self.v)));
             ne_build_forward_expand(&gf, ne_cpy(ctx0, Kcur_bs[i], k_bs[i]));
             ne_build_forward_expand(&gf, ne_cpy(ctx0, Vcur_bs[i], v_bs[i]));
           }
@@ -247,10 +251,10 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
         struct ne_tensor* Q = ne_permute(ctx0, ne_reshape_4d(ctx0, Qcur, head_dim, n_head, N, batch_size), 0, 2, 1, 3);
 
         // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
-        struct ne_tensor* K =
-            ne_view_4d(ctx0, kv_self.k, head_dim, n_past + N, n_head, batch_size, ne_element_size(kv_self.k) * head_dim,
-                       ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd * n_ctx,
-                       il * n_ctx * ne_element_size(kv_self.k) * n_embd * kv_n_ctx_block);
+        struct ne_tensor* K = ne_view_4d(
+            ctx0, kv_self.k, head_dim, n_past + N, n_head_kv, batch_size, ne_element_size(kv_self.k) * head_dim,
+            ne_element_size(kv_self.k) * head_dim * n_ctx, ne_element_size(kv_self.k) * n_embd_gqa * n_ctx,
+            il * n_ctx * ne_element_size(kv_self.k) * n_embd_gqa * kv_n_ctx_block);
 
         // K * Q
         struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
@@ -267,9 +271,9 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 
         // V_trans = Vmem.view(n_embd/n_head, n_head, n_past + N).permute(1, 2, 0, 3).contiguous()
         struct ne_tensor* V =
-            ne_view_4d(ctx0, kv_self.v, n_past + N, head_dim, n_head, batch_size, n_ctx * ne_element_size(kv_self.v),
-                       n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_embd,
-                       il * n_ctx * ne_element_size(kv_self.v) * n_embd * kv_n_ctx_block);
+            ne_view_4d(ctx0, kv_self.v, n_past + N, head_dim, n_head_kv, batch_size, n_ctx * ne_element_size(kv_self.v),
+                       n_ctx * ne_element_size(kv_self.v) * head_dim, n_ctx * ne_element_size(kv_self.v) * n_embd_gqa,
+                       il * n_ctx * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block);
 
         // KQV = transpose(V) * KQ_soft_max
         struct ne_tensor* KQV = ne_mul_mat(ctx0, V, KQ_soft_max);
@@ -286,15 +290,15 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 
         // store key and value to memory
         {
-          const auto k_cache = ne_view_3d(ctx0, kv_self.k,          // tensor
-                                          head_dim, n_ctx, n_head,  // ne
-                                          0, 0,                     // nb (bestla managed)
-                                          il * k_size);             // offset
+          const auto k_cache = ne_view_3d(ctx0, kv_self.k,             // tensor
+                                          head_dim, n_ctx, n_head_kv,  // ne
+                                          0, 0,                        // nb (bestla managed)
+                                          il * k_size);                // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, false));
-          const auto v_cache = ne_view_3d(ctx0, kv_self.v,          // tensor
-                                          head_dim, n_ctx, n_head,  // ne
-                                          0, 0,                     // nb (bestla managed)
-                                          il * v_size);             // offset
+          const auto v_cache = ne_view_3d(ctx0, kv_self.v,             // tensor
+                                          head_dim, n_ctx, n_head_kv,  // ne
+                                          0, 0,                        // nb (bestla managed)
+                                          il * v_size);                // offset
           ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur, n_past, false));
         }
 
@@ -303,14 +307,14 @@ static bool qwen_model_eval_internal(model_context* ctx, const model_input* inpu
 
         struct ne_tensor* K =
             ne_view_3d(ctx0, kv_self.k,                                             // tensor
-                       head_dim, seq_kv, n_head,                                    // ne
+                       head_dim, seq_kv, n_head_kv,                                 // ne
                        kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
                        il * k_size);                                                // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
         ne_set_name(K, "K");
         struct ne_tensor* V =
             ne_view_3d(ctx0, kv_self.v,                                                    // tensor
-                       seq_kv, head_dim, n_head,                                           // ne
+                       seq_kv, head_dim, n_head_kv,                                        // ne
                        kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
                        il * v_size);                                                       // offset
         *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout

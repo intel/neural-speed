@@ -68,7 +68,6 @@ function main() {
     if [[ "${compiler_version}" != "12.1.0" ]]; then
         conda install --update-deps -c conda-forge gxx==${compiler_version} gcc==${compiler_version} gxx_linux-64==${compiler_version} libstdcxx-ng sysroot_linux-64 -y
     fi
-    export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     # compile binary
     cd ${working_dir}
     mkdir build
@@ -81,7 +80,7 @@ function main() {
 
     ## prepare example requirement
     pip install -r neural_speed/models/requirements/common.txt
-
+    export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     ## prepare fp32 bin
     python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${input_model}
 

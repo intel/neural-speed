@@ -65,6 +65,8 @@ void QWEN::init(const char* path_model, model_context* ctx, int n_gpu_layer_, bo
   fprintf(stderr, "%s: n_ff       = %u\n", __func__, n_ff);
   fprintf(stderr, "%s: n_parts    = %zu\n", __func__, ml->file_loaders.size());
   n_embd = hparams.n_embd;
+  n_head_kv = hparams.n_head_kv;
+  n_head = hparams.n_head;
   n_vocab = hparams.n_vocab;
   n_layer = hparams.n_layer;
   scratch = qwen_mem_req(n_layer, lctx.scratch_size_ratio);
@@ -181,10 +183,12 @@ void QWEN::load(model_context* ctx, model_progress_callback progress_callback, v
       // qkv GEMM + out proj GEMM
       layer.attn[0] = ml->get_tensor(layers_i + ".self_attn.q_proj.weight", {n_embd, n_embd}, backend);
       layer.attn[1] = ml->get_tensor(layers_i + ".self_attn.q_proj.bias", {n_embd}, backend);
-      layer.attn[2] = ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd}, backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd}, backend);
-      layer.attn[4] = ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd}, backend);
-      layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd}, backend);
+      layer.attn[2] =
+          ml->get_tensor(layers_i + ".self_attn.k_proj.weight", {n_embd, n_embd * n_head_kv / n_head}, backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".self_attn.k_proj.bias", {n_embd * n_head_kv / n_head}, backend);
+      layer.attn[4] =
+          ml->get_tensor(layers_i + ".self_attn.v_proj.weight", {n_embd, n_embd * n_head_kv / n_head}, backend);
+      layer.attn[5] = ml->get_tensor(layers_i + ".self_attn.v_proj.bias", {n_embd * n_head_kv / n_head}, backend);
       layer.attn[6] = ml->get_tensor(layers_i + ".self_attn.o_proj.weight", {n_embd, n_embd}, backend);
 
       // ffn GEMM

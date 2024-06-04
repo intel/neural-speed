@@ -44,6 +44,18 @@ static const model_scratch qwen_mem_req(int n_layers, float scratch_size_ratio =
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
+    case 28:
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
+    case 80:
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 10 * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 10 * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 10 * 4096) * MB,
+      };
     default:
       MODEL_ASSERT(false);
   }
@@ -53,7 +65,7 @@ class QWEN : public IModel {
  private:
   model_archs arch = MODEL_QWEN;
   std::unique_ptr<model_model_loader> ml;
-  uint32_t n_layer, n_embd, n_ff, n_vocab;
+  uint32_t n_layer, n_embd, n_ff, n_vocab, n_head, n_head_kv;
   int n_gpu_layer;
   bool use_mmap, use_mlock, vocab_only;
   model_scratch scratch;

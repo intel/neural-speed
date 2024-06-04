@@ -63,7 +63,7 @@ jobs:
 
       - name: Env build
         run: |
-          bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "cpp-graph-test-neural-speed" "3.8"
+          bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "cpp-graph-test-neural-speed" "3.9"
 
       - name: BF16 Benchmark
         run: |
