@@ -33,7 +33,7 @@ class UT_AccumulatorWriteBack {
   void bf16fp32ut(int _M, int _N, int _M_offset, int _N_offset, int _cpy_M, int _cpy_N) {
     printf("Test Case %s %d %d %d %d %d %d\n", __FUNCTION__, _M, _N, _M_offset, _N_offset, _cpy_M, _cpy_N);
     std::vector<bf16> src(_M * _N);
-    for (int i = 0; i < _M * _N; i++) src[i].fromfloat(i);
+    for (int i = 0; i < _M * _N; i++) src[i].fromfloat(static_cast<float>(i));
     std::vector<float> dstref(_M * _N, 0), dstker(_M * _N, 0);
 
     epilogue::gemm::AccumulatorWriteBackBf16Fp32::template forward<BTLA_ISA::NoSIMD>(

@@ -358,7 +358,7 @@ class UT_ShuffleIndices {
     for (size_t i = 0; i < k; i++) {
       groupindices[i] = i % groupsize;
       auto offset = i / groupsize;
-      reflut[groupindices[i] * blocksize + offset] = i;
+      reflut[groupindices[i] * blocksize + offset] = static_cast<int>(i);
     }
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());

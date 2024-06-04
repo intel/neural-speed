@@ -475,11 +475,11 @@ class UT_GEMM_AVX512BW_KBLOCK {
     ref_kblock_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), zpA.data(), scaleA.data(), blk_num,
                                        scaleB.data(), reduceB.data(), n, m, n, k, kblock, k * sizeof(A[0]),
                                        k * sizeof(B[0]), n * sizeof(C[0]), 0);
-    for (size_t i = 0; i < k; i += kstep) {
+    for (int i = 0; i < k; i += kstep) {
       auto k_re = remainsize(i, k, kstep);
       gemm.forward(A.data() + i, B.data() + i * Core::Code::NTILE, C.data(), zpA.data(), scaleA.data(), blk_num,
-                   scaleB.data(), reduceB.data(), n, m, n, k_re, k_re, k * sizeof(A[0]), k * sizeof(B[0]),
-                   n * sizeof(C[0]), i, k_re / float(k), cache, CacheSize);
+                   scaleB.data(), reduceB.data(), n, m, n, k_re, k_re, (int)(k * sizeof(A[0])), (int)(k * sizeof(B[0])),
+                   (int)(n * sizeof(C[0])), i, k_re / float(k), cache, CacheSize);
     }
 
     ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);
@@ -580,11 +580,11 @@ class UT_GEMM_AVX512VNNI_KBLOCK {
     ref_kblock_int8<Core::Code::NTILE>(A.data(), B.data(), RefC.data(), zpA.data(), scaleA.data(), blk_num,
                                        scaleB.data(), reduceB.data(), n, m, n, k, kblock, k * sizeof(A[0]),
                                        k * sizeof(B[0]), n * sizeof(C[0]), 0);
-    for (size_t i = 0; i < k; i += kstep) {
+    for (int i = 0; i < k; i += kstep) {
       auto k_re = remainsize(i, k, kstep);
       gemm.forward(A.data() + i, B.data() + i * Core::Code::NTILE, C.data(), zpA.data(), scaleA.data(), blk_num,
-                   scaleB.data(), reduceB.data(), n, m, n, k_re, k_re, k * sizeof(A[0]), k * sizeof(B[0]),
-                   n * sizeof(C[0]), i, k_re / float(k), cache, CacheSize);
+                   scaleB.data(), reduceB.data(), n, m, n, k_re, k_re, (int)(k * sizeof(A[0])), (int)(k * sizeof(B[0])),
+                   (int)(n * sizeof(C[0])), i, k_re / float(k), cache, CacheSize);
     }
 
     ut::buffer_error(RefC.data(), C.data(), RefC.size(), 0.001f);

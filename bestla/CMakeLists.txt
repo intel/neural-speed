@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.12)
-
 project(bestla LANGUAGES CXX VERSION 0.1.0)
+
+include(cmake/FindSIMD.cmake)
+
 file(GLOB headers ${PROJECT_NAME}/*.h ${PROJECT_NAME}/*.hpp)
-file(GLOB xbyak_headers ${PROJECT_NAME}/xbyak/*.h ${PROJECT_NAME}/xbyak/*.hpp)
 
 option(BTLA_ENABLE_OPENMP "Compile OpenMP thread pool if OMP can be found" OFF)
 option(BTLA_SYCL "Compile OpenMP thread pool if OMP can be found" OFF)
@@ -22,23 +23,41 @@ option(BTLA_UT_NOASAN "Disable sanitize" OFF)
 option(BTLA_UT_BENCHMARK "Benchmark ON may take a long time to finish all tests" OFF)
 option(BTLA_UT_OPENMP "Use OpenMP for UT tests" OFF)
 
-
-
-
+include(FetchContent)
+FetchContent_Declare(
+    xbyak
+    GIT_REPOSITORY https://github.com/herumi/xbyak.git
+    GIT_TAG v7.06
+)
+FetchContent_MakeAvailable(xbyak)
 
 add_library(${PROJECT_NAME} INTERFACE)
+target_link_libraries(${PROJECT_NAME} INTERFACE xbyak)
 add_library(neural_speed::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_include_directories(
 	${PROJECT_NAME} INTERFACE
 	"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
 	"$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
+
+function(add_isa_def ARG)
+	if(${${ARG}_FOUND})
+    target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_${ARG}_FOUND=1)
+  else()
+    target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_${ARG}_FOUND=0)
+	endif()
+endfunction()
+
+foreach (ISA ${ISA_SET})
+  add_isa_def(${ISA})
+endforeach()
+
 set(sycl_headers)
 set(sycl_libs)
 if(BTLA_SYCL)
   include(cmake/sycl.cmake)
   file(GLOB sycl_headers ${PROJECT_NAME}/sycl/*.h ${PROJECT_NAME}/sycl/*.hpp)
-  add_compile_definitions(BTLA_SYCL)
+  target_compile_definitions(${PROJECT_NAME} INTERFACE BTLA_SYCL)
   list(APPEND sycl_libs IntelSYCL::SYCL_CXX)
   add_compile_options(-march=native)
   #add_link_options(-fsycl-targets=spir64 -Xsycl-target-backend "-options -ze-opt-large-register-file")

@@ -496,10 +496,10 @@ class CpuRuntime {
 
   inline void adjustPE(const BTLA_ISA isa, const float PE_) {
     // printf("Adjust:%d,%f\n",int(isa),PE_);
-    PE[int(isa)] = PE[int(isa)] * PE_ * 0.7 + PE[int(isa)] * 0.3;
+    PE[int(isa)] = PE[int(isa)] * PE_ * 0.7f + PE[int(isa)] * 0.3f;
   }
 
-  size_t mL2Cache, mL1Cache, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
+  size_t mL2Cache = 0, mL1Cache = 0, mL2Cache_P = 0, mL1Cache_P = 0, mL2Cache_E = 0, mL1Cache_E = 0;
   int P_core_num = 0, E_core_num = 0;
   bool mHybrid = false;
 
@@ -530,8 +530,8 @@ class CpuRuntime {
       }
     }
   }
-  float PE[int(BTLA_ISA::ISA_COUNT)];
-  int maxThreads;
+  float PE[int(BTLA_ISA::ISA_COUNT)] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
+  int maxThreads = 0;
 };
 }  // namespace device
 }  // namespace bestla

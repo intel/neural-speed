@@ -991,7 +991,7 @@ static inline float f8_to_fp32(utils::f8 v, BTLA_DTYPE f8_t) {
   auto mantissabit = 7 - ebits;
   e_revert &= 0x7f;
   e_revert >>= mantissabit;
-  e_revert = e_revert - std::pow(2, ebits - 1) + 1 + 127;
+  e_revert = e_revert - static_cast<uint32_t>(std::pow(2, ebits - 1)) + 1 + 127;
   e_revert <<= 23;
   mantissa_revert <<= (23 - mantissabit);
   mantissa_revert &= 0x007fffff;
@@ -1012,7 +1012,7 @@ static inline BTLA_CODE decompress_kblock_f8_fp(utils::f8* srcptr, _DST_T* dstpt
       float scale;
       if constexpr (std::is_same_v<_S_T, utils::f8>) {
         int shared_exp = sptr[j / _PACK_ROW].x;
-        scale = std::pow(2, shared_exp);
+        scale = static_cast<float>(std::pow(2, shared_exp));
       } else if constexpr (std::is_same_v<_S_T, float>) {
         scale = scales[j / _PACK_ROW];
       } else {
@@ -1599,7 +1599,7 @@ static inline BTLA_CODE get2d_e8m0_scale(const void* srcptr, void* dstptr, int r
   auto col_elt = col / sizeof(utils::f8);
   for (int i = 0; i < row; i++) {
     for (int j = 0; j < col_elt; j++) {
-      f32_v[i * f32_stride + j] = std::pow(2, f8_v[i * f8_stride + j].x);
+      f32_v[i * f32_stride + j] = static_cast<float>(std::pow(2, f8_v[i * f8_stride + j].x));
     }
   }
   return BTLA_CODE::Success;
@@ -1642,11 +1642,10 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       float scale = (maxval - minval) / 255;
       float rscale = 1.f / scale;
       scales[j / raw_blocksize * ld_dst + i] = scale;
-      int8_t bzp = utils::cast<float, int8_t>(utils::cast<float, int>((0 - minval) * rscale) - 128);
+      int8_t bzp = clip(utils::cast<float, int>((0 - minval) * rscale) - 128);
       zero_points[j / raw_blocksize * ld_dst + i] = bzp;
       for (size_t ij = 0; ij < blocksize; ij++) {
-        dstptr[(j + ij) * ld_dst + i] =
-            utils::cast<float, int8_t>(utils::cast<float, int>((srcptr[(j + ij) * ld_src + i]) * rscale) + bzp);
+        dstptr[(j + ij) * ld_dst + i] = clip(utils::cast<float, int>((srcptr[(j + ij) * ld_src + i]) * rscale) + bzp);
       }
     };
     auto sNauto_calc_store_scale_and_quantv_sym = [&](int blocksize) {
@@ -1661,7 +1660,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
       float NVal = SymValue + 0.5f;
       auto sum = maxval + minval;
       if (abs(sum) >= absmax / FullValue) {
-        NVal = sum > 0.f ? -FullValue : FullValue;
+        NVal = sum > 0.f ? static_cast<float>(-FullValue) : static_cast<float>(FullValue);
       }
       float scale = absmax / NVal;
       float rscale = 1.f / scale;
@@ -1722,7 +1721,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock(const float* srcptr, int8
 template <BTLA_DTYPE F8_T>
 static inline int8_t f8_mx_quantize(float v, float scale, BTLA_DTYPE scale_dtype) {
   if (scale_dtype == BTLA_DTYPE::F8_E8M0) {
-    v /= std::pow(2, scale);
+    v /= static_cast<float>(std::pow(2, scale));
   } else {
     v /= scale;
   }
@@ -1730,15 +1729,15 @@ static inline int8_t f8_mx_quantize(float v, float scale, BTLA_DTYPE scale_dtype
   auto quant_mantissa = utils::bestla_dtype_get_f8_quant_mbits(F8_T);
   auto store_mantissa = 7 - ebits;
   auto private_exp = std::floor(std::log2(std::abs(v == 0 ? v + 1 : v)));
-  auto min_exp = -1 * (std::pow(2, ebits - 1)) + 2;
+  auto min_exp = static_cast<float>(-1 * (std::pow(2, ebits - 1)) + 2);
   private_exp = private_exp < min_exp ? min_exp : private_exp;
 
   // Scale up so appropriate number of bits are in the integer portion of the number
-  v = v / std::pow(2, private_exp) * std::pow(2, quant_mantissa - 2);
+  v = static_cast<float>(v / std::pow(2, private_exp) * std::pow(2, quant_mantissa - 2));
   auto sign = v > 0 ? 1 : -1;
-  v = sign * std::floor(std::abs(v) + 0.5);
+  v = sign * static_cast<float>(std::floor(std::abs(v) + 0.5));
   // Undo scaling
-  v = v / std::pow(2, quant_mantissa - 2) * std::pow(2, private_exp);
+  v = static_cast<float>(v / std::pow(2, quant_mantissa - 2) * std::pow(2, private_exp));
 
   // saturate normals.
   auto max_norm = utils::get_mxfp_maxnorm(F8_T, ebits, quant_mantissa);
@@ -1749,7 +1748,7 @@ static inline int8_t f8_mx_quantize(float v, float scale, BTLA_DTYPE scale_dtype
   uint8_t store_signbit = (*(p + 3) & 0x80);
   *shift_v <<= 1;
   uint8_t store_ebit = (*(p + 3) & 0xFF);
-  store_ebit = store_ebit - 127 + std::pow(2, ebits - 1) - 1;
+  store_ebit = store_ebit - 127 + static_cast<uint8_t>(std::pow(2, ebits - 1)) - 1;
   if (store_ebit > 15 && F8_T == BTLA_DTYPE::F8_E4M3) store_ebit = 0;
   if (store_ebit > 31 && F8_T == BTLA_DTYPE::F8_E5M2) store_ebit = 0;
   store_ebit <<= store_mantissa;
@@ -1777,10 +1776,10 @@ static inline BTLA_CODE quantize_f32_f8_rowblock_mxscale(const float* srcptr, in
         if (scale == 0) scale += std::abs(std::numeric_limits<float>::min());
         scale = std::floor(std::log2(scale));
         auto ebits = utils::bestla_dtype_get_f8_ebits(F8_T);
-        auto emax = std::pow(2, ebits - 1);
+        auto emax = static_cast<float>(std::pow(2, ebits - 1));
         if (F8_T == BTLA_DTYPE::F8_E5M2) emax -= 1;
         scale -= emax;
-        auto scale_max = std::pow(2, 7) - 1;  // e8m0 scale type.
+        auto scale_max = static_cast<float>(std::pow(2, 7)) - 1;  // e8m0 scale type.
         scale = scale < (-1 * scale_max) ? (-1 * scale_max) : scale;
       } else if (scale_dtype == BTLA_DTYPE::F32) {
         scale /= utils::get_mxfp_maxnorm(F8_T, utils::bestla_dtype_get_f8_ebits(F8_T),
@@ -1952,18 +1951,18 @@ static inline uint8_t get_dq8_bnb(float v) {
 template <bool QDQ_SCALE>
 static inline BTLA_CODE dq8_bnb_double_quant(float* scale, size_t scale_size, int dq_blocksize, float* dq_buf) {
   float offset = 0.f;
-  for (int i = 0; i < scale_size; i++) offset += scale[i];
+  for (size_t i = 0; i < scale_size; i++) offset += scale[i];
   offset /= scale_size;
   dq_buf[utils::updiv(scale_size, dq_blocksize)] = offset;  // store zp.
-  int align_blk_size = scale_size / dq_blocksize * dq_blocksize;
-  int i = 0;
-  auto calc_scale = [&](int blksize) {
+  size_t align_blk_size = scale_size / dq_blocksize * dq_blocksize;
+  size_t i = 0;
+  auto calc_scale = [&](size_t blksize) {
     float absmax = std::numeric_limits<float>::min();
-    for (int j = 0; j < blksize; j++) {
+    for (size_t j = 0; j < blksize; j++) {
       scale[i + j] -= offset;
       absmax = std::max(absmax, std::abs(scale[i + j]));
     }
-    for (int j = 0; j < blksize; j++) {
+    for (size_t j = 0; j < blksize; j++) {
       scale[i + j] /= absmax;
       scale[i + j] = get_dq8_bnb(scale[i + j]);
       if constexpr (QDQ_SCALE) {

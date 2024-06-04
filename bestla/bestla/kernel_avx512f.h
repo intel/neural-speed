@@ -912,7 +912,7 @@ static inline BTLA_CODE quantize_f32_sign_int_rowblock_sym_auto(const float* src
           NVal = sum > 0.f ? -FullValue : FullValue;
         }
         NVal = NVal << (8 - NBits);
-        tmp_abs[iv] = NVal;
+        tmp_abs[iv] = static_cast<float>(NVal);
       }
       auto vmag = _mm512_loadu_ps(tmp_abs);
       vscale = _mm512_div_ps(vabsval, vmag);
@@ -2463,7 +2463,8 @@ static inline BTLA_CODE decompress_s4_s8(utils::int4x2* srcptr, int8_t* dstptr, 
       vout_y = _mm512_sub_epi8(vout_y, vbias);
       _mm512_storeu_si512((__m512i*)(dstptr + i), vout_y);
     } else {
-      ref::decompress_kblock_s4_s8<1, 1>(srcptr + i / 2, nullptr, dstptr + i, 0, 0, 0, 0, 1, elesize - i, nullptr, 0);
+      ref::decompress_kblock_s4_s8<1, 1>(srcptr + i / 2, nullptr, dstptr + i, 0, 0, 0, 0, 1,
+                                         static_cast<int>(elesize - i), nullptr, 0);
     }
   }
   return BTLA_CODE::Success;
@@ -2649,7 +2650,7 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* bit2ptr, int8_t* dstptr,
                                          size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
   auto vbias = _mm512_set1_epi8(2);
@@ -2658,7 +2659,7 @@ static inline BTLA_CODE decompress_s2_s8(utils::bit2x4* bit2ptr, int8_t* dstptr,
                                       13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
                                       15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_2bits(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
     vout = _mm512_sub_epi8(vout, vbias);
@@ -2871,7 +2872,7 @@ static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   uint64_t mask0 = 0x0303030303030303;
   auto vmask0 = _mm512_set1_epi64(*(int64_t*)&mask0);
   auto vbias = _mm512_set1_epi8(4);
@@ -2883,7 +2884,7 @@ static inline BTLA_CODE decompress_s3_s8(utils::bit2x4* bit2ptr, utils::bit1x8* 
 
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_2bits(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
     auto vb1 = unpack_1bits(bit1ptr + i / 8, zmm_0x00, zmm_0x04);
@@ -3131,13 +3132,13 @@ static inline BTLA_CODE decompress_s1_s8(utils::bit1x8* bit1ptr, int8_t* dstptr,
                                          size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (1 - 1);
   auto vbias = _mm512_set1_epi8(FullRange);
 
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vb1 = unpack_1bits(bit1ptr + i / 8, zmm_0x00, zmm_0x04);
     vb1 = _mm512_srli_epi32(vb1, 2);
@@ -3351,7 +3352,7 @@ static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* 
                                          size_t unpack_elt, int8_t* tmp, size_t tmpsize) {
   int constexpr VBits = 512;
   int constexpr VElt = VBits / 8;
-  int i = 0;
+  size_t i = 0;
   int constexpr FullRange = 1 << (5 - 1);
   uint32_t mask = 0x0f0f0f0f;
   auto vmask = _mm512_set1_epi32(*reinterpret_cast<int*>(&mask));
@@ -3359,7 +3360,7 @@ static inline BTLA_CODE decompress_s5_s8(utils::bit4x2* bit4ptr, utils::bit1x8* 
 
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_4bits(bit4ptr + i / 2, vmask);
     auto vb1 = unpack_1bits(bit1ptr + i / 8, zmm_0x00, zmm_0x04);
@@ -3617,7 +3618,7 @@ static inline BTLA_CODE decompress_s7_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
 
   auto zmm_0x04 = _mm512_set1_epi8(0x04);
   auto zmm_0x00 = _mm512_set1_epi8(0x00);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_4bits(bit4ptr + i / 2, vmask);
     auto vb1 = unpack_1bits(bit1ptr + i / 8, zmm_0x00, zmm_0x04);
@@ -3929,7 +3930,7 @@ static inline BTLA_CODE decompress_s6_s8(utils::bit4x2* bit4ptr, utils::bit2x4* 
                                       13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
                                       15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
   auto vorder_y = _mm512_set_epi32(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
-  int elt_pad = utils::padto_le(unpack_elt, VElt);
+  size_t elt_pad = utils::padto_le(unpack_elt, VElt);
   for (; i < elt_pad; i += VElt) {
     auto vout = unpack_4bits(bit4ptr + i / 2, vmask);
     auto vb1 = unpack_2bits(bit2ptr + i / 4, vshift_y, vmask0, vsfhl_mask_y, vorder_y);
