@@ -50,7 +50,7 @@ static const model_scratch qwen_mem_req(int n_layers, float scratch_size_ratio =
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
-    case 70:
+    case 80:
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 10*4096) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 10*2048) * MB,
