@@ -70,7 +70,7 @@ void ref_fp16_fp32(utils::fp16* matA, utils::fp16* matB, float* matC, int _m, in
               int _bstride, int _cstride, int kpos) {
   int lda = _astride / sizeof(utils::fp16);
   int ldb = _bstride / sizeof(utils::fp16);
-  int ldc = _cstride / sizeof(utils::fp16);
+  int ldc = _cstride / sizeof(float);
   int constexpr KPack = 1;
   for (int i = 0; i < _m; i++) {
     for (int j = 0; j < _n; j += NTILE) {
