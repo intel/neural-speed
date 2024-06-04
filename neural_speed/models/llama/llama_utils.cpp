@@ -202,7 +202,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
         NE_ASSERT(n_expert == 0);
         NE_ASSERT(n_expert_used == 0);
         layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, backend);
-        layer.ffn[1] = ml->get_tensor(layers_i + ".feed_forward.w2.weight", {n_ff, n_embd}, backend);
+        layer.ffn[1] = ml->get_tensor(layers_i + ".feed_forward.w2.weight", {n_ff, n_embd}, NE_BACKEND_SYCL);
         layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, backend);
       } else {
         NE_ASSERT(n_expert > 0);
@@ -212,7 +212,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
           layer.ffn_gate_exp[x] =
               ml->get_tensor(layers_i + ".ffn_gate." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
           layer.ffn_down_exp[x] =
-              ml->get_tensor(layers_i + ".ffn_down." + std::to_string(x) + ".weight", {n_ff, n_embd}, NE_BACKEND_SYCL);
+              ml->get_tensor(layers_i + ".ffn_down." + std::to_string(x) + ".weight", {n_ff, n_embd}, backend);
           layer.ffn_up_exp[x] =
               ml->get_tensor(layers_i + ".ffn_up." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
         }
