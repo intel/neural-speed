@@ -175,13 +175,22 @@ static inline int ne_nrows(const struct ne_tensor* tensor) {
 
 ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1, enum ne_op op) {
   ne_backend bk = NE_BACKEND_CPU;
+  bool src_on_devce = src0->backend == NE_BACKEND_SYCL;
+  if (src1) {
+    src_on_devce |= src1->backend == NE_BACKEND_SYCL;
+  }
   switch (op) {
     case NE_OP_MUL_MAT: {
       struct ne_tensor* wei = src0;
       if (src0->type == NE_TYPE_BTLA) {
-        bk = NE_BACKEND_SYCL;
+        bk = src_on_devce ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
     } break;
+    case NE_OP_MUL: {
+      if (src0->type == NE_TYPE_F32 || src0->type == NE_TYPE_F16) {
+        bk = src_on_devce ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
+      }
+    }
     default:
       break;
   }

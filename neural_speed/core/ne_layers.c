@@ -1792,11 +1792,12 @@ struct ne_tensor* ne_mul_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   if (inplace) {
     NE_ASSERT(is_node == false);
   }
+  enum ne_op op = NE_OP_MUL;
+  enum ne_backend bk = bestla_backend_support(a, b, op);
+  struct ne_tensor* result = inplace ? ne_view_tensor_bk(ctx, a, bk) : ne_dup_tensor_bk(ctx, a, bk);
 
-  struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
-
-  result->op = NE_OP_MUL;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->op = op;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -5551,7 +5552,14 @@ static void ne_compute_forward_sub(const struct ne_compute_params* params, const
 static void ne_compute_forward_mul_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        const struct ne_tensor* src1, struct ne_tensor* dst) {
   NE_ASSERT(ne_can_repeat_rows(src1, src0) && ne_are_same_shape(src0, dst));
-
+  if (dst->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
+    bestla_device_mul_f32(params, src0, src1, dst);
+#else
+    NE_ASSERT(0);
+#endif
+    return;
+  }
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }
@@ -5584,6 +5592,7 @@ static void ne_compute_forward_mul_f32(const struct ne_compute_params* params, c
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
+
   if (ne_is_contiguous(src0) && ne_is_contiguous(src1)) {
     if ((ne_nrows(src1) == 1 || ne_nrows(src1) == ne_nrows(src0)) && ne10 == ne00) {
       if (nb10 == sizeof(float)) {

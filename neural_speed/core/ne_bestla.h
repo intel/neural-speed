@@ -97,6 +97,8 @@ size_t bestla_device_storage_size();
 void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, void* queue);
 void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda,
                                   int ldo, void* workspace, void* queue);
+void bestla_device_mul_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                           const struct ne_tensor* src1, struct ne_tensor* dst);
 #endif
 #ifdef __cplusplus
 }
