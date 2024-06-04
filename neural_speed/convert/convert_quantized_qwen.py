@@ -65,7 +65,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", hparams["hidden_size"]))
     f.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
     f.write(struct.pack("i", hparams["num_attention_heads"]))
-    f.write(struct.pack("i", 0))  # multi-query attention
+    f.write(struct.pack("i", hparams["num_key_value_heads"] if "num_key_value_heads" in hparams else ["num_attention_heads"]))  # multi-query attention
     f.write(struct.pack("i", hparams["num_hidden_layers"]))
     f.write(
         struct.pack(
@@ -89,7 +89,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", 0))  # n_expert_used
     f.write(struct.pack("i", 0)) # n_embd_head_k for gemma
     f.write(struct.pack("f", hparams.get("rms_norm_eps", 1e-6)))  # rms norm eps
-    f.write(struct.pack("f", 10000.0))  # freq_base
+    f.write(struct.pack("f", hparams.get("rope_theta", 10000.0)))  # freq_base
     f.write(struct.pack("f", 1.0))  # rope_factor
 
     f.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
@@ -186,6 +186,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
         print(f"Success! saved as {out_path}")
     elif hparams['model_type'] == 'qwen2':
         # 3. write tensors
+        if hparams['tie_word_embeddings']:
+            list_vars["lm_head.weight"] = list_vars["model.embed_tokens.weight"]
         convert_qwen_to_fp32_tensor("model.embed_tokens.weight", "model.embed_tokens.weight", list_vars, f)
         convert_qwen_to_fp32_tensor("model.norm.weight", "model.norm.weight", list_vars, f)
         convert_qwen_to_fp32_tensor("lm_head.weight", "lm_head.weight", list_vars, f)
