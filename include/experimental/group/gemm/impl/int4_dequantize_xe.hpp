@@ -686,8 +686,8 @@ class gemm_t<
           // Only int8 needs to reserve the sign bit
           if constexpr (
               compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-            dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
-            dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
+            // dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
+            // dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
           }
         }
         // highest 4 bit
@@ -696,7 +696,7 @@ class gemm_t<
               cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1);
           if constexpr (
               compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-            dequant_i8_high_4bit = matB_blk.xetla_format<int8_t>() >> 4;
+            dequant_i8_high_4bit = matB_blk >> 4;
           } else {
             dequant_i8_high_4bit = matB_blk >> 4;
           }
@@ -726,14 +726,15 @@ class gemm_t<
               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
                   zero_pt_i8;
-              dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
-                  scale.reg[scale_idx];
-            } else {
-              dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
-                  scale.reg[scale_idx];
+            } else if constexpr (
+                compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+              cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
+                  int8_t(8);
             }
+            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                scale.reg[scale_idx];
 
             // sycl::ext::oneapi::experimental::printf(
             //     "scale[%d] %f \n",
