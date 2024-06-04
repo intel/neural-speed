@@ -67,26 +67,26 @@ void ref_fp16(utils::fp16* matA, utils::fp16* matB, utils::fp16* matC, int _m, i
 
 template <int NTILE>
 void ref_fp16_fp32(utils::fp16* matA, utils::fp16* matB, float* matC, int _m, int _n, int _k, int _astride,
-              int _bstride, int _cstride, int kpos) {
+                   int _bstride, int _cstride, int kpos) {
   int lda = _astride / sizeof(utils::fp16);
   int ldb = _bstride / sizeof(utils::fp16);
   int ldc = _cstride / sizeof(float);
-  int constexpr KPack = 1;
+  int constexpr KPack = 4 / sizeof(utils::fp16);
   for (int i = 0; i < _m; i++) {
     for (int j = 0; j < _n; j += NTILE) {
       for (int ij = 0; ij < NTILE; ij++) {
         if (j + ij >= _n) {
           continue;
         }
-        float tmp = 0.f;
+        float tmp = 0;
         for (int k = 0; k < _k; k += KPack) {
           for (int ik = 0; ik < KPack; ik++) {
             if (k + ik >= _k) {
               continue;
             }
-            auto tmpA = utils::cast<utils::fp16, float>(matA[i * lda + k + ik]);
-            auto tmpB = utils::cast<utils::fp16, float>(matB[k * NTILE + ij * KPack + ik + j * ldb]);
-            tmp = tmp + tmpA * tmpB;
+            auto tmpA = utils::cast<utils::fp16, float>(utils::fp16{matA[i * lda + k + ik]});
+            auto tmpB = utils::cast<utils::fp16, float>(utils::fp16{matB[k * NTILE + ij * KPack + ik + j * ldb]});
+            tmp += tmpA * tmpB;
           }
         }
         matC[i * ldc + j + ij] = tmp;
