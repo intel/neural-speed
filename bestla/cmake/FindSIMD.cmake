@@ -96,8 +96,9 @@ set(AVX512_FP16_CODE "
     #include <immintrin.h>
     int main()
     {
-        __m512i a = _mm512_set1_epi32(1); // avx512f
-        __m512h b = _mm512_cvt_roundepi16_ph(a, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC)); // avx512_fp16
+        char tmp[512];
+        __m256h a = _mm256_loadu_ph(tmp); // avx512vl + avx512fp16
+        _mm256_storeu_ph(tmp,a);
         return 0;
     }
 ")
