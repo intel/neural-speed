@@ -1610,12 +1610,12 @@ class mha_stable_interface_t {
             (std::is_same<V_T, fp16>::value && p.V_layout == ATTN_FWD_LAYOUT_NTILE24_ROWPACK1)));
 
     assert((!std::is_same<  //
-               PrologueK, mha::weight_forward_n_tile48_t<typename L_Max::GemmCore, L_Max::RT_ISA>>::value) ||
+               PrologueK, mha::weight_forward_n_tile48_t<typename L_Max::GemmCore>>::value) ||
            p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ||
            p.K_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);  // WeightForward can only be used with preprocessed layout
 
     assert((!std::is_same<  //
-               PrologueV, mha::weight_forward_n_tile48_t<typename L_Scale::GemmCore, L_Scale::RT_ISA>>::value) ||
+               PrologueV, mha::weight_forward_n_tile48_t<typename L_Scale::GemmCore>>::value) ||
            p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK4 ||
            p.V_layout == ATTN_FWD_LAYOUT_NTILE48_ROWPACK2);  // WeightForward can only be used with preprocessed layout
 
