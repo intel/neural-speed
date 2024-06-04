@@ -20,6 +20,7 @@ namespace bestla {
 namespace ut {
 using sAVX512F = gemm::SCoreRowNAvx512f<48, 8>;
 using sAMX_BF16 = gemm::HCoreRowNAmxbf16<64, 16>;
+using sAMX_FP16 = gemm::HCoreRowNAmxfp16<64, 16>;
 using sAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
 using sAVX_VNNI = gemm::ICoreRowNAvxvnni<24, 4>;
 using sAVX_VNNI_SS = gemm::ICoreRowNAvxvnniSS<24, 4>;
@@ -572,6 +573,20 @@ static inline void gemmref_bf16bf16fp32(int m, int n, int k, utils::bf16* A, uti
 
 static inline void gemmref_fp16fp16fp16(int m, int n, int k, utils::fp16* A, utils::fp16* B, utils::fp16* C, int lda,
                                         int ldb, int ldc) {
+#pragma omp parallel for
+  for (int j = 0; j < m; j++) {
+    for (int i = 0; i < n; i += 1) {
+      float tmp = 0;
+      for (int ik = 0; ik < k; ik++) {
+        tmp += float(A[ik + j * lda]) * float(B[ik * ldb + i]);
+      }
+      C[i + j * ldc] = tmp;
+    }
+  }
+}
+
+static inline void gemmref_fp16fp16fp32(int m, int n, int k, utils::fp16* A, utils::fp16* B, float* C, int lda, int ldb,
+                                        int ldc) {
 #pragma omp parallel for
   for (int j = 0; j < m; j++) {
     for (int i = 0; i < n; i += 1) {

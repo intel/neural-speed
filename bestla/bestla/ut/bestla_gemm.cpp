@@ -66,6 +66,36 @@ void ref_fp16(utils::fp16* matA, utils::fp16* matB, utils::fp16* matC, int _m, i
 }
 
 template <int NTILE>
+void ref_fp16_fp32(utils::fp16* matA, utils::fp16* matB, float* matC, int _m, int _n, int _k, int _astride,
+              int _bstride, int _cstride, int kpos) {
+  int lda = _astride / sizeof(utils::fp16);
+  int ldb = _bstride / sizeof(utils::fp16);
+  int ldc = _cstride / sizeof(utils::fp16);
+  int constexpr KPack = 1;
+  for (int i = 0; i < _m; i++) {
+    for (int j = 0; j < _n; j += NTILE) {
+      for (int ij = 0; ij < NTILE; ij++) {
+        if (j + ij >= _n) {
+          continue;
+        }
+        float tmp = 0.f;
+        for (int k = 0; k < _k; k += KPack) {
+          for (int ik = 0; ik < KPack; ik++) {
+            if (k + ik >= _k) {
+              continue;
+            }
+            auto tmpA = utils::cast<utils::fp16, float>(matA[i * lda + k + ik]);
+            auto tmpB = utils::cast<utils::fp16, float>(matB[k * NTILE + ij * KPack + ik + j * ldb]);
+            tmp = tmp + tmpA * tmpB;
+          }
+        }
+        matC[i * ldc + j + ij] = tmp;
+      }
+    }
+  }
+}
+
+template <int NTILE>
 void ref_fp32(float* matA, float* matB, float* matC, int _m, int _n, int _k, int _astride, int _bstride, int _cstride,
               int kpos) {
   int lda = _astride / sizeof(float);
@@ -778,7 +808,6 @@ class UT_GEMM_AMXINT8_KBLOCK {
   UT_GEMM_AMXINT8_KBLOCK() {
     UT_START();
     CheckISA(AMX_INT8);
-    request_perm_xtile_data();
     ut_splitblock<48, 16>(16, 144, 128, 64);
     ut_splitblock<48, 16>(16, 144, 128, 128);
     ut_splitblock<48, 16>(16, 144, 256, 128);
@@ -1035,7 +1064,6 @@ class UT_GEMM_AMXBF16 {
   UT_GEMM_AMXBF16() {
     UT_START();
     CheckISA(AMX_BF16);
-    request_perm_xtile_data();
     ut<32, 32>(32, 32, 64);
     ut<32, 32>(4, 96, 96);
     ut<48, 0>(4, 96, 96);
@@ -1070,12 +1098,50 @@ class UT_GEMM_AMXBF16 {
 static UT_GEMM_AMXBF16 sUT_GEMM_AMXBF16;
 #endif
 
+class UT_GEMM_AMXFP16 {
+ public:
+  UT_GEMM_AMXFP16() {
+    UT_START();
+    CheckISA(AMX_FP16);
+    ut<32, 32>(32, 32, 64);
+    ut<32, 32>(4, 96, 96);
+    ut<48, 0>(4, 96, 96);
+    ut<64, 16>(4, 128, 96);
+  }
+
+  template <int NTILE, int MTILE>
+  void ut(int m, int n, int k) {
+    printf("Test Case: %d %d %d\n", m, n, k);
+    using Core = gemm::HCoreRowNAmxfp16<NTILE, MTILE>;
+    static Core gemm;
+    if (n % Core::Code::NTILE != 0) {
+      return;
+    }
+    if (k % Core::Code::KTILE != 0) {
+      return;
+    }
+
+    avector<utils::fp16> matAfp16(m * k), matBfp16(k * n);
+    avector<float> matC(Core::Code::MTILE * n), refC(Core::Code::MTILE * n);
+    fill_buffer_randn(matAfp16.data(), matAfp16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
+    fill_buffer_randn(matBfp16.data(), matBfp16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
+    ref_fp16_fp32<Core::NTILE>(matAfp16.data(), matBfp16.data(), refC.data(), m, n, k, k * 2, k * 2, n * 4, 0);
+    gemm.configure(m, n, k);
+
+    gemm.forward(matAfp16.data(), matBfp16.data(), matC.data(), m, n, k, k * sizeof(fp16), k * sizeof(fp16),
+                 n * sizeof(float), 0, cache, CacheSize);
+    ut::buffer_error(refC.data(), matC.data(), m * n, 0.001f);
+  }
+};
+#ifdef BTLA_UT_GEMM
+static UT_GEMM_AMXFP16 sUT_GEMM_AMXFP16;
+#endif
+
 class UT_GEMM_AMXINT8 {
  public:
   UT_GEMM_AMXINT8() {
     UT_START();
     CheckISA(AMX_INT8);
-    request_perm_xtile_data();
     ut<32, 32>(32, 64, 64 * 3);
     ut<48, 16>(16, 96, 64 * 3);
     ut<32, 32>(4, 64, 64 * 3);

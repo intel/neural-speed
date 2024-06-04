@@ -232,6 +232,7 @@ class CpuDevice {
   inline bool AMX_BF16() { return mHasAMX_BF16; }
   inline bool AVX512_BF16() { return mHasAVX512_BF16; }
   inline bool AVX512_FP16() { return mHasAVX512_FP16; }
+  inline bool AMX_FP16() { return mHasAMX_FP16; }
   inline float* const getPE() { return PE; }
   inline int getPcoreNum() { return static_cast<int>(P_core.size()); }
   inline int getEcoreNum() { return static_cast<int>(E_core.size()); }
@@ -252,8 +253,9 @@ class CpuDevice {
     ADD_FLAG(AMX_INT8);
     ADD_FLAG(AVX512_BF16);
     ADD_FLAG(AVX512_FP16);
+    ADD_FLAG(AMX_FP16);
     numcores = _cpu.getNumCores(Xbyak::util::IntelCpuTopologyLevel::CoreLevel);
-    if (mHasAMX_BF16 || mHasAMX_INT8) {
+    if (mHasAMX_BF16 || mHasAMX_INT8 || mHasAMX_FP16) {
       utils::request_perm_xtile_data();
     }
     static bool p = false;
@@ -470,7 +472,8 @@ class CpuDevice {
   uint32_t L2Cache = 0, L1Cache = 0, L3Cache = 0;
   bool mHybrid = false, mClient = false;
   bool mHasAVX2 = false, mHasAVX_VNNI = false, mHasAVX = false, mHasAVX512_VNNI = false, mHasAMX_INT8 = false,
-       mHasAMX_BF16 = false, mHasAVX512F = false, mHasAVX512BW, mHasAVX512_BF16 = false, mHasAVX512_FP16 = false;
+       mHasAMX_BF16 = false, mHasAVX512F = false, mHasAVX512BW, mHasAVX512_BF16 = false, mHasAVX512_FP16 = false,
+       mHasAMX_FP16 = false;
   int numcores = 0;
   int numthreads = 0;
   std::vector<int> P_core, E_core, SMT_core;

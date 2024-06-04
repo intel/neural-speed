@@ -32,6 +32,7 @@ enum class BTLA_ISA : uint8_t {
   AMX_INT8,
   AVX512_FP16,
   AVX512_BF16,
+  AMX_FP16,
   ISA_COUNT,
 };
 enum class BTLA_DTYPE : uint32_t {

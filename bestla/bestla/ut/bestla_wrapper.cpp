@@ -284,5 +284,45 @@ class UT_Fp16Fp16Fp16 {
 #ifdef BTLA_UT_WRAPPER
 static UT_Fp16Fp16Fp16 sUT_Fp16Fp16Fp16;
 #endif
+
+class UT_Fp16Fp16Fp32 {
+ public:
+  UT_Fp16Fp16Fp32() {
+    UT_START();
+    CheckISA(AMX_FP16);
+    ut<sAMX_FP16>(1, 1, 1);
+    ut<sAMX_FP16>(8, 48, 2);
+    ut<sAMX_FP16>(8, 4096, 4096);
+    ut<sAMX_FP16>(384, 768, 768);
+    ut<sAMX_FP16>(1024, 1024, 1024);
+    ut<sAMX_FP16>(1024, 1536, 1536);
+  }
+
+  template <class GemmCore_T>
+  void ut(int m, int n, int k) {
+    printf("Test Case %s: %d %d %d core:%s\n", __FUNCTION__, m, n, k, gemm::CoreAttr::to_str(GemmCore_T::ID));
+    using Launcher =
+        wrapper::gemm::LauncherBase<GemmCore_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                    epilogue::gemm::AccumulatorWriteBackFp32>;
+
+    using Parallel = parallel::gemm::SchedulerBase<GemmCore_T>;
+    auto packw = Launcher::PrologueB::createStorage(n, k);
+    avector<int8_t> buffer(packw.mSize);
+    packw.assign(buffer.data());
+    avector<utils::fp16> matAbf16(m * k), matBbf16(k * n);
+    avector<float> matC(m * n), refC(m * n);
+    fill_buffer_randn(matAbf16.data(), matAbf16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
+    fill_buffer_randn(matBbf16.data(), matBbf16.size(), utils::fp16(-0.5f), utils::fp16(0.5f));
+    Launcher::PrologueB::packWeight(n, k, {matBbf16.data(), n, &packw}, UT_Threading::get());
+    gemmref_fp16fp16fp32(m, n, k, matAbf16.data(), matBbf16.data(), refC.data(), k, n, n);
+    GemmProblem gp(1, m, n, k);
+    typename Launcher::Param args{gp, {matAbf16.data(), k}, {matBbf16.data(), n, &packw}, {matC.data(), n}};
+    parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
+    buffer_error(refC.data(), matC.data(), refC.size(), 0.0002f * k);
+  }
+};
+#ifdef BTLA_UT_WRAPPER
+static UT_Fp16Fp16Fp32 sUT_Fp16Fp16Fp32;
+#endif
 }  // namespace ut
 }  // namespace bestla
