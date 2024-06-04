@@ -170,8 +170,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
 
       // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0, 2, 1, 3)
       struct ne_tensor* Q = ne_permute(
-          ctx0, ne_cpy(ctx0, Qcur, ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_embd / n_head, n_head, N, NE_SIZE_CALC)), 0, 2,
-          1, 3);
+          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_embd / n_head, n_head, N)), 0, 2, 1, 3);
 
       // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1, 3)
       struct ne_tensor* K = ne_permute(ctx0,
@@ -207,7 +206,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
                                                      il * n_ctx * ne_element_size(kv_self.v) * n_embd),
                                           n_embd / n_head, n_head, n_past + N),
                             1, 2, 0, 3),
-                 ne_new_tensor_3d(ctx0, kv_self.v->type, n_past + N, n_embd / n_head, n_head, NE_SIZE_CALC));
+                 d_ne_new_tensor_3d(ctx0, kv_self.v->type, n_past + N, n_embd / n_head, n_head));
       // KQV = transpose(V) * KQ_soft_max
       struct ne_tensor* KQV = ne_mul_mat(ctx0, V_trans, KQ_soft_max);
 
@@ -215,7 +214,7 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
       struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
       // cur = KQV_merged.contiguous().view(n_embd, N)
-      cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+      cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N));
     } else {
       const auto seq_kv = n_past + N;
       const auto k_size = kv_cache_info.k_bytes;

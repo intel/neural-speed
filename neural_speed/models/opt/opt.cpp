@@ -224,7 +224,7 @@ static bool opt_model_eval_internal(model_context* ctx, const model_input* input
       struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
       // [n_embd, N]
-      cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+      cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N));
     }
 
     // attn out projection

@@ -204,7 +204,7 @@ static bool chatglm_model_eval_internal(model_context* ctx, const model_input* i
       if (n_past == 0) {
         // build attention mask for context input
         ne_tensor* inf =
-            ne_new_tensor_4d(ctx0, attn_scores->type, 1, qlen - 1, num_attention_heads, batch_size, NE_SIZE_CALC);
+            d_ne_new_tensor_4d(ctx0, attn_scores->type, 1, qlen - 1, num_attention_heads, batch_size);
         ne_set_f32(inf, -INFINITY);
 
         ne_tensor* masked_attn_scores =

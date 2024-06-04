@@ -345,7 +345,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
 
     // for-loop self-attention
     struct ne_tensor* KQV_merged_contiguous =
-        ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC);
+        d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum);
     size_t off_sl = 0;
     for (int gi = 0; gi < infer_groups.size(); ++gi) {
       const int attn_bs = infer_groups[gi].size();
@@ -453,7 +453,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
       } else if (attn_n_total == 0 && run_mha_bf16_first) {
         // non-reordered kv-cache bf16 mha (first token only)
         auto vnele = ne_nelements(Vcur);
-        struct ne_tensor* Vtmp = ne_new_tensor_1d(ctx0, NE_TYPE_F16, vnele, NE_SIZE_CALC);
+        struct ne_tensor* Vtmp = d_ne_new_tensor_1d(ctx0, NE_TYPE_F16, vnele);
         Vtmp = ne_cpy(ctx0, ne_view_1d(ctx0, Vcur, vnele, 0), Vtmp);
         Vtmp = ne_view_4d(ctx0, Vtmp, head_size, n_head, attn_sl, attn_bs, ne_element_size(Vtmp) * head_size,
                           ne_element_size(Vtmp) * head_size * n_head,

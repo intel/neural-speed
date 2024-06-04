@@ -256,7 +256,7 @@ static bool gemma_model_eval_internal(model_context* ctx, const model_input* inp
 
         // cur = KQV_merged.contiguous().view(n_gqa_embd, N)
         cur = ne_cpy(ctx0, KQV_merged,
-                     ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_dim * n_head, N * batch_size, NE_SIZE_CALC));
+                     d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_dim * n_head, N * batch_size));
       } else {
         const auto seq_kv = n_past + N;
         const auto k_size = kv_cache_info.k_bytes;

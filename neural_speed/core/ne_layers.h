@@ -141,6 +141,9 @@ NE_API struct ne_tensor* ne_new_f32(struct ne_context* ctx, float value);
 NE_API struct ne_tensor* ne_dup_tensor(struct ne_context* ctx, const struct ne_tensor* src);
 NE_API struct ne_tensor* ne_view_tensor(struct ne_context* ctx, const struct ne_tensor* src);
 
+NE_API struct ne_tensor* ne_dup_tensor_bk(struct ne_context* ctx, const struct ne_tensor* src, enum ne_backend bk);
+NE_API struct ne_tensor* ne_view_tensor_bk(struct ne_context* ctx, const struct ne_tensor* src, enum ne_backend bk);
+
 NE_API struct ne_tensor* ne_set_zero(struct ne_tensor* tensor);
 NE_API struct ne_tensor* ne_set_i32(struct ne_tensor* tensor, int32_t value);
 NE_API struct ne_tensor* ne_set_f32(struct ne_tensor* tensor, float value);
