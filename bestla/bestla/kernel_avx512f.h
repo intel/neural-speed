@@ -296,6 +296,31 @@ static inline void vec_broadcast_epi32_2_4(__m512i* dst4regs, __m512i* src2regs)
   vec_broadcast_epi32_1_2(dst4regs + 2, src2regs + 1);
 }
 
+template <typename T>
+static inline __m512 load_T_fp32(const T* srcptr) {
+  __m512 vtmp;
+  if constexpr (std::is_same_v<T, float>) {
+    vtmp = _mm512_loadu_ps(srcptr);
+  } else if constexpr (std::is_same_v<T, utils::bf16>) {
+    vtmp = load_bf16_fp32(srcptr);
+  } else {
+    assert(0);
+  }
+  return vtmp;
+}
+
+static inline __m512 load_s8_fp32(int8_t* srcptr) {
+  auto src_y = load_s8_s32(srcptr);
+  auto dst_y = _mm512_cvtepi32_ps(src_y);
+  return dst_y;
+}
+
+static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
+  __m512i zero = _mm512_setzero_si512();
+  __mmask64 blt0 = _mm512_movepi8_mask(b);
+  return _mm512_mask_sub_epi8(a, blt0, zero, a);
+}
+
 template <typename _ST, typename _DT, bool _IS_SYM>
 static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _DT* dstptr, int row, int col,
                                                         int ld_src, int ld_dst, _ST* scales, int8_t* zero_points,
@@ -4703,31 +4728,6 @@ inline BTLA_CODE decompress_kblock_s7_fp(utils::bit4x2* b4ptr, utils::bit2x4* b2
     return BTLA_CODE::Success;
   }
   return ret;
-}
-
-template <typename T>
-static inline __m512 load_T_fp32(const T* srcptr) {
-  __m512 vtmp;
-  if constexpr (std::is_same_v<T, float>) {
-    vtmp = _mm512_loadu_ps(srcptr);
-  } else if constexpr (std::is_same_v<T, utils::bf16>) {
-    vtmp = load_bf16_fp32(srcptr);
-  } else {
-    assert(0);
-  }
-  return vtmp;
-}
-
-static inline __m512 load_s8_fp32(int8_t* srcptr) {
-  auto src_y = load_s8_s32(srcptr);
-  auto dst_y = _mm512_cvtepi32_ps(src_y);
-  return dst_y;
-}
-
-static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
-  __m512i zero = _mm512_setzero_si512();
-  __mmask64 blt0 = _mm512_movepi8_mask(b);
-  return _mm512_mask_sub_epi8(a, blt0, zero, a);
 }
 
 template <typename ScaleT, int NReg, int MTILE>
