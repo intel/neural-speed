@@ -167,6 +167,10 @@ void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output
 
 void bestla_device_mul_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                            const struct ne_tensor* src1, struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+
   auto q = (sycl::queue*)params->dev_queue;
 
   const int64_t ne00 = src0->ne[0];
@@ -194,6 +198,9 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
   sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  auto src0ptr = (float*)src0->data;
+  auto src1ptr = (float*)src1->data;
+  auto dstptr = (float*)dst->data;
   auto ev = q->submit([&](sycl::handler& cgh) {
     cgh.parallel_for(num_items, [=](auto it) {
       int i = it;
@@ -209,9 +216,9 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
       int i12 = i02 % ne12;
       int i11 = i01 % ne11;
 
-      float* dst_ptr = (float*)((char*)dst->data + i03 * nb3 + i02 * nb2 + i01 * nb1);
-      float* src0_ptr = (float*)((char*)src0->data + i03 * nb03 + i02 * nb02 + i01 * nb01);
-      float* src1_ptr = (float*)((char*)src1->data + i13 * nb13 + i12 * nb12 + i11 * nb11);
+      float* dst_ptr = (float*)((char*)dstptr + i03 * nb3 + i02 * nb2 + i01 * nb1);
+      float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
+      float* src1_ptr = (float*)((char*)src1ptr + i13 * nb13 + i12 * nb12 + i11 * nb11);
       dst_ptr[i00] = src0_ptr[i00] * src1_ptr[i00];
     });
   });
@@ -220,6 +227,10 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
 
 void bestla_device_elewise_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+
   auto q = (sycl::queue*)params->dev_queue;
   auto op = dst->op;
   const int64_t ne00 = src0->ne[0];
@@ -227,16 +238,17 @@ void bestla_device_elewise_f32(const struct ne_compute_params* params, const str
   const int64_t ne02 = src0->ne[2];
   const int64_t ne03 = src0->ne[3];
 
+  auto srcptr = (float*)src0->data;
+  auto dstptr = (float*)dst->data;
   sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
   auto ev = q->submit([&](sycl::handler& cgh) {
     cgh.parallel_for(num_items, [=](auto it) {
       int i = it;
-      float* dst_ptr = ((float*)dst->data + i);
-      float srcval = *((float*)src0->data + i);
+      float srcval = srcptr[i];
       if (op == NE_OP_SILU) {
         srcval = ne_silu_f32(srcval);
       }
-      *dst_ptr = srcval;
+      dstptr[i] = srcval;
     });
   });
   ev.wait();
