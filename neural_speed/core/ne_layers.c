@@ -2141,11 +2141,12 @@ struct ne_tensor* ne_silu_impl(struct ne_context* ctx, struct ne_tensor* a, bool
   if (!inplace && (a->grad)) {
     is_node = true;
   }
+  enum ne_op op = NE_OP_SILU;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
+  struct ne_tensor* result = inplace ? ne_view_tensor_bk(ctx, a, bk) : ne_dup_tensor_bk(ctx, a, bk);
 
-  struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
-
-  result->op = NE_OP_SILU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->op = op;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -4446,7 +4447,7 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
   if (params->type == NE_TASK_FINALIZE) {
 #ifdef NS_SYCL
     if (params->ith == 0) {
-      if (src1->backend != NE_BACKEND_CPU) {
+      if (dst->backend != NE_BACKEND_CPU) {
         bestla_device_memcpy_sync(dst->data, dstptr, dst->size, params->dev_queue);
       }
     }
@@ -6274,7 +6275,10 @@ static void ne_compute_forward_silu_f32(const struct ne_compute_params* params, 
   NE_ASSERT(ne_is_contiguous_except_dim_1(src0));
   NE_ASSERT(ne_is_contiguous_except_dim_1(dst));
   NE_ASSERT(ne_are_same_shape(src0, dst));
-
+  if (dst->backend == NE_BACKEND_SYCL) {
+    bestla_device_elewise_f32(params, src0, dst);
+    return;
+  }
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }

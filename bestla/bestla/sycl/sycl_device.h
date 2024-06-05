@@ -40,9 +40,10 @@ class SyclDevice {
 
     auto d_selector{sycl::default_selector_v};
     if (profile) {
-      sycl::property_list prop = {sycl::property::queue::enable_profiling()};
+      sycl::property_list prop = {sycl::property::queue::enable_profiling(), sycl::property::queue::in_order()};
       mQueue = sycl::queue(d_selector, exception_handler, prop);
     } else {
+      sycl::property_list prop = {sycl::property::queue::in_order()};
       mQueue = sycl::queue(d_selector, exception_handler);
     }
   }

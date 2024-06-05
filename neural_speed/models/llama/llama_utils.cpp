@@ -201,9 +201,9 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
       if (ml->verify_tensor(layers_i + ".feed_forward.w1.weight")) {
         NE_ASSERT(n_expert == 0);
         NE_ASSERT(n_expert_used == 0);
-        layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, backend);
+        layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, NE_BACKEND_SYCL);
         layer.ffn[1] = ml->get_tensor(layers_i + ".feed_forward.w2.weight", {n_ff, n_embd}, NE_BACKEND_SYCL);
-        layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, backend);
+        layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, NE_BACKEND_SYCL);
       } else {
         NE_ASSERT(n_expert > 0);
         NE_ASSERT(n_expert_used > 0);

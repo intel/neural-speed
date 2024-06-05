@@ -186,11 +186,12 @@ ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1
         bk = src_on_devce ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
     } break;
+    case NE_OP_SILU:
     case NE_OP_MUL: {
       if (src0->type == NE_TYPE_F32 || src0->type == NE_TYPE_F16) {
         bk = src_on_devce ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
-    }
+    } break;
     default:
       break;
   }
@@ -216,6 +217,9 @@ bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, si
   size_t ws_h = 0;
   size_t ws_d = 0;
   bool support = false;
+  if (node->backend==NE_BACKEND_SYCL) {
+    support = true;
+  }
   switch (node->op) {
     case NE_OP_MUL_MAT: {
       struct ne_tensor* wei = node->src0;

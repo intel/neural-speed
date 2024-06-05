@@ -140,7 +140,6 @@ void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, 
   }
 }
 
-
 template <class GCT>
 using ProAT = sycl_prologue_a::ActivationBase<GCT, float>;
 template <class GCT>
@@ -153,20 +152,93 @@ void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output
   auto dstor = (sycl_storage::StorageWeightKBlockNInteger*)weiptr;
   if (_m == 1) {
     using ProB = ProBTransT<GemmCore>;
-    auto e_esimd = ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
+    auto ev = ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
                               dstor->mBlockSize, (sycl::queue*)queue);
+    ev.wait();
   } else {
     using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;
     utils::GemmProblem gp(1, _m, _n, _k);
-    auto e_esimd = KernelTLauncher::compute(
+    auto ev = KernelTLauncher::compute(
         (sycl::queue*)queue, _m, _n, _k, dstor->mBlockSize,
         {{activation, lda}, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, {output, ldo}});
+    ev.wait();
   }
 }
 
 void bestla_device_mul_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
-  const struct ne_tensor* src1, struct ne_tensor* dst)
-{
+                           const struct ne_tensor* src1, struct ne_tensor* dst) {
+  auto q = (sycl::queue*)params->dev_queue;
 
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+  const size_t nb11 = ne11 == 1 ? 0 : src1->nb[1];
+  const size_t nb12 = ne12 == 1 ? 0 : src1->nb[2];
+  const size_t nb13 = ne13 == 1 ? 0 : src1->nb[3];
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+  sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  auto ev = q->submit([&](sycl::handler& cgh) {
+    cgh.parallel_for(num_items, [=](auto it) {
+      int i = it;
+      int i00 = i % ne00;
+      i /= ne00;
+      int i01 = i % ne01;
+      i /= ne01;
+      int i02 = i % ne02;
+      i /= ne02;
+      int i03 = i % ne03;
+
+      int i13 = i03 % ne13;
+      int i12 = i02 % ne12;
+      int i11 = i01 % ne11;
+
+      float* dst_ptr = (float*)((char*)dst->data + i03 * nb3 + i02 * nb2 + i01 * nb1);
+      float* src0_ptr = (float*)((char*)src0->data + i03 * nb03 + i02 * nb02 + i01 * nb01);
+      float* src1_ptr = (float*)((char*)src1->data + i13 * nb13 + i12 * nb12 + i11 * nb11);
+      dst_ptr[i00] = src0_ptr[i00] * src1_ptr[i00];
+    });
+  });
+  ev.wait();
+}
+
+void bestla_device_elewise_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                               struct ne_tensor* dst) {
+  auto q = (sycl::queue*)params->dev_queue;
+  auto op = dst->op;
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  auto ev = q->submit([&](sycl::handler& cgh) {
+    cgh.parallel_for(num_items, [=](auto it) {
+      int i = it;
+      float* dst_ptr = ((float*)dst->data + i);
+      float srcval = *((float*)src0->data + i);
+      if (op == NE_OP_SILU) {
+        srcval = ne_silu_f32(srcval);
+      }
+      *dst_ptr = srcval;
+    });
+  });
+  ev.wait();
 }
 #endif
