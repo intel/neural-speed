@@ -53,6 +53,12 @@ static const model_scratch llama_mem_req(int n_layers, float scratch_size_ratio 
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
+    case 56:
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
+      };
     case 60:
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,

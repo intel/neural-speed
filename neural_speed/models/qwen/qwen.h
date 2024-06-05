@@ -52,9 +52,9 @@ static const model_scratch qwen_mem_req(int n_layers, float scratch_size_ratio =
       };
     case 80:
       return {
-          static_cast<unsigned long long>(scratch_size_ratio * 10 * 4096) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 10 * 2048) * MB,
-          static_cast<unsigned long long>(scratch_size_ratio * 10 * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3 * 4096) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3 * 2048) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 3 * 4096) * MB,
       };
     default:
       MODEL_ASSERT(false);
