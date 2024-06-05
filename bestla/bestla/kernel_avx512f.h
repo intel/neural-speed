@@ -1237,19 +1237,20 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
                                                 int ld_dst, float* scales, int ld_scale, uint8_t* zps, int blocksize,
                                                 float* blkreduce) {
   int constexpr VLen = 16;
+  int constexpr Unroll = 2;
   auto vff = _mm512_set1_epi32(255);
   auto v0 = _mm512_set1_epi32(0);
   int vblocksize = utils::padto_le(blocksize, VLen);
-  int vblocksize_u3 = utils::padto_le(blocksize, VLen * 3);
+  int vblocksize_un = utils::padto_le(blocksize, VLen * Unroll);
   int colblk = utils::padto_le(col, blocksize);
-  for (int i = 0; i < row; i += 1) {
+  for (size_t i = 0; i < row; i += 1) {
     size_t j = 0;
     for (; j < colblk; j += blocksize) {
       __m512 vmaxval = _mm512_set1_ps(0.f);
       __m512 vminval = _mm512_set1_ps(0.f);
       size_t ij = 0;
-      for (; ij < vblocksize_u3; ij += VLen * 3) {
-        for (int iu = 0; iu < 3; iu++) {
+      for (; ij < vblocksize_un; ij += VLen * Unroll) {
+        for (size_t iu = 0; iu < Unroll; iu++) {
           __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
           vmaxval = _mm512_max_ps(vmaxval, vsrc);
           vminval = _mm512_min_ps(vminval, vsrc);
@@ -1281,8 +1282,8 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
       auto vdzp = _mm512_set1_epi32(zp);
       int sum = 0;
       ij = 0;
-      for (; ij < vblocksize_u3; ij += VLen * 3) {
-        for (int iu = 0; iu < 3; iu++) {
+      for (; ij < vblocksize_un; ij += VLen * Unroll) {
+        for (size_t iu = 0; iu < Unroll; iu++) {
           __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
           vsrc = _mm512_mul_ps(vsrc, vrscale);
           auto vdsrc = _mm512_cvtps_epi32(vsrc);
