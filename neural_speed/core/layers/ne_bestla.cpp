@@ -217,7 +217,7 @@ bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, si
   size_t ws_h = 0;
   size_t ws_d = 0;
   bool support = false;
-  if (node->backend==NE_BACKEND_SYCL) {
+  if (node->backend == NE_BACKEND_SYCL) {
     support = true;
   }
   switch (node->op) {

@@ -50,7 +50,8 @@ class UT_StorageMemCheck {
     using GemmCore = sycl_gemm::xve::DefaultSGemmCore;
     using PrologueB = prologue_b::gemm::WeightKBlockNInteger<GemmCore>;
 
-    auto packedW = PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
+    auto packedW =
+        PrologueB::createStorage(n, k, blocksize, qtype, bestla_dtype<float>, bestla_dtype<utils::bf16>, asym);
     avector<int8_t> buf0(packedW.mSize), buf1(packedW.mSize);
     packedW.assign(buf0.data());
     auto dev = UT_Device::get();

@@ -1368,13 +1368,13 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
         wstate->use_buf(ctx0, 0);
 
 #ifdef WHISPER_USE_FLASH_ATTN
-        struct ne_tensor* Q = ne_permute(
-            ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx)),
-            0, 2, 1, 3);
+        struct ne_tensor* Q =
+            ne_permute(ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
-        struct ne_tensor* K = ne_permute(
-            ctx0, ne_cpy(ctx0, Kcur, d_ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx)),
-            0, 2, 1, 3);
+        struct ne_tensor* K =
+            ne_permute(ctx0, ne_cpy(ctx0, Kcur, d_ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
         struct ne_tensor* V =
             ne_cpy(ctx0, ne_permute(ctx0, ne_reshape_3d(ctx0, Vcur, n_state / n_head, n_head, n_ctx), 1, 2, 0, 3),
@@ -1382,15 +1382,13 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
 
         struct ne_tensor* KQV = ggml_flash_attn(ctx0, Q, K, V, false);
 #else
-        struct ne_tensor* Q = ne_permute(
-            ctx0,
-            ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, n_ctx)), 0,
-            2, 1, 3);
+        struct ne_tensor* Q =
+            ne_permute(ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
-        struct ne_tensor* K = ne_permute(
-            ctx0,
-            ne_cpy(ctx0, Kcur, d_ne_new_tensor_3d(ctx0, wctx->itype, n_state / n_head, n_head, n_ctx)), 0,
-            2, 1, 3);
+        struct ne_tensor* K =
+            ne_permute(ctx0, ne_cpy(ctx0, Kcur, d_ne_new_tensor_3d(ctx0, wctx->itype, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
         // K * Q
         struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
@@ -1695,8 +1693,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       wstate->use_buf(ctx0, 0);
 
       struct ne_tensor* Q = ne_permute(
-          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N)), 0,
-          2, 1, 3);
+          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N)), 0, 2, 1, 3);
 
       struct ne_tensor* K = ne_permute(ctx0,
                                        ne_reshape_3d(ctx0,
@@ -1792,8 +1789,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       // ------
 
       struct ne_tensor* Q = ne_permute(
-          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N)), 0,
-          2, 1, 3);
+          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N)), 0, 2, 1, 3);
 
       struct ne_tensor* K = ne_permute(ctx0, Kcross, 0, 2, 1, 3);
 

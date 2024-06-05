@@ -85,7 +85,6 @@
 #define CompileAMX() BTLA_AMX_BF16_FOUND
 #endif
 
-
 // called by launcher, time critical functions
 #define TLACALL             \
   template <BTLA_ISA ISA_T> \

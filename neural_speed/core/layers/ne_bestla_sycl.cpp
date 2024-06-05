@@ -153,7 +153,7 @@ void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output
   if (_m == 1) {
     using ProB = ProBTransT<GemmCore>;
     auto ev = ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
-                              dstor->mBlockSize, (sycl::queue*)queue);
+                         dstor->mBlockSize, (sycl::queue*)queue);
     ev.wait();
   } else {
     using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;

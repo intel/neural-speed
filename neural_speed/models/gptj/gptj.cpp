@@ -344,8 +344,7 @@ static bool gptj_model_eval_internal(model_context* ctx, const model_input* inpu
     }
 
     // for-loop self-attention
-    struct ne_tensor* KQV_merged_contiguous =
-        d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum);
+    struct ne_tensor* KQV_merged_contiguous = d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum);
     size_t off_sl = 0;
     for (int gi = 0; gi < infer_groups.size(); ++gi) {
       const int attn_bs = infer_groups[gi].size();

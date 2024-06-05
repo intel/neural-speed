@@ -609,7 +609,7 @@ class Benchmark_DequantS4 {
         auto tmp = srcptr[i / 2 + j * k / 2];
         auto noffset = i / blocksize + j * blks;
         ref[i + j * k] = static_cast<float>(static_cast<int8_t>(tmp.x) - 8) * scale[noffset];
-        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8 ) * scale[noffset];
+        ref[i + 1 + j * k] = static_cast<float>(static_cast<int8_t>(tmp.y) - 8) * scale[noffset];
       }
     }
     sycl_vector<float> dS(scale.size(), q), dequantB(n * k, q);

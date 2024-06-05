@@ -127,7 +127,7 @@ class WeightKBlockNInteger {
   }
 
   AUTOCALL StorageWeight convertTransStorage(StorageWeight& srcstor, StorageWeight& dststor,
-                                           parallel::IThreading* threading) {
+                                             parallel::IThreading* threading) {
     auto s8buf = utils::amalloc<int8_t>((size_t)srcstor.mK * srcstor.mN);
     auto s8transbuf = utils::amalloc<int8_t>((size_t)srcstor.mKPad * srcstor.mNPad);
     unpackWeight(srcstor.mN, srcstor.mK, &srcstor, s8buf, srcstor.mN, threading);
@@ -137,14 +137,14 @@ class WeightKBlockNInteger {
     int nk_scale = utils::updiv(srcstor.mKPad, srcstor.mBlockSize);
     if (srcstor.mCorrection.mScaEleSize == 4) {
       transposeWeight<float>(nk_scale, srcstor.mNPad, srcstor.template SPtr<float>(), srcstor.mNPad,
-                                    dststor.template SPtr<float>(), dststor.CStep(), threading);
+                             dststor.template SPtr<float>(), dststor.CStep(), threading);
     } else if (srcstor.mCorrection.mScaEleSize == 2) {
       transposeWeight<uint16_t>(nk_scale, srcstor.mNPad, srcstor.template SPtr<uint16_t>(), srcstor.mNPad,
-                                       dststor.template SPtr<uint16_t>(), dststor.CStep(), threading);
+                                dststor.template SPtr<uint16_t>(), dststor.CStep(), threading);
     }
   }
   AUTOCALL void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
-                        utils::aligned_vector<float>* dq_buf) {
+                                 utils::aligned_vector<float>* dq_buf) {
     if (qtype == BTLA_DTYPE::DQ8_BNB) {
       dq_buf->resize(utils::updiv(scale_size, dq_blocksize) + 1);  // add 1 for offset.
       kernel::ref::dq8_bnb_double_quant<false>(scale, scale_size, dq_blocksize, dq_buf->data());
