@@ -1321,6 +1321,7 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
   int constexpr VLen = 16;
   auto vpos = _mm512_set1_epi32(127);
   auto vneg = _mm512_set1_epi32(-128);
+  int VBlockSizeU3 = utils::padto_le(blocksize, VLen * 3);
   int VBlockSize = utils::padto_le(blocksize, VLen);
   int colblk = utils::padto_le(col, blocksize);
   for (int i = 0; i < row; i += 1) {
@@ -1328,16 +1329,21 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
     for (; j < colblk; j += blocksize) {
       __m512 vmaxval = _mm512_set1_ps(std::numeric_limits<float>::min());
       size_t ij = 0;
-      for (; ij < VBlockSize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < VBlockSizeU3; ij += VLen * 3) {
+        for (int iu = 0; iu < 3; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vsrc = _mm512_abs_ps(vsrc);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
         }
-        vsrc = _mm512_abs_ps(vsrc);
-        vmaxval = _mm512_max_ps(vmaxval, vsrc);
       }
+      if (ij + VLen < VBlockSize) {
+        for (; ij < VBlockSize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vsrc = _mm512_abs_ps(vsrc);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
+        }
+      }
+
       auto maxval = _mm512_reduce_max_ps(vmaxval);
       if (ij < blocksize) {
         for (; ij < blocksize; ij++) {
@@ -1351,21 +1357,29 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
       auto vrscale = _mm512_set1_ps(rscale);
       ij = 0;
       int sum = 0;
-
-      for (; ij < VBlockSize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < VBlockSizeU3; ij += VLen * 3) {
+        for (int iu = 0; iu < 3; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          sum += _mm512_reduce_add_epi32(vdsrc);
+          vdsrc = _mm512_min_epi32(vdsrc, vpos);
+          vdsrc = _mm512_max_epi32(vdsrc, vneg);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst + iu * VLen]), vbsrc);
         }
-        vsrc = _mm512_mul_ps(vsrc, vrscale);
-        auto vdsrc = _mm512_cvtps_epi32(vsrc);
-        sum += _mm512_reduce_add_epi32(vdsrc);
-        vdsrc = _mm512_min_epi32(vdsrc, vpos);
-        vdsrc = _mm512_max_epi32(vdsrc, vneg);
-        auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
+      }
+      if (ij + VLen < VBlockSize) {
+        for (; ij < VBlockSize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          sum += _mm512_reduce_add_epi32(vdsrc);
+          vdsrc = _mm512_min_epi32(vdsrc, vpos);
+          vdsrc = _mm512_max_epi32(vdsrc, vneg);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
+        }
       }
       if (ij < blocksize) {
         for (; ij < blocksize; ij++) {
