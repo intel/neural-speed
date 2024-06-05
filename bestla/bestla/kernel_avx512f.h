@@ -296,6 +296,31 @@ static inline void vec_broadcast_epi32_2_4(__m512i* dst4regs, __m512i* src2regs)
   vec_broadcast_epi32_1_2(dst4regs + 2, src2regs + 1);
 }
 
+template <typename T>
+static inline __m512 load_T_fp32(const T* srcptr) {
+  __m512 vtmp;
+  if constexpr (std::is_same_v<T, float>) {
+    vtmp = _mm512_loadu_ps(srcptr);
+  } else if constexpr (std::is_same_v<T, utils::bf16>) {
+    vtmp = load_bf16_fp32(srcptr);
+  } else {
+    assert(0);
+  }
+  return vtmp;
+}
+
+static inline __m512 load_s8_fp32(int8_t* srcptr) {
+  auto src_y = load_s8_s32(srcptr);
+  auto dst_y = _mm512_cvtepi32_ps(src_y);
+  return dst_y;
+}
+
+static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
+  __m512i zero = _mm512_setzero_si512();
+  __mmask64 blt0 = _mm512_movepi8_mask(b);
+  return _mm512_mask_sub_epi8(a, blt0, zero, a);
+}
+
 template <typename _ST, typename _DT, bool _IS_SYM>
 static inline BTLA_CODE decompress_kblock_bit4_packrow1(utils::bit4x2* srcptr, _DT* dstptr, int row, int col,
                                                         int ld_src, int ld_dst, _ST* scales, int8_t* zero_points,
@@ -1212,27 +1237,33 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
                                                 int ld_dst, float* scales, int ld_scale, uint8_t* zps, int blocksize,
                                                 float* blkreduce) {
   int constexpr VLen = 16;
+  int constexpr Unroll = 2;
   auto vff = _mm512_set1_epi32(255);
   auto v0 = _mm512_set1_epi32(0);
   int vblocksize = utils::padto_le(blocksize, VLen);
+  int vblocksize_un = utils::padto_le(blocksize, VLen * Unroll);
   int colblk = utils::padto_le(col, blocksize);
-  for (int i = 0; i < row; i += 1) {
+  for (size_t i = 0; i < row; i += 1) {
     size_t j = 0;
     for (; j < colblk; j += blocksize) {
       __m512 vmaxval = _mm512_set1_ps(0.f);
       __m512 vminval = _mm512_set1_ps(0.f);
       size_t ij = 0;
-      for (; ij < vblocksize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < vblocksize_un; ij += VLen * Unroll) {
+        for (size_t iu = 0; iu < Unroll; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
+          vminval = _mm512_min_ps(vminval, vsrc);
         }
-        vmaxval = _mm512_max_ps(vmaxval, vsrc);
-        vminval = _mm512_min_ps(vminval, vsrc);
       }
+      if (ij + VLen < vblocksize) {
+        for (; ij < vblocksize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
+          vminval = _mm512_min_ps(vminval, vsrc);
+        }
+      }
+
       auto maxval = _mm512_reduce_max_ps(vmaxval);
       auto minval = _mm512_reduce_min_ps(vminval);
       if (ij < blocksize) {
@@ -1251,23 +1282,35 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
       auto vdzp = _mm512_set1_epi32(zp);
       int sum = 0;
       ij = 0;
-      for (; ij < vblocksize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < vblocksize_un; ij += VLen * Unroll) {
+        for (size_t iu = 0; iu < Unroll; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          if (blkreduce) {
+            sum += _mm512_reduce_add_epi32(vdsrc);
+          }
+          vdsrc = _mm512_add_epi32(vdsrc, vdzp);
+          vdsrc = _mm512_min_epi32(vdsrc, vff);
+          vdsrc = _mm512_max_epi32(vdsrc, v0);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst + iu * VLen]), vbsrc);
         }
-        vsrc = _mm512_mul_ps(vsrc, vrscale);
-        auto vdsrc = _mm512_cvtps_epi32(vsrc);
-        if (blkreduce) {
-          sum += _mm512_reduce_add_epi32(vdsrc);
+      }
+      if (ij + VLen < vblocksize) {
+        for (; ij < vblocksize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          if (blkreduce) {
+            sum += _mm512_reduce_add_epi32(vdsrc);
+          }
+          vdsrc = _mm512_add_epi32(vdsrc, vdzp);
+          vdsrc = _mm512_min_epi32(vdsrc, vff);
+          vdsrc = _mm512_max_epi32(vdsrc, v0);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
         }
-        vdsrc = _mm512_add_epi32(vdsrc, vdzp);
-        vdsrc = _mm512_min_epi32(vdsrc, vff);
-        vdsrc = _mm512_max_epi32(vdsrc, v0);
-        auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
       }
       for (; ij < blocksize; ij++) {
         auto srcval = static_cast<float>(srcptr[(j + ij) + i * ld_src]);
@@ -1321,6 +1364,7 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
   int constexpr VLen = 16;
   auto vpos = _mm512_set1_epi32(127);
   auto vneg = _mm512_set1_epi32(-128);
+  int VBlockSizeU3 = utils::padto_le(blocksize, VLen * 3);
   int VBlockSize = utils::padto_le(blocksize, VLen);
   int colblk = utils::padto_le(col, blocksize);
   for (int i = 0; i < row; i += 1) {
@@ -1328,16 +1372,21 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
     for (; j < colblk; j += blocksize) {
       __m512 vmaxval = _mm512_set1_ps(std::numeric_limits<float>::min());
       size_t ij = 0;
-      for (; ij < VBlockSize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < VBlockSizeU3; ij += VLen * 3) {
+        for (int iu = 0; iu < 3; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vsrc = _mm512_abs_ps(vsrc);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
         }
-        vsrc = _mm512_abs_ps(vsrc);
-        vmaxval = _mm512_max_ps(vmaxval, vsrc);
       }
+      if (ij + VLen < VBlockSize) {
+        for (; ij < VBlockSize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vsrc = _mm512_abs_ps(vsrc);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
+        }
+      }
+
       auto maxval = _mm512_reduce_max_ps(vmaxval);
       if (ij < blocksize) {
         for (; ij < blocksize; ij++) {
@@ -1351,21 +1400,29 @@ static inline BTLA_CODE quantize_fp_s8_colblock(int row, int col, const SRC_T* s
       auto vrscale = _mm512_set1_ps(rscale);
       ij = 0;
       int sum = 0;
-
-      for (; ij < VBlockSize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < VBlockSizeU3; ij += VLen * 3) {
+        for (int iu = 0; iu < 3; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          sum += _mm512_reduce_add_epi32(vdsrc);
+          vdsrc = _mm512_min_epi32(vdsrc, vpos);
+          vdsrc = _mm512_max_epi32(vdsrc, vneg);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst + iu * VLen]), vbsrc);
         }
-        vsrc = _mm512_mul_ps(vsrc, vrscale);
-        auto vdsrc = _mm512_cvtps_epi32(vsrc);
-        sum += _mm512_reduce_add_epi32(vdsrc);
-        vdsrc = _mm512_min_epi32(vdsrc, vpos);
-        vdsrc = _mm512_max_epi32(vdsrc, vneg);
-        auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
+      }
+      if (ij + VLen < VBlockSize) {
+        for (; ij < VBlockSize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          sum += _mm512_reduce_add_epi32(vdsrc);
+          vdsrc = _mm512_min_epi32(vdsrc, vpos);
+          vdsrc = _mm512_max_epi32(vdsrc, vneg);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
+        }
       }
       if (ij < blocksize) {
         for (; ij < blocksize; ij++) {
@@ -4672,31 +4729,6 @@ inline BTLA_CODE decompress_kblock_s7_fp(utils::bit4x2* b4ptr, utils::bit2x4* b2
     return BTLA_CODE::Success;
   }
   return ret;
-}
-
-template <typename T>
-static inline __m512 load_T_fp32(const T* srcptr) {
-  __m512 vtmp;
-  if constexpr (std::is_same_v<T, float>) {
-    vtmp = _mm512_loadu_ps(srcptr);
-  } else if constexpr (std::is_same_v<T, utils::bf16>) {
-    vtmp = load_bf16_fp32(srcptr);
-  } else {
-    assert(0);
-  }
-  return vtmp;
-}
-
-static inline __m512 load_s8_fp32(int8_t* srcptr) {
-  auto src_y = load_s8_s32(srcptr);
-  auto dst_y = _mm512_cvtepi32_ps(src_y);
-  return dst_y;
-}
-
-static inline __m512i _mm512_sign_epi8(__m512i a, __m512i b) {
-  __m512i zero = _mm512_setzero_si512();
-  __mmask64 blt0 = _mm512_movepi8_mask(b);
-  return _mm512_mask_sub_epi8(a, blt0, zero, a);
 }
 
 template <typename ScaleT, int NReg, int MTILE>

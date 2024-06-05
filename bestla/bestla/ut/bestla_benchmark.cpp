@@ -352,6 +352,85 @@ class Benchmark_Bf16Bf16Fp32 {
 static Benchmark_Bf16Bf16Fp32 sBenchmark_Bf16Bf16Fp32;
 #endif
 
+class Benchmark_Fp16Fp16Fp32 {
+ public:
+  Benchmark_Fp16Fp16Fp32() {
+    UT_START();
+    benchmark_all(1, 4096, 4096);
+    benchmark_all(1024, 4096, 4096);
+  }
+
+  using AType = utils::fp16;
+  using BType = utils::fp16;
+  using CType = float;
+  template <typename Core_T, typename LOG_T>
+  void benchmark(int m, int n, int k, int batch, AType* A, BType* B, CType* C, float timems, int threads) {
+    LOG_T log;
+    using Parallel = parallel::gemm::SchedulerBase<Core_T>;
+    using Launcher = wrapper::gemm::LauncherBase<Core_T, prologue_a::gemm::ActivationBase, prologue_b::gemm::WeightPack,
+                                                 epilogue::gemm::AccumulatorWriteBackFp32>;
+
+    UT_Threading::set_threads(threads);
+    auto corestr = gemm::CoreAttr::to_str(Core_T::ID);
+    utils::timer<std::chrono::milliseconds> tm;
+    auto tmpB = Launcher::PrologueB::createStorage(n, k);
+    std::vector<storage::gemm::StoragePackedWeight> packBs(batch, 0);
+    avector<int8_t> bufB(tmpB.mSize * batch);
+    for (size_t i = 0; i < batch; i++) {
+      packBs[i] = tmpB;
+      packBs[i].assign(bufB.data() + i * tmpB.mSize);
+      Launcher::PrologueB::packWeight(n, k, {B + i * n * k, n, &packBs[i]}, UT_Threading::get());
+    }
+    auto psize = (size_t)m * n * k * 2;
+    tm.start();
+    while (tm.stop() < timems) {
+      for (size_t i = 0; i < batch; i++) {
+        log.start();
+        GemmProblem gp(1, m, n, k);
+        typename Launcher::Param args{gp, {A + i * m * k, k}, {0, 0, &packBs[i]}, {C + i * m * n, n}};
+        parallel::GemmRun<Parallel, Launcher>(args, UT_Threading::get());
+        log.stop();
+        if (tm.stop() >= timems) {
+          break;
+        }
+      }
+    }
+    log.record();
+    double flops = double(psize) / log.min_val / 1e6;
+    printf("Threads %d %s %s Flops:%.3f PerCoreFlops:%.3f\n", threads, corestr, log.get_log_str(), flops,
+           flops / threads);
+  }
+
+  void benchmark_all(int m, int n, int k) {
+    auto memsize = gemm_memsize(m, n, k, BTLA_DTYPE::F16, BTLA_DTYPE::F16, BTLA_DTYPE::F32);
+    auto batch = auto_batch(memsize);
+    printf("%d %d %d %d %s %s %s\n", m, n, k, batch, bestla_dtype_str(BTLA_DTYPE::F16),
+           bestla_dtype_str(BTLA_DTYPE::F16), bestla_dtype_str(BTLA_DTYPE::F32));
+    avector<AType> A(size_t(m) * k * batch);
+    avector<BType> B(size_t(k) * n * batch);
+    avector<CType> C(size_t(m) * n * batch);
+    fill_buffer_randn(A.data(), k * m, AType(-0.5f), AType(0.5f));
+    fill_buffer_randn(B.data(), k * n, AType(-0.5f), AType(0.5f));
+    for (size_t i = 0; i < batch - 1; i++) {
+      memcpy(A.data() + i * m * k, A.data(), m * k * sizeof(AType));
+      memcpy(B.data() + i * n * k, B.data(), n * k * sizeof(BType));
+    }
+    using LOG = timer_statistics_logger<TestMs * 2>;
+    float testtime = float(TestMs);
+    GetCPUDevice();
+    auto threads_cfg = UT_Threading::get_threads_config();
+    for (auto threads : threads_cfg) {
+      if (_cd->AMX_FP16()) {
+        benchmark<gemm::HCoreRowNAmxfp16<32, 32>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
+        benchmark<gemm::HCoreRowNAmxfp16<64, 16>, LOG>(m, n, k, batch, A.data(), B.data(), C.data(), testtime, threads);
+      }
+    }
+  }
+};
+#ifdef BTLA_UT_WRAPPER
+static Benchmark_Fp16Fp16Fp32 sBenchmark_Fp16Fp16Fp32;
+#endif
+
 class Benchmark_Fp16Fp16Fp16 {
  public:
   Benchmark_Fp16Fp16Fp16() {
