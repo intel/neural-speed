@@ -4474,9 +4474,9 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
   }
   float* dstptr = dst->backend == NE_BACKEND_CPU ? (float*)dst->data : (float*)wsptr;
   if (params->type == NE_TASK_INIT) {
+    bool sync = src1->backend != NE_BACKEND_CPU || src0->backend != NE_BACKEND_CPU;
 #ifdef NS_SYCL
     if (params->ith == 0) {
-      bool sync = src1->backend != NE_BACKEND_CPU || src0->backend != NE_BACKEND_CPU;
       if (sync) {
         bestla_device_sync(params->dev_queue);
         if (src0->backend != NE_BACKEND_CPU) {
@@ -4489,7 +4489,7 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
       }
     }
 #else
-    NE_ASSERT(0);
+    if (sync) NE_ASSERT(0);
 #endif
     return;
   }
@@ -4502,7 +4502,9 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
       }
     }
 #else
-    NE_ASSERT(0);
+    if (dst->backend != NE_BACKEND_CPU) {
+      NE_ASSERT(0);
+    }
 #endif
     return;
   }
