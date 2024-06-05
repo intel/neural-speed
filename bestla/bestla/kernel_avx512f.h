@@ -1215,6 +1215,7 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
   auto vff = _mm512_set1_epi32(255);
   auto v0 = _mm512_set1_epi32(0);
   int vblocksize = utils::padto_le(blocksize, VLen);
+  int vblocksize_u3 = utils::padto_le(blocksize, VLen * 3);
   int colblk = utils::padto_le(col, blocksize);
   for (int i = 0; i < row; i += 1) {
     size_t j = 0;
@@ -1222,17 +1223,21 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
       __m512 vmaxval = _mm512_set1_ps(0.f);
       __m512 vminval = _mm512_set1_ps(0.f);
       size_t ij = 0;
-      for (; ij < vblocksize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < vblocksize_u3; ij += VLen * 3) {
+        for (int iu = 0; iu < 3; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
+          vminval = _mm512_min_ps(vminval, vsrc);
         }
-        vmaxval = _mm512_max_ps(vmaxval, vsrc);
-        vminval = _mm512_min_ps(vminval, vsrc);
       }
+      if (ij + VLen < vblocksize) {
+        for (; ij < vblocksize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vmaxval = _mm512_max_ps(vmaxval, vsrc);
+          vminval = _mm512_min_ps(vminval, vsrc);
+        }
+      }
+
       auto maxval = _mm512_reduce_max_ps(vmaxval);
       auto minval = _mm512_reduce_min_ps(vminval);
       if (ij < blocksize) {
@@ -1251,23 +1256,35 @@ static inline BTLA_CODE quantize_fp_u8_colblock(int row, int col, const SRC_T* s
       auto vdzp = _mm512_set1_epi32(zp);
       int sum = 0;
       ij = 0;
-      for (; ij < vblocksize; ij += VLen) {
-        __m512 vsrc;
-        if constexpr (std::is_same_v<SRC_T, float>) vsrc = _mm512_loadu_ps(&srcptr[(j + ij) + i * ld_src]);
-        if constexpr (std::is_same_v<SRC_T, utils::bf16>) {
-          auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr + j + ij + i * ld_src));
-          vsrc = zmm_cvt_bf16_fp32(tmp);
+      for (; ij < vblocksize_u3; ij += VLen * 3) {
+        for (int iu = 0; iu < 3; iu++) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src + iu * VLen);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          if (blkreduce) {
+            sum += _mm512_reduce_add_epi32(vdsrc);
+          }
+          vdsrc = _mm512_add_epi32(vdsrc, vdzp);
+          vdsrc = _mm512_min_epi32(vdsrc, vff);
+          vdsrc = _mm512_max_epi32(vdsrc, v0);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst + iu * VLen]), vbsrc);
         }
-        vsrc = _mm512_mul_ps(vsrc, vrscale);
-        auto vdsrc = _mm512_cvtps_epi32(vsrc);
-        if (blkreduce) {
-          sum += _mm512_reduce_add_epi32(vdsrc);
+      }
+      if (ij + VLen < vblocksize) {
+        for (; ij < vblocksize; ij += VLen) {
+          __m512 vsrc = load_T_fp32(srcptr + j + ij + i * ld_src);
+          vsrc = _mm512_mul_ps(vsrc, vrscale);
+          auto vdsrc = _mm512_cvtps_epi32(vsrc);
+          if (blkreduce) {
+            sum += _mm512_reduce_add_epi32(vdsrc);
+          }
+          vdsrc = _mm512_add_epi32(vdsrc, vdzp);
+          vdsrc = _mm512_min_epi32(vdsrc, vff);
+          vdsrc = _mm512_max_epi32(vdsrc, v0);
+          auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
+          _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
         }
-        vdsrc = _mm512_add_epi32(vdsrc, vdzp);
-        vdsrc = _mm512_min_epi32(vdsrc, vff);
-        vdsrc = _mm512_max_epi32(vdsrc, v0);
-        auto vbsrc = _mm512_cvtepi32_epi8(vdsrc);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(&dstptr[(j + ij) + i * ld_dst]), vbsrc);
       }
       for (; ij < blocksize; ij++) {
         auto srcval = static_cast<float>(srcptr[(j + ij) + i * ld_src]);
