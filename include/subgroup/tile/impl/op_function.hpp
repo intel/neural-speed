@@ -715,9 +715,9 @@ void dump_mat(
       sycl::ext::oneapi::experimental::printf(
           "%d ", (int)mat.reg[row * tile_x + col]);
     }
-    // sycl::ext::oneapi::experimental::printf("\n");
+    sycl::ext::oneapi::experimental::printf("\n");
   }
-  // sycl::ext::oneapi::experimental::printf("\n ");
+  sycl::ext::oneapi::experimental::printf("\n ");
 }
 template <typename T>
 void dump_mat_reg(T mat, size_t tile_x, size_t tile_y) {

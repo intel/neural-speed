@@ -73,11 +73,11 @@ struct tile_fma_t {
       b_block_size_y == matAcc_t::block_size_x,
       "matA block k should match with matAcc block k");
   static_assert(
-      b_block_size_x == matAcc_t::block_size_y,
-      "matb block n should match with matAcc block n");
+      a_block_size_y == matAcc_t::block_size_y,
+      "mata block m should match with matAcc block m");
 
-  static_assert(tile_size_m == 1, "matA tile m must be 1");
-  static_assert(a_block_size_y == 1, "matA block m must be 1");
+  // static_assert(tile_size_m == 1, "matA tile m must be 1");
+  // static_assert(a_block_size_y == 1, "matA block m must be 1");
   __XETLA_API static void mma(
       matAcc_t& acc_dst,
       matAcc_t& acc_src,
@@ -87,23 +87,26 @@ struct tile_fma_t {
       bool reduce) {
 #pragma unroll
     for (uint32_t k = 0; k < tile_size_k / block_size_k; k++) {
-      auto a_block =
-          a.reg.xetla_select<block_size_m * block_size_k, 1>(k * block_size_k);
 #pragma unroll
-      for (uint32_t n = 0; n < tile_size_n / block_size_n; n++) {
-        uint32_t b_block_idx = n * tile_size_k / block_size_k + k;
-        auto b_block = b.reg.xetla_select<matB_t::block_elems, 1>(
-            b_block_idx * matB_t::block_elems);
+      for (uint32_t m = 0; m < tile_size_m / block_size_m; m++) {
+        uint32_t a_block_idx = m * tile_size_k / block_size_k + k;
+        auto a_block = a.reg.xetla_select<block_size_m * block_size_k, 1>(
+            a_block_idx * matA_t::block_elems);
+#pragma unroll
+        for (uint32_t n = 0; n < tile_size_n / block_size_n; n++) {
+          uint32_t b_block_idx = n * tile_size_k / block_size_k + k;
+          auto b_block = b.reg.xetla_select<matB_t::block_elems, 1>(
+              b_block_idx * matB_t::block_elems);
 
-        uint32_t src_dst_idx = n * block_size_n;
-        auto src_block =
-            acc_src.reg.xetla_select<block_size_n * block_size_k, 1>(
-                src_dst_idx);
-        auto dst_block =
-            acc_dst.reg.xetla_select<block_size_n * block_size_k, 1>(
-                src_dst_idx);
-        fma_core<block_size_m, block_size_n, block_size_k>(
-            dst_block, src_block, b_block, a_block);
+          auto src_block =
+              acc_src.reg.xetla_select<block_size_m * block_size_k, 1>(
+                  m * matAcc_t::block_elems);
+          auto dst_block =
+              acc_dst.reg.xetla_select<block_size_m * block_size_k, 1>(
+                  m * matAcc_t::block_elems);
+          fma_core<block_size_m, block_size_n, block_size_k>(
+              dst_block, src_block, b_block, a_block);
+        }
       }
     }
     if (reduce) {
@@ -112,18 +115,24 @@ struct tile_fma_t {
   }
   template <int blk_m, int blk_n, int blk_k>
   __XETLA_API static void fma_core(
-      xetla_vector_ref<dtype_acc, blk_n * blk_k> __REF__ dst,
-      xetla_vector_ref<dtype_acc, blk_n * blk_k> __REF__ src,
+      xetla_vector_ref<dtype_acc, blk_m * blk_k> __REF__ dst_block,
+      xetla_vector_ref<dtype_acc, blk_m * blk_k> __REF__ src_block,
       xetla_vector_ref<dtype_b, blk_k * blk_n> __REF__ b_block,
       xetla_vector_ref<dtype_a, blk_m * blk_k> __REF__ a_block) {
-    static_assert(blk_m == 1, "block m must be 1");
-    auto dst_blk_2d = dst.xetla_format<dtype_acc, blk_n, blk_k>();
-    auto src_blk_2d = src.xetla_format<dtype_acc, blk_n, blk_k>();
+    static_assert(blk_n == 1, "block n must be 1");
+    auto dst_blk_2d = dst_block.xetla_format<dtype_acc, blk_m, blk_k>();
+    auto src_blk_2d = src_block.xetla_format<dtype_acc, blk_m, blk_k>();
     auto b_blk_2d = b_block.xetla_format<dtype_b, blk_n, blk_k>();
     auto a_blk_2d = a_block.xetla_format<dtype_a, blk_m, blk_k>();
+
 #pragma unroll
-    for (uint32_t n = 0; n < blk_n; n++) {
-      dst_blk_2d.row(n) = b_blk_2d.row(n) * a_blk_2d.row(0) + src_blk_2d.row(n);
+    for (uint32_t m = 0; m < blk_m; m++) {
+      auto a_row = a_blk_2d.row(m);
+#pragma unroll
+      for (uint32_t n = 0; n < blk_n; n++) {
+        auto b_row = b_blk_2d.row(n);
+        dst_blk_2d.row(m) = b_row * a_row + src_blk_2d.row(m);
+      }
     }
   }
   __XETLA_API static void reduce_acc_k(matAcc_t& matAcc, matC_t& matC) {
@@ -131,21 +140,29 @@ struct tile_fma_t {
     // matAcc[tx,ty,bx,by](matmul): tile_n, block_k, block_n, block_k
     // matAcc[tx,ty,bx,by](memory): block_k, tile_n, block_k, block_n
 
+    // static_assert(
+    //     matC_t::tile_size_y == 1 && matC_t::block_size_y == 1,
+    //     "matDst_t_ tile m and block m should match be 1");
     static_assert(
-        matC_t::tile_size_y == 1 && matC_t::block_size_y == 1,
-        "matDst_t_ tile m and block m should match be 1");
+        matAcc_t::tile_size_y == matC_t::tile_size_y,
+        "matAcc_t tile m should match with matDst_t_ tile m");
     static_assert(
-        matAcc_t::tile_size_y == matC_t::tile_size_x,
-        "matAcc_t tile n should match with matDst_t_ tile n");
-    static_assert(
-        matAcc_t::block_size_y == matC_t::block_size_x,
-        "matAcc_t block n should match with matDst_t_ block n");
-    static constexpr auto block_k = matAcc_t::block_size_x;
-    static constexpr auto tile_n = matAcc_t::tile_size_y;
+        matAcc_t::block_size_y == matC_t::block_size_y,
+        "matAcc_t block m should match with matDst_t_ block m");
+    static constexpr uint32_t block_k = matAcc_t::block_size_x;
+    static constexpr uint32_t block_m = matAcc_t::block_size_y;
     using dtype = matAcc_t::dtype;
 
-    matC.reg =
-        recur_col_reduce<reduce_op::sum, dtype, block_k, tile_n>(matAcc.reg);
+#pragma unroll
+    for (uint32_t m = 0; m < a_tile_size_y / a_block_size_y; m++) {
+      matC.reg.xetla_select<block_m, 1>(m * block_m) =
+          recur_col_reduce<reduce_op::sum, dtype, block_k, block_m>(
+              matAcc.reg.xetla_select<block_m * block_k, 1>(
+                  m * block_m * block_k));
+      // matC.reg =
+      //     recur_col_reduce<reduce_op::sum, dtype, block_k,
+      //     block_m>(matAcc.reg);
+    }
   }
 };
 

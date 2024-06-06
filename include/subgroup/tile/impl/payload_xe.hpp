@@ -1616,11 +1616,10 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<(
+    std::enable_if_t<
         arch_tag_ <= gpu_arch::XeHpg &&
-        ((tile_size_y_ != 1 || block_size_y_ != 1) ||
-         ((tile_size_x_ != 1 || block_size_x_ != 1) &&
-          reg_layout_ == reg_layout::transpose_tiled)))>> {
+        ((block_size_y_ != 1 && reg_layout_ == reg_layout::tiled) ||
+         (block_size_x_ != 1 && reg_layout_ == reg_layout::transpose_tiled))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -2121,7 +2120,9 @@ struct prefetch_payload_t<
 template <
     typename dtype_,
     uint32_t tile_size_x_,
+    uint32_t tile_size_y_,
     uint32_t block_size_x_,
+    uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
     uint32_t num_coop_sg_,
@@ -2129,10 +2130,19 @@ template <
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
     mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
-    tile_desc_t<tile_size_x_, 1, block_size_x_, 1, reg_layout_>,
+    tile_desc_t<
+        tile_size_x_,
+        tile_size_y_,
+        block_size_x_,
+        block_size_y_,
+        reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<
+        ((tile_size_y_ == 1 || block_size_y_ == 1) &&
+         reg_layout_ == reg_layout::tiled) ||
+        ((tile_size_x_ == 1 || block_size_x_ == 1) &&
+         reg_layout_ == reg_layout::transpose_tiled)>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;

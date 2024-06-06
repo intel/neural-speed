@@ -142,7 +142,7 @@ struct compute_policy_int4_dequantize<
   using dtype_zero_pt = dtype_zero_pt_;
   static constexpr quant_mode quant_type = quant_type_;
 
-  static constexpr uint32_t block_size_y_a = 1;
+  static constexpr uint32_t block_size_y_a = 4;
   static constexpr uint32_t block_bytes_x_a = 256;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);

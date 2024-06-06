@@ -89,7 +89,7 @@ class gemm_t<
   static constexpr bool is_col_major_a = mem_layout_a == mem_layout::col_major;
   static constexpr bool is_col_major_b = mem_layout_b == mem_layout::col_major;
   static constexpr bool is_gemv = is_col_major_b &&
-      compute_policy::mma_engine == mma_engine::fpu && sg_tile_m == 1;
+      compute_policy::mma_engine == mma_engine::fpu && sg_tile_m <= 4;
 
  private:
   /******** set data type **********/
@@ -266,9 +266,9 @@ class gemm_t<
  private:
   using matAcc_tile_desc_t = subgroup::tile_desc_t<
       block_size_y_b,
-      tile_size_x_b,
+      tile_size_y_a,
       block_size_y_b,
-      block_size_x_b,
+      block_size_y_a,
       reg_layout::tiled>;
   using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
   using scale_tile_desc_t = subgroup::tile_desc_t<
@@ -680,26 +680,13 @@ class gemm_t<
 
         // lowest 4 bit
         {
-          auto dequant_i8_low_4bit =
-              cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0);
-          dequant_i8_low_4bit = matB_blk & 0xf;
-          // Only int8 needs to reserve the sign bit
-          if constexpr (
-              compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-            // dequant_i8_low_4bit = dequant_i8_low_4bit << 4;
-            // dequant_i8_low_4bit = dequant_i8_low_4bit >> 4;
-          }
+          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0) =
+              matB_blk & 0xf;
         }
         // highest 4 bit
         {
-          auto dequant_i8_high_4bit =
-              cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1);
-          if constexpr (
-              compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-            dequant_i8_high_4bit = matB_blk >> 4;
-          } else {
-            dequant_i8_high_4bit = matB_blk >> 4;
-          }
+          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1) =
+              matB_blk >> 4;
         }
 
         // (b_i8 -  zero_pt_i8) x scale = fp16

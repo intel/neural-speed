@@ -397,7 +397,7 @@ tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   static constexpr uint32_t load_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
-  
+
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
   static constexpr uint32_t max_load_vec_len =
       load_store_attr::max_load_vec_len;

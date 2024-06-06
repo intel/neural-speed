@@ -20,6 +20,6 @@
 #pragma once
 
 #include <experimental/kernel/col_major_shuf/api.hpp>
+#include <experimental/kernel/col_major_shuf/col_major_shuf_xe.hpp>
 #include <experimental/kernel/col_major_shuf/common.hpp>
 #include <experimental/kernel/col_major_shuf/config.hpp>
-#include <experimental/kernel/col_major_shuf/col_major_shuf_xe.hpp>
