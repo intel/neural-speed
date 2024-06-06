@@ -898,11 +898,10 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
   const size_t cur_end = cur_offs + cur_size;
 
   size_t size_needed = 0;
-  assert(data == NULL);
   assert(!ctx->no_alloc);
   char* const mem_buffer = (char* const)ctx->mem_buffer;
   struct ne_object* const obj_new = (struct ne_object*)(mem_buffer + cur_end);
-  char* dptr = NULL;
+  char* dptr = (char*)data;
   if (type == NE_TYPE_BTLA) {
     size_needed = size;
     size_needed = ((size_needed + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN) * NE_MEM_ALIGN;
@@ -913,8 +912,9 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
     }
     size_needed = ((size_needed + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN) * NE_MEM_ALIGN;
   }
-
-  dptr = (char* const)ctx->dev_mem_buffer + ctx->dev_offs;
+  if (dptr == NULL) {
+    dptr = (char* const)ctx->dev_mem_buffer + ctx->dev_offs;
+  }
   ctx->dev_offs += size_needed;
 
   if (ctx->dev_offs + size_needed > ctx->dev_size) {
@@ -988,12 +988,13 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
       .perf_runs = 0,
       .perf_cycles = 0,
       .perf_time_us = 0,
-      .data = data == NULL ? (void*)(result + 1) : data,
+      .data = NULL,
       .size = size_needed,
       .name = {0},
       .padding = {0},
   };
   if (type == NE_TYPE_BTLA) {
+    result->data = (void*)(result + 1);
     memcpy(result->padding, &dptr, sizeof(dptr));
   } else {
     result->data = dptr;
@@ -1475,7 +1476,7 @@ struct ne_tensor* ne_dump_tensor(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_view_tensor(ctx, a);
 
   result->op = NE_OP_DUMP_TENSOR;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -1492,7 +1493,7 @@ struct ne_tensor* ne_dup_impl(struct ne_context* ctx, struct ne_tensor* a, bool 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_DUP;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -1559,7 +1560,7 @@ struct ne_tensor* ne_add1_impl(struct ne_context* ctx, struct ne_tensor* a, stru
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_ADD1;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -1603,7 +1604,7 @@ struct ne_tensor* ne_acc_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   ne_scratch_load(ctx);
 
   result->op = NE_OP_ACC;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   result->opt[0] = c;
@@ -1661,7 +1662,7 @@ struct ne_tensor* ne_tp_concat(struct ne_context* ctx, struct ne_tensor* a, enum
 
   ne_scratch_load(ctx);
   result->op = NE_OP_TP_CONCAT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   result->opt[0] = c;
@@ -1681,7 +1682,7 @@ struct ne_tensor* ne_all_reduce(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_view_tensor(ctx, a);
 
   result->op = NE_OP_ALL_REDUCE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -1737,7 +1738,7 @@ struct ne_tensor* ne_split(struct ne_context* ctx, struct ne_tensor* a, enum par
 
   ne_scratch_load(ctx);
   result->op = NE_OP_SPLIT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   result->opt[0] = c;
@@ -1760,7 +1761,7 @@ struct ne_tensor* ne_sub_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SUB;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -1809,7 +1810,7 @@ struct ne_tensor* ne_tanh(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_TANH;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   return result;
 }
@@ -1840,7 +1841,7 @@ struct ne_tensor* ne_div_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_DIV;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -1866,7 +1867,7 @@ struct ne_tensor* ne_sqr_impl(struct ne_context* ctx, struct ne_tensor* a, bool 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SQR;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -1892,7 +1893,7 @@ struct ne_tensor* ne_sqrt_impl(struct ne_context* ctx, struct ne_tensor* a, bool
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SQRT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -1918,7 +1919,7 @@ struct ne_tensor* ne_log_impl(struct ne_context* ctx, struct ne_tensor* a, bool 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_LOG;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -1944,7 +1945,7 @@ struct ne_tensor* ne_sum(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_new_tensor_1d(ctx, a->type, 1, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_SUM;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -1967,7 +1968,7 @@ struct ne_tensor* ne_sum_rows(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_new_tensor(ctx, a->type, a->n_dims, ne, a->size, a->backend);
 
   result->op = NE_OP_SUM_ROWS;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -1987,7 +1988,7 @@ struct ne_tensor* ne_mean(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, a->n_dims, ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_MEAN;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2011,7 +2012,7 @@ struct ne_tensor* ne_repeat(struct ne_context* ctx, struct ne_tensor* a, struct 
   struct ne_tensor* result = ne_new_tensor(ctx, a->type, b->n_dims, b->ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_REPEAT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -2029,7 +2030,7 @@ struct ne_tensor* ne_abs_impl(struct ne_context* ctx, struct ne_tensor* a, bool 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_ABS;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2055,7 +2056,7 @@ struct ne_tensor* ne_sgn_impl(struct ne_context* ctx, struct ne_tensor* a, bool 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SGN;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2081,7 +2082,7 @@ struct ne_tensor* ne_neg_impl(struct ne_context* ctx, struct ne_tensor* a, bool 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_NEG;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2107,7 +2108,7 @@ struct ne_tensor* ne_step_impl(struct ne_context* ctx, struct ne_tensor* a, bool
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_STEP;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2133,7 +2134,7 @@ struct ne_tensor* ne_relu_impl(struct ne_context* ctx, struct ne_tensor* a, bool
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_RELU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2159,7 +2160,7 @@ struct ne_tensor* ne_gelu_impl(struct ne_context* ctx, struct ne_tensor* a, bool
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_GELU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2213,7 +2214,7 @@ struct ne_tensor* ne_silu_back(struct ne_context* ctx, struct ne_tensor* a, stru
   struct ne_tensor* result = ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SILU_BACK;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -2228,13 +2229,14 @@ struct ne_tensor* ne_norm_impl(struct ne_context* ctx, struct ne_tensor* a, bool
     NE_ASSERT(false);  // TODO: implement backward
     is_node = true;
   }
-
-  struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
+  enum ne_op op = NE_OP_NORM;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
+  struct ne_tensor* result = inplace ? ne_view_tensor_bk(ctx, a, bk) : ne_dup_tensor_bk(ctx, a, bk);
 
   ne_set_op_params(result, &eps, sizeof(eps));
 
-  result->op = NE_OP_NORM;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->op = op;
+  result->grad = NULL;
   result->src0 = a;
   return result;
 }
@@ -2254,12 +2256,14 @@ struct ne_tensor* ne_rms_norm_impl(struct ne_context* ctx, struct ne_tensor* a, 
     is_node = true;
   }
 
-  struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
+  enum ne_op op = NE_OP_RMS_NORM;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
+  struct ne_tensor* result = inplace ? ne_view_tensor_bk(ctx, a, bk) : ne_dup_tensor_bk(ctx, a, bk);
 
   ne_set_op_params(result, &eps, sizeof(eps));
 
-  result->op = NE_OP_RMS_NORM;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->op = op;
+  result->grad = NULL;
   result->src0 = a;
   return result;
 }
@@ -2283,7 +2287,7 @@ struct ne_tensor* ne_rms_norm_back(struct ne_context* ctx, struct ne_tensor* a, 
   struct ne_tensor* result = ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_RMS_NORM_BACK;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -2304,7 +2308,7 @@ struct ne_tensor* ne_mul_mat(struct ne_context* ctx, struct ne_tensor* a, struct
   const int64_t ne[4] = {a->ne[1], b->ne[1], b->ne[2], b->ne[3]};
   struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, MAX(a->n_dims, b->n_dims), ne, NE_SIZE_CALC, a->backend);
   result->op = NE_OP_MUL_MAT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -2327,7 +2331,7 @@ struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor*
   struct ne_tensor* result = ne_new_tensor(ctx, a->type, MIN(w->n_dims, a->n_dims), ne, NE_SIZE_CALC, w->backend);
 
   result->op = NE_OP_MUL_MAT_BIAS;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = w;
   result->src1 = a;
   result->opt[0] = b;
@@ -2355,7 +2359,7 @@ struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor* const 
   int params[] = {id, n_as};
   ne_set_op_params(result, &params, sizeof(params));
   result->op = NE_OP_MUL_MAT_ID;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = ids;
   result->src1 = b;
 
@@ -2397,7 +2401,7 @@ struct ne_tensor* ne_mul_id_ffn_silu(struct ne_context* ctx, struct ne_tensor* c
   int params[] = {id, n_as};
   ne_set_op_params(result, &params, sizeof(params));
   result->op = NE_OP_MUL_ID_FFN_SILU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = ids;
   for (int i = 0; i < n_as; i++) {
@@ -2442,7 +2446,7 @@ struct ne_tensor* ne_mul_id_ffn_gelu(struct ne_context* ctx, struct ne_tensor* c
   int params[] = {id, n_as};
   ne_set_op_params(result, &params, sizeof(params));
   result->op = NE_OP_MUL_ID_FFN_GELU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = ids;
   for (int i = 0; i < n_as; i++) {
@@ -2464,7 +2468,7 @@ struct ne_tensor* ne_argsort(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_I32, NE_MAX_DIMS, a->ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_ARGSORT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   return result;
 }
@@ -2502,7 +2506,7 @@ struct ne_tensor* ne_mul_qkv(struct ne_context* ctx, struct ne_tensor* qw, struc
       ne_new_tensor(ctx, NE_TYPE_F32, MIN(src->n_dims, qw->n_dims), ne, NE_SIZE_CALC, qw->backend);
 
   result->op = NE_OP_MUL_QKV;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = qw;
   result->opt[0] = kw;
@@ -2530,7 +2534,7 @@ struct ne_tensor* ne_ffn_silu(struct ne_context* ctx, struct ne_tensor* w1, stru
   struct ne_tensor* tmp1 = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC, w1->backend);
 
   result->op = NE_OP_MUL_FFN_SILU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = w1;
   result->opt[0] = w2;
@@ -2556,7 +2560,7 @@ struct ne_tensor* ne_ffn_add_gelu(struct ne_context* ctx, struct ne_tensor* w1, 
   struct ne_tensor* tmp = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC, w1->backend);
 
   result->op = NE_OP_MUL_FFN_ADD_GELU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = w1;
   result->opt[0] = w2;
@@ -2582,7 +2586,7 @@ struct ne_tensor* ne_ffn_gelu(struct ne_context* ctx, struct ne_tensor* w1, stru
   struct ne_tensor* tmp = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC, w1->backend);
 
   result->op = NE_OP_MUL_FFN_GELU;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = w1;
   result->opt[0] = w2;
@@ -2608,7 +2612,7 @@ struct ne_tensor* ne_ffn_gelu_mul(struct ne_context* ctx, struct ne_tensor* w1, 
   struct ne_tensor* tmp1 = ne_new_tensor(ctx, NE_TYPE_F32, src->n_dims, tne, NE_SIZE_CALC, w1->backend);
 
   result->op = NE_OP_MUL_FFN_GELU_MUL;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = src;
   result->src1 = w1;
   result->opt[0] = w2;
@@ -2632,7 +2636,7 @@ struct ne_tensor* ne_scale_impl(struct ne_context* ctx, struct ne_tensor* a, str
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SCALE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -2674,7 +2678,7 @@ struct ne_tensor* ne_set_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   ne_scratch_load(ctx);
 
   result->op = NE_OP_SET;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   result->opt[0] = c;
@@ -2724,7 +2728,7 @@ struct ne_tensor* ne_cpy_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   struct ne_tensor* result = ne_view_tensor(ctx, b);
 
   result->op = NE_OP_CPY;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -2750,7 +2754,7 @@ struct ne_tensor* ne_cont_impl(struct ne_context* ctx, struct ne_tensor* a, bool
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_CONT;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2785,7 +2789,7 @@ struct ne_tensor* ne_reshape(struct ne_context* ctx, struct ne_tensor* a, struct
   struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, b->n_dims, b->ne, a->data, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_RESHAPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2805,7 +2809,7 @@ struct ne_tensor* ne_reshape_1d(struct ne_context* ctx, struct ne_tensor* a, int
   struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 1, ne, a->data, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_RESHAPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2825,7 +2829,7 @@ struct ne_tensor* ne_reshape_2d(struct ne_context* ctx, struct ne_tensor* a, int
   struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 2, ne, a->data, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_RESHAPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2842,10 +2846,12 @@ struct ne_tensor* ne_reshape_3d(struct ne_context* ctx, struct ne_tensor* a, int
   }
 
   const int64_t ne[3] = {ne0, ne1, ne2};
-  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 3, ne, a->data, NE_SIZE_CALC, a->backend);
+  enum ne_op op = NE_OP_RESHAPE;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
+  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 3, ne, a->data, NE_SIZE_CALC, bk);
 
-  result->op = NE_OP_RESHAPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->op = op;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2861,12 +2867,13 @@ struct ne_tensor* ne_reshape_4d(struct ne_context* ctx, struct ne_tensor* a, int
   if (a->grad) {
     is_node = true;
   }
-
+  enum ne_op op = NE_OP_RESHAPE;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
   const int64_t ne[4] = {ne0, ne1, ne2, ne3};
-  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 4, ne, a->data, NE_SIZE_CALC, a->backend);
-
-  result->op = NE_OP_RESHAPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  struct ne_tensor* result =
+      ne_new_tensor_impl(ctx, a->type, 4, ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
+  result->op = op;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -2885,7 +2892,7 @@ struct ne_tensor* ne_view_1d(struct ne_context* ctx, struct ne_tensor* a, int64_
       ne_new_tensor_impl(ctx, a->type, 1, &ne0, (char*)a->data + offset, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_VIEW;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -2914,7 +2921,7 @@ struct ne_tensor* ne_view_2d(struct ne_context* ctx, struct ne_tensor* a, int64_
   result->nb[3] = result->nb[2];
 
   result->op = NE_OP_VIEW;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -2943,7 +2950,7 @@ struct ne_tensor* ne_view_3d(struct ne_context* ctx, struct ne_tensor* a, int64_
   result->nb[3] = result->nb[2] * ne2;
 
   result->op = NE_OP_VIEW;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -2972,7 +2979,7 @@ struct ne_tensor* ne_view_4d(struct ne_context* ctx, struct ne_tensor* a, int64_
   result->nb[3] = nb3;
 
   result->op = NE_OP_VIEW;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -3029,7 +3036,7 @@ struct ne_tensor* ne_permute(struct ne_context* ctx, struct ne_tensor* a, int ax
   result->nb[3] = nb[3];
 
   result->op = NE_OP_PERMUTE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
 
@@ -3060,7 +3067,7 @@ struct ne_tensor* ne_transpose(struct ne_context* ctx, struct ne_tensor* a) {
   result->nb[1] = a->nb[0];
 
   result->op = NE_OP_TRANSPOSE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -3088,7 +3095,7 @@ struct ne_tensor* ne_get_rows(struct ne_context* ctx, struct ne_tensor* a, struc
       ne_new_tensor_4d(ctx, NE_TYPE_F32, a->ne[0], b->ne[0], b->ne[1], b->ne[2], NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_GET_ROWS;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3112,7 +3119,7 @@ struct ne_tensor* ne_get_rows_back(struct ne_context* ctx, struct ne_tensor* a, 
   struct ne_tensor* result = ne_new_tensor_2d(ctx, NE_TYPE_F32, c->ne[0], c->ne[1], NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_GET_ROWS_BACK;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   result->opt[0] = c;
@@ -3133,7 +3140,7 @@ struct ne_tensor* ne_diag(struct ne_context* ctx, struct ne_tensor* a) {
   struct ne_tensor* result = ne_new_tensor(ctx, a->type, MAX(a->n_dims, 2), ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_DIAG;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -3170,7 +3177,7 @@ struct ne_tensor* ne_diag_mask_inf_impl(struct ne_context* ctx, struct ne_tensor
   ne_scratch_load(ctx);
 
   result->op = NE_OP_DIAG_MASK_INF;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3216,7 +3223,7 @@ struct ne_tensor* ne_diag_mask_zero_impl(struct ne_context* ctx, struct ne_tenso
   ne_scratch_load(ctx);
 
   result->op = NE_OP_DIAG_MASK_ZERO;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3266,7 +3273,7 @@ struct ne_tensor* ne_padding_mask_inf_impl(struct ne_context* ctx, struct ne_ten
   ne_scratch_load(ctx);
 
   result->op = NE_OP_PADDING_MASK_INF;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3292,7 +3299,7 @@ struct ne_tensor* ne_soft_max_impl(struct ne_context* ctx, struct ne_tensor* a, 
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_SOFT_MAX;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
   return result;
@@ -3359,7 +3366,7 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
   ne_set_op_params(result, &params, sizeof(params));
 
   result->op = NE_OP_ROPE;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   result->opt[0] = cossin;
@@ -3426,7 +3433,7 @@ struct ne_tensor* ne_rope_back(struct ne_context* ctx, struct ne_tensor* a, int 
   ne_scratch_load(ctx);
 
   result->op = NE_OP_ROPE_BACK;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3478,7 +3485,7 @@ struct ne_tensor* ne_alibi(struct ne_context* ctx, struct ne_tensor* a, int n_pa
   ne_scratch_load(ctx);
 
   result->op = NE_OP_ALIBI;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3507,7 +3514,7 @@ struct ne_tensor* ne_clamp(struct ne_context* ctx, struct ne_tensor* a, float mi
   ne_scratch_load(ctx);
 
   result->op = NE_OP_CLAMP;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3535,7 +3542,7 @@ struct ne_tensor* ne_conv_1d_1s(struct ne_context* ctx, struct ne_tensor* a, str
   struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, 2, ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_CONV_1D_1S;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3563,7 +3570,7 @@ struct ne_tensor* ne_conv_1d_2s(struct ne_context* ctx, struct ne_tensor* a, str
   struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, 2, ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_CONV_1D_2S;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3597,7 +3604,7 @@ NE_API struct ne_tensor* ne_conv_1d(struct ne_context* ctx, struct ne_tensor* a,
   ne_set_op_params(result, params, sizeof(params));
 
   result->op = NE_OP_CONV_1D;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   return result;
@@ -3696,7 +3703,7 @@ struct ne_tensor* ne_flash_ff(struct ne_context* ctx, struct ne_tensor* a, struc
   struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, 4, a->ne, NE_SIZE_CALC, a->backend);
 
   result->op = NE_OP_FLASH_FF;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b0;
   result->opt[0] = b1;
@@ -3721,7 +3728,7 @@ struct ne_tensor* ne_map_unary_impl_f32(struct ne_context* ctx, struct ne_tensor
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_MAP_UNARY;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->opt[0] = addr_tensor;
   return result;
@@ -3753,7 +3760,7 @@ struct ne_tensor* ne_map_binary_impl_f32(struct ne_context* ctx, struct ne_tenso
   struct ne_tensor* result = inplace ? ne_view_tensor(ctx, a) : ne_dup_tensor(ctx, a);
 
   result->op = NE_OP_MAP_BINARY;
-  result->grad = is_node ? ne_dup_tensor(ctx, result) : NULL;
+  result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
   result->opt[0] = addr_tensor;

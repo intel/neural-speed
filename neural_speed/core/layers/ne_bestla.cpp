@@ -175,6 +175,7 @@ static inline int ne_nrows(const struct ne_tensor* tensor) {
 
 ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1, enum ne_op op) {
   ne_backend bk = NE_BACKEND_CPU;
+#ifdef NS_SYCL
   bool src_on_devce = src0->backend == NE_BACKEND_SYCL;
   if (src1) {
     src_on_devce |= src1->backend == NE_BACKEND_SYCL;
@@ -195,6 +196,7 @@ ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1
     default:
       break;
   }
+#endif
   return bk;
 }
 
