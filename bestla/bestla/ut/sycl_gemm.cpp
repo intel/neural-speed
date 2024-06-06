@@ -475,8 +475,8 @@ class UT_SyclS4Gemv {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    auto ev = sycl_prologue_b::WeightS4Trans<xve::DefaultHGemmCore, sycl::half>::gemv(A_d, {B_d, S_d, blks}, C_d,
-                                                                                           n, k, blocksize, q);
+    auto ev = sycl_prologue_b::WeightS4Trans<xve::DefaultHGemmCore, sycl::half>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k,
+                                                                                      blocksize, q);
     ev.wait();
     q->memcpy(C.data(), C_d, C.size() * 2).wait();
     buffer_error(refC.data(), C.data(), C.size(), utils::fp16(0.1f));

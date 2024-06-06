@@ -64,7 +64,7 @@ class SyclDevice {
     return dev.get_info<sycl::info::device::device_type>() == sycl::info::device_type::gpu;
   }
 
-   static inline bool is_cpu(sycl::queue* q) {
+  static inline bool is_cpu(sycl::queue* q) {
     return q->get_device().get_info<sycl::info::device::device_type>() == sycl::info::device_type::cpu;
   }
 
