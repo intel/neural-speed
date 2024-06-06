@@ -631,7 +631,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   // update kv token count
   lctx.model.kv_self.n = n_cached;
-  float* logptr = NULL;
+  float* logptr = nullptr;
   if (inpL->backend == NE_BACKEND_SYCL) {
 #ifdef NS_SYCL
     bestla_device_sync(ctx0->dev_queue);
