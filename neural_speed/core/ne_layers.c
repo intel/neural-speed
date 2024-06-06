@@ -2502,8 +2502,7 @@ struct ne_tensor* ne_mul_qkv(struct ne_context* ctx, struct ne_tensor* qw, struc
   }
 
   const int64_t ne[4] = {qw->ne[1], src->ne[1], src->ne[2] * 3, src->ne[3]};
-  struct ne_tensor* result =
-      ne_new_tensor(ctx, NE_TYPE_F32, MIN(src->n_dims, qw->n_dims), ne, NE_SIZE_CALC, qw->backend);
+  struct ne_tensor* result = ne_new_tensor(ctx, NE_TYPE_F32, 4, ne, NE_SIZE_CALC, qw->backend);
 
   result->op = NE_OP_MUL_QKV;
   result->grad = NULL;
@@ -2804,11 +2803,13 @@ struct ne_tensor* ne_reshape_1d(struct ne_context* ctx, struct ne_tensor* a, int
   if (a->grad) {
     is_node = true;
   }
-
+  enum ne_op op = NE_OP_RESHAPE;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
   const int64_t ne[1] = {ne0};
-  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 1, ne, a->data, NE_SIZE_CALC, a->backend);
+  struct ne_tensor* result =
+      ne_new_tensor_impl(ctx, a->type, 1, ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
 
-  result->op = NE_OP_RESHAPE;
+  result->op = op;
   result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
@@ -2824,11 +2825,13 @@ struct ne_tensor* ne_reshape_2d(struct ne_context* ctx, struct ne_tensor* a, int
   if (a->grad) {
     is_node = true;
   }
-
+  enum ne_op op = NE_OP_RESHAPE;
+  enum ne_backend bk = bestla_backend_support(a, NULL, op);
   const int64_t ne[2] = {ne0, ne1};
-  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 2, ne, a->data, NE_SIZE_CALC, a->backend);
+  struct ne_tensor* result =
+      ne_new_tensor_impl(ctx, a->type, 2, ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
 
-  result->op = NE_OP_RESHAPE;
+  result->op = op;
   result->grad = NULL;
   result->src0 = a;
   result->src1 = NULL;
@@ -2848,7 +2851,8 @@ struct ne_tensor* ne_reshape_3d(struct ne_context* ctx, struct ne_tensor* a, int
   const int64_t ne[3] = {ne0, ne1, ne2};
   enum ne_op op = NE_OP_RESHAPE;
   enum ne_backend bk = bestla_backend_support(a, NULL, op);
-  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 3, ne, a->data, NE_SIZE_CALC, bk);
+  struct ne_tensor* result =
+      ne_new_tensor_impl(ctx, a->type, 3, ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
 
   result->op = op;
   result->grad = NULL;
@@ -2877,6 +2881,20 @@ struct ne_tensor* ne_reshape_4d(struct ne_context* ctx, struct ne_tensor* a, int
   result->src0 = a;
   result->src1 = NULL;
   return result;
+}
+
+struct ne_tensor* ne_device_sync(struct ne_context* ctx, struct ne_tensor* a) {
+  if (a->n_dims == 4) {
+    return ne_reshape_4d(ctx, a, a->ne[0], a->ne[1], a->ne[2], a->ne[3]);
+  }
+  if (a->n_dims == 3) {
+    return ne_reshape_3d(ctx, a, a->ne[0], a->ne[1], a->ne[2]);
+  }
+  if (a->n_dims == 2) {
+    return ne_reshape_2d(ctx, a, a->ne[0], a->ne[1]);
+  }
+  assert(a->n_dims == 1);
+  return ne_reshape_1d(ctx, a, a->ne[0]);
 }
 
 // ne_view_1d
@@ -3638,7 +3656,7 @@ struct ne_tensor* ne_flash_attn(struct ne_context* ctx, struct ne_tensor* q, str
   bool is_node = true;
   struct ne_tensor* result =
       ne_new_tensor_4d(ctx, NE_TYPE_F32, headsize, headnum, seq_cur, batch, NE_SIZE_CALC, q->backend);
-  attn_shape_t atte_shape = {batch, headnum, headsize, seq_cur, seq_all};
+  attn_shape_t atte_shape = {batch, headnum, heads_kv, headsize, seq_cur, seq_all};
   size_t tmpsize = bestla_fusion_attn_workspace_size(&atte_shape);
   struct ne_tensor* tmp_t = ne_new_tensor_1d(ctx, NE_TYPE_I8, tmpsize, NE_SIZE_CALC, q->backend);
   result->op = NE_OP_FLASH_ATTN;
@@ -8263,6 +8281,18 @@ static void ne_compute_forward_cont(const struct ne_compute_params* params, cons
 
 static void ne_compute_forward_reshape(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        struct ne_tensor* dst) {
+  if (src0->backend != dst->backend) {
+#ifdef NS_SYCL
+    if (params->type == NE_TASK_INIT) {
+      if (params->ith == 0) {
+        bestla_device_sync(params->dev_queue);
+        bestla_device_memcpy_sync(dst->data, src0->data, src0->size, params->dev_queue);
+      }
+    }
+#else
+    NE_ASSERT(0);
+#endif
+  }
   // NOP
   UNUSED(params);
   UNUSED(src0);

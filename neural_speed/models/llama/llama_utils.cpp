@@ -121,6 +121,11 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   const int i_gpu_start = n_layer - n_gpu_layer;
   model.layers.resize(n_layer);
   size_t vram_total = 0;
+#ifdef NS_SYCL
+  const ne_backend test_backend = NE_BACKEND_SYCL;
+#else
+  const ne_backend test_backend = NE_BACKEND_CPU;
+#endif
   if (ml->verify_tensor("token_embd.weight")) {  // GGUF
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
@@ -175,7 +180,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
     model.others[0] = ml->get_tensor("tok_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("norm.weight", {n_embd}, NE_BACKEND_CPU);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
-                                     n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+                                     n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : test_backend);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
@@ -186,12 +191,12 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
       layer.norm[0] = ml->get_tensor(layers_i + ".attention_norm.weight", {n_embd}, backend);
 
       // qkv GEMM
-      layer.attn[0] = ml->get_tensor(layers_i + ".attention.wq.weight", {n_embd, n_embd}, backend);
+      layer.attn[0] = ml->get_tensor(layers_i + ".attention.wq.weight", {n_embd, n_embd}, test_backend);
       layer.attn[1] =
-          ml->get_tensor(layers_i + ".attention.wk.weight", {n_embd, n_embd / (n_head / n_head_kv)}, backend);
+          ml->get_tensor(layers_i + ".attention.wk.weight", {n_embd, n_embd / (n_head / n_head_kv)}, test_backend);
       layer.attn[2] =
-          ml->get_tensor(layers_i + ".attention.wv.weight", {n_embd, n_embd / (n_head / n_head_kv)}, backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".attention.wo.weight", {n_embd, n_embd}, backend);
+          ml->get_tensor(layers_i + ".attention.wv.weight", {n_embd, n_embd / (n_head / n_head_kv)}, test_backend);
+      layer.attn[3] = ml->get_tensor(layers_i + ".attention.wo.weight", {n_embd, n_embd}, NE_BACKEND_CPU);
 
       // ffn norm
       layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
@@ -201,9 +206,9 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
       if (ml->verify_tensor(layers_i + ".feed_forward.w1.weight")) {
         NE_ASSERT(n_expert == 0);
         NE_ASSERT(n_expert_used == 0);
-        layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, NE_BACKEND_CPU);
+        layer.ffn[0] = ml->get_tensor(layers_i + ".feed_forward.w1.weight", {n_embd, n_ff}, test_backend);
         layer.ffn[1] = ml->get_tensor(layers_i + ".feed_forward.w2.weight", {n_ff, n_embd}, NE_BACKEND_CPU);
-        layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, NE_BACKEND_CPU);
+        layer.ffn[2] = ml->get_tensor(layers_i + ".feed_forward.w3.weight", {n_embd, n_ff}, test_backend);
       } else {
         NE_ASSERT(n_expert > 0);
         NE_ASSERT(n_expert_used > 0);

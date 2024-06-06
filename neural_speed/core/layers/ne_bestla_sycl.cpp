@@ -253,4 +253,5 @@ void bestla_device_elewise_f32(const struct ne_compute_params* params, const str
   });
   ev.wait();
 }
+
 #endif

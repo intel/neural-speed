@@ -224,6 +224,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_size, n_head_kv, infer_seq_len,
                            infer_bs);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+      Vcur = ne_device_sync(ctx0, Vcur);
     }
     if (concat_multi_seqs) {
       size_t off_sl = 0;
@@ -508,10 +509,13 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
           cur = ne_ffn_silu(ctx0, model.layers[il].ffn[0], model.layers[il].ffn[1], model.layers[il].ffn[2], cur);
         } else {
           struct ne_tensor* tmp = ne_mul_mat(ctx0, model.layers[il].ffn[2], cur);
+          tmp = ne_device_sync(ctx0, tmp);
           cur = ne_mul_mat(ctx0, model.layers[il].ffn[0], cur);
+          cur = ne_device_sync(ctx0, cur);
           cur = ne_silu(ctx0, cur);
           cur = ne_mul(ctx0, cur, tmp);
           cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
+          cur = ne_device_sync(ctx0, cur);
         }
       } else {
         // for-loop MOE (deal with sequence one by one)
