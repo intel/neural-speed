@@ -395,6 +395,13 @@ class HFLM(TemplateLM):
             self._rank = 0
             self._world_size = 1
 
+        self.model_type = self._config.model_type
+        if self.model_type == "chatglm" and "chatglm2" in self._config._name_or_path:
+            self.model_type = "chatglm2"
+        if self.model_type == "chatglm" and "chatglm3" in self._config._name_or_path:
+            # due to the same model architecture.
+            self.model_type = "chatglm2"
+
     @property
     def config(self):
         # return the associated transformers.AutoConfig for the given pretrained model.
@@ -949,6 +956,11 @@ class HFLM(TemplateLM):
         if left_truncate_len:
             encoding = encoding[-left_truncate_len:]  # pylint: disable=E1130
 
+        if self.model_type == "chatglm":
+            # hacky code for chatGLM
+            # remove gmask_token_id and bos_token_id for slicing input and label
+            encoding = encoding[:-2]
+
         return encoding
 
     def tok_batch_encode(
@@ -1296,6 +1308,11 @@ class HFLM(TemplateLM):
                         dtype=torch.long,
                         device=self.device,
                     )
+                    # hacky code for chatGLM1 inputs
+                    # it will add [130001, 130004] tokens in the end (gmask_token_id + bos_token_id)
+                    if self.model_type == "chatglm":
+                        bos = torch.tensor([self.tokenizer.gmask_token_id, self.tokenizer.bos_token_id])
+                        inp = torch.cat((inp, bos), -1)
                     (inplen,) = inp.shape
                 elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
                     inp = torch.tensor(
