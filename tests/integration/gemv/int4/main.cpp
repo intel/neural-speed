@@ -25,6 +25,7 @@ constexpr int ITER = 1;
 #else
 constexpr int ITER = 200;
 #endif
+constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 
 class test_col_major_1 {
  public:
@@ -38,8 +39,8 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024;
   static constexpr size_t dequant_s = 128;
-  static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
-  // static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
+  // static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
+  static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -127,9 +128,9 @@ std::vector<fp16> convert_int4(
     int8_t dequant_8bit;
     dequant_8bit = data_b & 0xf;
     if constexpr (quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-      dequant_8bit = dequant_8bit << 4;
-      dequant_8bit = dequant_8bit >> 4;
-      dequant_fp16[i] = scale * dequant_8bit;
+      // dequant_8bit = dequant_8bit << 4;
+      // dequant_8bit = dequant_8bit >> 4;
+      dequant_fp16[i] = scale * (dequant_8bit - 8);
     } else {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
     }
@@ -323,25 +324,29 @@ void dequantize_gemv_run(int iter) {
   // Define and initialize the data required for the calculation
   auto* A_h = static_cast<data_type_a*>(
       malloc_host(size_a * sizeof(data_type_a), context));
-  auto* B_h = static_cast<data_type_b*>(
-      malloc_host(size_b * sizeof(data_type_b), context));
+  auto* B_h = static_cast<data_type_b*>(malloc_host(
+      (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b), context));
   auto* C_h = static_cast<data_type_c*>(
       malloc_host(size_c * sizeof(data_type_c), context));
   auto* Acc_h = static_cast<data_type_acc*>(
       malloc_host(size_acc * sizeof(data_type_acc), context));
   auto* Cnt_h =
       static_cast<uint32_t*>(malloc_host(size_cnt * sizeof(uint32_t), context));
-  auto* scale_h = static_cast<data_type_scale*>(
-      malloc_host(size_scale * sizeof(data_type_scale), context));
-  auto* zero_pt_h = static_cast<data_type_zero_pt*>(
-      malloc_host(size_zero_pt * sizeof(data_type_zero_pt), context));
+  auto* scale_h = static_cast<data_type_scale*>(malloc_host(
+      (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale), context));
+  auto* zero_pt_h = static_cast<data_type_zero_pt*>(malloc_host(
+      (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
+      context));
   auto* bias_h = static_cast<data_type_bias*>(
       malloc_host(size_bias * sizeof(data_type_bias), context));
 
   auto* A_d = static_cast<data_type_a*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_a * sizeof(data_type_a), device, context));
   auto* B_d = static_cast<data_type_b*>(aligned_alloc_device(
-      DEVICE_MEM_ALIGNMENT, size_b * sizeof(data_type_b), device, context));
+      DEVICE_MEM_ALIGNMENT,
+      (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b),
+      device,
+      context));
   auto* C_d = static_cast<data_type_c*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_c * sizeof(data_type_c), device, context));
   auto* Acc_d = static_cast<data_type_acc*>(aligned_alloc_device(
@@ -350,12 +355,12 @@ void dequantize_gemv_run(int iter) {
       DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(uint32_t), device, context));
   auto* scale_d = static_cast<data_type_scale*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT,
-      size_scale * sizeof(data_type_scale),
+      (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale),
       device,
       context));
   auto* zero_pt_d = static_cast<data_type_zero_pt*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT,
-      size_zero_pt * sizeof(data_type_zero_pt),
+      (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
       device,
       context));
   auto* bias_d = static_cast<data_type_bias*>(aligned_alloc_device(
@@ -374,7 +379,7 @@ void dequantize_gemv_run(int iter) {
 #endif
   }
 
-  for (unsigned i = 0; i < size_b; ++i) {
+  for (unsigned i = 0; i < size_b + UNDEFINED_DATA_SIZE; ++i) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       B_h[i] = random_uint8();
 #ifdef UT_DEBUG
@@ -394,8 +399,11 @@ void dequantize_gemv_run(int iter) {
     scale_h[i] = 1;
 #endif
   }
+  for (unsigned i = size_scale; i < size_scale + UNDEFINED_DATA_SIZE; ++i) {
+    scale_h[i] = INFINITY;
+  }
 
-  for (unsigned i = 0; i < size_zero_pt; ++i) {
+  for (unsigned i = 0; i < size_zero_pt + UNDEFINED_DATA_SIZE; ++i) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       zero_pt_h[i] = random_uint8();
 #ifdef UT_DEBUG
@@ -430,20 +438,27 @@ void dequantize_gemv_run(int iter) {
   }
 
   queue.memcpy((void*)A_d, (void*)A_h, size_a * sizeof(data_type_a)).wait();
-  queue.memcpy((void*)B_d, (void*)B_h, size_b * sizeof(data_type_b)).wait();
+  queue
+      .memcpy(
+          (void*)B_d,
+          (void*)B_h,
+          (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b))
+      .wait();
   queue.memcpy((void*)C_d, (void*)C_h, size_c * sizeof(data_type_c)).wait();
   queue.memcpy((void*)Acc_d, (void*)Acc_h, size_acc * sizeof(data_type_acc))
       .wait();
   queue.memcpy((void*)Cnt_d, (void*)Cnt_h, size_cnt * sizeof(uint32_t)).wait();
   queue
       .memcpy(
-          (void*)scale_d, (void*)scale_h, size_scale * sizeof(data_type_scale))
+          (void*)scale_d,
+          (void*)scale_h,
+          (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale))
       .wait();
   queue
       .memcpy(
           (void*)zero_pt_d,
           (void*)zero_pt_h,
-          size_zero_pt * sizeof(data_type_zero_pt))
+          (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt))
       .wait();
   queue.memcpy((void*)bias_d, (void*)bias_h, size_bias * sizeof(data_type_bias))
       .wait();
