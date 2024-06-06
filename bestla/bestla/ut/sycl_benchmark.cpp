@@ -674,7 +674,7 @@ class Benchmark_DequantS4 {
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
         auto ev = ProB::dequant_s4<sycl_prologue_b::KernelConfigBase>(n, k, blocksize, {dB.data(), dS.data(), n},
-                                                                           dequantB.data(), q);
+                                                                      dequantB.data(), q);
         ev.wait();
         log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= TestMs) {
