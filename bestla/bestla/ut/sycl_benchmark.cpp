@@ -47,9 +47,9 @@ class Benchmark_Fp32Fp32 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncher::compute<false>(q, m, n, k, {{A, k}, {B, n}, {C, n}});
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelLauncher::compute<false>(q, m, n, k, {{A, k}, {B, n}, {C, n}});
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -122,9 +122,9 @@ class Benchmark_Fp16Fp16 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncher::compute<false>(q, m, n, k, {{A, k}, {B, n}, {C, n}});
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelLauncher::compute<false>(q, m, n, k, {{A, k}, {B, n}, {C, n}});
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -197,9 +197,9 @@ class Benchmark_S4Fp32Fp32 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncher::compute(q, m, n, k, 128, {{A, k}, {B, B_scale, n}, {C, n}});
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelLauncher::compute(q, m, n, k, 128, {{A, k}, {B, B_scale, n}, {C, n}});
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -224,9 +224,9 @@ class Benchmark_S4Fp32Fp32 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncherT::compute(q, m, n, k, 128, {{A, k}, {B, B_scale, blks}, {C, n}});
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelLauncherT::compute(q, m, n, k, 128, {{A, k}, {B, B_scale, blks}, {C, n}});
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -258,9 +258,9 @@ class Benchmark_S4Fp32Fp32 {
         int constexpr GroupK = SgSize * TileK;
         sycl::range<1> group{SgSize};
         sycl::range<1> problem{n * SgSize};
-        auto e_esimd = ProBTransT<SGemmT>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = ProBTransT<SGemmT>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -352,9 +352,9 @@ class Benchmark_S4Fp16Fp16 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {B_d, S_d, n}, {C_d, n}});
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {B_d, S_d, n}, {C_d, n}});
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -381,9 +381,9 @@ class Benchmark_S4Fp16Fp16 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelTLauncher::compute({m, n, k, blocksize, {A_d, k}, {B_d, S_d, blks}, {C_d, n}}, q);
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelTLauncher::compute({m, n, k, blocksize, {A_d, k}, {B_d, S_d, blks}, {C_d, n}}, q);
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -410,9 +410,9 @@ class Benchmark_S4Fp16Fp16 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = KernelTLauncher::compute({m, n, k, blocksize, {A_d, k}, {B_d, S_d, blks}, {C_d, n}}, q);
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = KernelTLauncher::compute({m, n, k, blocksize, {A_d, k}, {B_d, S_d, blks}, {C_d, n}}, q);
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -438,9 +438,9 @@ class Benchmark_S4Fp16Fp16 {
     tm.start();
     while (tm.stop() < timems) {
       for (size_t i = 0; i < batch; i++) {
-        auto e_esimd = ProBTransT<GemmT>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = ProBTransT<GemmT>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= timems) {
           break;
         }
@@ -524,9 +524,9 @@ class Benchmark_DequantS4 {
     tm.start();
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
-        auto e_esimd =
+        auto ev =
             ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= TestMs) {
           break;
         }
@@ -576,9 +576,9 @@ class Benchmark_DequantS4 {
     tm.start();
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
-        auto e_esimd =
+        auto ev =
             ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= TestMs) {
           break;
         }
@@ -627,8 +627,8 @@ class Benchmark_DequantS4 {
     tm.start();
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
-        auto e_esimd = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        auto ev = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= TestMs) {
           break;
         }
@@ -673,10 +673,10 @@ class Benchmark_DequantS4 {
     tm.start();
     while (tm.stop() < TestMs) {
       for (size_t i = 0; i < 1; i++) {
-        auto e_esimd = ProB::dequant_s4<sycl_prologue_b::KernelConfigBase>(n, k, blocksize, {dB.data(), dS.data(), n},
+        auto ev = ProB::dequant_s4<sycl_prologue_b::KernelConfigBase>(n, k, blocksize, {dB.data(), dS.data(), n},
                                                                            dequantB.data(), q);
-        e_esimd.wait();
-        log.add(event_helper::execute_time(e_esimd) * 1000);
+        ev.wait();
+        log.add(event_helper::execute_time(ev) * 1000);
         if (tm.stop() >= TestMs) {
           break;
         }

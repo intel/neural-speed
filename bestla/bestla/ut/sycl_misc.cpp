@@ -157,9 +157,9 @@ class UT_CompFp32 {
     sycl_stor.assign(dbuf.data());
     sycl_stor.fromHost(transtor, q);
     int blks = updiv(k, blocksize);
-    auto e_esimd = ProBTransT::gemv(dA.data(), {(uint8_t*)sycl_stor.mQBuf, (float*)sycl_stor.mSBuf, blks}, dC.data(), n,
+    auto ev = ProBTransT::gemv(dA.data(), {(uint8_t*)sycl_stor.mQBuf, (float*)sycl_stor.mSBuf, blks}, dC.data(), n,
                                     k, blocksize, q);
-    e_esimd.wait();
+    ev.wait();
     q->memcpy(matC.data(), dC.data(), matC.size() * 4).wait();
 
     auto err = get_ut_err(qtype);

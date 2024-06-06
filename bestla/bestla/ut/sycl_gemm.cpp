@@ -40,8 +40,8 @@ class UT_SyclSGemm {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    auto e_esimd = KernelLauncher::compute(q, m, n, k, {{A_d, k}, {B_d, n}, {C_d, n}});
-    e_esimd.wait();
+    auto ev = KernelLauncher::compute(q, m, n, k, {{A_d, k}, {B_d, n}, {C_d, n}});
+    ev.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 4).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
@@ -83,8 +83,8 @@ class UT_SyclHGemm {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    auto e_esimd = KernelLauncher::compute(q, m, n, k, {{A_d, k}, {B_d, n}, {C_d, n}});
-    e_esimd.wait();
+    auto ev = KernelLauncher::compute(q, m, n, k, {{A_d, k}, {B_d, n}, {C_d, n}});
+    ev.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 2).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
@@ -97,6 +97,7 @@ class UT_SyclS4SGemm {
  public:
   UT_SyclS4SGemm() {
     UT_START();
+    utT(6, 4096, 11008, 128);
     ut(6, 32000, 4096, 128);
     utT(6, 32000, 4096, 128);
     ut(300, 1024, 1024, 32);
@@ -148,8 +149,8 @@ class UT_SyclS4SGemm {
     auto B_scale_d = dB_scale.data();
     auto C_d = dC.data();
     utils::GemmProblem gp(1, m, n, k);
-    auto e_esimd = KernelLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, n}, {C_d, n}});
-    e_esimd.wait();
+    auto ev = KernelLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, n}, {C_d, n}});
+    ev.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 4).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
@@ -189,8 +190,8 @@ class UT_SyclS4SGemm {
     auto B_scale_d = dB_scale.data();
     auto C_d = dC.data();
     utils::GemmProblem gp(1, m, n, k);
-    auto e_esimd = KernelTLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, blks}, {C_d, n}});
-    e_esimd.wait();
+    auto ev = KernelTLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, blks}, {C_d, n}});
+    ev.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 4).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), 0.001f);
   }
@@ -249,8 +250,8 @@ class UT_SyclS4HGemm {
     auto Bs8_d = dBs8.data();
     auto B_scale_d = dB_scale.data();
     auto C_d = dC.data();
-    auto e_esimd = KernelLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, n}, {C_d, n}});
-    e_esimd.wait();
+    auto ev = KernelLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, n}, {C_d, n}});
+    ev.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 2).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
@@ -287,8 +288,8 @@ class UT_SyclS4HGemm {
     auto Bs8_d = dBs8.data();
     auto B_scale_d = dB_scale.data();
     auto C_d = dC.data();
-    auto e_esimd = KernelTLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, blks}, {C_d, n}});
-    e_esimd.wait();
+    auto ev = KernelTLauncher::compute(q, m, n, k, blocksize, {{A_d, k}, {Bs8_d, B_scale_d, blks}, {C_d, n}});
+    ev.wait();
     q->memcpy(matC.data(), C_d, matC.size() * 2).wait();
     buffer_error(ref.data(), matC.data(), ref.size(), utils::fp16(0.2f));
   }
@@ -331,8 +332,8 @@ class UT_SyclInt4Dequant {
     auto S_d = dS.data();
     auto B_d = dB.data();
     auto DB_d = dequantB.data();
-    auto e_esimd = ProB::dequant_s4<sycl_prologue_b::KernelConfigBase>(n, k, blocksize, {B_d, S_d, n}, DB_d, q);
-    e_esimd.wait();
+    auto ev = ProB::dequant_s4<sycl_prologue_b::KernelConfigBase>(n, k, blocksize, {B_d, S_d, n}, DB_d, q);
+    ev.wait();
     q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
     buffer_error(ref.data(), dequant.data(), dequant.size(), 0.001f);
   }
@@ -363,15 +364,15 @@ class UT_SyclInt4Dequant {
     auto S_d = dS.data();
     auto B_d = dB.data();
     auto DB_d = dequantB.data();
-    auto e_esimd = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
-    e_esimd.wait();
+    auto ev = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+    ev.wait();
     q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
     buffer_error(ref.data(), dequant.data(), dequant.size(), 0.001f);
 
     avector<float> refNT(k * n);
     kernel::wrapper::Transpose2D<float>::forward<BTLA_ISA::NoSIMD>(ref.data(), refNT.data(), n, k, k, n);
-    e_esimd = ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
-    e_esimd.wait();
+    ev = ProB::dequant_s4_trans<sycl_prologue_b::KernelConfigTrans>(n, k, blocksize, {B_d, S_d, blks}, DB_d, q);
+    ev.wait();
     q->memcpy(dequant.data(), DB_d, dequant.size() * 4).wait();
     buffer_error(refNT.data(), dequant.data(), dequant.size(), 0.001f);
   }
@@ -384,6 +385,7 @@ class UT_SyclS4Gemv {
  public:
   UT_SyclS4Gemv() {
     UT_START();
+    ut_T(1024, 11008, 32);
     ut_T(1024, 1024, 32);
     ut_half(1024, 1024, 32);
   }
@@ -432,8 +434,8 @@ class UT_SyclS4Gemv {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    auto e_esimd = ProBTransT<SGemm_t>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
-    e_esimd.wait();
+    auto ev = ProBTransT<SGemm_t>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
+    ev.wait();
     q->memcpy(C.data(), C_d, C.size() * 4).wait();
     buffer_error(refC.data(), C.data(), C.size(), 0.001f);
   }
@@ -473,9 +475,9 @@ class UT_SyclS4Gemv {
     auto A_d = dA.data();
     auto B_d = dB.data();
     auto C_d = dC.data();
-    auto e_esimd = sycl_prologue_b::WeightS4Trans<xve::DefaultHGemmCore, sycl::half>::gemv(A_d, {B_d, S_d, blks}, C_d,
+    auto ev = sycl_prologue_b::WeightS4Trans<xve::DefaultHGemmCore, sycl::half>::gemv(A_d, {B_d, S_d, blks}, C_d,
                                                                                            n, k, blocksize, q);
-    e_esimd.wait();
+    ev.wait();
     q->memcpy(C.data(), C_d, C.size() * 2).wait();
     buffer_error(refC.data(), C.data(), C.size(), utils::fp16(0.1f));
   }

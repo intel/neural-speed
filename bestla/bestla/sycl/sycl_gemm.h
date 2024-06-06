@@ -64,9 +64,9 @@ class SGemmCoreSharedB {
 
   using SLM_B_Acc = sycl::local_accessor<TB, 1>;
 
-  using AType = typename TA;
-  using BType = typename TB;
-  using CType = typename TC;
+  using AType = TA;
+  using BType = TB;
+  using CType = TC;
   static auto constexpr NTILE = WgNEle;
   static auto constexpr MTILE = WgMEle;
   static auto constexpr KTILE = TileK;

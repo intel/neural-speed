@@ -126,8 +126,7 @@ class WeightKBlockNInteger {
     return tmp;
   }
 
-  AUTOCALL void convertTransStorage(StorageWeight& srcstor, StorageWeight& dststor,
-                                             parallel::IThreading* threading) {
+  AUTOCALL void convertTransStorage(StorageWeight& srcstor, StorageWeight& dststor, parallel::IThreading* threading) {
     auto s8buf = utils::amalloc<int8_t>((size_t)srcstor.mK * srcstor.mN);
     auto s8transbuf = utils::amalloc<int8_t>((size_t)srcstor.mKPad * srcstor.mNPad);
     unpackWeight(srcstor.mN, srcstor.mK, &srcstor, s8buf, srcstor.mN, threading);

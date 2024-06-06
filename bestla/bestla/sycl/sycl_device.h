@@ -67,16 +67,16 @@ class SyclDevice {
   void print() {
     std::cout << "Running on device: " << mQueue.get_device().get_info<sycl::info::device::name>() << "\n";
     if (is_gpu(mQueue.get_device())) {
-      std::cout << "EU count:" << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_eu_count>() << "\n";
+      std::cout << "EU count:" << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_eu_count>() << "\n";
       std::cout << "EU count per subslice:"
-                << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_eu_count_per_subslice>() << "\n";
-      std::cout << "EU SIMD width:" << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_eu_simd_width>()
+                << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_eu_count_per_subslice>() << "\n";
+      std::cout << "EU SIMD width:" << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_eu_simd_width>()
                 << "\n";
       std::cout << "HW threads per EU:"
-                << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_hw_threads_per_eu>() << "\n";
-      std::cout << "GPU slices:" << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_slices>() << "\n";
+                << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_hw_threads_per_eu>() << "\n";
+      std::cout << "GPU slices:" << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_slices>() << "\n";
       std::cout << "Subslice per slice:"
-                << mQueue.get_device().get_info<sycl::info::device::ext_intel_gpu_subslices_per_slice>() << "\n";
+                << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_subslices_per_slice>() << "\n";
     }
     std::cout << "Global Memory size: " << getGlobalMemSizeGB() << "\n";
   }
