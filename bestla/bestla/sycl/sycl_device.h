@@ -64,6 +64,14 @@ class SyclDevice {
     return dev.get_info<sycl::info::device::device_type>() == sycl::info::device_type::gpu;
   }
 
+   static inline bool is_cpu(sycl::queue* q) {
+    return q->get_device().get_info<sycl::info::device::device_type>() == sycl::info::device_type::cpu;
+  }
+
+  static inline bool is_gpu(sycl::queue* q) {
+    return q->get_device().get_info<sycl::info::device::device_type>() == sycl::info::device_type::gpu;
+  }
+
   void print() {
     std::cout << "Running on device: " << mQueue.get_device().get_info<sycl::info::device::name>() << "\n";
     if (is_gpu(mQueue.get_device())) {

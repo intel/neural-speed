@@ -150,18 +150,20 @@ void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output
                                   int ldo, void* workspace, void* queue) {
   using GemmCore = sycl_gemm::xve::DefaultSGemmCore;
   auto dstor = (sycl_storage::StorageWeightKBlockNInteger*)weiptr;
+  auto q = (sycl::queue*)queue;
   if (_m == 1) {
     using ProB = ProBTransT<GemmCore>;
-    auto ev = ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
-                         dstor->mBlockSize, (sycl::queue*)queue);
-    ev.wait();
+    ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
+               dstor->mBlockSize, q);
   } else {
     using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;
     utils::GemmProblem gp(1, _m, _n, _k);
-    auto ev = KernelTLauncher::compute(
-        (sycl::queue*)queue, _m, _n, _k, dstor->mBlockSize,
+    KernelTLauncher::compute(
+        q, _m, _n, _k, dstor->mBlockSize,
         {{activation, lda}, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, {output, ldo}});
-    ev.wait();
+  }
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
   }
 }
 
@@ -222,7 +224,9 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
       dst_ptr[i00] = src0_ptr[i00] * src1_ptr[i00];
     });
   });
-  ev.wait();
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
 }
 
 void bestla_device_elewise_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
@@ -251,7 +255,9 @@ void bestla_device_elewise_f32(const struct ne_compute_params* params, const str
       dstptr[i] = srcval;
     });
   });
-  ev.wait();
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
 }
 
 #endif
