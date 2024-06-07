@@ -240,8 +240,7 @@ class gemm_t<
       (k_stride < dequant_s) ? dequant_s / k_stride : 1;
 
   static constexpr uint32_t zero_pt_addr_update_freq =
-      (k_stride < dequant_s * pack_ratio) ? (dequant_s * pack_ratio) / k_stride
-                                          : 1;
+      (k_stride < dequant_s) ? dequant_s / k_stride : 1;
 
   using mem_desc_scale_t = mem_desc_t<
       dtype_scale,
@@ -251,7 +250,7 @@ class gemm_t<
 
   using mem_desc_zero_pt_t = mem_desc_t<
       dtype_zero_pt,
-      mem_layout_b,
+      mem_layout::row_major,
       mem_space::global,
       mem_desc_b_t::alignment>;
 
@@ -287,22 +286,13 @@ class gemm_t<
           mem_desc_scale_t::layout>,
       arch_tag>;
 
-  using zero_pt_tile_desc_t = std::conditional_t<
-      is_col_major_b,
-      // compress int4 along K dimensions
-      subgroup::tile_desc_t<
-          tile_size_x_b,
-          (tile_size_y_zero_pt + pack_ratio - 1) / pack_ratio,
-          block_size_x_b,
-          (block_size_y_zero_pt + pack_ratio - 1) / pack_ratio,
-          is_col_major_b ? reg_layout::transpose_tiled : reg_layout::tiled>,
-      // compress int4 along N dimensions
-      subgroup::tile_desc_t<
-          (tile_size_x_b + pack_ratio - 1) / pack_ratio,
-          tile_size_y_zero_pt,
-          (block_size_x_b + pack_ratio - 1) / pack_ratio,
-          block_size_y_zero_pt,
-          is_col_major_b ? reg_layout::transpose_tiled : reg_layout::tiled>>;
+  // compress int4 along N dimensions
+  using zero_pt_tile_desc_t = subgroup::tile_desc_t<
+      (tile_size_x_b + pack_ratio - 1) / pack_ratio,
+      tile_size_y_zero_pt,
+      (block_size_x_b + pack_ratio - 1) / pack_ratio,
+      block_size_y_zero_pt,
+      reg_layout::tiled>;
 
   using zero_pt_t = subgroup::tile_t<dtype_zero_pt, zero_pt_tile_desc_t>;
   using zero_pt_payload_t = subgroup::mem_payload_t<
@@ -332,6 +322,9 @@ class gemm_t<
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
   static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
+  uint32_t wg_start_m = 0;
+  uint32_t wg_start_n = 0;
+  uint32_t wg_start_k = 0;
 
  public:
   static constexpr uint32_t barrier_count =
@@ -500,6 +493,10 @@ class gemm_t<
     zero_pt_prefetch_payload_t zero_pt_prefetch_payload(
         args.zero_pt_base_desc, 0);
 
+    wg_start_m = args.matA_base_desc.coord.y;
+    wg_start_n = args.scale_base_desc.coord.x;
+    wg_start_k = args.matA_base_desc.coord.x;
+
     xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
     nbarrier_a.init_nbarrier(
         sg_idy + nbarrier_base, nbarrier_role::producer_consumer);
@@ -536,8 +533,9 @@ class gemm_t<
             scale_t::tile_size_y);
         if constexpr (
             compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
-          zero_pt_prefetch_payload.template update_tdesc<update_dir_b>(
-              zero_pt_t::tile_size_y);
+          zero_pt_prefetch_payload
+              .template update_tdesc<tdesc_update_dir::y_dir>(
+                  zero_pt_t::tile_size_y);
         }
       }
     }
@@ -593,7 +591,7 @@ class gemm_t<
       if constexpr (
           compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
         if (tile_k_idx % zero_pt_addr_update_freq == 0) {
-          zero_pt_payload.template update_tdesc<update_dir_b>(
+          zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
               zero_pt_t::tile_size_y);
         }
       }
@@ -658,7 +656,7 @@ class gemm_t<
       matB_acc_t& matB_acc,
       matB_t& matB,
       scale_t& scale,
-      [[maybe_unused]] zero_pt_t& zero_pt) {
+      zero_pt_t& zero_pt) {
     // no tail, because this is matB
     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
@@ -703,13 +701,19 @@ class gemm_t<
                 offset_x_in_tile;
 
             if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
-              uint32_t zero_pt_idx = offset_y_in_tile /
-                      (dequant_s * pack_ratio) * zero_pt_t::block_size_x +
-                  offset_x_in_tile;
+              uint32_t zero_pt_idx =
+                  offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
+                  offset_x_in_tile / pack_ratio;
               native_type_t<dtype_b> zero_pt_pack = zero_pt.reg[zero_pt_idx];
 
               int8_t zero_pt_i8 =
-                  (zero_pt_pack >> (4 * (scale_idx % pack_ratio))) & 0xf;
+                  (zero_pt_pack >>
+                   (4 * ((wg_start_n + offset_x_in_tile) % pack_ratio))) &
+                  0xf;
+              // sycl::ext::oneapi::experimental::printf(
+              //     "zero_pt.reg[%d}  %x    zero_pt_i8 %x  offset_x_in_tile:%d
+              //     \n", zero_pt_idx, zero_pt_pack, (int32_t)zero_pt_i8 ,
+              //     offset_x_in_tile);
 
               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -

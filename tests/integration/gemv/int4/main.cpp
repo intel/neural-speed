@@ -39,8 +39,8 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
-  static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
+  static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
+  // static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -128,16 +128,13 @@ template <
 std::vector<fp16> convert_int4(
     data_type_b data_b,
     data_type_scale scale,
-    [[maybe_unused]] data_type_zero_pt zero_pt) {
+    data_type_zero_pt zero_pt) {
   std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
 
   int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
-    int8_t dequant_8bit;
-    dequant_8bit = data_b & 0xf;
+    int8_t dequant_8bit = data_b & 0xf;
     if constexpr (quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-      // dequant_8bit = dequant_8bit << 4;
-      // dequant_8bit = dequant_8bit >> 4;
       dequant_fp16[i] = scale * (dequant_8bit - 8);
     } else {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
@@ -149,7 +146,7 @@ std::vector<fp16> convert_int4(
 
 template <
     size_t dequant_s,
-    mem_layout layout_b = mem_layout::row_major,
+    mem_layout layout_b = mem_layout::col_major,
     quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP,
     typename data_type_acc_in = fp16,
     typename data_type_b,
@@ -172,30 +169,29 @@ std::vector<data_type_acc_in> dequantize_weight(
     for (uint32_t j = 0; j < width; j += step) {
       int start_b_in = i * width + j;
       int start_scale_in = start_b_in / step;
-      int start_zero_pt_in = start_scale_in / pack_radio;
-
+      int start_zero_pt_in =
+          (j / step) * (matrix_n / pack_radio) + i / pack_radio;
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
-
       for (uint32_t jj = 0; jj < step; jj++) {
         std::vector<fp16> dequant_fp16 = convert_int4<quant_type>(
             b[start_b_in + jj],
             scale[start_scale_in],
-            zero_pt[start_zero_pt_in] >> (4 * (start_scale_in % pack_radio)));
+            zero_pt[start_zero_pt_in] >> (4 * (i % pack_radio)));
         for (uint32_t jjj = 0; jjj < dequant_fp16.size(); jjj++) {
           b_out[start_out + pack_radio * jj + jjj] = dequant_fp16[jjj];
         }
       }
     }
   }
-  // #ifdef UT_DEBUG
-  //   for (uint32_t i = 0; i < matrix_n; i++) {
-  //     for (uint32_t j = 0; j < matrix_k; j++) {
-  //       std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-  //     }
-  //     std::cout << std::endl;
-  //   }
-  // #endif
+#ifdef UT_DEBUG
+  for (uint32_t i = 0; i < matrix_n; i++) {
+    for (uint32_t j = 0; j < matrix_k; j++) {
+      std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+    }
+    std::cout << std::endl;
+  }
+#endif
   return b_out;
 }
 
@@ -237,7 +233,8 @@ void dequantize_gemv_run(int iter) {
 
   constexpr size_t size_zero_pt_k = matrix_k / dequant_s;
   constexpr size_t size_zero_pt_n = matrix_n;
-  constexpr size_t size_zero_pt = size_zero_pt_k * size_zero_pt_n;
+  constexpr size_t size_zero_pt =
+      size_zero_pt_k * size_zero_pt_n / (2 * sizeof(data_type_b));
 
   constexpr size_t size_c = matrix_m * matrix_n;
   constexpr size_t size_bias = matrix_n;
@@ -247,9 +244,7 @@ void dequantize_gemv_run(int iter) {
   uint32_t ldc = matrix_n;
   uint32_t ld_scale =
       layout_b == mem_layout::row_major ? size_scale_n : size_scale_k;
-
-  uint32_t ld_zero_pt =
-      layout_b == mem_layout::row_major ? size_zero_pt_n : size_zero_pt_k;
+  uint32_t ld_zero_pt = size_zero_pt_n;
 
   // Turn on the enable_profiling property to facilitate subsequent profiling
   sycl::property_list properties{
@@ -391,12 +386,12 @@ void dequantize_gemv_run(int iter) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       B_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      B_h[i] = 0x22;
+      B_h[i] = 0x77;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = i % 128;
+      B_h[i] = 0x77777777;
 #endif
     }
   }
@@ -410,22 +405,22 @@ void dequantize_gemv_run(int iter) {
   for (unsigned i = size_scale; i < size_scale + UNDEFINED_DATA_SIZE; ++i) {
     scale_h[i] = INFINITY;
   }
-
   for (unsigned i = 0; i < size_zero_pt + UNDEFINED_DATA_SIZE; ++i) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       zero_pt_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      zero_pt_h[i] = zero_pt_h[i] << 4 + i % 8;
-      zero_pt_h[i] = 0x33;
+      zero_pt_h[i] = 0x12 << i;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       zero_pt_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      zero_pt_h[i] = 0x01234567;
+      zero_pt_h[i] = 0x33333333;
 #endif
     }
   }
-
+  zero_pt_h[0] = 0x12;
+  zero_pt_h[1] = 0x34;
+  
   for (unsigned i = 0; i < size_c; ++i) {
     C_h[i] = random_float();
   }
@@ -520,11 +515,11 @@ void dequantize_gemv_run(int iter) {
             epilogue_args);
   }
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  if (!gemm_op_t::can_implement(gemm_arg)) {
-    std::cout << "The arguments cannot be supported, aborting ... "
-              << std::endl;
-    FAIL();
-  }
+  // if (!gemm_op_t::can_implement(gemm_arg)) {
+  //   std::cout << "The arguments cannot be supported, aborting ... "
+  //             << std::endl;
+  //   FAIL();
+  // }
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");

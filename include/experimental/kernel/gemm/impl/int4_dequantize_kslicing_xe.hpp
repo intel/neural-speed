@@ -622,8 +622,8 @@ class gemm_universal_t<
     int start_x_scale = start_n;
     int start_y_scale = start_k / dequant_s;
 
-    int start_x_zero_pt = start_n;
-    int start_y_zero_pt = start_k / (dequant_s * pack_ratio);
+    int start_x_zero_pt = start_n / pack_ratio;
+    int start_y_zero_pt = start_k / dequant_s;
 
     // set up arguments
     uint32_t gemm_slm_base = slm_base;
@@ -680,8 +680,8 @@ class gemm_universal_t<
     } else {
       mem_desc_zero_pt_t mem_desc_zero_pt(
           args.zero_pt_base,
-          {args.matrix_n / pack_ratio,
-           scale_size_y,
+          {(args.matrix_n + pack_ratio - 1) / pack_ratio,
+           ((args.matrix_k + dequant_s - 1) / dequant_s),
            args.zero_pt_ld / pack_ratio},
           {start_x_zero_pt, start_y_zero_pt});
       gemm_args = gemm_args_t(
