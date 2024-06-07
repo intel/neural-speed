@@ -88,6 +88,28 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
+  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
+  kv_cache_info_t kv_cache_info = {};
+  if (run_mha_reordered) {
+    NE_ASSERT(("kv cache should be the same dtype", kv_self.v->type == NE_TYPE_BTLA));
+    attn_shape_t attn_shape = {
+        /* .batch_size = */ 1,
+        /* .head_num = */ n_head,
+        /* .heads_kv = */ n_head,
+        /* .head_size = */ head_dim,
+        /* .sl_q = */ N,  // Note: make sure that bestla reordered attn supports next token inference
+        /* .sl_kv = */ n_past + N,
+    };
+
+    NE_ASSERT(("bestla managed kv-cache not supported; use `--memory-f16 / --memory-f32` instead",
+               bestla_reordered_attn_fp32_support(&attn_shape)));
+    kv_shape_t kv_shape{
+        /* .heads_kv = */ static_cast<uint32_t>(n_head),
+        /* .head_size = */ static_cast<uint32_t>(head_dim),
+        /* .sl_kv_max = */ static_cast<uint32_t>(n_ctx),
+    };
+    bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
+  }
 
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
   ne_set_name(embd, "embd");
@@ -129,12 +151,13 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
     // cur = ggml_debug(ctx0, cur);
 
     // self-attention
-    {
-      struct ne_tensor* Qcur = ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0 * sizeof(float) * n_embd);
-      struct ne_tensor* Kcur = ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1 * sizeof(float) * n_embd);
-      struct ne_tensor* Vcur = ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2 * sizeof(float) * n_embd);
 
-      // store key and value to memory
+    struct ne_tensor* Qcur = ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 0 * sizeof(float) * n_embd);
+    struct ne_tensor* Kcur = ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 1 * sizeof(float) * n_embd);
+    struct ne_tensor* Vcur = ne_view_2d(ctx0, cur, n_embd, N, cur->nb[1], 2 * sizeof(float) * n_embd);
+    const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_dim));
+    // store key and value to memory
+    if (!run_mha_reordered) {
       if (N >= 1) {
         struct ne_tensor* k =
             ne_view_1d(ctx0, kv_self.k, N * n_embd, (ne_element_size(kv_self.k) * n_embd) * (il * n_ctx + n_past));
@@ -193,11 +216,52 @@ static bool bloom_model_eval_internal(model_context* ctx, const model_input* inp
 
       // cur = KQV_merged.contiguous().view(n_embd, N)
       cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+    } else {
+      const auto seq_kv = n_past + N;
+      const auto k_size = kv_cache_info.k_bytes;
+      const auto v_size = kv_cache_info.v_bytes;
+      // store key and value to memory
+      {
+        const auto k_cache = ne_view_3d(ctx0, kv_self.k,          // tensor
+                                        head_dim, n_ctx, n_head,  // ne
+                                        0, 0,                     // nb (bestla managed)
+                                        il * k_size);             // offset
+        Kcur = ne_view_3d(ctx0, Kcur, head_dim, n_head, N, Kcur->nb[0] * head_dim, Kcur->nb[1], 0);
+        ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache, Kcur, n_past, false));
+        const auto v_cache = ne_view_3d(ctx0, kv_self.v,          // tensor
+                                        head_dim, n_ctx, n_head,  // ne
+                                        0, 0,                     // nb (bestla managed)
+                                        il * v_size);             // offset
+        Vcur = ne_view_3d(ctx0, Vcur, head_dim, n_head, N, Vcur->nb[0] * head_dim, Vcur->nb[1], 0);
+        ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache, Vcur, n_past, false));
+      }
 
-      // projection
-      cur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-      cur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[3], cur), cur);
+      struct ne_tensor* Q = ne_view_3d(ctx0, Qcur, head_dim, n_head, N, Qcur->nb[0] * head_dim, Qcur->nb[1], 0);
+      Q = ne_permute(ctx0, Q, 0, 2, 1, 3);
+      ne_set_name(Q, "Q");
+      struct ne_tensor* K =
+          ne_view_3d(ctx0, kv_self.k,                                             // tensor
+                     head_dim, seq_kv, n_head,                                    // ne
+                     kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num,  // nb (bestla managed)
+                     il * k_size);                                                // offset
+      *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;    // us nb0 for layout
+      ne_set_name(K, "K");
+      struct ne_tensor* V =
+          ne_view_3d(ctx0, kv_self.v,                                                    // tensor
+                     seq_kv, head_dim, n_head,                                           // ne
+                     kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,  // nb (bestla managed)
+                     il * v_size);                                                       // offset
+      *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;           // us nb0 for layout
+      ne_set_name(V, "V");
+
+      ne_attn_flags_t attn_flags = NE_ATTN_FLAG_IS_ALIBI8;    // mpt uses alibi operation
+      if (n_past == 0) attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
+      struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
+      cur = ne_view_2d(ctx0, KQV_Out, n_embd, N, n_embd * ne_element_size(KQV_Out), 0);
     }
+    // projection
+    cur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+    cur = ne_add(ctx0, ne_repeat(ctx0, model.layers[il].attn[3], cur), cur);
 
     struct ne_tensor* inpFF = ne_add(ctx0, cur, inpSA);
 

@@ -67,6 +67,8 @@ jobs:
 
       - name: BF16 Benchmark
         run: |
+          export https_proxy=http://proxy.ims.intel.com:911
+          export http_proxy=http://proxy.ims.intel.com:911
           cd ${{ github.workspace }}/.github/workflows/scripts/models
           bash cpp_graph_inference.sh cpp-graph-test-neural-speed ${{ matrix.modelName }} ${{ env.INPUT_COMPILER_VERSION }}
 
