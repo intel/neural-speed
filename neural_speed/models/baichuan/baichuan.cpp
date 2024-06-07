@@ -317,7 +317,7 @@ static bool baichuan_model_eval_internal(model_context* ctx, const model_input* 
   }
 
   lctx.use_buf(ctx0, -1);
-  if (embd->ne[0] > 1) {
+  if (!lctx.logits_all && embd->ne[0] > 1) {
     inpL = ne_view_1d(ctx0, inpL, n_embd, (embd->ne[0] - 1) * n_embd * ne_element_size(inpL));
   }
 
