@@ -188,14 +188,14 @@ std::vector<data_type_acc_in> dequantize_weight(
       }
     }
   }
-// #ifdef UT_DEBUG
-//   for (uint32_t i = 0; i < matrix_n; i++) {
-//     for (uint32_t j = 0; j < matrix_k; j++) {
-//       std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-//     }
-//     std::cout << std::endl;
-//   }
-// #endif
+  // #ifdef UT_DEBUG
+  //   for (uint32_t i = 0; i < matrix_n; i++) {
+  //     for (uint32_t j = 0; j < matrix_k; j++) {
+  //       std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+  //     }
+  //     std::cout << std::endl;
+  //   }
+  // #endif
   return b_out;
 }
 
@@ -520,11 +520,11 @@ void dequantize_gemv_run(int iter) {
             epilogue_args);
   }
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  // if (!gemm_op_t::can_implement(gemm_arg)) {
-  //   std::cout << "The arguments cannot be supported, aborting ... "
-  //             << std::endl;
-  //   FAIL();
-  // }
+  if (!gemm_op_t::can_implement(gemm_arg)) {
+    std::cout << "The arguments cannot be supported, aborting ... "
+              << std::endl;
+    FAIL();
+  }
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");

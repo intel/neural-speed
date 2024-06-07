@@ -693,6 +693,7 @@ class gemm_t<
         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
 #pragma unroll
         for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+#pragma unroll
           for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
             uint32_t offset_y_in_tile = i * block_size_y_b + ii;
             uint32_t offset_x_in_tile = j * block_size_x_b + jj;
