@@ -79,7 +79,6 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
 void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out);
 void bestla_add(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out);
 
-bool bestla_sycl_support(struct ne_tensor* node);
 enum ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1, enum ne_op op);
 bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t* dev_workspace);
 

@@ -176,21 +176,21 @@ static inline int ne_nrows(const struct ne_tensor* tensor) {
 ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1, enum ne_op op) {
   ne_backend bk = NE_BACKEND_CPU;
 #ifdef NS_SYCL
-  bool src_on_devce = src0->backend == NE_BACKEND_SYCL;
+  bool src_on_device = src0->backend == NE_BACKEND_SYCL;
   if (src1) {
-    src_on_devce |= src1->backend == NE_BACKEND_SYCL;
+    src_on_device |= src1->backend == NE_BACKEND_SYCL;
   }
   switch (op) {
     case NE_OP_MUL_MAT: {
       struct ne_tensor* wei = src0;
       if (src0->type == NE_TYPE_BTLA) {
-        bk = src_on_devce ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
+        bk = src_on_device ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
     } break;
     case NE_OP_SILU:
     case NE_OP_MUL: {
       if (src0->type == NE_TYPE_F32 || src0->type == NE_TYPE_F16) {
-        bk = src_on_devce ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
+        bk = src_on_device ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
     } break;
     default:
@@ -198,21 +198,6 @@ ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1
   }
 #endif
   return bk;
-}
-
-bool bestla_sycl_support(struct ne_tensor* node) {
-  bool support = false;
-  switch (node->op) {
-    case NE_OP_MUL_MAT: {
-      struct ne_tensor* wei = node->src0;
-      if (node->src0->type == NE_TYPE_BTLA) {
-        support = true;
-      }
-    } break;
-    default:
-      break;
-  }
-  return support;
 }
 
 bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t* dev_workspace) {

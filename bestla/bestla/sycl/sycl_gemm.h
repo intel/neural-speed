@@ -72,7 +72,7 @@ class SGemmCoreSharedB {
   static auto constexpr KTILE = TileK;
   static auto constexpr PACK_ROW = 1;
   static int constexpr PREFERRED_N = NTILE;
-  static auto constexpr ISA = BTLA_ISA::SYCL_XVE;
+  static auto constexpr ISA = BTLA_ISA::ISA_COUNT;
   static auto constexpr ID = 0;
 
   static inline void compute(const TA* aptr, int lda, const SLM_B_Acc& bacc, TACC* accptr,
