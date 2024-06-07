@@ -581,7 +581,7 @@ class UTWOQ_CompFp32 {
     }
     auto psize = (size_t)m * n * k * 2;
     int blks = k / blocksize;
-    int nbits = utils::bestla_dtype_bits(qtype);
+    size_t nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
@@ -700,7 +700,7 @@ class UTWOQ_CompBf16 {
     }
     auto psize = (size_t)m * n * k * 2;
     int blks = k / blocksize;
-    int nbits = utils::bestla_dtype_bits(qtype);
+    size_t nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     tm.start();
     while (tm.stop() < timems) {
@@ -816,7 +816,7 @@ class UTWOQ_CompInt8 {
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
     int blks = k / blocksize;
-    int nbits = utils::bestla_dtype_bits(qtype);
+    auto nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     if (isasym) {
       memsize += n * blks * sizeof(int8_t);
@@ -878,7 +878,7 @@ class UTWOQ_CompInt8 {
     quanA.assign(bufferA.data());
     auto psize = (size_t)m * n * k * 2;
     int blks = k / blocksize;
-    int nbits = utils::bestla_dtype_bits(qtype);
+    auto nbits = utils::bestla_dtype_bits(qtype);
     auto memsize = (size_t)(n * k * nbits / 8 + n * blks * sizeof(Scale_T)) + (m * k + m * n) * sizeof(float);
     if (isasym) {
       memsize += n * blks * sizeof(int8_t);

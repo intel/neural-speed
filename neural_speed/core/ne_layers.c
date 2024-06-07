@@ -344,7 +344,7 @@ static const int NE_BLCK_SIZE[NE_TYPE_COUNT] = {
     [NE_TYPE_Q6_K] = QK_K,  [NE_TYPE_Q8_K] = QK_K,  [NE_TYPE_I8] = 1,       [NE_TYPE_I16] = 1,
     [NE_TYPE_I32] = 1,
 };
-static_assert(NE_TYPE_COUNT == 21, "NE_BLCK_SIZE is outdated");
+static_assert(NE_TYPE_COUNT == 20, "NE_BLCK_SIZE is outdated");
 
 static const size_t NE_TYPE_SIZE[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = sizeof(float),       [NE_TYPE_F16] = sizeof(ne_fp16_t),   [NE_TYPE_Q4_0] = sizeof(block_q4_0),
@@ -353,7 +353,7 @@ static const size_t NE_TYPE_SIZE[NE_TYPE_COUNT] = {
     [NE_TYPE_Q8_K] = sizeof(block_q8_K), [NE_TYPE_I8] = sizeof(int8_t),       [NE_TYPE_I16] = sizeof(int16_t),
     [NE_TYPE_I32] = sizeof(int32_t),
 };
-static_assert(NE_TYPE_COUNT == 21, "NE_TYPE_SIZE is outdated");
+static_assert(NE_TYPE_COUNT == 20, "NE_TYPE_SIZE is outdated");
 
 static const char* NE_TYPE_NAME[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = "f32",   [NE_TYPE_F16] = "f16",   [NE_TYPE_Q4_0] = "q4_0", [NE_TYPE_Q4_1] = "q4_1",
@@ -361,14 +361,14 @@ static const char* NE_TYPE_NAME[NE_TYPE_COUNT] = {
     [NE_TYPE_Q6_K] = "q6_k", [NE_TYPE_Q8_K] = "q8_k", [NE_TYPE_I8] = "i8",     [NE_TYPE_I16] = "i16",
     [NE_TYPE_I32] = "i32",
 };
-static_assert(NE_TYPE_COUNT == 21, "NE_TYPE_NAME is outdated");
+static_assert(NE_TYPE_COUNT == 20, "NE_TYPE_NAME is outdated");
 
 static bool NE_IS_QUANTIZED[NE_TYPE_COUNT] = {
     [NE_TYPE_F32] = false, [NE_TYPE_F16] = false, [NE_TYPE_Q4_0] = true, [NE_TYPE_Q4_1] = true, [NE_TYPE_Q5_0] = true,
     [NE_TYPE_Q5_1] = true, [NE_TYPE_Q8_0] = true, [NE_TYPE_Q8_1] = true, [NE_TYPE_Q6_K] = true, [NE_TYPE_Q6_K] = true,
     [NE_TYPE_I8] = false,  [NE_TYPE_I16] = false, [NE_TYPE_I32] = false, [NE_TYPE_BTLA] = true,
 };
-static_assert(NE_TYPE_COUNT == 21, "NE_IS_QUANTIZED is outdated");
+static_assert(NE_TYPE_COUNT == 20, "NE_IS_QUANTIZED is outdated");
 
 static const char* NE_OP_LABEL[NE_OP_COUNT] = {"NONE",
 
@@ -11691,7 +11691,6 @@ bool ne_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t
       node->n_tasks = n_threads;
       support = true;
     } break;
-    case NE_OP_MUL_MAT_BIAS:
     case NE_OP_MUL_MAT_ID:
     case NE_OP_CONV_1D:
     case NE_OP_MUL_MAT: {
@@ -11713,6 +11712,8 @@ bool ne_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t
       } else if (ne_is_quantized(wei->type) && node->src1->type == NE_TYPE_F32) {
         const enum ne_type type_q = quantize_fns[wei->type].vec_dot_type;
         ws_h = NE_TYPE_SIZE[type_q] * ne_nelements(node->src1) / NE_BLCK_SIZE[type_q];
+      } else if (wei->type == NE_TYPE_F32 && node->src1->type == NE_TYPE_F32) {
+        ws_h = 0;
       } else {
         NE_ASSERT(false);
       }
@@ -11739,11 +11740,7 @@ bool ne_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t
     case NE_OP_DIAG_MASK_INF:
     case NE_OP_PADDING_MASK_INF:
     case NE_OP_ROPE:
-      // only first token use parallel
-      if (node->type == NE_TYPE_BTLA)
-        node->n_tasks = 1;
-      else
-        node->n_tasks = n_threads;
+      node->n_tasks = n_threads;
       support = true;
       break;
     case NE_OP_SOFT_MAX: {

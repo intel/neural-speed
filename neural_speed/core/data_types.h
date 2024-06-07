@@ -51,7 +51,6 @@ enum ne_type {
   NE_TYPE_I16,
   NE_TYPE_I32,
   NE_TYPE_BTLA,
-  NE_TYPE_BTLA_SYCL,
   NE_TYPE_COUNT,
 };
 

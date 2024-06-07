@@ -223,8 +223,13 @@ bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, si
     support = true;
   }
   switch (node->op) {
+    case NE_OP_MUL_MAT_ID:
+    case NE_OP_MUL_MAT_BIAS:
     case NE_OP_MUL_MAT: {
       struct ne_tensor* wei = node->src0;
+      if (node->op == NE_OP_MUL_MAT_ID) {
+        wei = node->opt[0];
+      }
       if (node->src0->type == NE_TYPE_BTLA) {
         if (node->src0->backend == NE_BACKEND_CPU) {
           ws_h = bestla_f32f32_get_workspace_size(node->src1->ne[1], wei->ne[1], node->src1->ne[0], wei->data);
@@ -232,6 +237,9 @@ bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, si
         support = true;
       }
     } break;
+    case NE_OP_ROPE:
+      if (node->type == NE_TYPE_BTLA) support = true;
+      break;
     case NE_OP_MUL:
     case NE_OP_ADD: {
       if (ne_is_contiguous(node->src1) && ne_is_contiguous(node->src0) &&
