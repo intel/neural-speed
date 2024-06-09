@@ -618,6 +618,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   inpL = ne_mul_mat(ctx0, model.others[2], inpL);
 
   inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_CPU);
+  if (!lctx.embedding.empty()) {
+    embeddings = ne_device_reshape(ctx0, embeddings, NE_BACKEND_CPU);
+  }
   lctx.use_buf(ctx0, -1);
 
   // logits -> probs

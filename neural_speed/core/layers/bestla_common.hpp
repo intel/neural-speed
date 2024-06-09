@@ -30,6 +30,9 @@ class ne_threading {
     static bestla::parallel::StdThreading OptmizedThreading;
 #if (BTLA_OPENMP && NS_USE_OMP)
     static bestla::parallel::OMPThreading DefaultThreading;
+#ifdef NS_SYCL
+    return &DefaultThreading;
+#endif
     if (!_cd->isHybrid()) {
       return &DefaultThreading;
     }
