@@ -229,6 +229,68 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
   }
 }
 
+void bestla_device_add_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                           const struct ne_tensor* src1, struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+
+  auto q = (sycl::queue*)params->dev_queue;
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb10 = src1->nb[0];
+  const size_t nb11 = ne11 == 1 ? 0 : src1->nb[1];
+  const size_t nb12 = ne12 == 1 ? 0 : src1->nb[2];
+  const size_t nb13 = ne13 == 1 ? 0 : src1->nb[3];
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+  sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  auto src0ptr = (float*)src0->data;
+  auto src1ptr = (float*)src1->data;
+  auto dstptr = (float*)dst->data;
+  auto ev = q->submit([&](sycl::handler& cgh) {
+    cgh.parallel_for(num_items, [=](auto it) {
+      int i = it;
+      int i00 = i % ne00;
+      i /= ne00;
+      int i01 = i % ne01;
+      i /= ne01;
+      int i02 = i % ne02;
+      i /= ne02;
+      int i03 = i % ne03;
+
+      int i13 = i03 % ne13;
+      int i12 = i02 % ne12;
+      int i11 = i01 % ne11;
+
+      float* dst_ptr = (float*)((char*)dstptr + i03 * nb3 + i02 * nb2 + i01 * nb1);
+      float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
+      float* src1_ptr = (float*)((char*)src1ptr + i13 * nb13 + i12 * nb12 + i11 * nb11);
+      dst_ptr[i00] = src0_ptr[i00] + src1_ptr[i00];
+    });
+  });
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
+}
+
 void bestla_device_elewise_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -260,4 +322,55 @@ void bestla_device_elewise_f32(const struct ne_compute_params* params, const str
   }
 }
 
+void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                                struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  auto q = (sycl::queue*)params->dev_queue;
+  float eps;
+  memcpy(&eps, dst->op_params, sizeof(float));
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+  const size_t nb00 = src0->nb[0];
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+  sycl::range<1> num_items{ne01 * ne02 * ne03};
+  auto src0ptr = (float*)src0->data;
+  auto dstptr = (float*)dst->data;
+  auto ev = q->submit([&](sycl::handler& cgh) {
+    cgh.parallel_for(num_items, [=](auto it) {
+      int i = it;
+      int i01 = i % ne01;
+      i /= ne01;
+      int i02 = i % ne02;
+      i /= ne02;
+      int i03 = i % ne03;
+
+      float* dst_ptr = (float*)((char*)dstptr + i03 * nb3 + i02 * nb2 + i01 * nb1);
+      float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
+      float sum = 0.0;
+      for (int64_t i00 = 0; i00 < ne00; i00++) {
+        sum += (src0_ptr[i00] * src0_ptr[i00]);
+      }
+
+      float mean = sum / ne00;
+
+      const float scale = 1.0f / sqrtf(mean + eps);
+      for (int64_t i00 = 0; i00 < ne00; i00++) {
+        dst_ptr[i00] = src0_ptr[i00] * scale;
+      }
+    });
+  });
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
+}
 #endif

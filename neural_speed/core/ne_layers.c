@@ -1530,7 +1530,7 @@ struct ne_tensor* ne_add_impl(struct ne_context* ctx, struct ne_tensor* a, struc
   enum ne_backend bk = bestla_backend_support(a, b, op);
   struct ne_tensor* result = inplace ? ne_view_tensor_bk(ctx, a, bk) : ne_dup_tensor_bk(ctx, a, bk);
 
-  result->op = NE_OP_ADD;
+  result->op = op;
   result->grad = NULL;
   result->src0 = a;
   result->src1 = b;
@@ -2883,18 +2883,15 @@ struct ne_tensor* ne_reshape_4d(struct ne_context* ctx, struct ne_tensor* a, int
   return result;
 }
 
-struct ne_tensor* ne_device_sync(struct ne_context* ctx, struct ne_tensor* a) {
-  if (a->n_dims == 4) {
-    return ne_reshape_4d(ctx, a, a->ne[0], a->ne[1], a->ne[2], a->ne[3]);
-  }
-  if (a->n_dims == 3) {
-    return ne_reshape_3d(ctx, a, a->ne[0], a->ne[1], a->ne[2]);
-  }
-  if (a->n_dims == 2) {
-    return ne_reshape_2d(ctx, a, a->ne[0], a->ne[1]);
-  }
-  assert(a->n_dims == 1);
-  return ne_reshape_1d(ctx, a, a->ne[0]);
+struct ne_tensor* ne_device_reshape(struct ne_context* ctx, struct ne_tensor* a, enum ne_backend bk) {
+  enum ne_op op = NE_OP_RESHAPE;
+  struct ne_tensor* result =
+      ne_new_tensor_impl(ctx, a->type, a->n_dims, a->ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
+  result->op = op;
+  result->grad = NULL;
+  result->src0 = a;
+  result->src1 = NULL;
+  return result;
 }
 
 // ne_view_1d
@@ -4488,49 +4485,15 @@ static void ne_compute_forward_dup(const struct ne_compute_params* params, const
 static void ne_compute_forward_add_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        const struct ne_tensor* src1, struct ne_tensor* dst) {
   NE_ASSERT(ne_can_repeat_rows(src1, src0) && ne_are_same_shape(src0, dst));
-  char* wsptr = (char*)params->wdata;
-  float* src0ptr = src0->backend == NE_BACKEND_CPU ? (float*)src0->data : (float*)wsptr;
-  if (src0->backend != NE_BACKEND_CPU) {
-    wsptr += src0->size;
+  if (dst->backend == NE_BACKEND_SYCL) {
+    bestla_device_add_f32(params, src0, src1, dst);
+    return;
   }
-  float* src1ptr = src1->backend == NE_BACKEND_CPU ? (float*)src1->data : (float*)wsptr;
-  if (src1->backend != NE_BACKEND_CPU) {
-    wsptr += src1->size;
-  }
-  float* dstptr = dst->backend == NE_BACKEND_CPU ? (float*)dst->data : (float*)wsptr;
   if (params->type == NE_TASK_INIT) {
-    bool sync = src1->backend != NE_BACKEND_CPU || src0->backend != NE_BACKEND_CPU;
-#ifdef NS_SYCL
-    if (params->ith == 0) {
-      if (sync) {
-        bestla_device_sync(params->dev_queue);
-        if (src0->backend != NE_BACKEND_CPU) {
-          bestla_device_memcpy(src0ptr, src0->data, src0->size, params->dev_queue);
-        }
-        if (src1->backend != NE_BACKEND_CPU) {
-          bestla_device_memcpy(src1ptr, src1->data, src1->size, params->dev_queue);
-        }
-        bestla_device_sync(params->dev_queue);
-      }
-    }
-#else
-    if (sync) NE_ASSERT(0);
-#endif
     return;
   }
 
   if (params->type == NE_TASK_FINALIZE) {
-#ifdef NS_SYCL
-    if (params->ith == 0) {
-      if (dst->backend != NE_BACKEND_CPU) {
-        bestla_device_memcpy_sync(dst->data, dstptr, dst->size, params->dev_queue);
-      }
-    }
-#else
-    if (dst->backend != NE_BACKEND_CPU) {
-      NE_ASSERT(0);
-    }
-#endif
     return;
   }
 
@@ -4563,6 +4526,9 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
 
+  float* src0ptr = (float*)src0->data;
+  float* src1ptr = (float*)src1->data;
+  float* dstptr = (float*)dst->data;
   NE_ASSERT(nb0 == sizeof(float));
   NE_ASSERT(nb00 == sizeof(float));
   NE_ASSERT(ne00 == ne10);
@@ -6539,7 +6505,10 @@ static void ne_compute_forward_norm(const struct ne_compute_params* params, cons
 static void ne_compute_forward_rms_norm_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                             struct ne_tensor* dst) {
   NE_ASSERT(ne_are_same_shape(src0, dst));
-
+  if (src0->backend == NE_BACKEND_SYCL) {
+    bestla_device_rms_norm_f32(params, src0, dst);
+    return;
+  }
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }

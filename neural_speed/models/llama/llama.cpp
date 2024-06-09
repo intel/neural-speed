@@ -199,6 +199,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
     // norm
     {
+      inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_SYCL);
       cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
 
       // cur = cur*attention_norm(broadcasted)
@@ -224,7 +225,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_size, n_head_kv, infer_seq_len,
                            infer_bs);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-      Vcur = ne_device_sync(ctx0, Vcur);
+      Vcur = ne_device_reshape(ctx0, Vcur, NE_BACKEND_CPU);
     }
     if (concat_multi_seqs) {
       size_t off_sl = 0;
@@ -490,7 +491,8 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
 
     lctx.use_buf(ctx0, 1);
-
+    cur = ne_device_reshape(ctx0, cur, NE_BACKEND_SYCL);
+    inpSA = ne_device_reshape(ctx0, inpSA, NE_BACKEND_SYCL);
     struct ne_tensor* inpFF = ne_add(ctx0, cur, inpSA);
 
     // feed-forward network
@@ -513,7 +515,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
           cur = ne_silu(ctx0, cur);
           cur = ne_mul(ctx0, cur, tmp);
           cur = ne_mul_mat(ctx0, model.layers[il].ffn[1], cur);
-          cur = ne_device_sync(ctx0, cur);
         }
       } else {
         // for-loop MOE (deal with sequence one by one)
@@ -616,6 +617,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   // lm_head
   inpL = ne_mul_mat(ctx0, model.others[2], inpL);
 
+  inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_CPU);
   lctx.use_buf(ctx0, -1);
 
   // logits -> probs
@@ -631,19 +633,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   // update kv token count
   lctx.model.kv_self.n = n_cached;
-  float* logptr = nullptr;
-  if (inpL->backend == NE_BACKEND_SYCL) {
-#ifdef NS_SYCL
-    bestla_device_sync(ctx0->dev_queue);
-    struct ne_tensor* inpL_host = ne_new_tensor_1d(ctx0, NE_TYPE_I8, inpL->size, NE_SIZE_CALC, NE_BACKEND_CPU);
-    logptr = (float*)inpL_host->data;
-    bestla_device_memcpy_sync(logptr, inpL->data, inpL->size, ctx0->dev_queue);
-#else
-    NE_ASSERT(false);
-#endif
-  } else {
-    logptr = (float*)inpL->data;
-  }
+  float* logptr = (float*)inpL->data;
 
   // extract logits
   {

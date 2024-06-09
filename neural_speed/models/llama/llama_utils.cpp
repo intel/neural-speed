@@ -178,7 +178,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
     }
   } else {  // NE Fortmat
     model.others[0] = ml->get_tensor("tok_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-    model.others[1] = ml->get_tensor("norm.weight", {n_embd}, NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("norm.weight", {n_embd}, test_backend);
     model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
                                      n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : test_backend);
 
@@ -188,7 +188,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
       std::string layers_i = "layers." + std::to_string(i);
 
       // attention norm
-      layer.norm[0] = ml->get_tensor(layers_i + ".attention_norm.weight", {n_embd}, backend);
+      layer.norm[0] = ml->get_tensor(layers_i + ".attention_norm.weight", {n_embd}, test_backend);
 
       // qkv GEMM
       layer.attn[0] = ml->get_tensor(layers_i + ".attention.wq.weight", {n_embd, n_embd}, test_backend);
@@ -196,10 +196,10 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
           ml->get_tensor(layers_i + ".attention.wk.weight", {n_embd, n_embd / (n_head / n_head_kv)}, test_backend);
       layer.attn[2] =
           ml->get_tensor(layers_i + ".attention.wv.weight", {n_embd, n_embd / (n_head / n_head_kv)}, test_backend);
-      layer.attn[3] = ml->get_tensor(layers_i + ".attention.wo.weight", {n_embd, n_embd}, NE_BACKEND_CPU);
+      layer.attn[3] = ml->get_tensor(layers_i + ".attention.wo.weight", {n_embd, n_embd}, test_backend);
 
       // ffn norm
-      layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, backend);
+      layer.norm[1] = ml->get_tensor(layers_i + ".ffn_norm.weight", {n_embd}, test_backend);
 
       // ffn GEMM
 

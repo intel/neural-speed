@@ -187,9 +187,11 @@ ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1
         bk = src_on_device ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
     } break;
+    case NE_OP_RMS_NORM:
     case NE_OP_SILU:
+    case NE_OP_ADD:
     case NE_OP_MUL: {
-      if (src0->type == NE_TYPE_F32 || src0->type == NE_TYPE_F16) {
+      if (src0->type == NE_TYPE_F32) {
         bk = src_on_device ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
       }
     } break;
