@@ -487,6 +487,8 @@ class isa_base {
 
 static inline int padto_le(int src, int padding) { return src / padding * padding; }
 
+static inline int64_t padto_le(int64_t src, int64_t padding) { return src / padding * padding; }
+
 static inline size_t padto_le(size_t src, int padding) { return src / size_t(padding) * size_t(padding); }
 
 static inline int updiv(int a, int b) { return (a + b - 1) / b; }

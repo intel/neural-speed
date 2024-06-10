@@ -42,6 +42,7 @@
 #include "models/model_utils/util.h"
 #include "models/models.h"
 
+#define SYCL_NDEBUG 1
 // evaluate the transformer
 //
 //   - lctx:      model context
@@ -190,6 +191,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
+  inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_SYCL);
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* inpSA = inpL;
 
@@ -199,7 +201,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
     // norm
     {
-      inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_SYCL);
       cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
 
       // cur = cur*attention_norm(broadcasted)
@@ -220,13 +221,21 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
                            infer_bs);
       Vcur = ne_view_1d(ctx0, QKVcur, qkv_size, 2 * qkv_bytes);
     } else {
+#if SYCL_NDEBUG
       Qcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[0], cur), head_size, n_head, infer_seq_len,
                            infer_bs);
       Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_size, n_head_kv, infer_seq_len,
                            infer_bs);
       Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
       Vcur = ne_device_reshape(ctx0, Vcur, NE_BACKEND_CPU);
+#else
+      cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
+      cur = ne_mul_mat(ctx0, model.layers[il].attn[1], cur);
+      cur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
+      cur = ne_mul_mat(ctx0, model.layers[il].attn[3], cur);
+#endif
     }
+#if SYCL_NDEBUG
     if (concat_multi_seqs) {
       size_t off_sl = 0;
       // per_request rope
@@ -489,7 +498,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       cur = ne_all_reduce(ctx0, cur);
     }
 #endif
-
+#endif
     lctx.use_buf(ctx0, 1);
     cur = ne_device_reshape(ctx0, cur, NE_BACKEND_SYCL);
     inpSA = ne_device_reshape(ctx0, inpSA, NE_BACKEND_SYCL);

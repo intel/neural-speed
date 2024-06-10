@@ -154,7 +154,7 @@ void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output
   if (_m == 1) {
     using ProB = ProBTransT<GemmCore>;
     ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
-               dstor->mBlockSize, q);
+                         dstor->mBlockSize, q);
   } else {
     using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;
     utils::GemmProblem gp(1, _m, _n, _k);
@@ -342,32 +342,62 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
-  sycl::range<1> num_items{ne01 * ne02 * ne03};
+  int64_t constexpr WgSize = 1024;
+  int constexpr SgSize = 16;
+  int64_t ne00_ = bestla::utils::padto_le(ne00, WgSize);
   auto src0ptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
   auto ev = q->submit([&](sycl::handler& cgh) {
-    cgh.parallel_for(num_items, [=](auto it) {
-      int i = it;
-      int i01 = i % ne01;
-      i /= ne01;
-      int i02 = i % ne02;
-      i /= ne02;
-      int i03 = i % ne03;
+    sycl::local_accessor<float, 1> slm(sycl::range(WgSize), cgh);
+    cgh.parallel_for(sycl::nd_range<1>(ne01 * ne02 * ne03 * WgSize, WgSize),
+                     [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
+                       auto sg = it.get_sub_group();
+                       auto sg_idx = sg.get_group_id()[0];
+                       auto wg_idx = it.get_group(0);
+                       auto wg_loc_id = it.get_local_id();
+                       auto lane_id = sg.get_local_id()[0];
+                       int i = wg_idx;
+                       int i01 = i % ne01;
+                       i /= ne01;
+                       int i02 = i % ne02;
+                       i /= ne02;
+                       int i03 = i % ne03;
 
-      float* dst_ptr = (float*)((char*)dstptr + i03 * nb3 + i02 * nb2 + i01 * nb1);
-      float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
-      float sum = 0.0;
-      for (int64_t i00 = 0; i00 < ne00; i00++) {
-        sum += (src0_ptr[i00] * src0_ptr[i00]);
-      }
+                       float* dst_ptr = (float*)((char*)dstptr + i03 * nb3 + i02 * nb2 + i01 * nb1);
+                       float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
+                       float sum = 0.0;
+                       int64_t i00 = wg_loc_id;
+                       for (; i00 < ne00_; i00 += WgSize) {
+                         sum += (src0_ptr[i00] * src0_ptr[i00]);
+                       }
+                       if (i00 < ne00) {
+                         sum += (src0_ptr[i00] * src0_ptr[i00]);
+                       }
+                       slm[wg_loc_id] = sum;
+                       it.barrier(sycl::access::fence_space::local_space);
+                       if (sg_idx == 0) {
+                         for (size_t i = wg_loc_id; i < WgSize - SgSize; i += SgSize) {
+                           sum += slm[i + SgSize];
+                         }
+                         float gsum = 0.f;
+                         for (int i = 0; i < SgSize; i += 1) {
+                           gsum += sg.shuffle(sum, i);
+                         }
+                         float mean = gsum / ne00;
+                         const float scale = 1.0f / sqrtf(mean + eps);
+                         slm[0] = scale;
+                       }
+                       it.barrier(sycl::access::fence_space::local_space);
 
-      float mean = sum / ne00;
-
-      const float scale = 1.0f / sqrtf(mean + eps);
-      for (int64_t i00 = 0; i00 < ne00; i00++) {
-        dst_ptr[i00] = src0_ptr[i00] * scale;
-      }
-    });
+                       float scale = slm[0];
+                       i00 = wg_loc_id;
+                       for (; i00 < ne00_; i00 += WgSize) {
+                         dst_ptr[i00] = src0_ptr[i00] * scale;
+                       }
+                       if (i00 < ne00) {
+                         dst_ptr[i00] = src0_ptr[i00] * scale;
+                       }
+                     });
   });
   if (sycl_device::SyclDevice::is_cpu(q)) {
     q->wait();
