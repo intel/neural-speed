@@ -387,6 +387,7 @@ class UT_SyclS4Gemv {
     UT_START();
     ut_T(1024, 11008, 32);
     ut_T(1024, 1024, 32);
+    ut_half(1024, 11008, 32);
     ut_half(1024, 1024, 32);
   }
   using SGemm_t = xve::DefaultSGemmCore;

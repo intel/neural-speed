@@ -902,15 +902,16 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
   char* const mem_buffer = (char* const)ctx->mem_buffer;
   struct ne_object* const obj_new = (struct ne_object*)(mem_buffer + cur_end);
   char* dptr = (char*)data;
+  int SYCL_ALIGN = 256;
   if (type == NE_TYPE_BTLA) {
     size_needed = size;
-    size_needed = ((size_needed + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN) * NE_MEM_ALIGN;
+    size_needed = ((size_needed + SYCL_ALIGN - 1) / SYCL_ALIGN) * SYCL_ALIGN;
   } else {
     size_needed += NE_TYPE_SIZE[type] * (ne[0] / NE_BLCK_SIZE[type]);
     for (int i = 1; i < n_dims; i++) {
       size_needed *= ne[i];
     }
-    size_needed = ((size_needed + NE_MEM_ALIGN - 1) / NE_MEM_ALIGN) * NE_MEM_ALIGN;
+    size_needed = ((size_needed + SYCL_ALIGN - 1) / SYCL_ALIGN) * SYCL_ALIGN;
   }
   if (dptr == NULL) {
     dptr = (char* const)ctx->dev_mem_buffer + ctx->dev_offs;

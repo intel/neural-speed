@@ -88,6 +88,7 @@ class Benchmark_Fp32Fp32 {
 #ifdef BTLA_UT_SYCL
 static Benchmark_Fp32Fp32 sBenchmark_Fp32Fp32;
 #endif
+
 class Benchmark_Fp16Fp16 {
  public:
   Benchmark_Fp16Fp16() {
@@ -160,6 +161,7 @@ class Benchmark_S4Fp32Fp32 {
   Benchmark_S4Fp32Fp32() {
     UT_START();
     benchmark_all(1, 4096, 4096);
+    benchmark_all(1, 4096, 11008);
     benchmark_all(1, 4096, 4096 * 3);
     benchmark_all(1, 4096 * 3, 4096);
     benchmark_all(1024, 4096, 4096);
@@ -315,6 +317,7 @@ class Benchmark_S4Fp16Fp16 {
   Benchmark_S4Fp16Fp16() {
     UT_START();
     benchmark_all(1, 4096, 4096, 128);
+    benchmark_all(1, 4096, 11008, 128);
     benchmark_all(1, 4096, 4096 * 4, 128);
     benchmark_all(1, 4096 * 3, 4096, 128);
     benchmark_all(1024, 4096, 4096, 32);
