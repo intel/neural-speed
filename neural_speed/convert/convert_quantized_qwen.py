@@ -66,7 +66,7 @@ def main(args_in: Optional[List[str]] = None) -> None:
     f.write(struct.pack("i", hparams["intermediate_size"]))  # dummy data
     f.write(struct.pack("i", hparams["num_attention_heads"]))
     f.write(struct.pack("i", hparams["num_key_value_heads"] if "num_key_value_heads" in hparams
-                        else ["num_attention_heads"]))  # multi-query attention
+                        else hparams["num_attention_heads"]))  # multi-query attention
     f.write(struct.pack("i", hparams["num_hidden_layers"]))
     f.write(
         struct.pack(
