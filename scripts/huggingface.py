@@ -596,7 +596,7 @@ class HFLM(TemplateLM):
                         model_type = "chatglm2"
                     else:
                         model_type = self.config.model_type
-                    
+
                     self._model.init_from_bin(model_type=model_type,model_path=init_from_bin, max_request_num=batch_size)
                 else:
                     self._model.init(pretrained, weight_dtype=weight_dtype, compute_dtype=compute_dtype,
