@@ -39,8 +39,8 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024;
   static constexpr size_t dequant_s = 128;
-  static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
-  // static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
+  // static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
+  static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -418,8 +418,6 @@ void dequantize_gemv_run(int iter) {
 #endif
     }
   }
-  zero_pt_h[0] = 0x12;
-  zero_pt_h[1] = 0x34;
   
   for (unsigned i = 0; i < size_c; ++i) {
     C_h[i] = random_float();

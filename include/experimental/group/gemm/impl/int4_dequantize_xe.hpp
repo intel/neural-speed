@@ -191,12 +191,14 @@ class gemm_t<
           tile_size_x_b,
           tile_size_y_b / pack_ratio,
           block_size_x_b,
+          // block_size_y_b * sizeof(dtype_mma_b) / sizeof(dtype_b),
           block_size_y_b / pack_ratio,
           reg_layout_b>,
       // compress int4 along N dimensions
       subgroup::tile_desc_t<
           tile_size_x_b / pack_ratio,
           tile_size_y_b,
+          // block_size_x_b * sizeof(dtype_mma_b) / sizeof(dtype_b),
           block_size_x_b / pack_ratio,
           block_size_y_b,
           reg_layout_b>>;
@@ -205,6 +207,8 @@ class gemm_t<
       mem_desc_b_t,
       matB_tile_desc_t,
       subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
+      // subgroup::msg_type_v<matB_tile_desc_t, mem_space_b,
+      // mem_desc_b_t::layout>,
       arch_tag>;
   using matB_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_b_t, matB_tile_desc_t, wg_size_y, arch_tag>;
@@ -557,6 +561,8 @@ class gemm_t<
           matA, matA_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           matB, matB_payload);
+      // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
+      //     matB, matB_payload);
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           scale, scale_payload);
       if constexpr (
