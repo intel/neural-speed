@@ -592,7 +592,12 @@ class HFLM(TemplateLM):
                 from neural_speed import Model
                 self._model = Model()
                 if init_from_bin != "default_none":
-                    self._model.init_from_bin(model_type= self.config.model_type,model_path=init_from_bin, max_request_num=batch_size)
+                    if self.config.model_type == "chatglm" and "chatglm2" in self.config._name_or_path:
+                        model_type = "chatglm2"
+                    else:
+                        model_type = self.config.model_type
+                    
+                    self._model.init_from_bin(model_type=model_type,model_path=init_from_bin, max_request_num=batch_size)
                 else:
                     self._model.init(pretrained, weight_dtype=weight_dtype, compute_dtype=compute_dtype,
                                         alg=alg,
