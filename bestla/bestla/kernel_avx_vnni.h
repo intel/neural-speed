@@ -20,9 +20,7 @@ namespace avx2 {
 #if CompileAVXVNNI()
 #if defined(__GNUC__)
 #pragma GCC push_options
-#pragma GCC target("avx2", "fma", \
-                   "f16c"，      \
-                   "avxvnni")
+#pragma GCC target("avx2", "fma", "f16c", "avxvnni")
 #elif defined(ICX)
 #pragma clang attribute push(__attribute__((target("avx,avx2,fma,avxvnni"))), apply_to = function)
 #endif

@@ -23,6 +23,8 @@ namespace avx512_fp16 {
 #if defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx512f", "avx512bf16", "avx512vl", "avx512bw", "avx512fp16")
+#elif defined(ICX)
+#pragma clang attribute push(__attribute__((target("avx512f,avx512bf16,avx512bw,avx512fp16"))), apply_to = function)
 #endif
 
 inline __m512 zmm_cvt_fp16_fp32(__m256i vfp16) { return _mm512_cvtxph_ps(vfp16); }
