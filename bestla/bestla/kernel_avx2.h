@@ -16,13 +16,12 @@
 #include "bestla_utils.h"
 #include "kernel_jit.h"
 #include "kernel_ref.h"
-#if CompileAVX2()
-#include <immintrin.h>
-#endif
+
 namespace bestla {
 namespace kernel {
 namespace avx2 {
 #if CompileAVX2()
+#include <immintrin.h>
 #if defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx2", "fma", "f16c")

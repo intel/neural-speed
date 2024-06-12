@@ -130,7 +130,7 @@ static inline std::array<__m512i, 16> load_fp16_bf16_tr_x16_dword(const utils::f
   static_assert(tail > 0 && tail <= 16, "Unexpected tail value.");
   std::array<__m512i, 16> dst;
   for (int i = 0; i < tail; ++i) {
-    dst[i] = (__m512i)(_mm512_cvtne2ps_pbh(                     //
+    dst[i] = (__m512i)(_mm512_cvtne2ps_pbh(                       //
         zmm_cvt_fp16_fp32(_mm256_loadu_epi16(a + i * lda + 16)),  //
         zmm_cvt_fp16_fp32(_mm256_loadu_epi16(a + i * lda + 0))));
   }
@@ -156,7 +156,7 @@ static inline std::array<__m512i, 16> load_maskz_fp16_bf16_tr_x16_dword(const ut
   const auto mask_lo = mask;
   const auto mask_hi = mask >> 16;
   for (int i = 0; i < tail; ++i) {
-    dst[i] = (__m512i)(_mm512_cvtne2ps_pbh(                                    //
+    dst[i] = (__m512i)(_mm512_cvtne2ps_pbh(                                      //
         zmm_cvt_fp16_fp32(_mm256_maskz_loadu_epi16(mask_hi, a + i * lda + 16)),  //
         zmm_cvt_fp16_fp32(_mm256_maskz_loadu_epi16(mask_lo, a + i * lda + 0))));
   }
@@ -385,5 +385,6 @@ struct padding_trans_interleave_cvt<utils::fp16, utils::bf16, 2> {
 #endif
 #endif
 }  // namespace avx512_fp16
+}  // namespace avx512f
 }  // namespace kernel
 }  // namespace bestla

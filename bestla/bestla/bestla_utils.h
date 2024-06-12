@@ -83,8 +83,6 @@
 // runtime auto-dispatch ISA, not time critical functions
 #define AUTOCALL static
 
-#include <immintrin.h>
-
 namespace bestla {
 namespace utils {
 
@@ -464,9 +462,11 @@ class isa_base {
   static bool constexpr avx2 = ISA_T >= BTLA_ISA::AVX2;
   static bool constexpr avx512f = ISA_T >= BTLA_ISA::AVX512F;
   static bool constexpr avx512_vnni = ISA_T >= BTLA_ISA::AVX512_VNNI;
+  static bool constexpr avx512_bf16 = ISA_T >= BTLA_ISA::AVX512_BF16;
   static bool constexpr avx512_fp16 = ISA_T >= BTLA_ISA::AVX512_FP16;
   static bool constexpr amx_bf16 = ISA_T >= BTLA_ISA::AMX_BF16;
   static bool constexpr amx_int8 = ISA_T >= BTLA_ISA::AMX_INT8;
+  static bool constexpr amx_fp16 = ISA_T >= BTLA_ISA::AMX_FP16;
 };
 
 static inline int padto_le(int src, int padding) { return src / padding * padding; }

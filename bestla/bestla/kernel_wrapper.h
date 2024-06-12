@@ -27,7 +27,6 @@
 #include "kernel_avx512_bf16.h"
 #include "kernel_avx512_fp16.h"
 
-
 namespace bestla {
 namespace kernel {
 namespace wrapper {
@@ -36,7 +35,7 @@ class ZeroReg {
  public:
   static void forward() {
 #if CompileAVX2()
-    bestla::kernel::avx2::zero_reg();
+    kernel::avx2::zero_reg();
 #endif
   }
 };
@@ -47,6 +46,13 @@ class PaddingInterleaveMN {
  public:
   TLACALL BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
                             int dst_step) {
+#if CompileFP16()
+    if constexpr (utils::isa_base<ISA_T>::avx512_fp16 && NTILE % 16 == 0) {
+      const auto kern_ret = kernel::avx512f::avx512_fp16::padding_interleave_cvt<T_SRC, T_DST, RowPack>::forward(
+          src, dst, NTILE, row, col, row_pad, col_pad, src_step, dst_step);
+      if (kern_ret != BTLA_CODE::NotSupport) return kern_ret;
+    }
+#endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f && NTILE % 16 == 0) {
       const auto kern_ret = kernel::avx512f::padding_interleave_cvt<T_SRC, T_DST, RowPack>::forward(
@@ -60,6 +66,9 @@ class PaddingInterleaveMN {
   AUTOCALL BTLA_CODE forward_auto(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad,
                                   int src_step, int dst_step) {
     GetCPUDevice();
+    if (_cd->AVX512_FP16()) {
+      return forward<BTLA_ISA::AVX512_FP16>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
+    }
     if (_cd->AVX512F()) {
       return forward<BTLA_ISA::AVX512F>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
     }
@@ -113,6 +122,9 @@ class PaddingTransInterleaveMN {
   AUTOCALL BTLA_CODE forward_auto(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad,
                                   int src_step, int dst_step) {
     GetCPUDevice();
+    if (_cd->AVX512_FP16()) {
+      return forward<BTLA_ISA::AVX512_FP16>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
+    }
     if (_cd->AVX512F()) {
       return forward<BTLA_ISA::AVX512F>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
     }
@@ -183,9 +195,9 @@ class Memcpy2DFp32CvtBf16 {
   static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileBF16()
-    if constexpr (utils::isa_base<ISA_T>::amx_bf16) {
-      return kernel::avx512_bf16::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride,
-                                                              zeropadding);
+    if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {
+      return kernel::avx512f::avx512_bf16::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride,
+                                                                       zeropadding);
     }
 #endif
 #if CompileAVX512F()
@@ -210,6 +222,13 @@ class Memcpy2DFp32CvtFp16 {
                            bool zeropadding) {
 #if CompileFP16()
     if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+      return kernel::avx512f::avx512_fp16::fp32_cvt_fp16_2D_write_back(
+          reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr), row, col,
+          srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
+    }
+#endif
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return kernel::avx512f::fp32_cvt_fp16_2D_write_back(
           reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr), row, col,
           srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
@@ -226,6 +245,13 @@ class Memcpy2DFp16CvtFp32 {
                            bool zeropadding) {
 #if CompileFP16()
     if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+      return kernel::avx512f::avx512_fp16::fp16_cvt_fp32_2D_write_back(  //
+          reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
+          srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
+    }
+#endif
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return kernel::avx512f::fp16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
@@ -241,14 +267,14 @@ class Memcpy2DBf16CvtFp32 {
   static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileBF16()
-    if constexpr (ISA_T >= BTLA_ISA::AMX_BF16) {
-      return kernel::avx512_bf16::bf16_cvt_fp32_2D_write_back(  //
+    if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {
+      return kernel::avx512f::avx512_bf16::bf16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
     }
 #endif
 #if CompileAVX512F()
-    if constexpr (ISA_T >= BTLA_ISA::AVX512F) {
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return kernel::avx512f::bf16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
