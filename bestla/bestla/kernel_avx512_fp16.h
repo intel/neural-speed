@@ -94,7 +94,10 @@ static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, 
   }
   return BTLA_CODE::Success;
 }
-
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
+#endif
 // Load 2 fp16 vectors; convert them to bf16 and interleave them
 template <int tail>
 static inline std::array<__m512i, 2> load_fp16_bf16_interleave_word(const utils::fp16* a, size_t lda) {
@@ -166,6 +169,10 @@ static inline std::array<__m512i, 16> load_maskz_fp16_bf16_tr_x16_dword(const ut
   tr_x16_dword(dst);
   return dst;
 }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
 static constexpr decltype(load_maskz_fp16_bf16_tr_x16_dword<1>)* load_maskz_fp16_bf16_tr_x16_dword_tbl[17]{
     load_maskz_fp16_bf16_tr_x16_dword<1>,  load_maskz_fp16_bf16_tr_x16_dword<1>,  load_maskz_fp16_bf16_tr_x16_dword<2>,
     load_maskz_fp16_bf16_tr_x16_dword<3>,  load_maskz_fp16_bf16_tr_x16_dword<4>,  load_maskz_fp16_bf16_tr_x16_dword<5>,

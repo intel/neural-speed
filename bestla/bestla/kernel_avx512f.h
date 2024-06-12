@@ -1978,7 +1978,10 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
   }
   return BTLA_CODE::Success;
 }
-
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-attributes"  // https://stackoverflow.com/a/49216021
+#endif
 // Interleave 2 bf16 zmm vectors inplace
 static inline void interleave_word(std::array<__m512i, 2>& dst) {  // NOLINT [runtime/references]
   static constexpr uint32_t perm_idx_a[16]{
@@ -2125,6 +2128,9 @@ static constexpr decltype(load_maskz_fp16_bf16_tr_x16_dword<1>)* load_maskz_fp16
     load_maskz_fp16_bf16_tr_x16_dword<12>, load_maskz_fp16_bf16_tr_x16_dword<13>, load_maskz_fp16_bf16_tr_x16_dword<14>,
     load_maskz_fp16_bf16_tr_x16_dword<15>, load_maskz_fp16_bf16_tr_x16_dword<16>,
 };
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 template <typename T_SRC, typename T_DST = T_SRC, int RowPack = 4 / sizeof(T_DST)>
 struct padding_interleave_cvt {
