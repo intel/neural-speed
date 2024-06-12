@@ -30,7 +30,7 @@ static inline __m512 zmm_cvt_bf16_fp32(__m256i vbf16) {
   return vf32;
 }
 
-static inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) { return _mm512_cvtneps_pbh(vfp32); }
+static inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) { return (__m256i)_mm512_cvtneps_pbh(vfp32); }
 
 static inline __m512 load_bf16_fp32(const utils::bf16* srcptr) {
   auto tmp = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(srcptr));

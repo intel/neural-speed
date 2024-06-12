@@ -29,7 +29,7 @@ namespace avx512_fp16 {
 
 inline __m512 zmm_cvt_fp16_fp32(__m256i vfp16) { return _mm512_cvtxph_ps((__m256h)vfp16); }
 
-inline __m256i zmm_cvt_fp32_fp16(__m512 vfp32) { return _mm512_cvtxps_ph(vfp32); }
+inline __m256i zmm_cvt_fp32_fp16(__m512 vfp32) { return (__m256i)_mm512_cvtxps_ph(vfp32); }
 
 template <typename T>
 static inline void store_fp32_T(__m512 src_y, T* dstptr) {
