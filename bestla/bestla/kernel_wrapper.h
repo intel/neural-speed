@@ -18,11 +18,15 @@
 
 #include "bestla.h"
 #include "bestla_utils.h"
-#include "kernel_avx2.h"
-#include "kernel_avx512f.h"
-#include "kernel_avx512_bf16.h"
-#include "kernel_jit.h"
 #include "kernel_ref.h"
+#include "kernel_jit.h"
+#include "kernel_avx2.h"
+#include "kernel_avx_vnni.h"
+#include "kernel_avx512f.h"
+#include "kernel_avx512_vnni.h"
+#include "kernel_avx512_bf16.h"
+#include "kernel_avx512_fp16.h"
+
 
 namespace bestla {
 namespace kernel {
@@ -32,7 +36,7 @@ class ZeroReg {
  public:
   static void forward() {
 #if CompileAVX2()
-    avx2::zero_reg();
+    bestla::kernel::avx2::zero_reg();
 #endif
   }
 };
@@ -88,6 +92,13 @@ class PaddingTransInterleaveMN {
  public:
   TLACALL BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
                             int dst_step) {
+#if CompileFP16()
+    if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+      const auto kern_ret = kernel::avx512f::avx512_fp16::padding_trans_interleave_cvt<T_SRC, T_DST, ColPack>::forward(
+          src, dst, MTile, row, col, row_pad, col_pad, src_step, dst_step);
+      if (kern_ret != BTLA_CODE::NotSupport) return kern_ret;
+    }
+#endif
 #if CompileAVX512F()
     // Note: rows/cols and i/j are in terms of src
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
