@@ -27,7 +27,7 @@ namespace avx512_fp16 {
 #pragma clang attribute push(__attribute__((target("avx512f,avx512bf16,avx512bw,avx512fp16"))), apply_to = function)
 #endif
 
-inline __m512 zmm_cvt_fp16_fp32(__m256i vfp16) { return _mm512_cvtxph_ps(vfp16); }
+inline __m512 zmm_cvt_fp16_fp32(__m256i vfp16) { return _mm512_cvtxph_ps((__m256h)vfp16); }
 
 inline __m256i zmm_cvt_fp32_fp16(__m512 vfp32) { return _mm512_cvtxps_ph(vfp32); }
 

@@ -26,7 +26,7 @@ namespace avx512_bf16 {
 #pragma clang attribute push(__attribute__((target("avx512bf16,avx512vl,avx512bw"))), apply_to = function)
 #endif
 static inline __m512 zmm_cvt_bf16_fp32(__m256i vbf16) {
-  auto vf32 = _mm512_cvtpbh_ps(vbf16);
+  auto vf32 = _mm512_cvtpbh_ps((__m256bh)vbf16);
   return vf32;
 }
 
@@ -123,7 +123,6 @@ static inline BTLA_CODE scale_exp_acc_sum_fp32(const float* src, const int src_s
   }
   return BTLA_CODE::Success;
 }
-
 
 static inline BTLA_CODE inplace_precompute_max_softmax_fp32_bf16(int m_size, int n_size, int n_pad_size, bool is_causal,
                                                                  float* src, utils::bf16* dst, const float* s_max,
