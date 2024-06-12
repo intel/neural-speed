@@ -25,11 +25,6 @@ namespace avx512_bf16 {
 #elif defined(ICX)
 #pragma clang attribute push(__attribute__((target("avx512bf16,avx512vl,avx512bw"))), apply_to = function)
 #endif
-static inline __m512 zmm_cvt_bf16_fp32(__m256i vbf16) {
-  auto vf32 = _mm512_cvtpbh_ps((__m256bh)vbf16);
-  return vf32;
-}
-
 static inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) { return (__m256i)_mm512_cvtneps_pbh(vfp32); }
 
 static inline __m512 load_bf16_fp32(const utils::bf16* srcptr) {
