@@ -90,6 +90,95 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
   }
   return BTLA_CODE::Success;
 }
+
+template <typename T_DST>
+static inline BTLA_CODE scale_exp_acc_sum_fp32(const float* src, const int src_step, T_DST* dst, int ld_dst,
+                                               float* dst_sum, const int M_offset, const int N_offset, const int M,
+                                               const int N, float scale, int causal_offset, void* /* tmpcache */,
+                                               size_t /* cachesize */) {
+  const auto v_scale = _mm512_set1_ps(scale);
+  for (int i = 0; i < M; ++i) {
+    const auto N_unmasked = std::min(N, causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + causal_offset + 1);
+
+    const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
+    int j = 0;
+    auto v_sum = _mm512_setzero_ps();
+    for (; j < N_unmasked - 15; j += 16) {
+      const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_mul_ps(v_scale, _mm512_loadu_ps(src + i * src_step + j)));
+      v_sum = _mm512_add_ps(v_sum, v_exp);
+      _mm256_storeu_epi16(dst + i * ld_dst + j, (__m256i)_mm512_cvtneps_pbh(v_exp));
+    }
+    if (j < N_unmasked) {
+      const auto v_exp =
+          kernel::avx512f::exp_ps_0_1(_mm512_mul_ps(v_scale, _mm512_maskz_loadu_ps(v_mask, src + i * src_step + j)));
+      v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
+      _mm256_storeu_epi16(dst + i * ld_dst + j, (__m256i)_mm512_maskz_cvtneps_pbh(v_mask, v_exp));
+      j += 16;
+    }
+    dst_sum[i] += _mm512_reduce_add_ps(v_sum);
+
+    if (j < utils::padto(N, 64)) std::memset(dst + i * ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
+  }
+  return BTLA_CODE::Success;
+}
+
+
+static inline BTLA_CODE inplace_precompute_max_softmax_fp32_bf16(int m_size, int n_size, int n_pad_size, bool is_causal,
+                                                                 float* src, utils::bf16* dst, const float* s_max,
+                                                                 float* expsum, int ld_src, int ld_dst) {
+  for (int ii = 0; ii < m_size; ++ii) {
+    const auto i_src = src + ii * ld_src;
+    const auto i_dst = dst + ii * ld_dst;
+    const auto curr_n_size = n_size + (is_causal ? ii : 0);
+    const auto v_mask = _cvtu32_mask16((1U << (curr_n_size % 16)) - 1);
+    const auto v_mask32 = _cvtu32_mask32((1U << (curr_n_size % 32)) - 1);
+    {  // subtract max
+      const auto row_max = _mm512_set1_ps(s_max[ii]);
+      for (int jj = 0; jj < curr_n_size; jj += 16) {  // should be fine to do extra work on idx >= curr_n_size
+        _mm512_storeu_ps(i_src + jj, _mm512_sub_ps(_mm512_loadu_ps(i_src + jj), row_max));
+      }
+    }
+    auto v_sum = _mm512_setzero_ps();
+    {  // exp & sum
+      int jj = 0;
+      for (; jj < curr_n_size / 16 * 16; jj += 16) {
+        const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));
+        v_sum = _mm512_add_ps(v_sum, v_exp);
+        _mm512_storeu_ps(i_src + jj, v_exp);
+      }
+      if (jj < curr_n_size) {
+        const auto v_exp =
+            kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));  // should be fine to load some extra
+        v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
+        _mm512_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
+      }
+      expsum[ii] = _mm512_reduce_add_ps(v_sum);
+      v_sum = _mm512_set1_ps(expsum[ii]);
+    }
+    {  // scale & bf16
+      int jj = 0;
+      for (; jj < curr_n_size / 32 * 32; jj += 32) {
+        const auto v_softmax0 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
+        const auto v_softmax1 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj + 16), v_sum);
+        _mm512_storeu_epi16(i_dst + jj, (__m512i)_mm512_cvtne2ps_pbh(v_softmax1, v_softmax0));
+      }
+      if (jj < curr_n_size) {
+        const auto v_softmax0 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
+        const auto v_softmax1 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj + 16), v_sum);
+#if defined(__GNUC__) && (__GNUC__ == 13) && (__GNUC_MINOR__ <= 2)
+        // There is a bug on gcc 13.1/13.2 what reverse the parameter order;
+        // A GUN team member said that it will befixed in GCC 13.3
+        _mm512_storeu_epi16(i_dst + jj, (__m512i)_mm512_maskz_cvtne2ps_pbh(v_mask32, v_softmax0, v_softmax1));
+#else
+        _mm512_storeu_epi16(i_dst + jj, (__m512i)_mm512_maskz_cvtne2ps_pbh(v_mask32, v_softmax1, v_softmax0));
+#endif
+        jj += 32;
+      }
+      if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(utils::bf16) * (n_pad_size - jj));
+    }
+  }
+  return BTLA_CODE::Success;
+}
 #if defined(__GNUC__)
 #pragma GCC pop_options
 #endif

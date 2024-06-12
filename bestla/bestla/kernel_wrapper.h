@@ -1774,6 +1774,209 @@ class Add {
   }
 };
 
+template <typename T_DST>
+class ScaleExpAccSumFp32 {
+ public:
+  TLACALL BTLA_CODE forward(const float* src, const int src_step, T_DST* dst, int ld_dst, float* dst_sum,
+                            const int M_offset, const int N_offset, const int M, const int N, float scale,
+                            int causal_offset, void* tmpcache, size_t cachesize) {
+    dst = dst + M_offset * ld_dst + N_offset;
+    dst_sum = dst_sum + M_offset;
+#if CompileBF16()
+    if constexpr (utils::isa_base<ISA_T>::avx512_bf16 && std::is_same_v<T_DST, utils::bf16>) {
+      return avx512f::avx512_bf16::scale_exp_acc_sum_fp32(src, src_step, dst, ld_dst, dst_sum, M_offset, N_offset, M, N,
+                                                          scale, causal_offset, tmpcache, cachesize);
+    }
+#endif
+    return ref::scale_exp_acc_sum_fp32(src, src_step, dst, ld_dst, dst_sum, M_offset, N_offset, M, N, scale,
+                                       causal_offset, tmpcache, cachesize);
+  }
+};
+
+template <typename T_SRC, typename T_DST>
+class ScaleTrackMax {
+ public:
+  using DType = T_DST;
+  using SType = T_SRC;
+
+  TLACALL BTLA_CODE forward(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
+                            const int M_offset, const int N_offset, const int M, const int N, float scale,
+                            int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache, size_t cachesize) {
+    dst = dst + M_offset * ld_dst + N_offset;
+    dst_max = dst_max + M_offset;
+    if constexpr (std::is_same_v<T_DST, float>) {
+      if constexpr (std::is_same_v<T_SRC, utils::fp16>) {
+        assert(("alibi not supported!", alibi_slope == 0.f));
+        assert(("tanh not supported!", tanh_scale == 0.f));
+#if CompileFP16()
+        if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+          return avx512f::avx512_fp16::scale_track_max_fp16_fp32(src, src_step, dst, dst_max, ld_dst, M_offset,
+                                                                 N_offset, M, N, scale, causal_offset, alibi_slope,
+                                                                 tanh_scale, tmpcache, cachesize);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<T_SRC, float>) {
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return forward_avx512(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N, scale, causal_offset,
+                                alibi_slope, tanh_scale, tmpcache, cachesize);
+        }
+#endif
+#if CompileAVX2()
+        if constexpr (utils::isa_base<ISA_T>::avx2) {
+          return forward_avx2(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N, scale, causal_offset,
+                              alibi_slope, tanh_scale, tmpcache, cachesize);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<T_SRC, int32_t>) {
+        assert(("alibi not supported!", alibi_slope == 0.f));
+        assert(("tanh not supported!", tanh_scale == 0.f));
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return avx512f::scale_track_max_int32_fp32(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
+                                                     scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                     cachesize);
+        }
+#endif
+      }
+    }
+
+    return ref::scale_track_max<T_SRC, T_DST>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N, scale,
+                                              causal_offset, alibi_slope, tanh_scale, tmpcache, cachesize);
+  }
+
+  static BTLA_CODE forward_avx2(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
+                                const int M_offset, const int N_offset, const int M, const int N, float scale,
+                                int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
+                                size_t cachesize) {
+    if (alibi_slope == 0 && tanh_scale == 0)
+      return avx2::scale_track_max_fp32_fp32<false, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
+                                                           N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                           cachesize);
+    else if (alibi_slope == 0 && tanh_scale != 0)
+      return avx2::scale_track_max_fp32_fp32<false, true>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
+                                                          scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                          cachesize);
+    else if (alibi_slope != 0 && tanh_scale == 0)
+      return avx2::scale_track_max_fp32_fp32<true, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
+                                                          scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                          cachesize);
+    else
+      return BTLA_CODE::NotSupport;
+  }
+
+  static BTLA_CODE forward_avx512(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
+                                  const int M_offset, const int N_offset, const int M, const int N, float scale,
+                                  int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
+                                  size_t cachesize) {
+    if (alibi_slope == 0 && tanh_scale == 0)
+      return avx512f::scale_track_max_fp32_fp32<false, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset,
+                                                              M, N, scale, causal_offset, alibi_slope, tanh_scale,
+                                                              tmpcache, cachesize);
+    else if (alibi_slope == 0 && tanh_scale != 0)
+      return avx512f::scale_track_max_fp32_fp32<false, true>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
+                                                             N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                             cachesize);
+    else if (alibi_slope != 0 && tanh_scale == 0)
+      return avx512f::scale_track_max_fp32_fp32<true, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
+                                                             N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                             cachesize);
+    else
+      return BTLA_CODE::NotSupport;
+  }
+};
+
+template <typename T_DST>
+class WeightCvtBf16Ntile48 {
+ public:
+  using BType = T_DST;
+  using SType = utils::bf16;
+
+  TLACALL BTLA_CODE forward(const SType* B, int ldb, bool is_padded, BType* dst_ptr, int dst_step, int k_size,
+                            int n_size, int k_offset, int n_offset, void* tmpcache, size_t cachesize) {
+    assert(is_padded);
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<BType, float>) {
+      return avx512f::weight_cvt_bf16_fp32_n48(B, ldb, is_padded, dst_ptr, dst_step, k_size, n_size, k_offset, n_offset,
+                                               tmpcache, cachesize);
+    }
+#endif
+    return BTLA_CODE::NotSupport;
+  }
+};
+
+template <typename T_DST>
+class WeightCvtFp16Ntile24 {
+ public:
+  using BType = T_DST;
+  using SType = utils::fp16;
+
+  TLACALL BTLA_CODE forward(const SType* B, int ldb, bool is_padded, BType* dst_ptr, int dst_step, int k_size,
+                            int n_size, int k_offset, int n_offset, void* tmpcache, size_t cachesize) {
+    assert(is_padded);
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<BType, float>) {
+      return avx2::weight_cvt_fp16_fp32_n24(B, ldb, is_padded, dst_ptr, dst_step, k_size, n_size, k_offset, n_offset,
+                                            tmpcache, cachesize);
+    }
+#endif
+    return BTLA_CODE::NotSupport;
+  }
+};
+
+template <class SRC_T, class DST_T>
+struct InplacePrecomputeMaxSoftmax {
+  // nsize is the staring n-size when causal mask enabled
+  // src and dst cam be on the same address if sizeof(SRC_T) >= sizeof(DST_T) and ld is correctly set
+  // s_max and expsum cam be on the same address
+  TLACALL BTLA_CODE forward(int m_size, int n_size, int n_pad_size, bool is_causal, SRC_T* src, DST_T* dst,
+                            const SRC_T* s_max, float* expsum, int ld_src, int ld_dst) {
+    if constexpr (std::is_same_v<SRC_T, float>) {
+      if constexpr (std::is_same_v<DST_T, float>) {
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return avx512f::inplace_precompute_max_softmax_fp32_fp32(m_size, n_size, n_pad_size, is_causal, src, dst,
+                                                                   s_max, expsum, ld_src, ld_dst);
+        }
+#endif
+#if CompileAVX2()
+        if constexpr (utils::isa_base<ISA_T>::avx2) {
+          return avx2::inplace_precompute_max_softmax_fp32_fp32(m_size, n_size, n_pad_size, is_causal, src, dst, s_max,
+                                                                expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<DST_T, utils::fp16>) {
+#if CompileFP16()
+        if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+          return avx512f::avx512_fp16::inplace_precompute_max_softmax_fp32_fp16(
+              m_size, n_size, n_pad_size, is_causal, src, dst, s_max, expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<DST_T, utils::bf16>) {
+#if CompileBF16()
+        if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {
+          return avx512f::avx512_bf16::inplace_precompute_max_softmax_fp32_bf16(
+              m_size, n_size, n_pad_size, is_causal, src, dst, s_max, expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<DST_T, uint8_t>) {
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return avx512f::inplace_precompute_max_softmax_fp32_u8(m_size, n_size, n_pad_size, is_causal, src, dst, s_max,
+                                                                 expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+    }
+    assert(false);
+    return BTLA_CODE::NotSupport;
+  }
+};
 }  // namespace wrapper
 }  // namespace kernel
 }  // namespace bestla

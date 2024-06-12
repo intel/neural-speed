@@ -14,8 +14,6 @@
 #ifndef NE_CORE_GRAPH_MHA_DENSE_WRAPPER_H
 #define NE_CORE_GRAPH_MHA_DENSE_WRAPPER_H
 
-#include <immintrin.h>
-
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -42,24 +40,6 @@
 
 #define MHA_2ND_EXP 1
 constexpr bool MHA_PREFER_AVX512FP16 = true;
-
-#if defined(__GNUC__) && !defined(__clang_major__)  // clang cannot understand target("t1", "t2", "t3" ...)
-#define ADD_TARGET(T, ...) __VA_ARGS__, T
-#define TARGETS_512_0() "avx512f", "avx512bw", "avx512vl"
-#if CompileBF16()
-#define TARGETS_512_1() ADD_TARGET("avx512bf16", TARGETS_512_0())
-#else
-#define TARGETS_512_1() TARGETS_512_0()
-#endif
-#if CompileFP16()
-#define TARGETS_512_2() ADD_TARGET("avx512fp16", TARGETS_512_1())
-#else
-#define TARGETS_512_2() TARGETS_512_1()
-#endif
-#define TARGET_512 __attribute__((target(TARGETS_512_2())))
-#else
-#define TARGET_512
-#endif
 
 namespace ne_bestla {
 namespace custom {
@@ -104,29 +84,6 @@ inline float mha_exp_ref(float x) {
 #endif
 }
 
-#ifdef NOT_CURRENTLY_USED
-TARGET_512 inline __m512 exp_2nd_ph(const __m512 z, const __m512 f, const __m512 c0, const __m512 c1, const __m512 c2) {
-  const auto y = _mm512_fmadd_ph(_mm512_fmadd_ph(f, c0, c1), f, c2);  // auto y = (f * c0 + c1) * f + c2;
-  const auto exp = _mm512_scalef_ph(y, z);
-  return exp;
-}
-
-TARGET_512 inline __m512 exp_ph_0_1(const __m512 x) {
-  static const auto c0 = _mm512_castsi512_ph(_mm512_set1_epi16(fp16(0.240226507f).x));
-  static const auto c1 = _mm512_castsi512_ph(_mm512_set1_epi16(fp16(0.452920674f).x));
-  static const auto c2 = _mm512_castsi512_ph(_mm512_set1_epi16(fp16(0.713483036f).x));
-  static const float v_log2e = std::log2(std::exp(1.f));
-  static const auto log2e = _mm512_castsi512_ph(_mm512_set1_epi16(fp16(v_log2e).x));
-  static const auto half = _mm512_castsi512_ph(_mm512_set1_epi16(fp16(.5f).x));
-
-  const auto x1 = _mm512_fmadd_ph(x, log2e, half);  // auto x1 = x * log2e + _mm512_set1_ph(.5f);
-  const auto z = _mm512_floor_ph(x1);
-  const auto f = _mm512_sub_ph(x1, z);  // auto f = x1 - z;
-
-  return exp_2nd_ph(z, f, c0, c1, c2);
-}
-#endif
-
 alignas(32) const uint32_t mask8[9][8]{
     {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
     {0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
@@ -155,53 +112,18 @@ class scale_exp_acc_sum_fp32_t {
     float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
   };
   template <BTLA_ISA ISA_T>
-  TARGET_512 static BTLA_CODE forward(const float* src, const int src_step, const int M_offset, const int N_offset,
-                                      const int M, const int N, const Param& p, void* /* tmpcache */,
-                                      size_t /* cachesize */) {
+  static BTLA_CODE forward(const float* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                           const int N, const Param& p, void* tmpcache, size_t cachesize) {
     assert(("alibi not supported!", p.alibi_slope == 0.f));
-    const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
-    const auto dst_sum = p.dst_sum + M_offset;
-#if MHA_2ND_EXP && CompileBF16()
-    static_assert(std::is_same<T_DST, bf16>::value, "bf16 support only");
-    const auto v_scale = _mm512_set1_ps(p.scale);
-    for (int i = 0; i < M; ++i) {
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-
-      const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
-      int j = 0;
-      auto v_sum = _mm512_setzero_ps();
-      for (; j < N_unmasked - 15; j += 16) {
-        const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_mul_ps(v_scale, _mm512_loadu_ps(src + i * src_step + j)));
-        v_sum = _mm512_add_ps(v_sum, v_exp);
-        _mm256_storeu_epi16(dst + i * p.ld_dst + j, (__m256i)_mm512_cvtneps_pbh(v_exp));
-      }
-      if (j < N_unmasked) {
-        const auto v_exp =
-            kernel::avx512f::exp_ps_0_1(_mm512_mul_ps(v_scale, _mm512_maskz_loadu_ps(v_mask, src + i * src_step + j)));
-        v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
-        _mm256_storeu_epi16(dst + i * p.ld_dst + j, (__m256i)_mm512_maskz_cvtneps_pbh(v_mask, v_exp));
-        j += 16;
-      }
-      dst_sum[i] += _mm512_reduce_add_ps(v_sum);
-
-      if (j < utils::padto(N, 64)) memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
-    }
+#ifdef MHA_2ND_EXP
+    return kernel::wrapper::ScaleExpAccSumFp32<T_DST>::template forward<ISA_T>(
+        src, src_step, p.dst, p.ld_dst, p.dst_sum, M_offset, N_offset, M, N, p.scale, p.causal_offset, tmpcache,
+        cachesize);
 #else
-    for (int i = 0; i < M; ++i) {
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-      for (int j = 0; j < N_unmasked; ++j) {
-        const auto exp_ = expf(src[i * src_step + j] * p.scale);
-        dst[i * p.ld_dst + j] = static_cast<T_DST>(exp_);
-        dst_sum[i] += exp_;
-      }
-      if (N_unmasked < utils::padto(N, 64))
-        memset(dst + i * p.ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
-    }
+    return kernel::wrapper::ScaleExpAccSumFp32<T_DST>::template forward<BTLA_ISA::NoSIMD>(
+        src, src_step, p.dst, p.ld_dst, p.dst_sum, M_offset, N_offset, M, N, p.scale, p.causal_offset, tmpcache,
+        cachesize);
 #endif
-
-    return BTLA_CODE::Success;
   }
 };
 using ScaleExpAccSumFp32Bf16 = scale_exp_acc_sum_fp32_t<bf16>;
@@ -219,9 +141,8 @@ class scale_write_back_t {
     DType* dst;
     int ld_dst;
   };
-  template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                           const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
+  TLACALL BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                            const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
     const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
     const auto scale = p.scale + M_offset;
     // TODO(Yi): high performance implementation
@@ -834,19 +755,6 @@ class scale_track_max_t {
  public:
   using DType = T_DST;
   using SType = T_SRC;
-  struct Param;
-  template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                           const int N, const Param& p) {
-    assert(false);
-    return BTLA_CODE::NotSupport;
-  }
-};
-template <>
-class scale_track_max_t<fp16, float> {
- public:
-  using DType = float;
-  using SType = fp16;
   struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
     DType* dst;
     DType* dst_max;
@@ -856,276 +764,22 @@ class scale_track_max_t<fp16, float> {
     float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
     float tanh_scale;
   };
-
-  template <BTLA_ISA ISA_T>
-  TARGET_512 static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                                      const int M, const int N, const Param& p, void* /* tmpcache */,
-                                      size_t /* cachesize */) {
-    assert(("alibi not supported!", p.alibi_slope == 0.f));
-    const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
-    const auto dst_max = p.dst_max + M_offset;
-#if CompileFP16()
-#if MHA_2ND_EXP
-    const auto v_scale = _mm512_set1_ps(p.scale);
-
-    for (int i = 0; i < M; ++i) {
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-
-      const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
-      int j = 0;
-      auto v_max = _mm512_set1_ps(-INFINITY);
-      for (; j < N_unmasked - 15; j += 16) {
-        const auto xs = _mm512_mul_ps(v_scale, _mm512_cvtxph_ps(_mm256_loadu_ph(src + i * src_step + j)));
-        v_max = _mm512_max_ps(v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-      }
-      if (j < N_unmasked) {
-        const auto xs = _mm512_mul_ps(
-            v_scale, _mm512_cvtxph_ps(_mm256_castsi256_ph(_mm256_maskz_loadu_epi16(v_mask, src + i * src_step + j))));
-        v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        j += 16;
-      }
-      dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
-
-      // if (j < utils::padto(N, 64))
-      //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
-    }
+  TLACALL BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
+                            const int N, const Param& p, void* tmpcache, size_t cachesize) {
+#ifdef MHA_2ND_EXP
+    return kernel::wrapper::ScaleTrackMax<SType, DType>::template forward<ISA_T>(
+        src, src_step, p.dst, p.dst_max, p.ld_dst, M_offset, N_offset, M, N, p.scale, p.causal_offset, p.alibi_slope,
+        p.tanh_scale, tmpcache, cachesize);
 #else
-    for (int i = 0; i < M; ++i) {
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-      for (int j = 0; j < N_unmasked; ++j) {
-        const auto val_ = src[i * src_step + j] * p.scale;
-        dst[i * p.ld_dst + j] = static_cast<T_DST>(val_);
-        dst_max[i] = std::max(dst_max[i], val_);
-      }
-      if (N_unmasked < utils::padto(N, 64))
-        memset(dst + i * p.ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
-    }
-#endif
-    return BTLA_CODE::Success;
-#else
-    return BTLA_CODE::NotSupport;
+    return kernel::wrapper::ScaleTrackMax<SType, DType>::template forward<BTLA_ISA::NoSIMD>(
+        src, src_step, p.dst, p.dst_max, p.ld_dst, M_offset, N_offset, M, N, p.scale, p.causal_offset, p.alibi_slope,
+        p.tanh_scale, tmpcache, cachesize);
 #endif
   }
 };
+
 using ScaleTrackMaxFp16Fp32 = scale_track_max_t<fp16, float>;
-
-template <>
-class scale_track_max_t<float, float> {
- public:
-  using DType = float;
-  using SType = float;
-  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
-    DType* dst;
-    DType* dst_max;
-    int ld_dst;  // #elements
-    float scale;
-    int causal_offset;  // offset for causal mask; negative value for disabling causal mask
-    float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
-    float tanh_scale;
-  };
-  static constexpr float seq15[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-
-  template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                           const int N, const Param& p, void* /* tmpcache */, size_t /* cachesize */) {
-    if (p.alibi_slope == 0 && p.tanh_scale == 0)
-      return forward_<ISA_T, false, false>(src, src_step, M_offset, N_offset, M, N, p);
-    else if (p.alibi_slope == 0 && p.tanh_scale != 0)
-      return forward_<ISA_T, false, true>(src, src_step, M_offset, N_offset, M, N, p);
-    else if (p.alibi_slope != 0 && p.tanh_scale == 0)
-      return forward_<ISA_T, true, false>(src, src_step, M_offset, N_offset, M, N, p);
-    else
-      return BTLA_CODE::NotSupport;
-  }
-
-#if CompileAVX512F()
-  template <bool HAS_ALIBI, bool HAS_TANH>
-  TARGET_512 static BTLA_CODE forward_512(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                                          const int M, const int N, const Param& p) {
-    const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
-    const auto dst_max = p.dst_max + M_offset;
-    const auto v_scale = _mm512_set1_ps(p.scale);
-    const auto v_seq15 = _mm512_loadu_ps(seq15);
-    const auto alibi_slope = _mm512_set1_ps(p.alibi_slope);
-    const auto alibi_base = _mm512_mul_ps(alibi_slope, _mm512_add_ps(v_seq15, _mm512_set1_ps(N_offset)));
-    const auto alibi_step = _mm512_set1_ps(p.alibi_slope * 16);
-
-    for (int i = 0; i < M; ++i) {
-      auto alibi_curr = alibi_base;
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-
-      const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
-      int j = 0;
-      auto v_max = _mm512_set1_ps(-INFINITY);
-      for (; j < N_unmasked - 15; j += 16) {
-        const auto xs = _mm512_fmadd_ps(v_scale, _mm512_loadu_ps(src + i * src_step + j), alibi_curr);
-        v_max = _mm512_max_ps(v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI)
-          alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
-        else if constexpr (HAS_TANH) {
-          float* dst_ = dst + i * p.ld_dst + j;
-          for (int jj = 0; jj < 16; jj++) dst_[jj] = p.tanh_scale * tanh(dst_[jj]);
-        }
-      }
-      if (j < N_unmasked) {
-        const auto xs = _mm512_fmadd_ps(v_scale, _mm512_maskz_loadu_ps(v_mask, src + i * src_step + j), alibi_curr);
-        v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI)
-          alibi_curr = _mm512_add_ps(alibi_curr, alibi_step);
-        else if constexpr (HAS_TANH) {
-          float* dst_ = dst + i * p.ld_dst + j;
-          for (int jj = 0; jj < N_unmasked - j; jj++) dst_[jj] = p.tanh_scale * tanh(dst_[jj]);
-        }
-        j += 16;
-      }
-      dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
-      if constexpr (HAS_TANH) dst_max[i] = p.tanh_scale * tanh(dst_max[i]);
-
-      // if (j < utils::padto(N, 64))
-      //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
-    }
-    return BTLA_CODE::Success;
-  }
-#endif
-#if CompileAVX2()
-  template <bool HAS_ALIBI, bool HAS_TANH>
-  static BTLA_CODE forward_avx2(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                                const int M, const int N, const Param& p) {
-    const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
-    const auto dst_max = p.dst_max + M_offset;
-    const auto v_scale = _mm256_set1_ps(p.scale);
-    const auto v_seq7 = _mm256_loadu_ps(seq15);
-    const auto alibi_slope = _mm256_set1_ps(p.alibi_slope);
-    const auto alibi_base = _mm256_mul_ps(alibi_slope, _mm256_add_ps(v_seq7, _mm256_set1_ps(N_offset)));
-    const auto alibi_step = _mm256_set1_ps(p.alibi_slope * 8);
-    const auto infinity_neg = _mm256_set1_ps(-INFINITY);
-    for (int i = 0; i < M; ++i) {
-      auto alibi_curr = alibi_base;
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-
-      const auto v_mask = _mm256_load_si256(reinterpret_cast<const __m256i*>(mask8[N_unmasked % 8]));
-      int j = 0;
-      auto v_max = infinity_neg;
-      for (; j < N_unmasked - 7; j += 8) {
-        const auto xs = _mm256_fmadd_ps(v_scale, _mm256_loadu_ps(src + i * src_step + j), alibi_curr);
-        v_max = _mm256_max_ps(v_max, xs);
-        _mm256_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI) alibi_curr = _mm256_add_ps(alibi_curr, alibi_step);
-      }
-      if (j < N_unmasked) {
-        const auto xs = _mm256_fmadd_ps(v_scale, _mm256_maskload_ps(src + i * src_step + j, v_mask), alibi_curr);
-        const auto masked_xs = _mm256_blendv_ps(infinity_neg, xs, _mm256_castsi256_ps(v_mask));
-        v_max = _mm256_max_ps(v_max, masked_xs);
-        _mm256_storeu_ps(dst + i * p.ld_dst + j, xs);
-        if constexpr (HAS_ALIBI) alibi_curr = _mm256_add_ps(alibi_curr, alibi_step);
-        j += 8;
-      }
-      alignas(32) float dst_tmp[8];
-      _mm256_store_ps(dst_tmp, v_max);
-      for (int ii = 0; ii < 8; ++ii) dst_max[i] = std::max(dst_max[i], dst_tmp[ii]);
-      // if (j < bestla::utils::padto(N, 64))
-      //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (bestla::utils::padto(N, 64) - j));
-    }
-    return BTLA_CODE::Success;
-  }
-#endif
-  template <BTLA_ISA ISA_T, bool HAS_ALIBI, bool HAS_TANH>
-  static BTLA_CODE forward_(const SType* src, const int src_step, const int M_offset, const int N_offset, const int M,
-                            const int N, const Param& p) {
-    const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
-    const auto dst_max = p.dst_max + M_offset;
-#if MHA_2ND_EXP
-#if CompileAVX512F()
-    if constexpr (ISA_T >= BTLA_ISA::AVX512F) {
-      return forward_512<HAS_ALIBI, HAS_TANH>(src, src_step, M_offset, N_offset, M, N, p);
-    }
-#endif
-#if CompileAVX2()
-    if constexpr (ISA_T >= BTLA_ISA::AVX2) {
-      return forward_avx2<HAS_ALIBI, HAS_TANH>(src, src_step, M_offset, N_offset, M, N, p);
-    }
-#endif
-#endif
-
-    // reference without alibi and tanh. NO USE
-    for (int i = 0; i < M; ++i) {
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-      for (int j = 0; j < N_unmasked; ++j) {
-        const auto val_ = src[i * src_step + j] * p.scale;
-        dst[i * p.ld_dst + j] = static_cast<DType>(val_);
-        dst_max[i] = std::max(dst_max[i], val_);
-      }
-      if (N_unmasked < utils::padto(N, 64))
-        memset(dst + i * p.ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
-    }
-    return BTLA_CODE::Success;
-  }
-};
 using ScaleTrackMaxFp32Fp32 = scale_track_max_t<float, float>;
-
-template <>
-class scale_track_max_t<int32_t, float> {
- public:
-  using DType = float;
-  using SType = int32_t;
-  struct Param {  // NOLINT(readability-identifier-naming): align with bestla name
-    DType* dst;
-    DType* dst_max;
-    int ld_dst;  // #elements
-    float scale;
-    int causal_offset;  // offset for causal mask; negative value for disabling causal mask
-    float alibi_slope;  // m-factor in the alibi paper for current head: https://arxiv.org/abs/2108.12409
-    float tanh_scale;
-  };
-
-  template <BTLA_ISA ISA_T>
-  TARGET_512 static BTLA_CODE forward(const SType* src, const int src_step, const int M_offset, const int N_offset,
-                                      const int M, const int N, const Param& p, void* /* tmpcache */,
-                                      size_t /* cachesize */) {
-    assert(("alibi not supported!", p.alibi_slope == 0.f));
-    const auto dst = p.dst + M_offset * p.ld_dst + N_offset;
-    const auto dst_max = p.dst_max + M_offset;
-#if CompileAVX512F()
-    const auto v_scale = _mm512_set1_ps(p.scale);
-
-    for (int i = 0; i < M; ++i) {
-      const auto N_unmasked =
-          std::min(N, p.causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + p.causal_offset + 1);
-
-      const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
-      int j = 0;
-      auto v_max = _mm512_set1_ps(-INFINITY);
-      for (; j < N_unmasked - 15; j += 16) {
-        const auto xs = _mm512_mul_ps(v_scale, _mm512_cvtepi32_ps(_mm512_loadu_si512(src + i * src_step + j)));
-        v_max = _mm512_max_ps(v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-      }
-      if (j < N_unmasked) {
-        const auto xs =
-            _mm512_mul_ps(v_scale, _mm512_cvtepi32_ps(_mm512_maskz_loadu_epi32(v_mask, src + i * src_step + j)));
-        v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
-        _mm512_storeu_ps(dst + i * p.ld_dst + j, xs);
-        j += 16;
-      }
-      dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
-      // if (j < utils::padto(N, 64))
-      //   memset(dst + i * p.ld_dst + j, 0, sizeof(*dst) * (utils::padto(N, 64) - j));
-    }
-    return BTLA_CODE::Success;
-#else
-    return BTLA_CODE::NotSupport;
-#endif
-  }
-};
 using ScaleTrackMaxS32Fp32 = scale_track_max_t<int32_t, float>;
 
 template <class _GemmCore_T>
@@ -1180,7 +834,7 @@ class weight_forward_n_tile48_t {
     return BTLA_CODE::Success;
   }
 };
-#if CompileAVX512F()
+
 template <class _GemmCore_T>
 class weight_cvt_bf16_ntile48_t {
  public:
@@ -1191,38 +845,16 @@ class weight_cvt_bf16_ntile48_t {
     int ldb;
     bool is_padded;
   };
-  weight_cvt_bf16_ntile48_t() = default;
-  TLACALL TARGET_512 BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size,
-                                         int k_offset, int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
+
+  TLACALL BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
+                              int n_offset, void* tmpcache, size_t cachesize) {
     assert(p.is_padded);
-    const auto src = const_cast<SType*>(p.B) + k_offset * 48 + n_offset * p.ldb;
-    const auto dst = *dst_ptr;
     *dst_step = _GemmCore_T::NTILE;
-    if constexpr (std::is_same_v<BType, float> && std::is_same_v<SType, utils::bf16>) {
-      assert(n_size <= _GemmCore_T::NTILE);
-      assert(n_size <= 48);
-      assert(n_offset % 2 == 0 && k_offset % 2 == 0);
-      // static const auto mask_lo = _cvtu32_mask32(0x55555555U);
-      static const auto mask_hi = _cvtu32_mask32(0xaaaaaaaaU);
-      for (int i = 0; i < k_size; i += 2) {
-        for (int j = 0; j < n_size; j += 16) {
-          const auto cur_src = src + i * 48 + j * 2;
-          const auto cur_dst = dst + i * 48 + j;
-          const auto src_lo = _mm512_castsi512_ps(_mm512_slli_epi32(_mm512_loadu_si512(cur_src), 16U));
-          const auto src_hi = _mm512_castsi512_ps(_mm512_maskz_loadu_epi16(mask_hi, cur_src));
-          _mm512_store_ps(cur_dst + 0, src_lo);
-          _mm512_store_ps(cur_dst + 48, src_hi);
-        }
-      }
-    } else {
-      assert(0);
-    }
-    return BTLA_CODE::Success;
+    return kernel::wrapper::WeightCvtBf16Ntile48<BType>::template forward<ISA_T>(
+        p.B, p.ldb, p.is_padded, *dst_ptr, *dst_step, k_size, n_size, k_offset, n_offset, tmpcache, cachesize);
   }
 };
-#endif
 
-#if CompileAVX2()
 template <class _GemmCore_T>
 class weight_cvt_f16_n_tile24_t {  // convert fp16 weight to fp32 using F16C
  public:
@@ -1233,322 +865,27 @@ class weight_cvt_f16_n_tile24_t {  // convert fp16 weight to fp32 using F16C
     int ldb;
     bool is_padded;
   };
-  weight_cvt_f16_n_tile24_t() = default;
-  TLACALL BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
-                              int n_offset, void* /* tmpcache */, size_t /* cachesize */) {
-    assert(p.is_padded);
-    const auto src = const_cast<SType*>(p.B) + k_offset * 24 + n_offset * p.ldb;
-    const auto dst = *dst_ptr;
-    *dst_step = _GemmCore_T::NTILE;
-    if constexpr (std::is_same_v<BType, float> && std::is_same_v<SType, utils::fp16>) {
-      assert(n_size <= _GemmCore_T::NTILE);
-      assert(n_size <= 24);
-      assert(n_offset % 24 == 0);
-      if (n_size == 24) {
-        constexpr auto n_size = 24;
-        for (int i = 0; i < k_size; ++i) {
-          for (int j = 0; j < n_size; j += 8) {
-            const auto cur_src = src + i * 24 + j;
-            const auto cur_dst = dst + i * 24 + j;
-            const auto src = _mm256_cvtph_ps(_mm_loadu_si128(reinterpret_cast<const __m128i*>(cur_src)));
-            _mm256_store_ps(cur_dst, src);
-          }
-        }
-      } else {
-        for (int i = 0; i < k_size; ++i) {
-          for (int j = 0; j < n_size; j += 8) {
-            const auto cur_src = src + i * 24 + j;
-            const auto cur_dst = dst + i * 24 + j;
-            const auto src = _mm256_cvtph_ps(_mm_loadu_si128(reinterpret_cast<const __m128i*>(cur_src)));
-            _mm256_store_ps(cur_dst, src);
-          }
-        }
-      }
 
-    } else {
-      assert(0);
-    }
-    return BTLA_CODE::Success;
+  TLACALL BTLA_CODE getWeight(BType** dst_ptr, int* dst_step, const Param& p, int k_size, int n_size, int k_offset,
+                              int n_offset, void* tmpcache, size_t cachesize) {
+    return kernel::wrapper::WeightCvtFp16Ntile24<BType>::template forward<ISA_T>(
+        p.B, p.ldb, p.is_padded, *dst_ptr, *dst_step, k_size, n_size, k_offset, n_offset, tmpcache, cachesize);
   }
 };
-#endif
-template <class SRC_T, class DST_T, BTLA_ISA ISA_T>
+
+template <class SRC_T, class DST_T>
 struct inplace_precompute_max_softmax_t {
   // nsize is the staring n-size when causal mask enabled
   // src and dst cam be on the same address if sizeof(SRC_T) >= sizeof(DST_T) and ld is correctly set
   // s_max and expsum cam be on the same address
-  static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, SRC_T* src, DST_T* dst,
-                      const SRC_T* s_max, float* expsum, int ld_src, int ld_dst) {
-    assert(false);
+  TLACALL void forward(int m_size, int n_size, int n_pad_size, bool is_causal, SRC_T* src, DST_T* dst,
+                       const SRC_T* s_max, float* expsum, int ld_src, int ld_dst) {
+    auto ret = kernel::wrapper::InplacePrecomputeMaxSoftmax<SRC_T, DST_T>::template forward<ISA_T>(
+        m_size, n_size, n_pad_size, is_causal, src, dst, s_max, expsum, ld_src, ld_dst);
+    assert(ret == BTLA_CODE::Success);
   }
 };
-#if CompileFP16()
-template <BTLA_ISA ISA_T>
-struct inplace_precompute_max_softmax_t<float, fp16, ISA_T> {
-  TARGET_512 static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, fp16* dst,
-                                 const float* s_max, float* expsum, int ld_src, int ld_dst) {
-    for (int ii = 0; ii < m_size; ++ii) {
-      const auto i_src = src + ii * ld_src;
-      const auto i_dst = dst + ii * ld_dst;
-      const auto curr_n_size = n_size + (is_causal ? ii : 0);
-      const uint16_t v_mask = _cvtu32_mask16((1U << (curr_n_size % 16)) - 1);
-      {  // subtract max
-        const auto row_max = _mm512_set1_ps(s_max[ii]);
-        for (int jj = 0; jj < curr_n_size; jj += 16) {  // should be fine to do extra work on idx >= curr_n_size
-          _mm512_storeu_ps(i_src + jj, _mm512_sub_ps(_mm512_loadu_ps(i_src + jj), row_max));
-        }
-      }
-      auto v_sum = _mm512_setzero_ps();
-      {  // exp & sum
-        int jj = 0;
-        for (; jj < curr_n_size / 16 * 16; jj += 16) {
-          const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));
-          v_sum = _mm512_add_ps(v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);
-        }
-        if (jj < curr_n_size) {
-          const auto v_exp =
-              kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));  // should be fine to load some extra
-          v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
-        }
-        expsum[ii] = _mm512_reduce_add_ps(v_sum);
-        v_sum = _mm512_set1_ps(expsum[ii]);
-      }
-      {  // scale & fp16
-        int jj = 0;
-        for (; jj < curr_n_size / 16 * 16; jj += 16) {
-          const auto v_softmax = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
-          _mm256_storeu_ph(i_dst + jj, _mm512_cvtxps_ph(v_softmax));
-        }
-        if (jj < curr_n_size) {
-          const auto v_softmax = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
-          _mm256_storeu_ph(i_dst + jj, _mm512_maskz_cvtxps_ph(v_mask, v_softmax));
-          jj += 16;
-        }
-        if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(fp16) * (n_pad_size - jj));
-      }
-    }
-  }
-};
-#endif
 
-#if CompileBF16()
-template <BTLA_ISA ISA_T>
-struct inplace_precompute_max_softmax_t<float, bf16, ISA_T> {
-  TARGET_512 static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, bf16* dst,
-                                 const float* s_max, float* expsum, int ld_src, int ld_dst) {
-    for (int ii = 0; ii < m_size; ++ii) {
-      const auto i_src = src + ii * ld_src;
-      const auto i_dst = dst + ii * ld_dst;
-      const auto curr_n_size = n_size + (is_causal ? ii : 0);
-      const auto v_mask = _cvtu32_mask16((1U << (curr_n_size % 16)) - 1);
-      const auto v_mask32 = _cvtu32_mask32((1U << (curr_n_size % 32)) - 1);
-      {  // subtract max
-        const auto row_max = _mm512_set1_ps(s_max[ii]);
-        for (int jj = 0; jj < curr_n_size; jj += 16) {  // should be fine to do extra work on idx >= curr_n_size
-          _mm512_storeu_ps(i_src + jj, _mm512_sub_ps(_mm512_loadu_ps(i_src + jj), row_max));
-        }
-      }
-      auto v_sum = _mm512_setzero_ps();
-      {  // exp & sum
-        int jj = 0;
-        for (; jj < curr_n_size / 16 * 16; jj += 16) {
-          const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));
-          v_sum = _mm512_add_ps(v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);
-        }
-        if (jj < curr_n_size) {
-          const auto v_exp =
-              kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));  // should be fine to load some extra
-          v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
-        }
-        expsum[ii] = _mm512_reduce_add_ps(v_sum);
-        v_sum = _mm512_set1_ps(expsum[ii]);
-      }
-      {  // scale & bf16
-        int jj = 0;
-        for (; jj < curr_n_size / 32 * 32; jj += 32) {
-          const auto v_softmax0 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
-          const auto v_softmax1 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj + 16), v_sum);
-          _mm512_storeu_epi16(i_dst + jj, (__m512i)_mm512_cvtne2ps_pbh(v_softmax1, v_softmax0));
-        }
-        if (jj < curr_n_size) {
-          const auto v_softmax0 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
-          const auto v_softmax1 = _mm512_div_ps(_mm512_loadu_ps(i_src + jj + 16), v_sum);
-#if defined(__GNUC__) && (__GNUC__ == 13) && (__GNUC_MINOR__ <= 2)
-          // There is a bug on gcc 13.1/13.2 what reverse the parameter order;
-          // A GUN team member said that it will befixed in GCC 13.3
-          _mm512_storeu_epi16(i_dst + jj, (__m512i)_mm512_maskz_cvtne2ps_pbh(v_mask32, v_softmax0, v_softmax1));
-#else
-          _mm512_storeu_epi16(i_dst + jj, (__m512i)_mm512_maskz_cvtne2ps_pbh(v_mask32, v_softmax1, v_softmax0));
-#endif
-          jj += 32;
-        }
-        if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(bf16) * (n_pad_size - jj));
-      }
-    }
-  }
-};
-#endif
-
-#if CompileAVX512F()
-template <BTLA_ISA ISA_T>
-struct inplace_precompute_max_softmax_t<std::enable_if_t<ISA_T >= BTLA_ISA::AVX512F, float>, float, ISA_T> {
-  TARGET_512 static void forward(  // NOLINT [build/include_what_you_use]
-      int m_size, int n_size, int n_pad_size, bool is_causal, float* src, float* dst, const float* s_max, float* expsum,
-      int ld_src, int ld_dst) {
-    for (int ii = 0; ii < m_size; ++ii) {
-      const auto i_src = src + ii * ld_src;
-      const auto i_dst = dst + ii * ld_dst;
-      const auto curr_n_size = n_size + (is_causal ? ii : 0);
-      const auto v_mask = _cvtu32_mask16((1U << (curr_n_size % 16)) - 1);
-      {  // subtract max
-        const auto row_max = _mm512_set1_ps(s_max[ii]);
-        for (int jj = 0; jj < curr_n_size; jj += 16) {  // should be fine to do extra work on idx >= curr_n_size
-          _mm512_storeu_ps(i_src + jj, _mm512_sub_ps(_mm512_loadu_ps(i_src + jj), row_max));
-        }
-      }
-      auto v_sum = _mm512_setzero_ps();
-      {  // exp & sum
-        int jj = 0;
-        for (; jj < curr_n_size / 16 * 16; jj += 16) {
-          const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));
-          v_sum = _mm512_add_ps(v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);
-        }
-        if (jj < curr_n_size) {
-          const auto v_exp =
-              kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));  // should be fine to load some extra
-          v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
-        }
-        expsum[ii] = _mm512_reduce_add_ps(v_sum);
-        v_sum = _mm512_set1_ps(expsum[ii]);
-      }
-      {  // scale & store
-        int jj = 0;
-        for (; jj < padto_le(curr_n_size, 16); jj += 16) {
-          _mm512_store_ps(i_dst + jj, _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum));
-        }
-        if (jj < curr_n_size) {
-          _mm512_store_ps(i_dst + jj, _mm512_maskz_div_ps(v_mask, _mm512_loadu_ps(i_src + jj), v_sum));
-          jj += 16;
-        }
-        if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(bf16) * (n_pad_size - jj));
-      }
-    }
-  }
-};
-#endif
-
-#if CompileAVX2()
-template <BTLA_ISA ISA_T>
-struct inplace_precompute_max_softmax_t<std::enable_if_t<(ISA_T < BTLA_ISA::AVX512F && ISA_T >= BTLA_ISA::AVX2), float>,
-                                        float, ISA_T> {
-  static void forward(  // NOLINT [build/include_what_you_use]
-      int m_size, int n_size, int n_pad_size, bool is_causal, float* src, float* dst, const float* s_max, float* expsum,
-      int ld_src, int ld_dst) {
-    for (int ii = 0; ii < m_size; ++ii) {
-      const auto i_src = src + ii * ld_src;
-      const auto i_dst = dst + ii * ld_dst;
-      const auto curr_n_size = n_size + (is_causal ? ii : 0);
-      const auto v_mask = _mm256_load_si256(reinterpret_cast<const __m256i*>(mask8[curr_n_size % 8]));
-      {  // subtract max
-        const auto row_max = _mm256_set1_ps(s_max[ii]);
-        for (int jj = 0; jj < curr_n_size; jj += 8) {  // should be fine to do extra work on idx >= curr_n_size
-          _mm256_storeu_ps(i_src + jj, _mm256_sub_ps(_mm256_loadu_ps(i_src + jj), row_max));
-        }
-      }
-      auto v_sum = _mm256_setzero_ps();
-      {  // exp & sum
-        int jj = 0;
-        for (; jj < padto_le(curr_n_size, 8); jj += 8) {
-          const auto v_exp = kernel::avx2::exp_ps_0_1(_mm256_loadu_ps(i_src + jj));
-          v_sum = _mm256_add_ps(v_sum, v_exp);
-          _mm256_storeu_ps(i_src + jj, v_exp);
-        }
-        if (jj < curr_n_size) {
-          const auto v_exp = kernel::avx2::exp_ps_0_1(_mm256_loadu_ps(i_src + jj));  // should be fine to load extra
-          v_sum = _mm256_add_ps(v_sum, _mm256_and_ps(v_exp, _mm256_castsi256_ps(v_mask)));
-          _mm256_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
-        }
-
-        alignas(32) float sum_tmp[8];
-        _mm256_store_ps(sum_tmp, v_sum);
-        expsum[ii] = 0.f;
-        for (int iii = 0; iii < 8; ++iii) expsum[ii] += sum_tmp[iii];
-        v_sum = _mm256_set1_ps(expsum[ii]);
-      }
-      {  // scale & store
-        int jj = 0;
-        for (; jj < padto_le(curr_n_size, 8); jj += 8) {
-          _mm256_store_ps(i_dst + jj, _mm256_div_ps(_mm256_loadu_ps(i_src + jj), v_sum));
-        }
-        if (jj < curr_n_size) {
-          const auto quotient = _mm256_div_ps(_mm256_loadu_ps(i_src + jj), v_sum);
-          _mm256_store_ps(i_dst + jj, _mm256_and_ps(quotient, _mm256_castsi256_ps(v_mask)));
-          jj += 8;
-        }
-        if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(float) * (n_pad_size - jj));
-      }
-    }
-  }
-};
-#endif
-#if CompileAVX512F()
-template <BTLA_ISA ISA_T>
-struct inplace_precompute_max_softmax_t<float, uint8_t, ISA_T> {
-  TARGET_512 static void forward(int m_size, int n_size, int n_pad_size, bool is_causal, float* src, uint8_t* dst,
-                                 float* s_max, float* expsum, int ld_src, int ld_dst) {
-    for (int ii = 0; ii < m_size; ++ii) {
-      const auto i_src = src + ii * ld_src;
-      const auto i_dst = dst + ii * ld_dst;
-      const auto curr_n_size = n_size + (is_causal ? ii : 0);
-      const uint16_t v_mask = _cvtu32_mask16((1U << (curr_n_size % 16)) - 1);
-      {  // subtract max
-        const auto row_max = _mm512_set1_ps(s_max[ii]);
-        for (int jj = 0; jj < curr_n_size; jj += 16) {  // should be fine to do extra work on idx >= curr_n_size
-          _mm512_storeu_ps(i_src + jj, _mm512_sub_ps(_mm512_loadu_ps(i_src + jj), row_max));
-        }
-      }
-      {  // exp & sum
-        auto v_sum = _mm512_setzero_ps();
-        int jj = 0;
-        for (; jj < curr_n_size / 16 * 16; jj += 16) {
-          const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));
-          v_sum = _mm512_add_ps(v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);
-        }
-        if (jj < curr_n_size) {
-          const auto v_exp =
-              kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));  // should be fine to load some extra
-          v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
-          _mm512_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
-        }
-        expsum[ii] = _mm512_reduce_add_ps(v_sum);
-      }
-      {  // scale & int8
-        const auto v_scale = _mm512_set1_ps(UINT8_MAX);
-        int jj = 0;
-        for (; jj < curr_n_size / 16 * 16; jj += 16) {
-          const auto v_softmax = _mm512_mul_ps(_mm512_loadu_ps(i_src + jj), v_scale);
-          _mm_storeu_si128(reinterpret_cast<__m128i*>(i_dst + jj),
-                           _mm512_cvtusepi32_epi8(_mm512_cvtps_epu32(v_softmax)));
-        }
-        if (jj < curr_n_size) {
-          const auto v_softmax = _mm512_mul_ps(_mm512_loadu_ps(i_src + jj), v_scale);
-          _mm_storeu_si128(reinterpret_cast<__m128i*>(i_dst + jj),
-                           _mm512_maskz_cvtusepi32_epi8(v_mask, _mm512_cvtps_epu32(v_softmax)));
-          jj += 16;
-        }
-        if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(uint8_t) * (n_pad_size - jj));
-      }
-    }
-  }
-};
-#endif
 /**
  * @brief MHA interface with N-dim parallelism & stable softmax
  *
@@ -1755,9 +1092,9 @@ class mha_stable_interface_t {
           const auto unmasked_size_start = is_causal ? std::min(sl_diff + i_m + 1, p.sl_kv) : p.sl_kv;
           float expsum[M_TILE]{};  // maximum for each row of the S matrix
           const auto softmax_npad_size = padto(unmasked_size_pad_pv, GemmPV::KTILE);
-          inplace_precompute_max_softmax_t<float, PType, RT_ISA>::forward(  //
-              m_size, unmasked_size_start, softmax_npad_size,               // m / n
-              is_causal, tmp_s, tmp_p, s_max, expsum, ld_tmp_s, ld_tmp_p);  //
+          inplace_precompute_max_softmax_t<float, PType>::template forward<RT_ISA>(  //
+              m_size, unmasked_size_start, softmax_npad_size,                        // m / n
+              is_causal, tmp_s, tmp_p, s_max, expsum, ld_tmp_s, ld_tmp_p);           //
 
           const auto pv_scale = expsum;
           for (int i = 0; i < M_TILE; ++i) pv_scale[i] = p.V_sc / UINT8_MAX / expsum[i] / p.dst_sc;

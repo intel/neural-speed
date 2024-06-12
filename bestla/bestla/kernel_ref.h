@@ -3386,6 +3386,42 @@ static inline BTLA_CODE add(const T* src0ptr, const T* src1ptr, T* dstptr, size_
   }
   return BTLA_CODE::Success;
 }
+
+template <typename T_DST>
+static inline BTLA_CODE scale_exp_acc_sum_fp32(const float* src, const int src_step, T_DST* dst, int ld_dst,
+                                               float* dst_sum, const int M_offset, const int N_offset, const int M,
+                                               const int N, float scale, int causal_offset, void* /* tmpcache */,
+                                               size_t /* cachesize */) {
+  for (int i = 0; i < M; ++i) {
+    const auto N_unmasked = std::min(N, causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + causal_offset + 1);
+    for (int j = 0; j < N_unmasked; ++j) {
+      const auto exp_ = expf(src[i * src_step + j] * scale);
+      dst[i * ld_dst + j] = static_cast<T_DST>(exp_);
+      dst_sum[i] += exp_;
+    }
+    if (N_unmasked < utils::padto(N, 64))
+      memset(dst + i * ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
+  }
+  return BTLA_CODE::Success;
+}
+
+template <typename T_SRC, typename T_DST>
+static inline BTLA_CODE scale_track_max(const T_SRC* src, const int src_step, T_DST* dst, T_DST* dst_max,
+                                                  int ld_dst, const int M_offset, const int N_offset, const int M,
+                                                  const int N, float scale, int causal_offset, float alibi_slope,
+                                                  float tanh_scale, void* tmpcache, size_t cachesize) {
+  for (int i = 0; i < M; ++i) {
+    const auto N_unmasked = std::min(N, causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + causal_offset + 1);
+    for (int j = 0; j < N_unmasked; ++j) {
+      const auto val_ = float(src[i * src_step + j]) * scale;
+      dst[i * ld_dst + j] = static_cast<T_DST>(val_);
+      dst_max[i] = std::max(dst_max[i], val_);
+    }
+    if (N_unmasked < utils::padto(N, 64))
+      memset(dst + i * ld_dst + N_unmasked, 0, sizeof(*dst) * (utils::padto(N, 64) - N_unmasked));
+  }
+  return BTLA_CODE::Success;
+}
 }  // namespace ref
 }  // namespace kernel
 }  // namespace bestla

@@ -380,6 +380,82 @@ struct padding_trans_interleave_cvt<utils::fp16, utils::bf16, 2> {
   }
 };
 
+static inline BTLA_CODE scale_track_max_fp16_fp32(const utils::fp16* src, const int src_step, float* dst,
+                                                  float* dst_max, int ld_dst, const int M_offset, const int N_offset,
+                                                  const int M, const int N, float scale, int causal_offset,
+                                                  float alibi_slope, float tanh_scale, void* tmpcache,
+                                                  size_t cachesize) {
+  const auto v_scale = _mm512_set1_ps(scale);
+  for (int i = 0; i < M; ++i) {
+    const auto N_unmasked = std::min(N, causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + causal_offset + 1);
+
+    const auto v_mask = _cvtu32_mask16((1U << (N_unmasked % 16)) - 1);
+    int j = 0;
+    auto v_max = _mm512_set1_ps(-INFINITY);
+    for (; j < N_unmasked - 15; j += 16) {
+      const auto xs = _mm512_mul_ps(v_scale, _mm512_cvtxph_ps(_mm256_loadu_ph(src + i * src_step + j)));
+      v_max = _mm512_max_ps(v_max, xs);
+      _mm512_storeu_ps(dst + i * ld_dst + j, xs);
+    }
+    if (j < N_unmasked) {
+      const auto xs = _mm512_mul_ps(
+          v_scale, _mm512_cvtxph_ps(_mm256_castsi256_ph(_mm256_maskz_loadu_epi16(v_mask, src + i * src_step + j))));
+      v_max = _mm512_mask_max_ps(v_max, v_mask, v_max, xs);
+      _mm512_storeu_ps(dst + i * ld_dst + j, xs);
+      j += 16;
+    }
+    dst_max[i] = std::max(dst_max[i], _mm512_reduce_max_ps(v_max));
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE inplace_precompute_max_softmax_fp32_fp16(int m_size, int n_size, int n_pad_size, bool is_causal,
+                                                                 float* src, utils::fp16* dst, const float* s_max,
+                                                                 float* expsum, int ld_src, int ld_dst) {
+  for (int ii = 0; ii < m_size; ++ii) {
+    const auto i_src = src + ii * ld_src;
+    const auto i_dst = dst + ii * ld_dst;
+    const auto curr_n_size = n_size + (is_causal ? ii : 0);
+    const uint16_t v_mask = _cvtu32_mask16((1U << (curr_n_size % 16)) - 1);
+    {  // subtract max
+      const auto row_max = _mm512_set1_ps(s_max[ii]);
+      for (int jj = 0; jj < curr_n_size; jj += 16) {  // should be fine to do extra work on idx >= curr_n_size
+        _mm512_storeu_ps(i_src + jj, _mm512_sub_ps(_mm512_loadu_ps(i_src + jj), row_max));
+      }
+    }
+    auto v_sum = _mm512_setzero_ps();
+    {  // exp & sum
+      int jj = 0;
+      for (; jj < curr_n_size / 16 * 16; jj += 16) {
+        const auto v_exp = kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));
+        v_sum = _mm512_add_ps(v_sum, v_exp);
+        _mm512_storeu_ps(i_src + jj, v_exp);
+      }
+      if (jj < curr_n_size) {
+        const auto v_exp =
+            kernel::avx512f::exp_ps_0_1(_mm512_loadu_ps(i_src + jj));  // should be fine to load some extra
+        v_sum = _mm512_mask_add_ps(v_sum, v_mask, v_sum, v_exp);
+        _mm512_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
+      }
+      expsum[ii] = _mm512_reduce_add_ps(v_sum);
+      v_sum = _mm512_set1_ps(expsum[ii]);
+    }
+    {  // scale & fp16
+      int jj = 0;
+      for (; jj < curr_n_size / 16 * 16; jj += 16) {
+        const auto v_softmax = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
+        _mm256_storeu_ph(i_dst + jj, _mm512_cvtxps_ph(v_softmax));
+      }
+      if (jj < curr_n_size) {
+        const auto v_softmax = _mm512_div_ps(_mm512_loadu_ps(i_src + jj), v_sum);
+        _mm256_storeu_ph(i_dst + jj, _mm512_maskz_cvtxps_ph(v_mask, v_softmax));
+        jj += 16;
+      }
+      if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(utils::fp16) * (n_pad_size - jj));
+    }
+  }
+  return BTLA_CODE::Success;
+}
 #if defined(__GNUC__)
 #pragma GCC pop_options
 #endif

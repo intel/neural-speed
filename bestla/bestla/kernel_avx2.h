@@ -66,6 +66,8 @@ inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
   return _mm256_castsi256_ps(_mm256_slli_epi32(vf32, 16));
 }
 
+inline __m256 ymm_cvt_fp16_fp32(__m128i vfp16) { return _mm256_cvtph_ps(vfp16); }
+
 inline __m128i ymm_cvtepi32_epi16(__m256i src) {
   const auto shuffle_mask_32_to_16 = _mm256_set_epi8(13, 12, 9, 8, 5, 4, 1, 0, 13, 12, 9, 8, 5, 4, 1, 0, 13, 12, 9, 8,
                                                      5, 4, 1, 0, 13, 12, 9, 8, 5, 4, 1, 0);
@@ -91,6 +93,12 @@ static inline __m256 load_bf16_fp32(const utils::bf16* srcptr) {
   return vf32;
 }
 
+static inline __m256 load_fp16_fp32(const utils::fp16* srcptr) {
+  auto tmp = _mm_loadu_si128(reinterpret_cast<const __m128i*>(srcptr));
+  auto vf32 = ymm_cvt_fp16_fp32(tmp);
+  return vf32;
+}
+
 template <typename T>
 static inline __m256 load_T_fp32(const T* srcptr) {
   __m256 vtmp;
@@ -98,8 +106,10 @@ static inline __m256 load_T_fp32(const T* srcptr) {
     vtmp = _mm256_loadu_ps(srcptr);
   } else if constexpr (std::is_same_v<T, utils::bf16>) {
     vtmp = load_bf16_fp32(srcptr);
+  } else if constexpr (std::is_same_v<T, utils::fp16>) {
+    vtmp = load_fp16_fp32(srcptr);
   } else {
-    static_assert(std::is_same_v<T, float> || std::is_same_v<T, utils::bf16>);
+    static_assert(std::is_same_v<T, float> || std::is_same_v<T, utils::bf16> || std::is_same_v<T, utils::fp16>);
   }
   return vtmp;
 }
@@ -5191,6 +5201,150 @@ static inline BTLA_CODE add(const T* src0ptr, const T* src1ptr, T* dstptr, size_
   return BTLA_CODE::Success;
 }
 
+template <bool HAS_ALIBI, bool HAS_TANH>
+static inline BTLA_CODE scale_track_max_fp32_fp32(const float* src, const int src_step, float* dst, float* dst_max,
+                                                  int ld_dst, const int M_offset, const int N_offset, const int M,
+                                                  const int N, float scale, int causal_offset, float _alibi_slope,
+                                                  float tanh_scale, void* tmpcache, size_t cachesize) {
+  static constexpr float seq15[16]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  alignas(32) const uint32_t mask8[9][8]{
+      {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff},
+  };
+
+  const auto v_scale = _mm256_set1_ps(scale);
+  const auto v_seq7 = _mm256_loadu_ps(seq15);
+  const auto alibi_slope = _mm256_set1_ps(_alibi_slope);
+  const auto alibi_base = _mm256_mul_ps(alibi_slope, _mm256_add_ps(v_seq7, _mm256_set1_ps(N_offset)));
+  const auto alibi_step = _mm256_set1_ps(_alibi_slope * 8);
+  const auto infinity_neg = _mm256_set1_ps(-INFINITY);
+  for (int i = 0; i < M; ++i) {
+    auto alibi_curr = alibi_base;
+    const auto N_unmasked = std::min(N, causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + causal_offset + 1);
+
+    const auto v_mask = _mm256_load_si256(reinterpret_cast<const __m256i*>(mask8[N_unmasked % 8]));
+    int j = 0;
+    auto v_max = infinity_neg;
+    for (; j < N_unmasked - 7; j += 8) {
+      const auto xs = _mm256_fmadd_ps(v_scale, _mm256_loadu_ps(src + i * src_step + j), alibi_curr);
+      v_max = _mm256_max_ps(v_max, xs);
+      _mm256_storeu_ps(dst + i * ld_dst + j, xs);
+      if constexpr (HAS_ALIBI) alibi_curr = _mm256_add_ps(alibi_curr, alibi_step);
+    }
+    if (j < N_unmasked) {
+      const auto xs = _mm256_fmadd_ps(v_scale, _mm256_maskload_ps(src + i * src_step + j, v_mask), alibi_curr);
+      const auto masked_xs = _mm256_blendv_ps(infinity_neg, xs, _mm256_castsi256_ps(v_mask));
+      v_max = _mm256_max_ps(v_max, masked_xs);
+      _mm256_storeu_ps(dst + i * ld_dst + j, xs);
+      if constexpr (HAS_ALIBI) alibi_curr = _mm256_add_ps(alibi_curr, alibi_step);
+      j += 8;
+    }
+    alignas(32) float dst_tmp[8];
+    _mm256_store_ps(dst_tmp, v_max);
+    for (int ii = 0; ii < 8; ++ii) dst_max[i] = std::max(dst_max[i], dst_tmp[ii]);
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE weight_cvt_fp16_fp32_n24(const utils::fp16* B, int ldb, bool is_padded, float* dst_ptr,
+                                                 int dst_step, int k_size, int n_size, int k_offset, int n_offset,
+                                                 void* tmpcache, size_t cachesize) {
+  assert(is_padded);
+  const auto src = B + k_offset * 24 + n_offset * ldb;
+  assert(n_size <= 24);
+  assert(n_offset % 24 == 0);
+  if (n_size == 24) {
+    constexpr auto n_size = 24;
+    for (int i = 0; i < k_size; ++i) {
+      for (int j = 0; j < n_size; j += 8) {
+        const auto cur_src = src + i * 24 + j;
+        const auto cur_dst = dst_ptr + i * 24 + j;
+        const auto src = load_T_fp32(cur_src);
+        _mm256_store_ps(cur_dst, src);
+      }
+    }
+  } else {
+    for (int i = 0; i < k_size; ++i) {
+      for (int j = 0; j < n_size; j += 8) {
+        const auto cur_src = src + i * 24 + j;
+        const auto cur_dst = dst_ptr + i * 24 + j;
+        const auto src = load_T_fp32(cur_src);
+        _mm256_store_ps(cur_dst, src);
+      }
+    }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE inplace_precompute_max_softmax_fp32_fp32(int m_size, int n_size, int n_pad_size, bool is_causal,
+                                                                 float* src, float* dst, const float* s_max,
+                                                                 float* expsum, int ld_src, int ld_dst) {
+  alignas(32) const uint32_t mask8[9][8]{
+      {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000},
+      {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff},
+  };
+
+  for (int ii = 0; ii < m_size; ++ii) {
+    const auto i_src = src + ii * ld_src;
+    const auto i_dst = dst + ii * ld_dst;
+    const auto curr_n_size = n_size + (is_causal ? ii : 0);
+    const auto v_mask = _mm256_load_si256(reinterpret_cast<const __m256i*>(mask8[curr_n_size % 8]));
+    {  // subtract max
+      const auto row_max = _mm256_set1_ps(s_max[ii]);
+      for (int jj = 0; jj < curr_n_size; jj += 8) {  // should be fine to do extra work on idx >= curr_n_size
+        _mm256_storeu_ps(i_src + jj, _mm256_sub_ps(_mm256_loadu_ps(i_src + jj), row_max));
+      }
+    }
+    auto v_sum = _mm256_setzero_ps();
+    {  // exp & sum
+      int jj = 0;
+      for (; jj < utils::padto_le(curr_n_size, 8); jj += 8) {
+        const auto v_exp = kernel::avx2::exp_ps_0_1(_mm256_loadu_ps(i_src + jj));
+        v_sum = _mm256_add_ps(v_sum, v_exp);
+        _mm256_storeu_ps(i_src + jj, v_exp);
+      }
+      if (jj < curr_n_size) {
+        const auto v_exp = kernel::avx2::exp_ps_0_1(_mm256_loadu_ps(i_src + jj));  // should be fine to load extra
+        v_sum = _mm256_add_ps(v_sum, _mm256_and_ps(v_exp, _mm256_castsi256_ps(v_mask)));
+        _mm256_storeu_ps(i_src + jj, v_exp);  // should be fine to store some extra
+      }
+
+      alignas(32) float sum_tmp[8];
+      _mm256_store_ps(sum_tmp, v_sum);
+      expsum[ii] = 0.f;
+      for (int iii = 0; iii < 8; ++iii) expsum[ii] += sum_tmp[iii];
+      v_sum = _mm256_set1_ps(expsum[ii]);
+    }
+    {  // scale & store
+      int jj = 0;
+      for (; jj < utils::padto_le(curr_n_size, 8); jj += 8) {
+        _mm256_store_ps(i_dst + jj, _mm256_div_ps(_mm256_loadu_ps(i_src + jj), v_sum));
+      }
+      if (jj < curr_n_size) {
+        const auto quotient = _mm256_div_ps(_mm256_loadu_ps(i_src + jj), v_sum);
+        _mm256_store_ps(i_dst + jj, _mm256_and_ps(quotient, _mm256_castsi256_ps(v_mask)));
+        jj += 8;
+      }
+      if (jj < n_pad_size) memset(i_dst + jj, 0, sizeof(float) * (n_pad_size - jj));
+    }
+  }
+
+  return BTLA_CODE::Success;
+}
 #ifdef __GNUC__
 #pragma GCC pop_options
 #endif
