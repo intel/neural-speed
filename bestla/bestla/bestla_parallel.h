@@ -19,6 +19,7 @@
 #if BTLA_OPENMP
 #include <omp.h>
 #endif
+#include <immintrin.h>
 #include "bestla_utils.h"
 #include "bestla_device.h"
 
