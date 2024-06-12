@@ -21,7 +21,6 @@ namespace bestla {
 namespace kernel {
 namespace avx2 {
 #if CompileAVX2()
-#include <immintrin.h>
 #if defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx2", "fma", "f16c")

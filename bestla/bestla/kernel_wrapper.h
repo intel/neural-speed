@@ -15,6 +15,7 @@
 #include <array>
 #include <cassert>
 #include <type_traits>
+#include <immintrin.h>
 
 #include "bestla.h"
 #include "bestla_utils.h"

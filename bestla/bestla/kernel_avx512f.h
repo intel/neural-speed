@@ -21,9 +21,6 @@
 #include <cmath>
 #include <cstring>
 #include <type_traits>
-#if CompileAVX512F()
-#include <immintrin.h>
-#endif
 
 namespace bestla {
 namespace kernel {
