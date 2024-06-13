@@ -190,6 +190,27 @@ class Memcpy2D {
   }
 };
 
+class Memcpy2DPadding {
+ public:
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int colsize, int srcstride, int dststride,
+                           bool zeropadding) {
+    auto srcp = (char*)srcptr;
+    if (zeropadding && dststride != colsize) {
+      for (int i = 0; i < row; i++) {
+        auto dstp = (char*)dstptr + i * dststride;
+        std::memcpy(dstp, srcp + i * srcstride, colsize);
+        std::memset(dstp + colsize, 0, (dststride - colsize));
+      }
+    } else {
+      for (int i = 0; i < row; i++) {
+        auto dstp = (char*)dstptr + i * dststride;
+        std::memcpy(dstp, srcp + i * srcstride, colsize);
+      }
+    }
+    return BTLA_CODE::Success;
+  }
+};
+
 class Memcpy2DFp32CvtBf16 {
  public:
   template <BTLA_ISA ISA_T>
@@ -221,7 +242,7 @@ class Memcpy2DFp32CvtBf16 {
 class Memcpy2DFp32CvtFp16 {
  public:
   template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileFP16()
     if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
@@ -249,10 +270,44 @@ class Memcpy2DFp32CvtFp16 {
   }
 };
 
+template <typename T>
+class Memcpy2DFp32TPadding {
+ public:
+  TLACALL BTLA_CODE forward(const float* srcptr, T* dstptr, int row, int col, int srcstride, int dststride,
+                            bool zeropadding) {
+    if constexpr (std::is_same_v<T, utils::fp16>) {
+      return Memcpy2DFp32CvtFp16::forward<ISA_T>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if constexpr (std::is_same_v<T, utils::bf16>) {
+      return Memcpy2DFp32CvtBf16::forward<ISA_T>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    return Memcpy2D::forward<ISA_T, float, T>(srcptr, dstptr, row, col, srcstride / sizeof(float),
+                                              dststride / sizeof(T), nullptr);
+  }
+
+  AUTOCALL BTLA_CODE forward_auto(const float* srcptr, T* dstptr, int row, int col, int srcstride, int dststride,
+                                  bool zeropadding) {
+    GetCPUDevice();
+    if (_cd->AVX512_FP16()) {
+      return forward<BTLA_ISA::AVX512_FP16>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if (_cd->AVX512_BF16()) {
+      return forward<BTLA_ISA::AVX512_BF16>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    return forward<BTLA_ISA::NoSIMD>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+  }
+};
+
 class Memcpy2DFp16CvtFp32 {
  public:
   template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileFP16()
     if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
@@ -283,7 +338,7 @@ class Memcpy2DFp16CvtFp32 {
 class Memcpy2DBf16CvtFp32 {
  public:
   template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileBF16()
     if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {

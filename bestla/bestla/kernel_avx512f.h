@@ -4192,6 +4192,9 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
         } else if (sdtype == BTLA_DTYPE::BF16) {
           auto sptr = (utils::bf16*)scales_ + ele_off;
           for (int i = 0; i < NReg; i++) vscale_y[i] = load_bf16_fp32(sptr + i * VLen);
+        } else if (sdtype == BTLA_DTYPE::F16) {
+          auto sptr = (utils::fp16*)scales_ + ele_off;
+          for (int i = 0; i < NReg; i++) vscale_y[i] = load_fp16_fp32(sptr + i * VLen);
         }
         for (int ib = 0; ib < k_remain; ib += PackRow) {
           auto b8ptr = srcptr + (ir + ib) * NTILE;
@@ -4210,6 +4213,9 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           } else if (sdtype == BTLA_DTYPE::BF16) {
             auto sptr = (utils::bf16*)scales_ + ele_off;
             vraw = load_bf16_fp32(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::F16) {
+            auto sptr = (utils::fp16*)scales_ + ele_off;
+            vraw = load_fp16_fp32(sptr + i * VLen);
           } else {
             assert(0);
           }
@@ -4239,6 +4245,9 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           } else if (sdtype == BTLA_DTYPE::BF16) {
             auto sptr = (utils::bf16*)scales_ + ele_off;
             vraw = load_bf16_fp32(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::F16) {
+            auto sptr = (utils::fp16*)scales_ + ele_off;
+            vraw = load_fp16_fp32(sptr + i * VLen);
           }
           vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vraw, vshuf_index_high, vshuf_index_low);
           vscale_y[i * PackRow + 1] = broadcast_ps_1_2<false>(vraw, vshuf_index_high, vshuf_index_low);
@@ -4269,6 +4278,9 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
         } else if (sdtype == BTLA_DTYPE::BF16) {
           auto sptr = (utils::bf16*)scales_ + ele_off;
           for (int i = 0; i < NReg; i++) vscale_y[i] = load_bf16_fp32(sptr + i * VLen);
+        } else if (sdtype == BTLA_DTYPE::F16) {
+          auto sptr = (utils::fp16*)scales_ + ele_off;
+          for (int i = 0; i < NReg; i++) vscale_y[i] = load_fp16_fp32(sptr + i * VLen);
         }
         __m512i vzp_y[NReg];
         for (int i = 0; i < NReg; i++) vzp_y[i] = load_s8_s32(zero_points + ele_off + i * VLen);
@@ -4290,6 +4302,9 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           } else if (sdtype == BTLA_DTYPE::BF16) {
             auto sptr = (utils::bf16*)scales_ + ele_off;
             vraw = load_bf16_fp32(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::F16) {
+            auto sptr = (utils::fp16*)scales_ + ele_off;
+            vraw = load_fp16_fp32(sptr + i * VLen);
           } else {
             assert(0);
           }
@@ -4329,6 +4344,9 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           } else if (sdtype == BTLA_DTYPE::BF16) {
             auto sptr = (utils::bf16*)scales_ + ele_off;
             vraw = load_bf16_fp32(sptr + i * VLen);
+          } else if (sdtype == BTLA_DTYPE::F16) {
+            auto sptr = (utils::fp16*)scales_ + ele_off;
+            vraw = load_fp16_fp32(sptr + i * VLen);
           }
           vscale_y[i * PackRow + 0] = broadcast_ps_1_2<true>(vraw, vshuf_index_high, vshuf_index_low);
           vscale_y[i * PackRow + 1] = broadcast_ps_1_2<false>(vraw, vshuf_index_high, vshuf_index_low);

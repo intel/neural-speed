@@ -388,6 +388,8 @@ inline constexpr size_t bestla_dtype_bits(const BTLA_DTYPE t) {
   return bestla_dtype_get_mask_val(t, BTLA_DTYPE::EleBitsMask, BTLA_DTYPE::EleBitsShift);
 }
 
+inline constexpr size_t bestla_dtype_bytes(const BTLA_DTYPE t) { return bestla_dtype_bits(t) >> 3; }
+
 inline constexpr size_t bestla_dtype_type(const BTLA_DTYPE t) {
   return bestla_dtype_get_mask_val(t, BTLA_DTYPE::TypeMask, BTLA_DTYPE::TypeShift);
 }

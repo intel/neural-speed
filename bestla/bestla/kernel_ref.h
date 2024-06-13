@@ -2389,7 +2389,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
           for (int in = 0; in < NTILE; in++) {
             auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
             auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-            auto vscale = ascale * bsptr[in];
+            auto vscale = ascale * (float)bsptr[in];
             int bzp = bzptr[in] + 8;
             accf[im * NTILE + in] += int(a8ptr[0 + im * A.lda] - azp) * (bv0.x - bzp) * vscale;
             accf[im * NTILE + in] += int(a8ptr[1 + im * A.lda] - azp) * (bv0.y - bzp) * vscale;
@@ -2408,7 +2408,7 @@ static inline BTLA_CODE gemv_4bit_u8s8_fp32(const utils::GemvParamA& A, const ut
           for (int in = 0; in < NTILE; in++) {
             auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
             auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-            auto vscale = ascale * bsptr[in];
+            auto vscale = ascale * (float)bsptr[in];
             accf[im * NTILE + in] += int(a8ptr[0 + im * A.lda] - azp) * (bv0.x - 8) * vscale;
             accf[im * NTILE + in] += int(a8ptr[1 + im * A.lda] - azp) * (bv0.y - 8) * vscale;
             accf[im * NTILE + in] += int(a8ptr[2 + im * A.lda] - azp) * (bv1.x - 8) * vscale;
@@ -2448,7 +2448,7 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           for (int in = 0; in < NTILE; in++) {
             auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
             auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-            auto vscale = ascale * bsptr[in];
+            auto vscale = ascale * (float)bsptr[in];
             auto bzp = bzptr[in] + 8;
             accf[im * NTILE + in] += int(a8ptr[0 + im * A.lda]) * (bv0.x - bzp) * vscale;
             accf[im * NTILE + in] += int(a8ptr[1 + im * A.lda]) * (bv0.y - bzp) * vscale;
@@ -2466,7 +2466,7 @@ static inline BTLA_CODE gemv_4bit_s8s8_fp32(const utils::GemvParamA& A, const ut
           for (int in = 0; in < NTILE; in++) {
             auto bv0 = *(utils::int4x2*)(b4ptr + in * 2);
             auto bv1 = *(utils::int4x2*)(b4ptr + in * 2 + 1);
-            auto vscale = ascale * bsptr[in];
+            auto vscale = ascale * (float)bsptr[in];
             accf[im * NTILE + in] += int(a8ptr[0 + im * A.lda]) * (bv0.x - 8) * vscale;
             accf[im * NTILE + in] += int(a8ptr[1 + im * A.lda]) * (bv0.y - 8) * vscale;
             accf[im * NTILE + in] += int(a8ptr[2 + im * A.lda]) * (bv1.x - 8) * vscale;
@@ -2502,8 +2502,8 @@ static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, int lda, const utils
           auto aval = A[ib * blocksize + ik + im * lda];
           for (int in = 0; in < NTILE; in += 2) {
             auto bv0 = *(utils::int4x2*)(b4ptr + in / 2);
-            accf[im * NTILE + in + 0] += aval * (bv0.x - 8 - bzptr[in + 0]) * bsptr[in + 0];
-            accf[im * NTILE + in + 1] += aval * (bv0.y - 8 - bzptr[in + 1]) * bsptr[in + 1];
+            accf[im * NTILE + in + 0] += aval * (bv0.x - 8 - bzptr[in + 0]) * (float)bsptr[in + 0];
+            accf[im * NTILE + in + 1] += aval * (bv0.y - 8 - bzptr[in + 1]) * (float)bsptr[in + 1];
           }
         }
         b4ptr += NTILE / 2;
@@ -2514,8 +2514,8 @@ static inline BTLA_CODE gemv_4bit_fp32_fp32(const float* A, int lda, const utils
           auto aval = A[ib * blocksize + ik + im * lda];
           for (int in = 0; in < NTILE; in += 2) {
             auto bv0 = *(utils::int4x2*)(b4ptr + in / 2);
-            accf[im * NTILE + in + 0] += aval * (bv0.x - 8) * bsptr[in + 0];
-            accf[im * NTILE + in + 1] += aval * (bv0.y - 8) * bsptr[in + 1];
+            accf[im * NTILE + in + 0] += aval * (bv0.x - 8) * (float)bsptr[in + 0];
+            accf[im * NTILE + in + 1] += aval * (bv0.y - 8) * (float)bsptr[in + 1];
           }
         }
         b4ptr += NTILE / 2;
@@ -2574,7 +2574,7 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32_align128(const utils::GemvParamA& A,
     int zp = azptr[ib];
     for (int in = 0; in < NTILE; in++) {
       auto tmp = float(acci[in] - zp * wacc[in]);
-      tmp = tmp * (scale * bsptr[in]);
+      tmp = tmp * (scale * (float)bsptr[in]);
       accf[in] += tmp;
     }
   }
@@ -2623,7 +2623,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32_align128(const utils::GemvParamA& A,
     float scale = asptr[ib];
     for (int in = 0; in < NTILE; in++) {
       auto tmp = float(acci[in]);
-      tmp = tmp * (scale * bsptr[in]);
+      tmp = tmp * (scale * (float)bsptr[in]);
       accf[in] += tmp;
     }
   }
@@ -2654,7 +2654,7 @@ static inline BTLA_CODE gemv_2bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         auto azp = A.zpptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2691,7 +2691,7 @@ static inline BTLA_CODE gemv_2bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         float ascale = A.sptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2730,7 +2730,7 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
         for (int ikt = 0; ikt < Unroll; ikt++) {
           for (int im = 0; im < MTILE; im++) {
             for (int in = 0; in < NTILE; in++) {
-              auto bval = (UnpackBuf[in + ikt * NTILE] - bzptr[in]) * bsptr[in];
+              auto bval = (UnpackBuf[in + ikt * NTILE] - bzptr[in]) * (float)bsptr[in];
               auto aval = A[ikt + im * lda];
               accf[im * NTILE + in] += aval * bval;
             }
@@ -2740,7 +2740,7 @@ static inline BTLA_CODE gemv_2bit_fp32_fp32(const float* A, int lda, const utils
         for (int im = 0; im < MTILE; im++) {
           for (int in = 0; in < NTILE; in++) {
             for (int ikt = 0; ikt < Unroll; ikt++) {
-              auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+              auto bval = (UnpackBuf[in + ikt * NTILE]) * (float)bsptr[in];
               auto aval = A[ikt + im * lda];
               accf[im * NTILE + in] += aval * bval;
             }
@@ -2780,7 +2780,7 @@ static inline BTLA_CODE gemv_1bit_fp32_fp32(const float* A, int lda, const utils
       for (int im = 0; im < MTILE; im++) {
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < Unroll; ikt++) {
-            auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+            auto bval = (UnpackBuf[in + ikt * NTILE]) * (float)bsptr[in];
             auto aval = A[ikt + im * lda];
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2819,7 +2819,7 @@ static inline BTLA_CODE gemv_1bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         auto azp = A.zpptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2857,7 +2857,7 @@ static inline BTLA_CODE gemv_1bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         float ascale = A.sptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2897,7 +2897,7 @@ static inline BTLA_CODE gemv_3bit_fp32_fp32(const float* A, int lda, const utils
       for (int im = 0; im < MTILE; im++) {
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < Unroll; ikt++) {
-            auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+            auto bval = (UnpackBuf[in + ikt * NTILE]) * (float)bsptr[in];
             auto aval = A[ikt + im * lda];
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2938,7 +2938,7 @@ static inline BTLA_CODE gemv_3bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         auto azp = A.zpptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -2978,7 +2978,7 @@ static inline BTLA_CODE gemv_3bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         float ascale = A.sptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3019,7 +3019,7 @@ static inline BTLA_CODE gemv_6bit_fp32_fp32(const float* A, int lda, const utils
       for (int im = 0; im < MTILE; im++) {
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < Unroll; ikt++) {
-            auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+            auto bval = (UnpackBuf[in + ikt * NTILE]) * (float)bsptr[in];
             auto aval = A[ikt + im * lda];
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3060,7 +3060,7 @@ static inline BTLA_CODE gemv_6bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         auto azp = A.zpptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3100,7 +3100,7 @@ static inline BTLA_CODE gemv_6bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         float ascale = A.sptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3141,7 +3141,7 @@ static inline BTLA_CODE gemv_5bit_fp32_fp32(const float* A, int lda, const utils
       for (int im = 0; im < MTILE; im++) {
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < Unroll; ikt++) {
-            auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+            auto bval = (UnpackBuf[in + ikt * NTILE]) * (float)bsptr[in];
             auto aval = A[ikt + im * lda];
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3182,7 +3182,7 @@ static inline BTLA_CODE gemv_5bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         auto azp = A.zpptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3222,7 +3222,7 @@ static inline BTLA_CODE gemv_5bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         float ascale = A.sptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3264,7 +3264,7 @@ static inline BTLA_CODE gemv_7bit_fp32_fp32(const float* A, int lda, const utils
       for (int im = 0; im < MTILE; im++) {
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < Unroll; ikt++) {
-            auto bval = (UnpackBuf[in + ikt * NTILE]) * bsptr[in];
+            auto bval = (UnpackBuf[in + ikt * NTILE]) * (float)bsptr[in];
             auto aval = A[ikt + im * lda];
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3307,7 +3307,7 @@ static inline BTLA_CODE gemv_7bit_u8s8_fp32(const utils::GemvParamA& A, const ut
         auto azp = A.zpptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda] - azp) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3349,7 +3349,7 @@ static inline BTLA_CODE gemv_7bit_s8s8_fp32(const utils::GemvParamA& A, const ut
         float ascale = A.sptr[ib + im * A.ldzp];
         for (int in = 0; in < NTILE; in++) {
           for (int ikt = 0; ikt < KTILE; ikt++) {
-            auto bval = (UnpackBuf[in * KTILE + ikt]) * bsptr[in];
+            auto bval = (UnpackBuf[in * KTILE + ikt]) * (float)bsptr[in];
             auto aval = int(a8ptr[ikt + im * A.lda]) * ascale;
             accf[im * NTILE + in] += aval * bval;
           }
@@ -3406,10 +3406,10 @@ static inline BTLA_CODE scale_exp_acc_sum_fp32(const float* src, const int src_s
 }
 
 template <typename T_SRC, typename T_DST>
-static inline BTLA_CODE scale_track_max(const T_SRC* src, const int src_step, T_DST* dst, T_DST* dst_max,
-                                                  int ld_dst, const int M_offset, const int N_offset, const int M,
-                                                  const int N, float scale, int causal_offset, float alibi_slope,
-                                                  float tanh_scale, void* tmpcache, size_t cachesize) {
+static inline BTLA_CODE scale_track_max(const T_SRC* src, const int src_step, T_DST* dst, T_DST* dst_max, int ld_dst,
+                                        const int M_offset, const int N_offset, const int M, const int N, float scale,
+                                        int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
+                                        size_t cachesize) {
   for (int i = 0; i < M; ++i) {
     const auto N_unmasked = std::min(N, causal_offset < 0 ? INT32_MAX : i + M_offset - N_offset + causal_offset + 1);
     for (int j = 0; j < N_unmasked; ++j) {
