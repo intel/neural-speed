@@ -99,8 +99,6 @@ def _get_model_type(model_config):
     if model_type == "chatglm" and "glm-4" in model_config._name_or_path:
         # due to the same model architecture.
         model_type = "chatglm2"
-    import pdb
-    pdb.set_trace()
     # for TheBloke/falcon-40b-instruct-GPTQ & TheBloke/Falcon-7B-Instruct-GPTQ
     if model_type == "RefinedWebModel" or model_type == "RefinedWeb":
         model_type = "falcon"
