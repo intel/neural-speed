@@ -486,5 +486,145 @@ class UT_SyclS4Gemv {
 #ifdef BTLA_UT_SYCL
 static UT_SyclS4Gemv sUT_SyclS4Gemv;
 #endif
+
+void mha_sref(float* Q, float* K, float* V, float* S, float* O, int batch, int seq, int seqA, int hnum, int hsize) {
+  avector<float> tmps(seqA);
+  int nf = hnum * hsize;
+  const float attn_scale = 1.0f / sqrtf(static_cast<float>(hsize));
+  int n_past = seqA - seq;
+  for (int i = 0; i < batch; i++) {
+    for (int j = 0; j < seq; j++) {
+      for (int ii = 0; ii < hnum; ii++) {
+        float maxs = 0.f;
+        for (int jj = 0; jj < seqA; jj++) {
+          float tmp = 0.f;
+          if (jj <= j + n_past) {
+            for (int kk = 0; kk < hsize; kk++) {
+              tmp += Q[i * seq * nf + j * nf + ii * hsize + kk] * K[i * nf * seqA + kk * hnum * seqA + ii * seqA + jj];
+            }
+            tmp *= attn_scale;
+          } else {
+            tmp = -INFINITY;
+          }
+
+          tmps[jj] = tmp;
+          maxs = std::max(maxs, tmp);
+        }
+        float sums = 0.f;
+        for (int jj = 0; jj < seqA; jj++) {
+          tmps[jj] = std::expf(tmps[jj] - maxs);
+          sums += tmps[jj];
+        }
+        sums = 1.f / sums;
+        for (int jj = 0; jj < seqA; jj++) {
+          tmps[jj] *= sums;
+          S[i * seq * hnum * seqA + j * hnum * seqA + ii * seqA + jj] = tmps[jj];
+        }
+        for (int kk = 0; kk < hsize; kk++) {
+          float tmp = 0.f;
+          for (int jj = 0; jj < seqA; jj++) {
+            tmp += tmps[jj] * V[i * seqA * nf + jj * nf + ii * hsize + kk];
+          }
+          O[i * seq * nf + j * nf + ii * hsize + kk] = tmp;
+        }
+      }
+    }
+  }
+}
+
+class UT_MHASgemm {
+ public:
+  UT_MHASgemm() {
+    UT_START();
+    ut_T(1, 1, 1, 32, 128);
+    ut_T(1, 1, 64, 32, 128);
+    ut_T(4, 1, 64, 32, 128);
+    ut_T(4, 64, 64, 32, 128);
+  }
+
+  void ut_T(int batch, int seq, int seqA, int hnum, int hsize) {
+    auto dev = UT_Device::get();
+    auto q = dev->getQueue();
+    assert(seqA >= seq);
+    printf("Test Case %s: %d %d %d %d %d Device:%s\n", __FUNCTION__, batch, seq, seqA, hnum, hsize,
+           dev->getName().c_str());
+    avector<float> Q(batch * seq * hnum * hsize), K(batch * seqA * hnum * hsize), V(batch * seqA * hnum * hsize);
+    fill_buffer_randn(Q.data(), Q.size(), -0.5f, 0.5f);
+    fill_buffer_randn(K.data(), K.size(), -0.5f, 0.5f);
+    fill_buffer_randn(V.data(), V.size(), -0.5f, 0.5f);
+    avector<float> S(batch * seq * hnum * seqA), O(batch * seq * hnum * hsize);
+    mha_sref(Q.data(), K.data(), V.data(), S.data(), O.data(), batch, seq, seqA, hnum, hsize);
+    sycl_vector<float> dQ(batch * seq * hnum * hsize, q), dK(batch * seqA * hnum * hsize, q),
+        dV(batch * seqA * hnum * hsize, q);
+    sycl_vector<float> dS(batch * seq * hnum * seqA, q), dO(batch * seq * hnum * hsize, q);
+    q->memcpy(dQ.data(), Q.data(), Q.size() * sizeof(Q[0]));
+    q->memcpy(dK.data(), K.data(), K.size() * sizeof(K[0]));
+    q->memcpy(dV.data(), V.data(), V.size() * sizeof(V[0]));
+    q->wait();
+    auto Qptr = dQ.data();
+    auto Kptr = dK.data();
+    auto Vptr = dV.data();
+    auto Sptr = dS.data();
+    auto Optr = dO.data();
+    int nf = hnum * hsize;
+    sycl::range<1> num_items{batch * seq * hnum};
+    int n_past = seqA - seq;
+    const float attn_scale = 1.0f / sqrtf(static_cast<float>(hsize));
+    auto ev = q->submit([&](sycl::handler& cgh) {
+      cgh.parallel_for(num_items, [=](auto it) {
+        int i = it;
+        int ih = i % hnum;
+        i /= hnum;
+        int is = i % seq;
+        i /= seq;
+        int ib = i % batch;
+        float maxs = 0.f;
+        float tmps[64];
+        for (int jj = 0; jj < seqA; jj++) {
+          float tmp = 0.f;
+          if (jj <= is + n_past) {
+            for (int kk = 0; kk < hsize; kk++) {
+              tmp += Qptr[ib * seq * nf + is * nf + ih * hsize + kk] *
+                     Kptr[ib * nf * seqA + kk * hnum * seqA + ih * seqA + jj];
+            }
+            tmp *= attn_scale;
+          } else {
+            tmp = -INFINITY;
+          }
+
+          tmps[jj] = tmp;
+          maxs = std::max(maxs, tmp);
+        }
+        float sums = 0.f;
+        for (int jj = 0; jj < seqA; jj++) {
+          tmps[jj] = std::expf(tmps[jj] - maxs);
+          sums += tmps[jj];
+        }
+        sums = 1.f / sums;
+        for (int jj = 0; jj < seqA; jj++) {
+          tmps[jj] *= sums;
+          Sptr[ib * seq * hnum * seqA + is * hnum * seqA + ih * seqA + jj] = tmps[jj];
+        }
+        for (int kk = 0; kk < hsize; kk++) {
+          float tmp = 0.f;
+          for (int jj = 0; jj < seqA; jj++) {
+            tmp += tmps[jj] * Vptr[ib * seqA * nf + jj * nf + ih * hsize + kk];
+          }
+          Optr[ib * seq * nf + is * nf + ih * hsize + kk] = tmp;
+        }
+      });
+    });
+    q->wait();
+    avector<float> STar(batch * seq * hnum * seqA), OTar(batch * seq * hnum * hsize);
+    q->memcpy(STar.data(), S.data(), S.size() * sizeof(S[0]));
+    q->memcpy(OTar.data(), O.data(), O.size() * sizeof(O[0]));
+    q->wait();
+    buffer_error(S.data(), STar.data(), S.size(), 0.f);
+    buffer_error(O.data(), OTar.data(), O.size(), 0.f);
+  }
+};
+#ifdef BTLA_UT_SYCL
+#endif
+static UT_MHASgemm sUT_MHASgemm;
 }  // namespace sycl_ut
 }  // namespace bestla
