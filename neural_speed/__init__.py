@@ -95,7 +95,7 @@ def _get_model_type(model_config):
     if model_type == "chatglm" and "chatglm3" in model_config._name_or_path:
         # due to the same model architecture.
         model_type = "chatglm2"
-    # For ChatGLM3
+    # For GLM4
     if model_type == "chatglm" and "glm-4" in model_config._name_or_path:
         # due to the same model architecture.
         model_type = "chatglm2"
