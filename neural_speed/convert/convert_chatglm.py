@@ -1115,7 +1115,8 @@ def main(args_in: Optional[List[str]] = None) -> None:
     # ChatGLM3 shares the same architecture and model config with ChatGLM2
     # but its tokenizer further supports system prompts,
     # so we can check system token to discriminate ChatGLM3 from ChatGLM2.
-    if hasattr(model.config, "rope_ratio"):
+    # For GLM4-9B
+    if model.config.num_layers == 40:
         chatglm4_convert(model, tokenizer, dir_model, fname_out, ftype, hparams)
     elif hasattr(tokenizer, "tokenizer") and "<|system|>" in tokenizer.tokenizer.special_tokens:
         if args.format == "GGUF":
