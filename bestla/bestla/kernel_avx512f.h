@@ -44,8 +44,23 @@ inline __m512 zmm_cvt_bf16_fp32(__m256i vbf16) {
   return _mm512_castsi512_ps(_mm512_slli_epi32(vf32, 16));
 }
 
+static inline __m256i cvt_fp32_to_bf16(const __m512 _src) {
+  const auto bf16_and_helper = _mm512_set1_epi32(0x00000001);
+  const auto bf16_add_helper = _mm512_set1_epi32(0X00007FFF);
+  auto src = _mm512_castps_si512(_src);
+  auto round_bias = _mm512_and_epi32(bf16_and_helper, _mm512_bsrli_epi128(src, 2));
+  round_bias = _mm512_add_epi32(round_bias, bf16_add_helper);
+  auto round_fp32_v = _mm512_add_epi32(round_bias, src);
+  auto pack_bf16_value = _mm512_cvtepi32_epi16(_mm512_srli_epi32(round_fp32_v, 16));
+  return pack_bf16_value;
+}
+
 inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) {
+#if FP32_BF16_FAST
   return _mm512_cvtepi32_epi16(_mm512_bsrli_epi128(_mm512_castps_si512(vfp32), 2));
+#else
+  return cvt_fp32_to_bf16(vfp32);
+#endif
 }
 
 inline __m512i zmm_cvt_fp32_bf16_x2(__m512 vfp32_hi, __m512 vfp32_lo) {
@@ -1828,75 +1843,14 @@ static inline BTLA_CODE remove_zeropoint_bias(float* accptr, int ldacc, int row,
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
-                                                    int srcstride, int dststride, bool zeropadding) {
-  auto srcptr = reinterpret_cast<const char*>(raw_srcptr);
-  auto dstptr = reinterpret_cast<char*>(raw_dstptr);
+template <typename T>
+static inline BTLA_CODE cvt_fp32_T_2D(const float* src_ptr, T* dst_ptr, int row, int col, int src_step, int dst_step,
+                                      bool zeropadding) {
+  const int npadding = (dst_step - col) * sizeof(T);
   constexpr int simd_proc_elt = 16;
-  auto col_body_loop = col / simd_proc_elt;
-  auto col_tail = col % simd_proc_elt;
-  auto tail_mask = _cvtu32_mask16(0xffff >> (16 - col_tail));
-  int npadding = dststride - col * sizeof(utils::bf16);
-  auto bf16_and_helper = _mm512_set1_epi32(0x00000001);
-  auto bf16_add_helper = _mm512_set1_epi32(0X00007FFF);
-  for (int i = 0; i < row; i++) {
-    auto src = srcptr + i * srcstride;
-    auto dst = dstptr + i * dststride;
-    int j = 0;
-    for (; j < col_body_loop; j++) {
-      auto round_bias = _mm512_loadu_si512(src + sizeof(float) * simd_proc_elt * j);
-      round_bias = _mm512_and_epi32(bf16_and_helper, _mm512_bsrli_epi128(round_bias, 2));
-      round_bias = _mm512_add_epi32(round_bias, bf16_add_helper);
-      auto round_fp32_v = _mm512_add_epi32(round_bias, _mm512_loadu_si512(src + sizeof(float) * simd_proc_elt * j));
-      auto pack_bf16_value = _mm512_cvtepi32_epi16(_mm512_srli_epi32(round_fp32_v, 16));
-      _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + (j * simd_proc_elt) * sizeof(utils::bf16)), pack_bf16_value);
-    }
-    if (col_tail > 0) {
-      auto round_bias = _mm512_maskz_loadu_epi32(tail_mask, src + sizeof(float) * simd_proc_elt * j);
-      round_bias = _mm512_and_epi32(bf16_and_helper, _mm512_bsrli_epi128(round_bias, 2));
-      round_bias = _mm512_add_epi32(round_bias, bf16_add_helper);
-      auto round_fp32_v =
-          _mm512_add_epi32(round_bias, _mm512_maskz_loadu_epi32(tail_mask, src + sizeof(float) * simd_proc_elt * j));
-      auto pack_bf16_tail = _mm512_cvtepi32_epi16(_mm512_srli_epi32(round_fp32_v, 16));
-      _mm256_mask_storeu_epi16(reinterpret_cast<__m256i*>(dst + (j * simd_proc_elt) * sizeof(utils::bf16)), tail_mask,
-                               pack_bf16_tail);
-    }
-    if (zeropadding && npadding) {
-      std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
-    }
-  }
-  return BTLA_CODE::Success;
-}
-
-static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
-                                                    int src_step, int dst_step, bool zeropadding) {
-  const int npadding = (dst_step - col) * sizeof(float);
-  constexpr int simd_proc_elt = 16;
+  float tmpbuf[simd_proc_elt];
   auto col_body = col / simd_proc_elt * simd_proc_elt;
   auto col_tail = col % simd_proc_elt;
-  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
-  for (int i = 0; i < row; i++) {
-    auto src = const_cast<utils::bf16*>(src_ptr + i * src_step);
-    auto dst = dst_ptr + i * dst_step;
-    int j = 0;
-    for (; j < col_body; j += simd_proc_elt) _mm512_storeu_ps(dst + j, load_bf16_fp32(src + j));
-    if (col_tail > 0) {
-      __m256i tmp = _mm256_setzero_si256();
-      tmp = _mm256_mask_loadu_epi16(tmp, tail_mask, src + j);
-      _mm512_mask_storeu_ps(dst + j, tail_mask, zmm_cvt_bf16_fp32(tmp));
-    }
-    if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
-  }
-  return BTLA_CODE::Success;
-}
-
-static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
-                                                    int src_step, int dst_step, bool zeropadding) {
-  const int npadding = (dst_step - col) * sizeof(utils::fp16);
-  constexpr int simd_proc_elt = 16;
-  auto col_body = col / simd_proc_elt * simd_proc_elt;
-  auto col_tail = col % simd_proc_elt;
-  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
   for (int i = 0; i < row; i++) {
     const auto src = src_ptr + i * src_step;
     const auto dst = dst_ptr + i * dst_step;
@@ -1905,22 +1859,24 @@ static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils:
       store_fp32_T(_mm512_loadu_ps(src + j), dst + j);
     }
     if (col_tail > 0) {
-      auto vf32 = _mm512_maskz_loadu_ps(tail_mask, src + j);
-      auto vf16 = zmm_cvt_fp32_fp16(vf32);
-      _mm256_mask_storeu_epi16(dst + j, tail_mask, vf16);
+      memcpy(tmpbuf, src + j, col_tail * sizeof(src_ptr[0]));
+      auto vf32 = _mm512_loadu_ps(tmpbuf);
+      store_fp32_T(vf32, (T*)tmpbuf);
+      memcpy(dst + j, tmpbuf, col_tail * sizeof(dst[0]));
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, float* dst_ptr, int row, int col,
-                                                    int src_step, int dst_step, bool zeropadding) {
+template <typename T>
+static inline BTLA_CODE cvt_T_fp32_2D(const T* src_ptr, float* dst_ptr, int row, int col, int src_step, int dst_step,
+                                      bool zeropadding) {
   const int npadding = (dst_step - col) * sizeof(float);
   constexpr int simd_proc_elt = 16;
+  float tmpbuf[simd_proc_elt];
   auto col_body = col / simd_proc_elt * simd_proc_elt;
   auto col_tail = col % simd_proc_elt;
-  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
   for (int i = 0; i < row; i++) {
     const auto src = src_ptr + i * src_step;
     const auto dst = dst_ptr + i * dst_step;
@@ -1930,9 +1886,10 @@ static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, 
       _mm512_storeu_ps(dst + j, vf32);
     }
     if (col_tail > 0) {
-      auto vf16 = _mm256_maskz_loadu_epi16(tail_mask, src + j);
-      auto v32 = zmm_cvt_fp16_fp32(vf16);
-      _mm512_mask_storeu_ps(dst + j, tail_mask, v32);
+      memcpy(tmpbuf, src + j, col_tail * sizeof(src_ptr[0]));
+      auto vf32 = load_T_fp32((T*)tmpbuf);
+      _mm512_storeu_ps(tmpbuf, vf32);
+      memcpy(dst + j, tmpbuf, col_tail * sizeof(dst[0]));
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }

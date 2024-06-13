@@ -20,6 +20,8 @@
 #define BTLA_OPENMP 0
 #endif
 
+#define FP32_BF16_FAST 0
+
 #if BTLA_OPENMP
 #include <omp.h>
 #endif

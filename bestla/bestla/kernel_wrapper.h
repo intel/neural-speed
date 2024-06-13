@@ -203,12 +203,14 @@ class Memcpy2DFp32CvtBf16 {
 #endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return kernel::avx512f::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+      return kernel::avx512f::cvt_fp32_T_2D((const float*)srcptr, (utils::bf16*)dstptr, row, col,
+                                            srcstride / sizeof(float), dststride / sizeof(utils::bf16), zeropadding);
     }
 #endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
-      return kernel::avx2::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+      return kernel::avx2::cvt_fp32_T_2D((const float*)srcptr, (utils::bf16*)dstptr, row, col,
+                                         srcstride / sizeof(float), dststride / sizeof(utils::bf16), zeropadding);
     }
 #endif
     return kernel::ref::dt_cvt_2D_write_back<float, utils::bf16>(srcptr, dstptr, row, col, srcstride, dststride,
@@ -230,19 +232,20 @@ class Memcpy2DFp32CvtFp16 {
 #endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return kernel::avx512f::fp32_cvt_fp16_2D_write_back(
-          reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr), row, col,
-          srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
+      return kernel::avx512f::cvt_fp32_T_2D(reinterpret_cast<const float*>(srcptr),
+                                            reinterpret_cast<utils::fp16*>(dstptr), row, col, srcstride / sizeof(float),
+                                            dststride / sizeof(utils::fp16), zeropadding);
     }
 #endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
-      return kernel::avx2::fp32_cvt_fp16_2D_write_back(
-          reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr), row, col,
-          srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
+      return kernel::avx2::cvt_fp32_T_2D(reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr),
+                                         row, col, srcstride / sizeof(float), dststride / sizeof(utils::fp16),
+                                         zeropadding);
     }
 #endif
-    return BTLA_CODE::NotSupport;
+    return kernel::ref::dt_cvt_2D_write_back<float, utils::fp16>(srcptr, dstptr, row, col, srcstride, dststride,
+                                                                 zeropadding);
   }
 };
 
@@ -260,19 +263,20 @@ class Memcpy2DFp16CvtFp32 {
 #endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return kernel::avx512f::fp16_cvt_fp32_2D_write_back(  //
+      return kernel::avx512f::cvt_T_fp32_2D(  //
           reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
     }
 #endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
-      return kernel::avx2::fp16_cvt_fp32_2D_write_back(  //
+      return kernel::avx2::cvt_T_fp32_2D(  //
           reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
     }
 #endif
-    return BTLA_CODE::NotSupport;
+    return kernel::ref::dt_cvt_2D_write_back<utils::fp16, float>(srcptr, dstptr, row, col, srcstride, dststride,
+                                                                 zeropadding);
   }
 };
 
@@ -290,16 +294,16 @@ class Memcpy2DBf16CvtFp32 {
 #endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return kernel::avx512f::bf16_cvt_fp32_2D_write_back(  //
-          reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
-          srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
+      return kernel::avx512f::cvt_T_fp32_2D(reinterpret_cast<const utils::bf16*>(srcptr),
+                                            reinterpret_cast<float*>(dstptr), row, col, srcstride / sizeof(utils::bf16),
+                                            dststride / sizeof(float), zeropadding);
     }
 #endif
 #if CompileAVX2()
     if constexpr (ISA_T >= BTLA_ISA::AVX2) {
-      return kernel::avx2::bf16_cvt_fp32_2D_write_back(
-          reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
-          srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
+      return kernel::avx2::cvt_T_fp32_2D(reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr),
+                                         row, col, srcstride / sizeof(utils::bf16), dststride / sizeof(float),
+                                         zeropadding);
     }
 #endif
     return kernel::ref::dt_cvt_2D_write_back<utils::bf16, float>(srcptr, dstptr, row, col, srcstride, dststride,

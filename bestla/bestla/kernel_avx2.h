@@ -78,8 +78,29 @@ inline __m128i ymm_cvtepi32_epi16(__m256i src) {
   return result;
 }
 
+static const uint8_t avx2_bf16_convert_maigc_num[32] = {
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80};
+
+static inline __m128i cvt_fp32_to_bf16(const __m256 src) {
+  const auto bf16_and_helper = _mm256_set1_epi32(0X00000001);
+  const auto bf16_add_helper = _mm256_set1_epi32(0x00007FFF);
+  auto shuffle_v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(avx2_bf16_convert_maigc_num));
+  auto round_bias = _mm256_castps_si256(src);
+  round_bias = _mm256_and_si256(bf16_and_helper, _mm256_srli_si256(round_bias, 2));
+  round_bias = _mm256_add_epi32(round_bias, bf16_add_helper);
+  auto round_fp32_v = _mm256_add_epi32(_mm256_castps_si256(src), round_bias);
+  __m256i trunc_elements = _mm256_shuffle_epi8(round_fp32_v, shuffle_v);
+  __m256i ordered = _mm256_permute4x64_epi64(trunc_elements, 0x58);
+  return _mm256_castsi256_si128(ordered);
+}
+
 inline __m128i ymm_cvt_fp32_bf16(const __m256& vfp32) {
+#if FP32_BF16_FAST
   return ymm_cvtepi32_epi16(_mm256_bsrli_epi128(_mm256_castps_si256(vfp32), 2));
+#else
+  return cvt_fp32_to_bf16(vfp32);
+#endif
 }
 
 static inline __m256i load_s8_s32(int8_t* srcptr) {
@@ -128,6 +149,9 @@ static inline void store_fp32_T(const __m256& src_y, T* dstptr) {
     _mm_storeu_si128(reinterpret_cast<__m128i*>(dstptr), xmm);
   } else if constexpr (std::is_same_v<T, float>) {
     _mm256_storeu_ps(dstptr, src_y);
+  } else if constexpr (std::is_same_v<T, utils::fp16>) {
+    auto xmm = ymm_cvt_fp32_fp16(src_y);
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(dstptr), xmm);
   } else {
     assert(0);
   }
@@ -3183,78 +3207,14 @@ static inline BTLA_CODE col_block_reduce_sum(const SRC_T* srcptr, int ldsrc, int
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE bf16_cvt_fp32_2D_write_back(const utils::bf16* src_ptr, float* dst_ptr, int row, int col,
-                                                    int src_step, int dst_step, bool zeropadding) {
-  const int npadding = (dst_step - col) * sizeof(float);
+template <typename T>
+static inline BTLA_CODE cvt_fp32_T_2D(const float* src_ptr, T* dst_ptr, int row, int col, int src_step, int dst_step,
+                                      bool zeropadding) {
+  const int npadding = (dst_step - col) * sizeof(T);
   constexpr int simd_proc_elt = 8;
-  auto col_body = col / simd_proc_elt * simd_proc_elt;
-  for (int i = 0; i < row; i++) {
-    auto src = const_cast<utils::bf16*>(src_ptr + i * src_step);
-    auto dst = dst_ptr + i * dst_step;
-    int j = 0;
-    for (; j < col_body; j += simd_proc_elt) {
-      auto bf16_v = _mm_loadu_si128(reinterpret_cast<__m128i*>(src + j));
-      auto fp32_v = _mm256_castsi256_ps(_mm256_bslli_epi128(_mm256_cvtepu16_epi32(bf16_v), 2));
-      _mm256_storeu_ps(dst + j, fp32_v);
-    }
-    for (; j < col; j++) {
-      *(dst + j) = (src + j)->tofloat();
-    }
-    if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
-  }
-  return BTLA_CODE::Success;
-}
-
-static const uint8_t avx2_bf16_convert_maigc_num[32] = {
-    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80};
-
-static inline __m128i cvt_fp32_to_bf16(const __m256 src, __m256i* and_helper, __m256i* add_helper) {
-  auto shuffle_v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(avx2_bf16_convert_maigc_num));
-  auto round_bias = _mm256_castps_si256(src);
-  round_bias = _mm256_and_si256(*and_helper, _mm256_srli_si256(round_bias, 2));
-  round_bias = _mm256_add_epi32(round_bias, *add_helper);
-  auto round_fp32_v = _mm256_add_epi32(_mm256_castps_si256(src), round_bias);
-  __m256i trunc_elements = _mm256_shuffle_epi8(round_fp32_v, shuffle_v);
-  __m256i ordered = _mm256_permute4x64_epi64(trunc_elements, 0x58);
-  return _mm256_castsi256_si128(ordered);
-}
-
-static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void* raw_dstptr, int row, int col,
-                                                    int srcstride, int dststride, bool zeropadding) {
-  auto srcptr = reinterpret_cast<const char*>(raw_srcptr);
-  auto dstptr = reinterpret_cast<char*>(raw_dstptr);
-  constexpr int simd_proc_elt = 8;
-  auto bf16_and_helper = _mm256_set1_epi32(0X00000001);
-  auto bf16_add_helper = _mm256_set1_epi32(0x00007FFF);
-  auto col_body_loop = col / simd_proc_elt * simd_proc_elt;
-  int npadding = dststride - col * sizeof(utils::bf16);
-  for (int i = 0; i < row; i++) {
-    auto src = srcptr + i * srcstride;
-    auto dst = dstptr + i * dststride;
-    int j = 0;
-    for (; j < col_body_loop; j += simd_proc_elt) {
-      auto pack_bf16_value = cvt_fp32_to_bf16(_mm256_loadu_ps(reinterpret_cast<const float*>(src) + j),
-                                              &bf16_and_helper, &bf16_add_helper);
-      _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + j * sizeof(utils::bf16)), pack_bf16_value);
-    }
-    for (; j < col; j++) {
-      (reinterpret_cast<utils::bf16*>(dst) + j)->fromfloat(*(reinterpret_cast<const float*>(src) + j));
-    }
-    if (zeropadding && npadding) {
-      std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
-    }
-  }
-  return BTLA_CODE::Success;
-}
-
-static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
-                                                    int src_step, int dst_step, bool zeropadding) {
-  const int npadding = (dst_step - col) * sizeof(utils::fp16);
-  constexpr int simd_proc_elt = 16;
+  float tmpbuf[simd_proc_elt];
   auto col_body = col / simd_proc_elt * simd_proc_elt;
   auto col_tail = col % simd_proc_elt;
-  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
   for (int i = 0; i < row; i++) {
     const auto src = src_ptr + i * src_step;
     const auto dst = dst_ptr + i * dst_step;
@@ -3263,22 +3223,24 @@ static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils:
       store_fp32_T(_mm256_loadu_ps(src + j), dst + j);
     }
     if (col_tail > 0) {
-      auto vf32 = _mm256_maskz_loadu_ps(tail_mask, src + j);
-      auto vf16 = ymm_cvt_fp32_fp16(vf32);
-      _mm_mask_storeu_epi16(dst + j, tail_mask, vf16);
+      memcpy(tmpbuf, src + j, col_tail * sizeof(src_ptr[0]));
+      auto vf32 = _mm256_loadu_ps(tmpbuf);
+      store_fp32_T(vf32, (T*)tmpbuf);
+      memcpy(dst + j, tmpbuf, col_tail * sizeof(dst[0]));
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
   return BTLA_CODE::Success;
 }
 
-static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, float* dst_ptr, int row, int col,
-                                                    int src_step, int dst_step, bool zeropadding) {
+template <typename T>
+static inline BTLA_CODE cvt_T_fp32_2D(const T* src_ptr, float* dst_ptr, int row, int col, int src_step, int dst_step,
+                                      bool zeropadding) {
   const int npadding = (dst_step - col) * sizeof(float);
-  constexpr int simd_proc_elt = 16;
+  constexpr int simd_proc_elt = 8;
   auto col_body = col / simd_proc_elt * simd_proc_elt;
   auto col_tail = col % simd_proc_elt;
-  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
+  float tmpbuf[simd_proc_elt];
   for (int i = 0; i < row; i++) {
     const auto src = src_ptr + i * src_step;
     const auto dst = dst_ptr + i * dst_step;
@@ -3288,9 +3250,10 @@ static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, 
       _mm256_storeu_ps(dst + j, vf32);
     }
     if (col_tail > 0) {
-      auto vf16 = _mm_maskz_loadu_epi16(tail_mask, src + j);
-      auto v32 = ymm_cvt_fp16_fp32(vf16);
-      _mm256_mask_storeu_ps(dst + j, tail_mask, v32);
+      memcpy(tmpbuf, src + j, col_tail * sizeof(src_ptr[0]));
+      auto vf32 = load_T_fp32((T*)tmpbuf);
+      _mm256_storeu_ps(tmpbuf, vf32);
+      memcpy(dst + j, tmpbuf, col_tail * sizeof(dst[0]));
     }
     if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
