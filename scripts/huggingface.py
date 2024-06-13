@@ -401,6 +401,10 @@ class HFLM(TemplateLM):
         if self.model_type == "chatglm" and "chatglm3" in self._config._name_or_path:
             # due to the same model architecture.
             self.model_type = "chatglm2"
+        # For GLM4
+        if model_type == "chatglm" and "glm-4" in self._config._name_or_path:
+            # due to the same model architecture.
+            model_type = "chatglm2"
 
     @property
     def config(self):
