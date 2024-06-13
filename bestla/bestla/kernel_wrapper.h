@@ -235,6 +235,13 @@ class Memcpy2DFp32CvtFp16 {
           srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
     }
 #endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return kernel::avx2::fp32_cvt_fp16_2D_write_back(
+          reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr), row, col,
+          srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
+    }
+#endif
     return BTLA_CODE::NotSupport;
   }
 };
@@ -254,6 +261,13 @@ class Memcpy2DFp16CvtFp32 {
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
       return kernel::avx512f::fp16_cvt_fp32_2D_write_back(  //
+          reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
+          srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
+    }
+#endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return kernel::avx2::fp16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
     }

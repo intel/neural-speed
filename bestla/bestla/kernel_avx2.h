@@ -67,6 +67,8 @@ inline __m256 ymm_cvt_bf16_fp32(__m128i vbf16) {
 
 inline __m256 ymm_cvt_fp16_fp32(__m128i vfp16) { return _mm256_cvtph_ps(vfp16); }
 
+inline __m128i ymm_cvt_fp32_fp16(__m256 vfp32) { return _mm256_cvtps_ph(vfp32, _MM_FROUND_TO_NEAREST_INT); }
+
 inline __m128i ymm_cvtepi32_epi16(__m256i src) {
   const auto shuffle_mask_32_to_16 = _mm256_set_epi8(13, 12, 9, 8, 5, 4, 1, 0, 13, 12, 9, 8, 5, 4, 1, 0, 13, 12, 9, 8,
                                                      5, 4, 1, 0, 13, 12, 9, 8, 5, 4, 1, 0);
@@ -120,7 +122,7 @@ static inline __m256 load_s8_fp32(int8_t* srcptr) {
 }
 
 template <typename T>
-static inline void store_fp_T(const __m256& src_y, T* dstptr) {
+static inline void store_fp32_T(const __m256& src_y, T* dstptr) {
   if constexpr (std::is_same_v<T, utils::bf16>) {
     auto xmm = ymm_cvt_fp32_bf16(src_y);
     _mm_storeu_si128(reinterpret_cast<__m128i*>(dstptr), xmm);
@@ -134,7 +136,7 @@ static inline void store_fp_T(const __m256& src_y, T* dstptr) {
 template <typename T>
 static inline void convert_s8_fp_v8(T* dstptr, int8_t* srcptr) {
   auto src_fp_y = load_s8_fp32(srcptr);
-  store_fp_T(src_fp_y, dstptr);
+  store_fp32_T(src_fp_y, dstptr);
 }
 
 template <bool IsAsym = false>
@@ -157,7 +159,7 @@ static inline void dequant_s8_N_avx2(DstT* dstptr, int8_t* srcptr, __m256* vscal
     } else {
       dq_f32_y = dequant_s8_fp<IsAsym>(srcptr, vscales[iv]);
     }
-    store_fp_T(dq_f32_y, dstptr + iv * 8);
+    store_fp32_T(dq_f32_y, dstptr + iv * 8);
   }
 }
 
@@ -2471,7 +2473,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           auto b8ptr = srcptr + (ir + ib) * NTILE;
           for (int i = 0; i < NReg; i++) {
             auto vdeq_y = dequant_s8_fp(b8ptr + i * 8, vscale_y[i]);
-            store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8);
+            store_fp32_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8);
           }
         }
       } else if constexpr (PackRow == 4) {
@@ -2501,7 +2503,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           for (int i = 0; i < NReg; i++) {
             for (int ip = 0; ip < PackRow; ip++) {
               auto vdeq_y = dequant_s8_fp(b8ptr + i * 8 * PackRow + ip * 8, vscale_y[i * PackRow + ip]);
-              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
+              store_fp32_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
             }
           }
         }
@@ -2526,7 +2528,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           for (int i = 0; i < NReg; i++) {
             for (int ip = 0; ip < PackRow; ip++) {
               auto vdeq_y = dequant_s8_fp(b8ptr + i * 8 * PackRow + ip * 8, vscale_y[i * PackRow + ip]);
-              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
+              store_fp32_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
             }
           }
         }
@@ -2554,7 +2556,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
           auto b8ptr = srcptr + (ir + ib) * NTILE;
           for (int i = 0; i < NReg; i++) {
             auto vdeq_y = dequant_s8_fp<true>(b8ptr + i * 8, vscale_y[i], vzp_y[i]);
-            store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8);
+            store_fp32_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8);
           }
         }
       } else if constexpr (PackRow == 4) {
@@ -2594,7 +2596,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
             for (int ip = 0; ip < PackRow; ip++) {
               auto vdeq_y = dequant_s8_fp<true>(b8ptr + i * 8 * PackRow + ip * 8, vscale_y[i * PackRow + ip],
                                                 vzp_y[i * PackRow + ip]);
-              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
+              store_fp32_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
             }
           }
         }
@@ -2624,7 +2626,7 @@ inline BTLA_CODE decompress_kblock_s8_fp_row(int8_t* srcptr, DST_T* dstptr, int 
             for (int ip = 0; ip < PackRow; ip++) {
               auto vdeq_y = dequant_s8_fp<true>(b8ptr + i * 8 * PackRow + ip * 8, vscale_y[i * PackRow + ip],
                                                 vzp_y[i * PackRow + ip]);
-              store_fp_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
+              store_fp32_T(vdeq_y, dstptr + (ir + ib) * NTILE + i * 8 * PackRow + ip * 8);
             }
           }
         }
@@ -3242,6 +3244,55 @@ static inline BTLA_CODE fp32_cvt_bf16_2D_write_back(const void* raw_srcptr, void
     if (zeropadding && npadding) {
       std::memset(dst + col * sizeof(utils::bf16), 0, npadding);
     }
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE fp32_cvt_fp16_2D_write_back(const float* src_ptr, utils::fp16* dst_ptr, int row, int col,
+                                                    int src_step, int dst_step, bool zeropadding) {
+  const int npadding = (dst_step - col) * sizeof(utils::fp16);
+  constexpr int simd_proc_elt = 16;
+  auto col_body = col / simd_proc_elt * simd_proc_elt;
+  auto col_tail = col % simd_proc_elt;
+  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
+  for (int i = 0; i < row; i++) {
+    const auto src = src_ptr + i * src_step;
+    const auto dst = dst_ptr + i * dst_step;
+    int j = 0;
+    for (; j < col_body; j += simd_proc_elt) {
+      store_fp32_T(_mm256_loadu_ps(src + j), dst + j);
+    }
+    if (col_tail > 0) {
+      auto vf32 = _mm256_maskz_loadu_ps(tail_mask, src + j);
+      auto vf16 = ymm_cvt_fp32_fp16(vf32);
+      _mm_mask_storeu_epi16(dst + j, tail_mask, vf16);
+    }
+    if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
+  }
+  return BTLA_CODE::Success;
+}
+
+static inline BTLA_CODE fp16_cvt_fp32_2D_write_back(const utils::fp16* src_ptr, float* dst_ptr, int row, int col,
+                                                    int src_step, int dst_step, bool zeropadding) {
+  const int npadding = (dst_step - col) * sizeof(float);
+  constexpr int simd_proc_elt = 16;
+  auto col_body = col / simd_proc_elt * simd_proc_elt;
+  auto col_tail = col % simd_proc_elt;
+  const auto tail_mask = _cvtu32_mask16((1U << col_tail) - 1);
+  for (int i = 0; i < row; i++) {
+    const auto src = src_ptr + i * src_step;
+    const auto dst = dst_ptr + i * dst_step;
+    int j = 0;
+    for (; j < col_body; j += simd_proc_elt) {
+      auto vf32 = load_T_fp32(src + j);
+      _mm256_storeu_ps(dst + j, vf32);
+    }
+    if (col_tail > 0) {
+      auto vf16 = _mm_maskz_loadu_epi16(tail_mask, src + j);
+      auto v32 = ymm_cvt_fp16_fp32(vf16);
+      _mm256_mask_storeu_ps(dst + j, tail_mask, v32);
+    }
+    if (zeropadding && npadding) std::memset(dst + col, 0, npadding);
   }
   return BTLA_CODE::Success;
 }
@@ -5163,7 +5214,7 @@ static inline BTLA_CODE mul(const T* src0ptr, const T* src1ptr, T* dstptr, size_
     auto v0 = load_T_fp32(src0ptr + i);
     auto v1 = load_T_fp32(src1ptr + i);
     auto out = _mm256_mul_ps(v0, v1);
-    store_fp_T(out, dstptr + i);
+    store_fp32_T(out, dstptr + i);
   };
   for (; i < velt; i += VLen) vfunc();
   if (i < size) {
@@ -5186,7 +5237,7 @@ static inline BTLA_CODE add(const T* src0ptr, const T* src1ptr, T* dstptr, size_
     auto v0 = load_T_fp32(src0ptr + i);
     auto v1 = load_T_fp32(src1ptr + i);
     auto out = _mm256_add_ps(v0, v1);
-    store_fp_T(out, dstptr + i);
+    store_fp32_T(out, dstptr + i);
   };
   for (; i < velt; i += VLen) vfunc();
   if (i < size) {
