@@ -598,6 +598,8 @@ class HFLM(TemplateLM):
                 if init_from_bin != "default_none":
                     if self.config.model_type == "chatglm" and "chatglm2" in self.config._name_or_path:
                         model_type = "chatglm2"
+                    elif self.config.model_type == "chatglm" and "glm-4" in self.config._name_or_path:
+                        model_type = "chatglm2"
                     else:
                         model_type = self.config.model_type
 
