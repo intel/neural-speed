@@ -170,6 +170,7 @@ model_name_map["baichuan13b-gptq"]="Baichuan2-13B-Chat-GPTQ"
 model_name_map["mistral-gptq"]="TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
 model_name_map["phi3"]="microsoft/Phi-3-mini-128k-instruct"
 model_name_map["llama3"]="meta-llama/Meta-Llama-3-8B"
+model_name_map["glm4"]="THUDM/glm-4-9b"
 
 
 function main() {
@@ -255,6 +256,11 @@ function main() {
         infer_cmd="python $working_dir/scripts/inference.py"
         extension=" --model_name chatglm3 --tokenizer $model_path"
         requirements_file="$working_dir/neural_speed/models/requirements/chatglm-6b.sh"
+        input_list=(32 1024)
+    elif [[ "${model}" == "glm4" ]]; then
+        quant_script="./build/bin/quant_chatglm2"
+        convert_script="${convert_script}/convert_chatglm.py"
+        infer_cmd="./build/bin/run_chatglm2"
         input_list=(32 1024)
     elif [[ "${model}" == "chatglm-6b" ]]; then
         quant_script="./build/bin/quant_chatglm"
@@ -474,7 +480,7 @@ function main() {
                          $infer_cmd -f "/tf_dataset2/models/nlp_toolkit/whisper-tiny/jfk.wav" -m ${model}-${precision}.bin
                     else
                         real_ctx=$ctx # TODO(Zhenzhong): use same ctx for  chatglm & baichuan
-                        [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" ||
+                        [[ "${model}" == "chatglm2" || "${model}" == "chatglm-6b" || "${model}" == "glm4" ||
                             "${model}" == "baichuan-13b" || "${model}" == "baichuan2-13b" ]] && real_ctx=2048
                         if [[ "${model}" == *"gptq" ]]; then
                              NEURAL_SPEED_VERBOSE=1 OMP_NUM_THREADS=$cores_per_instance numactl -m 0 -C 0-$(($cores_per_instance - 1)) $infer_cmd 2>&1 | tee ${WORKSPACE}/${logs_file} || true &
