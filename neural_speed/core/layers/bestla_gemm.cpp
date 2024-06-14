@@ -129,14 +129,8 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
         }
         if (btype == gemm::CompType::tBF16 && PackRow == 2) {
           if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-            if (M <= tAVX512_BF16::MTILE) {
-              static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-              BTLAGemmCompF32<tAVX512_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
-                                                      DataParams[i].ldc, WorkSpace, pth);
-            } else {
-              BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
-                                                   DataParams[i].ldc, WorkSpace, pth);
-            }
+            BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                 DataParams[i].ldc, WorkSpace, pth);
           }
         }
         if (btype == gemm::CompType::tFP16 && PackRow == 2) {
@@ -206,14 +200,8 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
         }
         if (btype == gemm::CompType::tBF16 && PackRow == 2) {
           if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-            if (M <= tAVX512_BF16::MTILE) {
-              static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-              BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                        DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
-            } else {
-              BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
-                                                     DataParams[i].ldc, WorkSpace, pth);
-            }
+            BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                   DataParams[i].ldc, WorkSpace, pth);
           }
         }
         if (btype == gemm::CompType::tFP16 && PackRow == 2) {
@@ -544,14 +532,8 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
         }
         if (btype == gemm::CompType::tBF16 && PackRow == 2) {
           if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-            if (M <= tAVX512_BF16::MTILE) {
-              static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-              BTLAGemmCompF32<tAVX512_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
-                                                      DataParams[i].ldc, WorkSpace, pth);
-            } else {
-              BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
-                                                   DataParams[i].ldc, WorkSpace, pth);
-            }
+            BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                 DataParams[i].ldc, WorkSpace, pth);
           }
         }
         if (btype == gemm::CompType::tFP16 && PackRow == 2) {
@@ -621,14 +603,8 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
         }
         if (btype == gemm::CompType::tBF16 && PackRow == 2) {
           if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-            if (M <= tAVX512_BF16::MTILE) {
-              static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-              BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr,
-                                                        DataParams[i].C, DataParams[i].ldc, WorkSpace, pth);
-            } else {
-              BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
-                                                     DataParams[i].ldc, WorkSpace, pth);
-            }
+            BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                   DataParams[i].ldc, WorkSpace, pth);
           }
         }
         if (btype == gemm::CompType::tFP16 && PackRow == 2) {

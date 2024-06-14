@@ -220,14 +220,8 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
     }
     if (btype == gemm::CompType::tBF16 && PackRow == 2) {
       if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-        if (_m <= tAVX512_BF16::MTILE) {
-          static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-          ip_qkv::BTLAGemmCompF32<tAVX512_BF16, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                          workspace, pth);
-        } else {
-          ip_qkv::BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                       workspace, pth);
-        }
+        ip_qkv::BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
+                                                     workspace, pth);
       }
     }
     if (btype == gemm::CompType::tFP16 && PackRow == 2) {
@@ -296,14 +290,8 @@ void bestla_fusion_QKV_f32f32_forward(float* activation, void* wqptr, void* wkpt
     }
     if (btype == gemm::CompType::tBF16 && PackRow == 2) {
       if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-        if (_m <= tAVX512_BF16::MTILE) {
-          static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-          ip_qkv::BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output,
-                                                            ldo, workspace, pth);
-        } else {
-          ip_qkv::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
-                                                         workspace, pth);
-        }
+        ip_qkv::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(_m, _n, _k, activation, lda, wqtmp, wktmp, wvtmp, output, ldo,
+                                                       workspace, pth);
       }
     }
     if (btype == gemm::CompType::tFP16 && PackRow == 2) {
