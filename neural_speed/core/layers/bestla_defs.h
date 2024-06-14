@@ -40,6 +40,7 @@ using tAVX512F = gemm::SCoreRowNAvx512f<48, 8>;
 using tAVX512BW = gemm::ICoreRowNAvx512bw<48, 8>;
 using tAVX512_VNNI = gemm::ICoreRowNAvx512vnni<48, 8>;
 using tAMX_BF16 = gemm::HCoreRowNAmxbf16<48, 16>;
+using tAMX_FP16 = gemm::HCoreRowNAmxfp16<48, 16>;
 using tAVX512_BF16 = gemm::HCoreRowNAvx512bf16<48, 8>;
 using tAVX512_FP16 = gemm::HCoreRowNAvx512fp16<96, 8>;
 using tAMX_INT8_US = gemm::ICoreRowNAmxint8<48, 16>;
@@ -62,13 +63,14 @@ using tActKBaseF32 = prologue_a::gemm::ShuffleActivationKBlockBaseF32<GC_T>;
 
 constexpr uint64_t Fp32Cores[] = {tAVX2::ID, tAVX512F::ID};
 constexpr uint64_t Bf16Cores[] = {tAMX_BF16::ID, tAVX512_BF16::ID};
-constexpr uint64_t Fp16Cores[] = {tAVX512_FP16::ID};
+constexpr uint64_t Fp16Cores[] = {tAVX512_FP16::ID, tAMX_FP16::ID};
 constexpr uint64_t Int8Cores[] = {tAVX2::ID,        tAVX_VNNI::ID,    tAVX2_VNNI_KBlock::ID, tAVX512BW_KBlock::ID,
                                   tAVX512_VNNI::ID, tAMX_INT8_US::ID, tAMX_INT8_SS::ID};
-constexpr uint64_t FloatCores[] = {tAVX2::ID, tAVX512F::ID, tAMX_BF16::ID, tAVX512_FP16::ID};
+constexpr uint64_t FloatCores[] = {tAVX2::ID, tAVX512F::ID, tAMX_BF16::ID, tAVX512_FP16::ID, tAMX_FP16::ID};
 constexpr uint64_t AllKBlockCores[] = {tAVX2::ID,
                                        tAVX512F::ID,
                                        tAMX_BF16::ID,
+                                       tAMX_FP16::ID,
                                        tAVX512_FP16::ID,
                                        tAVX2_VNNI_KBlock::ID,
                                        tAVX_VNNI_KBlock::ID,

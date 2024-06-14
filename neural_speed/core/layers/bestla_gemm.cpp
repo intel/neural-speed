@@ -139,6 +139,12 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
             }
           }
         }
+        if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+          if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+            BTLAGemmCompF32<tAMX_FP16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                 DataParams[i].ldc, WorkSpace, pth);
+          }
+        }
         if (btype == gemm::CompType::tS8 && PackRow == 4) {
           if (NTile == tAMX_INT8_US_KBlock::NTILE && _cd->AMX_INT8() && BlkSize % tAMX_INT8_US_KBlock::KTILE == 0) {
             if (bptr->mBlockSize < K) {
@@ -210,6 +216,12 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
             }
           }
         }
+        if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+          if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+            BTLAGemmCompF32<tAMX_FP16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                   DataParams[i].ldc, WorkSpace, pth);
+          }
+        }
       }
       delete ptr;
     } else {
@@ -270,11 +282,16 @@ size_t BTLAGemmPackBSizeLocal(size_t N, size_t K, size_t BlkSize, BTLA_DTYPE Qua
         }
       }
       [[fallthrough]];
-    case NE_COMP_F16:
     case NE_COMP_BF16:
       if (_cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-        return BTLABuSize<tLauncher_Int8_F32F32<tAMX_BF16, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType,
-                                                                   ScaleDtype, isAsym, shuffle_indice);
+        return BTLABuSize<tLauncher_Fp_F32F32<tAMX_BF16, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType, ScaleDtype,
+                                                                 isAsym, shuffle_indice);
+      }
+      [[fallthrough]];
+    case NE_COMP_F16:
+      if (_cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+        return BTLABuSize<tLauncher_Fp_F32F32<tAMX_FP16, Wei_T>>(static_cast<int>(BlkSize), N, K, QuantType, ScaleDtype,
+                                                                 isAsym, shuffle_indice);
       }
       [[fallthrough]];
     case NE_COMP_F32:
@@ -355,10 +372,17 @@ bool BTLAGemmQuantPackBLocal(void* PackedBuf, const float* FpData, size_t N, siz
         }
       }
       [[fallthrough]];
-    case NE_COMP_F16:
     case NE_COMP_BF16:
       if (_cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
         BTLAGemmQuantPackB<tLauncher_Fp_F32F32<tAMX_BF16, Wei_T>>(
+            PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
+            ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
+        return true;
+      }
+      [[fallthrough]];
+    case NE_COMP_F16:
+      if (_cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+        BTLAGemmQuantPackB<tLauncher_Fp_F32F32<tAMX_FP16, Wei_T>>(
             PackedBuf, static_cast<int>(BlkSize), FpData, static_cast<int>(N), static_cast<int>(K), QuantType,
             ScaleDtype, isAsym, static_cast<int>(ldb), isTrans, ThreadPool);
         return true;
@@ -455,6 +479,13 @@ bool BTLAGemmPackBLocal(void* PackedBuf, const int8_t* QData, const float* Scale
       }
       [[fallthrough]];
     case NE_COMP_F16:
+      if (_cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+        BTLAGemmPackBImpl<tLauncher_Fp_F32F32<tAMX_FP16, Wei_T>>(
+            PackedBuf, static_cast<int>(BlkSize), QData, Scales, Zp, static_cast<int>(N), static_cast<int>(K),
+            QuantType, ScaleDtype, isAsym, static_cast<int>(ldb), shuffle_indice, ThreadPool);
+        return true;
+      }
+      [[fallthrough]];
     case NE_COMP_BF16:
       if (_cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
         BTLAGemmPackBImpl<tLauncher_Fp_F32F32<tAMX_BF16, Wei_T>>(
@@ -521,6 +552,12 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
               BTLAGemmCompF32<tAMX_BF16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
                                                    DataParams[i].ldc, WorkSpace, pth);
             }
+          }
+        }
+        if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+          if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+            BTLAGemmCompF32<tAMX_FP16, tWeiNInt>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                 DataParams[i].ldc, WorkSpace, pth);
           }
         }
         if (btype == gemm::CompType::tS8 && PackRow == 4) {
@@ -592,6 +629,12 @@ bool BTLAGemmBatchDriver(const size_t M, const size_t N, const size_t K, const s
               BTLAGemmCompF32<tAMX_BF16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
                                                      DataParams[i].ldc, WorkSpace, pth);
             }
+          }
+        }
+        if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+          if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+            BTLAGemmCompF32<tAMX_FP16, tWeiNFloat>(M, N, K, DataParams[i].A, DataParams[i].lda, ptr, DataParams[i].C,
+                                                   DataParams[i].ldc, WorkSpace, pth);
           }
         }
       }
@@ -692,6 +735,12 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
                                                                           sptr, FpData, static_cast<int>(ldb), pth);
         }
       }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16()) {
+          prologue_b::gemm::WeightKBlockNInteger<tAMX_FP16>::unpackWeight(static_cast<int>(N), static_cast<int>(K),
+                                                                          sptr, FpData, static_cast<int>(ldb), pth);
+        }
+      }
     }
     if (ptr->mPrologueID == BTLA_PROLOGUEB_IDS::WeightKBlockNFloat) {
       auto sptr = reinterpret_cast<storage::gemm::StorageWeightKBlockNFloat*>(ptr);
@@ -707,6 +756,12 @@ bool BTLAGemmUnPackB(float* FpData, const void* PackedBuf, size_t N, size_t K, s
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
           prologue_b::gemm::WeightKBlockNFloat<tAMX_BF16>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
+                                                                        FpData, static_cast<int>(ldb), pth);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16()) {
+          prologue_b::gemm::WeightKBlockNFloat<tAMX_FP16>::unpackWeight(static_cast<int>(N), static_cast<int>(K), sptr,
                                                                         FpData, static_cast<int>(ldb), pth);
         }
       }
