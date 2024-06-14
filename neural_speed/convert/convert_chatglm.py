@@ -561,7 +561,7 @@ def chatglm4_convert(model, tokenizer, dir_model, fname_out, ftype, hparams):
     fout.write(struct.pack("i", 0)) # n_embd_head_k for gemma
     fout.write(struct.pack("f", hparams.get("layernorm_epsilon", 1e-5)))  # rms_norm_eps or layer_norm_eps
     fout.write(struct.pack("f", 10000.0))  # freq_base
-    fout.write(struct.pack("f", hparams.get("rope_ratio", 1)))  # rope_factor
+    fout.write(struct.pack("f", 1))  # rope_factor
 
     fout.write(struct.pack("f", 0.0))  # config.json "rope_scaling.factor", not enabled
     fout.write(struct.pack("i", 0))  # rope_scaling.original_max_position_embeddings
