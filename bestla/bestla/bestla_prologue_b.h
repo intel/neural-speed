@@ -248,10 +248,10 @@ class WeightKBlockNInteger {
               auto sb = bestla::utils::bestla_dtype_bytes(stor->SDtype());
               if (sb == 2) {
                 std::memset(stor->template SPtr<utils::fp16>() + (thdp.loc[1] + rows) * stor->mNPad, 0,
-                            (thdp.size[1] - rows) * stor->mNPad * sb);
+                            sb * (thdp.size[1] - rows) * stor->mNPad);
               } else if (sb == 4) {
                 std::memset(stor->template SPtr<float>() + (thdp.loc[1] + rows) * stor->mNPad, 0,
-                            (thdp.size[1] - rows) * stor->mNPad * sb);
+                            sb * (thdp.size[1] - rows) * stor->mNPad);
               } else {
                 assert(0);
               }
@@ -260,11 +260,11 @@ class WeightKBlockNInteger {
           if (zero_points) {
             kernel::wrapper::Memcpy2DPadding::forward(
                 zero_points + thdp.loc[1] * N, stor->template ZPtr<int8_t>() + thdp.loc[1] * stor->mNPad, rows,
-                N * sizeof(zero_points[0]), N * sizeof(zero_points[0]), stor->mNPad * sizeof(int8_t), true);
+                N * sizeof(zero_points[0]), N * sizeof(zero_points[0]), sizeof(int8_t) * stor->mNPad, true);
 
             if (rows < thdp.size[1]) {
               std::memset(stor->template ZPtr<int8_t>() + (thdp.loc[1] + rows) * stor->mNPad, 0,
-                          (thdp.size[1] - rows) * stor->mNPad * sizeof(int8_t));
+                          sizeof(int8_t) * (thdp.size[1] - rows) * stor->mNPad);
             }
           }
         }
@@ -384,7 +384,7 @@ class WeightKBlockNInteger {
     auto blks_padding2 = utils::padto(blks, 2);
     auto tmpscales = tmp;
     auto tmpzeropoints = reinterpret_cast<int8_t*>(tmpscales + N * blks);
-    assert(isasym == zero_points != nullptr);
+    assert(isasym == (zero_points != nullptr));
     if (scales) {
       for (size_t i = 0; i < N * blks; i += 1) {
         tmpscales[i] = scales[i];
