@@ -1091,7 +1091,8 @@ struct mem_payload_t<
   static constexpr reg_layout register_layout = tile_desc::register_layout;
   static constexpr bool reg_transpose =
       register_layout == reg_layout::transpose_tiled;
-  static constexpr bool trans = mem_transpose ^ reg_transpose;
+  static constexpr bool trans = mem_transpose ^ reg_transpose &&
+      !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
   static constexpr bool mem_transform = (sizeof(dtype) < 4) &&
       (register_layout == reg_layout::vnni_tiled ||
@@ -1617,8 +1618,8 @@ struct prefetch_payload_t<
     arch_tag_,
     std::enable_if_t<
         arch_tag_ <= gpu_arch::XeHpg &&
-        ((block_size_y_ != 1 && reg_layout_ == reg_layout::tiled) ||
-         (block_size_x_ != 1 && reg_layout_ == reg_layout::transpose_tiled))>> {
+        ((block_size_y_ != 1 && mem_layout_ == mem_layout::row_major) ||
+         (block_size_x_ != 1 && mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -1848,10 +1849,8 @@ struct prefetch_payload_t<
     arch_tag_,
     std::enable_if_t<
         (arch_tag_ == gpu_arch::XeHpc) &&
-        (((tile_size_y_ != 1 || block_size_y_ != 1) &&
-          mem_layout_ == mem_layout::row_major) ||
-         ((tile_size_x_ != 1 || block_size_x_ != 1) &&
-          mem_layout_ == mem_layout::col_major))>> {
+        (((block_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
+         ((block_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -2141,22 +2140,15 @@ struct prefetch_payload_t<
     num_coop_sg_,
     arch_tag_,
     std::enable_if_t<
-        ((tile_size_y_ == 1 || block_size_y_ == 1) &&
-         mem_layout_ == mem_layout::row_major) ||
-        ((tile_size_x_ == 1 || block_size_x_ == 1) &&
-         mem_layout_ == mem_layout::col_major)>> {
+        ((block_size_y_ == 1) && mem_layout_ == mem_layout::row_major) ||
+        ((block_size_x_ == 1) && mem_layout_ == mem_layout::col_major)>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
   // CL aligned, so we can use uint64_t
   using prefetch_dtype = uint64_t;
   static constexpr msg_type message_type = msg_type::block_1d;
-  using tile_desc = tile_desc_t<
-      tile_size_x_,
-      tile_size_y_,
-      block_size_x_,
-      block_size_x_,
-      reg_layout_>;
+  using tile_desc = tile_desc_t<tile_size_x_, 1, block_size_x_, 1, reg_layout_>;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
   static constexpr gpu_arch arch_tag = arch_tag_;

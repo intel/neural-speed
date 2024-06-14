@@ -36,7 +36,7 @@ template <
     typename mem_desc_b_t_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    int dequant_s_,
+    uint32_t dequant_s_,
     quant_mode quant_type_,
     mma_engine mma_engine_,
     typename pre_processing_t_,
@@ -322,7 +322,13 @@ class gemm_t<
           matA_acc_t,
           compute_policy::mma_engine,
           arch_tag>>;
-
+  using dequantize_t = subgroup::dequant_int4_weight_t<
+      matB_acc_t,
+      matB_t,
+      scale_t,
+      zero_pt_t,
+      dequant_s,
+      quant_type_>;
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
   static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
@@ -500,6 +506,9 @@ class gemm_t<
     wg_start_m = args.matA_base_desc.coord.y;
     wg_start_n = args.scale_base_desc.coord.x;
     wg_start_k = args.matA_base_desc.coord.x;
+    typename dequantize_t::arguments_t dequantize_args{
+        wg_start_m, wg_start_n, wg_start_k};
+    dequantize_t dequantize;
 
     xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
     nbarrier_a.init_nbarrier(
@@ -624,7 +633,8 @@ class gemm_t<
         subgroup::vnni_reverse(matA);
       }
       subgroup::elemwise_cvt(matA_acc, matA);
-      dequantize(matB_acc, matB, scale, zero_pt);
+
+      dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
@@ -658,91 +668,97 @@ class gemm_t<
   }
 
  private:
-  inline void dequantize(
-      matB_acc_t& matB_acc,
-      matB_t& matB,
-      scale_t& scale,
-      zero_pt_t& zero_pt) {
-    // no tail, because this is matB
-    constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
-    constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
-#pragma unroll
-    for (uint32_t i = 0; i < num_block_y; ++i) {
-#pragma unroll
-      for (uint32_t j = 0; j < num_block_x; ++j) {
-        int block_id = (i * num_block_x + j);
-        // Must be little-endian
-        auto matB_blk = matB.reg.xetla_format<uint8_t>()
-                            .xetla_select<matB_acc_t::block_elems / 2, 1>(
-                                block_id * matB_acc_t::block_elems / 2);
+  //   inline void dequantize(
+  //       matB_acc_t& matB_acc,
+  //       matB_t& matB,
+  //       scale_t& scale,
+  //       zero_pt_t& zero_pt) {
+  //     // no tail, because this is matB
+  //     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
+  //     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
+  // #pragma unroll
+  //     for (uint32_t i = 0; i < num_block_y; ++i) {
+  // #pragma unroll
+  //       for (uint32_t j = 0; j < num_block_x; ++j) {
+  //         int block_id = (i * num_block_x + j);
+  //         // Must be little-endian
+  //         auto matB_blk = matB.reg.xetla_format<uint8_t>()
+  //                             .xetla_select<matB_acc_t::block_elems / 2, 1>(
+  //                                 block_id * matB_acc_t::block_elems / 2);
 
-        auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
-            block_id * matB_acc_t::block_elems);
+  //         auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems,
+  //         1>(
+  //             block_id * matB_acc_t::block_elems);
 
-        // int8 includes 2 4bits data.
-        xetla_vector<int8_t, matB_acc_t::block_elems> cvt_blk_i8;
+  //         // int8 includes 2 4bits data.
+  //         xetla_vector<int8_t, matB_acc_t::block_elems> cvt_blk_i8;
 
-        // lowest 4 bit
-        {
-          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0) =
-              matB_blk & 0xf;
-        }
-        // highest 4 bit
-        {
-          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1) =
-              matB_blk >> 4;
-        }
+  //         // lowest 4 bit
+  //         {
+  //           cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0) =
+  //               matB_blk & 0xf;
+  //         }
+  //         // highest 4 bit
+  //         {
+  //           cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1) =
+  //               matB_blk >> 4;
+  //         }
 
-        // (b_i8 -  zero_pt_i8) x scale = fp16
-        constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
-#pragma unroll
-        for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
-#pragma unroll
-          for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
-            uint32_t offset_y_in_tile = i * block_size_y_b + ii;
-            uint32_t offset_x_in_tile = j * block_size_x_b + jj;
+  //         // (b_i8 -  zero_pt_i8) x scale = fp16
+  //         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
+  // #pragma unroll
+  //         for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+  // #pragma unroll
+  //           for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
+  //             uint32_t offset_y_in_tile = i * block_size_y_b + ii;
+  //             uint32_t offset_x_in_tile = j * block_size_x_b + jj;
 
-            uint32_t scale_idx =
-                (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
-                offset_x_in_tile;
+  //             uint32_t scale_idx =
+  //                 (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
+  //                 offset_x_in_tile;
 
-            if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
-              uint32_t zero_pt_idx =
-                  offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
-                  offset_x_in_tile / pack_ratio;
-              native_type_t<dtype_b> zero_pt_pack = zero_pt.reg[zero_pt_idx];
+  //             if constexpr (compute_policy::quant_type ==
+  //             quant_mode::S4_ASYM) {
+  //               uint32_t zero_pt_idx =
+  //                   offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
+  //                   offset_x_in_tile / pack_ratio;
+  //               native_type_t<dtype_b> zero_pt_pack =
+  //               zero_pt.reg[zero_pt_idx];
 
-              int8_t zero_pt_i8 =
-                  (zero_pt_pack >>
-                   (4 * ((wg_start_n + offset_x_in_tile) % pack_ratio))) &
-                  0xf;
-              // sycl::ext::oneapi::experimental::printf(
-              //     "zero_pt.reg[%d}  %x    zero_pt_i8 %x  offset_x_in_tile:%d
-              //     \n", zero_pt_idx, zero_pt_pack, (int32_t)zero_pt_i8 ,
-              //     offset_x_in_tile);
+  //               int8_t zero_pt_i8 =
+  //                   (zero_pt_pack >>
+  //                    (4 * ((wg_start_n + offset_x_in_tile) % pack_ratio))) &
+  //                   0xf;
+  //               // sycl::ext::oneapi::experimental::printf(
+  //               //     "zero_pt.reg[%d}  %x    zero_pt_i8 %x
+  //               offset_x_in_tile:%d
+  //               //     \n", zero_pt_idx, zero_pt_pack, (int32_t)zero_pt_i8 ,
+  //               //     offset_x_in_tile);
 
-              cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
-                  zero_pt_i8;
-            } else if constexpr (
-                compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
-              cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
-                  int8_t(8);
-            }
-            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
-                scale.reg[scale_idx];
+  //               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+  //                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b +
+  //                   ii) - zero_pt_i8;
+  //             } else if constexpr (
+  //                 compute_policy::quant_type ==
+  //                 quant_mode::S4_FULLRANGE_NO_ZP) {
+  //               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+  //                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b +
+  //                   ii) - int8_t(8);
+  //             }
+  //             dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+  //                 cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii)
+  //                 * scale.reg[scale_idx];
 
-            // sycl::ext::oneapi::experimental::printf(
-            //     "scale[%d] %f \n",
-            //     scale_idx,
-            //     float(sycl::half(scale.reg.xetla_select<1, 1>(scale_idx))));
-          }
-        }
-      }
-    }
-  }
+  //             // sycl::ext::oneapi::experimental::printf(
+  //             //     "scale[%d] %f \n",
+  //             //     scale_idx,
+  //             //     float(sycl::half(scale.reg.xetla_select<1,
+  //             1>(scale_idx))));
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
   /*
   inline void dequantize(

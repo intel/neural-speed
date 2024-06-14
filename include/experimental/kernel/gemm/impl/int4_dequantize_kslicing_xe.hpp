@@ -159,7 +159,7 @@ class gemm_universal_t<
   /// @brief GEMM arguments.
   /// This is the interface for users to pass the application-related runtime
   /// variables.
-  template <group::quant_mode quant_mode = group::S4_FULLRANGE_NO_ZP>
+  template <quant_mode quant_mode = S4_FULLRANGE_NO_ZP>
   struct arguments_t {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
@@ -295,7 +295,7 @@ class gemm_universal_t<
     }
   };
   template <>
-  struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
+  struct arguments_t<S4_FULLRANGE_NO_ZP> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
     uint32_t matrix_m;
@@ -486,7 +486,7 @@ class gemm_universal_t<
   /// @param args Is the GEMM arguments for application-related runtime
   /// variables.
   /// @return Expected nd_range.
-  template <group::quant_mode quant_mode>
+  template <quant_mode quant_mode>
   static cl::sycl::nd_range<3> get_nd_range(arguments_t<quant_mode>& args) {
     cl::sycl::range<3> local_range = get_local_range();
     cl::sycl::range<3> group_range =
@@ -523,7 +523,7 @@ class gemm_universal_t<
   /// @param args Is the GEMM arguments for application-related runtime
   /// variables.
   /// @return Check result.
-  template <group::quant_mode quant_mode>
+  template <quant_mode quant_mode>
   static bool can_implement(arguments_t<quant_mode>& args) {
     bool implementable = true;
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
@@ -566,8 +566,7 @@ class gemm_universal_t<
     implementable &=
         ((args.matB_ld % pack_ratio == 0) && (args.matrix_n % pack_ratio == 0));
     if constexpr (
-        gemm_t::compute_policy::quant_type !=
-        group::quant_mode::S4_FULLRANGE_NO_ZP) {
+        gemm_t::compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
       implementable &= (args.zero_pt_ld % pack_ratio == 0);
     }
 
@@ -584,7 +583,7 @@ class gemm_universal_t<
   /// variables.
   /// @param slm_base Is the slm base address.
   /// @param nbarrier_base Is the named barrier base.
-  template <group::quant_mode quant_mode>
+  template <quant_mode quant_mode>
   __XETLA_API KERNEL_FUNC void operator()(
       sycl::nd_item<3>& item,
       const arguments_t<quant_mode>& args,
@@ -669,8 +668,7 @@ class gemm_universal_t<
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args;
     if constexpr (
-        gemm_t::compute_policy::quant_type ==
-        group::quant_mode::S4_FULLRANGE_NO_ZP) {
+        gemm_t::compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
       gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,

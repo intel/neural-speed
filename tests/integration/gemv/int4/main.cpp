@@ -30,14 +30,14 @@ constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 4;
+  static constexpr size_t mat_m = 1;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 4;
+  static constexpr size_t wg_m = 1;
   static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 4;
+  static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024 / 4;
+  static constexpr size_t sg_k = 1024 / 1;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
@@ -55,12 +55,12 @@ class test_col_major_1 {
 class test_col_major_2 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 32;
+  static constexpr size_t mat_m = 4;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_m = 4;
   static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_m = 4;
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024;
   static constexpr size_t dequant_s = 128;

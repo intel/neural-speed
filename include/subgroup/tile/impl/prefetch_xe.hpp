@@ -25,23 +25,29 @@
 
 namespace gpu::xetla::subgroup {
 namespace detail {
+
+template <typename payload_t, typename = void>
+struct check_prefetch_type;
 template <typename payload_t>
-struct check_prefetch_type {
+struct check_prefetch_type<
+    payload_t,
+    std::enable_if_t<payload_t::memory_space == mem_space::local>> {
+  static constexpr bool is_global_2d = false;
+  static constexpr bool is_global_block_1d = false;
+  static constexpr bool is_global_unaligned_2d = false;
+  static constexpr bool is_local = true;
+};
+template <typename payload_t>
+struct check_prefetch_type<
+    payload_t,
+    std::enable_if_t<payload_t::memory_space == mem_space::global>> {
   static constexpr bool is_global_2d =
-      ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y != 1));
-
+      payload_t::message_type == msg_type::block_2d;
   static constexpr bool is_global_block_1d =
-      ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y == 1));
-
+      payload_t::message_type == msg_type::block_1d;
   static constexpr bool is_global_unaligned_2d =
-      ((payload_t::memory_space == mem_space::global) &&
-       (payload_t::tile_desc::tile_size_y != 1) &&
-       (payload_t::message_type == msg_type::unaligned_2d));
-
-  static constexpr bool is_local =
-      (payload_t::memory_space == mem_space::local);
+      payload_t::message_type == msg_type::unaligned_2d;
+  static constexpr bool is_local = false;
 };
 
 } // namespace detail

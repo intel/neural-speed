@@ -22,9 +22,6 @@
 #include <experimental/group/gemm/common.hpp>
 
 namespace gpu::xetla::group {
-
-enum quant_mode : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP };
-
 /// @brief Compute policy for int4 dequant gemm.
 /// @tparam compute_attr_ Is compute-related attributes.
 /// @tparam perf_tuning_knob_ Is performance-related knobs.
@@ -35,7 +32,7 @@ template <
     typename dtype_scale_,
     typename dtype_zero_pt_,
     quant_mode quant_type_,
-    int dequant_s_,
+    uint32_t dequant_s_,
     mma_engine mma_engine_ = mma_engine::xmx,
     gpu_arch arch_tag_ = gpu_arch::XeHpc,
     typename enable = void>

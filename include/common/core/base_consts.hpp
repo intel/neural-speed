@@ -23,9 +23,9 @@
 
 namespace gpu::xetla {
 
-/// @addtogroup xetla_core_base_types
+/// @addtogroup xetla_core_base_consts
 /// @{
-
-/// @} xetla_core_base_types
+enum quant_mode : uint8_t { S4_ASYM, S4_FULLRANGE_NO_ZP };
+/// @} xetla_core_base_consts
 
 } // namespace gpu::xetla
