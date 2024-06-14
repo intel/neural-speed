@@ -76,8 +76,8 @@ struct tile_fma_t {
       a_block_size_y == matAcc_t::block_size_y,
       "mata block m should match with matAcc block m");
 
-  // static_assert(tile_size_m == 1, "matA tile m must be 1");
-  // static_assert(a_block_size_y == 1, "matA block m must be 1");
+  static_assert(tile_size_n == 1, "matB tile n must be 1");
+  static_assert(b_block_size_x == 1, "matB block n must be 1");
   __XETLA_API static void mma(
       matAcc_t& acc_dst,
       matAcc_t& acc_src,
