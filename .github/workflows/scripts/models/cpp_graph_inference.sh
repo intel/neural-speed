@@ -80,7 +80,7 @@ function main() {
 
     ## prepare example requirement
     pip install -r neural_speed/models/requirements/common.txt
-    export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=${HOME}/miniforge3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
     ## prepare fp32 bin
     python ${convert_script} --outtype f32 --outfile ${working_dir}/${model}-fp32.bin ${input_model}
 
