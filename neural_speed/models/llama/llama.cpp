@@ -191,7 +191,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
-  inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_SYCL);
+  inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_SYCL);
   for (int il = 0; il < n_layer; ++il) {
     struct ne_tensor* inpSA = inpL;
 
@@ -226,8 +226,11 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
                            infer_bs);
       Kcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[1], cur), head_size, n_head_kv, infer_seq_len,
                            infer_bs);
-      Vcur = ne_mul_mat(ctx0, model.layers[il].attn[2], cur);
-      Vcur = ne_device_reshape(ctx0, Vcur, NE_BACKEND_CPU);
+      Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_size, n_head_kv, infer_seq_len,
+                           infer_bs);
+      Qcur = ne_device_sync(ctx0, Qcur, NE_BACKEND_CPU);
+      Kcur = ne_device_sync(ctx0, Kcur, NE_BACKEND_CPU);
+      Vcur = ne_device_sync(ctx0, Vcur, NE_BACKEND_CPU);
 #else
       cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
       cur = ne_mul_mat(ctx0, model.layers[il].attn[1], cur);
@@ -236,263 +239,335 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
     }
 #if SYCL_NDEBUG
-    if (concat_multi_seqs) {
-      size_t off_sl = 0;
-      // per_request rope
-      for (int gi = 0; gi < infer_groups.size(); ++gi) {
-        const int qk_bs = infer_groups[gi].size();
-        const int qk_sl = n_tokens[infer_groups[gi].front()];
-        const int qk_n_past = n_pasts[infer_groups[gi].front()];
-        struct ne_tensor* Qcur_req =
-            ne_view_4d(ctx0, Qcur, head_size, n_head, qk_sl, qk_bs, ne_element_size(Qcur) * head_size,
-                       ne_element_size(Qcur) * head_size * n_head, ne_element_size(Qcur) * head_size * n_head * qk_sl,
-                       off_sl * n_head * ne_element_size(Qcur));
-        ne_build_forward_expand(
-            &gf, ne_rope_inplace(ctx0, Qcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale));
-        struct ne_tensor* Kcur_req = ne_view_4d(
-            ctx0, Kcur, head_size, n_head_kv, qk_sl, qk_bs, ne_element_size(Kcur) * head_size,
-            ne_element_size(Kcur) * head_size * n_head_kv, ne_element_size(Kcur) * head_size * n_head_kv * qk_sl,
-            off_sl * n_head_kv * ne_element_size(Kcur));
-        ne_build_forward_expand(
-            &gf, ne_rope_inplace(ctx0, Kcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale));
-        off_sl += head_size * qk_bs * qk_sl;
-      }
-    } else {
-      Qcur = ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base,
-                             hparams.freq_scale);
-      Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
-          ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
-      // Vcur = ne_transpose(ctx0, ne_reshape_2d(ctx0, Vcur, head_size * n_head_kv, N));
-    }
-    ne_set_name(Qcur, "Qcur");
-    ne_set_name(Kcur, "Kcur");
-    ne_set_name(Vcur, "Vcur");
-    // self-attention
-    const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
-    struct ne_tensor* KQV_merged_contiguous =
-        ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_CPU);
-    if (!run_mha_reordered) {
+#ifdef NS_SYCL
+    if (infer_groups.size() == 1 && batch_size == 1 && !is_ring_full) {
+      Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+      Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+      ne_set_name(Qcur, "Qcur");
+      ne_set_name(Kcur, "Kcur");
+      ne_set_name(Vcur, "Vcur");
+      const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
+      Qcur = ne_permute(ctx0, Qcur, 0, 2, 1, 3);  // [heads, N, head_size]
+      Kcur = ne_permute(ctx0, Kcur, 0, 2, 1, 3);  // [heads, N, head_size]
+      Vcur = ne_permute(ctx0, Vcur, 1, 2, 0, 3);  // [heads, head_size, N]
+
+      struct ne_tensor* const k_cache =
+          ne_view_1d(ctx0, kv_self.k, n_ctx * n_embd_gqa * kv_n_ctx_block,
+                     il * n_ctx * ne_element_size(kv_self.k) * n_embd_gqa * kv_n_ctx_block);
+      struct ne_tensor* const v_cache =
+          ne_view_1d(ctx0, kv_self.v, n_ctx * n_embd_gqa * kv_n_ctx_block,
+                     il * n_ctx * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block);
       // store key and value to memory
-      // important:
-      // 1. storing RoPE-ed version of K in the KV cache!
-      // 2. for loop self-attention in multi seqs infer (num_request > 1)
       {
-        struct ne_tensor* const k_cache =
-            ne_view_1d(ctx0, kv_self.k, n_ctx * n_embd_gqa * kv_n_ctx_block,
-                       il * n_ctx * ne_element_size(kv_self.k) * n_embd_gqa * kv_n_ctx_block);
-        struct ne_tensor* const v_cache =
-            ne_view_1d(ctx0, kv_self.v, n_ctx * n_embd_gqa * kv_n_ctx_block,
-                       il * n_ctx * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block);
-        // cache = [tokens, beams, requests, layers],
-        // tokens = [head_dim, head_num, n_ctx] (may different orders)
-        size_t off_N_i = 0;
-        for (int i = 0; i < batch_size; ++i) {
-          const int block_idx = block_ids[i];
-          const int N_i = n_tokens[i];
-          const int n_past_i = n_pasts[i];
-          // batch K
-          struct ne_tensor* Kcur_bs_i =
-              ne_permute(ctx0,
-                         ne_view_4d(ctx0, Kcur, head_size, n_head_kv, N_i, 1, ne_element_size(Kcur) * head_size,
-                                    ne_element_size(Kcur) * n_embd_gqa, ne_element_size(Kcur) * n_embd_gqa * N_i,
-                                    ne_element_size(Kcur) * off_N_i),
-                         0, 2, 1, 3);
-          struct ne_tensor* k_bs_i =
-              ne_view_4d(ctx0, k_cache, head_size, N_i, n_head_kv, 1, ne_element_size(k_cache) * head_size,
-                         ne_element_size(k_cache) * head_size * n_ctx, ne_element_size(k_cache) * n_embd_gqa * n_ctx,
-                         block_idx * n_ctx * n_embd_gqa * ne_element_size(k_cache) +
-                             head_size * n_past_i * ne_element_size(k_cache));
-          // batch V
-          struct ne_tensor* Vcur_bs_i =
-              ne_permute(ctx0,
-                         ne_reshape_4d(ctx0,
-                                       ne_view_2d(ctx0, Vcur, n_embd_gqa, N_i, ne_element_size(Vcur) * n_embd_gqa,
-                                                  ne_element_size(Vcur) * off_N_i),
-                                       head_size, n_head_kv, N_i, 1),
-                         1, 2, 0, 3);
-          struct ne_tensor* v_bs_i = ne_view_4d(
-              ctx0, v_cache, N_i, head_size, n_head_kv, 1, n_ctx * ne_element_size(v_cache),
-              n_ctx * ne_element_size(v_cache) * head_size, n_ctx * ne_element_size(v_cache) * n_embd_gqa,
-              block_idx * n_ctx * n_embd_gqa * ne_element_size(v_cache) + n_past_i * ne_element_size(v_cache));
-          // concat
-          ne_build_forward_expand(&gf, ne_cpy(ctx0, Kcur_bs_i, k_bs_i));
-          ne_build_forward_expand(&gf, ne_cpy(ctx0, Vcur_bs_i, v_bs_i));
-          off_N_i += head_size * n_head_kv * N_i;
-        }
+        struct ne_tensor* k_cache_view =
+            ne_view_3d(ctx0, k_cache, head_size, infer_seq_len, n_head, ne_element_size(k_cache) * head_size,
+                       ne_element_size(k_cache) * head_size * n_ctx,
+                       n_past * head_size * ne_element_size(k_cache));  // [kv_heads, N, head_size]
+
+        struct ne_tensor* v_cache_view =
+            ne_view_3d(ctx0, v_cache, infer_seq_len, head_size, n_head, ne_element_size(v_cache) * n_ctx,
+                       ne_element_size(v_cache) * head_size * n_ctx,
+                       n_past * ne_element_size(v_cache));  // [kv_heads, head_size, N]
+
+        ne_build_forward_expand(&gf, ne_cpy(ctx0, Kcur, k_cache_view));
+        ne_build_forward_expand(&gf, ne_cpy(ctx0, Vcur, v_cache_view));
       }
 
-      // for-loop attention
-      size_t off_sl = 0;
-      for (int gi = 0; gi < infer_groups.size(); ++gi) {
-        const int attn_bs = infer_groups[gi].size();
-        const int attn_sl = n_tokens[infer_groups[gi].front()];
-        const int attn_block_id = block_ids[infer_groups[gi].front()];
-        const int attn_n_past = n_pasts[infer_groups[gi].front()];
-        const int attn_n_total = n_totals[infer_groups[gi].front()];
-        struct ne_tensor* Q =
-            ne_permute(ctx0,
-                       ne_view_4d(ctx0, Qcur, head_size, n_head, attn_sl, attn_bs, ne_element_size(Qcur) * head_size,
-                                  ne_element_size(Qcur) * head_size * n_head,
-                                  ne_element_size(Qcur) * head_size * n_head * attn_sl, off_sl * ne_element_size(Qcur)),
-                       0, 2, 1, 3);
-        std::string suffix = std::to_string(gi);
-        ne_set_name(Q, std::string("Q_" + suffix).c_str());
-        const int n_cached_gi = shift_roped_k ? n_cached : attn_n_past + attn_sl;
-        std::vector<int> attn_block_ids(infer_groups[gi].size());
-        for (int j = 0; j < infer_groups[gi].size(); ++j) {
-          attn_block_ids[j] = block_ids[infer_groups[gi][j]];
-        }
-        struct ne_tensor* K =
-            model_kv_cache_seq_concat(&gf, &lctx, ctx0, head_size, n_cached_gi, n_head_kv, attn_bs, attn_block_ids, il);
-        if (is_ring_full) {
-          K = ne_permute(ctx0, K, 0, 2, 1, 3);
-          struct ne_tensor* cossin_cache = nullptr;
-          // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
-          // in a single eval execution
-          if (N == 1) cossin_cache = kv_self.cossin;
-          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
-                                    hparams.freq_scale);
-          K = ne_permute(ctx0, K, 0, 2, 1, 3);
-        }
+      // concat key & value with past kv
+      Kcur = ne_view_3d(ctx0, k_cache, head_size, n_past + infer_seq_len, n_head, ne_element_size(k_cache) * head_size,
+                        ne_element_size(k_cache) * head_size * n_ctx,
+                        0);  // [kv_heads, klen, head_size]
+      Vcur = ne_view_3d(ctx0, v_cache, n_past + infer_seq_len, head_size, n_head, ne_element_size(v_cache) * n_ctx,
+                        ne_element_size(v_cache) * head_size * n_ctx,
+                        0);  // [kv_heads, head_size, klen]
 
-        // split cached V into n_head heads
-        struct ne_tensor* V = model_kv_cache_seq_concat(&gf, &lctx, ctx0, n_cached_gi, head_size, n_head_kv, attn_bs,
-                                                        attn_block_ids, il, false);
-        ne_set_name(K, std::string("K_" + suffix).c_str());
-        ne_set_name(V, std::string("V_" + suffix).c_str());
+      // attention
+      struct ne_tensor* KQ = ne_mul_mat(ctx0, Kcur, Qcur);  // [heads, N, klen]
+      // KQ_scaled = KQ / sqrt(n_embd/n_head)
+      struct ne_tensor* KQ_scale = ne_new_f32(ctx0, attn_scale);
+      // KQ_scaled shape [n_cached, N, n_head, 1]
+      struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, KQ, KQ_scale);
 
-        // K * Q
-        struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
-        ne_set_name(KQ, std::string("KQ_" + suffix).c_str());
-
-        // KQ_scaled = KQ / sqrt(n_embd/n_head)
-        struct ne_tensor* KQ_scale = ne_new_f32(ctx0, attn_scale);
-        ne_set_name(KQ_scale, std::string("1/sqrt(n_embd/n_head)_" + suffix).c_str());
-
-        // KQ_scaled shape [n_cached, N, n_head, 1]
-        struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, KQ, KQ_scale);
-        ne_set_name(KQ_scaled, std::string("KQ_scaled_" + suffix).c_str());
-
-        // KQ_masked = mask_past(KQ_scaled)
-        if (N > 1 || !shift_roped_k || attn_n_total == 0) {  // TODO(Yi): shift roped-k with N > 1 next-token
-          KQ_scaled = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, attn_n_past);
-          ne_set_name(KQ_scaled, std::string("KQ_masked_" + suffix).c_str());
-        }
-
-        // KQ = soft_max(KQ_masked)
-        struct ne_tensor* KQ_soft_max = ne_soft_max_inplace(ctx0, KQ_scaled);
-        ne_set_name(KQ_soft_max, std::string("KQ_soft_max_" + suffix).c_str());
-
-        struct ne_tensor* KQV = ne_mul_mat(ctx0, V, KQ_soft_max);
-        ne_set_name(KQV, std::string("KQV_" + suffix).c_str());
-
-        // KQV_merged = KQV.permute(0, 2, 1, 3)
-        struct ne_tensor* KQV_merged_gi = ne_permute(ctx0, KQV, 0, 2, 1, 3);
-        ne_set_name(KQV_merged_gi, std::string("KQV_merged_" + suffix).c_str());
-
-        ne_build_forward_expand(&gf,
-                                ne_cpy(ctx0, KQV_merged_gi,
-                                       ne_view_2d(ctx0, KQV_merged_contiguous, head_size * n_head, attn_sl * attn_bs,
-                                                  head_size * n_head * ne_element_size(KQV_merged_contiguous),
-                                                  ne_element_size(KQV_merged_contiguous) * off_sl)));
-        off_sl += head_size * n_head * attn_sl * attn_bs;
+      // KQ_masked = mask_past(KQ_scaled)
+      if (N > 1) {
+        KQ_scaled = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, n_past);
       }
-      ne_set_name(KQV_merged_contiguous, "KQV_merged_contiguous");
+
+      // KQ = soft_max(KQ_masked)
+      struct ne_tensor* KQ_soft_max = ne_soft_max_inplace(ctx0, KQ_scaled);
+
+      struct ne_tensor* KQV = ne_mul_mat(ctx0, Vcur, KQ_soft_max);
+
+      // KQV_merged = KQV.permute(0, 2, 1, 3)
+      KQV = ne_cont(ctx0, ne_permute(ctx0, KQV, 0, 2, 1, 3));
+
+      KQV = ne_reshape_2d(ctx0, KQV, head_size * n_head, infer_seq_len);
       // projection (no bias)
-      cur = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
-    } else {
-      const auto k_size = kv_cache_info.k_bytes;
-      const auto v_size = kv_cache_info.v_bytes;
-      // store key and value to memory
-      {
+      cur = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV);
+    } else
+#endif
+    {
+      if (concat_multi_seqs) {
+        size_t off_sl = 0;
+        // per_request rope
+        for (int gi = 0; gi < infer_groups.size(); ++gi) {
+          const int qk_bs = infer_groups[gi].size();
+          const int qk_sl = n_tokens[infer_groups[gi].front()];
+          const int qk_n_past = n_pasts[infer_groups[gi].front()];
+          struct ne_tensor* Qcur_req =
+              ne_view_4d(ctx0, Qcur, head_size, n_head, qk_sl, qk_bs, ne_element_size(Qcur) * head_size,
+                         ne_element_size(Qcur) * head_size * n_head, ne_element_size(Qcur) * head_size * n_head * qk_sl,
+                         off_sl * n_head * ne_element_size(Qcur));
+          ne_build_forward_expand(
+              &gf, ne_rope_inplace(ctx0, Qcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale));
+          struct ne_tensor* Kcur_req = ne_view_4d(
+              ctx0, Kcur, head_size, n_head_kv, qk_sl, qk_bs, ne_element_size(Kcur) * head_size,
+              ne_element_size(Kcur) * head_size * n_head_kv, ne_element_size(Kcur) * head_size * n_head_kv * qk_sl,
+              off_sl * n_head_kv * ne_element_size(Kcur));
+          ne_build_forward_expand(
+              &gf, ne_rope_inplace(ctx0, Kcur_req, qk_n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale));
+          off_sl += head_size * qk_bs * qk_sl;
+        }
+      } else {
+        Qcur = ne_rope_inplace(ctx0, Qcur, std::max(n_cached - N, n_past), n_rot, 0, 0, hparams.freq_base,
+                               hparams.freq_scale);
+        Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
+            ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+        // Vcur = ne_transpose(ctx0, ne_reshape_2d(ctx0, Vcur, head_size * n_head_kv, N));
+      }
+      ne_set_name(Qcur, "Qcur");
+      ne_set_name(Kcur, "Kcur");
+      ne_set_name(Vcur, "Vcur");
+      // self-attention
+      const float attn_scale = 1.0f / sqrtf(static_cast<float>(head_size));
+      struct ne_tensor* KQV_merged_contiguous =
+          ne_new_tensor_2d(ctx0, NE_TYPE_F32, head_size * n_head, seq_len_sum, NE_SIZE_CALC, NE_BACKEND_CPU);
+      if (!run_mha_reordered) {
+        // store key and value to memory
+        // important:
+        // 1. storing RoPE-ed version of K in the KV cache!
+        // 2. for loop self-attention in multi seqs infer (num_request > 1)
+        {
+          struct ne_tensor* const k_cache =
+              ne_view_1d(ctx0, kv_self.k, n_ctx * n_embd_gqa * kv_n_ctx_block,
+                         il * n_ctx * ne_element_size(kv_self.k) * n_embd_gqa * kv_n_ctx_block);
+          struct ne_tensor* const v_cache =
+              ne_view_1d(ctx0, kv_self.v, n_ctx * n_embd_gqa * kv_n_ctx_block,
+                         il * n_ctx * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block);
+          // cache = [tokens, beams, requests, layers],
+          // tokens = [head_dim, head_num, n_ctx] (may different orders)
+          size_t off_N_i = 0;
+          for (int i = 0; i < batch_size; ++i) {
+            const int block_idx = block_ids[i];
+            const int N_i = n_tokens[i];
+            const int n_past_i = n_pasts[i];
+            // batch K
+            struct ne_tensor* Kcur_bs_i =
+                ne_permute(ctx0,
+                           ne_view_4d(ctx0, Kcur, head_size, n_head_kv, N_i, 1, ne_element_size(Kcur) * head_size,
+                                      ne_element_size(Kcur) * n_embd_gqa, ne_element_size(Kcur) * n_embd_gqa * N_i,
+                                      ne_element_size(Kcur) * off_N_i),
+                           0, 2, 1, 3);
+            struct ne_tensor* k_bs_i =
+                ne_view_4d(ctx0, k_cache, head_size, N_i, n_head_kv, 1, ne_element_size(k_cache) * head_size,
+                           ne_element_size(k_cache) * head_size * n_ctx, ne_element_size(k_cache) * n_embd_gqa * n_ctx,
+                           block_idx * n_ctx * n_embd_gqa * ne_element_size(k_cache) +
+                               head_size * n_past_i * ne_element_size(k_cache));
+            // batch V
+            struct ne_tensor* Vcur_bs_i =
+                ne_permute(ctx0,
+                           ne_reshape_4d(ctx0,
+                                         ne_view_2d(ctx0, Vcur, n_embd_gqa, N_i, ne_element_size(Vcur) * n_embd_gqa,
+                                                    ne_element_size(Vcur) * off_N_i),
+                                         head_size, n_head_kv, N_i, 1),
+                           1, 2, 0, 3);
+            struct ne_tensor* v_bs_i = ne_view_4d(
+                ctx0, v_cache, N_i, head_size, n_head_kv, 1, n_ctx * ne_element_size(v_cache),
+                n_ctx * ne_element_size(v_cache) * head_size, n_ctx * ne_element_size(v_cache) * n_embd_gqa,
+                block_idx * n_ctx * n_embd_gqa * ne_element_size(v_cache) + n_past_i * ne_element_size(v_cache));
+            // concat
+            ne_build_forward_expand(&gf, ne_cpy(ctx0, Kcur_bs_i, k_bs_i));
+            ne_build_forward_expand(&gf, ne_cpy(ctx0, Vcur_bs_i, v_bs_i));
+            off_N_i += head_size * n_head_kv * N_i;
+          }
+        }
+
+        // for-loop attention
         size_t off_sl = 0;
         for (int gi = 0; gi < infer_groups.size(); ++gi) {
-          const int update_bs = infer_groups[gi].size();
-          const int update_sl = n_tokens[infer_groups[gi].front()];
-          const int update_block_id = block_ids[infer_groups[gi].front()];
-          const int update_n_past = n_pasts[infer_groups[gi].front()];
-          const auto k_cache_g = ne_view_4d(ctx0, kv_self.k,                         // tensor
-                                            head_size, n_ctx, n_head_kv, update_bs,  // ne
-                                            0, 0, k_size,                            // nb (bestla managed)
-                                            il * kv_n_ctx_block * k_size + update_block_id * k_size);  // offset
-          const auto k_cur_g =
-              ne_view_4d(ctx0, Kcur, head_size, n_head_kv, update_sl, update_bs, ne_element_size(Kcur) * head_size,
-                         ne_element_size(Kcur) * n_embd_gqa, ne_element_size(Kcur) * n_embd_gqa * update_sl,
-                         ne_element_size(Kcur) * off_sl);
-          ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache_g, k_cur_g, update_n_past, is_ring_full));
-          struct ne_tensor* v_cache_g =
-              ne_view_4d(ctx0, kv_self.v,                                           // tensor
-                         head_size, n_ctx, n_head_kv, update_bs,                    // ne
-                         0, 0, v_size,                                              // nb (bestla managed)
-                         il * kv_n_ctx_block * v_size + update_block_id * v_size);  // offset);
-          // bestla always view V as (D, n_head, seq, bs)
-          const auto v_cur_g =
-              ne_view_4d(ctx0, Vcur, head_size, n_head_kv, update_sl, update_bs, ne_element_size(Vcur) * head_size,
-                         ne_element_size(Vcur) * n_embd_gqa, ne_element_size(Vcur) * n_embd_gqa * update_sl,
-                         ne_element_size(Vcur) * off_sl);
-          ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache_g, v_cur_g, update_n_past, is_ring_full));
-          off_sl += n_embd_gqa * update_sl * update_bs;
-        }
-      }
+          const int attn_bs = infer_groups[gi].size();
+          const int attn_sl = n_tokens[infer_groups[gi].front()];
+          const int attn_block_id = block_ids[infer_groups[gi].front()];
+          const int attn_n_past = n_pasts[infer_groups[gi].front()];
+          const int attn_n_total = n_totals[infer_groups[gi].front()];
+          struct ne_tensor* Q = ne_permute(
+              ctx0,
+              ne_view_4d(ctx0, Qcur, head_size, n_head, attn_sl, attn_bs, ne_element_size(Qcur) * head_size,
+                         ne_element_size(Qcur) * head_size * n_head,
+                         ne_element_size(Qcur) * head_size * n_head * attn_sl, off_sl * ne_element_size(Qcur)),
+              0, 2, 1, 3);
+          std::string suffix = std::to_string(gi);
+          ne_set_name(Q, std::string("Q_" + suffix).c_str());
+          const int n_cached_gi = shift_roped_k ? n_cached : attn_n_past + attn_sl;
+          std::vector<int> attn_block_ids(infer_groups[gi].size());
+          for (int j = 0; j < infer_groups[gi].size(); ++j) {
+            attn_block_ids[j] = block_ids[infer_groups[gi][j]];
+          }
+          struct ne_tensor* K = model_kv_cache_seq_concat(&gf, &lctx, ctx0, head_size, n_cached_gi, n_head_kv, attn_bs,
+                                                          attn_block_ids, il);
+          if (is_ring_full) {
+            K = ne_permute(ctx0, K, 0, 2, 1, 3);
+            struct ne_tensor* cossin_cache = nullptr;
+            // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
+            // in a single eval execution
+            if (N == 1) cossin_cache = kv_self.cossin;
+            K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                      hparams.freq_scale);
+            K = ne_permute(ctx0, K, 0, 2, 1, 3);
+          }
 
-      // for-loop attention
-      size_t off_sl = 0;
-      for (int gi = 0; gi < infer_groups.size(); ++gi) {
-        const int attn_bs = infer_groups[gi].size();
-        const int attn_sl = n_tokens[infer_groups[gi].front()];
-        const int attn_block_id = block_ids[infer_groups[gi].front()];
-        const int attn_n_past = n_pasts[infer_groups[gi].front()];
-        const int attn_n_total = n_totals[infer_groups[gi].front()];
-        struct ne_tensor* Q =
-            ne_permute(ctx0,
-                       ne_view_4d(ctx0, Qcur, head_size, n_head, attn_sl, attn_bs, ne_element_size(Qcur) * head_size,
-                                  ne_element_size(Qcur) * head_size * n_head,
-                                  ne_element_size(Qcur) * head_size * n_head * attn_sl, off_sl * ne_element_size(Qcur)),
-                       0, 2, 1, 3);
-        std::string suffix = std::to_string(gi);
-        ne_set_name(Q, std::string("Q_" + suffix).c_str());
-        const int n_cached_gi = shift_roped_k ? n_cached : attn_n_past + attn_sl;
-        struct ne_tensor* K =
-            ne_view_4d(ctx0, kv_self.k,                                                     // tensor
-                       head_size, n_cached_gi, n_head_kv, attn_bs,                          // ne
-                       kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num, k_size,  // nb (bestla managed)
-                       il * kv_n_ctx_block * k_size + attn_block_id * k_size);              // offset
-        *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;            // use nb0 for layout
-        if (is_ring_full) {
-          struct ne_tensor* cossin_cache = nullptr;
-          // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
-          // in a single eval execution
-          if (N == 1) cossin_cache = kv_self.cossin;
-          K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
-                                    hparams.freq_scale);
-        }
-        struct ne_tensor* V = ne_view_4d(ctx0, kv_self.v,                             // tensor
-                                         n_cached_gi, head_size, n_head_kv, attn_bs,  // ne
-                                         kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,
-                                         v_size,                                                  // nb (bestla managed)
-                                         il * kv_n_ctx_block * v_size + attn_block_id * v_size);  // use nb0 for layout
-        *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;
-        ne_set_name(K, std::string("K_" + suffix).c_str());
-        ne_set_name(V, std::string("V_" + suffix).c_str());
+          // split cached V into n_head heads
+          struct ne_tensor* V = model_kv_cache_seq_concat(&gf, &lctx, ctx0, n_cached_gi, head_size, n_head_kv, attn_bs,
+                                                          attn_block_ids, il, false);
+          ne_set_name(K, std::string("K_" + suffix).c_str());
+          ne_set_name(V, std::string("V_" + suffix).c_str());
 
-        ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
-        if (hparams.mha_prefer_f32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
-        if (n_total == 0 || !shift_roped_k) attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
-        struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
-        struct ne_tensor* KQV_merged_gi = ne_view_2d(ctx0, KQV_Out, head_size * n_head, attn_sl * attn_bs,
-                                                     head_size * n_head * ne_element_size(KQV_Out), 0);
-        ne_set_name(KQV_merged_gi, std::string("KQV_merged_" + suffix).c_str());
-        ne_build_forward_expand(&gf,
-                                ne_cpy(ctx0, KQV_merged_gi,
-                                       ne_view_2d(ctx0, KQV_merged_contiguous, head_size * n_head, attn_sl * attn_bs,
-                                                  head_size * n_head * ne_element_size(KQV_merged_contiguous),
-                                                  ne_element_size(KQV_merged_contiguous) * off_sl)));
-        off_sl += head_size * n_head * attn_sl * attn_bs;
+          // K * Q
+          struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
+          ne_set_name(KQ, std::string("KQ_" + suffix).c_str());
+
+          // KQ_scaled = KQ / sqrt(n_embd/n_head)
+          struct ne_tensor* KQ_scale = ne_new_f32(ctx0, attn_scale);
+          ne_set_name(KQ_scale, std::string("1/sqrt(n_embd/n_head)_" + suffix).c_str());
+
+          // KQ_scaled shape [n_cached, N, n_head, 1]
+          struct ne_tensor* KQ_scaled = ne_scale_inplace(ctx0, KQ, KQ_scale);
+          ne_set_name(KQ_scaled, std::string("KQ_scaled_" + suffix).c_str());
+
+          // KQ_masked = mask_past(KQ_scaled)
+          if (N > 1 || !shift_roped_k || attn_n_total == 0) {  // TODO(Yi): shift roped-k with N > 1 next-token
+            KQ_scaled = ne_diag_mask_inf_inplace(ctx0, KQ_scaled, attn_n_past);
+            ne_set_name(KQ_scaled, std::string("KQ_masked_" + suffix).c_str());
+          }
+
+          // KQ = soft_max(KQ_masked)
+          struct ne_tensor* KQ_soft_max = ne_soft_max_inplace(ctx0, KQ_scaled);
+          ne_set_name(KQ_soft_max, std::string("KQ_soft_max_" + suffix).c_str());
+
+          struct ne_tensor* KQV = ne_mul_mat(ctx0, V, KQ_soft_max);
+          ne_set_name(KQV, std::string("KQV_" + suffix).c_str());
+
+          // KQV_merged = KQV.permute(0, 2, 1, 3)
+          struct ne_tensor* KQV_merged_gi = ne_permute(ctx0, KQV, 0, 2, 1, 3);
+          ne_set_name(KQV_merged_gi, std::string("KQV_merged_" + suffix).c_str());
+
+          ne_build_forward_expand(&gf,
+                                  ne_cpy(ctx0, KQV_merged_gi,
+                                         ne_view_2d(ctx0, KQV_merged_contiguous, head_size * n_head, attn_sl * attn_bs,
+                                                    head_size * n_head * ne_element_size(KQV_merged_contiguous),
+                                                    ne_element_size(KQV_merged_contiguous) * off_sl)));
+          off_sl += head_size * n_head * attn_sl * attn_bs;
+        }
+        ne_set_name(KQV_merged_contiguous, "KQV_merged_contiguous");
+        // projection (no bias)
+        cur = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
+      } else {
+        const auto k_size = kv_cache_info.k_bytes;
+        const auto v_size = kv_cache_info.v_bytes;
+        // store key and value to memory
+        {
+          size_t off_sl = 0;
+          for (int gi = 0; gi < infer_groups.size(); ++gi) {
+            const int update_bs = infer_groups[gi].size();
+            const int update_sl = n_tokens[infer_groups[gi].front()];
+            const int update_block_id = block_ids[infer_groups[gi].front()];
+            const int update_n_past = n_pasts[infer_groups[gi].front()];
+            const auto k_cache_g = ne_view_4d(ctx0, kv_self.k,                         // tensor
+                                              head_size, n_ctx, n_head_kv, update_bs,  // ne
+                                              0, 0, k_size,                            // nb (bestla managed)
+                                              il * kv_n_ctx_block * k_size + update_block_id * k_size);  // offset
+            const auto k_cur_g =
+                ne_view_4d(ctx0, Kcur, head_size, n_head_kv, update_sl, update_bs, ne_element_size(Kcur) * head_size,
+                           ne_element_size(Kcur) * n_embd_gqa, ne_element_size(Kcur) * n_embd_gqa * update_sl,
+                           ne_element_size(Kcur) * off_sl);
+            ne_build_forward_expand(&gf, ne_flash_attn_update_k(ctx0, k_cache_g, k_cur_g, update_n_past, is_ring_full));
+            struct ne_tensor* v_cache_g =
+                ne_view_4d(ctx0, kv_self.v,                                           // tensor
+                           head_size, n_ctx, n_head_kv, update_bs,                    // ne
+                           0, 0, v_size,                                              // nb (bestla managed)
+                           il * kv_n_ctx_block * v_size + update_block_id * v_size);  // offset);
+            // bestla always view V as (D, n_head, seq, bs)
+            const auto v_cur_g =
+                ne_view_4d(ctx0, Vcur, head_size, n_head_kv, update_sl, update_bs, ne_element_size(Vcur) * head_size,
+                           ne_element_size(Vcur) * n_embd_gqa, ne_element_size(Vcur) * n_embd_gqa * update_sl,
+                           ne_element_size(Vcur) * off_sl);
+            ne_build_forward_expand(&gf, ne_flash_attn_update_v(ctx0, v_cache_g, v_cur_g, update_n_past, is_ring_full));
+            off_sl += n_embd_gqa * update_sl * update_bs;
+          }
+        }
+
+        // for-loop attention
+        size_t off_sl = 0;
+        for (int gi = 0; gi < infer_groups.size(); ++gi) {
+          const int attn_bs = infer_groups[gi].size();
+          const int attn_sl = n_tokens[infer_groups[gi].front()];
+          const int attn_block_id = block_ids[infer_groups[gi].front()];
+          const int attn_n_past = n_pasts[infer_groups[gi].front()];
+          const int attn_n_total = n_totals[infer_groups[gi].front()];
+          struct ne_tensor* Q = ne_permute(
+              ctx0,
+              ne_view_4d(ctx0, Qcur, head_size, n_head, attn_sl, attn_bs, ne_element_size(Qcur) * head_size,
+                         ne_element_size(Qcur) * head_size * n_head,
+                         ne_element_size(Qcur) * head_size * n_head * attn_sl, off_sl * ne_element_size(Qcur)),
+              0, 2, 1, 3);
+          std::string suffix = std::to_string(gi);
+          ne_set_name(Q, std::string("Q_" + suffix).c_str());
+          const int n_cached_gi = shift_roped_k ? n_cached : attn_n_past + attn_sl;
+          struct ne_tensor* K =
+              ne_view_4d(ctx0, kv_self.k,                                                     // tensor
+                         head_size, n_cached_gi, n_head_kv, attn_bs,                          // ne
+                         kv_cache_info.stride_k_sl, kv_cache_info.stride_k_head_num, k_size,  // nb (bestla managed)
+                         il * kv_n_ctx_block * k_size + attn_block_id * k_size);              // offset
+          *reinterpret_cast<ATTN_FWD_LAYOUT*>(&K->nb[0]) = kv_cache_info.k_layout;            // use nb0 for layout
+          if (is_ring_full) {
+            struct ne_tensor* cossin_cache = nullptr;
+            // Currently we only cache cossin for N == 1 in model-wide; It may be worthwhile to cache cossin for other N
+            // in a single eval execution
+            if (N == 1) cossin_cache = kv_self.cossin;
+            K = ne_rope_shift_inplace(ctx0, K, -N, n_rot, 0, 0, n_keep, cossin_cache, hparams.freq_base,
+                                      hparams.freq_scale);
+          }
+          struct ne_tensor* V =
+              ne_view_4d(ctx0, kv_self.v,                             // tensor
+                         n_cached_gi, head_size, n_head_kv, attn_bs,  // ne
+                         kv_cache_info.stride_v_head_size, kv_cache_info.stride_v_head_num,
+                         v_size,                                                  // nb (bestla managed)
+                         il * kv_n_ctx_block * v_size + attn_block_id * v_size);  // use nb0 for layout
+          *reinterpret_cast<ATTN_FWD_LAYOUT*>(&V->nb[0]) = kv_cache_info.v_layout;
+          ne_set_name(K, std::string("K_" + suffix).c_str());
+          ne_set_name(V, std::string("V_" + suffix).c_str());
+
+          ne_attn_flags_t attn_flags = NE_ATTN_FLAG_NONE;
+          if (hparams.mha_prefer_f32) attn_flags |= NE_ATTN_FLAG_PREFER_FP32;
+          if (n_total == 0 || !shift_roped_k)
+            attn_flags |= NE_ATTN_FLAG_IS_CAUSAL;  // no causal mask on next-token cases
+          struct ne_tensor* KQV_Out = ne_flash_attn(ctx0, Q, K, V, attn_scale, attn_flags);
+          struct ne_tensor* KQV_merged_gi = ne_view_2d(ctx0, KQV_Out, head_size * n_head, attn_sl * attn_bs,
+                                                       head_size * n_head * ne_element_size(KQV_Out), 0);
+          ne_set_name(KQV_merged_gi, std::string("KQV_merged_" + suffix).c_str());
+          ne_build_forward_expand(&gf,
+                                  ne_cpy(ctx0, KQV_merged_gi,
+                                         ne_view_2d(ctx0, KQV_merged_contiguous, head_size * n_head, attn_sl * attn_bs,
+                                                    head_size * n_head * ne_element_size(KQV_merged_contiguous),
+                                                    ne_element_size(KQV_merged_contiguous) * off_sl)));
+          off_sl += head_size * n_head * attn_sl * attn_bs;
+        }
+        ne_set_name(KQV_merged_contiguous, "KQV_merged_contiguous");
+        // projection (no bias)
+        cur = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
       }
-      ne_set_name(KQV_merged_contiguous, "KQV_merged_contiguous");
-      // projection (no bias)
-      cur = ne_mul_mat(ctx0, model.layers[il].attn[3], KQV_merged_contiguous);
     }
+
 #ifdef NS_TP_MODEL
     if (enable_tp) {
       cur = ne_all_reduce(ctx0, cur);
@@ -500,8 +575,8 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
 #endif
     lctx.use_buf(ctx0, 1);
-    cur = ne_device_reshape(ctx0, cur, NE_BACKEND_SYCL);
-    inpSA = ne_device_reshape(ctx0, inpSA, NE_BACKEND_SYCL);
+    cur = ne_device_sync(ctx0, cur, NE_BACKEND_SYCL);
+    inpSA = ne_device_sync(ctx0, inpSA, NE_BACKEND_SYCL);
     struct ne_tensor* inpFF = ne_add(ctx0, cur, inpSA);
 
     // feed-forward network
@@ -626,9 +701,9 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   // lm_head
   inpL = ne_mul_mat(ctx0, model.others[2], inpL);
 
-  inpL = ne_device_reshape(ctx0, inpL, NE_BACKEND_CPU);
+  inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_CPU);
   if (!lctx.embedding.empty()) {
-    embeddings = ne_device_reshape(ctx0, embeddings, NE_BACKEND_CPU);
+    embeddings = ne_device_sync(ctx0, embeddings, NE_BACKEND_CPU);
   }
   lctx.use_buf(ctx0, -1);
 

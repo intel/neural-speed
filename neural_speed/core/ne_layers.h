@@ -343,7 +343,7 @@ NE_API struct ne_tensor* ne_reshape_4d(struct ne_context* ctx, struct ne_tensor*
                                        int64_t ne2, int64_t ne3);
 
 // If a is a device tensor, sync it to a host tensor. If a is a host tensor, it equals reshape(a).
-NE_API struct ne_tensor* ne_device_reshape(struct ne_context* ctx, struct ne_tensor* a, enum ne_backend bk);
+NE_API struct ne_tensor* ne_device_sync(struct ne_context* ctx, struct ne_tensor* a, enum ne_backend bk);
 
 // offset in bytes
 NE_API struct ne_tensor* ne_view_1d(struct ne_context* ctx, struct ne_tensor* a, int64_t ne0, size_t offset);

@@ -956,13 +956,13 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
     const bool support_bestla_kv = ctx->support_bestla_kv && bestla_reordered_attn_fp32_support(&attn_shape);
     fprintf(stderr, "%s: support_bestla_kv = %d\n", __func__, support_bestla_kv);
 
-    const ne_type memory_type = params.kv_type == KV_MEM_TYPE_F16   ? NE_TYPE_F16
-                                : params.kv_type == KV_MEM_TYPE_F32 ? NE_TYPE_F32
-                                : params.kv_type == KV_MEM_TYPE_AUTO
-                                    ? (support_bestla_kv ? NE_TYPE_BTLA : NE_TYPE_F16)  // fall back to fp16
-                                    : NE_TYPE_COUNT;
+    ne_type memory_type = params.kv_type == KV_MEM_TYPE_F16   ? NE_TYPE_F16
+                          : params.kv_type == KV_MEM_TYPE_F32 ? NE_TYPE_F32
+                          : params.kv_type == KV_MEM_TYPE_AUTO
+                              ? (support_bestla_kv ? NE_TYPE_BTLA : NE_TYPE_F16)  // fall back to fp16
+                              : NE_TYPE_COUNT;
+    memory_type = NE_TYPE_F16;
     NE_ASSERT(memory_type != NE_TYPE_COUNT);
-
     const bool kv_in_layers =
         (arch == MODEL_CHATGLM3 || arch == MODEL_CHATGLM2 || arch == MODEL_CHATGLM || arch == MODEL_BAICHUAN);
     if (!kv_cache_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->max_request_num,
