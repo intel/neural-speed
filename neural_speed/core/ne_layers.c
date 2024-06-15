@@ -3325,7 +3325,7 @@ struct ne_tensor* ne_rope_impl(struct ne_context* ctx, struct ne_tensor* a, int 
 #define ROPE_PADDING_IDX 5
 
   const int bs = a->ne[3];
-  struct ne_tensor* b = ne_new_tensor_1d(ctx, NE_TYPE_I32, ROPE_PARAMS_NUM + bs, NE_SIZE_CALC, a->backend);
+  struct ne_tensor* b = ne_new_tensor_1d(ctx, NE_TYPE_I32, ROPE_PARAMS_NUM + bs, NE_SIZE_CALC, NE_BACKEND_CPU);
 
   ((int32_t*)b->data)[ROPE_NPAST_IDX] = n_past;
   ((int32_t*)b->data)[ROPE_NDIMS_IDX] = n_dims;
@@ -9124,6 +9124,11 @@ void ggml_rope_yarn_corr_dims(int n_dims, int n_orig_ctx, float freq_base, float
 
 static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                         const struct ne_tensor* src1, struct ne_tensor* dst) {
+  if (dst->backend == NE_BACKEND_SYCL) {
+    assert(src1->backend == NE_BACKEND_CPU);
+    bestla_device_rope_f32(params, src0, src1, dst);
+    return;
+  }
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }

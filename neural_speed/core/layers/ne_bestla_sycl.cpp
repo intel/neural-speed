@@ -154,7 +154,7 @@ void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output
   if (_m == 1) {
     using ProB = ProBTransT<GemmCore>;
     ProB::gemv(activation, {(uint8_t*)dstor->mQBuf, (float*)dstor->mSBuf, dstor->mCStep}, output, _n, _k,
-                         dstor->mBlockSize, q);
+               dstor->mBlockSize, q);
   } else {
     using KernelTLauncher = sycl_wrapper::LauncherWOQ<ProAT, ProBTransT, EpiT, GemmCore>;
     utils::GemmProblem gp(1, _m, _n, _k);
@@ -398,6 +398,133 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
                          dst_ptr[i00] = src0_ptr[i00] * scale;
                        }
                      });
+  });
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
+}
+
+extern void ggml_rope_yarn_corr_dims(int n_dims, int n_orig_ctx, float freq_base, float beta_fast, float beta_slow,
+                                     float dims[2]);
+
+static float rope_yarn_ramp(const float low, const float high, const int i0) {
+  const float y = (i0 / 2 - low) / std::max(0.001f, high - low);
+  return 1.0f - std::min(1.0f, std::max(0.0f, y));
+}
+
+// YaRN algorithm based on LlamaYaRNScaledRotaryEmbedding.py from https://github.com/jquesnelle/yarn
+// MIT licensed. Copyright (c) 2023 Jeffrey Quesnelle and Bowen Peng.
+static void rope_yarn(float theta_extrap, float freq_scale, float corr_dims0, float corr_dims1, int64_t i0,
+                      float ext_factor, float mscale, float* cos_theta, float* sin_theta) {
+  // Get n-d rotational scaling corrected for extrapolation
+  float theta_interp = freq_scale * theta_extrap;
+  float theta = theta_interp;
+  if (ext_factor != 0.0f) {
+    float ramp_mix = rope_yarn_ramp(corr_dims0, corr_dims1, i0) * ext_factor;
+    theta = theta_interp * (1 - ramp_mix) + theta_extrap * ramp_mix;
+
+    // Get n-d magnitude scaling corrected for interpolation
+    mscale *= 1.0f + 0.1f * logf(1.0f / freq_scale);
+  }
+  *cos_theta = cosf(theta) * mscale;
+  *sin_theta = sinf(theta) * mscale;
+}
+
+void bestla_device_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                            const struct ne_tensor* src1, struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+  auto q = (sycl::queue*)params->dev_queue;
+  const int bs = src0->ne[3];
+  NE_ASSERT(src1->type == NE_TYPE_I32);
+
+  const float freq_base = ((float*)(dst->op_params))[0];
+  const float freq_scale = 1 / ((float*)(dst->op_params))[1];
+  const int n_orig_ctx = (int)((float*)(dst->op_params))[2];
+  const float ext_factor = ((float*)(dst->op_params))[3];
+  const float attn_factor = ((float*)(dst->op_params))[4];
+  const float beta_fast = ((float*)(dst->op_params))[5];
+  const float beta_slow = ((float*)(dst->op_params))[6];
+  const float scale_factor = ((float*)(dst->op_params))[7];
+#define ROPE_PARAMS_NUM 5
+#define ROPE_NPAST_IDX 0
+#define ROPE_NDIMS_IDX 1
+#define ROPE_MODE_IDX 2
+#define ROPE_PROMPTSIZE_IDX 3
+#define ROPE_NKEEP_IDX 4
+#define ROPE_PADDING_IDX 5
+  const int64_t n_past = ((int32_t*)src1->data)[ROPE_NPAST_IDX];
+  const int64_t n_dims = ((int32_t*)src1->data)[ROPE_NDIMS_IDX];
+  const int64_t mode = ((int32_t*)src1->data)[ROPE_MODE_IDX];
+  const int64_t prompt_size = ((int32_t*)src1->data)[ROPE_PROMPTSIZE_IDX];
+  const int64_t n_keep = ((int32_t*)src1->data)[ROPE_NKEEP_IDX];
+  assert(n_past >= 0);
+
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  const int nr = ne1 * ne2 * ne3;
+
+  const float theta_scale = powf(freq_base, -2.0f / n_dims);
+  const float inv_ndims = -1.f / n_dims;
+  float corr_dims[2];
+  ggml_rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
+  float corr_dims0 = corr_dims[0];
+  float corr_dims1 = corr_dims[1];
+  int constexpr SgSize = 16;
+  auto src0ptr = (float*)src0->data;
+  auto dstptr = (float*)dst->data;
+  auto ev = q->submit([&](sycl::handler& cgh) {
+    // sycl::local_accessor<float, 1> slm(sycl::range(WgSize), cgh);
+    cgh.parallel_for(sycl::nd_range<1>(nr * SgSize, SgSize), [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
+      auto sg = it.get_sub_group();
+      auto sg_idx = sg.get_group_id()[0];
+      auto wg_idx = it.get_group(0);
+      auto wg_loc_id = it.get_local_id();
+      auto lane_id = sg.get_local_id()[0];
+      int i = wg_idx;
+      int i1 = i % ne1;
+      i /= ne1;
+      int i2 = i % ne2;
+      i /= ne2;
+      int i3 = i % ne3;
+
+      const int64_t p = n_past + i2;
+      float theta_base = (float)p;
+      for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
+        float cos_theta, sin_theta;
+        rope_yarn(theta_base, freq_scale, corr_dims0, corr_dims1, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
+
+        theta_base *= theta_scale;
+
+        const float* const src = (float*)((char*)src0ptr + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
+        float* dst_data = (float*)((char*)dstptr + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
+
+        const float x0 = src[0];
+        const float x1 = src[1];
+
+        dst_data[0] = x0 * cos_theta - x1 * sin_theta;
+        dst_data[1] = x0 * sin_theta + x1 * cos_theta;
+      }
+    });
   });
   if (sycl_device::SyclDevice::is_cpu(q)) {
     q->wait();

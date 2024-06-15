@@ -228,8 +228,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
                            infer_bs);
       Vcur = ne_reshape_4d(ctx0, ne_mul_mat(ctx0, model.layers[il].attn[2], cur), head_size, n_head_kv, infer_seq_len,
                            infer_bs);
-      Qcur = ne_device_sync(ctx0, Qcur, NE_BACKEND_CPU);
-      Kcur = ne_device_sync(ctx0, Kcur, NE_BACKEND_CPU);
       Vcur = ne_device_sync(ctx0, Vcur, NE_BACKEND_CPU);
 #else
       cur = ne_mul_mat(ctx0, model.layers[il].attn[0], cur);
@@ -243,6 +241,8 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     if (infer_groups.size() == 1 && batch_size == 1 && !is_ring_full) {
       Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
       Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
+      Qcur = ne_device_sync(ctx0, Qcur, NE_BACKEND_CPU);
+      Kcur = ne_device_sync(ctx0, Kcur, NE_BACKEND_CPU);
       ne_set_name(Qcur, "Qcur");
       ne_set_name(Kcur, "Kcur");
       ne_set_name(Vcur, "Vcur");

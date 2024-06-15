@@ -103,7 +103,9 @@ void bestla_device_add_f32(const struct ne_compute_params* params, const struct 
 void bestla_device_elewise_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                struct ne_tensor* dst);
 void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
-                               struct ne_tensor* dst);
+                                struct ne_tensor* dst);
+void bestla_device_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                            const struct ne_tensor* src1, struct ne_tensor* dst);
 #endif
 #ifdef __cplusplus
 }
