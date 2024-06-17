@@ -530,4 +530,229 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
     q->wait();
   }
 }
+
+void bestla_device_dup_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                           struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+
+  auto q = (sycl::queue*)params->dev_queue;
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
+
+  const size_t nb00 = src0->nb[0];
+  const size_t nb01 = src0->nb[1];
+  const size_t nb02 = src0->nb[2];
+  const size_t nb03 = src0->nb[3];
+
+  const size_t nb0 = dst->nb[0];
+  const size_t nb1 = dst->nb[1];
+  const size_t nb2 = dst->nb[2];
+  const size_t nb3 = dst->nb[3];
+
+  auto srcptr = (float*)src0->data;
+  auto dstptr = (float*)dst->data;
+  auto dtype = dst->type;
+  sycl::range<1> num_items{ne0 * ne1 * ne2 * ne3};
+  auto ev = q->submit([&](sycl::handler& cgh) {
+    cgh.parallel_for(num_items, [=](auto it) {
+      int i = it;
+      int i0 = i % ne0;
+      i /= ne0;
+      int i1 = i % ne1;
+      i /= ne1;
+      int i2 = i % ne2;
+      i /= ne2;
+      int i3 = i % ne3;
+      float srcval = *(float*)((char*)srcptr + i0 * nb00 + i1 * nb01 + i2 * nb02 + i3 * nb03);
+      auto dptr = (char*)dstptr + i0 * nb0 + i1 * nb1 + i2 * nb2 + i3 * nb3;
+      if (dtype == NE_TYPE_F32) {
+        *(float*)dptr = srcval;
+      } else if (dtype == NE_TYPE_F16) {
+        *(sycl::half*)dptr = srcval;
+      }
+    });
+  });
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
+}
+
+template <typename T, typename T_DST>
+class MHA {
+ public:
+  template <bool Mask>
+  static sycl::event forward(int batch, int seq, int seq_acc, int hnum, int hsize, int n_ctx, const T* Q, const T* K,
+                             const T* V, T_DST* O, float attn_scale, sycl::queue* q) {
+    int constexpr SgSize = 16;
+    assert(hsize % SgSize == 0);
+    int n_past = seq_acc - seq;
+    if constexpr (Mask) {
+      assert(seq > 1);
+    }
+    int WgSize = SgSize;
+    int seq_acc_pad = utils::padto_le(seq_acc, WgSize * 2);
+    int nf = hnum * hsize;
+    auto ev = q->submit([&](sycl::handler& cgh) {
+      sycl::local_accessor<T, 1> slm(sycl::range(std::max(seq_acc, 1024)), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(WgSize * batch * seq * hnum, WgSize),
+                       [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
+                         auto sg = it.get_sub_group();
+                         auto sg_idx = sg.get_group_id()[0];
+                         auto wg_idx = it.get_group(0);
+                         auto wg_loc_id = it.get_local_id();
+                         auto lane_id = sg.get_local_id()[0];
+
+                         int i = wg_idx;
+                         int ih = i % hnum;
+                         i /= hnum;
+                         int is = i % seq;
+                         i /= seq;
+                         int ib = i % batch;
+                         size_t Q_off = ib * seq * nf + is * nf + ih * hsize;
+                         size_t K_off = ib * n_ctx * nf + ih * hsize * n_ctx;
+                         size_t V_off = ib * n_ctx * nf + ih * hsize * n_ctx;
+                         size_t O_off = ib * seq * nf + is * nf + ih * hsize;
+                         typedef sycl::vec<T, 2> TC;
+                         T maxs = -INFINITY;
+                         for (int jj = 0; jj < seq_acc; jj++) {
+                           TC tmp = {0, 0};
+                           if constexpr (Mask) {
+                             if (jj <= is + n_past) {
+                               for (int ik = wg_loc_id * 2; ik < hsize; ik += WgSize * 2) {
+                                 tmp += *(TC*)&Q[Q_off + ik] * *(TC*)&K[K_off + jj * hsize + ik];
+                               }
+                               tmp *= attn_scale;
+                             } else {
+                               tmp = {-INFINITY, -INFINITY};
+                             }
+                           } else {
+                             for (int ik = wg_loc_id * 2; ik < hsize; ik += WgSize * 2) {
+                               tmp += *(TC*)&Q[Q_off + ik] * *(TC*)&K[K_off + jj * hsize + ik];
+                             }
+                             tmp *= attn_scale;
+                           }
+                           T tmp_sum = tmp[0] + tmp[1];
+                           T sum = 0;
+                           for (int i = 0; i < SgSize; i += 1) {
+                             sum += sg.shuffle(tmp_sum, i);
+                           }
+                           slm[jj] = sum;
+                           maxs = std::max(maxs, sum);
+                         }
+                         float fsums = 0.f;
+                         float fmax = float(maxs);
+                         int jj = wg_loc_id * 2;
+                         for (; jj < seq_acc_pad; jj += WgSize * 2) {
+                           auto s2 = *(TC*)&slm[jj];
+                           s2[0] = std::expf(s2[0] - fmax);
+                           s2[1] = std::expf(s2[1] - fmax);
+                           fsums += s2[0];
+                           fsums += s2[1];
+                           *(TC*)&slm[jj] = s2;
+                         }
+                         if (jj < seq_acc) {
+                           slm[jj] = std::expf(float(slm[jj]) - fmax);
+                           fsums += slm[jj];
+                           if (jj + 1 < seq_acc) {
+                             slm[jj + 1] = std::expf(float(slm[jj + 1]) - fmax);
+                             fsums += slm[jj + 1];
+                           }
+                         }
+                         float gsum = 0;
+                         for (int i = 0; i < SgSize; i += 1) {
+                           gsum += sg.shuffle(fsums, i);
+                         }
+                         T scale = 1.f / gsum;
+                         jj = wg_loc_id * 2;
+                         for (; jj < seq_acc_pad; jj += WgSize * 2) {
+                           auto s2 = *(TC*)&slm[jj];
+                           s2 *= scale;
+                           *(TC*)&slm[jj] = s2;
+                         }
+                         if (jj < seq_acc) {
+                           slm[jj] *= scale;
+                           if (jj + 1 < seq_acc) {
+                             slm[jj + 1] *= scale;
+                           }
+                         }
+
+                         for (int kk = 0; kk < hsize; kk++) {
+                           TC tmp = {0, 0};
+                           jj = wg_loc_id * 2;
+                           for (; jj < seq_acc_pad; jj += WgSize * 2) {
+                             auto s2 = *(TC*)&slm[jj];
+                             auto v2 = *(TC*)&V[V_off + kk * n_ctx + jj];
+                             tmp += s2 * v2;
+                           }
+                           if (jj < seq_acc) {
+                             tmp[0] += slm[jj] * V[V_off + kk * n_ctx + jj];
+                             if (jj + 1 < seq_acc) {
+                               tmp[1] += slm[jj + 1] * V[V_off + kk * n_ctx + jj + 1];
+                             }
+                           }
+                           T tmp_sum = tmp[0] + tmp[1];
+                           T sum = 0;
+                           for (int i = 0; i < SgSize; i += 1) {
+                             sum += sg.shuffle(tmp_sum, i);
+                           }
+                           O[O_off + kk] = sum;
+                         }
+                       });
+    });
+    return ev;
+  }
+};
+void bestla_device_mha_f32(const struct ne_compute_params* params, const struct ne_tensor* _q,
+                           const struct ne_tensor* k, const struct ne_tensor* v, struct ne_tensor* dst) {
+  if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
+    return;
+  }
+
+  auto q = (sycl::queue*)params->dev_queue;
+  const int64_t neq0 = _q->ne[0];
+  const int64_t neq1 = _q->ne[1];
+  const int64_t neq2 = _q->ne[2];
+  const int64_t neq3 = _q->ne[3];
+
+  const int64_t nek0 = k->ne[0];
+  const int64_t nek1 = k->ne[1];
+  const int64_t nek2 = k->ne[2];
+  // const int64_t nek3 = k->ne[3];
+
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+
+  const int64_t headsize = neq0;
+  const int64_t headnum = neq1;
+  const int64_t heads_kv = nek2;
+  const int64_t embedsize = headnum * headsize;
+  const int64_t seq_cur = neq2;
+  const int64_t seq_all = nek1;
+  const int64_t batch = neq3;
+  auto scale = *(float*)dst->padding;
+  auto n_ctx = *(uint32_t*)&dst->padding[4];
+  auto Qptr = (float*)_q->data;
+  auto Kptr = (float*)k->data;
+  auto Vptr = (float*)v->data;
+  auto Optr = (float*)dst->data;
+  if (seq_cur > 1) {
+    MHA<float, float>::forward<true>(batch, seq_cur, seq_all, headnum, headsize, n_ctx, Qptr, Kptr, Vptr, Optr, scale,
+                                     q);
+  } else {
+    MHA<float, float>::forward<false>(batch, seq_cur, seq_all, headnum, headsize, n_ctx, Qptr, Kptr, Vptr, Optr, scale,
+                                      q);
+  }
+  if (sycl_device::SyclDevice::is_cpu(q)) {
+    q->wait();
+  }
+}
 #endif

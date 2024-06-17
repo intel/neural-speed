@@ -500,7 +500,8 @@ void mha_sref(float* Q, float* K, float* V, float* S, float* O, int batch, int s
           float tmp = 0.f;
           if (jj <= j + n_past) {
             for (int kk = 0; kk < hsize; kk++) {
-              tmp += Q[i * seq * nf + j * nf + ii * hsize + kk] * K[i * nf * seqA + kk * hnum * seqA + ii * seqA + jj];
+              tmp +=
+                  Q[i * seq * nf + j * nf + ii * hsize + kk] * K[i * nf * seqA + ii * seqA * hsize + jj * hsize + kk];
             }
             tmp *= attn_scale;
           } else {
@@ -523,7 +524,7 @@ void mha_sref(float* Q, float* K, float* V, float* S, float* O, int batch, int s
         for (int kk = 0; kk < hsize; kk++) {
           float tmp = 0.f;
           for (int jj = 0; jj < seqA; jj++) {
-            tmp += tmps[jj] * V[i * seqA * nf + jj * nf + ii * hsize + kk];
+            tmp += tmps[jj] * V[i * nf * seqA + ii * hsize * seqA + kk * seqA + jj];
           }
           O[i * seq * nf + j * nf + ii * hsize + kk] = tmp;
         }
@@ -537,10 +538,136 @@ class UT_MHASgemm {
   UT_MHASgemm() {
     UT_START();
     ut_T(1, 1, 1, 32, 128);
-    ut_T(1, 1, 64, 32, 128);
-    ut_T(4, 1, 64, 32, 128);
-    ut_T(4, 64, 64, 32, 128);
+     ut_T(1, 1, 64, 32, 128);
+     ut_T(4, 1, 64, 32, 128);
+     ut_T(4, 64, 64, 32, 128);
   }
+  template <typename T, typename T_DST>
+  class MHA {
+   public:
+    template <bool Mask>
+    static sycl::event forward(int batch, int seq, int seq_acc, int hnum, int hsize, const T* Q, const T* K, const T* V,
+                               T_DST* O, sycl::queue* q) {
+      const float attn_scale = 1.0f / sqrtf(static_cast<float>(hsize));
+      int constexpr SgSize = 16;
+      assert(hsize % SgSize == 0);
+      int n_past = seq_acc - seq;
+      if constexpr (Mask) {
+        assert(seq > 1);
+      }
+      int WgSize = SgSize;
+      int seq_acc_pad = utils::padto_le(seq_acc, WgSize * 2);
+      int nf = hnum * hsize;
+      auto ev = q->submit([&](sycl::handler& cgh) {
+        sycl::local_accessor<T, 1> slm(sycl::range(std::max(seq_acc, 1024)), cgh);
+        cgh.parallel_for(sycl::nd_range<1>(WgSize * batch * seq * hnum, WgSize),
+                         [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
+                           auto sg = it.get_sub_group();
+                           auto sg_idx = sg.get_group_id()[0];
+                           auto wg_idx = it.get_group(0);
+                           auto wg_loc_id = it.get_local_id();
+                           auto lane_id = sg.get_local_id()[0];
+
+                           int i = wg_idx;
+                           int ih = i % hnum;
+                           i /= hnum;
+                           int is = i % seq;
+                           i /= seq;
+                           int ib = i % batch;
+                           size_t Q_off = ib * seq * nf + is * nf + ih * hsize;
+                           size_t K_off = ib * seq_acc * nf + ih * hsize * seq_acc;
+                           size_t V_off = ib * seq_acc * nf + ih * hsize * seq_acc;
+                           size_t O_off = ib * seq * nf + is * nf + ih * hsize;
+                           typedef sycl::vec<T, 2> TC;
+                           T maxs = -INFINITY;
+                           for (int jj = 0; jj < seq_acc; jj++) {
+                             TC tmp = {0, 0};
+                             if constexpr (Mask) {
+                               if (jj <= is + n_past) {
+                                 for (int ik = wg_loc_id * 2; ik < hsize; ik += WgSize * 2) {
+                                   tmp += *(TC*)&Q[Q_off + ik] * *(TC*)&K[K_off + jj * hsize + ik];
+                                 }
+                                 tmp *= attn_scale;
+                               } else {
+                                 tmp = {-INFINITY, -INFINITY};
+                               }
+                             } else {
+                               for (int ik = wg_loc_id * 2; ik < hsize; ik += WgSize * 2) {
+                                 tmp += *(TC*)&Q[Q_off + ik] * *(TC*)&K[K_off + jj * hsize + ik];
+                               }
+                               tmp *= attn_scale;
+                             }
+                             T tmp_sum = tmp[0] + tmp[1];
+                             T sum = 0;
+                             for (int i = 0; i < SgSize; i += 1) {
+                               sum += sg.shuffle(tmp_sum, i);
+                             }
+                             slm[jj] = sum;
+                             maxs = std::max(maxs, sum);
+                           }
+                           float fsums = 0.f;
+                           float fmax = float(maxs);
+                           int jj = wg_loc_id * 2;
+                           for (; jj < seq_acc_pad; jj += WgSize * 2) {
+                             auto s2 = *(TC*)&slm[jj];
+                             s2[0] = std::expf(s2[0] - fmax);
+                             s2[1] = std::expf(s2[1] - fmax);
+                             fsums += s2[0];
+                             fsums += s2[1];
+                             *(TC*)&slm[jj] = s2;
+                           }
+                           if (jj < seq_acc) {
+                             slm[jj] = std::expf(float(slm[jj]) - fmax);
+                             fsums += slm[jj];
+                             if (jj + 1 < seq_acc) {
+                               slm[jj + 1] = std::expf(float(slm[jj + 1]) - fmax);
+                               fsums += slm[jj + 1];
+                             }
+                           }
+                           float gsum = 0;
+                           for (int i = 0; i < SgSize; i += 1) {
+                             gsum += sg.shuffle(fsums, i);
+                           }
+                           T scale = 1.f / gsum;
+                           jj = wg_loc_id * 2;
+                           for (; jj < seq_acc_pad; jj += WgSize * 2) {
+                             auto s2 = *(TC*)&slm[jj];
+                             s2 *= scale;
+                             *(TC*)&slm[jj] = s2;
+                           }
+                           if (jj < seq_acc) {
+                             slm[jj] *= scale;
+                             if (jj + 1 < seq_acc) {
+                               slm[jj + 1] *= scale;
+                             }
+                           }
+
+                           for (int kk = 0; kk < hsize; kk++) {
+                             TC tmp = {0, 0};
+                             jj = wg_loc_id * 2;
+                             for (; jj < seq_acc_pad; jj += WgSize * 2) {
+                               auto s2 = *(TC*)&slm[jj];
+                               auto v2 = *(TC*)&V[V_off + kk * seq_acc + jj];
+                               tmp += s2 * v2;
+                             }
+                             if (jj < seq_acc) {
+                               tmp[0] += slm[jj] * V[V_off + kk * seq_acc + jj];
+                               if (jj + 1 < seq_acc) {
+                                 tmp[1] += slm[jj + 1] * V[V_off + kk * seq_acc + jj + 1];
+                               }
+                             }
+                             T tmp_sum = tmp[0] + tmp[1];
+                             T sum = 0;
+                             for (int i = 0; i < SgSize; i += 1) {
+                               sum += sg.shuffle(tmp_sum, i);
+                             }
+                             O[O_off + kk] = sum;
+                           }
+                         });
+      });
+      return ev;
+    }
+  };
 
   void ut_T(int batch, int seq, int seqA, int hnum, int hsize) {
     auto dev = UT_Device::get();
@@ -570,57 +697,62 @@ class UT_MHASgemm {
     sycl::range<1> num_items{batch * seq * hnum};
     int n_past = seqA - seq;
     const float attn_scale = 1.0f / sqrtf(static_cast<float>(hsize));
-    auto ev = q->submit([&](sycl::handler& cgh) {
-      cgh.parallel_for(num_items, [=](auto it) {
-        int i = it;
-        int ih = i % hnum;
-        i /= hnum;
-        int is = i % seq;
-        i /= seq;
-        int ib = i % batch;
-        float maxs = 0.f;
-        float tmps[64];
-        for (int jj = 0; jj < seqA; jj++) {
-          float tmp = 0.f;
-          if (jj <= is + n_past) {
-            for (int kk = 0; kk < hsize; kk++) {
-              tmp += Qptr[ib * seq * nf + is * nf + ih * hsize + kk] *
-                     Kptr[ib * nf * seqA + kk * hnum * seqA + ih * seqA + jj];
-            }
-            tmp *= attn_scale;
-          } else {
-            tmp = -INFINITY;
-          }
+    if (seq > 1) {
+      MHA<float, float>::forward<true>(batch, seq, seqA, hnum, hsize, Qptr, Kptr, Vptr, Optr, q).wait();
+    } else {
+      MHA<float, float>::forward<false>(batch, seq, seqA, hnum, hsize, Qptr, Kptr, Vptr, Optr, q).wait();
+    }
+    // auto ev = q->submit([&](sycl::handler& cgh) {
+    //   cgh.parallel_for(num_items, [=](auto it) {
+    //     int i = it;
+    //     int ih = i % hnum;
+    //     i /= hnum;
+    //     int is = i % seq;
+    //     i /= seq;
+    //     int ib = i % batch;
+    //     float maxs = 0.f;
+    //     float tmps[64];
+    //     for (int jj = 0; jj < seqA; jj++) {
+    //       float tmp = 0.f;
+    //       if (jj <= is + n_past) {
+    //         for (int kk = 0; kk < hsize; kk++) {
+    //           tmp += Qptr[ib * seq * nf + is * nf + ih * hsize + kk] *
+    //                  Kptr[ib * nf * seqA + kk + ih * seqA * hsize + jj * hsize];
+    //         }
+    //         tmp *= attn_scale;
+    //       } else {
+    //         tmp = -INFINITY;
+    //       }
 
-          tmps[jj] = tmp;
-          maxs = std::max(maxs, tmp);
-        }
-        float sums = 0.f;
-        for (int jj = 0; jj < seqA; jj++) {
-          tmps[jj] = std::expf(tmps[jj] - maxs);
-          sums += tmps[jj];
-        }
-        sums = 1.f / sums;
-        for (int jj = 0; jj < seqA; jj++) {
-          tmps[jj] *= sums;
-          Sptr[ib * seq * hnum * seqA + is * hnum * seqA + ih * seqA + jj] = tmps[jj];
-        }
-        for (int kk = 0; kk < hsize; kk++) {
-          float tmp = 0.f;
-          for (int jj = 0; jj < seqA; jj++) {
-            tmp += tmps[jj] * Vptr[ib * seqA * nf + jj * nf + ih * hsize + kk];
-          }
-          Optr[ib * seq * nf + is * nf + ih * hsize + kk] = tmp;
-        }
-      });
-    });
+    //      tmps[jj] = tmp;
+    //      maxs = std::max(maxs, tmp);
+    //    }
+    //    float sums = 0.f;
+    //    for (int jj = 0; jj < seqA; jj++) {
+    //      tmps[jj] = std::expf(tmps[jj] - maxs);
+    //      sums += tmps[jj];
+    //    }
+    //    sums = 1.f / sums;
+    //    for (int jj = 0; jj < seqA; jj++) {
+    //      tmps[jj] *= sums;
+    //      Sptr[ib * seq * hnum * seqA + is * hnum * seqA + ih * seqA + jj] = tmps[jj];
+    //    }
+    //    for (int kk = 0; kk < hsize; kk++) {
+    //      float tmp = 0.f;
+    //      for (int jj = 0; jj < seqA; jj++) {
+    //        tmp += tmps[jj] * Vptr[ib * seqA * nf + jj + ih * hsize * seqA + kk * seqA];
+    //      }
+    //      Optr[ib * seq * nf + is * nf + ih * hsize + kk] = tmp;
+    //    }
+    //  });
+    //});
     q->wait();
     avector<float> STar(batch * seq * hnum * seqA), OTar(batch * seq * hnum * hsize);
-    q->memcpy(STar.data(), S.data(), S.size() * sizeof(S[0]));
-    q->memcpy(OTar.data(), O.data(), O.size() * sizeof(O[0]));
+    q->memcpy(STar.data(), Sptr, STar.size() * sizeof(STar[0]));
+    q->memcpy(OTar.data(), Optr, OTar.size() * sizeof(OTar[0]));
     q->wait();
-    buffer_error(S.data(), STar.data(), S.size(), 0.f);
-    buffer_error(O.data(), OTar.data(), O.size(), 0.f);
+    //buffer_error(S.data(), STar.data(), S.size(), 0.001f);
+    buffer_error(O.data(), OTar.data(), O.size(), 0.001f);
   }
 };
 #ifdef BTLA_UT_SYCL

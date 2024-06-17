@@ -49,11 +49,7 @@
 
 #define NE_SIZE_CALC -1
 
-#if __AVX512F__
 #define NE_ALIGNMENT 64
-#else
-#define NE_ALIGNMENT 32
-#endif
 
 #define NE_ASSERT(x)                                                     \
   do {                                                                   \

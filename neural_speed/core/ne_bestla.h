@@ -106,6 +106,9 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
                                 struct ne_tensor* dst);
 void bestla_device_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                             const struct ne_tensor* src1, struct ne_tensor* dst);
+void bestla_device_dup_f32(const struct ne_compute_params* params, const struct ne_tensor* src0, struct ne_tensor* dst);
+void bestla_device_mha_f32(const struct ne_compute_params* params, const struct ne_tensor* q, const struct ne_tensor* k,
+                           const struct ne_tensor* v, struct ne_tensor* dst);
 #endif
 #ifdef __cplusplus
 }

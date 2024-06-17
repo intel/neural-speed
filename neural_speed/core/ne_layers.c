@@ -916,7 +916,6 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
   if (dptr == NULL) {
     dptr = (char* const)ctx->dev_mem_buffer + ctx->dev_offs;
   }
-  ctx->dev_offs += size_needed;
 
   if (ctx->dev_offs + size_needed > ctx->dev_size) {
     NE_PRINT(
@@ -926,6 +925,7 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
     assert(false);
     return NULL;
   }
+  ctx->dev_offs += size_needed;
 
   if (ctx->scratch.data == NULL) {
     if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
@@ -2797,10 +2797,8 @@ struct ne_tensor* ne_reshape_2d(struct ne_context* ctx, struct ne_tensor* a, int
     is_node = true;
   }
   enum ne_op op = NE_OP_RESHAPE;
-  enum ne_backend bk = bestla_backend_support(a, NULL, op);
   const int64_t ne[2] = {ne0, ne1};
-  struct ne_tensor* result =
-      ne_new_tensor_impl(ctx, a->type, 2, ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
+  struct ne_tensor* result = ne_new_tensor_impl(ctx, a->type, 2, ne, a->data, NE_SIZE_CALC, a->backend);
 
   result->op = op;
   result->grad = NULL;
@@ -2856,6 +2854,9 @@ struct ne_tensor* ne_device_sync(struct ne_context* ctx, struct ne_tensor* a, en
   enum ne_op op = NE_OP_RESHAPE;
   struct ne_tensor* result =
       ne_new_tensor_impl(ctx, a->type, a->n_dims, a->ne, a->backend == bk ? a->data : NULL, NE_SIZE_CALC, bk);
+  for (size_t i = 0; i < a->n_dims; i++) {
+    result->nb[i] = a->nb[i];
+  }
   result->op = op;
   result->grad = NULL;
   result->src0 = a;
@@ -3604,6 +3605,33 @@ struct ne_tensor* ne_conv_1d_ph(struct ne_context* ctx, struct ne_tensor* a, str
 
 struct ne_tensor* ne_flash_attn(struct ne_context* ctx, struct ne_tensor* q, struct ne_tensor* k, struct ne_tensor* v,
                                 float scale, ne_attn_flags_t flags) {
+  if (q->backend == NE_BACKEND_SYCL) {
+    int headsize = q->ne[0];
+    int headnum = q->ne[1];
+    int seq_cur = q->ne[2];
+    int batch = q->ne[3];
+    int heads_kv = k->ne[2];
+    int seq_all = k->ne[1];
+    // int seq_past = seq_all - seq_cur;
+    NE_ASSERT(("headnum must be a multiple of heads_kv", headnum % heads_kv == 0));
+    NE_ASSERT(headsize == k->ne[0]);
+    NE_ASSERT(headsize == v->ne[1]);
+    NE_ASSERT(seq_all == v->ne[0]);
+    NE_ASSERT(("n_heads must be the same for K/V!", k->ne[2] == v->ne[2]));
+    NE_ASSERT(batch == k->ne[3]);
+    NE_ASSERT(batch == v->ne[3]);
+    bool is_node = true;
+    struct ne_tensor* result =
+        ne_new_tensor_4d(ctx, NE_TYPE_F32, headsize, headnum, seq_cur, batch, NE_SIZE_CALC, q->backend);
+    result->op = NE_OP_FLASH_ATTN;
+    result->grad = NULL;
+    result->src0 = q;
+    result->src1 = k;
+    result->opt[0] = v;
+    *(float*)result->padding = scale;
+    *(uint32_t*)&result->padding[4] = flags;
+    return result;
+  }
   NE_ASSERT(ne_can_mul_mat(k, q));
   int batch = q->ne[3];
   int headnum = q->ne[2];
@@ -4146,6 +4174,10 @@ static void ne_compute_forward_dup_f16(const struct ne_compute_params* params, c
 static void ne_compute_forward_dup_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
                                        struct ne_tensor* dst) {
   NE_ASSERT(ne_nelements(dst) == ne_nelements(src0));
+  if (dst->backend == NE_BACKEND_SYCL) {
+    bestla_device_dup_f32(params, src0, dst);
+    return;
+  }
 
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
@@ -9786,6 +9818,10 @@ static void ne_compute_forward_rope_back(const struct ne_compute_params* params,
 static void ne_compute_forward_flash_attn_f32(const struct ne_compute_params* params, const struct ne_tensor* q,
                                               const struct ne_tensor* k, const struct ne_tensor* v, const bool masked,
                                               struct ne_tensor* dst) {
+  if (dst->backend == NE_BACKEND_SYCL) {
+    bestla_device_mha_f32(params, q, k, v, dst);
+    return;
+  }
   int64_t t0 = ne_perf_time_us();
   UNUSED(t0);
 
@@ -10385,6 +10421,8 @@ static void ne_compute_forward_flash_attn(const struct ne_compute_params* params
         ne_compute_forward_flash_attn_f32_f16_f16(params, q, k, v, tmp, dst);
       } else if (k->type == NE_TYPE_BTLA && v->type == NE_TYPE_BTLA) {
         ne_compute_forward_flash_attn_reordered(params, q, k, v, tmp, dst);
+      } else if (k->type == NE_TYPE_F32) {
+        ne_compute_forward_flash_attn_f32(params, q, k, v, true, dst);
       } else {
         NE_ASSERT(false);
       }

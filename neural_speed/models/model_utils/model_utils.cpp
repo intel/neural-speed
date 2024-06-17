@@ -171,6 +171,55 @@ static bool kv_cache_init(const struct model_hparams& hparams, struct model_kv_c
   return true;
 }
 
+// non-null pointer of model for kv-cache as components of model->layers[il] (e.g. chatglm)
+static bool kv_cache_device_init(const struct model_hparams& hparams, struct model_kv_cache& cache,  // NOLINT
+                                 const ne_type _wtype, const int n_ctx, const int batch_size, const int beam_size,
+                                 const bool shift_roped_k, model_struct* model, void* device_queue) {
+  const auto n_layer = hparams.n_layer;
+  auto heads_kv = hparams.n_head_kv > 0 ? hparams.n_head_kv : hparams.n_head;
+  const auto head_size = hparams.n_embd_head_k == 0 ? hparams.n_embd / hparams.n_head : hparams.n_embd_head_k;
+
+  int32_t k_size, v_size;
+  auto wtype = NE_TYPE_F32;
+  assert(model == NULL);
+  assert(!shift_roped_k);
+
+  get_batch_kv_elements_from_gpt_params(heads_kv, head_size, n_ctx, wtype, &k_size, &v_size);
+
+  int64_t layer_ne_k = batch_size * beam_size * k_size;
+  int64_t layer_ne_v = batch_size * beam_size * v_size;
+  const auto wsize = ne_type_size(wtype);
+  cache.device_size = n_layer * (layer_ne_k + layer_ne_v) * wsize;
+  cache.device_size = (cache.device_size + 255) / 256 * 256;
+  cache.device_buf = bestla_device_malloc(cache.device_size, device_queue);
+  cache.seq_cells.resize(batch_size * beam_size);
+  for (int i = 0; i < cache.seq_cells.size(); ++i) {
+    cache.seq_cells[i].token_cells.resize(n_ctx);
+  }
+
+  struct ne_init_params params;
+  params.mem_size = 2u * MB;
+  params.mem_buffer = nullptr;
+  params.no_alloc = false;
+
+  cache.ctx = ne_init(params);
+
+  if (!cache.ctx) {
+    fprintf(stderr, "%s: failed to allocate memory for kv cache\n", __func__);
+    return false;
+  }
+  cache.ctx->dev_mem_buffer = cache.device_buf;
+  cache.ctx->dev_size = cache.device_size;
+  cache.ctx->dev_offs = 0;
+  cache.ctx->dev_queue = device_queue;
+  // NE_TYPE_BTLA can not be allocated memory
+  cache.k = ne_new_tensor_1d(cache.ctx, wtype, n_layer * layer_ne_k, NE_SIZE_CALC, NE_BACKEND_SYCL);
+  cache.v = ne_new_tensor_1d(cache.ctx, wtype, n_layer * layer_ne_v, NE_SIZE_CALC, NE_BACKEND_SYCL);
+  ne_set_name(cache.k, "cache_k");
+  ne_set_name(cache.v, "cache_v");
+  return true;
+}
+
 struct model_context_params model_context_default_params() {
   struct model_context_params result = {
       /*.arch                        =*/MODEL_LLAMA,
@@ -917,14 +966,17 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
   ctx->generation_conf = params.gen_conf;
 
   ctx->scratch_size_ratio = params.scratch_size_ratio * params.max_request_num * params.beam_size;
+  auto kv_backend = NE_BACKEND_CPU;
 #ifdef NS_SYCL
   ctx->device = bestla_create_device(false);
   ctx->device_queue = bestla_get_device_queue(ctx->device);
   auto memsize = bestla_device_gmem_size(ctx->device);
-  size_t constexpr Reserve = size_t(4000) << 20;
+  size_t constexpr Reserve = size_t(5000) << 20;
   ctx->device_buffer_size = std::min(Reserve, memsize);
   ctx->device_buffer = bestla_device_malloc(ctx->device_buffer_size, ctx->device);
   ctx->device_buffer_offs = 0;
+  params.kv_type = KV_MEM_TYPE_F32;
+  kv_backend = NE_BACKEND_SYCL;
 #endif
   const model_archs arch = params.arch;
 
@@ -961,15 +1013,24 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
                           : params.kv_type == KV_MEM_TYPE_AUTO
                               ? (support_bestla_kv ? NE_TYPE_BTLA : NE_TYPE_F16)  // fall back to fp16
                               : NE_TYPE_COUNT;
-    memory_type = NE_TYPE_F16;
     NE_ASSERT(memory_type != NE_TYPE_COUNT);
     const bool kv_in_layers =
         (arch == MODEL_CHATGLM3 || arch == MODEL_CHATGLM2 || arch == MODEL_CHATGLM || arch == MODEL_BAICHUAN);
-    if (!kv_cache_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->max_request_num,
-                       ctx->beam_size, params.shift_roped_k, (kv_in_layers ? &ctx->model : nullptr))) {
-      fprintf(stderr, "%s: kv_cache_init() failed for self-attention cache\n", __func__);
-      model_free(ctx);
-      return nullptr;
+    if (kv_backend == NE_BACKEND_CPU) {
+      if (!kv_cache_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->max_request_num,
+                         ctx->beam_size, params.shift_roped_k, (kv_in_layers ? &ctx->model : nullptr))) {
+        fprintf(stderr, "%s: kv_cache_init() failed for self-attention cache\n", __func__);
+        model_free(ctx);
+        return nullptr;
+      }
+    } else {
+      if (!kv_cache_device_init(ctx->model.hparams, ctx->model.kv_self, memory_type, ctx->n_ctx, ctx->max_request_num,
+                                ctx->beam_size, params.shift_roped_k, (kv_in_layers ? &ctx->model : nullptr),
+                                ctx->device_queue)) {
+        fprintf(stderr, "%s: kv_cache_device_init() failed for self-attention cache\n", __func__);
+        model_free(ctx);
+        return nullptr;
+      }
     }
 
     if (ctx->model.kv_self.k != nullptr) {
@@ -1012,6 +1073,7 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
 void model_free(struct model_context* ctx) {
 #ifdef NS_SYCL
   bestla_device_free(ctx->device_buffer, ctx->device);
+  bestla_device_free(ctx->model.kv_self.device_buf, ctx->device);
   bestla_release_device(ctx->device);
 #endif
   delete ctx;

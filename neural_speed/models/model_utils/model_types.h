@@ -206,6 +206,9 @@ struct model_kv_cache {
 
   model_ctx_buffer buf;
 
+  void* device_buf = nullptr;
+  size_t device_size = 0;
+
   int n;  // number of tokens currently in the cache
 
   bool has_shift = false;  // ring-buffer (for too long text generation like streaming-llm)
