@@ -83,7 +83,7 @@ struct col_major_shuf_t<
   using store_tile_payload_t = subgroup::mem_payload_t<
       mem_desc_store_tile_t,
       store_tile_desc_t,
-      subgroup::msg_type_v<store_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<store_tile_desc_t, mem_desc_store_tile_t>,
       arch_>;
 
   using mem_desc_gidx_t = mem_desc_t<
@@ -97,7 +97,7 @@ struct col_major_shuf_t<
   using gidx_payload_t = subgroup::mem_payload_t<
       mem_desc_gidx_t,
       gidx_tile_desc_t,
-      subgroup::msg_type_v<gidx_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<gidx_tile_desc_t, mem_desc_gidx_t>,
       arch_>;
 
   struct arguments_t {

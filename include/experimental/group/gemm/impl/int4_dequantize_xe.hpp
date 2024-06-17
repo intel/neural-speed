@@ -174,7 +174,7 @@ class gemm_t<
   using matA_payload_t = subgroup::mem_payload_t<
       mem_desc_a_t,
       matA_tile_desc_t,
-      subgroup::msg_type_v<matA_tile_desc_t, mem_space_a, mem_desc_a_t::layout>,
+      subgroup::msg_type_v<matA_tile_desc_t, mem_desc_a_t>,
       arch_tag>;
   using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
   using matA_prefetch_payload_t = subgroup::
@@ -204,9 +204,13 @@ class gemm_t<
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
       matB_tile_desc_t,
-      subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
-      // subgroup::msg_type_v<matB_tile_desc_t, mem_space_b,
-      // mem_desc_b_t::layout>,
+      subgroup::msg_type_v<
+          matB_tile_desc_t,
+          mem_desc_t<
+              typename mem_desc_b_t::dtype,
+              mem_layout::row_major,
+              mem_desc_b_t::space>>,
+      // subgroup::msg_type_v<matB_tile_desc_t, mem_desc_b_t>,
       arch_tag>;
   using matB_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_b_t, matB_tile_desc_t, wg_size_y, arch_tag>;
@@ -282,10 +286,7 @@ class gemm_t<
   using scale_payload_t = subgroup::mem_payload_t<
       mem_desc_scale_t,
       scale_tile_desc_t,
-      subgroup::msg_type_v<
-          scale_tile_desc_t,
-          mem_space::global,
-          mem_desc_scale_t::layout>,
+      subgroup::msg_type_v<scale_tile_desc_t, mem_desc_scale_t>,
       arch_tag>;
 
   // compress int4 along N dimensions
@@ -300,10 +301,7 @@ class gemm_t<
   using zero_pt_payload_t = subgroup::mem_payload_t<
       mem_desc_zero_pt_t,
       zero_pt_tile_desc_t,
-      subgroup::msg_type_v<
-          zero_pt_tile_desc_t,
-          mem_space::global,
-          mem_desc_zero_pt_t::layout>,
+      subgroup::msg_type_v<zero_pt_tile_desc_t, mem_desc_zero_pt_t>,
       arch_tag>;
   using scale_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_scale_t, scale_tile_desc_t, 1, arch_tag>;

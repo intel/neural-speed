@@ -136,7 +136,7 @@ class gemm_t<
   using matA_payload_t = subgroup::mem_payload_t<
       mem_desc_a_t,
       matA_tile_desc_t,
-      subgroup::msg_type_v<matA_tile_desc_t, mem_space_a>,
+      subgroup::msg_type_v<matA_tile_desc_t, mem_desc_a_t>,
       arch_tag>;
   using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
   using matA_prefetch_payload_t = subgroup::prefetch_payload_t<
@@ -157,7 +157,7 @@ class gemm_t<
   using matB_payload_t = subgroup::mem_payload_t<
       mem_desc_b_t,
       matB_tile_desc_t,
-      subgroup::msg_type_v<matB_tile_desc_t, mem_space_b>,
+      subgroup::msg_type_v<matB_tile_desc_t, mem_desc_b_t>,
       arch_tag>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_tile_desc_t>;
   using matB_prefetch_payload_t = subgroup::prefetch_payload_t<

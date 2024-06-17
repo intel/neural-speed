@@ -156,7 +156,7 @@ struct gru_layer {
   using mat_hidden_payload_t = mem_payload_t<
       mem_desc_a_t,
       matC_tile_desc_t,
-      msg_type_v<matC_tile_desc_t, mem_loc_input>,
+      msg_type_v<matC_tile_desc_t, mem_desc_a_t>,
       gpu_arch::XeHpc>;
   using matC_payload_t = mem_payload_t<
       mem_desc_c_t,

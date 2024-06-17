@@ -510,7 +510,6 @@ tile_store(tile_t& tile, payload_t& payload) {
 
           xetla_mask<num_channel> pred_y =
               channel_index < payload.height_in_elems;
-
           xetla_store_global<
               store_dtype,
               payload_t::simd_exec_size,

@@ -313,11 +313,12 @@ struct is_floating_to_integer {
       is_integral<typename T_dst::dtype>::value;
 };
 
-template <
-    typename tile_desc_,
-    mem_space memory_space,
-    mem_layout memory_layout = mem_layout::row_major>
+template <typename tile_desc_, typename mem_desc_>
 struct msg_type_query {
+  using dtype = mem_desc_::dtype;
+  static constexpr mem_layout memory_layout = mem_desc_::layout;
+  static constexpr mem_space memory_space = mem_desc_::space;
+
   static constexpr msg_type value = memory_space == mem_space::global
       ? (((tile_desc_::tile_size_y == 1 &&
            memory_layout == mem_layout::row_major) ||
@@ -331,12 +332,8 @@ struct msg_type_query {
              : msg_type::scatter);
 };
 
-template <
-    typename tile_desc_,
-    mem_space memory_space,
-    mem_layout memory_layout = mem_layout::row_major>
-constexpr msg_type msg_type_v =
-    msg_type_query<tile_desc_, memory_space, memory_layout>::value;
+template <typename tile_desc_, typename mem_desc_>
+constexpr msg_type msg_type_v = msg_type_query<tile_desc_, mem_desc_>::value;
 
 template <
     typename dtype,

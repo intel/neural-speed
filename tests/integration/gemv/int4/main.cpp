@@ -47,7 +47,7 @@ class test_col_major_1 {
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr gpu_arch arch = gpu_arch::XeHpc;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;

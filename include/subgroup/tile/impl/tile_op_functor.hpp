@@ -605,7 +605,7 @@ struct bias_add_op_t<
     using bias_payload_t = mem_payload_t<
         mem_desc_bias_t,
         bias_tile_desc_t,
-        msg_type_v<bias_tile_desc_t, mem_desc_bias_t::space>,
+        msg_type_v<bias_tile_desc_t, mem_desc_bias_t>,
         arch_tag>;
     coord_t bias_coord(coord.x, 0);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
@@ -727,7 +727,7 @@ struct scale_v_offset_v_op_t<
     using scale_payload_t = mem_payload_t<
         scale_mem_desc_t,
         scale_tile_desc_t,
-        msg_type_v<scale_tile_desc_t, scale_mem_desc_t::space>,
+        msg_type_v<scale_tile_desc_t, scale_mem_desc_t>,
         arch_tag>;
     coord_t scale_coord(coord.x, 0);
     scale_mem_desc_t scale_mem_desc(
@@ -743,7 +743,7 @@ struct scale_v_offset_v_op_t<
     using offset_payload_t = mem_payload_t<
         offset_mem_desc_t,
         offset_tile_desc_t,
-        msg_type_v<offset_tile_desc_t, offset_mem_desc_t::space>,
+        msg_type_v<offset_tile_desc_t, offset_mem_desc_t>,
         arch_tag>;
     coord_t offset_coord(coord.x, 0);
     offset_mem_desc_t offset_mem_desc(
@@ -847,7 +847,7 @@ struct scale_v_op_t<
     using scale_payload_t = mem_payload_t<
         scale_mem_desc_t,
         scale_tile_desc_t,
-        msg_type_v<scale_tile_desc_t, scale_mem_desc_t::space>,
+        msg_type_v<scale_tile_desc_t, scale_mem_desc_t>,
         arch_tag>;
     coord_t scale_coord(coord.x, 0);
     scale_mem_desc_t scale_mem_desc(
@@ -957,7 +957,7 @@ struct elemwise_reduce_op_t<
     using mat_in_payload_t = mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         arch_tag>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
@@ -998,7 +998,7 @@ struct elemwise_reduce_op_t<
       using mat_tail_in_payload_t = mem_payload_t<
           mem_desc_in_t,
           mat_tail_in_tile_desc_t,
-          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t::space>,
+          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t>,
           arch_tag>;
       using mat_tail_in_tile_acc_t = tile_t<dtype_acc, mat_tail_in_tile_desc_t>;
       mat_tail_in_tile_t mat_tail_in;
@@ -1085,7 +1085,7 @@ struct elemwise_reduce_op_stream_k_t<
     using mat_in_payload_t = mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         arch_tag>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
     mat_in_tile_t mat_in;
@@ -1200,7 +1200,7 @@ struct dropout_op_t<
     using mask_in_payload_t = mem_payload_t<
         mem_desc_mask_t,
         mask_in_tile_desc_t,
-        msg_type_v<mask_in_tile_desc_t, mem_desc_mask_t::space>,
+        msg_type_v<mask_in_tile_desc_t, mem_desc_mask_t>,
         arch_tag>;
     mem_desc_mask_t mem_desc_mask(args.base, args.shape, coord);
     mask_in_tile_t mask_in;
@@ -1298,7 +1298,7 @@ struct rng_dropout_op_t<
     using mask_out_payload_t = mem_payload_t<
         mem_desc_mask_t,
         mask_out_tile_desc_t,
-        msg_type_v<mask_out_tile_desc_t, mem_desc_mask_t::space>,
+        msg_type_v<mask_out_tile_desc_t, mem_desc_mask_t>,
         arch_tag>;
     if (args.prob == 0) {
       return;
@@ -1445,7 +1445,7 @@ struct linear_op_t<
     using mat_in_payload_t = mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         arch_tag>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
@@ -1489,7 +1489,7 @@ struct linear_op_t<
       using mat_tail_in_payload_t = mem_payload_t<
           mem_desc_in_t,
           mat_tail_in_tile_desc_t,
-          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t::space>,
+          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t>,
           arch_tag>;
       using mat_tail_in_tile_acc_t = tile_t<dtype_acc, mat_tail_in_tile_desc_t>;
 
