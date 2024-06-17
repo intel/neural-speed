@@ -164,6 +164,8 @@ void dequantize_gemm_run(uint32_t iter) {
   constexpr size_t matrix_m = Test::mat_m;
   constexpr size_t matrix_n = Test::mat_n;
   constexpr size_t matrix_k = Test::mat_k;
+
+  static constexpr mem_layout layout_b = Test::layout_b;
   constexpr uint32_t global_kslicing = Test::global_kslicing;
   constexpr uint32_t local_kslicing = Test::local_kslicing;
 
@@ -227,13 +229,15 @@ void dequantize_gemm_run(uint32_t iter) {
       compute_attr_t<data_type_acc_in, data_type_acc_in, data_type_acc>;
   using perf_tuning_knob = xetla::group::
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
+  
+  static constexpr quant_info quant_info{quant_mode::S4_ASYM, Test::dequant_s, layout_b};
+
   using compute_policy = xetla::group::compute_policy_int4_dequantize<
       compute_attr,
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_ASYM,
-      dequant_s,
+      quant_info,
       mma_engine::xmx,
       gpu_arch::XeHpg>;
   using gemm_t = xetla::group::
@@ -332,7 +336,7 @@ void dequantize_gemm_run(uint32_t iter) {
       .wait();
 
   // set up gemm arguments
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg(
+  typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg(
       matrix_m,
       matrix_k,
       matrix_n,

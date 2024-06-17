@@ -38,9 +38,9 @@ class test_col_major_1 {
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024 / 1;
-  static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_type = quant_mode::S4_ASYM;
-  static constexpr quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP;
+  static constexpr size_t dequant_s = 131072;
+  // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
+  static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -63,7 +63,7 @@ class test_col_major_2 {
   static constexpr size_t sg_m = 4;
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024;
-  static constexpr size_t dequant_s = 128;
+  static constexpr size_t dequant_s = 4096;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -120,7 +120,7 @@ int gemm_result_validate(
 }
 
 template <
-    quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -134,7 +134,7 @@ std::vector<fp16> convert_int4(
   int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     int8_t dequant_8bit = data_b & 0xf;
-    if constexpr (quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
       dequant_fp16[i] = scale * (dequant_8bit - 8);
     } else {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
@@ -147,7 +147,7 @@ std::vector<fp16> convert_int4(
 template <
     size_t dequant_s,
     mem_layout layout_b = mem_layout::col_major,
-    quant_mode quant_type = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -174,7 +174,7 @@ std::vector<data_type_acc_in> dequantize_weight(
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
       for (uint32_t jj = 0; jj < step; jj++) {
-        std::vector<fp16> dequant_fp16 = convert_int4<quant_type>(
+        std::vector<fp16> dequant_fp16 = convert_int4<quant_mode>(
             b[start_b_in + jj],
             scale[start_scale_in],
             zero_pt[start_zero_pt_in] >> (4 * (i % pack_radio)));
@@ -210,8 +210,8 @@ void dequantize_gemv_run(int iter) {
   constexpr size_t sg_tile_m = Test::sg_m;
   constexpr size_t sg_tile_n = Test::sg_n;
   constexpr size_t sg_tile_k = Test::sg_k;
-  constexpr size_t dequant_s = Test::dequant_s;
-  constexpr quant_mode quant_type = Test::quant_type;
+  constexpr size_t dequant_s = std::min(Test::dequant_s, matrix_k);
+  constexpr quant_mode quant_mode = Test::quant_mode;
   using data_type_a = typename Test::data_type_a;
   using data_type_b = typename Test::data_type_b;
   using data_type_c = typename Test::data_type_c;
@@ -287,14 +287,13 @@ void dequantize_gemv_run(int iter) {
       compute_attr_t<data_type_acc_in, data_type_acc_in, data_type_acc>;
   using perf_tuning_knob = xetla::group::
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
-
+  static constexpr quant_info quant_info{quant_mode, Test::dequant_s, layout_b};
   using compute_policy = xetla::group::compute_policy_int4_dequantize<
       compute_attr,
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      quant_type,
-      dequant_s,
+      quant_info,
       Test::mma_eng,
       Test::arch>;
 
@@ -474,10 +473,10 @@ void dequantize_gemv_run(int iter) {
       {// epilogue_args init list
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg;
-  if constexpr (compute_policy::quant_type == S4_FULLRANGE_NO_ZP) {
+  typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg;
+  if constexpr (compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
     gemm_arg =
-        typename gemm_op_t::template arguments_t<compute_policy::quant_type>(
+        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
             matrix_k,
             matrix_n,
@@ -492,9 +491,9 @@ void dequantize_gemv_run(int iter) {
             Acc_d,
             Cnt_d,
             epilogue_args);
-  } else if constexpr (compute_policy::quant_type == S4_ASYM) {
+  } else if constexpr (compute_policy::quant_mode == quant_mode::S4_ASYM) {
     gemm_arg =
-        typename gemm_op_t::template arguments_t<compute_policy::quant_type>(
+        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
             matrix_k,
             matrix_n,
@@ -513,11 +512,11 @@ void dequantize_gemv_run(int iter) {
             epilogue_args);
   }
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  // if (!gemm_op_t::can_implement(gemm_arg)) {
-  //   std::cout << "The arguments cannot be supported, aborting ... "
-  //             << std::endl;
-  //   FAIL();
-  // }
+  if (!gemm_op_t::can_implement(gemm_arg)) {
+    std::cout << "The arguments cannot be supported, aborting ... "
+              << std::endl;
+    FAIL();
+  }
 
   size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
   profiling_helper prof("dequantize_gemm", ops, "gflops");
@@ -553,7 +552,7 @@ void dequantize_gemv_run(int iter) {
   prof.print_profiling_result(profiling_selector::GPU);
   // check result
   std::vector<typename Test::data_type_a> dequantize_b =
-      dequantize_weight<dequant_s, layout_b, compute_policy::quant_type>(
+      dequantize_weight<dequant_s, layout_b, compute_policy::quant_mode>(
           matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
 
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();

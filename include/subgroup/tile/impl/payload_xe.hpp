@@ -65,11 +65,14 @@ struct mem_payload_t<
       mem_payload_t<mem_desc_t, tile_desc, msg_type::block_2d, arch_tag>;
 
  public:
-  static constexpr bool mem_transpose = memory_layout == mem_layout::col_major;
+  static constexpr bool mem_transpose =
+      memory_layout == mem_layout::col_major &&
+      !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
   static constexpr reg_layout register_layout = tile_desc::register_layout;
   static constexpr bool reg_transpose =
       register_layout == reg_layout::transpose_tiled;
+
   static constexpr bool trans = mem_transpose ^ reg_transpose;
 
   static constexpr bool mem_transform = (sizeof(dtype) < 4) && !mem_transpose &&

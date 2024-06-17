@@ -36,8 +36,7 @@ template <
     typename mem_desc_b_t_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    uint32_t dequant_s_,
-    quant_mode quant_type_,
+    quant_info quant_info_,
     mma_engine mma_engine_,
     typename pre_processing_t_,
     gpu_arch arch_tag_>
@@ -47,8 +46,7 @@ class gemm_t<
         perf_tuning_knob_,
         dtype_scale_,
         dtype_zero_pt_,
-        quant_type_,
-        dequant_s_,
+        quant_info_,
         mma_engine_,
         arch_tag_>,
     tile_shape_, // tile shape of workgroup-level gemm
@@ -66,8 +64,7 @@ class gemm_t<
       perf_tuning_knob_,
       dtype_scale_,
       dtype_zero_pt_,
-      quant_type_,
-      dequant_s_,
+      quant_info_,
       mma_engine_,
       arch_tag_>;
   static constexpr uint32_t k_stride = compute_policy::k_stride;
@@ -80,6 +77,7 @@ class gemm_t<
 
   constexpr static gpu_arch arch_tag = compute_policy::arch_tag;
   static constexpr uint32_t dequant_s = compute_policy::dequant_s;
+  static constexpr quant_mode quant_mode = compute_policy::quant_mode;
   using dtype_b = typename mem_desc_b_t::dtype;
   using dtype_zero_pt = typename compute_policy::dtype_zero_pt;
   static constexpr uint32_t pack_ratio = sizeof(dtype_b) * 2;
@@ -328,7 +326,7 @@ class gemm_t<
       scale_t,
       zero_pt_t,
       dequant_s,
-      quant_type_>;
+      quant_mode>;
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
   static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
@@ -531,7 +529,7 @@ class gemm_t<
       subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
           scale_prefetch_payload);
       if constexpr (
-          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+          compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
         // TODO 1D prefetch need pack to U32/U64
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             zero_pt_prefetch_payload);
@@ -545,7 +543,7 @@ class gemm_t<
         scale_prefetch_payload.template update_tdesc<update_dir_b>(
             scale_t::tile_size_y);
         if constexpr (
-            compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+            compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
           zero_pt_prefetch_payload
               .template update_tdesc<tdesc_update_dir::y_dir>(
                   zero_pt_t::tile_size_y);
@@ -575,7 +573,7 @@ class gemm_t<
       subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
           scale, scale_payload);
       if constexpr (
-          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+          compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
             zero_pt, zero_pt_payload);
       }
@@ -590,7 +588,7 @@ class gemm_t<
         subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
             scale_prefetch_payload);
         if constexpr (
-            compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+            compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
           // TODO 1D prefetch need pack to U32/U64
           subgroup::tile_prefetch<cache_hint::cached, cache_hint::cached>(
               zero_pt_prefetch_payload);
@@ -604,7 +602,7 @@ class gemm_t<
         scale_payload.template update_tdesc<update_dir_b>(scale_t::tile_size_y);
       }
       if constexpr (
-          compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+          compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
         if (tile_k_idx % zero_pt_addr_update_freq == 0) {
           zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
               zero_pt_t::tile_size_y);
@@ -619,7 +617,7 @@ class gemm_t<
           scale_prefetch_payload.template update_tdesc<tdesc_update_dir::y_dir>(
               scale_t::tile_size_y);
           if constexpr (
-              compute_policy::quant_type != quant_mode::S4_FULLRANGE_NO_ZP) {
+              compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
             zero_pt_prefetch_payload
                 .template update_tdesc<tdesc_update_dir::y_dir>(
                     zero_pt_t::tile_size_y);
@@ -717,7 +715,7 @@ class gemm_t<
   //                 (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
   //                 offset_x_in_tile;
 
-  //             if constexpr (compute_policy::quant_type ==
+  //             if constexpr (compute_policy::quant_mode ==
   //             quant_mode::S4_ASYM) {
   //               uint32_t zero_pt_idx =
   //                   offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
@@ -739,7 +737,7 @@ class gemm_t<
   //                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b +
   //                   ii) - zero_pt_i8;
   //             } else if constexpr (
-  //                 compute_policy::quant_type ==
+  //                 compute_policy::quant_mode ==
   //                 quant_mode::S4_FULLRANGE_NO_ZP) {
   //               cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
   //                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b +
@@ -791,7 +789,7 @@ class gemm_t<
         xetla_vector<uint8_t, block_size_x_b * block_size_y_b> cvt_blk;
 
         xetla_vector<int32_t, block_size_x_b * block_size_y_b> cvt_blk_i32;
-        if constexpr (compute_policy::quant_type == quant_mode::S4_ASYM) {
+        if constexpr (compute_policy::quant_mode == quant_mode::S4_ASYM) {
           auto zero_pt_vec = zero_pt.reg
                                  .xetla_select<zero_pt_t::block_size_x, 1>(
                                      scale_block_id * zero_pt_t::block_size_x)
@@ -815,7 +813,7 @@ class gemm_t<
                zero_pt_blk.xetla_format<int8_t>());
         }
         if constexpr (
-            compute_policy::quant_type == quant_mode::S4_FULLRANGE_NO_ZP) {
+            compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
           xetla_vector<int8_t, block_size_x_b * block_size_y_b> cvt_blk_i8;
           cvt_blk_i8.xetla_select<matB_t::block_elems, 2>(0) =
               matB_blk & 0x0f;

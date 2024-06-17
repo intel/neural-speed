@@ -621,13 +621,15 @@ void dequantize_gemm_run(int iter) {
   using perf_tuning_knob = xetla::group::
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
 
+  static constexpr quant_info quant_info{
+      quant_mode::S4_FULLRANGE_NO_ZP, Test::dequant_s, layout_b};
+
   using compute_policy = xetla::group::compute_policy_int4_dequantize<
       compute_attr,
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
-      dequant_s,
+      quant_info,
       Test::mma_eng,
       Test::arch>;
 
@@ -794,7 +796,7 @@ void dequantize_gemm_run(int iter) {
     }
     queue.memcpy((void*)gidx_d, (void*)gidx_h, size_gidx * sizeof(uint32_t))
         .wait();
-    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+    typename gemm_op_t::template arguments_t<compute_policy::quant_mode>
         gemm_arg(
             matrix_m,
             matrix_k,
@@ -901,7 +903,7 @@ void dequantize_gemm_run(int iter) {
     free(A_d_shuf, context);
   }
   if constexpr (Feature::feature == optional_feature::NONE) {
-    typename gemm_op_t::template arguments_t<compute_policy::quant_type>
+    typename gemm_op_t::template arguments_t<compute_policy::quant_mode>
         gemm_arg(
             matrix_m,
             matrix_k,

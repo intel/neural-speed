@@ -100,7 +100,7 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr bool reg_transpose = tile_desc::reg_transpose;
 
   static constexpr bool mem_transpose = payload_t::mem_transpose;
-  static constexpr bool trans = reg_transpose ^ mem_transpose;
+  static constexpr bool trans = payload_t::trans;
   static constexpr uint32_t scale_factor = payload_t::scale_factor;
 
   static constexpr bool mem_transform = payload_t::mem_transform;
@@ -535,9 +535,7 @@ tile_load(tile_t& tile, payload_t& payload) {
     // }
   }
 
-  if constexpr (
-      payload_t::trans &&
-      !(std::is_same_v<dtype, int4x2> || std::is_same_v<dtype, int4x8>)) {
+  if constexpr (payload_t::trans) {
     SW_BARRIER();
     tile_transpose(tile);
   }
@@ -604,9 +602,7 @@ tile_load(tile_t& tile, payload_t& payload) {
     }
   }
 
-  if constexpr (
-      payload_t::trans &&
-      !(std::is_same_v<dtype, int4x2> || std::is_same_v<dtype, int4x8>)) {
+  if constexpr (payload_t::trans) {
     SW_BARRIER();
     tile_transpose(tile);
   }

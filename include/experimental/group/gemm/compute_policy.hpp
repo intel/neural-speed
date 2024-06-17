@@ -31,8 +31,7 @@ template <
     typename perf_tuning_knob_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    quant_mode quant_type_,
-    uint32_t dequant_s_,
+    quant_info quant_info_,
     mma_engine mma_engine_ = mma_engine::xmx,
     gpu_arch arch_tag_ = gpu_arch::XeHpc,
     typename enable = void>
@@ -44,8 +43,7 @@ template <
     typename perf_tuning_knob_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    quant_mode quant_type_,
-    int dequant_s_,
+    quant_info quant_info_,
     mma_engine mma_engine_,
     gpu_arch arch_tag_>
 struct compute_policy_int4_dequantize<
@@ -53,8 +51,7 @@ struct compute_policy_int4_dequantize<
     perf_tuning_knob_,
     dtype_scale_,
     dtype_zero_pt_,
-    quant_type_,
-    dequant_s_,
+    quant_info_,
     mma_engine_,
     arch_tag_,
     std::enable_if_t<mma_engine_ == mma_engine::xmx>> {
@@ -70,17 +67,17 @@ struct compute_policy_int4_dequantize<
   static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
-  static_assert(arch_has_xmx<arch_tag>(), "XeLpg does not support xmx");
+  static_assert(arch_has_xmx<arch_tag>, "XeLpg does not support xmx");
 
   static constexpr bool is_int4_matB_policy = true;
 
-  static constexpr uint32_t dequant_s = dequant_s_;
+  static constexpr uint32_t dequant_s = quant_info_.dequant_s;
   static_assert(
       (dequant_s % (32 / sizeof(dtype_mma_b))) == 0,
       "dequant_s should be a multiply of 32B");
   using dtype_scale = dtype_scale_;
   using dtype_zero_pt = dtype_zero_pt_;
-  static constexpr quant_mode quant_type = quant_type_;
+  static constexpr quant_mode quant_mode = quant_info_.quant_mode;
 
   static constexpr uint32_t block_size_y_a = 16;
   using mma_attr = mma_attr_t<arch_tag_, block_size_y_a>;
@@ -103,8 +100,7 @@ template <
     typename perf_tuning_knob_,
     typename dtype_scale_,
     typename dtype_zero_pt_,
-    quant_mode quant_type_,
-    int dequant_s_,
+    quant_info quant_info_,
     mma_engine mma_engine_,
     gpu_arch arch_tag_>
 struct compute_policy_int4_dequantize<
@@ -112,8 +108,7 @@ struct compute_policy_int4_dequantize<
     perf_tuning_knob_,
     dtype_scale_,
     dtype_zero_pt_,
-    quant_type_,
-    dequant_s_,
+    quant_info_,
     mma_engine_,
     arch_tag_,
     std::enable_if_t<mma_engine_ == mma_engine::fpu>> {
@@ -131,20 +126,22 @@ struct compute_policy_int4_dequantize<
 
   static constexpr bool is_int4_matB_policy = true;
 
-  static constexpr uint32_t dequant_s = dequant_s_;
+  static constexpr uint32_t dequant_s = quant_info_.dequant_s;
   static_assert(
       (dequant_s % (32 / sizeof(dtype_mma_b))) == 0,
       "dequant_s should be a multiply of 32B");
   using dtype_scale = dtype_scale_;
   using dtype_zero_pt = dtype_zero_pt_;
-  static constexpr quant_mode quant_type = quant_type_;
+  static constexpr quant_mode quant_mode = quant_info_.quant_mode;
+  static constexpr bool is_col_major_b =
+      quant_info_.weight_mem_layout == mem_layout::col_major;
 
-  static constexpr uint32_t block_size_y_a = 4;
-  static constexpr uint32_t block_bytes_x_a = 256;
+  static constexpr uint32_t block_size_y_a = is_col_major_b ? 8 : 16;
+  static constexpr uint32_t block_bytes_x_a = is_col_major_b ? 256 : 32;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_x_b = 1;
-  static constexpr uint32_t block_bytes_y_b = 256;
+  static constexpr uint32_t block_size_x_b = is_col_major_b ? 1 : 32;
+  static constexpr uint32_t block_bytes_y_b = is_col_major_b ? 256 : 32;
   static constexpr uint32_t block_size_y_b =
       block_bytes_y_b / sizeof(dtype_mma_b);
 
