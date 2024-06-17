@@ -30,11 +30,6 @@ template <
     uint32_t sg_n,
     uint32_t sg_m>
 struct softmax_bwd_test_func {
-  using mem_desc_in_t =
-      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
-  using mem_desc_out_t =
-      mem_desc_t<dtype_out, mem_layout::row_major, mem_space::global>;
-
   using tile_shape = group::tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
   using work_group_t = typename tile_shape::work_group_t;
   static constexpr uint32_t wg_size_x = tile_shape::wg_size_x;
@@ -61,17 +56,21 @@ struct softmax_bwd_test_func {
       reg_layout::tiled>;
   using matAcc_t = subgroup::tile_t<dtype_acc, tile_desc_t>;
   using mat_in_t = subgroup::tile_t<dtype_in, tile_desc_t>;
+  using mem_desc_in_t =
+      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
   using mat_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
+      mem_desc_in_t,
       tile_desc_t,
-      subgroup::msg_type_v<tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<tile_desc_t, mem_desc_in_t>,
       gpu_arch::XeHpc>;
 
   using mat_out_t = subgroup::tile_t<dtype_in, tile_desc_t>;
+  using mem_desc_out_t =
+      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>;
   using mat_out_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_in, mem_layout::row_major, mem_space::global>,
+      mem_desc_out_t,
       tile_desc_t,
-      (tile_size_y > 1) ? msg_type::block_2d : msg_type::block_1d,
+      subgroup::msg_type_v<tile_desc_t, mem_desc_out_t>,
       gpu_arch::XeHpc>;
 
   using softmax_bwd_t = group::softmax_t<

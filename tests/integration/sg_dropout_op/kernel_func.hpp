@@ -66,7 +66,7 @@ struct dropout_func_t {
   using mat_in_payload_t = subgroup::mem_payload_t<
       mem_desc_in_t,
       tile_desc_t,
-      subgroup::msg_type_v<tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<tile_desc_t, mem_desc_in_t>,
       gpu_arch::XeHpc>;
 
   using tile_op_t = typename std::conditional<

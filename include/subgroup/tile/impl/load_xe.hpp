@@ -213,7 +213,6 @@ tile_load(tile_t& tile, payload_t& payload) {
             trans,
             mem_transform,
             arch_tag>(tdesc);
-
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
               .xetla_format<native_type_t<load_dtype>>() =

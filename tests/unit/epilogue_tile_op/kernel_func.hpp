@@ -41,7 +41,7 @@ struct tile_elemwise_op_func {
   using matA_payload_t = mem_payload_t<
       mem_desc_c_t,
       matA_tile_desc_t,
-      msg_type_v<matA_tile_desc_t, mem_space::global>,
+      msg_type_v<matA_tile_desc_t, mem_desc_c_t>,
       gpu_arch::XeHpc>;
   using tile_shape = tile_shape_t<twidth, theight, twidth, theight>;
 
@@ -95,7 +95,7 @@ struct tile_elemwise_op_func<
   using matA_payload_t = mem_payload_t<
       mem_desc_b_t,
       matA_tile_desc_t,
-      msg_type_v<matA_tile_desc_t, mem_space::global>,
+      msg_type_v<matA_tile_desc_t, mem_desc_b_t>,
       gpu_arch::XeHpc>;
   using tile_shape = tile_shape_t<twidth, theight, twidth, theight>;
   using epilogue_policy = epilogue_policy_tile_op<
@@ -150,7 +150,7 @@ struct tile_elemwise_op_func<
   using matA_payload_t = mem_payload_t<
       mem_desc_c_t,
       matA_tile_desc_t,
-      msg_type_v<matA_tile_desc_t, mem_space::global>,
+      msg_type_v<matA_tile_desc_t, mem_desc_c_t>,
       gpu_arch::XeHpc>;
   using tile_shape = tile_shape_t<twidth, theight, twidth, theight>;
   using epilogue_policy = epilogue_policy_tile_op<
