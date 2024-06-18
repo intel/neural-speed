@@ -320,7 +320,7 @@ struct layer_norm_fwd_t<
         itr_count += 1;
         nbarrier.wait();
 
-        xetla_vector<dtype_acc, wg_size_x * 2> mu_m2_vec =
+        xetla_vector<dtype_acc, wg_size_x* 2> mu_m2_vec =
             xetla_load_local<dtype_acc, wg_size_x * 2>(slm_load_base);
         xetla_vector<dtype_acc, wg_size_x> mu_vec =
             mu_m2_vec.xetla_select<wg_size_x, 2>(0);
