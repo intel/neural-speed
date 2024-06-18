@@ -56,7 +56,7 @@ class Launcher {
     int ldb = _param.paramB.ldb;
     int ldc = _param.paramC.ldc;
     int m_pad = utils::padto(utils::updiv(m, GemmCore::TileM), GemmCore::WgM);
-    sycl::range<2> problem{m_pad, static_cast<size_t>(n) / GemmCore::TileN};
+    sycl::range<2> problem{static_cast<size_t>(m_pad), static_cast<size_t>(n) / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
       cgh.parallel_for(
@@ -148,7 +148,7 @@ class LauncherWOQ {
     int ldb = _param.paramB.ldb;
     int ldc = _param.paramC.ldc;
     int m_pad = utils::padto(utils::updiv(m, GemmCore::TileM), GemmCore::WgM);
-    sycl::range<2> problem{m_pad, static_cast<size_t>(n) / GemmCore::TileN};
+    sycl::range<2> problem{static_cast<size_t>(m_pad), static_cast<size_t>(n) / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
       cgh.parallel_for(
