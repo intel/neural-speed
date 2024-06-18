@@ -107,7 +107,7 @@ class WeightS4 {
     int nsg_k = k / GroupK;
     int nsg_n = n / GroupN;
     sycl::range<1> group{SgSize};
-    sycl::range<1> problem{nsg_n * nsg_k * SgSize};
+    sycl::range<1> problem{static_cast<size_t>(nsg_n) * nsg_k * SgSize};
     auto B_d = in.B;
     auto S_d = in.scale;
     int ldb = in.ldb;
@@ -204,7 +204,7 @@ class WeightS4Trans {
     int nsg_k = k / GroupK;
     int nsg_n = n / GroupN;
     sycl::range<1> group{SgSize};
-    sycl::range<1> problem{nsg_n * nsg_k * SgSize};
+    sycl::range<1> problem{static_cast<size_t>(nsg_n) * nsg_k * SgSize};
     auto B_d = in.B;
     auto S_d = in.scale;
     int ldb = in.ldb;
@@ -255,7 +255,7 @@ class WeightS4Trans {
     int nsg_k = k / GroupK;
     int nsg_n = n / GroupN;
     sycl::range<1> group{SgSize};
-    sycl::range<1> problem{nsg_n * nsg_k * SgSize};
+    sycl::range<1> problem{static_cast<size_t>(nsg_n) * nsg_k * SgSize};
     auto B_d = in.B;
     auto S_d = in.scale;
     int ldb = in.ldb;
