@@ -42,7 +42,7 @@ class Benchmark_Fp32Fp32 {
     auto C_d = C;
     auto psize = (size_t)m * n * k * 2;
     sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
-    sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+    sycl::range<2> problem{static_cast<size_t>(m) / SGemmT::TileM, static_cast<size_t>(n) / SGemmT::TileN};
     utils::GemmProblem gp(1, m, n, k);
     tm.start();
     while (tm.stop() < timems) {
@@ -194,7 +194,7 @@ class Benchmark_S4Fp32Fp32 {
     auto C_d = C;
     auto psize = (size_t)m * n * k * 2;
     sycl::range<2> group{SGemmT::WgM, SGemmT::WgN};
-    sycl::range<2> problem{m / SGemmT::TileM, n / SGemmT::TileN};
+    sycl::range<2> problem{static_cast<size_t>(m) / SGemmT::TileM, static_cast<size_t>(n) / SGemmT::TileN};
     utils::GemmProblem gp(1, m, n, k);
     tm.start();
     while (tm.stop() < timems) {
@@ -259,7 +259,7 @@ class Benchmark_S4Fp32Fp32 {
         int constexpr TileK = 32;
         int constexpr GroupK = SgSize * TileK;
         sycl::range<1> group{SgSize};
-        sycl::range<1> problem{n * SgSize};
+        sycl::range<1> problem{static_cast<size_t>(n) * SgSize};
         auto ev = ProBTransT<SGemmT>::gemv(A_d, {B_d, S_d, blks}, C_d, n, k, blocksize, q);
         ev.wait();
         log.add(event_helper::execute_time(ev) * 1000);
@@ -367,7 +367,7 @@ class Benchmark_S4Fp16Fp16 {
     double flops = double(psize) / log.min_val / 1e6;
     printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
   }
-
+#if 0
   template <typename LOG_T>
   void benchmark_gemmT(int m, int n, int k, int blocksize, int batch, AType* A, uint8_t* B, BType* B_scale, CType* C,
                        float timems) {
@@ -425,6 +425,7 @@ class Benchmark_S4Fp16Fp16 {
     double flops = double(psize) / log.min_val / 1e6;
     printf(" %s Flops:%.3f\n", log.get_log_str(), flops);
   }
+#endif
   template <typename LOG_T>
   void benchmark_gemv_T2(int m, int n, int k, int blocksize, int batch, AType* A, uint8_t* B, BType* B_scale, CType* C,
                          float timems) {
