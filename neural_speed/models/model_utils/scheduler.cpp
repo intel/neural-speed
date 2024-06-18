@@ -15,7 +15,7 @@
 #include "models/model_utils/scheduler.h"
 
 // Iter_level_worker
-Iter_level_worker::Iter_level_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_params(params)) {
+Iter_level_worker::Iter_level_worker(const gpt_params& params) : m_ctx(model_init_from_gpt_params(params, nullptr)) {
   if (m_ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model.\n", __func__);
     exit(0);

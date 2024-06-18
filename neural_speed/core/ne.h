@@ -120,6 +120,18 @@ struct ne_scratch {
 // ne context
 //
 
+#define MAX_SYCL_BUFFER_SIZE (4ull << 30)  // 4GB
+#define MAX_SYCL_BUFFER_COUNT 64           // 32*4GB=128GB
+
+struct ne_sycl_context {
+  void* dev = NULL;
+  void* queue = NULL;
+  int n_buffers = 0;
+  void* buffers[MAX_SYCL_BUFFER_COUNT];
+  size_t offs[MAX_SYCL_BUFFER_COUNT];
+  size_t sizes[MAX_SYCL_BUFFER_COUNT];
+};
+
 struct ne_context {
   size_t mem_size;
   void* mem_buffer;
@@ -134,12 +146,7 @@ struct ne_context {
   struct ne_scratch scratch;
   struct ne_scratch scratch_save;
 
-  void* dev_queue;
-  void* dev_mem_buffer;
-  bool dev_mem_owned;
-  bool dev_no_alloc;
-  size_t dev_size;
-  size_t dev_offs;
+  ne_sycl_context* dev_ctx;
 };
 
 struct ne_context_container {

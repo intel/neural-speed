@@ -134,16 +134,18 @@ int main(int argc, char** argv) {  // NOLINT
   if (params.random_prompt) {
     params.prompt = gpt_random_prompt(rng);
   }
+  bestla_set_threads(params.n_threads);
 
   model_init_backend();
-  bestla_set_threads(params.n_threads);
+  ne_sycl_context* dev_ctx = model_init_sycl(false);
+
   model_context* ctx;
   g_ctx = &ctx;
-
   // load the model and apply lora adapter, if any
-  ctx = model_init_from_gpt_params(params);
+  ctx = model_init_from_gpt_params(params, dev_ctx);
   if (ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model\n", __func__);
+    model_release_sycl(dev_ctx);
     return 1;
   }
 

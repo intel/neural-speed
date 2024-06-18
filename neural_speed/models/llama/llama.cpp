@@ -140,11 +140,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   };
 
   struct ne_context* ctx0 = ne_init(params);
-  ctx0->dev_queue = ctx->device_queue;
-  ctx0->dev_mem_buffer = ctx->device_buffer;
-  ctx0->dev_mem_owned = false;
-  ctx0->dev_size = ctx->device_buffer_size;
-  ctx0->dev_offs = ctx->device_buffer_offs;
+  ctx0->dev_ctx = ctx->dev_ctx;
 
   // for big prompts, if BLAS is enabled, it is better to use only one thread
   // otherwise, the threads are spin-lock waiting for the BLAS calls and are degrading the performance
@@ -191,8 +187,12 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
 
   struct ne_tensor* inpL = ne_get_rows(ctx0, model.others[0], embd);
-  inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_SYCL);
+  int gpu_layer_start = n_layer - model.kv_self.n_gpu_layer;
   for (int il = 0; il < n_layer; ++il) {
+    bool cpu_layer = il < gpu_layer_start;
+    if (!cpu_layer) {
+      inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_SYCL);
+    }
     struct ne_tensor* inpSA = inpL;
 
     struct ne_tensor* cur;
@@ -237,7 +237,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     }
 #if SYCL_NDEBUG
 #ifdef NS_SYCL
-    if (infer_groups.size() == 1 && batch_size == 1 && !is_ring_full) {
+    if (!cpu_layer && infer_groups.size() == 1 && batch_size == 1 && !is_ring_full) {
       Qcur = ne_rope_inplace(ctx0, Qcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
       Kcur = ne_rope_inplace(ctx0, Kcur, n_past, n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
       const int attn_sl = n_tokens[infer_groups[0].front()];
@@ -283,7 +283,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #else
       Qcur = ne_permute(ctx0, Qcur, 0, 2, 1, 3);  // [heads, N, head_size]
 
-     
       Qcur = ne_device_sync(ctx0, Qcur, NE_BACKEND_CPU);
       k_cache = ne_device_sync(ctx0, k_cache, NE_BACKEND_CPU);
       v_cache = ne_device_sync(ctx0, v_cache, NE_BACKEND_CPU);
@@ -593,8 +592,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 #endif
 #endif
     lctx.use_buf(ctx0, 1);
-    cur = ne_device_sync(ctx0, cur, NE_BACKEND_SYCL);
-    inpSA = ne_device_sync(ctx0, inpSA, NE_BACKEND_SYCL);
     struct ne_tensor* inpFF = ne_add(ctx0, cur, inpSA);
 
     // feed-forward network

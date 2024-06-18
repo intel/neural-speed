@@ -23,6 +23,32 @@ namespace sycl_device {
 
 class SyclDevice {
  public:
+  SyclDevice(int gpu_idx, bool profile) {
+    // Create an exception handler for asynchronous SYCL exceptions
+    static auto exception_handler = [](sycl::exception_list e_list) {
+      for (std::exception_ptr const& e : e_list) {
+        try {
+          std::rethrow_exception(e);
+        } catch (std::exception const& e) {
+#if _DEBUG
+          std::cout << "Failure" << std::endl;
+#endif
+          std::terminate();
+        }
+      }
+    };
+    auto devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+    assert(gpu_idx < devices.size());
+
+    if (profile) {
+      sycl::property_list prop = {sycl::property::queue::enable_profiling(), sycl::property::queue::in_order()};
+      mQueue = sycl::queue(devices[gpu_idx], exception_handler, prop);
+    } else {
+      sycl::property_list prop = {sycl::property::queue::in_order()};
+      mQueue = sycl::queue(devices[gpu_idx], exception_handler);
+    }
+  }
+
   SyclDevice(bool profile) {
     // Create an exception handler for asynchronous SYCL exceptions
     static auto exception_handler = [](sycl::exception_list e_list) {
@@ -37,7 +63,6 @@ class SyclDevice {
         }
       }
     };
-
     auto d_selector{sycl::default_selector_v};
     if (profile) {
       sycl::property_list prop = {sycl::property::queue::enable_profiling(), sycl::property::queue::in_order()};
@@ -53,8 +78,10 @@ class SyclDevice {
   inline std::string getName() { return mQueue.get_device().get_info<sycl::info::device::name>(); };
 
   size_t getGlobalMemSize() { return mQueue.get_device().get_info<sycl::info::device::global_mem_size>(); }
+  size_t getMaxMemAllocSize() { return mQueue.get_device().get_info<sycl::info::device::max_mem_alloc_size>(); }
 
   double getGlobalMemSizeGB() { return double(getGlobalMemSize()) / 1e9; }
+  double getMaxMemAllocSizeMB() { return double(getGlobalMemSize()) / 1e6; }
 
   static inline bool is_cpu(const sycl::device& dev) {
     return dev.get_info<sycl::info::device::device_type>() == sycl::info::device_type::cpu;
@@ -87,6 +114,7 @@ class SyclDevice {
                 << mQueue.get_device().get_info<sycl::ext::intel::info::device::gpu_subslices_per_slice>() << "\n";
     }
     std::cout << "Global Memory size: " << getGlobalMemSizeGB() << "\n";
+    std::cout << "Global Memory size: " << getMaxMemAllocSize() << "\n";
   }
   sycl::queue mQueue;
 };

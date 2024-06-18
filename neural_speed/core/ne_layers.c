@@ -581,7 +581,9 @@ int ne_nrows(const struct ne_tensor* tensor) {
 
 size_t ne_nbytes(const struct ne_tensor* tensor) {
   static_assert(NE_MAX_DIMS == 4, "NE_MAX_DIMS is not 4 - update this function");
-
+  if (tensor->type == NE_TYPE_BTLA) {
+    return tensor->size;
+  }
   return (ne_nelements(tensor) * NE_TYPE_SIZE[tensor->type]) / NE_BLCK_SIZE[tensor->type];
 }
 
@@ -913,22 +915,28 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
     }
     size_needed = ((size_needed + SYCL_ALIGN - 1) / SYCL_ALIGN) * SYCL_ALIGN;
   }
-  if (dptr == NULL) {
-    dptr = (char* const)ctx->dev_mem_buffer + ctx->dev_offs;
+  int buf_idx = -1;
+  for (int i = 0; i < ctx->dev_ctx->n_buffers; i++) {
+    if (ctx->dev_ctx->offs[i] + size_needed <= ctx->dev_ctx->sizes[i]) {
+      buf_idx = i;
+      break;
+    }
   }
-
-  if (ctx->dev_offs + size_needed > ctx->dev_size) {
-    NE_PRINT(
-        "%s: %d device memory pool is not enough(current %zu MB, ctx->scratch.size available %zu MB), please "
-        "increase\n",
-        __func__, __LINE__, (ctx->dev_offs + size_needed) / 1024 / 1024, ctx->dev_size / 1024 / 1024);
+  if (buf_idx == -1) {
+    NE_PRINT("%s: %d device memory pool is not enough, please increase\n", __func__, __LINE__);
     assert(false);
     return NULL;
   }
-  ctx->dev_offs += size_needed;
-
+  if (dptr == NULL) {
+    dptr = (char* const)ctx->dev_ctx->buffers[buf_idx] + ctx->dev_ctx->offs[buf_idx];
+    ctx->dev_ctx->offs[buf_idx] += size_needed;
+  }
+  size_t obj_size = sizeof(struct ne_tensor);
+  if (type == NE_TYPE_BTLA) {
+    obj_size += bestla_device_storage_size();
+  }
   if (ctx->scratch.data == NULL) {
-    if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
+    if (cur_end + obj_size + NE_OBJECT_SIZE > ctx->mem_size) {
       NE_PRINT(
           "%s: %d Context's memory pool is not enough(current %zu MB, ctx->mem_size available %zu MB), please increase "
           "the scratch_size_ratio.\n",
@@ -939,7 +947,7 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
 
     *obj_new = (struct ne_object){
         .offs = cur_end + NE_OBJECT_SIZE,
-        .size = sizeof(struct ne_tensor) + bestla_device_storage_size(),
+        .size = obj_size,
         .next = NULL,
     };
   } else {
@@ -949,13 +957,18 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
       assert(false);
       return NULL;
     }
-
     *obj_new = (struct ne_object){
         .offs = cur_end + NE_OBJECT_SIZE,
         .size = sizeof(struct ne_tensor),
         .next = NULL,
     };
     if (type == NE_TYPE_BTLA) {
+      if (ctx->scratch.offs + bestla_device_storage_size() > ctx->scratch.size) {
+        NE_PRINT("%s: %d not enough space in the context's memory pool (needed %zu, ctx->mem_size available %zu)\n",
+                 __func__, __LINE__, cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE, ctx->mem_size);
+        assert(false);
+        return NULL;
+      }
       data = (char* const)ctx->scratch.data + ctx->scratch.offs;
       ctx->scratch.offs += bestla_device_storage_size();
     }
@@ -1003,7 +1016,6 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
   if (result->data == data) {
     result->size = size;
   }
-
   for (int i = 0; i < n_dims; i++) {
     result->ne[i] = ne[i];
   }
@@ -11899,7 +11911,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
                                        /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
                                        /*.dev_wsize =*/cgraph->dev_work ? cgraph->dev_work_size : 0,
                                        /*.dev_wdata =*/cgraph->dev_work ? cgraph->dev_work->data : NULL,
-                                       /*.dev_queue =*/ctx->dev_queue};
+                                       /*.dev_queue =*/ctx->dev_ctx->queue};
 
     bestla_parallel_for(ne_compute_forward, &params, node);
 #if NE_DEBUG
