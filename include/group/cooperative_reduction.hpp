@@ -95,7 +95,7 @@ class cooperative_reduce_t<
   static constexpr uint32_t block_size_x =
       gpu::xetla::subgroup::detail::gcd<tile_size_x, src_block_size_x>::value;
   static constexpr uint32_t block_size_y =
-      (tile_size_y > src_block_size_y) ? src_block_size_y : tile_size_y;
+      std::min(src_block_size_y, tile_size_y);
 
   using local_st_tile_desc_t = subgroup::tile_desc_t<
       sg_tile_n,

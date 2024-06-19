@@ -163,23 +163,21 @@ template <
     typename tile_t>
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::local>
-process_1d_tail(
-    tile_t& tile,
-    payload_t& payload,
-    uint32_t offset,
-    uint32_t address_offset) {
-  using mem_dtype = typename payload_t::mem_dtype;
+process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
+  using dtype = typename payload_t::dtype;
   if constexpr (remained_len >= base_len) {
-    auto reg_sub =
-        tile.reg.xetla_select<base_len * payload_t::scale_factor, 1>(offset);
+    uint32_t address_offset = offset * sizeof(dtype);
+    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(offset);
     if constexpr (flag == process_flag::load) {
-      reg_sub.xetla_format<mem_dtype>() =
-          xetla_load_local<mem_dtype, base_len, data_size::default_size>(
-              payload.base_address + payload.address + address_offset);
+      reg_sub.xetla_format<dtype>() = xetla_load_local<
+          dtype,
+          base_len / sizeof(dtype),
+          data_size::default_size>(
+          payload.base_address + payload.address + address_offset);
     } else {
-      xetla_store_local<mem_dtype, base_len>(
+      xetla_store_local<dtype, base_len / sizeof(dtype)>(
           payload.base_address + payload.address + address_offset,
-          reg_sub.xetla_format<mem_dtype>());
+          reg_sub.xetla_format<dtype>());
     }
     process_1d_tail<
         remained_len - base_len,
@@ -188,13 +186,7 @@ process_1d_tail(
         L1,
         L2,
         payload_t,
-        tile_t>(
-        tile,
-        payload,
-        offset + base_len * payload_t::scale_factor,
-        address_offset +
-            base_len * payload_t::scale_factor *
-                sizeof(typename tile_t::dtype));
+        tile_t>(tile, payload, offset + base_len);
   } else {
     process_1d_tail<
         remained_len,
@@ -203,7 +195,7 @@ process_1d_tail(
         L1,
         L2,
         payload_t,
-        tile_t>(tile, payload, offset, address_offset);
+        tile_t>(tile, payload, offset);
   }
 }
 
