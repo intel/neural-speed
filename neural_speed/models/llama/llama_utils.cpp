@@ -94,9 +94,11 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   size_t ctx_size;
   size_t mmapped_size;
   ml->calc_sizes(&ctx_size, &mmapped_size);
+  int n_cpu_layer = n_layer - n_gpu_layer;
+  n_cpu_layer = n_cpu_layer < 0 ? 0 : n_cpu_layer;
   fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
-  auto host_size = (ctx_size + (50 << 20)) * (n_layer - n_gpu_layer) / n_layer;
-  auto device_size = (ctx_size + (50 << 20)) * (n_gpu_layer) / n_layer;
+  auto host_size = (ctx_size + (50 << 20)) * n_cpu_layer / n_layer + n_embd * n_vocab * sizeof(float);
+  auto device_size = (ctx_size + (50 << 20)) * n_gpu_layer / n_layer + n_embd * n_vocab * sizeof(float);
   fprintf(stderr, "%s: host ctx size   = %7.2f MB\n", __func__, host_size / 1024.0 / 1024.0);
   fprintf(stderr, "%s: device ctx size   = %7.2f MB\n", __func__, device_size / 1024.0 / 1024.0);
 

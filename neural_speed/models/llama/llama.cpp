@@ -147,7 +147,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
   ne_cgraph gf = {};
   gf.n_threads = N >= 32 && ne_cpu_has_blas() ? 1 : n_threads;
 
-  const bool run_mha_reordered = kv_self.k->type == NE_TYPE_BTLA;
+  const bool run_mha_reordered = kv_self.k ? kv_self.k->type == NE_TYPE_BTLA : false;
   kv_cache_info_t kv_cache_info = {0, 0};
   if (run_mha_reordered) {
     NE_ASSERT(kv_self.v->type == NE_TYPE_BTLA);  // kv type should be the same
@@ -251,10 +251,10 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
       Kcur = ne_permute(ctx0, Kcur, 0, 2, 1, 3);  // [heads, N, head_size]
       Vcur = ne_permute(ctx0, Vcur, 1, 2, 0, 3);  // [heads, head_size, N]
 
-      struct ne_tensor* k_cache = ne_view_1d(ctx0, kv_self.k, n_ctx * n_embd_gqa * kv_n_ctx_block,
-                                             il * n_ctx * ne_element_size(kv_self.k) * n_embd_gqa * kv_n_ctx_block);
-      struct ne_tensor* v_cache = ne_view_1d(ctx0, kv_self.v, n_ctx * n_embd_gqa * kv_n_ctx_block,
-                                             il * n_ctx * ne_element_size(kv_self.v) * n_embd_gqa * kv_n_ctx_block);
+      struct ne_tensor* k_cache = ne_view_1d(ctx0, kv_self.k_d, n_ctx * n_embd_gqa * kv_n_ctx_block,
+                                             il * n_ctx * ne_element_size(kv_self.k_d) * n_embd_gqa * kv_n_ctx_block);
+      struct ne_tensor* v_cache = ne_view_1d(ctx0, kv_self.v_d, n_ctx * n_embd_gqa * kv_n_ctx_block,
+                                             il * n_ctx * ne_element_size(kv_self.v_d) * n_embd_gqa * kv_n_ctx_block);
       // store key and value to memory
       {
         struct ne_tensor* k_cache_view = ne_view_4d(
