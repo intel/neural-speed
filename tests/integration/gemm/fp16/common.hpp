@@ -52,7 +52,7 @@ class TestBase {
 class Test0 : public TestBase {
  public:
   static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 1280;
+  static constexpr size_t mat_n = 64;
   static constexpr size_t mat_k = 8192;
   static constexpr size_t wg_m = 8;
   static constexpr size_t wg_n = 32;

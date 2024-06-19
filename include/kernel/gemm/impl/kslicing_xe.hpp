@@ -427,12 +427,8 @@ class gemm_universal_t<
     int start_n = group_swizzle.template get_tile_idx<2>(item) * wg_tile_n;
     int start_k = 0;
     uint32_t wg_tile_k = args.matrix_k;
-    uint32_t boundary_n = (start_n + wg_tile_n) > args.matrix_n
-        ? args.matrix_n
-        : (start_n + wg_tile_n);
-    uint32_t boundary_m = (start_m + wg_tile_m) > args.matrix_m
-        ? args.matrix_m
-        : (start_m + wg_tile_m);
+    uint32_t boundary_n = std::min(start_n + wg_tile_n, args.matrix_n);
+    uint32_t boundary_m = std::min(start_m + wg_tile_m, args.matrix_m);
     uint32_t boundary_k = wg_tile_k;
     if constexpr (num_global_kslicing > 1) {
       wg_tile_k = (wg_tile_k + num_global_kslicing - 1) / num_global_kslicing;

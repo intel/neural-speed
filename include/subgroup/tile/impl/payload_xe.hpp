@@ -435,9 +435,15 @@ struct mem_payload_t<
   uint64_t base_offset;
   dtype* base_ptr;
   uint32_t pitch_in_bytes;
+  uint32_t height_in_elems;
+  uint32_t width_in_elems;
+  uint32_t payload_bytes;
 
   inline mem_payload_t(mem_desc_t& mem_tdesc) {
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
+    width_in_elems = mem_tdesc.shape.x;
+    height_in_elems = mem_tdesc.shape.y;
+    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
     base_offset = mem_transpose
@@ -448,14 +454,17 @@ struct mem_payload_t<
 
   inline mem_payload_t(
       dtype* p,
-      [[maybe_unused]] int surface_width,
-      [[maybe_unused]] int surface_height,
+      int surface_width,
+      int surface_height,
       int surface_pitch,
       int surface_offset_x,
       int surface_offset_y) {
     pitch_in_bytes = surface_pitch * sizeof(dtype);
     uint32_t offset_x = surface_offset_x;
     uint32_t offset_y = surface_offset_y;
+    width_in_elems = surface_width;
+    height_in_elems = surface_height;
+    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
@@ -466,6 +475,9 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
+    width_in_elems = mem_tdesc.shape.x;
+    height_in_elems = mem_tdesc.shape.y;
+    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
@@ -474,14 +486,17 @@ struct mem_payload_t<
 
   __XETLA_API void init(
       dtype* p,
-      [[maybe_unused]] int surface_width,
-      [[maybe_unused]] int surface_height,
+      int surface_width,
+      int surface_height,
       int surface_pitch,
       int surface_offset_x,
       int surface_offset_y) {
     pitch_in_bytes = surface_pitch * sizeof(dtype);
     uint32_t offset_x = surface_offset_x;
     uint32_t offset_y = surface_offset_y;
+    width_in_elems = surface_width;
+    height_in_elems = surface_height;
+    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
@@ -492,6 +507,9 @@ struct mem_payload_t<
     this->base_offset = rhs.base_offset;
     this->base_ptr = rhs.base_ptr;
     this->pitch_in_bytes = rhs.pitch_in_bytes;
+    this->width_in_elems = rhs.width_in_elems;
+    this->height_in_elems = rhs.height_in_elems;
+    this->payload_bytes = rhs.payload_bytes;
   }
 
   inline mem_payload_t() = default;
@@ -499,6 +517,9 @@ struct mem_payload_t<
     this->base_offset = rhs.base_offset;
     this->base_ptr = rhs.base_ptr;
     this->pitch_in_bytes = rhs.pitch_in_bytes;
+    this->width_in_elems = rhs.width_in_elems;
+    this->height_in_elems = rhs.height_in_elems;
+    this->payload_bytes = rhs.payload_bytes;
     return *this;
   }
 

@@ -283,34 +283,38 @@ tile_store(tile_t& tile, payload_t& payload) {
   static constexpr uint32_t store_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
-  using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_store_vec_len =
-      load_store_attr::max_store_vec_len;
-  static constexpr uint32_t max_store_vec_elems =
-      max_store_vec_len / sizeof(dtype);
+  if (payload.base_offset <= payload.payload_bytes) {
+    using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
+    static constexpr uint32_t max_store_vec_len =
+        load_store_attr::max_store_vec_len;
+    static constexpr uint32_t max_store_vec_elems =
+        max_store_vec_len / sizeof(dtype);
+    static constexpr uint32_t store_iter_steps =
+        store_len / max_store_vec_elems;
 
-  static constexpr uint32_t store_iter_steps = store_len / max_store_vec_elems;
-  if constexpr (store_len >= max_store_vec_elems) {
+    if constexpr (store_len >= max_store_vec_elems) {
 #pragma unroll
-    for (uint32_t i = 0; i < store_iter_steps; i++) {
-      uint32_t offset = i * max_store_vec_elems;
-      auto reg_sub = tile.reg.xetla_select<max_store_vec_elems, 1>(offset);
-      uint32_t address_offset = offset * sizeof(dtype);
+      for (uint32_t i = 0; i < store_iter_steps; i++) {
+        uint32_t offset = i * max_store_vec_elems;
+        auto reg_sub = tile.reg.xetla_select<max_store_vec_elems, 1>(offset);
+        uint32_t address_offset = offset * sizeof(dtype);
 
-      xetla_store_global<dtype, max_store_vec_elems, L1, L2>(
-          payload.base_ptr,
-          payload.base_offset + address_offset,
-          reg_sub.xetla_format<dtype>());
+        xetla_store_global<dtype, max_store_vec_elems, L1, L2>(
+            payload.base_ptr,
+            payload.base_offset + address_offset,
+            reg_sub.xetla_format<dtype>());
+      }
     }
+    constexpr uint32_t tail_len =
+        store_len % max_store_vec_elems * sizeof(dtype);
+    uint32_t tail_offset = store_iter_steps * max_store_vec_len;
+    detail::process_1d_tail<
+        tail_len,
+        (max_store_vec_len >> 1),
+        detail::process_flag::store,
+        L1,
+        L2>(tile, payload, tail_offset);
   }
-  constexpr uint32_t tail_len = store_len % max_store_vec_elems * sizeof(dtype);
-  uint32_t tail_offset = store_iter_steps * max_store_vec_len;
-  detail::process_1d_tail<
-      tail_len,
-      (max_store_vec_len >> 1),
-      detail::process_flag::store,
-      L1,
-      L2>(tile, payload, tail_offset);
 }
 
 /// @brief Is the func storing data from register file to unaligned global
@@ -348,7 +352,6 @@ tile_store(
   constexpr uint32_t num_channel_y = payload_t::num_channel_y;
   constexpr uint32_t store_elems = num_channel_y * payload_t::num_channel_x;
   constexpr uint32_t scale_factor = payload_t::scale_factor;
-
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
        i++) {
