@@ -337,7 +337,8 @@ class gemm_universal_t<
     //         args.matrix_m,
     //         args.matC_ld);
     //   } else {
-    //     implementable &= kernel::general_1d<arch_tag, dtype_c>::check_alignment(
+    //     implementable &= kernel::general_1d<arch_tag,
+    //     dtype_c>::check_alignment(
     //         args.matC_base.base, args.matC_ld);
     //   }
     // }
