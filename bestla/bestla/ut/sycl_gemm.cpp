@@ -538,9 +538,9 @@ class UT_MHASgemm {
   UT_MHASgemm() {
     UT_START();
     ut_T(1, 1, 1, 32, 128);
-     ut_T(1, 1, 64, 32, 128);
-     ut_T(4, 1, 64, 32, 128);
-     ut_T(4, 64, 64, 32, 128);
+    ut_T(1, 1, 64, 32, 128);
+    ut_T(4, 1, 64, 32, 128);
+    ut_T(4, 64, 64, 32, 128);
   }
   template <typename T, typename T_DST>
   class MHA {
@@ -751,7 +751,7 @@ class UT_MHASgemm {
     q->memcpy(STar.data(), Sptr, STar.size() * sizeof(STar[0]));
     q->memcpy(OTar.data(), Optr, OTar.size() * sizeof(OTar[0]));
     q->wait();
-    //buffer_error(S.data(), STar.data(), S.size(), 0.001f);
+    // buffer_error(S.data(), STar.data(), S.size(), 0.001f);
     buffer_error(O.data(), OTar.data(), O.size(), 0.001f);
   }
 };

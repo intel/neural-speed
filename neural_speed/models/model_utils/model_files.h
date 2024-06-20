@@ -1515,14 +1515,14 @@ struct model_model_loader {
 #ifdef NS_SYCL
         lt.data = bestla::utils::amalloc<uint8_t>(lt.ne_tensor->size);
         load_data_for(lt);
-        if (lt.ne_tensor->type==NE_TYPE_BTLA) {
+        if (lt.ne_tensor->type == NE_TYPE_BTLA) {
           void* dptr = NULL;
           memcpy(&dptr, lt.ne_tensor->padding, sizeof(dptr));
           bestla_device_load_storage(lt.data, lt.ne_tensor->data, dptr, ne_ctx->dev_ctx->queue);
         } else {
           bestla_device_memcpy_sync(lt.ne_tensor->data, lt.data, lt.ne_tensor->size, ne_ctx->dev_ctx->queue);
         }
-        
+
         bestla::utils::afree(lt.data);
 #else
         NE_ASSERT(false);

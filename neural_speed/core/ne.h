@@ -121,7 +121,7 @@ struct ne_scratch {
 //
 
 #define MAX_SYCL_BUFFER_SIZE (4000ull << 20)  // 4GB
-#define MAX_SYCL_BUFFER_COUNT 64           // 32*4GB=128GB
+#define MAX_SYCL_BUFFER_COUNT 64              // 32*4GB=128GB
 
 struct ne_sycl_context {
   void* dev;
