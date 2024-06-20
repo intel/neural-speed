@@ -129,6 +129,7 @@ struct ne_sycl_context {
   int n_buffers = 0;
   void* buffers[MAX_SYCL_BUFFER_COUNT];
   size_t offs[MAX_SYCL_BUFFER_COUNT];
+  size_t offs_save[MAX_SYCL_BUFFER_COUNT];
   size_t sizes[MAX_SYCL_BUFFER_COUNT];
 };
 
@@ -146,6 +147,7 @@ struct ne_context {
   struct ne_scratch scratch;
   struct ne_scratch scratch_save;
 
+  struct ne_object* objects_save;
   ne_sycl_context* dev_ctx;
 };
 

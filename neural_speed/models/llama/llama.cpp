@@ -192,14 +192,16 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     bool cpu_layer = il < gpu_layer_start;
     if (!cpu_layer) {
       inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_SYCL);
+    } else {
+      inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_CPU);
     }
     struct ne_tensor* inpSA = inpL;
 
     struct ne_tensor* cur;
 
     lctx.use_buf(ctx0, 0);
-
-    // norm
+    ne_buffer_save(ctx0);
+    //  norm
     {
       cur = ne_rms_norm(ctx0, inpL, hparams.norm_eps);
 
@@ -591,7 +593,7 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     }
 #endif
 #endif
-    lctx.use_buf(ctx0, 1);
+    // lctx.use_buf(ctx0, 1);
     struct ne_tensor* inpFF = ne_add(ctx0, cur, inpSA);
 
     // feed-forward network
@@ -694,12 +696,11 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
     }
 
     cur = ne_add(ctx0, cur, inpFF);
+    ne_buffer_load(ctx0);
 
     // input for next layer
     inpL = cur;
   }
-
-  lctx.use_buf(ctx0, 0);
 
   // used at the end to optionally extract the embeddings
   struct ne_tensor* embeddings = nullptr;
@@ -715,8 +716,8 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
 
   // lm_head
   inpL = ne_mul_mat(ctx0, model.others[2], inpL);
-
   inpL = ne_device_sync(ctx0, inpL, NE_BACKEND_CPU);
+
   if (!lctx.embedding.empty()) {
     embeddings = ne_device_sync(ctx0, embeddings, NE_BACKEND_CPU);
   }

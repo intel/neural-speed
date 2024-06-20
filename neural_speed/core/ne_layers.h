@@ -112,6 +112,10 @@ NE_API void ne_free(struct ne_context* ctx);
 
 NE_API size_t ne_used_mem(const struct ne_context* ctx);
 
+NE_API void ne_buffer_save(struct ne_context* ctx);
+
+NE_API void ne_buffer_load(struct ne_context* ctx);
+
 NE_API size_t ne_set_scratch(struct ne_context* ctx, struct ne_scratch scratch);
 
 NE_API struct ne_tensor* ne_new_tensor(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,

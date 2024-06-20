@@ -181,8 +181,8 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   } else {  // NE Fortmat
     model.others[0] = ml->get_tensor("tok_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("norm.weight", {n_embd}, n_gpu_layer ? NE_BACKEND_SYCL : NE_BACKEND_CPU);
-    model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
-                                     n_gpu_layer >= static_cast<int>(n_layer) ? NE_BACKEND_SYCL : NE_BACKEND_CPU);
+    model.others[2] =
+        ml->get_tensor("output.weight", {n_embd, n_vocab}, n_gpu_layer > 0 ? NE_BACKEND_SYCL : NE_BACKEND_CPU);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
       const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : NE_BACKEND_SYCL;
@@ -236,16 +236,6 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   }
   NE_ASSERT(vram_total <= host_size);
   NE_ASSERT(device_total <= device_size);
-  // print memory requirements
-  // this is the total memory required to run the inference
-  const size_t mem_required = ctx_size + mmapped_size - vram_total +  // weights in VRAM not in memory
-                              scratch.scratch0 + scratch.scratch1 + scratch.eval;
-  fprintf(stderr, "%s: scratch0   = %7.2f MB\n", __func__, scratch.scratch0 / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: scratch1   = %7.2f MB\n", __func__, scratch.scratch1 / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: scratch2   = %7.2f MB\n", __func__, scratch.eval / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: mem required  = %7.2f MB (+ memory per state)\n", __func__, mem_required / 1024.0 / 1024.0);
-
-  (void)n_gpu_layer;
 
   // populate `tensors_by_name`
   for (model_load_tensor& lt : ml->tensors_map.tensors) {

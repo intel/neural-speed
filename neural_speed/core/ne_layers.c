@@ -861,6 +861,18 @@ size_t ne_used_mem(const struct ne_context* ctx) {
   return ctx->objects_end == NULL ? 0 : ctx->objects_end->offs + ctx->objects_end->size;
 }
 
+void ne_buffer_save(struct ne_context* ctx) {
+  if (ctx->dev_ctx) {
+    memcpy(ctx->dev_ctx->offs_save, ctx->dev_ctx->offs, ctx->dev_ctx->n_buffers * sizeof(ctx->dev_ctx->offs_save[0]));
+  }
+}
+
+void ne_buffer_load(struct ne_context* ctx) {
+  if (ctx->dev_ctx) {
+    memcpy(ctx->dev_ctx->offs, ctx->dev_ctx->offs_save, ctx->dev_ctx->n_buffers * sizeof(ctx->dev_ctx->offs_save[0]));
+  }
+}
+
 size_t ne_set_scratch(struct ne_context* ctx, struct ne_scratch scratch) {
   const size_t result = ctx->scratch.data ? ctx->scratch.offs : 0;
 
