@@ -807,16 +807,23 @@ class MHA {
                            slm[jj] *= scale;
                          }
 
+                         T tmp[SgUnroll];
                          for (int kk = wg_loc_id * SgUnroll; kk < hsize; kk += SgUnroll * SgSize) {
 #pragma unroll
                            for (int ir = 0; ir < SgUnroll; ir++) {
-                             T tmp = 0;
-                             for (int ijj = 0; ijj < seq_acc; ijj += 1) {
-                               auto s = slm[ijj];
+                             tmp[ir] = 0;
+                           }
+                           for (int ijj = 0; ijj < seq_acc; ijj += 1) {
+                             auto s = slm[ijj];
+#pragma unroll
+                             for (int ir = 0; ir < SgUnroll; ir++) {
                                auto v = V[V_off + (kk + ir) * n_ctx + ijj];
-                               tmp += s * v;
+                               tmp[ir] += s * v;
                              }
-                             O[O_off + kk + ir] = tmp;
+                           }
+#pragma unroll
+                           for (int ir = 0; ir < SgUnroll; ir++) {
+                             O[O_off + kk + ir] = tmp[ir];
                            }
                          }
                        });
