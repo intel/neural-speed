@@ -213,7 +213,11 @@ static bool kv_cache_device_init(const struct model_hparams& hparams, struct mod
   const auto wsize = ne_type_size(wtype);
   cache.device_size = n_layer * (layer_ne_k + layer_ne_v) * wsize;
   cache.device_size = (cache.device_size + 255) / 256 * 256;
+#ifdef NS_SYCL
   cache.device_buf = bestla_device_malloc(cache.device_size, device_queue);
+#else
+  cache.device_buf = NULL;
+#endif
   cache.seq_cells.resize(batch_size * beam_size);
   for (int i = 0; i < cache.seq_cells.size(); ++i) {
     cache.seq_cells[i].token_cells.resize(n_ctx);

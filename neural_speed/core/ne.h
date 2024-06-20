@@ -124,9 +124,9 @@ struct ne_scratch {
 #define MAX_SYCL_BUFFER_COUNT 64           // 32*4GB=128GB
 
 struct ne_sycl_context {
-  void* dev = NULL;
-  void* queue = NULL;
-  int n_buffers = 0;
+  void* dev;
+  void* queue;
+  int n_buffers;
   void* buffers[MAX_SYCL_BUFFER_COUNT];
   size_t offs[MAX_SYCL_BUFFER_COUNT];
   size_t offs_save[MAX_SYCL_BUFFER_COUNT];
@@ -148,7 +148,7 @@ struct ne_context {
   struct ne_scratch scratch_save;
 
   struct ne_object* objects_save;
-  ne_sycl_context* dev_ctx;
+  struct ne_sycl_context* dev_ctx;
 };
 
 struct ne_context_container {

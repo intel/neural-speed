@@ -4199,7 +4199,11 @@ static void ne_compute_forward_dup_f32(const struct ne_compute_params* params, c
                                        struct ne_tensor* dst) {
   NE_ASSERT(ne_nelements(dst) == ne_nelements(src0));
   if (dst->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     bestla_device_dup_f32(params, src0, dst);
+#else
+    NE_ASSERT(false);
+#endif
     return;
   }
 
@@ -4511,7 +4515,11 @@ static void ne_compute_forward_add_f32(const struct ne_compute_params* params, c
                                        const struct ne_tensor* src1, struct ne_tensor* dst) {
   NE_ASSERT(ne_can_repeat_rows(src1, src0) && ne_are_same_shape(src0, dst));
   if (dst->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     bestla_device_add_f32(params, src0, src1, dst);
+#else
+    NE_ASSERT(0);
+#endif
     return;
   }
   if (params->type == NE_TASK_INIT) {
@@ -6531,7 +6539,11 @@ static void ne_compute_forward_rms_norm_f32(const struct ne_compute_params* para
                                             struct ne_tensor* dst) {
   NE_ASSERT(ne_are_same_shape(src0, dst));
   if (src0->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     bestla_device_rms_norm_f32(params, src0, dst);
+#else
+    NE_ASSERT(0);
+#endif
     return;
   }
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -9182,7 +9194,11 @@ static void ne_compute_forward_rope_f32(const struct ne_compute_params* params, 
                                         const struct ne_tensor* src1, struct ne_tensor* dst) {
   if (dst->backend == NE_BACKEND_SYCL) {
     assert(src1->backend == NE_BACKEND_CPU);
+#ifdef NS_SYCL
     bestla_device_rope_f32(params, src0, src1, dst);
+#else
+    NE_ASSERT(0);
+#endif
     return;
   }
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
@@ -9843,7 +9859,11 @@ static void ne_compute_forward_flash_attn_f32(const struct ne_compute_params* pa
                                               const struct ne_tensor* k, const struct ne_tensor* v, const bool masked,
                                               struct ne_tensor* dst) {
   if (dst->backend == NE_BACKEND_SYCL) {
+#ifdef NS_SYCL
     bestla_device_mha_f32(params, q, k, v, dst);
+#else
+    NE_ASSERT(0);
+#endif
     return;
   }
   int64_t t0 = ne_perf_time_us();
