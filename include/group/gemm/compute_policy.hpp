@@ -118,16 +118,15 @@ struct compute_policy_default_fpu<
   static constexpr int sync_freq = perf_tuning_knob::sync_freq;
   static constexpr int k_stride = perf_tuning_knob::k_stride;
 
-  static constexpr uint32_t block_size_y_a =
-      arch_tag_ == gpu_arch::XeLpg ? 8 : 16;
-  static constexpr uint32_t block_bytes_x_a = 32;
+  static constexpr uint32_t block_size_y_a = 16;
+  using mma_attr = mma_attr_t<arch_tag_, block_size_y_a>;
+  static constexpr uint32_t block_bytes_x_a = mma_attr::mma_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_bytes_x_b =
-      arch_attr_t<arch_tag>::template register_attr<>::reg_in_bytes;
-  static constexpr uint32_t block_size_x_b =
-      block_bytes_x_b / sizeof(dtype_mma_b);
-  static constexpr uint32_t block_size_y_b = block_size_x_a;
+  static constexpr uint32_t block_size_x_b = mma_attr::mma_n_in_elem;
+  static constexpr uint32_t block_bytes_y_b = mma_attr::mma_k_in_bytes;
+  static constexpr uint32_t block_size_y_b =
+      block_bytes_y_b / sizeof(dtype_mma_b);
 };
 
 /// @} xetla_gemm

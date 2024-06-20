@@ -21,7 +21,7 @@
 #include <cstdint>
 
 namespace gpu::xetla {
-enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2, Xe2 = 3 };
 
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 
