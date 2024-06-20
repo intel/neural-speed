@@ -1125,9 +1125,11 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
                                (10 << 20);
     ctx->buf_compute.resize(act_mem_per_layer);
     ctx->buf_scratch[0].resize(act_mem_per_layer);
-    model_alloc_sycl_mem(ctx->dev_ctx, act_mem_per_layer);
     fprintf(stderr, "%s: cpu activation size = %7.2f MB\n", __func__, act_mem_per_layer / 1024.0 / 1024.0);
+#ifdef NS_SYCL
+    model_alloc_sycl_mem(ctx->dev_ctx, act_mem_per_layer);
     fprintf(stderr, "%s: gpu activation size = %7.2f MB\n", __func__, act_mem_per_layer / 1024.0 / 1024.0);
+#endif
   }
 
   return ctx;

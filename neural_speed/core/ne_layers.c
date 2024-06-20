@@ -1173,14 +1173,14 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
   result->nb[0] = NE_TYPE_SIZE[type];
   if (type != NE_TYPE_BTLA) {
     result->nb[1] = result->nb[0] * (result->ne[0] / NE_BLCK_SIZE[type]);
-  }
-  if (size == NE_SIZE_CALC) {
-    size_needed = 0;
-    size_needed += NE_TYPE_SIZE[type] * (ne[0] / NE_BLCK_SIZE[type]);
-    for (int i = 1; i < n_dims; i++) {
-      size_needed *= ne[i];
+    if (size == NE_SIZE_CALC) {
+      size_needed = 0;
+      size_needed += NE_TYPE_SIZE[type] * (ne[0] / NE_BLCK_SIZE[type]);
+      for (int i = 1; i < n_dims; i++) {
+        size_needed *= ne[i];
+      }
+      result->size = size_needed;
     }
-    result->size = size_needed;
   }
 
   for (int i = 2; i < NE_MAX_DIMS; i++) {
@@ -11943,7 +11943,7 @@ void ne_graph_compute(struct ne_context* ctx, struct ne_cgraph* cgraph) {
                                        /*.wdata =*/cgraph->work ? cgraph->work->data : NULL,
                                        /*.dev_wsize =*/cgraph->dev_work ? cgraph->dev_work_size : 0,
                                        /*.dev_wdata =*/cgraph->dev_work ? cgraph->dev_work->data : NULL,
-                                       /*.dev_queue =*/ctx->dev_ctx->queue};
+                                       /*.dev_queue =*/ctx->dev_ctx ? ctx->dev_ctx->queue : NULL};
 
     bestla_parallel_for(ne_compute_forward, &params, node);
 #if NE_DEBUG

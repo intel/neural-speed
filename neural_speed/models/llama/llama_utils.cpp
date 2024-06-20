@@ -100,8 +100,9 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   auto host_size = (ctx_size + (50 << 20)) * n_cpu_layer / n_layer + n_embd * n_vocab * sizeof(float);
   auto device_size = (ctx_size + (50 << 20)) * n_gpu_layer / n_layer + n_embd * n_vocab * sizeof(float);
   fprintf(stderr, "%s: host ctx size   = %7.2f MB\n", __func__, host_size / 1024.0 / 1024.0);
+#ifdef NS_SYCL
   fprintf(stderr, "%s: device ctx size   = %7.2f MB\n", __func__, device_size / 1024.0 / 1024.0);
-
+#endif
   // create the ne context
   lctx.model.buf.resize(host_size);
   if (use_mlock) {
