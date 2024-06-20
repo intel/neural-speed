@@ -710,13 +710,125 @@ class MHA {
     });
     return ev;
   }
+
+  template <bool Mask, int HSize>
+  static sycl::event forward1(int batch, int seq, int seq_acc, int hnum, int hsize, int n_ctx, const T* Q, const T* K,
+                              const T* V, T_DST* O, float attn_scale, sycl::queue* q) {
+    int constexpr SgSize = 16;
+    static_assert(HSize % SgSize == 0);
+    int constexpr SgUnroll = HSize / SgSize;
+    assert(hsize % HSize == 0);
+    assert(hsize % SgSize == 0);
+    int n_past = seq_acc - seq;
+    if constexpr (Mask) {
+      assert(seq > 1);
+    }
+    int constexpr WgSize = SgSize;
+    int seq_acc_pad = utils::padto_le(seq_acc, WgSize);
+    int nf = hnum * hsize;
+    auto ev = q->submit([&](sycl::handler& cgh) {
+      sycl::local_accessor<T, 1> slm(sycl::range(std::max(seq_acc, 1024)), cgh);
+      cgh.parallel_for(sycl::nd_range<1>(WgSize * batch * seq * hnum, WgSize),
+                       [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
+                         auto sg = it.get_sub_group();
+                         auto sg_idx = sg.get_group_id()[0];
+                         auto wg_idx = it.get_group(0);
+                         auto wg_loc_id = it.get_local_id();
+                         auto lane_id = sg.get_local_id()[0];
+
+                         int i = wg_idx;
+                         int ih = i % hnum;
+                         i /= hnum;
+                         int is = i % seq;
+                         i /= seq;
+                         int ib = i % batch;
+                         size_t Q_off = ib * seq * nf + is * nf + ih * hsize;
+                         size_t K_off = ib * n_ctx * nf + ih * hsize * n_ctx;
+                         size_t V_off = ib * n_ctx * nf + ih * hsize * n_ctx;
+                         size_t O_off = ib * seq * nf + is * nf + ih * hsize;
+
+                         T maxs = -INFINITY;
+                         for (int jj = 0; jj < seq_acc; jj++) {
+                           T tmp = 0;
+                           if constexpr (Mask) {
+                             if (jj <= is + n_past) {
+                               for (int ik = wg_loc_id * SgUnroll; ik < hsize; ik += SgUnroll * SgSize) {
+#pragma unroll
+                                 for (int ir = 0; ir < SgUnroll; ir++) {
+                                   tmp += Q[Q_off + ik + ir] * K[K_off + jj * hsize + ik + ir];
+                                 }
+                               }
+                               tmp *= attn_scale;
+                             } else {
+                               tmp = -INFINITY;
+                             }
+                           } else {
+                             for (int ik = wg_loc_id * SgUnroll; ik < hsize; ik += SgUnroll * SgSize) {
+#pragma unroll
+                               for (int ir = 0; ir < SgUnroll; ir++) {
+                                 tmp += Q[Q_off + ik + ir] * K[K_off + jj * hsize + ik + ir];
+                               }
+                             }
+                             tmp *= attn_scale;
+                           }
+                           T sum = 0;
+#pragma unroll
+                           for (int i = 0; i < SgSize; i += 1) {
+                             sum += sg.shuffle(tmp, i);
+                           }
+                           slm[jj] = sum;
+                           maxs = std::max(maxs, sum);
+                         }
+                         float fsums = 0.f;
+                         float fmax = float(maxs);
+                         int jj = wg_loc_id;
+                         for (; jj < seq_acc_pad; jj += SgSize) {
+                           auto s = slm[jj];
+                           s = std::expf(s - fmax);
+                           fsums += s;
+                           slm[jj] = s;
+                         }
+                         if (jj < seq_acc) {
+                           auto s = std::expf(float(slm[jj]) - fmax);
+                           fsums += s;
+                           slm[jj] = s;
+                         }
+                         float gsum = 0;
+#pragma unroll
+                         for (int i = 0; i < SgSize; i += 1) {
+                           gsum += sg.shuffle(fsums, i);
+                         }
+                         T scale = 1.f / gsum;
+                         jj = wg_loc_id;
+                         for (; jj < seq_acc_pad; jj += WgSize) {
+                           slm[jj] *= scale;
+                         }
+                         if (jj < seq_acc) {
+                           slm[jj] *= scale;
+                         }
+
+                         for (int kk = wg_loc_id * SgUnroll; kk < hsize; kk += SgUnroll * SgSize) {
+#pragma unroll
+                           for (int ir = 0; ir < SgUnroll; ir++) {
+                             T tmp = 0;
+                             for (int ijj = 0; ijj < seq_acc; ijj += 1) {
+                               auto s = slm[ijj];
+                               auto v = V[V_off + (kk + ir) * n_ctx + ijj];
+                               tmp += s * v;
+                             }
+                             O[O_off + kk + ir] = tmp;
+                           }
+                         }
+                       });
+    });
+    return ev;
+  }
 };
 void bestla_device_mha_f32(const struct ne_compute_params* params, const struct ne_tensor* _q,
                            const struct ne_tensor* k, const struct ne_tensor* v, struct ne_tensor* dst) {
   if (params->type == NE_TASK_INIT || params->type == NE_TASK_FINALIZE) {
     return;
   }
-
   auto q = (sycl::queue*)params->dev_queue;
   const int64_t neq0 = _q->ne[0];
   const int64_t neq1 = _q->ne[1];
@@ -745,11 +857,11 @@ void bestla_device_mha_f32(const struct ne_compute_params* params, const struct 
   auto Vptr = (float*)v->data;
   auto Optr = (float*)dst->data;
   if (seq_cur > 1) {
-    MHA<float, float>::forward<true>(batch, seq_cur, seq_all, headnum, headsize, n_ctx, Qptr, Kptr, Vptr, Optr, scale,
-                                     q);
+    MHA<float, float>::forward1<true, 128>(batch, seq_cur, seq_all, headnum, headsize, n_ctx, Qptr, Kptr, Vptr, Optr,
+                                           scale, q);
   } else {
-    MHA<float, float>::forward<false>(batch, seq_cur, seq_all, headnum, headsize, n_ctx, Qptr, Kptr, Vptr, Optr, scale,
-                                      q);
+    MHA<float, float>::forward1<false, 128>(batch, seq_cur, seq_all, headnum, headsize, n_ctx, Qptr, Kptr, Vptr, Optr,
+                                            scale, q);
   }
   if (sycl_device::SyclDevice::is_cpu(q)) {
     q->wait();
