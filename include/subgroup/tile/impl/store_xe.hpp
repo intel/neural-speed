@@ -282,8 +282,8 @@ tile_store(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   static constexpr uint32_t store_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
-
-  if (payload.base_offset <= payload.payload_bytes) {
+  if (payload.base_offset + store_len * sizeof(dtype) <=
+      payload.payload_bytes) {
     using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
     static constexpr uint32_t max_store_vec_len =
         load_store_attr::max_store_vec_len;

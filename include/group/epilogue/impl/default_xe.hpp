@@ -100,8 +100,6 @@ class epilogue_t<
         subgroup::msg_type_v<mat_tile_desc, mem_desc_c_t>;
     using matC_payload_t = subgroup::
         mem_payload_t<mem_desc_c_t, mat_tile_desc, msg_type_c, arch_tag>;
-    using matC_payload_t = subgroup::
-        mem_payload_t<mem_desc_c_t, mat_tile_desc, msg_type_c, arch_tag>;
     update_sg_tile_tdesc(g, mem_desc_c);
     matC_t matC;
     matC_payload_t matC_payload(mem_desc_c);

@@ -47,7 +47,7 @@ class test_col_major_1 {
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr gpu_arch arch = gpu_arch::XeHpc;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
@@ -108,12 +108,12 @@ int gemm_result_validate(
   bool result = buff_cmp::xetla_buff_cmp(data, other, "gemv validation");
 
 #ifdef UT_DEBUG
-  for (uint32_t i = 0; i < m; i++) {
-    for (uint32_t j = 0; j < n; j++) {
-      std::cout << float(sycl::half(C[i * n + j])) << " ";
-    }
-    std::cout << std::endl;
-  }
+  // for (uint32_t i = 0; i < m; i++) {
+  //   for (uint32_t j = 0; j < n; j++) {
+  //     std::cout << float(sycl::half(C[i * n + j])) << " ";
+  //   }
+  //   std::cout << std::endl;
+  // }
 #endif
   std::cout << (!result ? "FAILED\n" : "PASSED\n");
   return result ? 0 : 1;
@@ -185,12 +185,12 @@ std::vector<data_type_acc_in> dequantize_weight(
     }
   }
 #ifdef UT_DEBUG
-  for (uint32_t i = 0; i < matrix_n; i++) {
-    for (uint32_t j = 0; j < matrix_k; j++) {
-      std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-    }
-    std::cout << std::endl;
-  }
+  // for (uint32_t i = 0; i < matrix_n; i++) {
+  //   for (uint32_t j = 0; j < matrix_k; j++) {
+  //     std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+  //   }
+  //   std::cout << std::endl;
+  // }
 #endif
   return b_out;
 }

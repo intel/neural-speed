@@ -443,7 +443,10 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     width_in_elems = mem_tdesc.shape.x;
     height_in_elems = mem_tdesc.shape.y;
-    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
+    payload_bytes = mem_transpose ? (mem_tdesc.shape.x - 1) * pitch_in_bytes +
+            mem_tdesc.shape.y * sizeof(dtype)
+                                  : (mem_tdesc.shape.y - 1) * pitch_in_bytes +
+            mem_tdesc.shape.x * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
     base_offset = mem_transpose
@@ -464,7 +467,10 @@ struct mem_payload_t<
     uint32_t offset_y = surface_offset_y;
     width_in_elems = surface_width;
     height_in_elems = surface_height;
-    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
+    payload_bytes = mem_transpose ? (surface_offset_x - 1) * pitch_in_bytes +
+            surface_offset_y * sizeof(dtype)
+                                  : (surface_offset_y - 1) * pitch_in_bytes +
+            surface_offset_x * sizeof(dtype);
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
@@ -477,7 +483,11 @@ struct mem_payload_t<
     uint32_t offset_y = mem_tdesc.coord.y;
     width_in_elems = mem_tdesc.shape.x;
     height_in_elems = mem_tdesc.shape.y;
-    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
+    payload_bytes = mem_transpose ? (mem_tdesc.shape.x - 1) * pitch_in_bytes +
+            mem_tdesc.shape.y * sizeof(dtype)
+                                  : (mem_tdesc.shape.y - 1) * pitch_in_bytes +
+            mem_tdesc.shape.x * sizeof(dtype);
+
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
@@ -496,7 +506,9 @@ struct mem_payload_t<
     uint32_t offset_y = surface_offset_y;
     width_in_elems = surface_width;
     height_in_elems = surface_height;
-    payload_bytes = width_in_elems * height_in_elems * sizeof(dtype);
+    payload_bytes = mem_transpose
+        ? (surface_width - 1) * pitch_in_bytes + surface_height * sizeof(dtype)
+        : (surface_height - 1) * pitch_in_bytes + surface_width * sizeof(dtype);
     base_offset = mem_transpose
         ? offset_x * pitch_in_bytes + offset_y * sizeof(dtype)
         : offset_y * pitch_in_bytes + offset_x * sizeof(dtype);
