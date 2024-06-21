@@ -97,7 +97,7 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   int n_cpu_layer = n_layer - n_gpu_layer;
   n_cpu_layer = n_cpu_layer < 0 ? 0 : n_cpu_layer;
   fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
-  auto host_size = (ctx_size + (50 << 20)) * n_cpu_layer / n_layer + (50 << 20);
+  auto host_size = (ctx_size + (50 << 20)) * n_cpu_layer / n_layer + n_embd * n_vocab * sizeof(float); // embedding on CPU
   auto device_size = (ctx_size + (50 << 20)) * n_gpu_layer / n_layer + (50 << 20);
   fprintf(stderr, "%s: host ctx size   = %7.2f MB\n", __func__, host_size / 1024.0 / 1024.0);
 #ifdef NS_SYCL
