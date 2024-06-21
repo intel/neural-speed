@@ -26,7 +26,7 @@
 namespace gpu::xetla::subgroup {
 
 namespace detail {
-template <typename tile_t, typename payload_t, bool is_lsc_gather_ = false>
+template <typename tile_t, typename payload_t, bool is_lsc_gather_ = true>
 struct check_load_type {
   static constexpr bool is_lsc_gather = is_lsc_gather_;
   static constexpr bool is_global_block_2d =
@@ -398,8 +398,10 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_load_vec_len =
-      load_store_attr::max_load_vec_len;
+  static constexpr uint32_t max_load_vec_len = std::min(
+      uint32_t(tile_t::block_elems * sizeof(dtype)),
+      load_store_attr::max_load_vec_len);
+
   static constexpr uint32_t max_load_vec_elems =
       max_load_vec_len / sizeof(dtype);
 
@@ -465,73 +467,73 @@ tile_load(tile_t& tile, payload_t& payload) {
       uint32_t offset_x = j * tile_desc::block_size_x;
       auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
           (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
-      // #pragma unroll
-      //       for (uint32_t sub_block_offset = 0; sub_block_offset <
-      //            (payload_t::mem_transpose ? tile_desc::block_size_x
-      //                                      : tile_desc::block_size_y);
-      //    sub_block_offset += num_channel) {
-      uint32_t sub_block_offset = 0;
-      xetla_vector<load_dtype, load_elems> reg_tmp = 0;
-      uint32_t address_offset = payload_t::mem_transpose
-          ? (offset_x + sub_block_offset) * payload.pitch_in_bytes +
-              offset_y * sizeof(dtype)
-          : offset_x * sizeof(dtype) +
-              (offset_y + sub_block_offset) * payload.pitch_in_bytes;
-      xetla_mask<num_channel> pred = 1;
-      if constexpr (num_channel > 1) {
-        // For SDP load, need pred
-        const uint32_t sub_block_offset_x = payload.base_x + offset_x +
-            (payload_t::mem_transpose ? sub_block_offset : 0);
-        const uint32_t sub_block_offset_y = payload.base_y + offset_y +
-            (payload_t::mem_transpose ? 0 : sub_block_offset);
-        const auto offset_ch_dim =
-            payload_t::trans ? sub_block_offset_x : sub_block_offset_y;
-        const auto size_ch_dim =
-            payload_t::trans ? payload.width_in_elems : payload.height_in_elems;
-
-        pred = offset_ch_dim + num_channel > size_ch_dim
-            ? (xetla_vector_gen<uint32_t, num_channel>(offset_ch_dim, 1) <
-               size_ch_dim)
-            : 1;
-      }
-      reg_tmp = xetla_load_global<
-          load_dtype,
-          payload_t::simd_exec_size,
-          data_size::default_size,
-          L1,
-          L2,
-          payload_t::num_channel>(
-          payload.base_ptr,
-          payload.channel_offset + payload.base_offset + address_offset,
-          pred);
-
-      if constexpr (
-          payload_t::simd_exec_size > 1 && payload_t::num_channel > 1) {
-        xetla_vector<load_dtype, load_elems> reg_tmp_trans;
 #pragma unroll
-        for (uint32_t iii = 0; iii < payload_t::num_channel; iii++) {
-          if ((bool)pred[iii]) // TODO (dingyi): Delete after driver fix
-            reg_tmp_trans.xetla_select<payload_t::simd_exec_size, 1>(
-                iii * payload_t::simd_exec_size) =
-                reg_tmp.xetla_select<
-                    payload_t::simd_exec_size,
-                    payload_t::num_channel>(iii);
-          else // TODO (dingyi): Delete after driver fix
-            reg_tmp_trans.xetla_select<payload_t::simd_exec_size, 1>(
-                iii * payload_t::simd_exec_size) = 0;
+      for (uint32_t sub_block_offset = 0; sub_block_offset <
+           (payload_t::mem_transpose ? tile_desc::block_size_x
+                                     : tile_desc::block_size_y);
+           sub_block_offset += num_channel) {
+        //   uint32_t sub_block_offset = 0;
+        xetla_vector<load_dtype, load_elems> reg_tmp = 0;
+        uint32_t address_offset = payload_t::mem_transpose
+            ? (offset_x + sub_block_offset) * payload.pitch_in_bytes +
+                offset_y * sizeof(dtype)
+            : offset_x * sizeof(dtype) +
+                (offset_y + sub_block_offset) * payload.pitch_in_bytes;
+        xetla_mask<num_channel> pred = 1;
+        if constexpr (num_channel > 1) {
+          // For SDP load, need pred
+          const uint32_t sub_block_offset_x = payload.base_x + offset_x +
+              (payload_t::mem_transpose ? sub_block_offset : 0);
+          const uint32_t sub_block_offset_y = payload.base_y + offset_y +
+              (payload_t::mem_transpose ? 0 : sub_block_offset);
+          const auto offset_ch_dim =
+              payload_t::trans ? sub_block_offset_x : sub_block_offset_y;
+          const auto size_ch_dim = payload_t::trans ? payload.width_in_elems
+                                                    : payload.height_in_elems;
+
+          pred = offset_ch_dim + num_channel > size_ch_dim
+              ? (xetla_vector_gen<uint32_t, num_channel>(offset_ch_dim, 1) <
+                 size_ch_dim)
+              : 1;
         }
-        reg_sub
-            .xetla_select<load_elems * pack_factor, 1>(
-                sub_block_offset * tile_desc::block_size_x)
-            .xetla_format<load_dtype>() = reg_tmp_trans;
-      } else {
-        reg_sub
-            .xetla_select<load_elems * pack_factor, 1>(
-                sub_block_offset * tile_desc::block_size_x)
-            .xetla_format<load_dtype>() = reg_tmp;
+        reg_tmp = xetla_load_global<
+            load_dtype,
+            payload_t::simd_exec_size,
+            data_size::default_size,
+            L1,
+            L2,
+            num_channel>(
+            payload.base_ptr,
+            payload.channel_offset + payload.base_offset + address_offset,
+            pred);
+
+        if constexpr (
+            payload_t::simd_exec_size > 1 && payload_t::num_channel > 1) {
+          xetla_vector<load_dtype, load_elems> reg_tmp_trans;
+#pragma unroll
+          for (uint32_t iii = 0; iii < payload_t::num_channel; iii++) {
+            if ((bool)pred[iii]) // TODO (dingyi): Delete after driver fix
+              reg_tmp_trans.xetla_select<payload_t::simd_exec_size, 1>(
+                  iii * payload_t::simd_exec_size) =
+                  reg_tmp.xetla_select<
+                      payload_t::simd_exec_size,
+                      payload_t::num_channel>(iii);
+            else // TODO (dingyi): Delete after driver fix
+              reg_tmp_trans.xetla_select<payload_t::simd_exec_size, 1>(
+                  iii * payload_t::simd_exec_size) = 0;
+          }
+          reg_sub
+              .xetla_select<load_elems * pack_factor, 1>(
+                  sub_block_offset * tile_desc::block_size_x)
+              .xetla_format<load_dtype>() = reg_tmp_trans;
+        } else {
+          reg_sub
+              .xetla_select<load_elems * pack_factor, 1>(
+                  sub_block_offset * tile_desc::block_size_x)
+              .xetla_format<load_dtype>() = reg_tmp;
+        }
       }
     }
-    // }
   }
 
   if constexpr (payload_t::trans) {
@@ -595,7 +597,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 
         reg_sub.xetla_select<load_elems, 1>(
             sub_block_y * tile_desc::block_size_x) =
-            xetla_load_global<dtype, load_elems>(
+            xetla_load_global<dtype, load_elems, L1, L2>(
                 (dtype*)payload.base_ptr, payload.base_offset + address_offset);
       }
     }

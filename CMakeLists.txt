@@ -46,7 +46,7 @@ if (${LOG} STREQUAL "on")
 endif ()
 
 # For large registers mode, enable 256 registers for kernels
-set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
+# set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
 # Enable bank conflict reduction.

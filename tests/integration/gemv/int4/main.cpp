@@ -37,7 +37,7 @@ class test_col_major_1 {
   static constexpr size_t wg_n = 1;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024 / 1;
+  static constexpr size_t sg_k = 512 / 1;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
@@ -47,7 +47,7 @@ class test_col_major_1 {
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeHpc;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;

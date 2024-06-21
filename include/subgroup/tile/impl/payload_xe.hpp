@@ -1152,23 +1152,22 @@ struct mem_payload_t<
           uint32_t,
           dtype>::type>::type;
   static constexpr uint32_t pack_factor = sizeof(mem_dtype) / sizeof(dtype);
-  // for pvc, we can use simd16 or simd32
-  static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
-  static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
-  static constexpr uint32_t simd_channel =
-      ((tile_bytes % max_store_bytes) == 0 &&
-       (block_bytes % max_store_bytes) == 0)
-      ? 32
-      : 16;
-  static constexpr uint32_t num_channel = mem_transpose
-      ? (simd_channel >= block_size_x) ? block_size_x : simd_channel
-      : (simd_channel >= block_size_y) ? block_size_y
-                                       : simd_channel;
 
   static constexpr uint32_t simd_exec_size =
       (mem_transpose ? block_size_y : block_size_x) >= pack_factor
       ? (mem_transpose ? block_size_y : block_size_x) / pack_factor
       : 1;
+
+  // for pvc, we can use simd16 or simd32
+  using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
+  static constexpr uint32_t max_bytes = load_store_attr::max_load_vec_len;
+
+  static constexpr uint32_t simd_channel =
+      max_bytes / (simd_exec_size * sizeof(mem_dtype));
+
+  static constexpr uint32_t num_channel = mem_transpose
+      ? std::min(block_size_x, simd_channel)
+      : std::min(block_size_y, simd_channel);
 
   xetla_vector<uint32_t, num_channel> channel_offset;
   xetla_vector<uint32_t, num_channel> step_x;
