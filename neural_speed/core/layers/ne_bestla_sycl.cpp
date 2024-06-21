@@ -404,6 +404,9 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
   }
 }
 
+extern void ggml_rope_yarn_corr_dims(int n_dims, int n_orig_ctx, float freq_base, float beta_fast, float beta_slow,
+                                     float dims[2]);
+
 static float rope_yarn_ramp(const float low, const float high, const int i0) {
   const float y = (i0 / 2 - low) / std::max(0.001f, high - low);
   return 1.0f - std::min(1.0f, std::max(0.0f, y));
@@ -425,22 +428,6 @@ static void rope_yarn(float theta_extrap, float freq_scale, float corr_dims0, fl
   }
   *cos_theta = cosf(theta) * mscale;
   *sin_theta = sinf(theta) * mscale;
-}
-
-#ifndef NE_PI
-#define NE_PI (3.14159265358979323846)
-#endif
-// Apparently solving `n_rot = 2pi * x * base^((2 * max_pos_emb) / n_dims)` for x, we get
-// `corr_dim(n_rot) = n_dims * log(max_pos_emb / (n_rot * 2pi)) / (2 * log(base))`
-static float rope_yarn_corr_dim(int n_dims, int n_orig_ctx, float n_rot, float base) {
-  return n_dims * logf(n_orig_ctx / (n_rot * 2 * (float)NE_PI)) / (2 * logf(base));
-}
-
-static void rope_yarn_corr_dims(int n_dims, int n_orig_ctx, float freq_base, float beta_fast, float beta_slow,
-                                float dims[2]) {
-  // start and end correction dims
-  dims[0] = std::max(0.f, floorf(rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_fast, freq_base)));
-  dims[1] = std::min(float(n_dims - 1), ceilf(rope_yarn_corr_dim(n_dims, n_orig_ctx, beta_slow, freq_base)));
 }
 
 void bestla_device_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
@@ -499,7 +486,7 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
   const float theta_scale = powf(freq_base, -2.0f / n_dims);
   const float inv_ndims = -1.f / n_dims;
   float corr_dims[2];
-  rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
+  ggml_rope_yarn_corr_dims(n_dims, n_orig_ctx, freq_base, beta_fast, beta_slow, corr_dims);
   float corr_dims0 = corr_dims[0];
   float corr_dims1 = corr_dims[1];
   int constexpr SgSize = 16;
