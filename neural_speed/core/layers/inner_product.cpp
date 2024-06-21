@@ -155,14 +155,14 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-          if (_m <= tAVX512_BF16::MTILE) {
-            static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            ip_add::BTLAGemmCompF32<tAVX512_BF16, tWeiNInt, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
-                                                                          bias, broadcast_bias, workspace, pth);
-          } else {
-            ip_add::BTLAGemmCompF32<tAMX_BF16, tWeiNInt, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
-                                                                       bias, broadcast_bias, workspace, pth);
-          }
+          ip_add::BTLAGemmCompF32<tAMX_BF16, tWeiNInt, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
+                                                                     bias, broadcast_bias, workspace, pth);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+          ip_add::BTLAGemmCompF32<tAMX_FP16, tWeiNInt, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
+                                                                     bias, broadcast_bias, workspace, pth);
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
@@ -225,14 +225,14 @@ void bestla_fusion_add_f32f32_forward(float* activation, void* weiptr, float* bi
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2 && BlkSize % tAMX_BF16::KTILE == 0) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16()) {
-          if (_m <= tAVX512_BF16::MTILE) {
-            static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            ip_add::BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output,
-                                                                            ldo, bias, broadcast_bias, workspace, pth);
-          } else {
-            ip_add::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
-                                                                         bias, broadcast_bias, workspace, pth);
-          }
+          ip_add::BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
+                                                                       bias, broadcast_bias, workspace, pth);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2 && BlkSize % tAMX_FP16::KTILE == 0) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16()) {
+          ip_add::BTLAGemmCompF32<tAMX_FP16, tWeiNFloat, tActKBaseF32>(_m, _n, _k, activation, lda, ptr, output, ldo,
+                                                                       bias, broadcast_bias, workspace, pth);
         }
       }
     }

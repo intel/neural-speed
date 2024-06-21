@@ -263,14 +263,14 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-          if (seq <= tAVX512_BF16::MTILE) {
-            static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            BTLAGemmCompF32<tAVX512_BF16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
-          } else {
-            BTLAGemmCompF32<tAMX_BF16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
-          }
+          BTLAGemmCompF32<tAMX_BF16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+          BTLAGemmCompF32<tAMX_FP16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
@@ -338,14 +338,14 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-          if (seq <= tAVX512_BF16::MTILE) {
-            static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
-          } else {
-            BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
-          }
+          BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+          BTLAGemmCompF32<tAMX_FP16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, tmp, output, seq, fin, fmid, fout, workspace, pth, epi_args1, epi_args2);
         }
       }
     }
@@ -609,16 +609,16 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-          if (seq <= tAVX512_BF16::MTILE) {
-            static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            BTLAGemmCompF32<tAVX512_BF16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-                epi_args2);
-          } else {
-            BTLAGemmCompF32<tAMX_BF16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-                epi_args2);
-          }
+          BTLAGemmCompF32<tAMX_BF16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+              epi_args2);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+          BTLAGemmCompF32<tAMX_FP16, tWeiNInt, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+              epi_args2);
         }
       }
       if (btype == gemm::CompType::tS8 && PackRow == 4) {
@@ -698,16 +698,16 @@ void bestla_fusion_ffn_f32f32_forward(float* activation, void* w1ptr, void* w2pt
       }
       if (btype == gemm::CompType::tBF16 && PackRow == 2) {
         if (NTile == tAMX_BF16::NTILE && _cd->AMX_BF16() && BlkSize % tAMX_BF16::KTILE == 0) {
-          if (seq <= tAVX512_BF16::MTILE) {
-            static_assert(tAVX512_BF16::NTILE == tAMX_BF16::NTILE);
-            BTLAGemmCompF32<tAVX512_BF16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-                epi_args2);
-          } else {
-            BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
-                activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
-                epi_args2);
-          }
+          BTLAGemmCompF32<tAMX_BF16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+              epi_args2);
+        }
+      }
+      if (btype == gemm::CompType::tFP16 && PackRow == 2) {
+        if (NTile == tAMX_FP16::NTILE && _cd->AMX_FP16() && BlkSize % tAMX_FP16::KTILE == 0) {
+          BTLAGemmCompF32<tAMX_FP16, tWeiNFloat, tActKBaseF32, epilogue1, epilogue2>(
+              activation, ptr1, ptr2, ptr3, tmp1, tmp2, output, seq, fin, fmid, fout, workspace, pth, epi_args1,
+              epi_args2);
         }
       }
     }

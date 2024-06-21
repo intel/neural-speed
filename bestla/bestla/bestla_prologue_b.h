@@ -224,48 +224,47 @@ class WeightKBlockNInteger {
     int rawnk_scale = utils::updiv(K, stor->mBlockSize);
     int nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
     parallel::Scheduler2D _para({threading->num_threads(), 1, nk_scale, 1, 1});
-    if (stor->SDtype() == BTLA_DTYPE::F32) {  // fp32 to fp32 direct copy
+    if (stor->SDtype() == BTLA_DTYPE::BF16 || stor->SDtype() == BTLA_DTYPE::F16 || stor->SDtype() == BTLA_DTYPE::F32) {
       threading->parallel_for([&](int tidx) {
         parallel::ThreadProblem2D thdp{tidx};
         _para.getIndex(thdp);
         if (thdp.valid) {
-          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
-            if (i < rawnk_scale) {
-              if (scales != nullptr)
-                std::memcpy(stor->template SPtr<float>() + i * stor->mNPad, scales + i * N, N * sizeof(scales[0]));
-              if (zero_points != nullptr)
-                std::memcpy(stor->template ZPtr<int8_t>() + i * stor->mNPad, zero_points + i * N,
-                            N * sizeof(zero_points[0]));
-            } else {
-              if (scales != nullptr)
-                std::memset(stor->template SPtr<float>() + i * stor->mNPad, 0, stor->mNPad * sizeof(float));
-              if (zero_points != nullptr)
-                std::memset(stor->template ZPtr<int8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(zero_points[0]));
+          int rows = thdp.loc[1] + thdp.size[1] <= rawnk_scale ? thdp.size[1] : rawnk_scale - thdp.loc[1];
+          if (scales) {
+            if (stor->SDtype() == BTLA_DTYPE::BF16) {
+              kernel::wrapper::Memcpy2DFp32TPadding<utils::bf16>::forward_auto(
+                  scales + thdp.loc[1] * N, stor->template SPtr<utils::bf16>() + thdp.loc[1] * stor->mNPad, rows, N,
+                  N * sizeof(scales[0]), stor->mNPad * sizeof(utils::bf16), true);
+            } else if (stor->SDtype() == BTLA_DTYPE::F32) {
+              kernel::wrapper::Memcpy2DPadding::forward(
+                  scales + thdp.loc[1] * N, stor->template SPtr<float>() + thdp.loc[1] * stor->mNPad, rows,
+                  N * sizeof(float), N * sizeof(scales[0]), stor->mNPad * sizeof(float), true);
+            } else if (stor->SDtype() == BTLA_DTYPE::F16) {
+              kernel::wrapper::Memcpy2DFp32TPadding<utils::fp16>::forward_auto(
+                  scales + thdp.loc[1] * N, stor->template SPtr<utils::fp16>() + thdp.loc[1] * stor->mNPad, rows, N,
+                  N * sizeof(scales[0]), stor->mNPad * sizeof(utils::fp16), true);
+            }
+            if (rows < thdp.size[1]) {
+              auto sb = bestla::utils::bestla_dtype_bytes(stor->SDtype());
+              if (sb == 2) {
+                std::memset(stor->template SPtr<utils::fp16>() + (thdp.loc[1] + rows) * stor->mNPad, 0,
+                            sb * (thdp.size[1] - rows) * stor->mNPad);
+              } else if (sb == 4) {
+                std::memset(stor->template SPtr<float>() + (thdp.loc[1] + rows) * stor->mNPad, 0,
+                            sb * (thdp.size[1] - rows) * stor->mNPad);
+              } else {
+                assert(0);
+              }
             }
           }
-        }
-      });
-    } else if (stor->SDtype() == BTLA_DTYPE::BF16) {
-      threading->parallel_for([&](int tidx) {
-        parallel::ThreadProblem2D thdp{tidx};
-        _para.getIndex(thdp);
-        if (thdp.valid) {
-          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
-            if (i < rawnk_scale) {
-              if (scales != nullptr) {
-                for (size_t j = 0; j < N; j++) {
-                  stor->template SPtr<utils::bf16>()[j + i * stor->mNPad] = static_cast<utils::bf16>(scales[i * N + j]);
-                }
-              }
-              if (zero_points != nullptr) {
-                std::memcpy(stor->template ZPtr<int8_t>() + i * stor->mNPad, zero_points + i * N,
-                            N * sizeof(zero_points[0]));
-              }
-            } else {
-              if (scales != nullptr)
-                std::memset(stor->template SPtr<utils::bf16>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::bf16));
-              if (zero_points != nullptr)
-                std::memset(stor->template ZPtr<int8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(zero_points[0]));
+          if (zero_points) {
+            kernel::wrapper::Memcpy2DPadding::forward(
+                zero_points + thdp.loc[1] * N, stor->template ZPtr<int8_t>() + thdp.loc[1] * stor->mNPad, rows,
+                N * sizeof(zero_points[0]), N * sizeof(zero_points[0]), sizeof(int8_t) * stor->mNPad, true);
+
+            if (rows < thdp.size[1]) {
+              std::memset(stor->template ZPtr<int8_t>() + (thdp.loc[1] + rows) * stor->mNPad, 0,
+                          sizeof(int8_t) * (thdp.size[1] - rows) * stor->mNPad);
             }
           }
         }
@@ -334,84 +333,24 @@ class WeightKBlockNInteger {
     utils::afree(countptr);
   }
 
-  AUTOCALL void setTransposeQuantCorrection(const int N, const int K, const int8_t* zero_points, const float* scales,
+  AUTOCALL void setTransposeQuantCorrection(const int N, const int K, const int8_t* zero_pointsT, const float* scalesT,
                                             StorageWeight* stor, parallel::IThreading* threading) {
     int rawnk_scale = utils::updiv(K, stor->mBlockSize);
-    int nk_scale = utils::updiv(stor->mKPad, stor->mBlockSize);
-    parallel::Scheduler2D _para({threading->num_threads(), 1, nk_scale, 1, 1});
-    if (stor->SDtype() == BTLA_DTYPE::F32) {  // fp32 to fp32 direct copy
-      threading->parallel_for([&](int tidx) {
-        parallel::ThreadProblem2D thdp{tidx};
-        _para.getIndex(thdp);
-        if (thdp.valid) {
-          if (scales) {
-            for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
-              if (i < rawnk_scale) {
-                for (int j = 0; j < N; j++) {
-                  stor->template SPtr<float>()[i * stor->mNPad + j] = scales[j * rawnk_scale + i];
-                }
-              } else {
-                std::memset(stor->template SPtr<float>() + i * stor->mNPad, 0, stor->mNPad * sizeof(float));
-              }
-            }
-          }
-        }
-      });
-    } else if (stor->SDtype() == BTLA_DTYPE::BF16) {
-      threading->parallel_for([&](int tidx) {
-        parallel::ThreadProblem2D thdp{tidx};
-        _para.getIndex(thdp);
-        if (thdp.valid) {
-          if (scales) {
-            for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
-              if (i < rawnk_scale) {
-                for (int j = 0; j < N; j++) {
-                  stor->template SPtr<utils::bf16>()[i * stor->mNPad + j] = utils::bf16(scales[j * rawnk_scale + i]);
-                }
-              } else {
-                std::memset(stor->template SPtr<utils::bf16>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::bf16));
-              }
-            }
-          }
-        }
-      });
-    } else if (stor->SDtype() == BTLA_DTYPE::F8_E8M0) {
-      threading->parallel_for([&](int tidx) {
-        parallel::ThreadProblem2D thdp{tidx};
-        _para.getIndex(thdp);
-        if (thdp.valid) {
-          if (scales) {
-            for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
-              if (i < rawnk_scale) {
-                for (int j = 0; j < N; j++) {
-                  stor->template SPtr<utils::f8>()[i * stor->mNPad + j] = static_cast<int>(scales[j * rawnk_scale + i]);
-                }
-              } else {
-                std::memset(stor->template SPtr<utils::f8>() + i * stor->mNPad, 0, stor->mNPad * sizeof(utils::f8));
-              }
-            }
-          }
-        }
-      });
-    } else {
-      assert(0);
+    auto scales = scalesT ? utils::amalloc<float>(rawnk_scale * N) : nullptr;
+    auto zero_points = zero_pointsT ? utils::amalloc<int8_t>(rawnk_scale * N) : nullptr;
+    if (scales) {
+      transposeWeight<float>(N, rawnk_scale, scalesT, rawnk_scale, scales, N, threading);
     }
-    if (stor->IsAsym() && zero_points)
-      threading->parallel_for([&](int tidx) {
-        parallel::ThreadProblem2D thdp{tidx};
-        _para.getIndex(thdp);
-        if (thdp.valid) {
-          for (int i = thdp.loc[1]; i < thdp.loc[1] + thdp.size[1]; i++) {
-            if (i < rawnk_scale) {
-              for (int j = 0; j < N; j++) {
-                stor->template ZPtr<int8_t>()[i * stor->mNPad + j] = zero_points[j * rawnk_scale + i];
-              }
-            } else {
-              std::memset(stor->template ZPtr<int8_t>() + i * stor->mNPad, 0, stor->mNPad * sizeof(zero_points[0]));
-            }
-          }
-        }
-      });
+    if (zero_points) {
+      transposeWeight<int8_t>(N, rawnk_scale, zero_pointsT, rawnk_scale, zero_points, N, threading);
+    }
+    setQuantCorrection(N, K, zero_points, scales, stor, threading);
+    if (scales) {
+      utils::afree(scales);
+    }
+    if (zero_points) {
+      utils::afree(zero_points);
+    }
   }
 
   AUTOCALL void packQWeight(const int N, const int K, const int8_t* B, const int ldb, const float* scales,
@@ -445,6 +384,7 @@ class WeightKBlockNInteger {
     auto blks_padding2 = utils::padto(blks, 2);
     auto tmpscales = tmp;
     auto tmpzeropoints = reinterpret_cast<int8_t*>(tmpscales + N * blks);
+    assert(isasym == (zero_points != nullptr));
     if (scales) {
       for (size_t i = 0; i < N * blks; i += 1) {
         tmpscales[i] = scales[i];
@@ -640,6 +580,7 @@ class WeightKBlockNInteger {
       }
     });
   }
+
   AUTOCALL void compressWeight(const int N, const int K, const int8_t* B, const int ldb, int8_t* dstptr,
                                BTLA_DTYPE qtype, parallel::IThreading* threading) {
     if (qtype == BTLA_DTYPE::S7_CLIP) return compressBit7Weight(N, K, B, dstptr, qtype, threading);
@@ -722,6 +663,13 @@ class WeightKBlockNInteger {
     if (wptr->SDtype() == BTLA_DTYPE::BF16) {
       auto aptr = wptr->template SPtr<utils::bf16>();
       kernel::wrapper::Memcpy2DBf16CvtFp32::forward<ISA_T>(
+          aptr + k_offset / wptr->mBlockSize * wptr->CStep() + n_offset, *dstptr,
+          utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep() * 2, n_size * 4, false);
+      *dststep = n_size;
+    }
+    if (wptr->SDtype() == BTLA_DTYPE::F16) {
+      auto aptr = wptr->template SPtr<utils::fp16>();
+      kernel::wrapper::Memcpy2DFp16CvtFp32::forward<ISA_T>(
           aptr + k_offset / wptr->mBlockSize * wptr->CStep() + n_offset, *dstptr,
           utils::updiv(k_size, wptr->mBlockSize), n_size, wptr->CStep() * 2, n_size * 4, false);
       *dststep = n_size;

@@ -353,6 +353,7 @@ class LauncherBase {
               _param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP;
       if constexpr (support()) {
         impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32 ||
+                _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F16 ||
                 _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::BF16;
       }
 
@@ -450,6 +451,17 @@ class LauncherBase {
             if (m == 6) gemv_kblock<utils::bf16, 6>(_param, _config);
             if (m == 7) gemv_kblock<utils::bf16, 7>(_param, _config);
             if (m == 8) gemv_kblock<utils::bf16, 8>(_param, _config);
+          }
+        } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F16) {
+          if (m == 1) gemv_kblock<utils::fp16, 1>(_param, _config);
+          if (m == 2) gemv_kblock<utils::fp16, 2>(_param, _config);
+          if (m == 3) gemv_kblock<utils::fp16, 3>(_param, _config);
+          if (m == 4) gemv_kblock<utils::fp16, 4>(_param, _config);
+          if constexpr (Reg32) {
+            if (m == 5) gemv_kblock<utils::fp16, 5>(_param, _config);
+            if (m == 6) gemv_kblock<utils::fp16, 6>(_param, _config);
+            if (m == 7) gemv_kblock<utils::fp16, 7>(_param, _config);
+            if (m == 8) gemv_kblock<utils::fp16, 8>(_param, _config);
           }
         }
       }
@@ -622,6 +634,7 @@ class LauncherIntKBlock {
               _param.paramB.packedW->mDType == BTLA_DTYPE::S1_CLIP ||
               _param.paramB.packedW->mDType == BTLA_DTYPE::S2_CLIP;
       impl &= _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F32 ||
+              _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::F16 ||
               _param.paramB.packedW->mCorrection.mScaT == BTLA_DTYPE::BF16;
       impl &= _param.problem.dims[1] <= MaxGemvM;
       return impl;
@@ -698,6 +711,17 @@ class LauncherIntKBlock {
             if (m == 6) gemv_kblock<utils::bf16, 6>(_param, _config);
             if (m == 7) gemv_kblock<utils::bf16, 7>(_param, _config);
             if (m == 8) gemv_kblock<utils::bf16, 8>(_param, _config);
+          }
+        } else if (_param.paramB.packedW->SDtype() == BTLA_DTYPE::F16) {
+          if (m == 1) gemv_kblock<utils::fp16, 1>(_param, _config);
+          if (m == 2) gemv_kblock<utils::fp16, 2>(_param, _config);
+          if (m == 3) gemv_kblock<utils::fp16, 3>(_param, _config);
+          if (m == 4) gemv_kblock<utils::fp16, 4>(_param, _config);
+          if constexpr (Reg32) {
+            if (m == 5) gemv_kblock<utils::fp16, 5>(_param, _config);
+            if (m == 6) gemv_kblock<utils::fp16, 6>(_param, _config);
+            if (m == 7) gemv_kblock<utils::fp16, 7>(_param, _config);
+            if (m == 8) gemv_kblock<utils::fp16, 8>(_param, _config);
           }
         }
       }

@@ -88,6 +88,49 @@ class UT_DecompressKBlockF4FP {
 static UT_DecompressKBlockF4FP sUT_DecompressKBlockF4FP;
 #endif
 
+class UT_memcpy2d {
+ public:
+  UT_memcpy2d() {
+    UT_START();
+    CheckISA(AVX2);
+    ut<utils::bf16, BTLA_ISA::AVX2>(32, 64);
+    ut<utils::bf16, BTLA_ISA::AVX2>(32, 64 + 3);
+    ut<utils::fp16, BTLA_ISA::AVX2>(32, 64);
+    ut<utils::fp16, BTLA_ISA::AVX2>(32, 64 + 3);
+    CheckISA(AVX512F);
+    ut<utils::bf16, BTLA_ISA::AVX512F>(32, 64);
+    ut<utils::bf16, BTLA_ISA::AVX512F>(32, 64 + 3);
+    ut<utils::fp16, BTLA_ISA::AVX512F>(32, 64);
+    ut<utils::fp16, BTLA_ISA::AVX512F>(32, 64 + 3);
+  }
+
+  template <typename T_SRC, BTLA_ISA ISA_T>
+  void ut(int row, int col) {
+    printf("%s %d %d\n", __FUNCTION__, row, col);
+    std::vector<T_SRC> src(row * col);
+    std::vector<float> dst(row * col);
+    std::vector<T_SRC> src_revert(row * col);
+
+    fill_buffer_randn(src.data(), src.size(), T_SRC(-127), T_SRC(127));
+    if (std::is_same_v<T_SRC, utils::bf16>) {
+      kernel::wrapper::Memcpy2DBf16CvtFp32::forward<ISA_T>(src.data(), dst.data(), row, col, col * sizeof(T_SRC),
+                                                           col * sizeof(float), true);
+      kernel::wrapper::Memcpy2DFp32CvtBf16::forward<ISA_T>(dst.data(), src_revert.data(), row, col, col * sizeof(float),
+                                                           col * sizeof(T_SRC), true);
+    }
+    if (std::is_same_v<T_SRC, utils::fp16>) {
+      kernel::wrapper::Memcpy2DFp16CvtFp32::forward<ISA_T>(src.data(), dst.data(), row, col, col * sizeof(T_SRC),
+                                                           col * sizeof(float), true);
+      kernel::wrapper::Memcpy2DFp32CvtFp16::forward<ISA_T>(dst.data(), src_revert.data(), row, col, col * sizeof(float),
+                                                           col * sizeof(T_SRC), true);
+    }
+    ut::buffer_error(src.data(), src_revert.data(), src.size(), T_SRC(1.f));
+  }
+};
+#ifdef BTLA_UT_KERNEL_WRAPPER
+static UT_memcpy2d sUT_memcpy2d;
+#endif
+
 class UT_PaddingInterleaveMN {
  public:
   UT_PaddingInterleaveMN() {
