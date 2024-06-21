@@ -141,7 +141,7 @@ int main(int argc, char** argv) {  // NOLINT
 
   model_context* ctx;
   g_ctx = &ctx;
-  if (dev_ctx == NULL) {
+  if (dev_ctx == nullptr) {
     params.n_gpu_layers = 0;
   }
   // load the model and apply lora adapter, if any
