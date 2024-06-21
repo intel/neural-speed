@@ -1123,12 +1123,17 @@ struct model_context* model_init_from_file(const char* path_model, struct model_
                                    (32ULL * ctx->n_ctx * hparams.n_embd + 2ULL * ctx->n_ctx * hparams.ffn_hidden_size) *
                                    ne_type_size(NE_TYPE_F32) +
                                (10 << 20);
+#ifdef NS_SYCL
     ctx->buf_compute.resize(act_mem_per_layer);
     ctx->buf_scratch[0].resize(act_mem_per_layer);
     fprintf(stderr, "%s: cpu activation size = %7.2f MB\n", __func__, act_mem_per_layer / 1024.0 / 1024.0);
-#ifdef NS_SYCL
     model_alloc_sycl_mem(ctx->dev_ctx, act_mem_per_layer);
     fprintf(stderr, "%s: gpu activation size = %7.2f MB\n", __func__, act_mem_per_layer / 1024.0 / 1024.0);
+#else
+    ctx->buf_compute.resize(ctx->model.scratchs.eval);
+
+    ctx->buf_scratch[0].resize(ctx->model.scratchs.scratch0);
+    ctx->buf_scratch[1].resize(ctx->model.scratchs.scratch1);
 #endif
   }
 
