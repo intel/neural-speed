@@ -216,7 +216,7 @@ static bool kv_cache_device_init(const struct model_hparams& hparams, struct mod
 #ifdef NS_SYCL
   cache.device_buf = bestla_device_malloc(cache.device_size, device_queue);
 #else
-  cache.device_buf = NULL;
+  cache.device_buf = nullptr;
 #endif
   cache.seq_cells.resize(batch_size * beam_size);
   for (int i = 0; i < cache.seq_cells.size(); ++i) {
