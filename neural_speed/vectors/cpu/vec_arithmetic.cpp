@@ -15,7 +15,7 @@
 #include "vec_load.hpp"
 #include "vec_store.hpp"
 #include "vec_arithmetic.hpp"
-#include "cmath"
+#include <math.h>
 
 fp32x16 sub_fp32x16(fp32x16 x, fp32x16 y) {
 #if __AVX512F__
