@@ -235,6 +235,7 @@ bool _handle_fp_types(
     buff_vals<dtype>& data,
     buff_vals<dtype>& other,
     [[maybe_unused]] std::string name,
+    double diff_elems_tol,
     size_t ulp_tol,
     double abs_tol) {
   const bool verbose = name != "";
@@ -283,14 +284,11 @@ bool _handle_fp_types(
       std::max_element(aulpte.begin(), aulpte.end()) - aulpte.begin();
 
   if (verbose) {
-    std::cout << "\t"
-              << "max absolute ULP diff:\n";
-    std::cout << "\t\t"
-              << "data_idx: " << data.idx_mapping[aulpidx]
+    std::cout << "\t" << "max absolute ULP diff:\n";
+    std::cout << "\t\t" << "data_idx: " << data.idx_mapping[aulpidx]
               << " gold_idx: " << other.idx_mapping[aulpidx]
               << " abserr: " << (float)aulpte[aulpidx] << std::endl;
-    std::cout << "\t\t"
-              << "data_val: " << ulp_data[aulpidx]
+    std::cout << "\t\t" << "data_val: " << ulp_data[aulpidx]
               << " gold_val: " << (float)ulp_other[aulpidx] << std::endl;
   }
 
@@ -324,7 +322,8 @@ bool _handle_fp_types(
   float pass_rate = 100 - fail_rate;
   if (verbose || fail_rate != 0)
     std::cout << "\tpass rate: " << pass_rate << "%\n";
-
+  if (fail_rate < diff_elems_tol * 100)
+    flag = true;
   return flag;
 }
 
@@ -347,7 +346,7 @@ bool _cast_and_handle_fp_types(
       std::vector<cast_dtype>(other.buff.begin(), other.buff.end());
   casted_other.idx_mapping = other.idx_mapping;
   return buff_cmp::_handle_fp_types<cast_dtype>(
-      casted_data, casted_other, name, ulp_tol, abs_tol);
+      casted_data, casted_other, name, diff_elems_tol, ulp_tol, abs_tol);
 }
 
 ///
@@ -390,23 +389,17 @@ bool xetla_buff_cmp(
       std::max_element(diff.ate.begin(), diff.ate.end()) - diff.ate.begin();
   if (verbose) {
     std::cout << name << ":\n";
-    std::cout << "\t"
-              << "max relative diff:\n";
-    std::cout << "\t\t"
-              << "data_idx: " << data.idx_mapping[ridx]
+    std::cout << "\t" << "max relative diff:\n";
+    std::cout << "\t\t" << "data_idx: " << data.idx_mapping[ridx]
               << " gold_idx: " << other.idx_mapping[ridx]
               << " relerr: " << diff.rte[ridx] << std::endl;
-    std::cout << "\t\t"
-              << "data_val: " << data.buff[ridx]
+    std::cout << "\t\t" << "data_val: " << data.buff[ridx]
               << " gold_val: " << other.buff[ridx] << std::endl;
-    std::cout << "\t"
-              << "max absolute diff:\n";
-    std::cout << "\t\t"
-              << "data_idx: " << data.idx_mapping[aidx]
+    std::cout << "\t" << "max absolute diff:\n";
+    std::cout << "\t\t" << "data_idx: " << data.idx_mapping[aidx]
               << " gold_idx: " << other.idx_mapping[aidx]
               << " abserr: " << diff.ate[aidx] << std::endl;
-    std::cout << "\t\t"
-              << "data_val: " << data.buff[aidx]
+    std::cout << "\t\t" << "data_val: " << data.buff[aidx]
               << " gold_val: " << other.buff[aidx] << std::endl;
   }
 
