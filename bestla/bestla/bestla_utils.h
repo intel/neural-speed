@@ -62,6 +62,17 @@
 
 // As long as the compiler supports the ISA, we will enable it.
 // Only the ISA you use in your project will be compiled.
+#if defined(_MSC_VER) && defined(__INTEL_LLVM_COMPILER)
+#define CompileAVX512F() defined(__AVX512F__)
+#define CompileAVX512VNNI() defined(__AVX512VNNI__)
+#define CompileAVX2() defined(__AVX2__) && defined(__F16C__) && defined(__FMA__)
+#define CompileAVXVNNI() defined(__AVXVNNI__)
+#define CompileAMX() defined(__AMX_TILE__)
+#define CompileBF16() defined(__AVX512BF16__)
+#define CompileFP16() defined(__AVX512FP16__)
+#define CompileAMXBF16() (CompileAMX())
+#define CompileAMXINT8() (CompileAMX())
+#else
 #define CompileAVX512F() BTLA_AVX512_FOUND
 #define CompileAVX512VNNI() BTLA_AVX512_VNNI_FOUND
 #define CompileAVX2() BTLA_AVX2_FOUND
@@ -72,6 +83,7 @@
 #define CompileAMXFP16() BTLA_AMX_FP16_FOUND
 #define CompileAMXINT8() BTLA_AMX_INT8_FOUND
 #define CompileAMX() BTLA_AMX_BF16_FOUND
+#endif
 
 // called by launcher, time critical functions
 #define TLACALL             \
@@ -474,6 +486,8 @@ class isa_base {
 };
 
 static inline int padto_le(int src, int padding) { return src / padding * padding; }
+
+static inline int64_t padto_le(int64_t src, int64_t padding) { return src / padding * padding; }
 
 static inline size_t padto_le(size_t src, int padding) { return src / size_t(padding) * size_t(padding); }
 

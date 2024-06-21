@@ -25,7 +25,7 @@ namespace avx2 {
 #pragma GCC push_options
 #pragma GCC target("avx2", "fma", "f16c")
 #elif defined(ICX)
-#pragma clang attribute push(__attribute__((target("avx,avx2,fma"))), apply_to = function)
+//#pragma clang attribute push(__attribute__((target("avx2,fma,f16c"))), apply_to = function)
 #endif
 
 static inline void zero_reg() { _mm256_zeroupper(); }

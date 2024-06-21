@@ -16,7 +16,7 @@
 #define ENGINE_EXECUTOR_INCLUDE_VEC_BASE_HPP_
 
 #include <immintrin.h>
-#include <cstdint>
+#include <stdint.h>
 
 #if __AVX512F__
 struct fp32x16 {

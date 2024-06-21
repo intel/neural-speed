@@ -454,7 +454,7 @@ void Model::init_model(const std::string& model_path, int max_new_tokens, int n_
   token_eos = false;
   curr_input_ids.clear();
   curr_input_ids.resize(params.max_request_num);
-  ctx = model_init_from_gpt_params(params);
+  ctx = model_init_from_gpt_params(params, nullptr);
   n_vocab = model_n_vocab(ctx);
   n_ctx = model_n_ctx(ctx);
   last_n_tokens.resize(params.max_request_num);

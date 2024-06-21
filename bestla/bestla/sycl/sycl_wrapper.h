@@ -16,7 +16,7 @@
 #ifdef BTLA_SYCL
 #include <sycl/sycl.hpp>
 
-#include "bestla_utils.h"
+#include "bestla/bestla_utils.h"
 #include "sycl_utils.h"
 #include "sycl_device.h"
 #include "sycl_gemm.h"
@@ -56,12 +56,12 @@ class Launcher {
     int ldb = _param.paramB.ldb;
     int ldc = _param.paramC.ldc;
     int m_pad = utils::padto(utils::updiv(m, GemmCore::TileM), GemmCore::WgM);
-    sycl::range<2> problem{m_pad, n / GemmCore::TileN};
+    sycl::range<2> problem{static_cast<size_t>(m_pad), static_cast<size_t>(n) / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
       cgh.parallel_for(
           sycl::nd_range<2>(problem, group),
-          [=](sycl::nd_item<2> it) [[cl::reqd_work_group_size(
+          [=](sycl::nd_item<2> it) [[sycl::reqd_work_group_size(
               1, GemmCore::WgM,
               GemmCore::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
             sycl_utils::nd_item_helper<GemmCore> helper(it);
@@ -148,15 +148,15 @@ class LauncherWOQ {
     int ldb = _param.paramB.ldb;
     int ldc = _param.paramC.ldc;
     int m_pad = utils::padto(utils::updiv(m, GemmCore::TileM), GemmCore::WgM);
-    sycl::range<2> problem{m_pad, n / GemmCore::TileN};
+    sycl::range<2> problem{static_cast<size_t>(m_pad), static_cast<size_t>(n) / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
       cgh.parallel_for(
           sycl::nd_range<2>(problem, group),
-          [=](sycl::nd_item<2> it) [[cl::reqd_work_group_size(
+          [=](sycl::nd_item<2> it) [[sycl::reqd_work_group_size(
               1, GemmCore::WgM,
               GemmCore::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
-            nd_item_helper<GemmCore> helper(it);
+            sycl_utils::nd_item_helper<GemmCore> helper(it);
             if constexpr (debug) {
               compute_tile(k, blocksize, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
             } else {

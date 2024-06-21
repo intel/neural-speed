@@ -49,11 +49,7 @@
 
 #define NE_SIZE_CALC -1
 
-#if __AVX512F__
 #define NE_ALIGNMENT 64
-#else
-#define NE_ALIGNMENT 32
-#endif
 
 #define NE_ASSERT(x)                                                     \
   do {                                                                   \
@@ -98,7 +94,7 @@ struct ne_context;
 
 enum ne_backend {
   NE_BACKEND_CPU = 0,
-  NE_BACKEND_CUDA = 1,
+  NE_BACKEND_SYCL = 1,
 };
 
 // ne object
@@ -124,6 +120,19 @@ struct ne_scratch {
 // ne context
 //
 
+#define MAX_SYCL_BUFFER_SIZE (4000ull << 20)  // 4GB
+#define MAX_SYCL_BUFFER_COUNT 64              // 32*4GB=128GB
+
+struct ne_sycl_context {
+  void* dev;
+  void* queue;
+  int n_buffers;
+  void* buffers[MAX_SYCL_BUFFER_COUNT];
+  size_t offs[MAX_SYCL_BUFFER_COUNT];
+  size_t offs_save[MAX_SYCL_BUFFER_COUNT];
+  size_t sizes[MAX_SYCL_BUFFER_COUNT];
+};
+
 struct ne_context {
   size_t mem_size;
   void* mem_buffer;
@@ -137,6 +146,9 @@ struct ne_context {
 
   struct ne_scratch scratch;
   struct ne_scratch scratch_save;
+
+  struct ne_object* objects_save;
+  struct ne_sycl_context* dev_ctx;
 };
 
 struct ne_context_container {
@@ -197,6 +209,9 @@ struct ne_cgraph {
   size_t work_size;
   struct ne_tensor* work;
 
+  size_t dev_work_size;
+  struct ne_tensor* dev_work;
+
   struct ne_tensor* nodes[NE_MAX_NODES];
   struct ne_tensor* grads[NE_MAX_NODES];
   struct ne_tensor* leafs[NE_MAX_NODES];
@@ -232,6 +247,11 @@ struct ne_compute_params {
   // work buffer for all threads
   size_t wsize;
   void* wdata;
+
+  size_t dev_wsize;
+  void* dev_wdata;
+
+  void* dev_queue;
 };
 
 #ifdef __cplusplus

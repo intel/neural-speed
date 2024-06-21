@@ -222,7 +222,7 @@ static bool falcon_model_eval_internal(model_context* ctx, const model_input* in
         struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
         // cur = KQV_merged.contiguous().view(n_embd, N)
-        cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+        cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N));
       } else {  // Using MHA (GQA/MQA) managed kv-cache
         const auto seq_kv = n_past + N;
         const auto k_size = kv_cache_info.k_bytes;
@@ -272,7 +272,7 @@ static bool falcon_model_eval_internal(model_context* ctx, const model_input* in
     lctx.use_buf(ctx0, 1);
 
     struct ne_tensor* inpFF = layernorm_output;
-    struct ne_tensor* attn_out = ne_cpy(ctx0, cur, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+    struct ne_tensor* attn_out = ne_cpy(ctx0, cur, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N));
 
     // FFN (pre_layer_norm output)
     {

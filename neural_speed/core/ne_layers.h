@@ -112,33 +112,41 @@ NE_API void ne_free(struct ne_context* ctx);
 
 NE_API size_t ne_used_mem(const struct ne_context* ctx);
 
+NE_API void ne_buffer_save(struct ne_context* ctx);
+
+NE_API void ne_buffer_load(struct ne_context* ctx);
+
 NE_API size_t ne_set_scratch(struct ne_context* ctx, struct ne_scratch scratch);
 
 NE_API struct ne_tensor* ne_new_tensor(struct ne_context* ctx, enum ne_type type, int n_dims, const int64_t* ne,
-                                       size_t size);
+                                       size_t size, enum ne_backend bk);
 
-NE_API struct ne_tensor* ne_new_tensor_1d(struct ne_context* ctx, enum ne_type type, int64_t ne0, size_t size);
+NE_API struct ne_tensor* ne_new_tensor_1d(struct ne_context* ctx, enum ne_type type, int64_t ne0, size_t size,
+                                          enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_new_tensor_2d(struct ne_context* ctx, enum ne_type type, int64_t ne0, int64_t ne1,
-                                          size_t size);
+                                          size_t size, enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_new_tensor_3d(struct ne_context* ctx, enum ne_type type, int64_t ne0, int64_t ne1,
-                                          int64_t ne2, size_t size);
+                                          int64_t ne2, size_t size, enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_new_tensor_4d(struct ne_context* ctx, enum ne_type type, int64_t ne0, int64_t ne1,
-                                          int64_t ne2, int64_t ne3, size_t size);
+                                          int64_t ne2, int64_t ne3, size_t size, enum ne_backend bk);
 
-#define d_ne_new_tensor(...) ne_new_tensor(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_1d(...) ne_new_tensor_1d(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_2d(...) ne_new_tensor_2d(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_3d(...) ne_new_tensor_3d(__VA_ARGS__, NE_SIZE_CALC)
-#define d_ne_new_tensor_4d(...) ne_new_tensor_4d(__VA_ARGS__, NE_SIZE_CALC)
+#define d_ne_new_tensor(...) ne_new_tensor(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_1d(...) ne_new_tensor_1d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_2d(...) ne_new_tensor_2d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_3d(...) ne_new_tensor_3d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
+#define d_ne_new_tensor_4d(...) ne_new_tensor_4d(__VA_ARGS__, NE_SIZE_CALC, NE_BACKEND_CPU)
 
 NE_API struct ne_tensor* ne_new_i32(struct ne_context* ctx, int32_t value);
 NE_API struct ne_tensor* ne_new_f32(struct ne_context* ctx, float value);
 
 NE_API struct ne_tensor* ne_dup_tensor(struct ne_context* ctx, const struct ne_tensor* src);
 NE_API struct ne_tensor* ne_view_tensor(struct ne_context* ctx, const struct ne_tensor* src);
+
+NE_API struct ne_tensor* ne_dup_tensor_bk(struct ne_context* ctx, const struct ne_tensor* src, enum ne_backend bk);
+NE_API struct ne_tensor* ne_view_tensor_bk(struct ne_context* ctx, const struct ne_tensor* src, enum ne_backend bk);
 
 NE_API struct ne_tensor* ne_set_zero(struct ne_tensor* tensor);
 NE_API struct ne_tensor* ne_set_i32(struct ne_tensor* tensor, int32_t value);
@@ -337,6 +345,9 @@ NE_API struct ne_tensor* ne_reshape_3d(struct ne_context* ctx, struct ne_tensor*
 
 NE_API struct ne_tensor* ne_reshape_4d(struct ne_context* ctx, struct ne_tensor* a, int64_t ne0, int64_t ne1,
                                        int64_t ne2, int64_t ne3);
+
+// If a is a device tensor, sync it to a host tensor. If a is a host tensor, it equals reshape(a).
+NE_API struct ne_tensor* ne_device_sync(struct ne_context* ctx, struct ne_tensor* a, enum ne_backend bk);
 
 // offset in bytes
 NE_API struct ne_tensor* ne_view_1d(struct ne_context* ctx, struct ne_tensor* a, int64_t ne0, size_t offset);

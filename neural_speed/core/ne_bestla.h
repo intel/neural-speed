@@ -78,6 +78,38 @@ void bestla_layernormalization(int norm_count, int norm_size, bool isrms, float 
 
 void bestla_mul(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out);
 void bestla_add(int batch, int vsize, const float* tensor, const float* vector, int vstep, float* out);
+
+enum ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1, enum ne_op op);
+bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t* dev_workspace);
+
+#ifdef NS_SYCL
+void* bestla_create_device(bool profile);
+void* bestla_get_device_queue(void* device);
+void bestla_release_device(void* device);
+size_t bestla_device_gmem_size(void* device);
+void* bestla_device_malloc(size_t size, void* queue);
+void bestla_device_free(void* ptr, void* queue);
+void bestla_device_memcpy(void* dstptr, const void* srcptr, size_t size, void* queue);
+void bestla_device_memcpy_sync(void* dstptr, const void* srcptr, size_t size, void* queue);
+void bestla_device_sync(void* queue);
+size_t bestla_device_storage_size();
+void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, void* queue);
+void bestla_device_f32f32_forward(float* activation, void* weiptr, float* output, int _m, int _n, int _k, int lda,
+                                  int ldo, void* workspace, void* queue);
+void bestla_device_mul_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                           const struct ne_tensor* src1, struct ne_tensor* dst);
+void bestla_device_add_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                           const struct ne_tensor* src1, struct ne_tensor* dst);
+void bestla_device_elewise_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                               struct ne_tensor* dst);
+void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                                struct ne_tensor* dst);
+void bestla_device_rope_f32(const struct ne_compute_params* params, const struct ne_tensor* src0,
+                            const struct ne_tensor* src1, struct ne_tensor* dst);
+void bestla_device_dup_f32(const struct ne_compute_params* params, const struct ne_tensor* src0, struct ne_tensor* dst);
+void bestla_device_mha_f32(const struct ne_compute_params* params, const struct ne_tensor* q, const struct ne_tensor* k,
+                           const struct ne_tensor* v, struct ne_tensor* dst);
+#endif
 #ifdef __cplusplus
 }
 #endif

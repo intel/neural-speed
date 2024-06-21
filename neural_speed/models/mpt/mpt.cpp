@@ -163,8 +163,7 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
       // Q = Qcur.contiguous().view(n_embd/n_head, n_head, N).permute(0,
       // 2, 1, 3) [64, N, 12]
       struct ne_tensor* Q = ne_permute(
-          ctx0, ne_cpy(ctx0, Qcur, ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_embd / n_head, n_head, N, NE_SIZE_CALC)), 0, 2,
-          1, 3);
+          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_embd / n_head, n_head, N)), 0, 2, 1, 3);
 
       // K = Kmem.view(n_embd/n_head, n_head, n_past + N).permute(0, 2, 1,
       // 3) [64, n_past + N, 12]
@@ -201,7 +200,7 @@ static bool mpt_model_eval_internal(model_context* ctx, const model_input* input
       struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
       // cur = KQV_merged.contiguous().view(n_embd, N)
-      cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+      cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N));
     } else {
       const auto seq_kv = n_past + N;
       const auto k_size = kv_cache_info.k_bytes;

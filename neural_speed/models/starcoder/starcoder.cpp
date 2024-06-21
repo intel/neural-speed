@@ -248,7 +248,7 @@ static bool starcoder_model_eval_internal(model_context* ctx, const model_input*
 
         // cur = KQV_merged.contiguous().view(n_embd, N)
         // [768, N]
-        cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N, NE_SIZE_CALC));
+        cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N));
       } else {
         const auto seq_kv = n_past + N;
         const auto k_size = kv_cache_info.k_bytes;
