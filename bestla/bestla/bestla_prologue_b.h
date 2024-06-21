@@ -133,6 +133,12 @@ class WeightKBlockNInteger {
     transposeWeight<int8_t>(srcstor.mK, srcstor.mN, s8buf, srcstor.mN, s8transbuf, srcstor.mKPad, threading);
     compressWeight(srcstor.mKPad, srcstor.mNPad, s8transbuf, srcstor.mKPad, dststor.WPtr<int8_t>(), srcstor.mDType,
                    threading);
+    if (s8buf) {
+      utils::afree(s8buf);
+    }
+    if (s8transbuf) {
+      utils::afree(s8transbuf);
+    }
     int nk_scale = utils::updiv(srcstor.mKPad, srcstor.mBlockSize);
     if (srcstor.mCorrection.mScaEleSize == 4) {
       transposeWeight<float>(nk_scale, srcstor.mNPad, srcstor.template SPtr<float>(), srcstor.mNPad,
@@ -141,6 +147,7 @@ class WeightKBlockNInteger {
       transposeWeight<uint16_t>(nk_scale, srcstor.mNPad, srcstor.template SPtr<uint16_t>(), srcstor.mNPad,
                                 dststor.template SPtr<uint16_t>(), dststor.CStep(), threading);
     }
+
   }
   AUTOCALL void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
                                  utils::aligned_vector<float>* dq_buf) {

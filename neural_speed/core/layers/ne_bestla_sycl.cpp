@@ -138,6 +138,9 @@ void bestla_device_load_storage(void* hoststor, void* devstor, void* deviceptr, 
       dstor->fromHost(transtor, (sycl::queue*)device_queue);
     }
   }
+  if (ptr) {
+    delete ptr;
+  }
 }
 
 template <class GCT>
