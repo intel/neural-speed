@@ -147,7 +147,6 @@ class WeightKBlockNInteger {
       transposeWeight<uint16_t>(nk_scale, srcstor.mNPad, srcstor.template SPtr<uint16_t>(), srcstor.mNPad,
                                 dststor.template SPtr<uint16_t>(), dststor.CStep(), threading);
     }
-
   }
   AUTOCALL void doubleQuantScale(float* scale, size_t scale_size, int dq_blocksize, BTLA_DTYPE qtype,
                                  utils::aligned_vector<float>* dq_buf) {
