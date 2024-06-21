@@ -16,31 +16,28 @@ find_package(Threads REQUIRED)
 file(GLOB layers_srcs "layers/*.cpp")
 file(GLOB test_srcs "layers/*test*.cpp")
 list(REMOVE_ITEM layers_srcs ${test_srcs})
+set(sources ne_layers.c ${layers_srcs})
 
-add_library_w_warning(ne_layers_cpp "${layers_srcs}")
-target_include_directories(ne_layers_cpp PUBLIC .)
+add_shareable_library_w_warning(ne_layers "${sources}")
 
+target_include_directories(ne_layers PUBLIC .)
+target_compile_features(ne_layers PUBLIC c_std_11) # don't bump
+set_target_properties(ne_layers PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if (NS_TP)
   find_package(oneCCL REQUIRED)
   find_package(MPI REQUIRED)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   add_library(parallel_context STATIC parallel_context.cpp)
-  target_link_libraries(ne_layers_cpp PUBLIC Threads::Threads bestla ne_vec MPI::MPI_CXX ccl parallel_context)
+  target_link_libraries(ne_layers PUBLIC Threads::Threads bestla ne_vec MPI::MPI_CXX ccl parallel_context)
 else ()
-  target_link_libraries(ne_layers_cpp PUBLIC Threads::Threads bestla ne_vec)
+  target_link_libraries(ne_layers PUBLIC Threads::Threads bestla ne_vec)
 endif()
 
-
-add_shareable_library_w_warning(ne_layers ne_layers.c)
-set_target_properties(ne_layers PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories(ne_layers PUBLIC .)
-target_compile_features(ne_layers PUBLIC c_std_11) # don't bump
 if(NOT WIN32)
   target_link_libraries(ne_layers PUBLIC rt)
 else()
   target_link_options(ne_layers PUBLIC /STACK:5242880 /F5242880)
 endif()
-target_link_libraries(ne_layers PRIVATE ne_layers_cpp)
 
 
 if (NS_BUILD_TESTS)

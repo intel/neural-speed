@@ -175,15 +175,15 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
 
   auto q = (sycl::queue*)params->dev_queue;
 
-  const size_t ne00 = src0->ne[0];
-  const size_t ne01 = src0->ne[1];
-  const size_t ne02 = src0->ne[2];
-  const size_t ne03 = src0->ne[3];
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
 
-  const size_t ne10 = src1->ne[0];
-  const size_t ne11 = src1->ne[1];
-  const size_t ne12 = src1->ne[2];
-  const size_t ne13 = src1->ne[3];
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
 
   const size_t nb00 = src0->nb[0];
   const size_t nb01 = src0->nb[1];
@@ -237,15 +237,15 @@ void bestla_device_add_f32(const struct ne_compute_params* params, const struct 
 
   auto q = (sycl::queue*)params->dev_queue;
 
-  const size_t ne00 = src0->ne[0];
-  const size_t ne01 = src0->ne[1];
-  const size_t ne02 = src0->ne[2];
-  const size_t ne03 = src0->ne[3];
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
 
-  const size_t ne10 = src1->ne[0];
-  const size_t ne11 = src1->ne[1];
-  const size_t ne12 = src1->ne[2];
-  const size_t ne13 = src1->ne[3];
+  const int64_t ne10 = src1->ne[0];
+  const int64_t ne11 = src1->ne[1];
+  const int64_t ne12 = src1->ne[2];
+  const int64_t ne13 = src1->ne[3];
 
   const size_t nb00 = src0->nb[0];
   const size_t nb01 = src0->nb[1];
@@ -299,10 +299,10 @@ void bestla_device_elewise_f32(const struct ne_compute_params* params, const str
 
   auto q = (sycl::queue*)params->dev_queue;
   auto op = dst->op;
-  const size_t ne00 = src0->ne[0];
-  const size_t ne01 = src0->ne[1];
-  const size_t ne02 = src0->ne[2];
-  const size_t ne03 = src0->ne[3];
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
 
   auto srcptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
@@ -330,10 +330,10 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
   auto q = (sycl::queue*)params->dev_queue;
   float eps;
   memcpy(&eps, dst->op_params, sizeof(float));
-  const size_t ne00 = src0->ne[0];
-  const size_t ne01 = src0->ne[1];
-  const size_t ne02 = src0->ne[2];
-  const size_t ne03 = src0->ne[3];
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
   const size_t nb00 = src0->nb[0];
   const size_t nb01 = src0->nb[1];
   const size_t nb02 = src0->nb[2];
@@ -342,9 +342,9 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
-  size_t constexpr WgSize = 1024;
+  int64_t constexpr WgSize = 1024;
   int constexpr SgSize = 16;
-  size_t ne00_ = bestla::utils::padto_le(ne00, WgSize);
+  int64_t ne00_ = bestla::utils::padto_le(ne00, WgSize);
   auto src0ptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
   auto ev = q->submit([&](sycl::handler& cgh) {
@@ -366,7 +366,7 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
                        float* dst_ptr = (float*)((char*)dstptr + i03 * nb3 + i02 * nb2 + i01 * nb1);
                        float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
                        float sum = 0.0;
-                       size_t i00 = wg_loc_id;
+                       int64_t i00 = wg_loc_id;
                        for (; i00 < ne00_; i00 += WgSize) {
                          sum += (src0_ptr[i00] * src0_ptr[i00]);
                        }
@@ -411,7 +411,7 @@ static float rope_yarn_ramp(const float low, const float high, const int i0) {
 
 // YaRN algorithm based on LlamaYaRNScaledRotaryEmbedding.py from https://github.com/jquesnelle/yarn
 // MIT licensed. Copyright (c) 2023 Jeffrey Quesnelle and Bowen Peng.
-static void rope_yarn(float theta_extrap, float freq_scale, float corr_dims0, float corr_dims1, size_t i0,
+static void rope_yarn(float theta_extrap, float freq_scale, float corr_dims0, float corr_dims1, int64_t i0,
                       float ext_factor, float mscale, float* cos_theta, float* sin_theta) {
   // Get n-d rotational scaling corrected for extrapolation
   float theta_interp = freq_scale * theta_extrap;
@@ -474,15 +474,15 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
   const int64_t n_keep = ((int32_t*)src1->data)[ROPE_NKEEP_IDX];
   assert(n_past >= 0);
 
-  const size_t ne00 = src0->ne[0];
-  const size_t ne01 = src0->ne[1];
-  const size_t ne02 = src0->ne[2];
-  const size_t ne03 = src0->ne[3];
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
 
-  const size_t ne0 = dst->ne[0];
-  const size_t ne1 = dst->ne[1];
-  const size_t ne2 = dst->ne[2];
-  const size_t ne3 = dst->ne[3];
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
 
   const size_t nb00 = src0->nb[0];
   const size_t nb01 = src0->nb[1];
@@ -520,9 +520,9 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
       i /= ne2;
       int i3 = i % ne3;
 
-      const size_t p = n_past + i2;
+      const int64_t p = n_past + i2;
       float theta_base = (float)p;
-      for (size_t i0 = 0; i0 < ne0; i0 += 2) {
+      for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
         float cos_theta, sin_theta;
         rope_yarn(theta_base, freq_scale, corr_dims0, corr_dims1, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
 
@@ -551,15 +551,15 @@ void bestla_device_dup_f32(const struct ne_compute_params* params, const struct 
   }
 
   auto q = (sycl::queue*)params->dev_queue;
-  const size_t ne00 = src0->ne[0];
-  const size_t ne01 = src0->ne[1];
-  const size_t ne02 = src0->ne[2];
-  const size_t ne03 = src0->ne[3];
+  const int64_t ne00 = src0->ne[0];
+  const int64_t ne01 = src0->ne[1];
+  const int64_t ne02 = src0->ne[2];
+  const int64_t ne03 = src0->ne[3];
 
-  const size_t ne0 = dst->ne[0];
-  const size_t ne1 = dst->ne[1];
-  const size_t ne2 = dst->ne[2];
-  const size_t ne3 = dst->ne[3];
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
+  const int64_t ne2 = dst->ne[2];
+  const int64_t ne3 = dst->ne[3];
 
   const size_t nb00 = src0->nb[0];
   const size_t nb01 = src0->nb[1];
@@ -666,17 +666,17 @@ class MHA {
                          int jj = wg_loc_id * 2;
                          for (; jj < seq_acc_pad; jj += WgSize * 2) {
                            auto s2 = *(TC*)&slm[jj];
-                           s2[0] = std::exp(s2[0] - fmax);
-                           s2[1] = std::exp(s2[1] - fmax);
+                           s2[0] = std::expf(s2[0] - fmax);
+                           s2[1] = std::expf(s2[1] - fmax);
                            fsums += s2[0];
                            fsums += s2[1];
                            *(TC*)&slm[jj] = s2;
                          }
                          if (jj < seq_acc) {
-                           slm[jj] = std::exp(float(slm[jj]) - fmax);
+                           slm[jj] = std::expf(float(slm[jj]) - fmax);
                            fsums += slm[jj];
                            if (jj + 1 < seq_acc) {
-                             slm[jj + 1] = std::exp(float(slm[jj + 1]) - fmax);
+                             slm[jj + 1] = std::expf(float(slm[jj + 1]) - fmax);
                              fsums += slm[jj + 1];
                            }
                          }
@@ -797,12 +797,12 @@ class MHA {
                          int jj = wg_loc_id;
                          for (; jj < seq_acc_pad; jj += SgSize) {
                            auto s = slm[jj];
-                           s = std::exp(s - fmax);
+                           s = std::expf(s - fmax);
                            fsums += s;
                            slm[jj] = s;
                          }
                          if (jj < seq_acc) {
-                           auto s = std::exp(float(slm[jj]) - fmax);
+                           auto s = std::expf(float(slm[jj]) - fmax);
                            fsums += s;
                            slm[jj] = s;
                          }
@@ -850,26 +850,26 @@ void bestla_device_mha_f32(const struct ne_compute_params* params, const struct 
     return;
   }
   auto q = (sycl::queue*)params->dev_queue;
-  const size_t neq0 = _q->ne[0];
-  const size_t neq1 = _q->ne[1];
-  const size_t neq2 = _q->ne[2];
-  const size_t neq3 = _q->ne[3];
+  const int64_t neq0 = _q->ne[0];
+  const int64_t neq1 = _q->ne[1];
+  const int64_t neq2 = _q->ne[2];
+  const int64_t neq3 = _q->ne[3];
 
-  const size_t nek0 = k->ne[0];
-  const size_t nek1 = k->ne[1];
-  const size_t nek2 = k->ne[2];
-  // const size_t nek3 = k->ne[3];
+  const int64_t nek0 = k->ne[0];
+  const int64_t nek1 = k->ne[1];
+  const int64_t nek2 = k->ne[2];
+  // const int64_t nek3 = k->ne[3];
 
-  const size_t ne0 = dst->ne[0];
-  const size_t ne1 = dst->ne[1];
+  const int64_t ne0 = dst->ne[0];
+  const int64_t ne1 = dst->ne[1];
 
-  const size_t headsize = neq0;
-  const size_t headnum = neq1;
-  const size_t heads_kv = nek2;
-  const size_t embedsize = headnum * headsize;
-  const size_t seq_cur = neq2;
-  const size_t seq_all = nek1;
-  const size_t batch = neq3;
+  const int64_t headsize = neq0;
+  const int64_t headnum = neq1;
+  const int64_t heads_kv = nek2;
+  const int64_t embedsize = headnum * headsize;
+  const int64_t seq_cur = neq2;
+  const int64_t seq_all = nek1;
+  const int64_t batch = neq3;
   auto scale = *(float*)dst->padding;
   auto n_ctx = *(uint32_t*)&dst->padding[4];
   auto Qptr = (float*)_q->data;
