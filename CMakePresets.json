@@ -143,7 +143,7 @@
         "BTLA_UT_OPENMP": "ON",
         "BTLA_ENABLE_OPENMP": "ON",
         "CMAKE_CXX_COMPILER": "icx",
-        "CMAKE_C_COMPILER": "icx"
+        "CMAKE_C_COMPILER": "cl"
       }
     },
     {
