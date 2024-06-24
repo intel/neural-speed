@@ -1138,12 +1138,11 @@ struct mem_payload_t<
   static constexpr uint32_t block_bytes =
       block_size_x * block_size_y * sizeof(dtype);
 
-  //     using mem_dtype = uint32_t;
-
   static constexpr uint32_t block_per_row_bytes = std::min(
       (mem_transpose ? block_size_y : block_size_x) * uint32_t(sizeof(dtype)),
       alignment_in_bytes);
 
+  //     using mem_dtype = uint32_t;
   using mem_dtype = typename std::conditional<
       (block_per_row_bytes % sizeof(uint64_t) == 0),
       uint64_t,
@@ -1160,14 +1159,23 @@ struct mem_payload_t<
 
   // for pvc, we can use simd16 or simd32
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_bytes = load_store_attr::max_load_vec_len;
+  static constexpr uint32_t max_bytes =
+      std::min(load_store_attr::max_load_vec_len, block_bytes);
 
-  static constexpr uint32_t simd_channel =
+  static constexpr uint32_t max_channel =
       max_bytes / (simd_exec_size * sizeof(mem_dtype));
 
-  static constexpr uint32_t num_channel = mem_transpose
-      ? std::min(block_size_x, simd_channel)
-      : std::min(block_size_y, simd_channel);
+
+  static constexpr uint32_t select_channel(const uint32_t channel) {
+    return (channel >= 32 && arch_tag == gpu_arch::XeHpc) ? 32
+        : channel >= 16                                   ? 16
+        : channel >= 8                                    ? 8
+                                                          : 1;
+  }
+
+  static constexpr uint32_t num_channel = select_channel(
+      mem_transpose ? std::min(block_size_x, max_channel)
+                    : std::min(block_size_y, max_channel));
 
   xetla_vector<uint32_t, num_channel> channel_offset;
   xetla_vector<uint32_t, num_channel> step_x;

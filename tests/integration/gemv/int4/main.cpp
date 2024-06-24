@@ -37,7 +37,7 @@ class test_col_major_1 {
   static constexpr size_t wg_n = 1;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 512 / 1;
+  static constexpr size_t sg_k = 512 / sg_m;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
