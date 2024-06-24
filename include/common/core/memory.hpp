@@ -752,18 +752,6 @@ template <typename Ty, int NElts = 1, data_size DS = data_size::default_size>
 __XETLA_API void xetla_store_local(
     uint32_t offset,
     xetla_vector<Ty, NElts> vals) {
-  // using T = native_type_t<Ty>;
-  // DEBUG_INVOKE(
-  //     dbg_level::core,
-  //     core::general_1d<gpu_arch::XeHpc, Ty>::template
-  //     check_restriction<NElts>(
-  //         offset));
-
-  // __ESIMD_ENS::
-  //     lsc_slm_block_store<T, NElts, gpu::xetla::detail::get_data_size(DS)>(
-  //         offset, vals);
-  // __ESIMD_NS::properties props{};
-
   __ESIMD_NS::slm_block_store<Ty, NElts>(offset, vals);
 }
 

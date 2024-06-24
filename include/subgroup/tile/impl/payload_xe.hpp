@@ -1165,7 +1165,6 @@ struct mem_payload_t<
   static constexpr uint32_t max_channel =
       max_bytes / (simd_exec_size * sizeof(mem_dtype));
 
-
   static constexpr uint32_t select_channel(const uint32_t channel) {
     return (channel >= 32 && arch_tag == gpu_arch::XeHpc) ? 32
         : channel >= 16                                   ? 16
