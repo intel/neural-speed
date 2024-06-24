@@ -166,7 +166,7 @@ class Model:
         # check cache and quantization
         output_path = "runtime_outs"
         os.makedirs(output_path, exist_ok=True)
-        fp32_bin = "{}/ne_{}_f32.bin".format(output_path, model_type)
+        fp32_bin = "{}/ns_{}_f32.bin".format(output_path, model_type)
         quant_desc = weight_dtype
         if use_ggml:
             quant_desc += "_ggml"
@@ -189,7 +189,7 @@ class Model:
             if quant_desc is None:
                 print("Error: No quant_method info in model config...")
                 exit(0)
-        quant_bin = "{}/ne_{}_q_{}.bin".format(output_path, model_type, quant_desc)
+        quant_bin = "{}/ns_{}_q_{}.bin".format(output_path, model_type, quant_desc)
 
         if not use_quant:
             self.bin_file = fp32_bin

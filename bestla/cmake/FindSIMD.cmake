@@ -98,11 +98,13 @@ set(AVX512_FP16_CODE "
     {
         char tmp[512];
         __m256h a = _mm256_loadu_ph(tmp); // avx512vl + avx512fp16
+        __m512 b = _mm512_cvtxph_ps(a); // avx512fp16
+        a = _mm512_cvtxps_ph(b); // avx512fp16
         _mm256_storeu_ph(tmp,a);
         return 0;
     }
 ")
-set(AVX512_FP16_FLAGS "-mavx512f -mavx512fp16")
+set(AVX512_FP16_FLAGS "-mavx512f -mavx512vl -mavx512fp16")
 
 # "avx512_bf16"
 set(AVX512_BF16_CODE "

@@ -13,7 +13,7 @@ on:
           description: 'compiler_version'
           required: false
           type: string
-          default: '12.1.0'
+          default: '13.2.0'
 
 # If there is a new commit, the previous jobs will be canceled
 concurrency:
@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '12.1.0' }}
+  INPUT_COMPILER_VERSION: ${{ inputs.compiler_version || '13.2.0' }}
   WORKING_DIR: ${{ github.workspace }}
   CONTAINER_NAME: "utTest"
 
@@ -45,6 +45,7 @@ jobs:
       - name: Env build
         run: |
           echo "do not need conda env"
+          source ~/.bashrc
           bash ${{ github.workspace }}/.github/workflows/scripts/prepare_env_with_conda.sh "unit-test-bestla" "3.10"
           conda activate unit-test-bestla || source activate unit-test-bestla
           conda install --update-deps -c conda-forge gxx==${{ env.INPUT_COMPILER_VERSION }} gcc==${{ env.INPUT_COMPILER_VERSION }} gxx_linux-64==${{ env.INPUT_COMPILER_VERSION }} libstdcxx-ng sysroot_linux-64 -y
@@ -52,8 +53,9 @@ jobs:
       - name: Run UT
         run: |
           #source /opt/rh/gcc-toolset-12/enable
+          source ~/.bashrc
           conda activate unit-test-bestla || source activate unit-test-bestla
-          export LD_LIBRARY_PATH=${HOME}/miniconda3/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
+          export LD_LIBRARY_PATH=${HOME}/miniforge/envs/${conda_env}/lib/:$LD_LIBRARY_PATH
           cd ${{ github.workspace }}/bestla && mkdir build && cd build && cmake .. -DBTLA_UT_ALL=ON && make -j
           ./bestla_ut 2>&1 | tee unit_test_bestla.log
 

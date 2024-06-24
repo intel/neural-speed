@@ -36,11 +36,19 @@ static const model_scratch llama_mem_req(int n_layers, float scratch_size_ratio 
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
     case 32:
+#ifdef NS_SYCL
+      return {
+          static_cast<unsigned long long>(scratch_size_ratio * 0) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 0) * MB,
+          static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
+      };
+#else
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 2048) * MB,
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,
       };
+#endif
     case 40:
       return {
           static_cast<unsigned long long>(scratch_size_ratio * 4096) * MB,

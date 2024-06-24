@@ -565,8 +565,8 @@ static bool kv_cache_init(const struct whisper_hparams_t& hparams, const size_t 
   const int n_mem = n_text_layer * n_ctx;
   const int n_elements = n_text_state * n_mem;
 
-  cache->k = ne_new_tensor_1d(cache->ctx, wtype, n_elements, NE_SIZE_CALC);
-  cache->v = ne_new_tensor_1d(cache->ctx, wtype, n_elements, NE_SIZE_CALC);
+  cache->k = d_ne_new_tensor_1d(cache->ctx, wtype, n_elements);
+  cache->v = d_ne_new_tensor_1d(cache->ctx, wtype, n_elements);
 
   return true;
 }
@@ -595,8 +595,8 @@ static bool kv_cache_reinit(struct whisper_kv_cache_t* cache) {
     return false;
   }
 
-  cache->k = ne_new_tensor_1d(cache->ctx, wtype, n_elements, NE_SIZE_CALC);
-  cache->v = ne_new_tensor_1d(cache->ctx, wtype, n_elements, NE_SIZE_CALC);
+  cache->k = d_ne_new_tensor_1d(cache->ctx, wtype, n_elements);
+  cache->v = d_ne_new_tensor_1d(cache->ctx, wtype, n_elements);
 
   return true;
 }
@@ -965,16 +965,16 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
 
     // encoder
     {
-      model.e_pe = ne_new_tensor_2d(ctx, NE_TYPE_F32, n_audio_state, n_audio_ctx, NE_SIZE_CALC);
+      model.e_pe = d_ne_new_tensor_2d(ctx, NE_TYPE_F32, n_audio_state, n_audio_ctx);
 
-      model.e_conv_1_w = ne_new_tensor_3d(ctx, vtype, 3, n_mels, n_audio_state, NE_SIZE_CALC);
-      model.e_conv_1_b = ne_new_tensor_2d(ctx, NE_TYPE_F32, 1, n_audio_state, NE_SIZE_CALC);
+      model.e_conv_1_w = d_ne_new_tensor_3d(ctx, vtype, 3, n_mels, n_audio_state);
+      model.e_conv_1_b = d_ne_new_tensor_2d(ctx, NE_TYPE_F32, 1, n_audio_state);
 
-      model.e_conv_2_w = ne_new_tensor_3d(ctx, vtype, 3, n_audio_state, n_audio_state, NE_SIZE_CALC);
-      model.e_conv_2_b = ne_new_tensor_2d(ctx, NE_TYPE_F32, 1, n_audio_state, NE_SIZE_CALC);
+      model.e_conv_2_w = d_ne_new_tensor_3d(ctx, vtype, 3, n_audio_state, n_audio_state);
+      model.e_conv_2_b = d_ne_new_tensor_2d(ctx, NE_TYPE_F32, 1, n_audio_state);
 
-      model.e_ln_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
-      model.e_ln_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+      model.e_ln_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
+      model.e_ln_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
       // map by name
       model.tensors["encoder.positional_embedding"] = model.e_pe;
@@ -991,28 +991,28 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
       for (int i = 0; i < n_audio_layer; ++i) {
         auto& layer = model.layers_encoder[i];
 
-        layer.mlp_ln_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
-        layer.mlp_ln_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+        layer.mlp_ln_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
+        layer.mlp_ln_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
-        layer.mlp_0_w = ne_new_tensor_2d(ctx, wtype, n_audio_state, 4 * n_audio_state, NE_SIZE_CALC);
-        layer.mlp_0_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, 4 * n_audio_state, NE_SIZE_CALC);
+        layer.mlp_0_w = d_ne_new_tensor_2d(ctx, wtype, n_audio_state, 4 * n_audio_state);
+        layer.mlp_0_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, 4 * n_audio_state);
 
-        layer.mlp_1_w = ne_new_tensor_2d(ctx, wtype, 4 * n_audio_state, n_audio_state, NE_SIZE_CALC);
-        layer.mlp_1_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+        layer.mlp_1_w = d_ne_new_tensor_2d(ctx, wtype, 4 * n_audio_state, n_audio_state);
+        layer.mlp_1_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
-        layer.attn_ln_0_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
-        layer.attn_ln_0_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+        layer.attn_ln_0_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
+        layer.attn_ln_0_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
-        layer.attn_q_w = ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state, NE_SIZE_CALC);
-        layer.attn_q_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+        layer.attn_q_w = d_ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state);
+        layer.attn_q_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
-        layer.attn_k_w = ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state, NE_SIZE_CALC);
+        layer.attn_k_w = d_ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state);
 
-        layer.attn_v_w = ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state, NE_SIZE_CALC);
-        layer.attn_v_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+        layer.attn_v_w = d_ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state);
+        layer.attn_v_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
-        layer.attn_ln_1_w = ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state, NE_SIZE_CALC);
-        layer.attn_ln_1_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state, NE_SIZE_CALC);
+        layer.attn_ln_1_w = d_ne_new_tensor_2d(ctx, wtype, n_audio_state, n_audio_state);
+        layer.attn_ln_1_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_audio_state);
 
         // map by name
         model.tensors["encoder.blocks." + std::to_string(i) + ".mlp_ln.weight"] = layer.mlp_ln_w;
@@ -1042,12 +1042,12 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
 
     // decoder
     {
-      model.d_pe = ne_new_tensor_2d(ctx, NE_TYPE_F32, n_text_state, n_text_ctx, NE_SIZE_CALC);
+      model.d_pe = d_ne_new_tensor_2d(ctx, NE_TYPE_F32, n_text_state, n_text_ctx);
 
-      model.d_te = ne_new_tensor_2d(ctx, wtype, n_text_state, n_vocab, NE_SIZE_CALC);
+      model.d_te = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_vocab);
 
-      model.d_ln_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
-      model.d_ln_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+      model.d_ln_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
+      model.d_ln_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
       // map by name
       model.tensors["decoder.positional_embedding"] = model.d_pe;
@@ -1060,42 +1060,42 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
       for (int i = 0; i < n_text_layer; ++i) {
         auto& layer = model.layers_decoder[i];
 
-        layer.mlp_ln_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
-        layer.mlp_ln_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.mlp_ln_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
+        layer.mlp_ln_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.mlp_0_w = ne_new_tensor_2d(ctx, wtype, n_text_state, 4 * n_text_state, NE_SIZE_CALC);
-        layer.mlp_0_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, 4 * n_text_state, NE_SIZE_CALC);
+        layer.mlp_0_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, 4 * n_text_state);
+        layer.mlp_0_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, 4 * n_text_state);
 
-        layer.mlp_1_w = ne_new_tensor_2d(ctx, wtype, 4 * n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.mlp_1_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.mlp_1_w = d_ne_new_tensor_2d(ctx, wtype, 4 * n_text_state, n_text_state);
+        layer.mlp_1_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.attn_ln_0_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
-        layer.attn_ln_0_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.attn_ln_0_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
+        layer.attn_ln_0_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.attn_q_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.attn_q_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.attn_q_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
+        layer.attn_q_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.attn_k_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
+        layer.attn_k_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
 
-        layer.attn_v_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.attn_v_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.attn_v_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
+        layer.attn_v_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.attn_ln_1_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.attn_ln_1_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.attn_ln_1_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
+        layer.attn_ln_1_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.cross_attn_ln_0_w = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
-        layer.cross_attn_ln_0_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.cross_attn_ln_0_w = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
+        layer.cross_attn_ln_0_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.cross_attn_q_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.cross_attn_q_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.cross_attn_q_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
+        layer.cross_attn_q_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.cross_attn_k_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
+        layer.cross_attn_k_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
 
-        layer.cross_attn_v_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.cross_attn_v_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.cross_attn_v_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
+        layer.cross_attn_v_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
-        layer.cross_attn_ln_1_w = ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state, NE_SIZE_CALC);
-        layer.cross_attn_ln_1_b = ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state, NE_SIZE_CALC);
+        layer.cross_attn_ln_1_w = d_ne_new_tensor_2d(ctx, wtype, n_text_state, n_text_state);
+        layer.cross_attn_ln_1_b = d_ne_new_tensor_1d(ctx, NE_TYPE_F32, n_text_state);
 
         // map by name
         model.tensors["decoder.blocks." + std::to_string(i) + ".mlp_ln.weight"] = layer.mlp_ln_w;
@@ -1261,7 +1261,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
 
   wstate->use_buf(ctx0, 0);
 
-  struct ne_tensor* mel = ne_new_tensor_2d(ctx0, NE_TYPE_F32, 2 * n_ctx, n_mels, NE_SIZE_CALC);
+  struct ne_tensor* mel = d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, 2 * n_ctx, n_mels);
   assert(mel->type == NE_TYPE_F32);
   {
     float* dst = reinterpret_cast<float*>(mel->data);
@@ -1368,29 +1368,27 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
         wstate->use_buf(ctx0, 0);
 
 #ifdef WHISPER_USE_FLASH_ATTN
-        struct ne_tensor* Q = ne_permute(
-            ctx0, ne_cpy(ctx0, Qcur, ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx, NE_SIZE_CALC)),
-            0, 2, 1, 3);
+        struct ne_tensor* Q =
+            ne_permute(ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
-        struct ne_tensor* K = ne_permute(
-            ctx0, ne_cpy(ctx0, Kcur, ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx, NE_SIZE_CALC)),
-            0, 2, 1, 3);
+        struct ne_tensor* K =
+            ne_permute(ctx0, ne_cpy(ctx0, Kcur, d_ne_new_tensor_3d(ctx0, wctx.itype, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
         struct ne_tensor* V =
             ne_cpy(ctx0, ne_permute(ctx0, ne_reshape_3d(ctx0, Vcur, n_state / n_head, n_head, n_ctx), 1, 2, 0, 3),
-                   ne_new_tensor_3d(ctx0, wctx.itype, n_ctx, n_state / n_head, n_head, NE_SIZE_CALC));
+                   d_ne_new_tensor_3d(ctx0, wctx.itype, n_ctx, n_state / n_head, n_head));
 
         struct ne_tensor* KQV = ggml_flash_attn(ctx0, Q, K, V, false);
 #else
-        struct ne_tensor* Q = ne_permute(
-            ctx0,
-            ne_cpy(ctx0, Qcur, ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, n_ctx, NE_SIZE_CALC)), 0,
-            2, 1, 3);
+        struct ne_tensor* Q =
+            ne_permute(ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
-        struct ne_tensor* K = ne_permute(
-            ctx0,
-            ne_cpy(ctx0, Kcur, ne_new_tensor_3d(ctx0, wctx->itype, n_state / n_head, n_head, n_ctx, NE_SIZE_CALC)), 0,
-            2, 1, 3);
+        struct ne_tensor* K =
+            ne_permute(ctx0, ne_cpy(ctx0, Kcur, d_ne_new_tensor_3d(ctx0, wctx->itype, n_state / n_head, n_head, n_ctx)),
+                       0, 2, 1, 3);
 
         // K * Q
         struct ne_tensor* KQ = ne_mul_mat(ctx0, K, Q);
@@ -1402,7 +1400,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
 
         struct ne_tensor* V =
             ne_cpy(ctx0, ne_permute(ctx0, ne_reshape_3d(ctx0, Vcur, n_state / n_head, n_head, n_ctx), 1, 2, 0, 3),
-                   ne_new_tensor_3d(ctx0, wctx->itype, n_ctx, n_state / n_head, n_head, NE_SIZE_CALC));
+                   d_ne_new_tensor_3d(ctx0, wctx->itype, n_ctx, n_state / n_head, n_head));
 
         struct ne_tensor* KQV = ne_mul_mat(ctx0, V, KQ_soft_max);
 #endif
@@ -1410,7 +1408,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
 
         wstate->use_buf(ctx0, 1);
 
-        cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_state, n_ctx, NE_SIZE_CALC));
+        cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_state, n_ctx));
       }
 
       // projection
@@ -1449,7 +1447,7 @@ static bool whisper_encode_internal(whisper_context* wctx, whisper_state* wstate
 #ifdef WHISPER_USE_FLASH_FF
         wstate.use_buf(ctx0, 0);
 
-        cur = ggml_flash_ff(ctx0, ne_cpy(ctx0, cur, ne_new_tensor_2d(ctx0, wstate.itype, n_state, n_ctx, NE_SIZE_CALC)),
+        cur = ggml_flash_ff(ctx0, ne_cpy(ctx0, cur, d_ne_new_tensor_2d(ctx0, wstate.itype, n_state, n_ctx)),
                             layer.mlp_0_w, layer.mlp_0_b, layer.mlp_1_w, layer.mlp_1_b);
 #else
         wstate->use_buf(ctx0, 0);
@@ -1630,10 +1628,10 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
 
   struct ne_cgraph gf = {};
   gf.n_threads = n_threads;
-  struct ne_tensor* embd = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
+  struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
   memcpy(embd->data, tokens, N * ne_element_size(embd));
 
-  struct ne_tensor* position = ne_new_tensor_1d(ctx0, NE_TYPE_I32, N, NE_SIZE_CALC);
+  struct ne_tensor* position = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N);
   for (int i = 0; i < N; ++i) {
     (reinterpret_cast<int32_t*>(position->data))[i] = n_past + i;
   }
@@ -1695,8 +1693,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       wstate->use_buf(ctx0, 0);
 
       struct ne_tensor* Q = ne_permute(
-          ctx0, ne_cpy(ctx0, Qcur, ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N, NE_SIZE_CALC)), 0,
-          2, 1, 3);
+          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N)), 0, 2, 1, 3);
 
       struct ne_tensor* K = ne_permute(ctx0,
                                        ne_reshape_3d(ctx0,
@@ -1728,7 +1725,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
 
       struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
-      cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_state, N, NE_SIZE_CALC));
+      cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_state, N));
     }
 
     // projection
@@ -1781,7 +1778,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       // struct ne_tensor * V_trans =
       //     ne_cpy(ctx0,
       //             ne_permute(ctx0, Vcross, 1, 2, 0, 3),
-      //             ne_new_tensor_3d(ctx0, Vcross->type, M, n_state/n_head,
+      //             d_ne_new_tensor_3d(ctx0, Vcross->type, M, n_state/n_head,
       //             n_head));
 
       struct ne_tensor* V =
@@ -1792,8 +1789,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       // ------
 
       struct ne_tensor* Q = ne_permute(
-          ctx0, ne_cpy(ctx0, Qcur, ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N, NE_SIZE_CALC)), 0,
-          2, 1, 3);
+          ctx0, ne_cpy(ctx0, Qcur, d_ne_new_tensor_3d(ctx0, NE_TYPE_F32, n_state / n_head, n_head, N)), 0, 2, 1, 3);
 
       struct ne_tensor* K = ne_permute(ctx0, Kcross, 0, 2, 1, 3);
 
@@ -1817,7 +1813,7 @@ static bool whisper_decode_internal(whisper_context* wctx, whisper_state* wstate
       struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
       // cur = KQV_merged.contiguous().view(n_state, N)
-      cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_state, N, NE_SIZE_CALC));
+      cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_state, N));
     }
 
     // projection

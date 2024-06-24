@@ -1456,13 +1456,13 @@ struct model_model_loader {
     struct ne_tensor* tensor;
     if (lt.ne.size() == 2) {
       if (lt.type == NE_TYPE_BTLA) {
-        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), lt.size);
+        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), lt.size, backend);
       } else {
-        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), NE_SIZE_CALC);
+        tensor = ne_new_tensor_2d(ne_ctx, lt.type, lt.ne.at(0), lt.ne.at(1), NE_SIZE_CALC, backend);
       }
     } else {
       MODEL_ASSERT(lt.ne.size() == 1);
-      tensor = ne_new_tensor_1d(ne_ctx, lt.type, lt.ne.at(0), NE_SIZE_CALC);
+      tensor = ne_new_tensor_1d(ne_ctx, lt.type, lt.ne.at(0), NE_SIZE_CALC, backend);
     }
     ne_set_name(tensor, lt.name.c_str());
     MODEL_ASSERT(lt.ne_tensor == nullptr);  // if this fails, we called get_tensor twice on the same tensor
@@ -1503,16 +1503,31 @@ struct model_model_loader {
 
     size_t done_size = 0;
     for (model_load_tensor& lt : tensors_map.tensors) {
-      if (lt.ne_tensor->backend != NE_BACKEND_CPU) {
-        continue;
-      }
       if (progress_callback) {
         progress_callback((float)done_size / data_size, progress_callback_user_data);
       }
       MODEL_ASSERT(lt.ne_tensor);  // unused tensors should have been caught by load_data already
       lt.data = (uint8_t*)lt.ne_tensor->data;
-      load_data_for(lt);
-      lt.ne_tensor->data = lt.data;
+      if (lt.ne_tensor->backend == NE_BACKEND_CPU) {
+        load_data_for(lt);
+        lt.ne_tensor->data = lt.data;
+      } else {
+#ifdef NS_SYCL
+        lt.data = bestla::utils::amalloc<uint8_t>(lt.ne_tensor->size);
+        load_data_for(lt);
+        if (lt.ne_tensor->type == NE_TYPE_BTLA) {
+          void* dptr = NULL;
+          memcpy(&dptr, lt.ne_tensor->padding, sizeof(dptr));
+          bestla_device_load_storage(lt.data, lt.ne_tensor->data, dptr, ne_ctx->dev_ctx->queue);
+        } else {
+          bestla_device_memcpy_sync(lt.ne_tensor->data, lt.data, lt.ne_tensor->size, ne_ctx->dev_ctx->queue);
+        }
+
+        bestla::utils::afree(lt.data);
+#else
+        NE_ASSERT(false);
+#endif
+      }
       done_size += lt.size;
       if (use_mmap && lmlock) {
         lmlock->grow_to(done_size);

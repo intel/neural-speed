@@ -13,7 +13,7 @@
 //  limitations under the License.
 #pragma once
 #include "sycl_device.h"
-#include "bestla_utils.h"
+#include "bestla/bestla_utils.h"
 
 namespace bestla {
 namespace sycl_utils {

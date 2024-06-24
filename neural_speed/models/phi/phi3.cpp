@@ -117,7 +117,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
     bestla_reordered_attn_fp32_batch_kv_info(&kv_shape, &kv_cache_info);
   }
   struct ne_tensor* embd = d_ne_new_tensor_1d(ctx0, NE_TYPE_I32, N * batch_size);
-  struct ne_tensor* factor = ne_new_tensor_1d(ctx0, NE_TYPE_F32, 48, sizeof(float));
+  struct ne_tensor* factor = d_ne_new_tensor_1d(ctx0, NE_TYPE_F32, 48);
   const float longfactor[48] = {
       1.0299999713897705, 1.0499999523162842, 1.0499999523162842, 1.0799999237060547, 1.2299998998641968,
       1.2299998998641968, 1.2999999523162842, 1.4499999284744263, 1.5999999046325684, 1.6499998569488525,
@@ -265,7 +265,7 @@ static bool phi3_model_eval_internal(model_context* ctx, const model_input* inpu
         struct ne_tensor* KQV_merged = ne_permute(ctx0, KQV, 0, 2, 1, 3);
 
         // cur = KQV_merged.contiguous().view(n_embd, N)
-        cur = ne_cpy(ctx0, KQV_merged, ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N * batch_size, NE_SIZE_CALC));
+        cur = ne_cpy(ctx0, KQV_merged, d_ne_new_tensor_2d(ctx0, NE_TYPE_F32, n_embd, N * batch_size));
       } else {
         const auto seq_kv = n_past + N;
         const auto k_size = kv_cache_info.k_bytes;

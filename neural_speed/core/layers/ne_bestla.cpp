@@ -162,3 +162,115 @@ void bestla_add(int batch, int vsize, const float* tensor, const float* vector, 
     pth->parallel_for(threadfunc);
   }
 }
+
+static inline bool ne_is_contiguous(const struct ne_tensor* tensor) {
+  static_assert(NE_MAX_DIMS == 4, "NE_MAX_DIMS is not 4 - update this function");
+  return tensor->nb[0] <= tensor->nb[1] && tensor->nb[1] <= tensor->nb[2] && tensor->nb[2] <= tensor->nb[3];
+}
+
+static inline int ne_nrows(const struct ne_tensor* tensor) {
+  static_assert(NE_MAX_DIMS == 4, "NE_MAX_DIMS is not 4 - update this function");
+  return tensor->ne[1] * tensor->ne[2] * tensor->ne[3];
+}
+
+ne_backend bestla_backend_support(struct ne_tensor* src0, struct ne_tensor* src1, enum ne_op op) {
+  ne_backend bk = NE_BACKEND_CPU;
+#ifdef NS_SYCL
+  bool src_on_device = src0->backend == NE_BACKEND_SYCL;
+  if (src1) {
+    src_on_device |= src1->backend == NE_BACKEND_SYCL;
+  }
+  switch (op) {
+    case NE_OP_MUL_MAT: {
+      struct ne_tensor* wei = src0;
+      if (src0->type == NE_TYPE_BTLA) {
+        bk = src_on_device ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
+      }
+    } break;
+    case NE_OP_RMS_NORM:
+    case NE_OP_SILU:
+    case NE_OP_ADD:
+    case NE_OP_MUL: {
+      if (src0->type == NE_TYPE_F32) {
+        bk = src_on_device ? NE_BACKEND_SYCL : NE_BACKEND_CPU;
+      }
+    } break;
+    default:
+      break;
+  }
+#endif
+  return bk;
+}
+
+bool bestla_support(struct ne_tensor* node, int n_threads, size_t* workspace, size_t* dev_workspace) {
+  size_t ws_h = 0;
+  size_t ws_d = 0;
+  bool support = false;
+  if (node->backend == NE_BACKEND_SYCL) {
+    support = true;
+  }
+  switch (node->op) {
+    case NE_OP_MUL_MAT_ID:
+    case NE_OP_MUL_MAT_BIAS:
+    case NE_OP_MUL_MAT: {
+      struct ne_tensor* wei = node->src0;
+      if (node->op == NE_OP_MUL_MAT_ID) {
+        wei = node->opt[0];
+      }
+      if (node->src0->type == NE_TYPE_BTLA) {
+        if (node->src0->backend == NE_BACKEND_CPU) {
+          ws_h = bestla_f32f32_get_workspace_size(node->src1->ne[1], wei->ne[1], node->src1->ne[0], wei->data);
+        }
+        support = true;
+      }
+    } break;
+    case NE_OP_ROPE:
+      if (node->type == NE_TYPE_BTLA) support = true;
+      break;
+    case NE_OP_MUL:
+    case NE_OP_ADD: {
+      if (ne_is_contiguous(node->src1) && ne_is_contiguous(node->src0) &&
+          (ne_nrows(node->src1) == 1 || ne_nrows(node->src1) == ne_nrows(node->src0)) &&
+          node->src0->ne[0] == node->src1->ne[0] && node->nb[0] == sizeof(float)) {
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL_FFN_SILU:
+    case NE_OP_MUL_FFN_GELU:
+    case NE_OP_MUL_FFN_GELU_MUL:
+    case NE_OP_MUL_FFN_ADD_GELU: {
+      if (node->src0->backend == NE_BACKEND_CPU) {
+        ws_h = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->src1->ne[1],
+                                                           node->opt[0]->ne[1], node->src1->data, node->opt[0]->data);
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL_ID_FFN_GELU:
+    case NE_OP_MUL_ID_FFN_SILU: {
+      if (node->src0->backend == NE_BACKEND_CPU) {
+        ws_h = bestla_fusion_FFN_f32f32_get_workspace_size(node->src0->ne[1], node->src0->ne[0], node->opt[0]->ne[1],
+                                                           node->opt[9]->ne[1], node->opt[0]->data, node->opt[9]->data);
+        support = true;
+      }
+    } break;
+    case NE_OP_MUL_QKV: {
+      ws_h = bestla_fusion_QKV_f32f32_get_workspace_size(node->src0->ne[1], node->src1->ne[1], node->src1->ne[0],
+                                                         node->src1->data);
+      support = true;
+    } break;
+    case NE_OP_NORM:
+    case NE_OP_RMS_NORM: {
+      if (ne_is_contiguous(node->src0)) {
+        support = true;
+      }
+    } break;
+    default:
+      break;
+  }
+  if (support) {
+    node->n_tasks = 1;
+  }
+  *workspace = ws_h;
+  *dev_workspace = ws_d;
+  return support;
+}

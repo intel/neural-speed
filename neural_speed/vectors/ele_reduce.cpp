@@ -13,7 +13,7 @@
 //  limitations under the License.
 #include "vectors/cpu/vec.hpp"
 #include "vectors/ele_reduce.h"
-#include "cmath"
+#include <math.h>
 
 void ne_vec_norm_f32_(const int n, float* s, const float* x) {
   float sum = 0.0;

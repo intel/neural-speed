@@ -79,6 +79,10 @@ MODEL_API bool model_mlock_supported();
 // Call once at the start of the program
 MODEL_API void model_init_backend();
 
+MODEL_API ne_sycl_context* model_init_sycl(bool profile);
+MODEL_API void model_alloc_sycl_mem(ne_sycl_context*, size_t size);
+MODEL_API void model_release_sycl(ne_sycl_context* ctx);
+
 MODEL_API int64_t model_time_us();
 
 // Various functions for loading a ne model model.

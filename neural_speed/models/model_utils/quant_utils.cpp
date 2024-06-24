@@ -331,7 +331,7 @@ size_t bestla_quantize(const float* f32ptr, void* dstpr, const quant_params_inte
     scale_type = BTLA_DTYPE::F32;
   }
   if (params.scale_dtype == quant_sdtype::fp16) {
-    printf("Current not support float16 scale, reset to bf16\n");
+    scale_type = BTLA_DTYPE::F16;
   }
   if (quant_type == BTLA_DTYPE::F8_E4M3 || quant_type == BTLA_DTYPE::F8_E5M2) {
     if (params.scale_dtype != quant_sdtype::fp8 && params.scale_dtype != quant_sdtype::fp32) {

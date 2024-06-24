@@ -97,7 +97,7 @@ void* init_gptj(int seed, int n_predict, int n_batch, int top_k, float top_p, fl
   model_init_backend();
   model_context* ctx;
   g_ctx = &ctx;
-  ctx = model_init_from_gpt_params(params);
+  ctx = model_init_from_gpt_params(params, nullptr);
   if (ctx == nullptr) {
     fprintf(stderr, "%s: error: unable to load model\n", __func__);
     return nullptr;

@@ -200,12 +200,18 @@ struct kv_seq_cell {
 struct model_kv_cache {
   struct ne_tensor* k = nullptr;
   struct ne_tensor* v = nullptr;
+  struct ne_tensor* k_d = nullptr;
+  struct ne_tensor* v_d = nullptr;
   struct ne_tensor* cossin = nullptr;  // cached cos/sin value for shifting RoPE
 
   struct ne_context* ctx = nullptr;
 
   model_ctx_buffer buf;
 
+  void* device_buf = nullptr;
+  size_t device_size = 0;
+
+  int n_gpu_layer = 0;
   int n;  // number of tokens currently in the cache
 
   bool has_shift = false;  // ring-buffer (for too long text generation like streaming-llm)
@@ -350,6 +356,8 @@ struct model_context {
   int buf_last = 0;
   size_t buf_max_size[MODEL_MAX_SCRATCH_BUFFERS] = {0};
 
+  ne_sycl_context* dev_ctx = NULL;
+
   void use_buf(struct ne_context* ctx, int i) {
 #if defined(MODEL_USE_SCRATCH)
     size_t last_size = 0;
@@ -461,6 +469,7 @@ struct model_context_params {
   model_progress_callback progress_callback;
   // context pointer passed to the progress callback
   void* progress_callback_user_data;
+  ne_sycl_context* dev_ctx;
 };
 
 class model_name_to_arch {

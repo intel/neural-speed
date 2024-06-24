@@ -15,14 +15,18 @@
 #include <array>
 #include <cassert>
 #include <type_traits>
+#include <immintrin.h>
 
 #include "bestla.h"
 #include "bestla_utils.h"
-#include "kernel_avx2.h"
-#include "kernel_avx512f.h"
-#include "kernel_avx512_bf16.h"
-#include "kernel_jit.h"
 #include "kernel_ref.h"
+#include "kernel_jit.h"
+#include "kernel_avx2.h"
+#include "kernel_avx_vnni.h"
+#include "kernel_avx512f.h"
+#include "kernel_avx512_vnni.h"
+#include "kernel_avx512_bf16.h"
+#include "kernel_avx512_fp16.h"
 
 namespace bestla {
 namespace kernel {
@@ -32,7 +36,7 @@ class ZeroReg {
  public:
   static void forward() {
 #if CompileAVX2()
-    avx2::zero_reg();
+    kernel::avx2::zero_reg();
 #endif
   }
 };
@@ -43,6 +47,13 @@ class PaddingInterleaveMN {
  public:
   TLACALL BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
                             int dst_step) {
+#if CompileFP16()
+    if constexpr (utils::isa_base<ISA_T>::avx512_fp16 && NTILE % 16 == 0) {
+      const auto kern_ret = kernel::avx512f::avx512_fp16::padding_interleave_cvt<T_SRC, T_DST, RowPack>::forward(
+          src, dst, NTILE, row, col, row_pad, col_pad, src_step, dst_step);
+      if (kern_ret != BTLA_CODE::NotSupport) return kern_ret;
+    }
+#endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f && NTILE % 16 == 0) {
       const auto kern_ret = kernel::avx512f::padding_interleave_cvt<T_SRC, T_DST, RowPack>::forward(
@@ -56,6 +67,9 @@ class PaddingInterleaveMN {
   AUTOCALL BTLA_CODE forward_auto(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad,
                                   int src_step, int dst_step) {
     GetCPUDevice();
+    if (_cd->AVX512_FP16()) {
+      return forward<BTLA_ISA::AVX512_FP16>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
+    }
     if (_cd->AVX512F()) {
       return forward<BTLA_ISA::AVX512F>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
     }
@@ -88,6 +102,13 @@ class PaddingTransInterleaveMN {
  public:
   TLACALL BTLA_CODE forward(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad, int src_step,
                             int dst_step) {
+#if CompileFP16()
+    if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+      const auto kern_ret = kernel::avx512f::avx512_fp16::padding_trans_interleave_cvt<T_SRC, T_DST, ColPack>::forward(
+          src, dst, MTile, row, col, row_pad, col_pad, src_step, dst_step);
+      if (kern_ret != BTLA_CODE::NotSupport) return kern_ret;
+    }
+#endif
 #if CompileAVX512F()
     // Note: rows/cols and i/j are in terms of src
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
@@ -102,6 +123,9 @@ class PaddingTransInterleaveMN {
   AUTOCALL BTLA_CODE forward_auto(const T_SRC* src, T_DST* dst, int row, int col, int row_pad, int col_pad,
                                   int src_step, int dst_step) {
     GetCPUDevice();
+    if (_cd->AVX512_FP16()) {
+      return forward<BTLA_ISA::AVX512_FP16>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
+    }
     if (_cd->AVX512F()) {
       return forward<BTLA_ISA::AVX512F>(src, dst, row, col, row_pad, col_pad, src_step, dst_step);
     }
@@ -166,25 +190,48 @@ class Memcpy2D {
   }
 };
 
+class Memcpy2DPadding {
+ public:
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int colsize, int srcstride, int dststride,
+                           bool zeropadding) {
+    auto srcp = (char*)srcptr;
+    if (zeropadding && dststride != colsize) {
+      for (int i = 0; i < row; i++) {
+        auto dstp = (char*)dstptr + i * dststride;
+        std::memcpy(dstp, srcp + i * srcstride, colsize);
+        std::memset(dstp + colsize, 0, (dststride - colsize));
+      }
+    } else {
+      for (int i = 0; i < row; i++) {
+        auto dstp = (char*)dstptr + i * dststride;
+        std::memcpy(dstp, srcp + i * srcstride, colsize);
+      }
+    }
+    return BTLA_CODE::Success;
+  }
+};
+
 class Memcpy2DFp32CvtBf16 {
  public:
   template <BTLA_ISA ISA_T>
   static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileBF16()
-    if constexpr (utils::isa_base<ISA_T>::amx_bf16) {
-      return kernel::avx512_bf16::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride,
-                                                              zeropadding);
+    if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {
+      return kernel::avx512f::avx512_bf16::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride,
+                                                                       zeropadding);
     }
 #endif
 #if CompileAVX512F()
     if constexpr (utils::isa_base<ISA_T>::avx512f) {
-      return kernel::avx512f::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+      return kernel::avx512f::cvt_fp32_T_2D((const float*)srcptr, (utils::bf16*)dstptr, row, col,
+                                            srcstride / sizeof(float), dststride / sizeof(utils::bf16), zeropadding);
     }
 #endif
 #if CompileAVX2()
     if constexpr (utils::isa_base<ISA_T>::avx2) {
-      return kernel::avx2::fp32_cvt_bf16_2D_write_back(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+      return kernel::avx2::cvt_fp32_T_2D((const float*)srcptr, (utils::bf16*)dstptr, row, col,
+                                         srcstride / sizeof(float), dststride / sizeof(utils::bf16), zeropadding);
     }
 #endif
     return kernel::ref::dt_cvt_2D_write_back<float, utils::bf16>(srcptr, dstptr, row, col, srcstride, dststride,
@@ -195,59 +242,123 @@ class Memcpy2DFp32CvtBf16 {
 class Memcpy2DFp32CvtFp16 {
  public:
   template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileFP16()
     if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
-      return kernel::avx512f::fp32_cvt_fp16_2D_write_back(
+      return kernel::avx512f::avx512_fp16::fp32_cvt_fp16_2D_write_back(
           reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr), row, col,
           srcstride / sizeof(float), dststride / sizeof(utils::fp16), zeropadding);
     }
 #endif
-    return BTLA_CODE::NotSupport;
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return kernel::avx512f::cvt_fp32_T_2D(reinterpret_cast<const float*>(srcptr),
+                                            reinterpret_cast<utils::fp16*>(dstptr), row, col, srcstride / sizeof(float),
+                                            dststride / sizeof(utils::fp16), zeropadding);
+    }
+#endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return kernel::avx2::cvt_fp32_T_2D(reinterpret_cast<const float*>(srcptr), reinterpret_cast<utils::fp16*>(dstptr),
+                                         row, col, srcstride / sizeof(float), dststride / sizeof(utils::fp16),
+                                         zeropadding);
+    }
+#endif
+    return kernel::ref::dt_cvt_2D_write_back<float, utils::fp16>(srcptr, dstptr, row, col, srcstride, dststride,
+                                                                 zeropadding);
+  }
+};
+
+template <typename T>
+class Memcpy2DFp32TPadding {
+ public:
+  TLACALL BTLA_CODE forward(const float* srcptr, T* dstptr, int row, int col, int srcstride, int dststride,
+                            bool zeropadding) {
+    if constexpr (std::is_same_v<T, utils::fp16>) {
+      return Memcpy2DFp32CvtFp16::forward<ISA_T>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if constexpr (std::is_same_v<T, utils::bf16>) {
+      return Memcpy2DFp32CvtBf16::forward<ISA_T>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    return Memcpy2D::forward<ISA_T, float, T>(srcptr, dstptr, row, col, srcstride / sizeof(float),
+                                              dststride / sizeof(T), nullptr);
+  }
+
+  AUTOCALL BTLA_CODE forward_auto(const float* srcptr, T* dstptr, int row, int col, int srcstride, int dststride,
+                                  bool zeropadding) {
+    GetCPUDevice();
+    if (_cd->AVX512_FP16()) {
+      return forward<BTLA_ISA::AVX512_FP16>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if (_cd->AVX512_BF16()) {
+      return forward<BTLA_ISA::AVX512_BF16>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if (_cd->AVX512F()) {
+      return forward<BTLA_ISA::AVX512F>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    if (_cd->AVX2()) {
+      return forward<BTLA_ISA::AVX2>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
+    }
+    return forward<BTLA_ISA::NoSIMD>(srcptr, dstptr, row, col, srcstride, dststride, zeropadding);
   }
 };
 
 class Memcpy2DFp16CvtFp32 {
  public:
   template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileFP16()
     if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
-      return kernel::avx512f::fp16_cvt_fp32_2D_write_back(  //
+      return kernel::avx512f::avx512_fp16::fp16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
     }
 #endif
-    return BTLA_CODE::NotSupport;
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return kernel::avx512f::cvt_T_fp32_2D(  //
+          reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
+          srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
+    }
+#endif
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2) {
+      return kernel::avx2::cvt_T_fp32_2D(  //
+          reinterpret_cast<const utils::fp16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
+          srcstride / sizeof(utils::fp16), dststride / sizeof(float), zeropadding);
+    }
+#endif
+    return kernel::ref::dt_cvt_2D_write_back<utils::fp16, float>(srcptr, dstptr, row, col, srcstride, dststride,
+                                                                 zeropadding);
   }
 };
 
 class Memcpy2DBf16CvtFp32 {
  public:
   template <BTLA_ISA ISA_T>
-  static BTLA_CODE forward(void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
+  static BTLA_CODE forward(const void* srcptr, void* dstptr, int row, int col, int srcstride, int dststride,
                            bool zeropadding) {
 #if CompileBF16()
-    if constexpr (ISA_T >= BTLA_ISA::AMX_BF16) {
-      return kernel::avx512_bf16::bf16_cvt_fp32_2D_write_back(  //
+    if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {
+      return kernel::avx512f::avx512_bf16::bf16_cvt_fp32_2D_write_back(  //
           reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
           srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
     }
 #endif
 #if CompileAVX512F()
-    if constexpr (ISA_T >= BTLA_ISA::AVX512F) {
-      return kernel::avx512f::bf16_cvt_fp32_2D_write_back(  //
-          reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
-          srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
+    if constexpr (utils::isa_base<ISA_T>::avx512f) {
+      return kernel::avx512f::cvt_T_fp32_2D(reinterpret_cast<const utils::bf16*>(srcptr),
+                                            reinterpret_cast<float*>(dstptr), row, col, srcstride / sizeof(utils::bf16),
+                                            dststride / sizeof(float), zeropadding);
     }
 #endif
 #if CompileAVX2()
     if constexpr (ISA_T >= BTLA_ISA::AVX2) {
-      return kernel::avx2::bf16_cvt_fp32_2D_write_back(
-          reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr), row, col,
-          srcstride / sizeof(utils::bf16), dststride / sizeof(float), zeropadding);
+      return kernel::avx2::cvt_T_fp32_2D(reinterpret_cast<const utils::bf16*>(srcptr), reinterpret_cast<float*>(dstptr),
+                                         row, col, srcstride / sizeof(utils::bf16), dststride / sizeof(float),
+                                         zeropadding);
     }
 #endif
     return kernel::ref::dt_cvt_2D_write_back<utils::bf16, float>(srcptr, dstptr, row, col, srcstride, dststride,
@@ -1737,6 +1848,209 @@ class Add {
   }
 };
 
+template <typename T_DST>
+class ScaleExpAccSumFp32 {
+ public:
+  TLACALL BTLA_CODE forward(const float* src, const int src_step, T_DST* dst, int ld_dst, float* dst_sum,
+                            const int M_offset, const int N_offset, const int M, const int N, float scale,
+                            int causal_offset, void* tmpcache, size_t cachesize) {
+    dst = dst + M_offset * ld_dst + N_offset;
+    dst_sum = dst_sum + M_offset;
+#if CompileBF16()
+    if constexpr (utils::isa_base<ISA_T>::avx512_bf16 && std::is_same_v<T_DST, utils::bf16>) {
+      return avx512f::avx512_bf16::scale_exp_acc_sum_fp32(src, src_step, dst, ld_dst, dst_sum, M_offset, N_offset, M, N,
+                                                          scale, causal_offset, tmpcache, cachesize);
+    }
+#endif
+    return ref::scale_exp_acc_sum_fp32(src, src_step, dst, ld_dst, dst_sum, M_offset, N_offset, M, N, scale,
+                                       causal_offset, tmpcache, cachesize);
+  }
+};
+
+template <typename T_SRC, typename T_DST>
+class ScaleTrackMax {
+ public:
+  using DType = T_DST;
+  using SType = T_SRC;
+
+  TLACALL BTLA_CODE forward(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
+                            const int M_offset, const int N_offset, const int M, const int N, float scale,
+                            int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache, size_t cachesize) {
+    dst = dst + M_offset * ld_dst + N_offset;
+    dst_max = dst_max + M_offset;
+    if constexpr (std::is_same_v<T_DST, float>) {
+      if constexpr (std::is_same_v<T_SRC, utils::fp16>) {
+        assert(("alibi not supported!", alibi_slope == 0.f));
+        assert(("tanh not supported!", tanh_scale == 0.f));
+#if CompileFP16()
+        if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+          return avx512f::avx512_fp16::scale_track_max_fp16_fp32(src, src_step, dst, dst_max, ld_dst, M_offset,
+                                                                 N_offset, M, N, scale, causal_offset, alibi_slope,
+                                                                 tanh_scale, tmpcache, cachesize);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<T_SRC, float>) {
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return forward_avx512(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N, scale, causal_offset,
+                                alibi_slope, tanh_scale, tmpcache, cachesize);
+        }
+#endif
+#if CompileAVX2()
+        if constexpr (utils::isa_base<ISA_T>::avx2) {
+          return forward_avx2(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N, scale, causal_offset,
+                              alibi_slope, tanh_scale, tmpcache, cachesize);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<T_SRC, int32_t>) {
+        assert(("alibi not supported!", alibi_slope == 0.f));
+        assert(("tanh not supported!", tanh_scale == 0.f));
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return avx512f::scale_track_max_int32_fp32(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
+                                                     scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                     cachesize);
+        }
+#endif
+      }
+    }
+
+    return ref::scale_track_max<T_SRC, T_DST>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N, scale,
+                                              causal_offset, alibi_slope, tanh_scale, tmpcache, cachesize);
+  }
+
+  static BTLA_CODE forward_avx2(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
+                                const int M_offset, const int N_offset, const int M, const int N, float scale,
+                                int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
+                                size_t cachesize) {
+    if (alibi_slope == 0 && tanh_scale == 0)
+      return avx2::scale_track_max_fp32_fp32<false, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
+                                                           N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                           cachesize);
+    else if (alibi_slope == 0 && tanh_scale != 0)
+      return avx2::scale_track_max_fp32_fp32<false, true>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
+                                                          scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                          cachesize);
+    else if (alibi_slope != 0 && tanh_scale == 0)
+      return avx2::scale_track_max_fp32_fp32<true, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
+                                                          scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                          cachesize);
+    else
+      return BTLA_CODE::NotSupport;
+  }
+
+  static BTLA_CODE forward_avx512(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
+                                  const int M_offset, const int N_offset, const int M, const int N, float scale,
+                                  int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
+                                  size_t cachesize) {
+    if (alibi_slope == 0 && tanh_scale == 0)
+      return avx512f::scale_track_max_fp32_fp32<false, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset,
+                                                              M, N, scale, causal_offset, alibi_slope, tanh_scale,
+                                                              tmpcache, cachesize);
+    else if (alibi_slope == 0 && tanh_scale != 0)
+      return avx512f::scale_track_max_fp32_fp32<false, true>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
+                                                             N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                             cachesize);
+    else if (alibi_slope != 0 && tanh_scale == 0)
+      return avx512f::scale_track_max_fp32_fp32<true, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
+                                                             N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
+                                                             cachesize);
+    else
+      return BTLA_CODE::NotSupport;
+  }
+};
+
+template <typename T_DST>
+class WeightCvtBf16Ntile48 {
+ public:
+  using BType = T_DST;
+  using SType = utils::bf16;
+
+  TLACALL BTLA_CODE forward(const SType* B, int ldb, bool is_padded, BType* dst_ptr, int dst_step, int k_size,
+                            int n_size, int k_offset, int n_offset, void* tmpcache, size_t cachesize) {
+    assert(is_padded);
+#if CompileAVX512F()
+    if constexpr (utils::isa_base<ISA_T>::avx512f && std::is_same_v<BType, float>) {
+      return avx512f::weight_cvt_bf16_fp32_n48(B, ldb, is_padded, dst_ptr, dst_step, k_size, n_size, k_offset, n_offset,
+                                               tmpcache, cachesize);
+    }
+#endif
+    return BTLA_CODE::NotSupport;
+  }
+};
+
+template <typename T_DST>
+class WeightCvtFp16Ntile24 {
+ public:
+  using BType = T_DST;
+  using SType = utils::fp16;
+
+  TLACALL BTLA_CODE forward(const SType* B, int ldb, bool is_padded, BType* dst_ptr, int dst_step, int k_size,
+                            int n_size, int k_offset, int n_offset, void* tmpcache, size_t cachesize) {
+    assert(is_padded);
+#if CompileAVX2()
+    if constexpr (utils::isa_base<ISA_T>::avx2 && std::is_same_v<BType, float>) {
+      return avx2::weight_cvt_fp16_fp32_n24(B, ldb, is_padded, dst_ptr, dst_step, k_size, n_size, k_offset, n_offset,
+                                            tmpcache, cachesize);
+    }
+#endif
+    return BTLA_CODE::NotSupport;
+  }
+};
+
+template <class SRC_T, class DST_T>
+struct InplacePrecomputeMaxSoftmax {
+  // nsize is the staring n-size when causal mask enabled
+  // src and dst cam be on the same address if sizeof(SRC_T) >= sizeof(DST_T) and ld is correctly set
+  // s_max and expsum cam be on the same address
+  TLACALL BTLA_CODE forward(int m_size, int n_size, int n_pad_size, bool is_causal, SRC_T* src, DST_T* dst,
+                            const SRC_T* s_max, float* expsum, int ld_src, int ld_dst) {
+    if constexpr (std::is_same_v<SRC_T, float>) {
+      if constexpr (std::is_same_v<DST_T, float>) {
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return avx512f::inplace_precompute_max_softmax_fp32_fp32(m_size, n_size, n_pad_size, is_causal, src, dst,
+                                                                   s_max, expsum, ld_src, ld_dst);
+        }
+#endif
+#if CompileAVX2()
+        if constexpr (utils::isa_base<ISA_T>::avx2) {
+          return avx2::inplace_precompute_max_softmax_fp32_fp32(m_size, n_size, n_pad_size, is_causal, src, dst, s_max,
+                                                                expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<DST_T, utils::fp16>) {
+#if CompileFP16()
+        if constexpr (utils::isa_base<ISA_T>::avx512_fp16) {
+          return avx512f::avx512_fp16::inplace_precompute_max_softmax_fp32_fp16(
+              m_size, n_size, n_pad_size, is_causal, src, dst, s_max, expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<DST_T, utils::bf16>) {
+#if CompileBF16()
+        if constexpr (utils::isa_base<ISA_T>::avx512_bf16) {
+          return avx512f::avx512_bf16::inplace_precompute_max_softmax_fp32_bf16(
+              m_size, n_size, n_pad_size, is_causal, src, dst, s_max, expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+      if constexpr (std::is_same_v<DST_T, uint8_t>) {
+#if CompileAVX512F()
+        if constexpr (utils::isa_base<ISA_T>::avx512f) {
+          return avx512f::inplace_precompute_max_softmax_fp32_u8(m_size, n_size, n_pad_size, is_causal, src, dst, s_max,
+                                                                 expsum, ld_src, ld_dst);
+        }
+#endif
+      }
+    }
+    assert(false);
+    return BTLA_CODE::NotSupport;
+  }
+};
 }  // namespace wrapper
 }  // namespace kernel
 }  // namespace bestla

@@ -32,6 +32,7 @@
 #include "core/ne.h"
 #include "core/ne_layers.h"
 #include "models/llama/llama.h"
+#include "models/model_utils/model_utils.h"
 #include "models/model_utils/model_config.h"
 #include "models/model_utils/model_files.h"
 #include "models/model_utils/model_types.h"
@@ -93,14 +94,23 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   size_t ctx_size;
   size_t mmapped_size;
   ml->calc_sizes(&ctx_size, &mmapped_size);
+  int n_cpu_layer = n_layer - n_gpu_layer;
+  n_cpu_layer = n_cpu_layer < 0 ? 0 : n_cpu_layer;
   fprintf(stderr, "%s: ctx size   = %7.2f MB\n", __func__, ctx_size / 1024.0 / 1024.0);
-
+  auto host_size =
+      (ctx_size + (50 << 20)) * n_cpu_layer / n_layer + n_embd * n_vocab * sizeof(float);  // embedding on CPU
+  auto device_size = (ctx_size + (50 << 20)) * n_gpu_layer / n_layer + (50 << 20);
+  fprintf(stderr, "%s: host ctx size   = %7.2f MB\n", __func__, host_size / 1024.0 / 1024.0);
+#ifdef NS_SYCL
+  fprintf(stderr, "%s: device ctx size   = %7.2f MB\n", __func__, device_size / 1024.0 / 1024.0);
+#endif
   // create the ne context
-  lctx.model.buf.resize(ctx_size);
+  lctx.model.buf.resize(host_size);
   if (use_mlock) {
     lctx.model.mlock_buf.init(lctx.model.buf.addr);
     lctx.model.mlock_buf.grow_to(lctx.model.buf.size);
   }
+  model_alloc_sycl_mem(lctx.dev_ctx, device_size);
 
   struct ne_init_params params = {
       /*.mem_size   =*/lctx.model.buf.size,
@@ -112,12 +122,14 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   if (!model.ctx) {
     throw format("ne_init() failed");
   }
-
+  ne_ctx->dev_ctx = ctx->dev_ctx;
   ml->ne_ctx = ne_ctx;
 
   const int i_gpu_start = n_layer - n_gpu_layer;
   model.layers.resize(n_layer);
   size_t vram_total = 0;
+  size_t device_total = 0;
+
   if (ml->verify_tensor("token_embd.weight")) {  // GGUF
     model.others[0] = ml->get_tensor("token_embd.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
     model.others[1] = ml->get_tensor("output_norm.weight", {n_embd}, NE_BACKEND_CPU);
@@ -170,12 +182,12 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
     }
   } else {  // NE Fortmat
     model.others[0] = ml->get_tensor("tok_embeddings.weight", {n_embd, n_vocab}, NE_BACKEND_CPU);
-    model.others[1] = ml->get_tensor("norm.weight", {n_embd}, NE_BACKEND_CPU);
-    model.others[2] = ml->get_tensor("output.weight", {n_embd, n_vocab},
-                                     n_gpu_layer > static_cast<int>(n_layer) ? MODEL_BACKEND_OFFLOAD : NE_BACKEND_CPU);
+    model.others[1] = ml->get_tensor("norm.weight", {n_embd}, n_gpu_layer ? NE_BACKEND_SYCL : NE_BACKEND_CPU);
+    model.others[2] =
+        ml->get_tensor("output.weight", {n_embd, n_vocab}, n_gpu_layer > 0 ? NE_BACKEND_SYCL : NE_BACKEND_CPU);
 
     for (uint32_t i = 0; i < n_layer; ++i) {
-      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : MODEL_BACKEND_OFFLOAD;
+      const ne_backend backend = static_cast<int>(i) < i_gpu_start ? NE_BACKEND_CPU : NE_BACKEND_SYCL;
       auto& layer = model.layers[i];
       std::string layers_i = "layers." + std::to_string(i);
 
@@ -214,24 +226,18 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
               ml->get_tensor(layers_i + ".ffn_up." + std::to_string(x) + ".weight", {n_embd, n_ff}, backend);
         }
       }
-      if (backend != NE_BACKEND_CPU) {
-        vram_total += ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
-                      ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.norm[1]) +
-                      ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      auto layer_total = ne_nbytes(layer.norm[0]) + ne_nbytes(layer.attn[0]) + ne_nbytes(layer.attn[1]) +
+                         ne_nbytes(layer.attn[2]) + ne_nbytes(layer.attn[3]) + ne_nbytes(layer.norm[1]) +
+                         ne_nbytes(layer.ffn[0]) + ne_nbytes(layer.ffn[1]) + ne_nbytes(layer.ffn[2]);
+      if (backend == NE_BACKEND_CPU) {
+        vram_total += layer_total;
+      } else {
+        device_total += layer_total;
       }
     }
   }
-
-  // print memory requirements
-  // this is the total memory required to run the inference
-  const size_t mem_required = ctx_size + mmapped_size - vram_total +  // weights in VRAM not in memory
-                              scratch.scratch0 + scratch.scratch1 + scratch.eval;
-  fprintf(stderr, "%s: scratch0   = %7.2f MB\n", __func__, scratch.scratch0 / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: scratch1   = %7.2f MB\n", __func__, scratch.scratch1 / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: scratch2   = %7.2f MB\n", __func__, scratch.eval / 1024.0 / 1024.0);
-  fprintf(stderr, "%s: mem required  = %7.2f MB (+ memory per state)\n", __func__, mem_required / 1024.0 / 1024.0);
-
-  (void)n_gpu_layer;
+  NE_ASSERT(vram_total <= host_size);
+  NE_ASSERT(device_total <= device_size);
 
   // populate `tensors_by_name`
   for (model_load_tensor& lt : ml->tensors_map.tensors) {
@@ -239,7 +245,6 @@ void Llama::load(model_context* ctx, model_progress_callback progress_callback, 
   }
 
   ml->load_all_data(progress_callback, progress_callback_user_data, use_mlock ? &lctx.model.mlock_mmap : nullptr);
-
   if (progress_callback) {
     progress_callback(1.0f, progress_callback_user_data);
   }
