@@ -355,7 +355,6 @@ function main() {
 
     # init conda
     #. $(dirname ${CONDA_EXE})/../etc/profile.d/conda.sh
-    source ~/.bashrc 
     conda activate $conda_env || source activate $conda_env
     pip install cmake ninja psutil
     if [[ "${compiler_version}" != "12.1.0" ]]; then
