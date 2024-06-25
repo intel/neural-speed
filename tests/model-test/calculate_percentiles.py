@@ -44,6 +44,14 @@ def parse_output_file_acc(file_path):
             if accuracy_match:
                 accuracy[0]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
                 continue
+            accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|+\s+\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[0]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
+            accuracy_match = re.search(r"\|\s+\|\s+\|none\s+\|\s+0\|acc\s+\|+\s+\d\.\d+\|\±\s+\|+\s+\d\.\d+\|", line)
+            if accuracy_match:
+                accuracy[0]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
+                continue
             accuracy_match = re.search(r"\|\s+boolq+\|\s+2\|none\s+\|\s+0\|acc\s+\|\d\.\d+\|\±\s+\|\d\.\d+\|", line)
             if accuracy_match:
                 accuracy[1]=float(re.search(r"\d+\.\d+", accuracy_match.group()).group())*100
