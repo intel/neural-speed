@@ -1,5 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR}/tests/integration/gemm)
 if (DEVICE STREQUAL "mtl")
+    add_subdirectory(int4_dequantization)
+    add_subdirectory(int4_dequantization_bias)
 else()
     add_subdirectory(bf16)
     add_subdirectory(stream_k)

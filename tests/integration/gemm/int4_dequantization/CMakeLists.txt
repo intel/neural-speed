@@ -4,3 +4,8 @@ string(PREPEND ProjectId "gemm_")
 
 FILE(GLOB src main.cpp)
 add_integration_test(${ProjectId} ${src})
+if (DEVICE STREQUAL "mtl")
+    target_compile_definitions(${ProjectId} PRIVATE MMA_ENGINE=fpu GPU_ARCH=XeLpg)
+else()
+    target_compile_definitions(${ProjectId} PRIVATE MMA_ENGINE=xmx GPU_ARCH=XeHpg)
+endif()
