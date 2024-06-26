@@ -1101,7 +1101,7 @@ struct mem_payload_t<
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpg)>> {
+    std::enable_if_t<(arch_has_2d_load_store<arch_tag_>)>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -1658,7 +1658,7 @@ struct prefetch_payload_t<
     num_coop_sg_,
     arch_tag_,
     std::enable_if_t<
-        arch_tag_ <= gpu_arch::XeHpg &&
+        arch_has_2d_load_store<arch_tag_> &&
         ((block_size_y_ != 1 && mem_layout_ == mem_layout::row_major) ||
          (block_size_x_ != 1 && mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
