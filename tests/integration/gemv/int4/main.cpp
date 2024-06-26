@@ -31,14 +31,14 @@ template <typename scalar_t>
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_m = 4096;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 512 / sg_m;
+  static constexpr size_t wg_m = 64;
+  static constexpr size_t wg_n = 32;
+  static constexpr size_t sg_m = 16;
+  static constexpr size_t sg_n = 8;
+  static constexpr size_t sg_k = 32;
   static constexpr size_t dequant_s = 128;
   static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
 
@@ -109,14 +109,17 @@ int gemm_result_validate(
   bool result = buff_cmp::xetla_buff_cmp(data, other, "gemv validation");
 
 #ifdef UT_DEBUG
-  // for (uint32_t i = 0; i < m; i++) {
-  //   for (uint32_t j = 0; j < n; j++) {
-  //     std::cout << float(sycl::half(C[i * n + j])) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  if (m * n <= 4096) {
+    std::cout << "result:\n";
+    for (uint32_t i = 0; i < m; i++) {
+      for (uint32_t j = 0; j < n; j++) {
+        std::cout << float(sycl::half(C[i * n + j])) << " ";
+      }
+      std::cout << "\n";
+    }
+  }
 #endif
-  std::cout << (!result ? "FAILED\n" : "PASSED\n");
+  std::cout << (!result ? "FAILED" : "PASSED") << std::endl;
   return result ? 0 : 1;
 }
 
@@ -186,12 +189,15 @@ std::vector<data_type_acc_in> dequantize_weight(
     }
   }
 #ifdef UT_DEBUG
-  // for (uint32_t i = 0; i < matrix_n; i++) {
-  //   for (uint32_t j = 0; j < matrix_k; j++) {
-  //     std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  if (matrix_n * matrix_k <= 4096) {
+    std::cout << "dequantize_weight:\n";
+    for (uint32_t i = 0; i < matrix_n; i++) {
+      for (uint32_t j = 0; j < matrix_k; j++) {
+        std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
 #endif
   return b_out;
 }
@@ -386,12 +392,14 @@ void dequantize_gemv_run(int iter) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       B_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77;
+      B_h[i] = ((7 + i) % 15 + 1) * 0x11;
+      if (i >= size_b)
+        B_h[i] = -1;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77777777;
+      B_h[i] = ((7 + i) % 15 + 1) * 0x11111111;
 #endif
     }
   }

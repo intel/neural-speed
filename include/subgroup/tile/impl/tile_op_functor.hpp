@@ -83,6 +83,12 @@ struct dequant_int4_weight_t {
     constexpr uint32_t block_size_y_b = matB_acc_t::block_size_y;
     static constexpr uint32_t pack_ratio = sizeof(typename matB_t::dtype) * 2;
 
+    // If the result of dequant should be tranposed before storing to matB_acc
+    constexpr bool trans_acc =
+        matB_t::register_layout == reg_layout::transpose_tiled &&
+        (matB_acc_t::register_layout == reg_layout::tiled ||
+         matB_acc_t::register_layout == reg_layout::vnni_tiled);
+
     constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
     constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
 #pragma unroll
@@ -149,9 +155,18 @@ struct dequant_int4_weight_t {
                   cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
                   int8_t(8);
             }
-            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
-                cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
-                scale.reg[scale_idx];
+            // Scale and write back to matB_acc
+            if constexpr (trans_acc) {
+              dst_blk.xetla_select<step, block_size_x_b>(
+                  ii * block_size_x_b + jj) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                  scale.reg[scale_idx];
+
+            } else {
+              dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                  scale.reg[scale_idx];
+            }
 
             // sycl::ext::oneapi::experimental::printf(
             //     "scale[%d] %f \n",
