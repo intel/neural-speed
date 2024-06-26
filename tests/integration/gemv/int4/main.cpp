@@ -30,14 +30,14 @@ constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_m = 4096;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 512 / sg_m;
+  static constexpr size_t wg_m = 64;
+  static constexpr size_t wg_n = 32;
+  static constexpr size_t sg_m = 16;
+  static constexpr size_t sg_n = 8;
+  static constexpr size_t sg_k = 32;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
@@ -46,8 +46,8 @@ class test_col_major_1 {
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr mma_engine mma_eng = mma_engine::xmx;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
@@ -108,14 +108,17 @@ int gemm_result_validate(
   bool result = buff_cmp::xetla_buff_cmp(data, other, "gemv validation");
 
 #ifdef UT_DEBUG
-  // for (uint32_t i = 0; i < m; i++) {
-  //   for (uint32_t j = 0; j < n; j++) {
-  //     std::cout << float(sycl::half(C[i * n + j])) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  if (m * n <= 4096) {
+    std::cout << "result:\n";
+    for (uint32_t i = 0; i < m; i++) {
+      for (uint32_t j = 0; j < n; j++) {
+        std::cout << float(sycl::half(C[i * n + j])) << " ";
+      }
+      std::cout << "\n";
+    }
+  }
 #endif
-  std::cout << (!result ? "FAILED\n" : "PASSED\n");
+  std::cout << (!result ? "FAILED" : "PASSED") << std::endl;
   return result ? 0 : 1;
 }
 
@@ -185,12 +188,15 @@ std::vector<data_type_acc_in> dequantize_weight(
     }
   }
 #ifdef UT_DEBUG
-  // for (uint32_t i = 0; i < matrix_n; i++) {
-  //   for (uint32_t j = 0; j < matrix_k; j++) {
-  //     std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  if (matrix_n * matrix_k <= 4096) {
+    std::cout << "dequantize_weight:\n";
+    for (uint32_t i = 0; i < matrix_n; i++) {
+      for (uint32_t j = 0; j < matrix_k; j++) {
+        std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
 #endif
   return b_out;
 }
@@ -385,12 +391,14 @@ void dequantize_gemv_run(int iter) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       B_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77;
+      B_h[i] = ((7 + i) % 15 + 1) * 0x11;
+      if (i >= size_b)
+        B_h[i] = -1;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77777777;
+      B_h[i] = ((7 + i) % 15 + 1) * 0x11111111;
 #endif
     }
   }
@@ -473,43 +481,43 @@ void dequantize_gemv_run(int iter) {
       {// epilogue_args init list
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
-  typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg;
+  using gemm_arg_t =
+      typename gemm_op_t::template arguments_t<compute_policy::quant_mode>;
+  gemm_arg_t gemm_arg;
   if constexpr (compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
-    gemm_arg =
-        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
-            matrix_m,
-            matrix_k,
-            matrix_n,
-            A_d,
-            lda,
-            B_d,
-            ldb,
-            C_d,
-            ldc,
-            scale_d,
-            ld_scale,
-            Acc_d,
-            Cnt_d,
-            epilogue_args);
+    gemm_arg = gemm_arg_t(
+        matrix_m,
+        matrix_k,
+        matrix_n,
+        A_d,
+        lda,
+        B_d,
+        ldb,
+        C_d,
+        ldc,
+        scale_d,
+        ld_scale,
+        Acc_d,
+        Cnt_d,
+        epilogue_args);
   } else if constexpr (compute_policy::quant_mode == quant_mode::S4_ASYM) {
-    gemm_arg =
-        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
-            matrix_m,
-            matrix_k,
-            matrix_n,
-            A_d,
-            lda,
-            B_d,
-            ldb,
-            C_d,
-            ldc,
-            scale_d,
-            ld_scale,
-            zero_pt_d,
-            ld_zero_pt,
-            Acc_d,
-            Cnt_d,
-            epilogue_args);
+    gemm_arg = gemm_arg_t(
+        matrix_m,
+        matrix_k,
+        matrix_n,
+        A_d,
+        lda,
+        B_d,
+        ldb,
+        C_d,
+        ldc,
+        scale_d,
+        ld_scale,
+        zero_pt_d,
+        ld_zero_pt,
+        Acc_d,
+        Cnt_d,
+        epilogue_args);
   }
   cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
   // if (!gemm_op_t::can_implement(gemm_arg)) {
