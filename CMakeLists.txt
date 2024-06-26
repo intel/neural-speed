@@ -66,7 +66,7 @@ else()
     set(XETLA_KERNEL_FLAGS ${XETLA_KERNEL_FLAGS} -Xs "${XETLA_OFFLINE_OPTIONS}")
 endif()
 
-add_compile_options(-fsycl -fsycl-device-code-split=per_kernel  -ftemplate-backtrace-limit=0)
+add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
 add_compile_options(-Wall -Wextra -Werror)
 
 include(ProcessorCount)
@@ -75,7 +75,7 @@ add_link_options(-fsycl -fsycl-device-code-split=per_kernel -fsycl-max-parallel-
 add_link_options(${XETLA_KERNEL_FLAGS})
 
 if(UNIX)
-    add_compile_options(-fp-model=precise)
+    add_compile_options(-fp-model=precise -ftemplate-backtrace-limit=0)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)
     link_libraries(-lgtest -lgtest_main)
 else() # Windows
