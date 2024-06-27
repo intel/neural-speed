@@ -56,6 +56,7 @@ struct layer_norm_bwd_t<
   using layer_norm_attr = layer_norm_attr_;
   using ln_bwd_fused_op = ln_bwd_fused_op_;
   using ln_fused_op_arguments_t = typename ln_bwd_fused_op::arguments_t;
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static constexpr uint32_t wg_tile_m = layer_norm_attr::wg_tile_m;
   static constexpr uint32_t wg_tile_n = layer_norm_attr::wg_tile_n;
   static constexpr uint32_t sg_tile_m = layer_norm_attr::sg_tile_m;
@@ -96,22 +97,22 @@ struct layer_norm_bwd_t<
       mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using x_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using gamma_in_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using dx_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
       ln_bwd_tile_desc_t,
       msg_type::block_1d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using ln_group_row_reduce_store_t = group::group_row_reduce_store_t<
       dtype_acc,
@@ -120,7 +121,7 @@ struct layer_norm_bwd_t<
       wg_size_x,
       wg_size_y,
       32,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   /// @brief
   ///
@@ -162,7 +163,7 @@ struct layer_norm_bwd_t<
       reduce_op Op,
       uint32_t wg_size_x,
       uint32_t wg_size_y,
-      gpu_arch arch_ = gpu_arch::XeHpc>
+      gpu_arch arch_>
   struct ln_group_all_reduce_t {
     uint32_t itr_count;
     uint32_t slm_base_0;
@@ -266,7 +267,7 @@ struct layer_norm_bwd_t<
       reduce_op::sum,
       wg_size_x,
       wg_size_y,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
  public:
   __XETLA_API static void call(

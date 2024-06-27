@@ -38,15 +38,30 @@ TYPED_TEST_P(unaligned_gemm_test, esimd) {
 }
 REGISTER_TYPED_TEST_SUITE_P(unaligned_gemm_test, esimd);
 using tests = ::testing::Types<
-    Test0,
-    Test1,
-    Test2,
-    Test3,
-    // Test4,
-    Test5,
-    Test6,
-    Test7,
-    Test8>;
+    Test0x,
+    Test1x,
+    Test2x,
+    Test3x,
+    Test4x,
+    Test5x,
+    Test6x,
+    Test7x,
+    Test8x,
+    Test9x,
+    Test10x,
+    Test11x,
+    Test12x,
+    Test13x,
+    Test14x,
+    Test15x,
+    Test16x,
+    Test17x,
+    Test18x,
+    Test19f,
+    Test19x,
+    Test20f,
+    Test21x,
+    Test21f>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     unaligned_gemm_test_suite,

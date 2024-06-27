@@ -53,6 +53,7 @@ struct xetla_mha_core_attn_fwd_t {
   using dtype_sfx = dtype_sfx_;
   using dtype_acc = dtype_acc_;
 
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static constexpr int ThreadNum = HWThreadNum;
   static constexpr int max_seqlen = Max_SeqLen;
   static constexpr mem_space mem_space_a = mem_space::global;
@@ -90,7 +91,7 @@ struct xetla_mha_core_attn_fwd_t {
   using compute_policy_QKT = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_bin, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using mem_desc_a_out =
       mem_desc_t<dtype_sfx, gemm_mem_layout_a, gemm_mem_space_a>;
@@ -99,7 +100,7 @@ struct xetla_mha_core_attn_fwd_t {
   using compute_policy_out = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_sfx, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint16_t sfx_type_size = sizeof(dtype_sfx);
@@ -109,11 +110,11 @@ struct xetla_mha_core_attn_fwd_t {
   using work_group_t = work_group_t<ThreadNum>;
 
   using pre_processing_128x128 =
-      group::pre_processing_default_t<tile_attr_128x128, gpu_arch::XeHpc>;
+      group::pre_processing_default_t<tile_attr_128x128, arch_tag>;
   using pre_processing_128x256 =
-      group::pre_processing_default_t<tile_attr_128x256, gpu_arch::XeHpc>;
-  using pre_processing_128x64 = group::
-      pre_processing_matA_neg_filter_t<tile_attr_128x64, gpu_arch::XeHpc>;
+      group::pre_processing_default_t<tile_attr_128x256, arch_tag>;
+  using pre_processing_128x64 =
+      group::pre_processing_matA_neg_filter_t<tile_attr_128x64, arch_tag>;
 
   using gemm_op_128x128_t = group::gemm_t<
       compute_policy_QKT,
@@ -167,17 +168,17 @@ struct xetla_mha_core_attn_fwd_t {
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_128x128_tile_desc_t,
       (global_kslicing > 1) ? msg_type::atomic_add : msg_type::block_2d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_128x256_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_128x256_tile_desc_t,
       (global_kslicing > 1) ? msg_type::atomic_add : msg_type::block_2d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_128x64_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_128x64_tile_desc_t,
       (global_kslicing > 1) ? msg_type::atomic_add : msg_type::block_2d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   // 512 = 16x32 or 8x64
   using matElem_tile_desc_t = gpu::xetla::subgroup::tile_desc_t<
@@ -192,14 +193,14 @@ struct xetla_mha_core_attn_fwd_t {
       mem_desc_t<dtype_sfx, mem_layout::row_major, mem_space::global>,
       matElem_tile_desc_t,
       subgroup::msg_type_v<matElem_tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matElem_st_t =
       gpu::xetla::subgroup::tile_t<dtype_sfx, matElem_tile_desc_t>;
   using matElem_st_payload_t = gpu::xetla::subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout::row_major, mem_space::global>,
       matElem_tile_desc_t,
       subgroup::msg_type_v<matElem_tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matElem_reg_t = gpu::xetla::subgroup::tile_t<
       float,
       gpu::xetla::subgroup::tile_desc_t<32, 16, 32, 16, reg_layout::tiled>>;
@@ -311,8 +312,8 @@ struct xetla_mha_core_attn_fwd_t {
       blk_128x256_loop_num = 2;
     }
 
-    xetla_nbarrier_t<32, 32, gpu_arch::XeHpc> first_nbarr;
-    xetla_nbarrier_t<32, 32, gpu_arch::XeHpc> second_nbarr;
+    xetla_nbarrier_t<32, 32, arch_tag> first_nbarr;
+    xetla_nbarrier_t<32, 32, arch_tag> second_nbarr;
     first_nbarr.init_nbarrier(0, nbarrier_role::producer_consumer);
     second_nbarr.init_nbarrier(1, nbarrier_role::producer_consumer);
 
@@ -869,6 +870,7 @@ struct xetla_mha_core_attn_bwd_t {
   using dtype_sfx = dtype_bwd_sfx_;
   using dtype_acc = dtype_bwd_acc_;
 
+  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
   static constexpr int ThreadNum = HWThreadNum;
   static_assert(ThreadNum == 32);
   static constexpr mem_space mem_space_a = mem_space::global;
@@ -909,7 +911,7 @@ struct xetla_mha_core_attn_bwd_t {
   using compute_policy_QKT = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_bin, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using mem_desc_a_out =
       mem_desc_t<dtype_sfx, gemm_mem_layout_a, gemm_mem_space_a>;
@@ -918,7 +920,7 @@ struct xetla_mha_core_attn_bwd_t {
   using compute_policy_out = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_sfx, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   using mem_desc_a_out_b_trnp_a =
       mem_desc_t<dtype_sfx, gemm_mem_layout_trnp_a, gemm_mem_space_trnp_a>;
@@ -927,7 +929,7 @@ struct xetla_mha_core_attn_bwd_t {
   using compute_policy_out_b_trnp_a = group::compute_policy_default_xmx<
       group::compute_attr_t<dtype_sfx, dtype_bin, dtype_acc>,
       bgm_perf_tuning_knob,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint16_t sfx_type_size = sizeof(dtype_sfx);
@@ -937,17 +939,17 @@ struct xetla_mha_core_attn_bwd_t {
   using work_group_t = work_group_t<ThreadNum>;
 
   using pre_processing_128x128 =
-      group::pre_processing_default_t<tile_attr_128x128, gpu_arch::XeHpc>;
+      group::pre_processing_default_t<tile_attr_128x128, arch_tag>;
   using pre_processing_128x256 =
-      group::pre_processing_default_t<tile_attr_128x256, gpu_arch::XeHpc>;
+      group::pre_processing_default_t<tile_attr_128x256, arch_tag>;
   using pre_processing_128x64 =
-      group::pre_processing_default_t<tile_attr_128x64, gpu_arch::XeHpc>;
+      group::pre_processing_default_t<tile_attr_128x64, arch_tag>;
   using pre_processing_256x64 =
-      group::pre_processing_default_t<tile_attr_256x64, gpu_arch::XeHpc>;
-  using pre_processing_128x64_af = group::
-      pre_processing_matA_neg_filter_t<tile_attr_128x64, gpu_arch::XeHpc>;
-  using pre_processing_256x64_af = group::
-      pre_processing_matA_neg_filter_t<tile_attr_256x64, gpu_arch::XeHpc>;
+      group::pre_processing_default_t<tile_attr_256x64, arch_tag>;
+  using pre_processing_128x64_af =
+      group::pre_processing_matA_neg_filter_t<tile_attr_128x64, arch_tag>;
+  using pre_processing_256x64_af =
+      group::pre_processing_matA_neg_filter_t<tile_attr_256x64, arch_tag>;
 
   using gemm_op_128x128_t = group::gemm_t<
       compute_policy_QKT,
@@ -1072,49 +1074,49 @@ struct xetla_mha_core_attn_bwd_t {
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x128_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_128x256_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout_c, mem_space_c>,
       matC_128x256_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x256_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_128x64_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_128x64_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x64_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_128x64_trnp_a_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_128x64_trnp_a_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x64_trnp_a_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_256x64_trnp_a_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_256x64_trnp_a_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_256x64_trnp_a_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_128x64_trnp_af_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_128x64_trnp_af_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_128x64_trnp_af_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matC_256x64_trnp_af_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_bot, mem_layout_c, mem_space_c>,
       matC_256x64_trnp_af_tile_desc_t,
       (global_kslicing > 1)
           ? msg_type::atomic_add
           : subgroup::msg_type_v<matC_256x64_trnp_af_tile_desc_t, mem_space_c>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
 
   // 512 = 16x32 or 8x64
   using matElem_tile_desc_t = gpu::xetla::subgroup::tile_desc_t<
@@ -1131,12 +1133,12 @@ struct xetla_mha_core_attn_bwd_t {
       mem_desc_t<dtype_sfx, mem_layout::row_major, mem_space::global>,
       matElem_tile_desc_t,
       subgroup::msg_type_v<matElem_tile_desc_t, mem_space::global>,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matElem_st_payload_t = gpu::xetla::subgroup::mem_payload_t<
       mem_desc_t<dtype_sfx, mem_layout::row_major, mem_space::global>,
       matElem_tile_desc_t,
       msg_type::block_2d,
-      gpu_arch::XeHpc>;
+      arch_tag>;
   using matElem_reg_t = gpu::xetla::subgroup::tile_t<
       float,
       gpu::xetla::subgroup::tile_desc_t<32, 16, 32, 16, reg_layout::tiled>>;
@@ -1243,15 +1245,15 @@ struct xetla_mha_core_attn_bwd_t {
     g_thd32_tid.init(tid_linear);
 
     static_assert(ThreadNum == 32, "All Thread Sync");
-    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::XeHpc> first_nbarr;
-    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::XeHpc> second_nbarr;
+    xetla_nbarrier_t<ThreadNum, ThreadNum, arch_tag> first_nbarr;
+    xetla_nbarrier_t<ThreadNum, ThreadNum, arch_tag> second_nbarr;
 
     int max_2d_nbar_id = ThreadNum >> 1;
     first_nbarr.init_nbarrier(max_2d_nbar_id, nbarrier_role::producer_consumer);
     second_nbarr.init_nbarrier(
         max_2d_nbar_id + 1, nbarrier_role::producer_consumer);
 
-    xetla_nbarrier_t<ThreadNum, ThreadNum, gpu_arch::XeHpc> all_nbarr;
+    xetla_nbarrier_t<ThreadNum, ThreadNum, arch_tag> all_nbarr;
     all_nbarr.init_nbarrier(ThreadNum - 1, nbarrier_role::producer_consumer);
 
     for (int transp128_loop = 0; transp128_loop < transp128_loop_num;

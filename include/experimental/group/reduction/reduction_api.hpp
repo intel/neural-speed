@@ -45,8 +45,8 @@ template <
     uint32_t row_size,
     uint32_t wg_size_x,
     uint32_t wg_size_y,
-    uint32_t max_simd_len = 32,
-    gpu_arch arch_ = gpu_arch::XeHpc>
+    uint32_t max_simd_len,
+    gpu_arch arch_>
 struct group_row_reduce_store_t {};
 
 } // namespace gpu::xetla::group

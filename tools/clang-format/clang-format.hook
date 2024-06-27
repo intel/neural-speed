@@ -21,7 +21,7 @@ format_file() {
 
   if [ -f $file ]; then
 
-    clang-format-12 -i ${STYLEARG} ${1}
+    clang-format -i ${STYLEARG} ${1}
 
     git add ${1}
 

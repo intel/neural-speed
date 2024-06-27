@@ -21,9 +21,14 @@
 #include <cstdint>
 
 namespace gpu::xetla {
-enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2 };
+enum class gpu_arch : uint8_t { XeLpg = 0, XeHpg = 1, XeHpc = 2, XeLast };
+
+template <gpu_arch arch_tag>
+inline constexpr bool valid_xe_arch_tag = (arch_tag < gpu_arch::XeLast);
 
 enum class grf_mode : uint8_t { normal = 0, double_grf = 1 };
 
 enum class mem_layout : uint8_t { row_major = 0, col_major = 1 };
+
+enum class mma_engine : uint8_t { xmx = 0, fpu = 1 };
 } // namespace gpu::xetla

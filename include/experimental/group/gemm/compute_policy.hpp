@@ -36,8 +36,8 @@ template <
     typename dtype_zero_pt_,
     quant_mode quant_type_,
     int dequant_s_,
-    mma_engine mma_engine_ = mma_engine::xmx,
-    gpu_arch arch_tag_ = gpu_arch::XeHpc,
+    mma_engine mma_engine_,
+    gpu_arch arch_tag_,
     typename enable = void>
 struct compute_policy_int4_dequantize {};
 
@@ -60,7 +60,7 @@ struct compute_policy_int4_dequantize<
     dequant_s_,
     mma_engine_,
     arch_tag_,
-    std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
   using compute_attr = compute_attr_;
   using dtype_mma_acc = typename compute_attr::dtype_acc;
   using dtype_mma_a = typename compute_attr::dtype_a;
@@ -74,8 +74,9 @@ struct compute_policy_int4_dequantize<
   static constexpr gpu_arch arch_tag = arch_tag_;
 
   static_assert(
-      !(mma_engine == mma_engine::xmx && arch_tag == gpu_arch::XeLpg),
-      "XeLpg does not support xmx");
+      ((mma_engine == mma_engine::xmx && arch_has_xmx<arch_tag>) ||
+       (mma_engine == mma_engine::fpu && arch_has_fpu<arch_tag>)),
+      "arch does not support mma_engine specified");
 
   static constexpr bool is_int4_matB_policy = true;
 
@@ -88,15 +89,17 @@ struct compute_policy_int4_dequantize<
   static constexpr quant_mode quant_type = quant_type_;
 
   static constexpr uint32_t block_size_y_a = 16;
-  using mma_attr = mma_attr_t<arch_tag_, block_size_y_a>;
-  static constexpr uint32_t block_bytes_x_a =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 32;
+  using mma_attr = mma_attr_t<arch_tag_, mma_engine, block_size_y_a>;
+  static constexpr uint32_t block_bytes_x_a = (mma_engine == mma_engine::xmx)
+      ? mma_attr::mma_k_in_bytes
+      : mma_attr::blk_k_in_bytes;
   static constexpr uint32_t block_size_x_a =
       block_bytes_x_a / sizeof(dtype_mma_a);
-  static constexpr uint32_t block_size_x_b =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_n_in_elem : 32;
-  static constexpr uint32_t block_bytes_y_b =
-      (mma_engine == mma_engine::xmx) ? mma_attr::mma_k_in_bytes : 32;
+
+  static constexpr uint32_t block_size_x_b = (mma_engine == mma_engine::xmx)
+      ? mma_attr::mma_n_in_elem
+      : mma_attr::blk_n_in_bytes / sizeof(dtype_mma_b);
+  static constexpr uint32_t block_bytes_y_b = block_bytes_x_a;
   static constexpr uint32_t block_size_y_b =
       block_bytes_y_b / sizeof(dtype_mma_b);
 

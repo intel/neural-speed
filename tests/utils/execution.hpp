@@ -132,7 +132,7 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(arg);
 
     int constexpr warm_up = 10;
-    int constexpr iters = 100;
+    int constexpr iters = 10;
     for (size_t i = 0; i < batch; i++) {
       auto A_ptr = A + i * size_a;
       auto B_ptr = B + i * size_b;
@@ -315,7 +315,6 @@ class dispatch_arch {
     switch (deviceArch) {
       case ENS::architecture::intel_gpu_pvc:
         return F<gpu_arch::XeHpc>::exec(std::forward<Args>(args)...);
-        return;
       case ENS::architecture::intel_gpu_dg2_g10:
       case ENS::architecture::intel_gpu_dg2_g11:
       case ENS::architecture::intel_gpu_dg2_g12:
