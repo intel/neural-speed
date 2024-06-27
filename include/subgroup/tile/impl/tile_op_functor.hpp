@@ -51,6 +51,124 @@ struct none_op_t {
   }
 };
 
+template <
+    typename matB_acc_t,
+    typename matB_t,
+    typename scale_t,
+    typename zero_pt_t,
+    uint32_t dequant_s,
+    quant_mode quant_mode>
+struct dequant_int4_weight_t {
+  struct arguments_t {
+    uint32_t wg_start_m;
+    uint32_t wg_start_n;
+    uint32_t wg_start_k;
+    inline arguments_t() = default;
+    inline arguments_t(
+        uint32_t wg_start_m_,
+        uint32_t wg_start_n_,
+        uint32_t wg_start_k_)
+        : wg_start_m(wg_start_m_),
+          wg_start_n(wg_start_n_),
+          wg_start_k(wg_start_k_) {}
+  };
+  __XETLA_API KERNEL_FUNC void operator()(
+      matB_acc_t& matB_acc,
+      matB_t& matB,
+      scale_t& scale,
+      zero_pt_t& zero_pt,
+      //   [[maybe_unused]] const coord_t& coord,
+      [[maybe_unused]] const arguments_t& args,
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
+    // no tail, because this is matB
+    constexpr uint32_t tile_size_x_b = matB_acc_t::tile_size_x;
+    constexpr uint32_t tile_size_y_b = matB_acc_t::tile_size_y;
+    constexpr uint32_t block_size_x_b = matB_acc_t::block_size_x;
+    constexpr uint32_t block_size_y_b = matB_acc_t::block_size_y;
+    static constexpr uint32_t pack_ratio = sizeof(typename matB_t::dtype) * 2;
+
+    constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
+    constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
+#pragma unroll
+    for (uint32_t i = 0; i < num_block_y; ++i) {
+#pragma unroll
+      for (uint32_t j = 0; j < num_block_x; ++j) {
+        int block_id = (i * num_block_x + j);
+        // Must be little-endian
+        auto matB_blk = matB.reg.xetla_format<uint8_t>()
+                            .xetla_select<matB_acc_t::block_elems / 2, 1>(
+                                block_id * matB_acc_t::block_elems / 2);
+
+        auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
+            block_id * matB_acc_t::block_elems);
+
+        // int8 includes 2 4bits data.
+        xetla_vector<int8_t, matB_acc_t::block_elems> cvt_blk_i8;
+
+        // lowest 4 bit
+        {
+          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0) =
+              matB_blk & 0xf;
+        }
+        // highest 4 bit
+        {
+          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1) =
+              matB_blk >> 4;
+        }
+
+        // (b_i8 -  zero_pt_i8) x scale = fp16
+        constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
+#pragma unroll
+        for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+#pragma unroll
+          for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
+            uint32_t offset_y_in_tile = i * block_size_y_b + ii;
+            uint32_t offset_x_in_tile = j * block_size_x_b + jj;
+
+            uint32_t scale_idx =
+                (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
+                offset_x_in_tile;
+
+            if constexpr (quant_mode == quant_mode::S4_ASYM) {
+              uint32_t zero_pt_idx =
+                  offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
+                  offset_x_in_tile / pack_ratio;
+              native_type_t<typename matB_t::dtype> zero_pt_pack =
+                  zero_pt.reg[zero_pt_idx];
+
+              int8_t zero_pt_i8 =
+                  (zero_pt_pack >>
+                   (4 * ((args.wg_start_n + offset_x_in_tile) % pack_ratio))) &
+                  0xf;
+              // sycl::ext::oneapi::experimental::printf(
+              //     "zero_pt.reg[%d}  %x    zero_pt_i8 %x  offset_x_in_tile:%d
+              //     \n", zero_pt_idx, zero_pt_pack, (int32_t)zero_pt_i8 ,
+              //     offset_x_in_tile);
+
+              cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
+                  zero_pt_i8;
+            } else if constexpr (quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+              cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                  cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) -
+                  int8_t(8);
+            }
+            dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
+                cvt_blk_i8.xetla_select<step, 1>(jj * block_size_y_b + ii) *
+                scale.reg[scale_idx];
+
+            // sycl::ext::oneapi::experimental::printf(
+            //     "scale[%d] %f \n",
+            //     scale_idx,
+            //     float(sycl::half(scale.reg.xetla_select<1, 1>(scale_idx))));
+          }
+        }
+      }
+    }
+  }
+};
+
 /// @brief Is the element-wise relu op functor.
 /// Get the relu input from matAcc, update the relu output in place,
 /// Used in epilogue::tile_op or chained_tile_op.
@@ -487,7 +605,7 @@ struct bias_add_op_t<
     using bias_payload_t = mem_payload_t<
         mem_desc_bias_t,
         bias_tile_desc_t,
-        msg_type_v<bias_tile_desc_t, mem_desc_bias_t::space>,
+        msg_type_v<bias_tile_desc_t, mem_desc_bias_t>,
         arch_tag>;
     coord_t bias_coord(coord.x, 0);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
@@ -609,7 +727,7 @@ struct scale_v_offset_v_op_t<
     using scale_payload_t = mem_payload_t<
         scale_mem_desc_t,
         scale_tile_desc_t,
-        msg_type_v<scale_tile_desc_t, scale_mem_desc_t::space>,
+        msg_type_v<scale_tile_desc_t, scale_mem_desc_t>,
         arch_tag>;
     coord_t scale_coord(coord.x, 0);
     scale_mem_desc_t scale_mem_desc(
@@ -625,7 +743,7 @@ struct scale_v_offset_v_op_t<
     using offset_payload_t = mem_payload_t<
         offset_mem_desc_t,
         offset_tile_desc_t,
-        msg_type_v<offset_tile_desc_t, offset_mem_desc_t::space>,
+        msg_type_v<offset_tile_desc_t, offset_mem_desc_t>,
         arch_tag>;
     coord_t offset_coord(coord.x, 0);
     offset_mem_desc_t offset_mem_desc(
@@ -729,7 +847,7 @@ struct scale_v_op_t<
     using scale_payload_t = mem_payload_t<
         scale_mem_desc_t,
         scale_tile_desc_t,
-        msg_type_v<scale_tile_desc_t, scale_mem_desc_t::space>,
+        msg_type_v<scale_tile_desc_t, scale_mem_desc_t>,
         arch_tag>;
     coord_t scale_coord(coord.x, 0);
     scale_mem_desc_t scale_mem_desc(
@@ -839,7 +957,7 @@ struct elemwise_reduce_op_t<
     using mat_in_payload_t = mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         arch_tag>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
@@ -880,7 +998,7 @@ struct elemwise_reduce_op_t<
       using mat_tail_in_payload_t = mem_payload_t<
           mem_desc_in_t,
           mat_tail_in_tile_desc_t,
-          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t::space>,
+          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t>,
           arch_tag>;
       using mat_tail_in_tile_acc_t = tile_t<dtype_acc, mat_tail_in_tile_desc_t>;
       mat_tail_in_tile_t mat_tail_in;
@@ -967,7 +1085,7 @@ struct elemwise_reduce_op_stream_k_t<
     using mat_in_payload_t = mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         arch_tag>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
     mat_in_tile_t mat_in;
@@ -1082,7 +1200,7 @@ struct dropout_op_t<
     using mask_in_payload_t = mem_payload_t<
         mem_desc_mask_t,
         mask_in_tile_desc_t,
-        msg_type_v<mask_in_tile_desc_t, mem_desc_mask_t::space>,
+        msg_type_v<mask_in_tile_desc_t, mem_desc_mask_t>,
         arch_tag>;
     mem_desc_mask_t mem_desc_mask(args.base, args.shape, coord);
     mask_in_tile_t mask_in;
@@ -1180,7 +1298,7 @@ struct rng_dropout_op_t<
     using mask_out_payload_t = mem_payload_t<
         mem_desc_mask_t,
         mask_out_tile_desc_t,
-        msg_type_v<mask_out_tile_desc_t, mem_desc_mask_t::space>,
+        msg_type_v<mask_out_tile_desc_t, mem_desc_mask_t>,
         arch_tag>;
     if (args.prob == 0) {
       return;
@@ -1327,7 +1445,7 @@ struct linear_op_t<
     using mat_in_payload_t = mem_payload_t<
         mem_desc_in_t,
         mat_in_tile_desc_t,
-        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t::space>,
+        msg_type_v<mat_in_tile_desc_t, mem_desc_in_t>,
         arch_tag>;
     using mat_in_tile_acc_t = tile_t<dtype_acc, mat_in_tile_desc_t>;
     mem_desc_in_t mem_desc_in(args.base, args.shape, coord);
@@ -1371,7 +1489,7 @@ struct linear_op_t<
       using mat_tail_in_payload_t = mem_payload_t<
           mem_desc_in_t,
           mat_tail_in_tile_desc_t,
-          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t::space>,
+          msg_type_v<mat_tail_in_tile_desc_t, mem_desc_in_t>,
           arch_tag>;
       using mat_tail_in_tile_acc_t = tile_t<dtype_acc, mat_tail_in_tile_desc_t>;
 

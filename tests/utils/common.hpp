@@ -36,6 +36,9 @@ using namespace gpu::xetla;
 
 #define random_float() (generate_real_random<double>())
 #define random_uint8() (generate_int_random<unsigned>(0, 255))
+#define random_uint32() \
+  (generate_int_random<unsigned>(0, std::numeric_limits<unsigned>::max()))
+
 template <typename data_type>
 inline auto getTypeName() {
   fprintf(stderr, "FAIL: Not implemented specialization\n");

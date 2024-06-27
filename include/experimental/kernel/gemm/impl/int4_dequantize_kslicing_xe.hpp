@@ -95,7 +95,7 @@ class gemm_universal_t<
   using dtype_c = typename mem_desc_c_t::dtype;
   using dtype_scale = typename mem_desc_scale_t::dtype;
   using dtype_zero_pt = typename mem_desc_zero_pt_t::dtype;
-  using matAcc_t = typename gemm_t::matAcc_t;
+  using matAcc_t = typename gemm_t::matC_t;
   using dtype_acc = typename matAcc_t::dtype;
   using mem_desc_acc_t =
       mem_desc_t<dtype_acc, mem_layout::row_major, mem_space::global>;
@@ -159,7 +159,7 @@ class gemm_universal_t<
   /// @brief GEMM arguments.
   /// This is the interface for users to pass the application-related runtime
   /// variables.
-  template <group::quant_mode quant_mode = group::S4_FULLRANGE_NO_ZP>
+  template <quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP>
   struct arguments_t {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
@@ -295,7 +295,7 @@ class gemm_universal_t<
     }
   };
   template <>
-  struct arguments_t<group::S4_FULLRANGE_NO_ZP> {
+  struct arguments_t<quant_mode::S4_FULLRANGE_NO_ZP> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
     uint32_t matrix_m;
@@ -486,7 +486,7 @@ class gemm_universal_t<
   /// @param args Is the GEMM arguments for application-related runtime
   /// variables.
   /// @return Expected nd_range.
-  template <group::quant_mode quant_mode>
+  template <quant_mode quant_mode>
   static cl::sycl::nd_range<3> get_nd_range(arguments_t<quant_mode>& args) {
     cl::sycl::range<3> local_range = get_local_range();
     cl::sycl::range<3> group_range =
@@ -523,7 +523,7 @@ class gemm_universal_t<
   /// @param args Is the GEMM arguments for application-related runtime
   /// variables.
   /// @return Check result.
-  template <group::quant_mode quant_mode>
+  template <quant_mode quant_mode>
   static bool can_implement(arguments_t<quant_mode>& args) {
     bool implementable = true;
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
@@ -550,24 +550,24 @@ class gemm_universal_t<
             args.matB_base.base, args.matB_ld / pack_ratio);
       }
     }
-    if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
-      if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
-            (uint64_t)(args.matC_base.base),
-            args.matrix_n,
-            args.matrix_m,
-            args.matC_ld);
-      } else {
-        implementable &= kernel::general_1d<arch_tag, dtype_c>::check_alignment(
-            args.matC_base.base, args.matC_ld);
-      }
-    }
+    // if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
+    //   if (epilogue_t::msg_type_c == msg_type::block_2d) {
+    //     implementable &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
+    //         (uint64_t)(args.matC_base.base),
+    //         args.matrix_n,
+    //         args.matrix_m,
+    //         args.matC_ld);
+    //   } else {
+    //     implementable &= kernel::general_1d<arch_tag,
+    //     dtype_c>::check_alignment(
+    //         args.matC_base.base, args.matC_ld);
+    //   }
+    // }
     // check for int4x2
     implementable &=
         ((args.matB_ld % pack_ratio == 0) && (args.matrix_n % pack_ratio == 0));
     if constexpr (
-        gemm_t::compute_policy::quant_type !=
-        group::quant_mode::S4_FULLRANGE_NO_ZP) {
+        gemm_t::compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
       implementable &= (args.zero_pt_ld % pack_ratio == 0);
     }
 
@@ -584,7 +584,7 @@ class gemm_universal_t<
   /// variables.
   /// @param slm_base Is the slm base address.
   /// @param nbarrier_base Is the named barrier base.
-  template <group::quant_mode quant_mode>
+  template <quant_mode quant_mode>
   __XETLA_API KERNEL_FUNC void operator()(
       sycl::nd_item<3>& item,
       const arguments_t<quant_mode>& args,
@@ -598,12 +598,8 @@ class gemm_universal_t<
     int start_n = group_swizzle.template get_tile_idx<2>(item) * wg_tile_n;
     int start_k = 0;
     uint32_t wg_tile_k = args.matrix_k;
-    uint32_t boundary_n = (start_n + wg_tile_n) > args.matrix_n
-        ? args.matrix_n
-        : (start_n + wg_tile_n);
-    uint32_t boundary_m = (start_m + wg_tile_m) > args.matrix_m
-        ? args.matrix_m
-        : (start_m + wg_tile_m);
+    uint32_t boundary_n = std::min(start_n + wg_tile_n, args.matrix_n);
+    uint32_t boundary_m = std::min(start_m + wg_tile_m, args.matrix_m);
     uint32_t boundary_k = wg_tile_k;
     if constexpr (num_global_kslicing > 1) {
       wg_tile_k = (wg_tile_k + num_global_kslicing - 1) / num_global_kslicing;
@@ -647,10 +643,17 @@ class gemm_universal_t<
         args.matA_base,
         {boundary_k, boundary_m, args.matA_ld},
         {start_k, start_m});
-    mem_desc_b.init(
-        args.matB_base,
-        {boundary_n / pack_ratio, boundary_k, args.matB_ld / pack_ratio},
-        {int(start_n / pack_ratio), start_k});
+    if constexpr (gemm_t::is_col_major_b) {
+      mem_desc_b.init(
+          args.matB_base,
+          {boundary_n, boundary_k / pack_ratio, args.matB_ld / pack_ratio},
+          {start_n, int(start_k / pack_ratio)});
+    } else {
+      mem_desc_b.init(
+          args.matB_base,
+          {boundary_n / pack_ratio, boundary_k, args.matB_ld / pack_ratio},
+          {int(start_n / pack_ratio), start_k});
+    }
 
     uint32_t scale_size_y = ((args.matrix_k + dequant_s - 1) / dequant_s);
     mem_desc_scale_t mem_desc_scale(
@@ -658,23 +661,28 @@ class gemm_universal_t<
         {args.matrix_n, scale_size_y, args.scale_ld},
         {start_x_scale, start_y_scale});
 
+    uint32_t inner_loop_start = (start_k + k_stride - 1) / k_stride;
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args;
     if constexpr (
-        gemm_t::compute_policy::quant_type ==
-        group::quant_mode::S4_FULLRANGE_NO_ZP) {
-      gemm_args =
-          gemm_args_t(mem_desc_a, mem_desc_b, inner_loop_count, mem_desc_scale);
+        gemm_t::compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+      gemm_args = gemm_args_t(
+          mem_desc_a,
+          mem_desc_b,
+          inner_loop_start,
+          inner_loop_count,
+          mem_desc_scale);
     } else {
       mem_desc_zero_pt_t mem_desc_zero_pt(
           args.zero_pt_base,
-          {args.matrix_n / pack_ratio,
-           scale_size_y,
+          {(args.matrix_n + pack_ratio - 1) / pack_ratio,
+           ((args.matrix_k + dequant_s - 1) / dequant_s),
            args.zero_pt_ld / pack_ratio},
           {start_x_zero_pt, start_y_zero_pt});
       gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,
+          inner_loop_start,
           inner_loop_count,
           mem_desc_scale,
           mem_desc_zero_pt);

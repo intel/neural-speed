@@ -41,8 +41,8 @@ template <
     gpu_arch gpu_arch>
 struct fp16_gemm_test_func {
   using tile_shape = tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-  static constexpr uint32_t periodic_sync_interval = 0 ; //8;
-  static constexpr uint32_t prefetch_distance = 0 ;//256 / (sg_k * sizeof(dtype_a));
+  static constexpr uint32_t periodic_sync_interval = 1 ; //8;
+  static constexpr uint32_t prefetch_distance = 3 ;//256 / (sg_k * sizeof(dtype_a));
 
   using compute_attr = typename std::conditional<
       (engine == mma_engine::fpu),

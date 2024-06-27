@@ -92,20 +92,26 @@ struct layer_norm_bwd_t<
   using gamma_in_t = subgroup::tile_t<dtype_weight, ln_bwd_tile_desc_t>;
   using dx_out_t = subgroup::tile_t<dtype_x, ln_bwd_tile_desc_t>;
 
+  using mem_desc_y_t =
+      mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>;
   using dy_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>,
+      mem_desc_y_t,
       ln_bwd_tile_desc_t,
-      subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_desc_y_t>,
       gpu_arch::XeHpc>;
+  using mem_desc_x_t =
+      mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>;
   using x_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
+      mem_desc_x_t,
       ln_bwd_tile_desc_t,
-      subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_desc_x_t>,
       gpu_arch::XeHpc>;
+  using mem_desc_weight_t =
+      mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>;
   using gamma_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
+      mem_desc_weight_t,
       ln_bwd_tile_desc_t,
-      subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<ln_bwd_tile_desc_t, mem_desc_weight_t>,
       gpu_arch::XeHpc>;
   using dx_out_payload_t = subgroup::mem_payload_t<
       mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,

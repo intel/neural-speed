@@ -275,18 +275,6 @@ class gemm_universal_t<
             args.matB_base.base, args.matB_ld);
       }
     }
-    if (epilogue_t::msg_type_c != msg_type::unaligned_2d) {
-      if (epilogue_t::msg_type_c == msg_type::block_2d) {
-        implementable &= kernel::block_2d<arch_tag, dtype_c>::check_tensor(
-            (uint64_t)(args.matC_base.base),
-            args.matrix_n,
-            args.matrix_m,
-            args.matC_ld);
-      } else {
-        implementable &= kernel::general_1d<arch_tag, dtype_c>::check_alignment(
-            args.matC_base.base, args.matC_ld);
-      }
-    }
 
     return implementable;
   }

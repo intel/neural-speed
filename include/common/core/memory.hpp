@@ -256,7 +256,7 @@ constexpr __ESIMD_NS::atomic_op get_atomic_op(gpu::xetla::atomic_op ao) {
 ///
 template <
     typename Ty,
-    uint8_t NElts = 1,
+    int NElts = 1,
     data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::cached,
     cache_hint L2H = cache_hint::cached,
@@ -293,7 +293,7 @@ __XETLA_API void xetla_prefetch_global(
 ///
 template <
     typename Ty,
-    uint8_t NElts = 1,
+    int NElts = 1,
     data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::cached,
     cache_hint L2H = cache_hint::cached>
@@ -355,7 +355,12 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
-  return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
+  if constexpr (sizeof(T) * N < sizeof(uint32_t)) {
+    xetla_vector<uint32_t, N> offsets(byte_offset, sizeof(T));
+    return __ESIMD_NS::gather<T, N, uint32_t>(ptr, offsets);
+  } else {
+    return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
+  }
 }
 
 /// @brief Stateless scattered load.
@@ -380,7 +385,7 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
 ///
 template <
     typename Ty,
-    uint8_t NElts = 1,
+    int NElts = 1,
     data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none,
@@ -426,7 +431,7 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
 ///
 template <
     typename Ty,
-    uint8_t NElts = 1,
+    int NElts = 1,
     data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none,
@@ -495,7 +500,13 @@ __XETLA_API void xetla_store_global(
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
-  __ESIMD_NS::block_store<T, N>(ptr, byte_offset, vals, props);
+
+  if constexpr (sizeof(T) * N < sizeof(uint32_t)) {
+    xetla_vector<uint32_t, N> offsets(byte_offset, sizeof(T));
+    return __ESIMD_NS::scatter<T, N, uint32_t>(ptr, offsets, vals);
+  } else {
+    __ESIMD_NS::block_store<T, N>(ptr, byte_offset, vals, props);
+  }
 }
 
 /// @brief Stateless scattered atomic (0 src).
@@ -642,7 +653,7 @@ __XETLA_API void xetla_local_init() {
 ///
 template <
     typename Ty,
-    uint8_t NElts = 1,
+    int NElts = 1,
     data_size DS = data_size::default_size,
     int N>
 __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
@@ -659,35 +670,31 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
           xetla_cvt<uint64_t, uint32_t>(offsets), pred);
 }
 
-/// @brief SLM block load. (transposed gather with 1 channel).
-/// Collects elements located at slm and returns them as a single \ref
-/// xetla_vector object.
+/// Loads a contiguous block of SLM memory referenced by the given byte-offset
+/// \p offset, then returns the loaded data as a simd object.
+/// The generated code depends on the combination {T, N, Flags}.
+/// Providing flags specifying the alignment of 16-bytes or more produces more
+/// efficient code. If the alignment is smaller than 16-bytes, then less
+/// efficient gather is generated. If the loaded vector is too long
+/// for 1 flat-load GPU instruction, then a series of flat-loads and/or gathers
+/// may be generated.
+/// @tparam T Element type.
+/// @tparam N Number of elements to load.
+/// @tparam Flags The alignment specifier type tag.
+/// @param byte_offset The byte-offset to load from.
+/// @param Flags Specifies the alignment.
+/// @return A vector of loaded elements.
 ///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_load.slm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to load per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @param offset [in] is the zero-based offset for SLM buffer in bytes.
-/// @return is a xetla_vector of type T and size NElts.
-///
-template <
-    typename Ty,
-    uint8_t NElts = 1,
-    data_size DS = data_size::default_size>
+template <typename Ty, int NElts = 1, data_size DS = data_size::default_size>
 __XETLA_API xetla_vector<Ty, NElts> xetla_load_local(uint32_t offset) {
   using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
-          (uint64_t)offset));
+  // DEBUG_INVOKE(
+  //     dbg_level::core,
+  //     core::general_1d<gpu_arch::XeHpc, Ty>::template
+  //     check_restriction<NElts>(
+  //         (uint64_t)offset));
 
-  return __ESIMD_ENS::
-      lsc_slm_block_load<T, NElts, gpu::xetla::detail::get_data_size(DS)>(
-          offset);
+  return __ESIMD_NS::slm_block_load<T, NElts>(offset);
 }
 
 /// @brief SLM scattered store.
@@ -708,7 +715,7 @@ __XETLA_API xetla_vector<Ty, NElts> xetla_load_local(uint32_t offset) {
 ///
 template <
     typename Ty,
-    uint8_t NElts = 1,
+    int NElts = 1,
     data_size DS = data_size::default_size,
     int N>
 __XETLA_API void xetla_store_local(
@@ -726,36 +733,26 @@ __XETLA_API void xetla_store_local(
           offsets, vals, pred);
 }
 
-/// @brief SLM block store (transposed SLM scatter with 1 channel).
-/// Scatters elements located to slm.
+/// Stores elements of the vector \p vals to a contiguous block of SLM memory
+/// at the given byte-offset \p offset.
+/// The generated code depends on the combination {T, N, Flags}.
+/// Providing flags specifying the alignment of 16-bytes or more produces more
+/// efficient code. If the alignment is smaller than 16-bytes, then less
+/// efficient scatter is generated. If the stored vector is too long
+/// for 1 flat-store GPU instruction, then a series of flat-store and/or
+/// scatters may be generated.
+/// @tparam T Element type.
+/// @tparam N Number of elements to store.
+/// @tparam Flags The alignment specifier type tag.
+/// @param offset The byte-offset to store at.
+/// @param vals The vector to store.
+/// @param Flags Specifies the alignment.
 ///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_store.slm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to store per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @param offset [in] is the zero-based offset for SLM buffer in bytes.
-/// @param vals   [in] is values to store.
-///
-template <
-    typename Ty,
-    uint8_t NElts = 1,
-    data_size DS = data_size::default_size>
+template <typename Ty, int NElts = 1, data_size DS = data_size::default_size>
 __XETLA_API void xetla_store_local(
     uint32_t offset,
     xetla_vector<Ty, NElts> vals) {
-  using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::template check_restriction<NElts>(
-          offset));
-
-  __ESIMD_ENS::
-      lsc_slm_block_store<T, NElts, gpu::xetla::detail::get_data_size(DS)>(
-          offset, vals);
+  __ESIMD_NS::slm_block_store<Ty, NElts>(offset, vals);
 }
 
 /// @brief SLM scattered atomic (0 src).

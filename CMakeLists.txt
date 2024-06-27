@@ -46,7 +46,7 @@ if (${LOG} STREQUAL "on")
 endif ()
 
 # For large registers mode, enable 256 registers for kernels
-set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
+# set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
 # Enable bank conflict reduction.
@@ -75,7 +75,7 @@ add_link_options(-fsycl -fsycl-device-code-split=per_kernel -fsycl-max-parallel-
 add_link_options(${XETLA_KERNEL_FLAGS})
 
 if(UNIX)
-    add_compile_options(-fp-model=precise)
+    add_compile_options(-fp-model=precise -ftemplate-backtrace-limit=0)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)
     link_libraries(-lgtest -lgtest_main)
 else() # Windows

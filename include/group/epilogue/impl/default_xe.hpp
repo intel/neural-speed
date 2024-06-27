@@ -70,9 +70,9 @@ class epilogue_t<
   }
 
  public:
-  static constexpr msg_type msg_type_c =
-      (mem_space_c == mem_space::global ? msg_type::block_2d
-                                        : msg_type::scatter);
+  //   static constexpr msg_type msg_type_c =
+  //       (mem_space_c == mem_space::global ? msg_type::block_2d
+  //                                         : msg_type::scatter);
 
   /// @brief Default epilogue.
   /// 1) Convert dtype_acc to dtype_c 2) Overwrite to memory.
@@ -94,6 +94,10 @@ class epilogue_t<
       [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using mat_tile_desc = typename matAcc_t::tile_desc;
     using matC_t = subgroup::tile_t<dtype_c, mat_tile_desc>;
+
+    // static constexpr msg_type msg_type_c = msg_type::unaligned_2d;
+    static constexpr msg_type msg_type_c =
+        subgroup::msg_type_v<mat_tile_desc, mem_desc_c_t>;
     using matC_payload_t = subgroup::
         mem_payload_t<mem_desc_c_t, mat_tile_desc, msg_type_c, arch_tag>;
     update_sg_tile_tdesc(g, mem_desc_c);
@@ -143,9 +147,7 @@ class epilogue_t<
   using dtype_c = typename mem_desc_c_t::dtype;
   static constexpr mem_layout mem_layout_c = mem_desc_c_t::layout;
   static constexpr mem_space mem_space_c = mem_desc_c_t::space;
-  static constexpr msg_type msg_type_c =
-      (mem_space_c == mem_space::global ? msg_type::block_2d
-                                        : msg_type::scatter);
+
   /// @brief Updates tile base descriptor based on the tid.
   __XETLA_API static void update_sg_tile_tdesc(
       work_group_t& g,
@@ -165,8 +167,6 @@ class epilogue_t<
   }
 
  public:
-  static constexpr bool is_2d_block_c = (msg_type_c == msg_type::block_2d);
-
   /// @brief Default epilogue.
   /// 1) Convert dtype_acc to dtype_c 2) Overwrite to memory.
   /// @tparam matAcc_t Is the type of the input tile.
@@ -190,11 +190,13 @@ class epilogue_t<
       [[maybe_unused]] uint32_t nbarrier_base = 0) {
     using mat_tile_desc = typename matAcc_t::tile_desc;
     using matC_t = subgroup::tile_t<dtype_c, mat_tile_desc>;
-    using matC_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<dtype_c, mem_layout_c, mem_space_c>,
-        mat_tile_desc,
-        msg_type_c,
-        arch_tag>;
+
+    static constexpr msg_type msg_type_c = msg_type::block_2d;
+    // static constexpr msg_type msg_type_c =
+    //     subgroup::msg_type_v<mat_tile_desc, mem_desc_c_t>;
+
+    using matC_payload_t = subgroup::
+        mem_payload_t<mem_desc_c_t, mat_tile_desc, msg_type_c, arch_tag>;
 
     update_sg_tile_tdesc(g, mem_desc_c);
 

@@ -409,20 +409,20 @@ class multi_layer_perceptron_t {
                 args.matW_base.base, args.matW_ld);
       }
     }
-    if (epilogue_layer1_t::msg_type_c != msg_type::unaligned_2d) {
-      if (epilogue_layer1_t::msg_type_c == msg_type::block_2d) {
-        implementable &=
-            kernel::block_2d<gpu_arch::XeHpc, dtype_b>::check_tensor(
-                (uint64_t)(args.matB_base.base),
-                args.matrix_n_layer1,
-                args.matrix_m_layer1,
-                args.matB_ld);
-      } else {
-        implementable &=
-            kernel::general_1d<gpu_arch::XeHpc, dtype_b>::check_alignment(
-                args.matB_base.base, args.matB_ld);
-      }
-    }
+    // if (epilogue_layer1_t::msg_type_c != msg_type::unaligned_2d) {
+    //   if (epilogue_layer1_t::msg_type_c == msg_type::block_2d) {
+    //     implementable &=
+    //         kernel::block_2d<gpu_arch::XeHpc, dtype_b>::check_tensor(
+    //             (uint64_t)(args.matB_base.base),
+    //             args.matrix_n_layer1,
+    //             args.matrix_m_layer1,
+    //             args.matB_ld);
+    //   } else {
+    //     implementable &=
+    //         kernel::general_1d<gpu_arch::XeHpc, dtype_b>::check_alignment(
+    //             args.matB_base.base, args.matB_ld);
+    //   }
+    // }
     if (gemm_layer2_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_layer2_t::msg_type_a == msg_type::block_2d) {
         implementable &=
@@ -451,20 +451,20 @@ class multi_layer_perceptron_t {
                 args.matV_base.base, args.matV_ld);
       }
     }
-    if (epilogue_layer2_t::msg_type_c != msg_type::unaligned_2d) {
-      if (epilogue_layer2_t::msg_type_c == msg_type::block_2d) {
-        implementable &=
-            kernel::block_2d<gpu_arch::XeHpc, dtype_c>::check_tensor(
-                (uint64_t)(args.matC_base.base),
-                args.matrix_n_layer2,
-                args.matrix_m_layer2,
-                args.matC_ld);
-      } else {
-        implementable &=
-            kernel::general_1d<gpu_arch::XeHpc, dtype_c>::check_alignment(
-                args.matC_base.base, args.matC_ld);
-      }
-    }
+    // if (epilogue_layer2_t::msg_type_c != msg_type::unaligned_2d) {
+    //   if (epilogue_layer2_t::msg_type_c == msg_type::block_2d) {
+    //     implementable &=
+    //         kernel::block_2d<gpu_arch::XeHpc, dtype_c>::check_tensor(
+    //             (uint64_t)(args.matC_base.base),
+    //             args.matrix_n_layer2,
+    //             args.matrix_m_layer2,
+    //             args.matC_ld);
+    //   } else {
+    //     implementable &=
+    //         kernel::general_1d<gpu_arch::XeHpc, dtype_c>::check_alignment(
+    //             args.matC_base.base, args.matC_ld);
+    //   }
+    // }
 
     return implementable;
   }

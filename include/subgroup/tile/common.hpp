@@ -132,23 +132,21 @@ __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::global>
 process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
   using dtype = typename payload_t::dtype;
-  using mem_dtype = typename payload_t::mem_dtype;
   if constexpr (remained_len >= base_len) {
     uint32_t address_offset = offset * sizeof(dtype);
-    auto reg_sub =
-        tile.reg.xetla_select<base_len * payload_t::scale_factor, 1>(offset);
+    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(offset);
     if constexpr (flag == process_flag::load) {
-      reg_sub.xetla_format<mem_dtype>() =
-          xetla_load_global<mem_dtype, base_len, L1, L2>(
+      reg_sub.xetla_format<dtype>() =
+          xetla_load_global<dtype, base_len / sizeof(dtype), L1, L2>(
               payload.base_ptr, payload.base_offset + address_offset);
     } else {
-      xetla_store_global<mem_dtype, base_len, L1, L2>(
+      xetla_store_global<dtype, base_len / sizeof(dtype), L1, L2>(
           payload.base_ptr,
           payload.base_offset + address_offset,
-          reg_sub.xetla_format<mem_dtype>());
+          reg_sub.xetla_format<dtype>());
     }
     process_1d_tail<remained_len - base_len, (base_len >> 1), flag, L1, L2>(
-        tile, payload, offset + base_len * payload_t::scale_factor);
+        tile, payload, offset + base_len);
   } else {
     process_1d_tail<remained_len, (base_len >> 1), flag, L1, L2>(
         tile, payload, offset);
@@ -165,23 +163,21 @@ template <
     typename tile_t>
 __XETLA_API typename std::enable_if_t<
     base_len != 0 && payload_t::memory_space == mem_space::local>
-process_1d_tail(
-    tile_t& tile,
-    payload_t& payload,
-    uint32_t offset,
-    uint32_t address_offset) {
-  using mem_dtype = typename payload_t::mem_dtype;
+process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
+  using dtype = typename payload_t::dtype;
   if constexpr (remained_len >= base_len) {
-    auto reg_sub =
-        tile.reg.xetla_select<base_len * payload_t::scale_factor, 1>(offset);
+    uint32_t address_offset = offset * sizeof(dtype);
+    auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(offset);
     if constexpr (flag == process_flag::load) {
-      reg_sub.xetla_format<mem_dtype>() =
-          xetla_load_local<mem_dtype, base_len, data_size::default_size>(
-              payload.base_address + payload.address + address_offset);
+      reg_sub.xetla_format<dtype>() = xetla_load_local<
+          dtype,
+          base_len / sizeof(dtype),
+          data_size::default_size>(
+          payload.base_address + payload.address + address_offset);
     } else {
-      xetla_store_local<mem_dtype, base_len>(
+      xetla_store_local<dtype, base_len / sizeof(dtype)>(
           payload.base_address + payload.address + address_offset,
-          reg_sub.xetla_format<mem_dtype>());
+          reg_sub.xetla_format<dtype>());
     }
     process_1d_tail<
         remained_len - base_len,
@@ -190,13 +186,7 @@ process_1d_tail(
         L1,
         L2,
         payload_t,
-        tile_t>(
-        tile,
-        payload,
-        offset + base_len * payload_t::scale_factor,
-        address_offset +
-            base_len * payload_t::scale_factor *
-                sizeof(typename tile_t::dtype));
+        tile_t>(tile, payload, offset + base_len);
   } else {
     process_1d_tail<
         remained_len,
@@ -205,7 +195,7 @@ process_1d_tail(
         L1,
         L2,
         payload_t,
-        tile_t>(tile, payload, offset, address_offset);
+        tile_t>(tile, payload, offset);
   }
 }
 
@@ -315,14 +305,17 @@ struct is_floating_to_integer {
       is_integral<typename T_dst::dtype>::value;
 };
 
-template <
-    typename tile_desc_,
-    mem_space memory_space,
-    mem_layout memory_layout = mem_layout::row_major>
+template <typename tile_desc_, typename mem_desc_>
 struct msg_type_query {
+  using dtype = mem_desc_::dtype;
+  static constexpr mem_layout memory_layout = mem_desc_::layout;
+  static constexpr mem_space memory_space = mem_desc_::space;
+
   static constexpr msg_type value = memory_space == mem_space::global
-      ? (((tile_desc_::tile_size_y == 1) &&
-          (memory_layout == mem_layout::row_major))
+      ? (((tile_desc_::tile_size_y == 1 &&
+           memory_layout == mem_layout::row_major) ||
+          (tile_desc_::tile_size_x == 1 &&
+           memory_layout == mem_layout::col_major))
              ? msg_type::block_1d
              : msg_type::block_2d)
       : (((tile_desc_::tile_size_y == 1) &&
@@ -331,8 +324,8 @@ struct msg_type_query {
              : msg_type::scatter);
 };
 
-template <typename tile_desc_, mem_space memory_space>
-constexpr msg_type msg_type_v = msg_type_query<tile_desc_, memory_space>::value;
+template <typename tile_desc_, typename mem_desc_>
+constexpr msg_type msg_type_v = msg_type_query<tile_desc_, mem_desc_>::value;
 
 template <
     typename dtype,

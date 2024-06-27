@@ -101,23 +101,29 @@ struct layer_norm_fwd_t<
   using beta_in_t = subgroup::tile_t<dtype_weight, ln_fwd_tile_desc_t>;
   using y_out_t = subgroup::tile_t<dtype_y, ln_fwd_tile_desc_t>;
 
+  using mem_desc_x_t =
+      mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>;
   using x_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_x, mem_layout::row_major, mem_space::global>,
+      mem_desc_x_t,
       ln_fwd_tile_desc_t,
-      subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_desc_x_t>,
       gpu_arch::XeHpc>;
+  using mem_desc_weight_t =
+      mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>;
   using gamma_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
+      mem_desc_weight_t,
       ln_fwd_tile_desc_t,
-      subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_desc_weight_t>,
       gpu_arch::XeHpc>;
   using beta_in_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_weight, mem_layout::row_major, mem_space::global>,
+      mem_desc_weight_t,
       ln_fwd_tile_desc_t,
-      subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_space::global>,
+      subgroup::msg_type_v<ln_fwd_tile_desc_t, mem_desc_weight_t>,
       gpu_arch::XeHpc>;
+  using mem_desc_y_t =
+      mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>;
   using y_out_payload_t = subgroup::mem_payload_t<
-      mem_desc_t<dtype_y, mem_layout::row_major, mem_space::global>,
+      mem_desc_y_t,
       ln_fwd_tile_desc_t,
       msg_type::block_1d,
       gpu_arch::XeHpc>;
@@ -320,7 +326,7 @@ struct layer_norm_fwd_t<
         itr_count += 1;
         nbarrier.wait();
 
-        xetla_vector<dtype_acc, wg_size_x * 2> mu_m2_vec =
+        xetla_vector<dtype_acc, wg_size_x* 2> mu_m2_vec =
             xetla_load_local<dtype_acc, wg_size_x * 2>(slm_load_base);
         xetla_vector<dtype_acc, wg_size_x> mu_vec =
             mu_m2_vec.xetla_select<wg_size_x, 2>(0);

@@ -93,15 +93,15 @@ inline constexpr bool arch_has_2d_load_store =
 
 template <gpu_arch arch_tag>
 struct load_store_attr_t<msg_type::block_1d, arch_tag> {
-  static constexpr uint32_t max_load_vec_len = 32;
-  static constexpr uint32_t max_store_vec_len = 32;
+  static constexpr uint32_t max_load_vec_len = 256;
+  static constexpr uint32_t max_store_vec_len = 256;
   static constexpr uint32_t max_prefetch_vec_len = 32;
 };
 
 template <>
 struct load_store_attr_t<msg_type::block_1d, gpu_arch::XeHpc> {
-  static constexpr uint32_t max_load_vec_len = 64;
-  static constexpr uint32_t max_store_vec_len = 64;
+  static constexpr uint32_t max_load_vec_len = 512;
+  static constexpr uint32_t max_store_vec_len = 512;
   static constexpr uint32_t max_prefetch_vec_len = 64;
 };
 

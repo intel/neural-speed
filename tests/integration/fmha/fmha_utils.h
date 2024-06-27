@@ -156,7 +156,9 @@ struct group_row_reduce_t {
   using load_payload_t = subgroup::mem_payload_t<
       mem_desc_t<T, mem_layout::row_major, mem_space::local>,
       load_tile_desc,
-      subgroup::msg_type_v<load_tile_desc, mem_space::local>,
+      subgroup::msg_type_v<
+          load_tile_desc,
+          mem_desc_t<T, mem_layout::row_major, mem_space::local>>,
       arch_tag>;
 
   xetla_nbarrier_t<kNumSg, kNumSg, arch_tag> nbarrier;
@@ -243,10 +245,12 @@ struct bias_add_op_t {
     using bias_tile_desc_t = subgroup::
         tile_desc_t<tile_size_x, 1, block_size_x, 1, reg_layout::tiled>;
     using bias_t = subgroup::tile_t<dtype_bias, bias_tile_desc_t>;
+    using mem_desc_bias_t =
+        mem_desc_t<dtype_bias, mem_desc_bias_t::layout, mem_desc_bias_t::space>;
     using bias_payload_t = subgroup::mem_payload_t<
-        mem_desc_t<dtype_bias, mem_desc_bias_t::layout, mem_desc_bias_t::space>,
+        mem_desc_bias_t,
         bias_tile_desc_t,
-        subgroup::msg_type_v<bias_tile_desc_t, mem_desc_bias_t::space>,
+        subgroup::msg_type_v<bias_tile_desc_t, mem_desc_bias_t>,
         arch_tag>;
     coord_t bias_coord(coord.x, coord.y);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);

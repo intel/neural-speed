@@ -318,7 +318,7 @@ void dequantize_gemm_run(int iter) {
   constexpr size_t matrix_k = Test::mat_k;
   constexpr uint32_t global_kslicing = Test::global_kslicing;
   constexpr uint32_t local_kslicing = Test::local_kslicing;
-
+  static constexpr mem_layout layout_b = Test::layout_b;
   constexpr size_t wg_tile_m = Test::wg_m;
   constexpr size_t wg_tile_n = Test::wg_n;
   constexpr size_t sg_tile_m = Test::sg_m;
@@ -368,7 +368,7 @@ void dequantize_gemm_run(int iter) {
       DEVICE_MEM_ALIGNMENT / sizeof(data_type_a)>;
   using mem_desc_b_t = xetla::mem_desc_t<
       data_type_b,
-      mem_layout::row_major,
+      layout_b,
       mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(data_type_b)>;
   using mem_desc_c_t = xetla::mem_desc_t<
@@ -387,14 +387,15 @@ void dequantize_gemm_run(int iter) {
       compute_attr_t<data_type_acc_in, data_type_acc_in, data_type_acc>;
   using perf_tuning_knob = xetla::group::
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
+  static constexpr quant_info quant_info{
+      quant_mode::S4_FULLRANGE_NO_ZP, Test::dequant_s, layout_b};
 
   using compute_policy = xetla::group::compute_policy_int4_dequantize<
       compute_attr,
       perf_tuning_knob,
       data_type_scale,
       data_type_zero_pt,
-      gpu::xetla::group::quant_mode::S4_FULLRANGE_NO_ZP,
-      dequant_s,
+      quant_info,
       mma_engine::xmx,
       gpu_arch::XeHpc>;
 
@@ -531,7 +532,7 @@ void dequantize_gemm_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
 
-  typename gemm_op_t::template arguments_t<compute_policy::quant_type> gemm_arg(
+  typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg(
       matrix_m,
       matrix_k,
       matrix_n,
