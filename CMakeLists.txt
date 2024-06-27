@@ -74,6 +74,9 @@ ProcessorCount(nproc)
 add_link_options(-fsycl -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=${nproc})
 add_link_options(${XETLA_KERNEL_FLAGS})
 
+# add_link_options(-gline-tables-only -fdebug-info-for-profiling -O2 -g)
+# add_compile_options(-gline-tables-only -fdebug-info-for-profiling)
+
 if(UNIX)
     add_compile_options(-fp-model=precise -ftemplate-backtrace-limit=0)
     add_link_options(-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm)

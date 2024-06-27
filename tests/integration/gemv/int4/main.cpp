@@ -23,7 +23,7 @@ using namespace gpu::xetla::group;
 #ifdef UT_DEBUG
 constexpr int ITER = 1;
 #else
-constexpr int ITER = 200;
+constexpr int ITER = 1000;
 #endif
 constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 
@@ -36,8 +36,8 @@ class test_col_major_1 {
   static constexpr size_t wg_m = 64;
   static constexpr size_t wg_n = 64;
   static constexpr size_t sg_m = 16;
-  static constexpr size_t sg_n = 16;
-  static constexpr size_t sg_k = 32;
+  static constexpr size_t sg_n = 8;
+  static constexpr size_t sg_k = 128;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
@@ -531,7 +531,7 @@ void dequantize_gemv_run(int iter) {
 #ifdef UT_DEBUG
   int constexpr warm = 0;
 #else
-  int constexpr warm = 100;
+  int constexpr warm = 300;
 #endif
   try {
     for (int i = 0; i < iter + warm; i++) {

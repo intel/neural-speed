@@ -170,8 +170,8 @@ class gemm_t<
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
       tile_size_y_a,
-      block_size_x_a,
-      block_size_y_a,
+      tile_size_x_a,
+      tile_size_y_a,
       reg_layout_a>;
   using matA_t = subgroup::tile_t<dtype_a, matA_tile_desc_t>;
   using matA_payload_t = subgroup::mem_payload_t<
@@ -179,7 +179,14 @@ class gemm_t<
       matA_tile_desc_t,
       subgroup::msg_type_v<matA_tile_desc_t, mem_desc_a_t>,
       arch_tag>;
-  using matA_acc_t = subgroup::tile_t<dtype_mma_a, matA_tile_desc_t>;
+  using matA_acc_t = subgroup::tile_t<
+      dtype_mma_a,
+      subgroup::tile_desc_t<
+          tile_size_x_a,
+          tile_size_y_a,
+          block_size_x_a,
+          block_size_y_a,
+          reg_layout_a>>;
   using matA_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_a_t, matA_tile_desc_t, wg_size_x, arch_tag>;
 
@@ -192,8 +199,8 @@ class gemm_t<
           tile_size_x_b,
           tile_size_y_b / pack_ratio,
           block_size_x_b,
-          // block_size_y_b * sizeof(dtype_mma_b) / sizeof(dtype_b),
-          block_size_y_b / pack_ratio,
+          tile_size_y_b / pack_ratio,
+          //   block_size_y_b / pack_ratio,
           reg_layout_b>,
       // compress int4 along N dimensions
       subgroup::tile_desc_t<
@@ -567,8 +574,8 @@ class gemm_t<
           matB, matB_payload);
       // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
       //     matB, matB_payload);
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          scale, scale_payload);
+      //   subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+      //       scale, scale_payload);
       if constexpr (
           compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
         subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
@@ -624,6 +631,10 @@ class gemm_t<
       SW_BARRIER();
       matA_acc_t matA_acc;
       matB_acc_t matB_acc;
+      //   matA_acc.reg= 1;
+      //   matB_acc.reg= 3;
+      //   matB.reg= 3;
+      scale.reg = 1;
       if constexpr (is_vnni_tiled_a) {
         subgroup::vnni_reverse(matA);
       }
@@ -640,9 +651,9 @@ class gemm_t<
             matA_acc,
             i == args.inner_loop_count - 1);
       } else {
-        if constexpr (
-            matB_acc_tile_desc_t::register_layout == reg_layout::vnni_tiled)
-          subgroup::vnni_convert(matB_acc);
+        // if constexpr (
+        //     matB_acc_tile_desc_t::register_layout == reg_layout::vnni_tiled)
+        //   subgroup::vnni_convert(matB_acc);
         tile_mma::mma(matC, matC, matB_acc, matA_acc);
       }
       SW_BARRIER();
