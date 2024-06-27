@@ -9,7 +9,7 @@ peft
 protobuf<3.20
 py-cpuinfo
 sentencepiece
-setuptools>=61
+setuptools<=69.5.1
 tiktoken
 torch
 transformers
