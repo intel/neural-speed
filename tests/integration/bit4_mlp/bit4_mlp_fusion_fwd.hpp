@@ -290,7 +290,7 @@ class bit4_mlp_fusion_fwd_t {
       ks_coop_num_y * wg_size_y,
       ks_coop_num_x,
       ks_coop_num_y>;
-  // TODO(zhe): impl global_group_recude_2mat_t
+
  public:
   struct quant_param_t {
     scale_base_t up_proj_scale_base;
@@ -299,6 +299,8 @@ class bit4_mlp_fusion_fwd_t {
     zero_pt_base_t gate_proj_zero_pt_base;
     uint32_t scale_ld;
     uint32_t zero_pt_ld;
+
+    quant_param_t() = default;
 
     inline quant_param_t(
         scale_base_t up_proj_scale_base_,
@@ -392,12 +394,12 @@ class bit4_mlp_fusion_fwd_t {
           quant_param(quant_param_) {}
 
     // TODO(zhe): impl the two func of big 3.
-    // inline arguments_t([[maybe_unused]] const arguments_t& args) {
-    //   assert(0);
-    // }
-    // inline arguments_t& operator=([[maybe_unused]] const arguments_t& args) {
-    //   assert(0);
-    // }
+    inline arguments_t([[maybe_unused]] const arguments_t& args) {
+      assert(0);
+    }
+    inline arguments_t& operator=([[maybe_unused]] const arguments_t& args) {
+      assert(0);
+    }
   };
 
   /// @brief Gets named_barrier id consumption count.
