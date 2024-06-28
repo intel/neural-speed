@@ -286,7 +286,9 @@ class gemm_t<
       mem_desc_scale_t,
       scale_tile_desc_t,
       subgroup::msg_type_v<scale_tile_desc_t, mem_desc_scale_t>,
-      arch_tag>;
+      (tile_size_x_b > 1 && arch_tag == gpu_arch::XeHpc) // TODO(Yi): PVC 2d WA
+          ? gpu_arch::XeHpg
+          : arch_tag>;
 
   // compress int4 along N dimensions
   using zero_pt_tile_desc_t = subgroup::tile_desc_t<
