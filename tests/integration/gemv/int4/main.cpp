@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-// #define UT_DEBUG
+#define UT_DEBUG
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;
 // The number of times the kernel is executed
@@ -35,9 +35,9 @@ class test_col_major_1 {
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 64;
-  static constexpr size_t wg_n = 32;
+  static constexpr size_t wg_n = 64;
   static constexpr size_t sg_m = 16;
-  static constexpr size_t sg_n = 8;
+  static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 32;
   static constexpr size_t dequant_s = 128;
   static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
