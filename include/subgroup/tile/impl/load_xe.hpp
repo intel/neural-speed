@@ -486,14 +486,13 @@ tile_load(tile_t& tile, payload_t& payload) {
               (payload_t::mem_transpose ? sub_block_offset : 0);
           const uint32_t sub_block_offset_y = payload.base_y + offset_y +
               (payload_t::mem_transpose ? 0 : sub_block_offset);
-          const auto offset_ch_dim =
-              payload_t::trans ? sub_block_offset_x : sub_block_offset_y;
-          const auto size_ch_dim = payload_t::trans ? payload.width_in_elems
-                                                    : payload.height_in_elems;
+          const auto offset_ch_dim = payload_t::mem_transpose
+              ? sub_block_offset_x
+              : sub_block_offset_y;
 
-          pred = offset_ch_dim + num_channel > size_ch_dim
+          pred = offset_ch_dim + num_channel > payload.height_in_elems
               ? (xetla_vector_gen<uint32_t, num_channel>(offset_ch_dim, 1) <
-                 size_ch_dim)
+                 payload.height_in_elems)
               : 1;
         }
         reg_tmp = xetla_load_global<

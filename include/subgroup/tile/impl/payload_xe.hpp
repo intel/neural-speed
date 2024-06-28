@@ -441,8 +441,8 @@ struct mem_payload_t<
 
   inline mem_payload_t(mem_desc_t& mem_tdesc) {
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     payload_bytes = mem_transpose ? (mem_tdesc.shape.x - 1) * pitch_in_bytes +
             mem_tdesc.shape.y * sizeof(dtype)
                                   : (mem_tdesc.shape.y - 1) * pitch_in_bytes +
@@ -481,8 +481,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     uint32_t offset_x = mem_tdesc.coord.x;
     uint32_t offset_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     payload_bytes = mem_transpose ? (mem_tdesc.shape.x - 1) * pitch_in_bytes +
             mem_tdesc.shape.y * sizeof(dtype)
                                   : (mem_tdesc.shape.y - 1) * pitch_in_bytes +
@@ -950,8 +950,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -996,8 +996,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -1193,8 +1193,8 @@ struct mem_payload_t<
     pitch_in_bytes = mem_tdesc.shape.stride * sizeof(dtype);
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
@@ -1232,8 +1232,8 @@ struct mem_payload_t<
     base_x = mem_tdesc.coord.x;
     base_y = mem_tdesc.coord.y;
 
-    width_in_elems = mem_tdesc.shape.x;
-    height_in_elems = mem_tdesc.shape.y;
+    width_in_elems = mem_transpose ? mem_tdesc.shape.y : mem_tdesc.shape.x;
+    height_in_elems = mem_transpose ? mem_tdesc.shape.x : mem_tdesc.shape.y;
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
