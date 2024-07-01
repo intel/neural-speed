@@ -133,7 +133,7 @@ __XETLA_API typename std::enable_if_t<
 process_1d_tail(tile_t& tile, payload_t& payload, uint32_t offset) {
   using dtype = typename payload_t::dtype;
   if constexpr (remained_len >= base_len) {
-    uint32_t address_offset = offset * sizeof(dtype);
+    uint32_t address_offset = offset;
     auto reg_sub = tile.reg.xetla_select<base_len / sizeof(dtype), 1>(offset);
     if constexpr (flag == process_flag::load) {
       reg_sub.xetla_format<dtype>() =
