@@ -398,9 +398,8 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_load_vec_len = std::min(
-      uint32_t(tile_t::block_elems * sizeof(dtype)),
-      load_store_attr::max_load_vec_len);
+  static constexpr uint32_t max_load_vec_len =
+      load_store_attr::max_load_vec_len;
 
   static constexpr uint32_t max_load_vec_elems =
       max_load_vec_len / sizeof(dtype);
@@ -418,8 +417,9 @@ tile_load(tile_t& tile, payload_t& payload) {
     }
   }
 
-  constexpr uint32_t tail_len = load_len % max_load_vec_elems * sizeof(dtype);
-  uint32_t tail_offset = load_iter_steps * max_load_vec_len;
+  static constexpr uint32_t tail_len =
+      load_len % max_load_vec_elems * sizeof(dtype);
+  static constexpr uint32_t tail_offset = load_iter_steps * max_load_vec_len;
   detail::process_1d_tail<
       tail_len,
       (max_load_vec_len >> 1),
