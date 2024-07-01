@@ -163,11 +163,10 @@ struct dequant_int4_weight_t {
               uint32_t zero_pt_idx =
                   offset_y_in_tile / dequant_s * zero_pt_t::block_size_x +
                   offset_x_in_tile;
-              native_type_t<typename zero_pt_t::dtype> zero_pt_pack =
-                  zero_pt.reg[zero_pt_idx];
+              xetla_vector<fp16, 1> zero_pt_pack = zero_pt.reg[zero_pt_idx];
               dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) =
                   dst_blk.xetla_select<step, 1>(jj * block_size_y_b + ii) +
-                  zero_pt_pack;
+                  zero_pt_pack[0];
             }
             // sycl::ext::oneapi::experimental::printf(
             //     "scale[%d] %f \n",

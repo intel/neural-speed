@@ -49,9 +49,9 @@ class test_col_major_1 {
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
-  using data_type_a = fp16;
+  using data_type_a = bf16;
   using data_type_b = int4x8;
-  using data_type_c = fp16;
+  using data_type_c = bf16;
 };
 class test_col_major_2 {
  public:
@@ -569,9 +569,11 @@ void dequantize_gemv_run(int iter) {
   // performance
   prof.print_profiling_result(profiling_selector::GPU);
   // check result
-  std::vector<typename Test::data_type_a> dequantize_b =
-      dequantize_weight<dequant_s, layout_b, compute_policy::quant_mode>(
-          matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
+  std::vector<typename Test::data_type_a> dequantize_b = dequantize_weight<
+      dequant_s,
+      layout_b,
+      compute_policy::quant_mode,
+      data_type_c>(matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
 
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();
   ASSERT_EQ(
