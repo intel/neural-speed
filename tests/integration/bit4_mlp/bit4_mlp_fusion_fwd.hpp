@@ -299,22 +299,6 @@ class bit4_mlp_fusion_fwd_t {
     zero_pt_base_t gate_proj_zero_pt_base;
     uint32_t scale_ld;
     uint32_t zero_pt_ld;
-
-    quant_param_t() = default;
-
-    inline quant_param_t(
-        scale_base_t up_proj_scale_base_,
-        scale_base_t gate_proj_scale_base_,
-        zero_pt_base_t up_proj_zero_pt_base_,
-        zero_pt_base_t gate_proj_zero_pt_base_,
-        uint32_t scale_ld_,
-        uint32_t zero_pt_ld_)
-        : up_proj_scale_base(up_proj_scale_base_),
-          gate_proj_scale_base(gate_proj_scale_base_),
-          up_proj_zero_pt_base(up_proj_zero_pt_base_),
-          gate_proj_zero_pt_base(gate_proj_zero_pt_base_),
-          scale_ld(scale_ld_),
-          zero_pt_ld(zero_pt_ld_) {}
   };
 
   struct arguments_t {
@@ -392,14 +376,6 @@ class bit4_mlp_fusion_fwd_t {
           acc_gate_proj_base(acc_gate_proj_base_),
           cnt_base(cnt_base_),
           quant_param(quant_param_) {}
-
-    // TODO(zhe): impl the two func of big 3.
-    inline arguments_t([[maybe_unused]] const arguments_t& args) {
-      assert(0);
-    }
-    inline arguments_t& operator=([[maybe_unused]] const arguments_t& args) {
-      assert(0);
-    }
   };
 
   /// @brief Gets named_barrier id consumption count.
