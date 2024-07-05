@@ -128,7 +128,8 @@ int bit4_mlp_result_validate(
 
   buff_cmp::buff_vals<data_type_c, data_type_acc> other(gold_C.data(), m, n, n);
 
-  bool result = buff_cmp::xetla_buff_cmp(data, other, "bit4_mlp-fusion validation");
+  bool result =
+      buff_cmp::xetla_buff_cmp(data, other, "bit4_mlp-fusion validation");
 
 #ifdef UT_DEBUG
   // for (uint32_t i = 0; i < m; i++) {
@@ -320,12 +321,16 @@ void dequantize_bit4_mlp_run(int iter) {
       tile_shape,
       mem_desc_c_t>;
 
+  using post_ops_up_t = subgroup::chained_tile_op_t<>;
+  using post_ops_gate_t = subgroup::chained_tile_op_t<subgroup::silu_op_t>;
+
   using bit4_mlp_op_t = xetla::mlp::bit4_mlp_fusion_fwd_t<
       Test::arch,
       global_kslicing,
       local_kslicing,
       gemm_t,
-      xetla::subgroup::silu_op_t,
+      post_ops_up_t,
+      post_ops_gate_t,
       epilogue_t>;
 
   size_t size_acc = bit4_mlp_op_t::get_acc_buf_size(matrix_m, matrix_n);
@@ -551,7 +556,9 @@ void dequantize_bit4_mlp_run(int iter) {
       Acc_up_proj_d,
       Acc_gate_proj_d,
       Cnt_d,
-      quant_arg);
+      quant_arg,
+      {},
+      {{}});
 
   cl::sycl::nd_range<3> nd_range = bit4_mlp_op_t::get_nd_range(bit4_mlp_arg);
   // 2 gemm(2*m*n*k) + mul(m*n) + silu(3*m*n)

@@ -200,18 +200,22 @@ class global_sum_reduce_two_mat_t {
 /// @tparam num_global_kslicing_ Is the k dim split ratio between groups.
 /// @tparam num_local_kslicing_ Is the k dim split ratio within a group.
 /// @tparam gemm_t_ Is the gemm functor to compose a GEMM.
-/// @tparam act_func_ Is the activation func apply on gate_proj linear.
+/// @tparam post_ops_up_t_ Is the post ops for up_proj linear.
+/// @tparam post_ops_gate_t_ Is the post ops for gate_proj linear.
 /// @tparam epilogue_t_ Just for write back the output matrix.
 template <
     gpu_arch arch_tag,
     int num_global_kslicing_,
     int num_local_kslicing_,
     typename gemm_t_,
-    typename act_func_,
+    typename post_ops_up_t_,
+    typename post_ops_gate_t_,
     typename epilogue_t_>
 class bit4_mlp_fusion_fwd_t {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
+  using post_ops_up_t = post_ops_up_t_;
+  using post_ops_gate_t = post_ops_gate_t_;
   using gemm_args_t = typename gemm_t::arguments_t;
   using tile_shape = typename gemm_t::tile_shape;
   static constexpr uint32_t wg_tile_m = tile_shape::wg_tile_size_y;
@@ -337,6 +341,9 @@ class bit4_mlp_fusion_fwd_t {
     /// @brief Is the dequant related param, include zp/scale.
     quant_param_t quant_param;
 
+    post_ops_up_t::arguments_t post_ops_up_args;
+    post_ops_gate_t::arguments_t post_ops_gate_args;
+
     /// @brief Constructs arguments with default method.
     inline arguments_t() = default;
 
@@ -361,7 +368,9 @@ class bit4_mlp_fusion_fwd_t {
         acc_base_t acc_up_proj_base_,
         acc_base_t acc_gate_proj_base_,
         cnt_base_t cnt_base_,
-        quant_param_t quant_param_)
+        quant_param_t quant_param_,
+        post_ops_up_t::arguments_t post_ops_up_args_,
+        post_ops_gate_t::arguments_t post_ops_gate_args_)
         : matrix_m(matrix_m_),
           matrix_k(matrix_k_),
           matrix_n(matrix_n_),
@@ -375,7 +384,9 @@ class bit4_mlp_fusion_fwd_t {
           acc_up_proj_base(acc_up_proj_base_),
           acc_gate_proj_base(acc_gate_proj_base_),
           cnt_base(cnt_base_),
-          quant_param(quant_param_) {}
+          quant_param(quant_param_),
+          post_ops_up_args(post_ops_up_args_),
+          post_ops_gate_args(post_ops_gate_args_) {}
   };
 
   /// @brief Gets named_barrier id consumption count.
@@ -615,18 +626,24 @@ class bit4_mlp_fusion_fwd_t {
         gate_tile = &gate_proj_out;
         up_tile = &up_proj_out;
       }
-      if constexpr (std::is_same_v<act_func_, xetla::subgroup::silu_op_t>) {
-        act_func_ act_func;
-        act_func(*gate_tile, mem_desc_out.coord, {});
-        constexpr uint32_t out_tile_size = mat_slice_t::tile_size_x *
-            mat_slice_t::tile_size_y; // shape of slice_tile and gate_tile is
-                                      // same when disable kslicing.
-        gate_tile->reg.xetla_select<out_tile_size, 1>(0) =
-            gate_tile->reg.xetla_select<out_tile_size, 1>(0) *
-            up_tile->reg.xetla_select<out_tile_size, 1>(0);
-      } else {
-        assert(0);
-      }
+    post_ops_up_t{}(
+        *up_tile,
+        mem_desc_out.coord,
+        args.post_ops_up_args,
+        slm_base,
+        nbarrier_base);
+    post_ops_gate_t{}(
+        *gate_tile,
+        mem_desc_out.coord,
+        args.post_ops_gate_args,
+        slm_base,
+        nbarrier_base);
+      constexpr uint32_t out_tile_size = mat_slice_t::tile_size_x *
+          mat_slice_t::tile_size_y; // shape of slice_tile and gate_tile is
+                                    // same when disable kslicing.
+      gate_tile->reg.xetla_select<out_tile_size, 1>(0) =
+          gate_tile->reg.xetla_select<out_tile_size, 1>(0) *
+          up_tile->reg.xetla_select<out_tile_size, 1>(0);
 
       epilogue_t epilogue;
       epilogue(
