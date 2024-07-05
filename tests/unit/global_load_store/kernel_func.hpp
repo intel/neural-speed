@@ -57,8 +57,7 @@ struct global_prefetch_block {
       dtype* b,
       [[maybe_unused]] dtype* c) {
     uint64_t offset = 0;
-    xetla_prefetch_global<dtype, SIMD, data_size::default_size, L1, L2>(
-        a, offset);
+    xetla_prefetch_global<dtype, SIMD, L1, L2>(a, offset);
     xetla_vector<dtype, SIMD> A_load_vec =
         xetla_load_global<dtype, SIMD>(a, offset);
     xetla_store_global<dtype, SIMD>(b, offset, A_load_vec);
@@ -108,21 +107,12 @@ struct global_load_scatter_mask {
     pred.xetla_select<4, 1>(0) = 1;
 
     xetla_vector<dtype, SIMD> A_load_vec(0);
-    xetla_vector<dtype, SIMD> tmp = xetla_load_global<
-        dtype,
-        1,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(a, offsets, pred);
+    xetla_vector<dtype, SIMD> tmp =
+        xetla_load_global<dtype, SIMD, 1, cache_hint::none, cache_hint::none>(
+            a, offsets, pred);
     A_load_vec.xetla_merge(tmp, pred);
-    xetla_store_global<
-        dtype,
-        1,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(b, offsets, A_load_vec);
+    xetla_store_global<dtype, SIMD, 1, cache_hint::none, cache_hint::none>(
+        b, offsets, A_load_vec);
   }
 };
 
@@ -141,29 +131,19 @@ struct global_prefetch_scatter_mask {
     pred.xetla_select<4, 1>(0) = 1;
     xetla_prefetch_global<
         dtype,
+        SIMD,
         1,
-        data_size::default_size,
         cache_hint::cached,
-        cache_hint::cached,
-        SIMD>(a, offsets, pred);
+        cache_hint::cached>(a, offsets, pred);
 
     xetla_vector<dtype, SIMD> A_load_vec(0);
-    xetla_vector<dtype, SIMD> tmp = xetla_load_global<
-        dtype,
-        1,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(a, offsets, pred);
+    xetla_vector<dtype, SIMD> tmp =
+        xetla_load_global<dtype, SIMD, 1, cache_hint::none, cache_hint::none>(
+            a, offsets, pred);
     A_load_vec.xetla_merge(tmp, pred);
 
-    xetla_store_global<
-        dtype,
-        1,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(b, offsets, A_load_vec);
+    xetla_store_global<dtype, SIMD, 1, cache_hint::none, cache_hint::none>(
+        b, offsets, A_load_vec);
   }
 };
 
@@ -185,22 +165,13 @@ struct global_store_scatter_mask {
     pred.xetla_select<4, 1>(0) = 1;
 
     xetla_vector<dtype, SIMD> A_load_vec(0);
-    xetla_vector<dtype, SIMD> tmp = xetla_load_global<
-        dtype,
-        1,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(a, offsets);
+    xetla_vector<dtype, SIMD> tmp =
+        xetla_load_global<dtype, SIMD, 1, cache_hint::none, cache_hint::none>(
+            a, offsets);
     A_load_vec.xetla_merge(tmp, pred);
 
-    xetla_store_global<
-        dtype,
-        1,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(b, offsets, A_load_vec, pred);
+    xetla_store_global<dtype, SIMD, 1, cache_hint::none, cache_hint::none>(
+        b, offsets, A_load_vec, pred);
   }
 };
 
@@ -217,17 +188,11 @@ struct global_load_store_scatter_nelt2 {
 
     xetla_vector<dtype, SIMD * 2> A_load_vec = xetla_load_global<
         dtype,
+        SIMD * 2,
         2,
-        data_size::default_size,
         cache_hint::none,
-        cache_hint::none,
-        SIMD>(a, offsets);
-    xetla_store_global<
-        dtype,
-        2,
-        data_size::default_size,
-        cache_hint::none,
-        cache_hint::none,
-        SIMD>(b, offsets, A_load_vec);
+        cache_hint::none>(a, offsets);
+    xetla_store_global<dtype, SIMD * 2, 2, cache_hint::none, cache_hint::none>(
+        b, offsets, A_load_vec);
   }
 };

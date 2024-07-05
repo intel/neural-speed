@@ -233,78 +233,110 @@ constexpr __ESIMD_NS::atomic_op get_atomic_op(gpu::xetla::atomic_op ao) {
 }
 } // namespace detail
 
-/// @addtogroup xetla_core_memory
-/// @{
+/// template <typename T, int N, int VS, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   simd_mask<N / VS> mask,
+///                   PropertyListT props = {});                   // (usm-pf-1)
+/// void prefetch(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   PropertyListT props = {});                   // (usm-pf-2)
+///
+/// The next 2 functions are similar to the above and were added for
+/// convenience. They assume the VS parameter is set to 1 and do not require
+/// specifying the template parameters <T, N, VS> at function calls.
+/// template <typename T, int N, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, simd<OffsetT, N> byte_offsets,
+///                   simd_mask<N> mask,
+///                   PropertyListT props = {});                   // (usm-pf-3)
+/// void prefetch(const T *p, simd<OffsetT, N> byte_offsets,
+///                   PropertyListT props = {});                   // (usm-pf-4)
+/// The next 2 functions are variations of the first 2 above (usm-pf-1,2)
+/// and were added only to support simd_view instead of simd for byte_offsets
+/// operand.
+/// template <typename T, int N, int VS = 1, typename OffsetSimdViewT,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, OffsetSimdViewT byte_offsets,
+///             simd_mask<N / VS> mask, PropertyListT props = {}); // (usm-pf-5)
+/// void prefetch(const T *p, OffsetSimdViewT byte_offsets,
+///             PropertyListT props = {});                        // (usm-pf-6)
+///
+/// The next functions perform transposed 1-channel prefetch.
+/// template <typename T, int VS = 1, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, OffsetT byte_offset, simd_mask<1> mask,
+///                   PropertyListT props = {});                   // (usm-pf-7)
+/// void prefetch(const T *p, OffsetT byte_offset,
+///                   PropertyListT props = {});                   // (usm-pf-8)
+/// template <typename T, int VS = 1,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, simd_mask<1> mask,
+///                   PropertyListT props = {});                   // (usm-pf-9)
+/// void prefetch(const T *p, PropertyListT props = {});           //(usm-pf-10)
+///
 
-/// @brief Stateless scattered prefetch.
-/// Prefetches elements located at specified address.
-///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_load.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to prefetch per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @tparam N is the number of SIMD channels (platform dependent).
-/// @param p       [in] is the base pointer.
-/// @param offsets [in] is the zero-based offsets in bytes.
-/// @param pred    [in] is predicates.
-///
+/// template <typename T, int N, int VS, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   simd_mask<N / VS> mask,
+///                   PropertyListT props = {});                   // (usm-pf-1)
+/// Supported platforms: DG2, PVC only.
+/// Prefetches elements of the type 'T' from memory locations addressed
+/// by the base pointer \p p and byte offsets \p byte_offsets, to the cache.
+/// Access to any element's memory location can be disabled via the input vector
+/// of predicates \p mask. If mask[i] is unset, then the prefetch from
+/// (p + byte_offsets[i]) is skipped.
+/// @tparam T Element type.
+/// @tparam N Number of elements to read.
+/// @tparam VS Vector size. It can also be read as the number of reads per each
+/// address. The parameter 'N' must be divisible by 'VS'.
+/// @param p The base address.
+/// @param byte_offsets the vector of 32-bit or 64-bit offsets in bytes.
+/// For each i, ((byte*)p + byte_offsets[i]) must be element size aligned.
+/// @param mask The access mask.
+/// @param props The optional compile-time properties. Only cache hint
+/// properties are used.
 template <
-    typename Ty,
-    int NElts = 1,
-    data_size DS = data_size::default_size,
-    cache_hint L1H = cache_hint::cached,
-    cache_hint L2H = cache_hint::cached,
-    int N>
-__XETLA_API void xetla_prefetch_global(
-    Ty* p,
-    xetla_vector<uint32_t, N> offsets,
-    xetla_mask<N> pred = 1) {
-  using T = native_type_t<Ty>;
-  __ESIMD_ENS::lsc_prefetch<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H),
-      N>((T*)p, offsets, pred);
-}
-
-/// @brief Stateless block prefetch (transposed gather with 1 channel).
-/// Prefetches elements located at specified address.
-///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_load.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to prefetch per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p      [in] is the base pointer.
-/// @param offset [in] is the zero-based offset in bytes.
-///
-template <
-    typename Ty,
-    int NElts = 1,
-    data_size DS = data_size::default_size,
+    typename T,
+    int N,
+    int VS,
     cache_hint L1H = cache_hint::cached,
     cache_hint L2H = cache_hint::cached>
-__XETLA_API void xetla_prefetch_global(Ty* p, uint64_t offset = 0) {
-  using T = native_type_t<Ty>;
-  __ESIMD_ENS::lsc_prefetch<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>((T*)p + (offset / sizeof(T)));
+__XETLA_API void xetla_prefetch_global(
+    T* p,
+    xetla_vector<uint32_t, N / VS> byte_offsets,
+    xetla_mask<N / VS> mask = 1) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
+  __ESIMD_NS::prefetch<T, N, VS>(p, byte_offsets, mask, props);
+}
+
+/// template <typename T, int VS = 1, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// void prefetch(const T *p, OffsetT byte_offset,
+///                   PropertyListT props = {});                   // (usm-pf-8)
+/// Supported platforms: DG2, PVC only.
+/// Prefetches elements of the type 'T' from continuous memory location
+/// addressed by the base pointer \p p, and offset \p byte_offset and the length
+/// \p VS elements into the cache.
+/// @tparam T Element type.
+/// @tparam VS Vector size. It specifies the number of consequent elements to
+/// prefetch.
+/// @param p The base address.
+/// @param byte_offset offset from the base address
+/// @param props The optional compile-time properties. Only cache hint
+/// properties are used.
+template <
+    typename T,
+    int VS = 1,
+    cache_hint L1H = cache_hint::cached,
+    cache_hint L2H = cache_hint::cached>
+__XETLA_API void xetla_prefetch_global(T* p, uint64_t offset = 0) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
+  __ESIMD_NS::prefetch<T, VS>(p, offset, props);
 }
 
 /// simd<T, N> block_load(const T* ptr, size_t byte_offset,
@@ -366,94 +398,206 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
     return __ESIMD_NS::block_load<T, N>(ptr, byte_offset, props);
   }
 }
-
-/// @brief Stateless scattered load.
-/// Collects elements located at specified address and returns them
-/// to a single \ref xetla_vector object.
+/// template <typename T, int N, int VS, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// simd<T, N> gather(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   simd_mask<N / VS> mask, simd<T, N> pass_thru,
+///                   PropertyListT props = {});                   // (usm-ga-1)
+/// simd<T, N> gather(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   simd_mask<N / VS> mask,
+///                   PropertyListT props = {});                   // (usm-ga-2)
+/// simd<T, N> gather(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   PropertyListT props = {});                   // (usm-ga-3)
 ///
-/// Supported platforms: DG2, PVC
+/// The next 3 functions are similar to the above and were added for
+/// convenience. They assume the VS parameter is set to 1 and do not require
+/// specifying the template parameters <T, N, VS> at function calls.
+/// template <typename T, int N, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// simd<T, N> gather(const T *p, simd<OffsetT, N> byte_offsets,
+///                   simd_mask<N> mask, simd<T, N> pass_thru,
+///                   PropertyListT props = {});                   // (usm-ga-4)
+/// simd<T, N> gather(const T *p, simd<OffsetT, N> byte_offsets,
+///                   simd_mask<N> mask, PropertyListT props = {});// (usm-ga-5)
+/// simd<T, N> gather(const T *p, simd<OffsetT, N> byte_offsets,
+///                   PropertyListT props = {});                   // (usm-ga-6)
 ///
-/// VISA instruction: lsc_load.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to load per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @tparam N is the number of SIMD channels (platform dependent).
-/// @param p       [in] is the base pointer.
-/// @param offsets [in] is the zero-based offsets in bytes.
-/// @param pred    [in] is predicates.
-/// @return  is a xetla_vector of type T and size N * NElts.
-///
+/// The next 3 functions are variations of the first 3 above (usm-ga-1,2,3)
+/// and were added only to support simd_view instead of simd for byte_offsets
+/// and/or pass_thru operands.
+/// template <typename T, int N, int VS = 1, typename OffsetObjT,
+///           typename OffsetRegionT, typename PropertyListT = empty_props_t>
+/// simd <T, N> gather(const T *p,
+///             simd_view<OffsetObjT, OffsetRegionT> byte_offsets,
+///             simd_mask<N / VS> mask, simd<T, N> pass_thru,
+///             PropertyListT props = {});                         // (usm-ga-7)
+/// simd <T, N> gather(const T *p,
+///             simd_view<OffsetObjT, OffsetRegionT> byte_offsets,
+///             simd_mask<N / VS> mask, PropertyListT props = {}); // (usm-ga-8)
+/// simd <T, N> gather(const T *p,
+///             simd_view<OffsetObjT, OffsetRegionT> byte_offsets,
+///             PropertyListT props = {});                         // (usm-ga-9)
+#ifndef __ESIMD_GATHER_SCATTER_LLVM_IR
+/// Supported platforms: DG2, PVC only - Temporary restriction for the variant
+/// with pass_thru operand.
+#endif // __ESIMD_GATHER_SCATTER_LLVM_IR
+/// template <typename T, int N, int VS, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// simd<T, N> gather(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   simd_mask<N / VS> mask, simd<T, N> pass_thru,
+///                   PropertyListT props = {});
+/// Loads ("gathers") elements of the type 'T' from memory locations addressed
+/// by the base pointer \p p and byte offsets \p byte_offsets, and returns
+/// the loaded elements.
+/// Access to any element's memory location can be disabled via the input vector
+/// of predicates \p mask. If mask[i] is unset, then the load from
+/// (p + byte_offsets[i]) is skipped and the corresponding i-th element from
+/// \p pass_thru operand is returned.
+/// @tparam T Element type.
+/// @tparam N Number of elements to read.
+/// @tparam VS Vector size. It can also be read as the number of reads per each
+/// address. The parameter 'N' must be divisible by 'VS'. (VS > 1) is supported
+/// only on DG2 and PVC and only for 4- and 8-byte element vectors.
+/// @param p The base address.
+/// @param byte_offsets the vector of 32-bit or 64-bit offsets in bytes.
+/// For each i, ((byte*)p + byte_offsets[i]) must be element size aligned.
+/// If the alignment property is not passed, then it is assumed that each
+/// accessed address is aligned by element-size.
+/// @param mask The access mask.
+/// @param pass_thru The vector pass through values.
+/// @param props The optional compile-time properties. Only 'alignment'
+/// and cache hint properties are used.
+/// @return A vector of elements read.
 template <
-    typename Ty,
-    int NElts = 1,
-    data_size DS = data_size::default_size,
+    typename T,
+    int N,
+    int VS,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none,
-    int N,
-    typename Toffset = uint32_t>
-__XETLA_API xetla_vector<Ty, N * NElts> xetla_load_global(
-    Ty* p,
-    xetla_vector<Toffset, N> offsets,
-    xetla_mask<N> pred = 1) {
-  using T = native_type_t<Ty>;
-  DEBUG_INVOKE(
-      dbg_level::core,
-      core::general_1d<gpu_arch::XeHpc, Ty>::
-          template check_restriction<NElts, N>(offsets, (uint64_t)p));
+    int alignment = 16,
+    typename OffsetT = uint32_t>
+__XETLA_API xetla_vector<T, N> xetla_load_global(
+    T* p,
+    xetla_vector<OffsetT, N / VS> byte_offsets,
+    xetla_mask<N / VS> mask,
+    xetla_vector<T, N> pass_thru) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
 
-  return __ESIMD_ENS::lsc_gather<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H),
-      N>((T*)p, offsets, pred);
+  return __ESIMD_NS::gather<T, N, VS>(p, byte_offsets, mask, pass_thru, props);
 }
 
-/// @brief Stateless scattered store.
-/// Writes elements to specific address.
-///
-/// Supported platforms: DG2, PVC
-///
-/// VISA instruction: lsc_store.ugm
-///
-/// @tparam Ty is element type.
-/// @tparam NElts is the number of elements to store per address (i.e.
-/// vector_size per SIMD channel).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @tparam N is the number of SIMD channels (platform dependent).
-/// @param p       [in] is the base pointer.
-/// @param offsets [in] is the zero-based offsets in bytes.
-/// @param vals    [in] is values to store.
-/// @param pred    [in] is predicates.
-///
+/// template <typename T, int N, int VS, typename OffsetT,
+///           typename PropertyListT = empty_properties_t>
+/// simd<T, N> gather(const T *p, simd<OffsetT, N / VS> byte_offsets,
+///                   simd_mask<N / VS> mask,
+///                   PropertyListT props = {});                   // (usm-ga-2)
+/// Loads ("gathers") elements of the type 'T' from memory locations addressed
+/// by the base pointer \p p and byte offsets \p byte_offsets, and returns
+/// the loaded elements.
+/// Access to any element's memory location can be disabled via the input vector
+/// of predicates \p mask. If mask[i] is unset, then the load from
+/// (p + byte_offsets[i]) is skipped and the corresponding i-th element of the
+/// returned vector is undefined.
+/// @tparam T Element type.
+/// @tparam N Number of elements to read.
+/// @tparam VS Vector size. It can also be read as the number of reads per each
+/// address. The parameter 'N' must be divisible by 'VS'. (VS > 1) is supported
+/// only on DG2 and PVC.
+/// @param p The base address.
+/// @param byte_offsets the vector of 32-bit or 64-bit offsets in bytes.
+/// For each i, ((byte*)p + byte_offsets[i]) must be element size aligned.
+/// @param mask The access mask.
+/// @param props The optional compile-time properties. Only 'alignment'
+/// and cache hint properties are used.
+/// @return A vector of elements read. Elements in masked out lanes are
+///   undefined.
 template <
-    typename Ty,
-    int NElts = 1,
-    data_size DS = data_size::default_size,
+    typename T,
+    int N,
+    int VS,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none,
+    int alignment = 16,
+    typename OffsetT = uint32_t>
+__XETLA_API xetla_vector<T, N> xetla_load_global(
+    T* p,
+    xetla_vector<OffsetT, N / VS> byte_offsets,
+    xetla_mask<N / VS> mask = 1) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
+
+  return __ESIMD_NS::gather<T, N, VS>(p, byte_offsets, mask, props);
+}
+
+/// template <typename T, int N, int VS = 1, typename OffsetT,
+/// 	  typename PropertyListT = empty_properties_t>
+/// void scatter(T *p, simd<OffsetT, N / VS> byte_offsets, simd<T, N> vals,
+/// 	simd_mask<N / VS> mask, PropertyListT props = {}); // (usm-sc-1)
+
+/// template <typename T, int N, int VS = 1, typename OffsetT,
+/// 	  typename PropertyListT = empty_properties_t>
+/// void scatter(T *p, simd<OffsetT, N / VS> byte_offsets, simd<T, N> vals,
+/// 	PropertyListT props = {});                         // (usm-sc-2)
+
+/// The next two functions are similar to usm-sc-{1,2} with the 'byte_offsets'
+/// parameter represerented as 'simd_view'.
+
+/// template <typename T, int N, int VS = 1, typename OffsetSimdViewT,
+/// 	  typename PropertyListT = empty_properties_t>
+/// void scatter(T *p, OffsetSimdViewT byte_offsets, simd<T, N> vals,
+/// 	simd_mask<N / VS> mask, PropertyListT props = {}); // (usm-sc-3)
+
+/// template <typename T, int N, int VS = 1, typename OffsetSimdViewT,
+/// 	  typename PropertyListT = empty_properties_t>
+/// void scatter(T *p, OffsetSimdViewT byte_offsets, simd<T, N> vals,
+///      PropertyListT props = {});                         // (usm-sc-4)
+
+/// template <typename T, int N, int VS = 1, typename OffsetT,
+/// 	  typename PropertyListT = empty_properties_t>
+/// void scatter(T *p, simd<OffsetT, N / VS> byte_offsets, simd<T, N> vals,
+/// 	simd_mask<N / VS> mask, PropertyListT props = {}); // (usm-sc-1)
+///
+/// Writes ("scatters") elements of the input vector to different memory
+/// locations. Each memory location is base address plus an offset - a
+/// value of the corresponding element in the input offset vector. Access to
+/// any element's memory location can be disabled via the input mask.
+/// @tparam T Element type.
+/// @tparam N Number of elements to write.
+/// @tparam VS Vector size. It can also be read as the number of writes per each
+/// address. The parameter 'N' must be divisible by 'VS'. (VS > 1) is supported
+/// only on DG2 and PVC and only for 4- and 8-byte element vectors.
+/// @param p The base address.
+/// @param byte_offsets the vector of 32-bit or 64-bit offsets in bytes.
+/// For each i, ((byte*)p + byte_offsets[i]) must be element size aligned.
+/// If the alignment property is not passed, then it is assumed that each
+/// accessed address is aligned by element-size.
+/// @param vals The vector to scatter.
+/// @param mask The access mask.
+/// @param props The optional compile-time properties. Only 'alignment'
+/// and cache hint properties are used.
+template <
+    typename T,
     int N,
-    typename Toffset = uint32_t>
+    int VS = 1,
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int alignment = 16,
+    typename OffsetT = uint32_t>
 __XETLA_API void xetla_store_global(
-    Ty* p,
-    xetla_vector<Toffset, N> offsets,
-    xetla_vector<Ty, N * NElts> vals,
-    xetla_mask<N> pred = 1) {
-  using T = native_type_t<Ty>;
-  __ESIMD_ENS::lsc_scatter<
-      T,
-      NElts,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H),
-      N>((T*)p, offsets, vals, pred);
+    T* p,
+    xetla_vector<OffsetT, N / VS> byte_offsets,
+    xetla_vector<T, N> vals,
+    xetla_mask<N / VS> mask = 1) {
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
+      __ESIMD_NS::alignment<alignment>};
+  __ESIMD_NS::scatter<T, N, VS>(p, byte_offsets, vals, mask, props);
 }
 
 /// void block_store(T* ptr, size_t byte_offset,         // (usm-bs-2)
