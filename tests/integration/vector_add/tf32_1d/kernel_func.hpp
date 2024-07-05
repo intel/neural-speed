@@ -31,20 +31,11 @@ KERNEL_FUNC inline void vector_add_func(
   offsets *= sizeof(dtype);
   offsets += offset;
   /// use scattered prefetch for a
-  xetla_prefetch_global<
-      dtype,
-      1,
-      data_size::default_size,
-      cache_hint::streaming,
-      cache_hint::cached,
-      SIMD>(a, offsets);
+  xetla_prefetch_global<dtype, SIMD, cache_hint::streaming, cache_hint::cached>(
+      a, offsets);
   /// use block prefetch for b
-  xetla_prefetch_global<
-      dtype,
-      SIMD,
-      data_size::default_size,
-      cache_hint::cached,
-      cache_hint::cached>(b, offset);
+  xetla_prefetch_global<dtype, SIMD, cache_hint::cached, cache_hint::cached>(
+      b, offset);
   SW_BARRIER();
   /// use scattered load for a
   xetla_vector<dtype, SIMD> ivector1 = xetla_load_global<

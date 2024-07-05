@@ -543,7 +543,8 @@ struct global_atomic_cmpxchg_base {
     offsets *= sizeof(uint32_t);
     offsets += offset;
     xetla_mask<SIMD> pred(1);
-    xetla_vector<uint32_t, SIMD> old_data = xetla_load_global(a, offsets);
+    xetla_vector<uint32_t, SIMD> old_data =
+        xetla_load_global<uint32_t, SIMD, 1>(a, offsets);
     xetla_vector<uint32_t, SIMD> new_data(3);
     xetla_atomic_global<
         atomic_op::cmpxchg,
@@ -569,7 +570,8 @@ struct global_atomic_cmpxchg_mask {
     offsets += offset;
     xetla_mask<SIMD> pred(0);
     pred.xetla_select<4, 1>(0) = 1;
-    xetla_vector<uint32_t, SIMD> old_data = xetla_load_global(a, offsets);
+    xetla_vector<uint32_t, SIMD> old_data =
+        xetla_load_global<uint32_t, SIMD, 1>(a, offsets);
     xetla_vector<uint32_t, SIMD> new_data(3);
     xetla_atomic_global<
         atomic_op::cmpxchg,
@@ -594,7 +596,8 @@ struct global_atomic_cmpxchg_return {
     offsets *= sizeof(uint32_t);
     offsets += offset;
     xetla_mask<SIMD> pred(1);
-    xetla_vector<uint32_t, SIMD> old_data = xetla_load_global(a, offsets);
+    xetla_vector<uint32_t, SIMD> old_data =
+        xetla_load_global<uint32_t, SIMD, 1>(a, offsets);
     xetla_vector<uint32_t, SIMD> new_data(3);
     xetla_vector<uint32_t, SIMD> result = xetla_atomic_global<
         atomic_op::cmpxchg,
@@ -620,7 +623,8 @@ struct global_atomic_fcmpxchg_base {
     offsets *= sizeof(float);
     offsets += offset;
     xetla_mask<SIMD> pred(1);
-    xetla_vector<float, SIMD> old_data = xetla_load_global(a, offsets);
+    xetla_vector<float, SIMD> old_data =
+        xetla_load_global<float, SIMD, 1>(a, offsets);
     xetla_vector<float, SIMD> new_data(3);
     xetla_atomic_global<
         atomic_op::fcmpxchg,

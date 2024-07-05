@@ -33,11 +33,12 @@ struct xetla_abs_vector_version_with_different_input_and_output_types {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     A_load_vec -= 8;
     xetla_vector<int, SIMD> result =
         xetla_vector<int, SIMD>(xetla_abs<float, int, SIMD>(A_load_vec));
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -54,10 +55,11 @@ struct xetla_abs_vector_version_with_same_input_and_output_types {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     A_load_vec -= 8;
     xetla_vector<int, SIMD> result = xetla_abs<int, SIMD>(A_load_vec);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -96,10 +98,11 @@ struct xetla_max_with_vector_Src0_and_vector_Src1 {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     xetla_vector<int, SIMD> tmp(8);
     xetla_vector<int, SIMD> result = xetla_max<int, SIMD>(A_load_vec, tmp);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -116,9 +119,10 @@ struct xetla_max_with_vector_Src0_and_scalar_Src1 {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     xetla_vector<int, SIMD> result = xetla_max<int, SIMD>(A_load_vec, 8);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -135,9 +139,10 @@ struct xetla_max_with_scalar_Src0_and_vector_Src1 {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     xetla_vector<int, SIMD> result = xetla_max<int, SIMD>(8, A_load_vec);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -165,10 +170,11 @@ struct xetla_min_with_vector_Src0_and_vector_Src1 {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     xetla_vector<int, SIMD> tmp(8);
     xetla_vector<int, SIMD> result = xetla_min<int, SIMD>(A_load_vec, tmp);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -185,9 +191,10 @@ struct xetla_min_with_vector_Src0_and_scalar_Src1 {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     xetla_vector<int, SIMD> result = xetla_min<int, SIMD>(A_load_vec, 8);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 
@@ -204,9 +211,10 @@ struct xetla_min_with_scalar_Src0_and_vector_Src1 {
     offsets *= sizeof(int);
     offsets += offset;
 
-    xetla_vector<int, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<int, SIMD> A_load_vec =
+        xetla_load_global<int, SIMD, 1>(a, offsets);
     xetla_vector<int, SIMD> result = xetla_min<int, SIMD>(8, A_load_vec);
-    xetla_store_global(c, offsets, result);
+    xetla_store_global<int, SIMD, 1>(c, offsets, result);
   }
 };
 

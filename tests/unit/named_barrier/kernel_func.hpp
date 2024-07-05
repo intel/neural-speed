@@ -38,10 +38,11 @@ struct named_barrier_func {
 #pragma unroll
     for (size_t i = 0; i < 16; i++) {
       if (item->get_local_id(0) == i) {
-        xetla_vector<dtype, SIMD> A_load_vec = xetla_load_global(a, offsets);
+        xetla_vector<dtype, SIMD> A_load_vec =
+            xetla_load_global<dtype, SIMD, 1>(a, offsets);
         xetla_vector<dtype, SIMD> Dst = A_load_vec * 2;
-        xetla_store_global(c, offsets, A_load_vec);
-        xetla_store_global(a, offsets, Dst);
+        xetla_store_global<dtype, SIMD, 1>(c, offsets, A_load_vec);
+        xetla_store_global<dtype, SIMD, 1>(a, offsets, Dst);
       }
       nbarrier.arrive();
       nbarrier.wait();

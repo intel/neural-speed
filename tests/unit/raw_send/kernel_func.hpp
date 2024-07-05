@@ -34,7 +34,8 @@ struct raw_send_with_2_source_and_1_destination_func {
     offsets += offset;
     xetla_vector<uint64_t, SIMD> dsec = offsets + (uint64_t)a;
 
-    xetla_vector<dtype, SIMD> A_load_vec = xetla_load_global(a, offsets);
+    xetla_vector<dtype, SIMD> A_load_vec =
+        xetla_load_global<dtype, SIMD, 1>(a, offsets);
     xetla_vector<dtype, SIMD> Dst = A_load_vec;
 
     constexpr uint32_t size = SIMD * sizeof(dtype) / 64;
