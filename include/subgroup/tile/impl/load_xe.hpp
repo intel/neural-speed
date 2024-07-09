@@ -524,12 +524,16 @@ tile_load(tile_t& tile, payload_t& payload) {
           }
           reg_sub
               .xetla_select<load_elems * pack_factor, 1>(
-                  sub_block_offset * tile_desc::block_size_x)
+                  sub_block_offset *
+                  (payload_t::mem_transpose ? tile_desc::block_size_y
+                                            : tile_desc::block_size_x))
               .xetla_format<load_dtype>() = reg_tmp_trans;
         } else {
           reg_sub
               .xetla_select<load_elems * pack_factor, 1>(
-                  sub_block_offset * tile_desc::block_size_x)
+                  sub_block_offset *
+                  (payload_t::mem_transpose ? tile_desc::block_size_y
+                                            : tile_desc::block_size_x))
               .xetla_format<load_dtype>() = reg_tmp;
         }
       }
