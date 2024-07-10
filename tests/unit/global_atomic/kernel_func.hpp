@@ -38,7 +38,6 @@ struct global_atomic_iinc_base {
         atomic_op::iinc,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, pred);
   }
@@ -63,7 +62,6 @@ struct global_atomic_iinc_mask {
         atomic_op::iinc,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, pred);
   }
@@ -86,7 +84,6 @@ struct global_atomic_iinc_return {
         atomic_op::iinc,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, pred);
 
@@ -112,7 +109,6 @@ struct global_atomic_idec_base {
         atomic_op::idec,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, pred);
   }
@@ -136,7 +132,6 @@ struct global_atomic_iadd_base {
         atomic_op::iadd,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -161,7 +156,6 @@ struct global_atomic_iadd_mask {
         atomic_op::iadd,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -185,7 +179,6 @@ struct global_atomic_iadd_return {
         atomic_op::iadd,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
 
@@ -211,7 +204,6 @@ struct global_atomic_isub_base {
         atomic_op::isub,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -235,7 +227,6 @@ struct global_atomic_smin_base {
         atomic_op::smin,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -259,7 +250,6 @@ struct global_atomic_smax_base {
         atomic_op::smax,
         int,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -283,7 +273,6 @@ struct global_atomic_fadd_base {
         atomic_op::fadd,
         float,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -307,7 +296,6 @@ struct global_atomic_fsub_base {
         atomic_op::fsub,
         float,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -331,7 +319,6 @@ struct global_atomic_fmin_base {
         atomic_op::fmin,
         float,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -355,7 +342,6 @@ struct global_atomic_fmax_base {
         atomic_op::fmax,
         float,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -379,7 +365,6 @@ struct global_atomic_umin_base {
         atomic_op::umin,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -403,7 +388,6 @@ struct global_atomic_umax_base {
         atomic_op::umax,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -427,7 +411,6 @@ struct global_atomic_bit_and_base {
         atomic_op::bit_and,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -451,7 +434,6 @@ struct global_atomic_bit_or_base {
         atomic_op::bit_or,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -475,7 +457,6 @@ struct global_atomic_bit_xor_base {
         atomic_op::bit_xor,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, adder, pred);
   }
@@ -498,7 +479,6 @@ struct global_atomic_load {
         atomic_op::load,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, pred);
 
@@ -524,7 +504,6 @@ struct global_atomic_store {
         atomic_op::store,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, data, pred);
   }
@@ -550,7 +529,6 @@ struct global_atomic_cmpxchg_base {
         atomic_op::cmpxchg,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, old_data, new_data, pred);
   }
@@ -577,7 +555,6 @@ struct global_atomic_cmpxchg_mask {
         atomic_op::cmpxchg,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, old_data, new_data, pred);
   }
@@ -603,7 +580,6 @@ struct global_atomic_cmpxchg_return {
         atomic_op::cmpxchg,
         uint32_t,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, old_data, new_data, pred);
     xetla_store_global(c, offsets, result);
@@ -630,7 +606,6 @@ struct global_atomic_fcmpxchg_base {
         atomic_op::fcmpxchg,
         float,
         SIMD,
-        data_size::default_size,
         cache_hint::uncached,
         cache_hint::write_back>(a, offsets, old_data, new_data, pred);
   }
