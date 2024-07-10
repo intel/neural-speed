@@ -194,8 +194,8 @@ class global_sum_reduce_two_mat_t {
 };
 
 /// @brief This is an implementation of part of mlp fusion, that is
-/// Mul(SiLu(gate_proj Linear),up_proj Linear), note that shape of gate_proj &
-/// up_proj weight must be same.
+/// Mul(post_ops_gate(gate_proj Linear), post_ops_up(up_proj Linear)), note that
+/// shape of gate_proj & up_proj weight must be same.
 ///
 /// @tparam num_global_kslicing_ Is the k dim split ratio between groups.
 /// @tparam num_local_kslicing_ Is the k dim split ratio within a group.
@@ -211,7 +211,7 @@ template <
     typename post_ops_up_t_,
     typename post_ops_gate_t_,
     typename epilogue_t_>
-class bit4_mlp_fusion_fwd_t {
+class bit4_mlp_gate_mul_up_fwd_t {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using post_ops_up_t = post_ops_up_t_;
@@ -500,7 +500,8 @@ class bit4_mlp_fusion_fwd_t {
   /// to workgroups -> 2) sg-level building up_proj & gate_proj block -> 3)
   /// sg-level reduction -> 4) global-reduce, store up_proj and gate_proj in
   /// tile registers -> 5) the last-global-reduce sg tile-register-level apply
-  /// act-func to gate_proj output tile and mul up_proj output. -> 6) epilogue
+  /// corresponding post ops to gate_proj output tile and up_proj output tile.
+  /// -> 6) elt-wise multiply gate_proj output and up_proj output -> 7) epilogue
   /// write-back.
   /// @param Item the sycl::nd_item, returns execution related information, such
   /// as workgroup id, subgroup id...
@@ -626,18 +627,18 @@ class bit4_mlp_fusion_fwd_t {
         gate_tile = &gate_proj_out;
         up_tile = &up_proj_out;
       }
-    post_ops_up_t{}(
-        *up_tile,
-        mem_desc_out.coord,
-        args.post_ops_up_args,
-        slm_base,
-        nbarrier_base);
-    post_ops_gate_t{}(
-        *gate_tile,
-        mem_desc_out.coord,
-        args.post_ops_gate_args,
-        slm_base,
-        nbarrier_base);
+      post_ops_up_t{}(
+          *up_tile,
+          mem_desc_out.coord,
+          args.post_ops_up_args,
+          slm_base,
+          nbarrier_base);
+      post_ops_gate_t{}(
+          *gate_tile,
+          mem_desc_out.coord,
+          args.post_ops_gate_args,
+          slm_base,
+          nbarrier_base);
       constexpr uint32_t out_tile_size = mat_slice_t::tile_size_x *
           mat_slice_t::tile_size_y; // shape of slice_tile and gate_tile is
                                     // same when disable kslicing.
