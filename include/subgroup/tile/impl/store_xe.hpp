@@ -664,13 +664,7 @@ tile_store(
                   sub_block_y * block_size_x),
               pred_x & pred_y);
         } else {
-          xetla_atomic_global<
-              op_kind,
-              dtype,
-              payload_t::num_channel,
-              data_size::default_size,
-              L1,
-              L2>(
+          xetla_atomic_global<op_kind, dtype, payload_t::num_channel, L1, L2>(
               reinterpret_cast<dtype*>(payload.base_pointer + address_offset),
               payload.channel_offset,
               reg_sub.xetla_select<payload_t::store_elems, 1>(
