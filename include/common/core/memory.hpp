@@ -206,8 +206,6 @@ constexpr __ESIMD_NS::atomic_op get_atomic_op(gpu::xetla::atomic_op ao) {
       return __ESIMD_NS::atomic_op::umax;
     case gpu::xetla::atomic_op::cmpxchg:
       return __ESIMD_NS::atomic_op::cmpxchg;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     case gpu::xetla::atomic_op::fadd:
       return __ESIMD_NS::atomic_op::fadd;
     case gpu::xetla::atomic_op::fsub:
@@ -217,8 +215,7 @@ constexpr __ESIMD_NS::atomic_op get_atomic_op(gpu::xetla::atomic_op ao) {
     case gpu::xetla::atomic_op::fmax:
       return __ESIMD_NS::atomic_op::fmax;
     case gpu::xetla::atomic_op::fcmpxchg:
-      return __ESIMD_NS::atomic_op::fcmpwr;
-#pragma clang diagnostic pop
+      return __ESIMD_NS::atomic_op::fcmpxchg;
     case gpu::xetla::atomic_op::bit_and:
       return __ESIMD_NS::atomic_op::bit_and;
     case gpu::xetla::atomic_op::bit_or:
@@ -659,103 +656,190 @@ __XETLA_API void xetla_store_global(
   }
 }
 
-/// @brief Stateless scattered atomic (0 src).
-/// Supported platforms: DG2, PVC
-/// VISA instruction: lsc_atomic_<OP>.ugm
+/// @addtogroup sycl_esimd_memory_atomics
+/// @{
+
+/// @anchor usm_atomic_update0
+/// @brief No-argument variant of the atomic update operation.
 ///
-/// @tparam Op is operation type.
-/// @tparam T is element type.
-/// @tparam N is the number of SIMD channels (platform dependent).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p       [in] is the base pointer.
-/// @param offsets [in] is the zero-based offsets.
-/// @param pred    [in] is predicates.
+/// simd<T, N>
+/// atomic_update(T *p, simd<Toffset, N> byte_offset,
+///               simd_mask<N> mask, props = {});               /// (usm-au0-1)
+/// simd<T, N>
+/// atomic_update(T *p, simd<Toffset, N> byte_offset,
+///               props = {});                                  /// (usm-au0-2)
+/// simd<T, N>
+/// atomic_update(T *p, simd_view<OffsetObjT, RegionTy> byte_offset,
+///               simd_mask<N> mask, props = {});               /// (usm-au0-3)
+/// simd<T, N>
+/// atomic_update(T *p, simd_view<OffsetObjT, RegionTy> byte_offset,
+///               props = {});                                  /// (usm-au0-4)
+///
+/// Usage of cache hints or non-standard operation width N requires DG2 or PVC.
+///
+/// simd<T, N>
+/// atomic_update(T *p, simd<Toffset, N> byte_offset,
+///               simd_mask<N> mask, props = {});               /// (usm-au0-1)
+/// Atomically updates \c N memory locations represented by a USM pointer and
+/// a vector of offsets relative to the pointer, and returns a vector of old
+/// values found at the memory locations before update. The update operation
+/// has no arguments in addition to the value at the memory location.
+///
+/// @tparam Op The atomic operation - can be \c atomic_op::inc,
+///   \c atomic_op::dec, or \c atomic_op::load.
+/// @tparam T The vector element type.
+/// @tparam N The number of memory locations to update.
+/// @param p The USM pointer.
+/// @param byte_offset The vector of 32-bit or 64-bit offsets in bytes
+///  (zero-based).
+/// @param mask Operation mask, only locations with non-zero in the
+///   corresponding mask element are updated.
+/// @param props The parameter 'props' specifies the optional compile-time
+///   properties list. Only L1/L2 properties are used.
+//    Other properties are ignored.
+/// @return A vector of the old values at the memory locations before the
+///   update.
 ///
 template <
     atomic_op Op,
     typename T,
     int N,
-    data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none>
 __XETLA_API xetla_vector<T, N> xetla_atomic_global(
     T* p,
     xetla_vector<uint32_t, N> offsets,
-    xetla_mask<N> pred) {
+    xetla_mask<N> mask) {
   static_assert(
       !(is_internal_type<T>::value),
       "The internal types are not yet supported!");
-  return __ESIMD_ENS::lsc_atomic_update<
-      gpu::xetla::detail::get_atomic_op(Op),
-      T,
-      N,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>(p, offsets, pred);
+
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
+  return __ESIMD_NS::atomic_update<gpu::xetla::detail::get_atomic_op(Op), T, N>(
+      p, offsets, mask, props);
 }
 
-/// @brief Stateless scattered atomic (1 src).
-/// Supported platforms: DG2, PVC
-/// VISA instruction: lsc_atomic_<OP>.ugm
+/// @anchor usm_atomic_update1
+/// @brief Single-argument variant of the atomic update operation.
 ///
-/// @tparam Op is operation type.
-/// @tparam T is element type.
-/// @tparam N is the number of SIMD channels (platform dependent).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p       [in] is the base pointer.
-/// @param offsets [in] is the zero-based offsets.
-/// @param src0    [in] is the first atomic operand.
-/// @param pred    [in] is predicates.
+/// simd<T, N>
+/// atomic_update(T *ptr, simd<Toffset, N> byte_offset,
+///               simd<T, N> src0, simd_mask<N> mask, props = {});//(usm-au1-1)
+/// simd<T, N>
+/// atomic_update(T *ptr, simd<Toffset, N> byte_offset,
+///               simd<T, N> src0, props = {});                  // (usm-au1-2)
+///
+/// simd<T, N>
+/// atomic_update(T *p, simd_view<OffsetObjT, OffsetRegionTy> byte_offset,
+///               simd<T, N> src0,
+///               simd_mask<N> mask, props = {});                // (usm-au1-3)
+/// simd<T, N>
+/// atomic_update(T *p, simd_view<OffsetObjT, OffsetRegionTy> byte_offset,
+///               simd<T, N> src0,
+///               props = {});                                   // (usm-au1-4)
+///
+
+/// simd<T, N>
+/// atomic_update(T *ptr, simd<Toffset, N> byte_offset,
+///               simd<T, N> src0, simd_mask<N> mask, props = {});//(usm-au1-1)
+///
+/// Atomically updates \c N memory locations represented by a USM pointer and
+/// a vector of offsets relative to the pointer, and returns a vector of old
+/// values found at the memory locations before update. The update operation
+/// has 1 additional argument.
+///
+/// @tparam Op The atomic operation - can be one of the following:
+/// \c atomic_op::add, \c atomic_op::sub, \c atomic_op::min, \c atomic_op::max,
+/// \c atomic_op::xchg, \c atomic_op::bit_and, \c atomic_op::bit_or,
+/// \c atomic_op::bit_xor, \c atomic_op::minsint, \c atomic_op::maxsint,
+/// \c atomic_op::fmax, \c atomic_op::fmin, \c atomic_op::fadd, \c
+/// atomic_op::fsub, \c atomic_op::store.
+/// @tparam T The vector element type.
+/// @tparam N The number of memory locations to update.
+/// @param p The USM pointer.
+/// @param byte_offset The vector of 32-bit or 64-bit offsets in bytes.
+/// @param src0 The additional argument.
+/// @param mask Operation mask, only locations with non-zero in the
+///   corresponding mask element are updated.
+/// @param props The parameter 'props' specifies the optional compile-time
+///   properties list. Only L1/L2 properties are used. Other properties are
+///   ignored.
+/// @return A vector of the old values at the memory locations before the
+///   update.
 ///
 template <
     atomic_op Op,
     typename T,
     int N,
-    data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none>
 __XETLA_API xetla_vector<T, N> xetla_atomic_global(
     T* p,
     xetla_vector<uint32_t, N> offsets,
     xetla_vector<T, N> src0,
-    xetla_mask<N> pred) {
+    xetla_mask<N> mask) {
   static_assert(
       !(is_internal_type<T>::value),
       "The internal types are not yet supported!");
-  return __ESIMD_ENS::lsc_atomic_update<
-      gpu::xetla::detail::get_atomic_op(Op),
-      T,
-      N,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>(p, offsets, src0, pred);
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
+  return __ESIMD_NS::atomic_update<gpu::xetla::detail::get_atomic_op(Op), T, N>(
+      p, offsets, src0, mask, props);
 }
 
-/// @brief Stateless scattered atomic (2 src).
-/// Supported platforms: DG2, PVC
-/// VISA instruction: lsc_atomic_<OP>.ugm
+/// @anchor usm_atomic_update2
+/// Atomically updates \c N memory locations represented by a USM pointer and
+/// a vector of offsets relative to the pointer, and returns a vector of old
+/// values found at the memory locations before update. The update operation
+/// has 2 additional arguments.
 ///
-/// @tparam Op is operation type.
-/// @tparam T is element type.
-/// @tparam N is the number of SIMD channels (platform dependent).
-/// @tparam DS is the data size.
-/// @tparam L1H is L1 cache hint.
-/// @tparam L2H is L2 cache hint.
-/// @param p       [in] is the base pointer.
-/// @param offsets [in] is the zero-based offsets.
-/// @param src0    [in] is the first atomic operand.
-/// @param src1    [in] is the second atomic operand.
-/// @param pred    [in] is predicates.
+/// simd<T, N>
+/// atomic_update(T *p, simd<Toffset, N> byte_offset,
+///               simd<T, N> src0, simd<T, N> src1,
+///               simd_mask<N> mask, props = {});               // (usm-au2-1)
+/// simd<T, N>
+/// atomic_update(T *p, simd<Toffset, N> byte_offset,
+///               simd<T, N> src0, simd<T, N> src1,
+///               props = {});                                  // (usm-au2-2)
+///
+/// simd<T, N>
+/// atomic_update(T *p, simd_view<OffsetObjT, OffsetRegionTy> byte_offset,
+///               simd<T, N> src0, simd<T, N> src1,
+///               simd_mask<N> mask, props = {})                // (usm-au2-3)
+/// simd<T, N>
+/// atomic_update(T *p, simd_view<OffsetObjT, OffsetRegionTy> byte_offset,
+///               simd<T, N> src0, simd<T, N> src1,
+///               props = {})                                   // (usm-au2-4)
+///
+
+/// simd<T, N>
+/// atomic_update(T *p, simd<Toffset, N> byte_offset,
+///               simd<T, N> src0, simd<T, N> src1,
+///               simd_mask<N> mask, props = {});               // (usm-au2-1)
+///
+/// @tparam Op The atomic operation - can be one of the following:
+///   \c atomic_op::cmpxchg, \c atomic_op::fcmpxchg.
+/// @tparam T The vector element type.
+/// @tparam N The number of memory locations to update.
+/// @param p The USM pointer.
+/// @param byte_offset The vector of 32-bit or 64-bit offsets in bytes.
+/// @param src0 The first additional argument (new value).
+/// @param src1 The second additional argument (expected value).
+/// @param mask Operation mask, only locations with non-zero in the
+///   corresponding mask element are updated.
+/// @param props The parameter 'props' specifies the optional compile-time
+///   properties list. Only L1/L2 properties are used.
+//    Other properties are ignored.
+/// @return A vector of the old values at the memory locations before the
+///   update.
 ///
 template <
     atomic_op Op,
     typename T,
     int N,
-    data_size DS = data_size::default_size,
     cache_hint L1H = cache_hint::none,
     cache_hint L2H = cache_hint::none>
 __XETLA_API xetla_vector<T, N> xetla_atomic_global(
@@ -763,17 +847,20 @@ __XETLA_API xetla_vector<T, N> xetla_atomic_global(
     xetla_vector<uint32_t, N> offsets,
     xetla_vector<T, N> src0,
     xetla_vector<T, N> src1,
-    xetla_mask<N> pred) {
+    xetla_mask<N> mask) {
   static_assert(
       !(is_internal_type<T>::value),
       "The internal types are not yet supported!");
-  return __ESIMD_ENS::lsc_atomic_update<
-      gpu::xetla::detail::get_atomic_op(Op),
-      T,
-      N,
-      gpu::xetla::detail::get_data_size(DS),
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>(p, offsets, src0, src1, pred);
+
+  __ESIMD_NS::properties props{
+      __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
+      __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
+
+  // 2-argument xetla_atomic_global arguments order matches the standard one -
+  // expected value first, then new value. But atomic_update uses reverse
+  // order, hence the src1/src0 swap.
+  return __ESIMD_NS::atomic_update<gpu::xetla::detail::get_atomic_op(Op), T, N>(
+      p, offsets, src1, src0, mask, props);
 }
 /// @brief Declare per-work-group slm size.
 /// @tparam SLMSize  Shared Local Memory (SLM) size (in Bytes).
