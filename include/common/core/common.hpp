@@ -228,8 +228,13 @@ enum class atomic_op : uint8_t {
 /// xetla dpas argument typ
 enum class argument_type : uint8_t {
   Invalid = 0,
+#if __INTEL_LLVM_COMPILER >= 20240200
   U1 __SYCL_DEPRECATED("u1 is reserved/unsupported") = 1, // unsigned 1 bit
   S1 __SYCL_DEPRECATED("s1 is reserved/unsupported") = 2, // signed 1 bit
+#else
+  U1 = 1, // unsigned 1 bit
+  S1 = 2, // signed 1 bit
+#endif
   U2 = 3, // unsigned 2 bits
   S2 = 4, // signed 2 bits
   U4 = 5, // unsigned 4 bits

@@ -303,10 +303,21 @@ __XETLA_API void xetla_prefetch_global(
     T* p,
     xetla_vector<uint32_t, N / VS> byte_offsets,
     xetla_mask<N / VS> mask = 1) {
+#if __INTEL_LLVM_COMPILER >= 20240200
   __ESIMD_NS::properties props{
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
   __ESIMD_NS::prefetch<T, N, VS>(p, byte_offsets, mask, props);
+#else
+  constexpr data_size DS = data_size::default_size;
+  __ESIMD_ENS::lsc_prefetch<
+      T,
+      VS,
+      gpu::xetla::detail::get_data_size(DS),
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H),
+      N / VS>(p, byte_offsets, mask);
+#endif
 }
 
 /// template <typename T, int VS = 1, typename OffsetT,
@@ -329,11 +340,22 @@ template <
     int VS = 1,
     cache_hint L1H = cache_hint::cached,
     cache_hint L2H = cache_hint::cached>
-__XETLA_API void xetla_prefetch_global(T* p, uint64_t offset = 0) {
+__XETLA_API void xetla_prefetch_global(T* p, uint64_t byte_offset = 0) {
+#if __INTEL_LLVM_COMPILER >= 20240200
   __ESIMD_NS::properties props{
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>};
-  __ESIMD_NS::prefetch<T, VS>(p, offset, props);
+  __ESIMD_NS::prefetch<T, VS>(p, byte_offset, props);
+#else
+  constexpr data_size DS = data_size::default_size;
+  __ESIMD_ENS::lsc_prefetch<
+      T,
+      VS,
+      gpu::xetla::detail::get_data_size(DS),
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H),
+      1>(p, (byte_offset / sizeof(T)));
+#endif
 }
 
 /// simd<T, N> block_load(const T* ptr, size_t byte_offset,
@@ -523,12 +545,22 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
     T* p,
     xetla_vector<OffsetT, N / VS> byte_offsets,
     xetla_mask<N / VS> mask = 1) {
+#if __INTEL_LLVM_COMPILER >= 20240200
   __ESIMD_NS::properties props{
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
-
   return __ESIMD_NS::gather<T, N, VS>(p, byte_offsets, mask, props);
+#else
+  constexpr data_size DS = data_size::default_size;
+  return __ESIMD_ENS::lsc_gather<
+      T,
+      VS,
+      gpu::xetla::detail::get_data_size(DS),
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H),
+      N / VS>(p, byte_offsets, mask);
+#endif
 }
 
 /// template <typename T, int N, int VS = 1, typename OffsetT,
@@ -590,11 +622,22 @@ __XETLA_API void xetla_store_global(
     xetla_vector<OffsetT, N / VS> byte_offsets,
     xetla_vector<T, N> vals,
     xetla_mask<N / VS> mask = 1) {
+#if __INTEL_LLVM_COMPILER >= 20240200
   __ESIMD_NS::properties props{
       __ESIMD_NS::cache_hint_L1<gpu::xetla::detail::get_cache_hint(L1H)>,
       __ESIMD_NS::cache_hint_L2<gpu::xetla::detail::get_cache_hint(L2H)>,
       __ESIMD_NS::alignment<alignment>};
   __ESIMD_NS::scatter<T, N, VS>(p, byte_offsets, vals, mask, props);
+#else
+  constexpr data_size DS = data_size::default_size;
+  __ESIMD_ENS::lsc_scatter<
+      T,
+      VS,
+      gpu::xetla::detail::get_data_size(DS),
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H),
+      N / VS>((T*)p, byte_offsets, vals, mask);
+#endif
 }
 
 /// void block_store(T* ptr, size_t byte_offset,         // (usm-bs-2)
