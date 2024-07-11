@@ -159,7 +159,7 @@ class gemm_universal_t<
   /// @brief GEMM arguments.
   /// This is the interface for users to pass the application-related runtime
   /// variables.
-  template <quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP>
+  template <quant_mode quant_mode = quant_mode::I4_SYM>
   struct arguments_t {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
@@ -295,7 +295,7 @@ class gemm_universal_t<
     }
   };
   template <>
-  struct arguments_t<quant_mode::S4_FULLRANGE_NO_ZP> {
+  struct arguments_t<quant_mode::I4_SYM> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
     uint32_t matrix_m;
@@ -570,8 +570,7 @@ class gemm_universal_t<
     // check for int4x2
     implementable &=
         ((args.matB_ld % pack_ratio == 0) && (args.matrix_n % pack_ratio == 0));
-    if constexpr (
-        gemm_t::compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (gemm_t::compute_policy::quant_mode != quant_mode::I4_SYM) {
       implementable &= (args.zero_pt_ld % pack_ratio == 0);
     }
 
@@ -668,8 +667,7 @@ class gemm_universal_t<
     uint32_t inner_loop_start = (start_k + k_stride - 1) / k_stride;
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args;
-    if constexpr (
-        gemm_t::compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (gemm_t::compute_policy::quant_mode == quant_mode::I4_SYM) {
       gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,

@@ -40,8 +40,8 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 512 / sg_m;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
-  static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
+  // static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
+  static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -121,7 +121,7 @@ int gemm_result_validate(
 }
 
 template <
-    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::I4_SYM,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -135,7 +135,7 @@ std::vector<fp16> convert_int4(
   int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     int8_t dequant_8bit = data_b & 0xf;
-    if constexpr (quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (quant_mode == quant_mode::I4_SYM) {
       dequant_fp16[i] = scale * (dequant_8bit - 8);
     } else {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
@@ -148,7 +148,7 @@ std::vector<fp16> convert_int4(
 template <
     size_t dequant_s,
     mem_layout layout_b = mem_layout::col_major,
-    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::I4_SYM,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -475,7 +475,7 @@ void dequantize_gemv_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
   typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg;
-  if constexpr (compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+  if constexpr (compute_policy::quant_mode == quant_mode::I4_SYM) {
     gemm_arg =
         typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
@@ -492,7 +492,7 @@ void dequantize_gemv_run(int iter) {
             Acc_d,
             Cnt_d,
             epilogue_args);
-  } else if constexpr (compute_policy::quant_mode == quant_mode::S4_ASYM) {
+  } else if constexpr (compute_policy::quant_mode == quant_mode::I4_ASYM) {
     gemm_arg =
         typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,

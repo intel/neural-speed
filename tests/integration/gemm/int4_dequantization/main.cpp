@@ -231,7 +231,7 @@ void dequantize_gemm_run(uint32_t iter) {
       perf_tuning_knob_t<sg_tile_k, prefetch_distance, periodic_sync_interval>;
 
   static constexpr quant_info quant_info{
-      quant_mode::S4_ASYM, Test::dequant_s, layout_b};
+      quant_mode::I4_ASYM, Test::dequant_s, layout_b};
 
   using compute_policy = xetla::group::compute_policy_int4_dequantize<
       compute_attr,
