@@ -27,6 +27,7 @@ constexpr int ITER = 200;
 #endif
 constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 
+template <typename scalar_t>
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
@@ -48,9 +49,9 @@ class test_col_major_1 {
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
-  using data_type_a = fp16;
+  using data_type_a = scalar_t;
   using data_type_b = int4x8;
-  using data_type_c = fp16;
+  using data_type_c = scalar_t;
 };
 class test_col_major_2 {
  public:
@@ -173,11 +174,11 @@ std::vector<data_type_acc_in> dequantize_weight(
           (j / step) * (matrix_n / pack_radio) + i / pack_radio;
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
+      data_type_zero_pt zp_value = zero_pt[start_zero_pt_in];
+      zp_value = zp_value >> (4 * (i % pack_radio));
       for (uint32_t jj = 0; jj < step; jj++) {
         std::vector<fp16> dequant_fp16 = convert_int4<quant_mode>(
-            b[start_b_in + jj],
-            scale[start_scale_in],
-            zero_pt[start_zero_pt_in] >> (4 * (i % pack_radio)));
+            b[start_b_in + jj], scale[start_scale_in], zp_value);
         for (uint32_t jjj = 0; jjj < dequant_fp16.size(); jjj++) {
           b_out[start_out + pack_radio * jj + jjj] = dequant_fp16[jjj];
         }
@@ -551,9 +552,11 @@ void dequantize_gemv_run(int iter) {
   // performance
   prof.print_profiling_result(profiling_selector::GPU);
   // check result
-  std::vector<typename Test::data_type_a> dequantize_b =
-      dequantize_weight<dequant_s, layout_b, compute_policy::quant_mode>(
-          matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
+  std::vector<typename Test::data_type_a> dequantize_b = dequantize_weight<
+      dequant_s,
+      layout_b,
+      compute_policy::quant_mode,
+      data_type_c>(matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
 
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();
   ASSERT_EQ(
@@ -585,6 +588,12 @@ void dequantize_gemv_run(int iter) {
   free(Cnt_d, context);
 }
 
+// Placeholder for void test param
+template <>
+void dequantize_gemv_run<void>(int) {
+  GTEST_SKIP();
+}
+
 template <typename T>
 class dequantize_gemv_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(dequantize_gemv_test);
@@ -594,7 +603,11 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
-using tests = ::testing::Types<test_col_major_1>;
+using tests = ::testing::Types< //
+    test_col_major_1<fp16>,
+    test_col_major_1<bf16>,
+    // test_col_major_2,
+    void>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemv_test_suite,

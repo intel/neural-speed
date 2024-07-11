@@ -526,6 +526,10 @@ class gemm_universal_t<
   template <quant_mode quant_mode>
   static bool can_implement(arguments_t<quant_mode>& args) {
     bool implementable = true;
+    if (arch_tag == gpu_arch::XeLpg) {
+      implementable &= !std::is_same_v<dtype_a, bf16>; // XeLpg arch dosen't
+                                                       // have bf16 related isa.
+    }
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_a == msg_type::block_2d) {
         implementable &= kernel::block_2d<arch_tag, dtype_a>::check_tensor(
