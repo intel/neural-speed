@@ -59,24 +59,22 @@ class Launcher {
     sycl::range<2> problem{static_cast<size_t>(m_pad), static_cast<size_t>(n) / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
-      cgh.parallel_for(
-          sycl::nd_range<2>(problem, group),
-          [=](sycl::nd_item<2> it) [[sycl::reqd_work_group_size(
-              1, GemmCore::WgM,
-              GemmCore::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
-            sycl_utils::nd_item_helper<GemmCore> helper(it);
-            if constexpr (debug) {
-              compute_tile(k, B, ldb, slm_b, A, lda, C, ldc, it);
-            } else {
-              int m_tail = m - helper.sg_g_m();
-              m_tail = m_tail > GemmCore::TileM ? GemmCore::TileM : m_tail;
-              if (m_tail == GemmCore::TileM) {
-                compute_tile(k, B, ldb, slm_b, A, lda, C, ldc, it);
-              } else {
-                compute_tail(k, B, ldb, slm_b, A, lda, C, ldc, m_tail, it);
-              }
-            }
-          });
+      cgh.parallel_for(sycl::nd_range<2>(problem, group),
+                       [=](sycl::nd_item<2> it)
+                           [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
+                             sycl_utils::nd_item_helper<GemmCore> helper(it);
+                             if constexpr (debug) {
+                               compute_tile(k, B, ldb, slm_b, A, lda, C, ldc, it);
+                             } else {
+                               int m_tail = m - helper.sg_g_m();
+                               m_tail = m_tail > GemmCore::TileM ? GemmCore::TileM : m_tail;
+                               if (m_tail == GemmCore::TileM) {
+                                 compute_tile(k, B, ldb, slm_b, A, lda, C, ldc, it);
+                               } else {
+                                 compute_tail(k, B, ldb, slm_b, A, lda, C, ldc, m_tail, it);
+                               }
+                             }
+                           });
     });
     return ev;
   }
@@ -151,24 +149,22 @@ class LauncherWOQ {
     sycl::range<2> problem{static_cast<size_t>(m_pad), static_cast<size_t>(n) / GemmCore::TileN};
     auto ev = q->submit([&](sycl::handler& cgh) {
       sycl::local_accessor<BType, 1> slm_b(sycl::range(GemmCore::SLM_B_Size), cgh);
-      cgh.parallel_for(
-          sycl::nd_range<2>(problem, group),
-          [=](sycl::nd_item<2> it) [[sycl::reqd_work_group_size(
-              1, GemmCore::WgM,
-              GemmCore::WgN)]] [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
-            sycl_utils::nd_item_helper<GemmCore> helper(it);
-            if constexpr (debug) {
-              compute_tile(k, blocksize, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
-            } else {
-              int m_tail = m - helper.sg_g_m();
-              m_tail = m_tail > GemmCore::TileM ? GemmCore::TileM : m_tail;
-              if (m_tail == GemmCore::TileM) {
-                compute_tile(k, blocksize, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
-              } else {
-                compute_tail(k, blocksize, m_tail, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
-              }
-            }
-          });
+      cgh.parallel_for(sycl::nd_range<2>(problem, group),
+                       [=](sycl::nd_item<2> it)
+                           [[intel::kernel_args_restrict]] [[intel::reqd_sub_group_size(GemmCore::SgSize)]] {
+                             sycl_utils::nd_item_helper<GemmCore> helper(it);
+                             if constexpr (debug) {
+                               compute_tile(k, blocksize, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
+                             } else {
+                               int m_tail = m - helper.sg_g_m();
+                               m_tail = m_tail > GemmCore::TileM ? GemmCore::TileM : m_tail;
+                               if (m_tail == GemmCore::TileM) {
+                                 compute_tile(k, blocksize, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
+                               } else {
+                                 compute_tail(k, blocksize, m_tail, B, B_scale, ldb, slm_b, A, lda, C, ldc, it);
+                               }
+                             }
+                           });
     });
     return ev;
   }

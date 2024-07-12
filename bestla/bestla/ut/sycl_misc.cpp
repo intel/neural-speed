@@ -102,7 +102,7 @@ class UT_BlockQunatize_S3S4 {
     using ProB = sycl_prologue_b::WeightS4Trans<GemmCore, float>;
     sycl_utils::sycl_vector<float> dequantB(n * k, q);
     int blks = updiv(k, blocksize);
-    auto evt = ProB::dequant_s4<sycl_prologue_b::KernelConfigTrans>(
+    auto evt = ProB::template dequant_s4<sycl_prologue_b::KernelConfigTrans>(
         n, k, blocksize, {(uint8_t*)sycl_stor.mQBuf, (float*)sycl_stor.mSBuf, blks}, dequantB.data(), q);
     evt.wait();
     q->memcpy(dequant.data(), dequantB.data(), dequantB.size() * 4).wait();

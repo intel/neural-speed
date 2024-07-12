@@ -16,12 +16,12 @@ find_package(Threads REQUIRED)
 file(GLOB layers_srcs "layers/*.cpp")
 file(GLOB test_srcs "layers/*test*.cpp")
 list(REMOVE_ITEM layers_srcs ${test_srcs})
-set(sources ne_layers.c ${layers_srcs})
+set(sources ne_layers.cpp ${layers_srcs})
 
 add_shareable_library_w_warning(ne_layers "${sources}")
 
 target_include_directories(ne_layers PUBLIC .)
-target_compile_features(ne_layers PUBLIC c_std_11) # don't bump
+target_compile_features(ne_layers PUBLIC cxx_std_17)
 set_target_properties(ne_layers PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if (NS_TP)
   find_package(oneCCL REQUIRED)

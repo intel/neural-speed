@@ -12,8 +12,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 // Defines CLOCK_MONOTONIC on Linux
-#define _GNU_SOURCE
-
 #include "ne_layers.h"
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
@@ -30,7 +28,14 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdio.h>
-
+#include <atomic>
+#ifndef PRId64
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#define PRId64 "lld"
+#else
+#define PRId64 "ld"
+#endif
+#endif
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #include <intrin.h>
 #else
@@ -50,24 +55,9 @@
 #include "ne.h"
 #include "ne_bestla.h"
 
-// if C99 - static_assert is noop
-// ref: https://stackoverflow.com/a/53923785/4039976
-#ifndef static_assert
-#define static_assert(cond, msg) struct global_scope_noop_trick
-#endif
-
 #if defined(_WIN32)
 
 #include <windows.h>
-
-typedef volatile LONG atomic_int;
-typedef atomic_int atomic_bool;
-
-static void atomic_store(atomic_int* ptr, LONG val) { InterlockedExchange(ptr, val); }
-static LONG atomic_load(atomic_int* ptr) { return InterlockedCompareExchange(ptr, 0, 0); }
-static LONG atomic_fetch_add(atomic_int* ptr, LONG inc) { return InterlockedExchangeAdd(ptr, inc); }
-static LONG atomic_fetch_sub(atomic_int* ptr, LONG dec) { return atomic_fetch_add(ptr, -(dec)); }
-
 typedef HANDLE pthread_t;
 
 typedef DWORD thread_ret_t;
@@ -91,8 +81,6 @@ static int sched_yield(void) {
 }
 #else
 #include <pthread.h>
-#include <stdatomic.h>
-
 typedef void* thread_ret_t;
 #endif
 
@@ -254,78 +242,76 @@ int64_t ne_cycles_per_ms(void) { return CLOCKS_PER_SEC / 1000; }
 // cache line
 //
 
-#if defined(__cpp_lib_hardware_interference_size)
-#define CACHE_LINE_SIZE hardware_destructive_interference_size
-#else
 #define CACHE_LINE_SIZE 64
-#endif
 
 static const size_t CACHE_LINE_SIZE_F32 = CACHE_LINE_SIZE / sizeof(float);
 
 static const quantize_fns_t quantize_fns[NE_TYPE_COUNT] = {
-    [NE_TYPE_Q4_0] =
-        {
-            .dequantize_row_q = (dequantize_row_q_t)dequantize_row_q4_0,
-            .quantize_row_q = quantize_row_q4_0,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q4_0_reference,
-            .quantize_row_q_dot = quantize_row_q8_0,
-            .vec_dot_q = ne_vec_dot_q4_0_q8_0,
-            .vec_dot_type = NE_TYPE_Q8_0,
-        },
-    [NE_TYPE_Q4_1] =
-        {
-            .dequantize_row_q = (dequantize_row_q_t)dequantize_row_q4_1,
-            .quantize_row_q = quantize_row_q4_1,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q4_1_reference,
-            .quantize_row_q_dot = quantize_row_q8_1,
-            .vec_dot_q = ne_vec_dot_q4_1_q8_1,
-            .vec_dot_type = NE_TYPE_Q8_1,
-        },
-    [NE_TYPE_Q5_0] =
-        {
-            .dequantize_row_q = (dequantize_row_q_t)dequantize_row_q5_0,
-            .quantize_row_q = quantize_row_q5_0,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q5_0_reference,
-            .quantize_row_q_dot = quantize_row_q8_0,
-            .vec_dot_q = ne_vec_dot_q5_0_q8_0,
-            .vec_dot_type = NE_TYPE_Q8_0,
-        },
-    [NE_TYPE_Q5_1] =
-        {
-            .dequantize_row_q = (dequantize_row_q_t)dequantize_row_q5_1,
-            .quantize_row_q = quantize_row_q5_1,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q5_1_reference,
-            .quantize_row_q_dot = quantize_row_q8_1,
-            .vec_dot_q = ne_vec_dot_q5_1_q8_1,
-            .vec_dot_type = NE_TYPE_Q8_1,
-        },
-    [NE_TYPE_Q8_0] =
-        {
-            .dequantize_row_q = dequantize_row_q8_0,
-            .quantize_row_q = quantize_row_q8_0,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q8_0_reference,
-            .quantize_row_q_dot = quantize_row_q8_0,
-            .vec_dot_q = ne_vec_dot_q8_0_q8_0,
-            .vec_dot_type = NE_TYPE_Q8_0,
-        },
-    [NE_TYPE_Q8_1] =
-        {
-            .dequantize_row_q = NULL,  // TODO
-            .quantize_row_q = quantize_row_q8_1,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q8_1_reference,
-            .quantize_row_q_dot = quantize_row_q8_1,
-            .vec_dot_q = NULL,  // TODO
-            .vec_dot_type = NE_TYPE_Q8_1,
-        },
-    [NE_TYPE_Q6_K] =
-        {
-            .dequantize_row_q = (dequantize_row_q_t)dequantize_row_q6_K,  // TODO
-            .quantize_row_q = quantize_row_q6_K,
-            .quantize_row_q_reference = (quantize_row_q_t)quantize_row_q6_K_reference,
-            .quantize_row_q_dot = quantize_row_q8_K,
-            .vec_dot_q = ggml_vec_dot_q6_K_q8_K,  // TODO
-            .vec_dot_type = NE_TYPE_Q8_K,
-        },
+    {},  // NE_TYPE_F32 = 0
+    {},  // NE_TYPE_F16 = 1
+    {
+        (dequantize_row_q_t)dequantize_row_q4_0,        //.dequantize_row_q =
+        quantize_row_q4_0,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q4_0_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_0,                              //.quantize_row_q_dot =
+        ne_vec_dot_q4_0_q8_0,                           //.vec_dot_q =
+        NE_TYPE_Q8_0,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q4_0 = 2,
+    {
+        (dequantize_row_q_t)dequantize_row_q4_1,        //.dequantize_row_q =
+        quantize_row_q4_1,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q4_1_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_1,                              //.quantize_row_q_dot =
+        ne_vec_dot_q4_1_q8_1,                           //.vec_dot_q =
+        NE_TYPE_Q8_1,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q4_1 =3
+    {},                                                 // NE_TYPE_Q4_2 = 4, support has been removed
+    {},                                                 // NE_TYPE_Q4_3 (5) support has been removed
+    {
+        (dequantize_row_q_t)dequantize_row_q5_0,        //.dequantize_row_q =
+        quantize_row_q5_0,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q5_0_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_0,                              //.quantize_row_q_dot =
+        ne_vec_dot_q5_0_q8_0,                           //.vec_dot_q =
+        NE_TYPE_Q8_0,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q5_0 = 6,
+
+    {
+        (dequantize_row_q_t)dequantize_row_q5_1,        //.dequantize_row_q =
+        quantize_row_q5_1,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q5_1_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_1,                              //.quantize_row_q_dot =
+        ne_vec_dot_q5_1_q8_1,                           //.vec_dot_q =
+        NE_TYPE_Q8_1,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q5_1 = 7,
+    {
+        dequantize_row_q8_0,                            //.dequantize_row_q =
+        quantize_row_q8_0,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q8_0_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_0,                              //.quantize_row_q_dot =
+        ne_vec_dot_q8_0_q8_0,                           //.vec_dot_q =
+        NE_TYPE_Q8_0,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q8_0 = 8,
+    {
+        NULL,                                           // .dequantize_row_q =
+        quantize_row_q8_1,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q8_1_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_1,                              //.quantize_row_q_dot =
+        NULL,                                           // .vec_dot_q =
+        NE_TYPE_Q8_1,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q8_1 = 9,
+    {},
+    {},
+    {},
+    {},
+    {
+        (dequantize_row_q_t)dequantize_row_q6_K,        // .dequantize_row_q =
+        quantize_row_q6_K,                              //.quantize_row_q =
+        (quantize_row_q_t)quantize_row_q6_K_reference,  //.quantize_row_q_reference =
+        quantize_row_q8_K,                              //.quantize_row_q_dot =
+        ggml_vec_dot_q6_K_q8_K,                         // .vec_dot_q =
+        NE_TYPE_Q8_K,                                   //.vec_dot_type =
+    },                                                  // NE_TYPE_Q6_K = 14,
 };
 
 // For internal test use
@@ -338,35 +324,81 @@ quantize_fns_t ne_internal_get_quantize_fn(size_t i) {
 // data types
 //
 
-static const int NE_BLCK_SIZE[NE_TYPE_COUNT] = {
-    [NE_TYPE_F32] = 1,      [NE_TYPE_F16] = 1,      [NE_TYPE_Q4_0] = QK4_0, [NE_TYPE_Q4_1] = QK4_1,
-    [NE_TYPE_Q5_0] = QK5_0, [NE_TYPE_Q5_1] = QK5_1, [NE_TYPE_Q8_0] = QK8_0, [NE_TYPE_Q8_1] = QK8_1,
-    [NE_TYPE_Q6_K] = QK_K,  [NE_TYPE_Q8_K] = QK_K,  [NE_TYPE_I8] = 1,       [NE_TYPE_I16] = 1,
-    [NE_TYPE_I32] = 1,
-};
+static const int NE_BLCK_SIZE[NE_TYPE_COUNT] = {1,      // NE_TYPE_F32=0
+                                                1,      // NE_TYPE_F16=1
+                                                QK4_0,  // NE_TYPE_Q4_0=2
+                                                QK4_1,  // NE_TYPE_Q4_1=3
+                                                0,     0,
+                                                QK5_0,  //[NE_TYPE_Q5_0] =
+                                                QK5_1,  //[NE_TYPE_Q5_1] =
+                                                QK8_0,  //[NE_TYPE_Q8_0] =
+                                                QK8_1,  //[NE_TYPE_Q8_1] =
+                                                0,     0, 0, 0,
+                                                QK_K,  //[NE_TYPE_Q6_K] =
+                                                QK_K,  //[NE_TYPE_Q8_K] =
+                                                1,     //[NE_TYPE_I8] =
+                                                1,     //[NE_TYPE_I16] =
+                                                1,     //[NE_TYPE_I32] =
+                                                -1};
 static_assert(NE_TYPE_COUNT == 20, "NE_BLCK_SIZE is outdated");
 
-static const size_t NE_TYPE_SIZE[NE_TYPE_COUNT] = {
-    [NE_TYPE_F32] = sizeof(float),       [NE_TYPE_F16] = sizeof(ne_fp16_t),   [NE_TYPE_Q4_0] = sizeof(block_q4_0),
-    [NE_TYPE_Q4_1] = sizeof(block_q4_1), [NE_TYPE_Q5_0] = sizeof(block_q5_0), [NE_TYPE_Q5_1] = sizeof(block_q5_1),
-    [NE_TYPE_Q8_0] = sizeof(block_q8_0), [NE_TYPE_Q8_1] = sizeof(block_q8_1), [NE_TYPE_Q6_K] = sizeof(block_q6_K),
-    [NE_TYPE_Q8_K] = sizeof(block_q8_K), [NE_TYPE_I8] = sizeof(int8_t),       [NE_TYPE_I16] = sizeof(int16_t),
-    [NE_TYPE_I32] = sizeof(int32_t),
-};
+static const size_t NE_TYPE_SIZE[NE_TYPE_COUNT] = {sizeof(float),       //[NE_TYPE_F32] =
+                                                   sizeof(ne_fp16_t),   //[NE_TYPE_F16] =
+                                                   sizeof(block_q4_0),  //[NE_TYPE_Q4_0] =
+                                                   sizeof(block_q4_1),  //[NE_TYPE_Q4_1] =
+                                                   0,
+                                                   0,
+                                                   sizeof(block_q5_0),  //[NE_TYPE_Q5_0] =
+                                                   sizeof(block_q5_1),  //[NE_TYPE_Q5_1] =
+                                                   sizeof(block_q8_0),  //[NE_TYPE_Q8_0] =
+                                                   sizeof(block_q8_1),  //[NE_TYPE_Q8_1] =
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   sizeof(block_q6_K),  //[NE_TYPE_Q6_K] =
+                                                   sizeof(block_q8_K),  //[NE_TYPE_Q8_K] =
+                                                   sizeof(int8_t),      //[NE_TYPE_I8] =
+                                                   sizeof(int16_t),     //[NE_TYPE_I16] =
+                                                   sizeof(int32_t),     //[NE_TYPE_I32] =
+                                                   1};
 static_assert(NE_TYPE_COUNT == 20, "NE_TYPE_SIZE is outdated");
 
-static const char* NE_TYPE_NAME[NE_TYPE_COUNT] = {
-    [NE_TYPE_F32] = "f32",   [NE_TYPE_F16] = "f16",   [NE_TYPE_Q4_0] = "q4_0", [NE_TYPE_Q4_1] = "q4_1",
-    [NE_TYPE_Q5_0] = "q5_0", [NE_TYPE_Q5_1] = "q5_1", [NE_TYPE_Q8_0] = "q8_0", [NE_TYPE_Q8_1] = "q8_1",
-    [NE_TYPE_Q6_K] = "q6_k", [NE_TYPE_Q8_K] = "q8_k", [NE_TYPE_I8] = "i8",     [NE_TYPE_I16] = "i16",
-    [NE_TYPE_I32] = "i32",
-};
+static const char* NE_TYPE_NAME[NE_TYPE_COUNT] = {"f32",   //[NE_TYPE_F32] =
+                                                  "f16",   //[NE_TYPE_F16] =
+                                                  "q4_0",  //[NE_TYPE_Q4_0] =
+                                                  "q4_1",  //[NE_TYPE_Q4_1] =
+                                                  "",      "",
+                                                  "q5_0",  //[NE_TYPE_Q5_0] =
+                                                  "q5_1",  //[NE_TYPE_Q5_1] =
+                                                  "q8_0",  //[NE_TYPE_Q8_0] =
+                                                  "q8_1",  //[NE_TYPE_Q8_1] =
+                                                  "",      "", "", "",
+                                                  "q6_k",  //[NE_TYPE_Q6_K] =
+                                                  "q8_k",  //[NE_TYPE_Q8_K] =
+                                                  "i8",    //[NE_TYPE_I8] =
+                                                  "i16",   //[NE_TYPE_I16] =
+                                                  "i32",   //[NE_TYPE_I32] =
+                                                  "bestla"};
 static_assert(NE_TYPE_COUNT == 20, "NE_TYPE_NAME is outdated");
 
 static bool NE_IS_QUANTIZED[NE_TYPE_COUNT] = {
-    [NE_TYPE_F32] = false, [NE_TYPE_F16] = false, [NE_TYPE_Q4_0] = true, [NE_TYPE_Q4_1] = true, [NE_TYPE_Q5_0] = true,
-    [NE_TYPE_Q5_1] = true, [NE_TYPE_Q8_0] = true, [NE_TYPE_Q8_1] = true, [NE_TYPE_Q6_K] = true, [NE_TYPE_Q6_K] = true,
-    [NE_TYPE_I8] = false,  [NE_TYPE_I16] = false, [NE_TYPE_I32] = false, [NE_TYPE_BTLA] = true,
+    false,  // [NE_TYPE_F32] =
+    false,  //[NE_TYPE_F16] =
+    true,   //[NE_TYPE_Q4_0] =
+    true,   //[NE_TYPE_Q4_1] =
+    false, false,
+    true,  //[NE_TYPE_Q5_0] =
+    true,  //[NE_TYPE_Q5_1] =
+    true,  //[NE_TYPE_Q8_0] =
+    true,  //[NE_TYPE_Q8_1] =
+    false, false, false, false,
+    true,   //[NE_TYPE_Q6_K] =
+    true,   //[NE_TYPE_Q6_K] =
+    false,  //[NE_TYPE_I8] =
+    false,  //[NE_TYPE_I16] =
+    false,  //[NE_TYPE_I32] =
+    true,   //[NE_TYPE_BTLA] =
 };
 static_assert(NE_TYPE_COUNT == 20, "NE_IS_QUANTIZED is outdated");
 
@@ -530,23 +562,23 @@ struct ne_state {
 
 // global state
 static struct ne_state g_state;
-static atomic_int g_state_barrier = 0;
+static std::atomic<char16_t> g_state_barrier = 0;
 
 // barrier via spin lock
 inline static void ne_critical_section_start(void) {
-  int processing = atomic_fetch_add(&g_state_barrier, 1);
+  int processing = g_state_barrier.fetch_add(1);
 
   while (processing > 0) {
     // wait for other threads to finish
-    atomic_fetch_sub(&g_state_barrier, 1);
+    g_state_barrier.fetch_sub(1);
     sched_yield();  // TODO: reconsider this
-    processing = atomic_fetch_add(&g_state_barrier, 1);
+    processing = g_state_barrier.fetch_add(1);
   }
 }
 
 // TODO: make this somehow automatically executed
 //       some sort of "sentry" mechanism
-inline static void ne_critical_section_end(void) { atomic_fetch_sub(&g_state_barrier, 1); }
+inline static void ne_critical_section_end(void) { g_state_barrier.fetch_sub(1); }
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -756,7 +788,7 @@ struct ne_context* ne_init(struct ne_init_params params) {
       const uint64_t t_start = ne_time_us();
       UNUSED(t_start);
 
-      g_state = (struct ne_state){
+      g_state = ne_state{
           /*.contexts =*/{{0}},
       };
 
@@ -796,26 +828,25 @@ struct ne_context* ne_init(struct ne_init_params params) {
 
   const size_t mem_size = (params.mem_size + NE_MEM_ALIGN - 1) & ~(NE_MEM_ALIGN - 1);
 
-  *ctx =
-      (struct ne_context){/*.mem_size           =*/mem_size,
-                          /*.mem_buffer         =*/params.mem_buffer ? params.mem_buffer : NE_ALIGNED_MALLOC(mem_size),
-                          /*.mem_buffer_owned   =*/params.mem_buffer ? false : true,
-                          /*.no_alloc           =*/params.no_alloc,
-                          /*.n_objects          =*/0,
-                          /*.objects_begin      =*/NULL,
-                          /*.objects_end        =*/NULL,
-                          /*.scratch            =*/
-                          {
-                              0,
-                              0,
-                              NULL,
-                          },
-                          /*.scratch_save       =*/
-                          {
-                              0,
-                              0,
-                              NULL,
-                          }};
+  *ctx = ne_context{/*.mem_size           =*/mem_size,
+                    /*.mem_buffer         =*/params.mem_buffer ? params.mem_buffer : NE_ALIGNED_MALLOC(mem_size),
+                    /*.mem_buffer_owned   =*/params.mem_buffer ? false : true,
+                    /*.no_alloc           =*/params.no_alloc,
+                    /*.n_objects          =*/0,
+                    /*.objects_begin      =*/NULL,
+                    /*.objects_end        =*/NULL,
+                    /*.scratch            =*/
+                    {
+                        0,
+                        0,
+                        NULL,
+                    },
+                    /*.scratch_save       =*/
+                    {
+                        0,
+                        0,
+                        NULL,
+                    }};
 
   NE_ASSERT(ctx->mem_buffer != NULL);
 
@@ -957,10 +988,10 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
       return NULL;
     }
 
-    *obj_new = (struct ne_object){
-        .offs = cur_end + NE_OBJECT_SIZE,
-        .size = obj_size,
-        .next = NULL,
+    *obj_new = ne_object{
+        cur_end + NE_OBJECT_SIZE,
+        obj_size,
+        NULL,
     };
   } else {
     if (cur_end + sizeof(struct ne_tensor) + NE_OBJECT_SIZE > ctx->mem_size) {
@@ -969,10 +1000,10 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
       assert(false);
       return NULL;
     }
-    *obj_new = (struct ne_object){
-        .offs = cur_end + NE_OBJECT_SIZE,
-        .size = sizeof(struct ne_tensor),
-        .next = NULL,
+    *obj_new = ne_object{
+        cur_end + NE_OBJECT_SIZE,
+        sizeof(struct ne_tensor),
+        NULL,
     };
     if (type == NE_TYPE_BTLA) {
       if (ctx->scratch.offs + bestla_device_storage_size() > ctx->scratch.size) {
@@ -997,27 +1028,27 @@ struct ne_tensor* ne_new_device_tensor_impl(struct ne_context* ctx, enum ne_type
 
   struct ne_tensor* const result = (struct ne_tensor*)(mem_buffer + obj_new->offs);
 
-  *result = (struct ne_tensor){
-      .type = type,
-      .backend = NE_BACKEND_SYCL,
-      .n_dims = n_dims,
-      .ne = {1, 1, 1, 1},
-      .nb = {0, 0, 0, 0},
-      .op = NE_OP_NONE,
-      .is_param = false,
-      .op_params = {0},
-      .grad = NULL,
-      .src0 = NULL,
-      .src1 = NULL,
-      .opt = {NULL},
-      .n_tasks = 0,
-      .perf_runs = 0,
-      .perf_cycles = 0,
-      .perf_time_us = 0,
-      .data = NULL,
-      .size = size_needed,
-      .name = {0},
-      .padding = {0},
+  *result = ne_tensor{
+      type,
+      NE_BACKEND_SYCL,
+      n_dims,
+      {1, 1, 1, 1},
+      {0, 0, 0, 0},
+      NE_OP_NONE,
+      false,
+      {0},
+      NULL,
+      NULL,
+      NULL,
+      {NULL},
+      0,
+      0,
+      0,
+      0,
+      NULL,
+      size_needed,
+      {0},
+      {0},
   };
   if (type == NE_TYPE_BTLA) {
     result->data = (void*)(result + 1);
@@ -1100,10 +1131,10 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
       return NULL;
     }
 
-    *obj_new = (struct ne_object){
-        .offs = cur_end + NE_OBJECT_SIZE,
-        .size = size_needed,
-        .next = NULL,
+    *obj_new = ne_object{
+        cur_end + NE_OBJECT_SIZE,
+        size_needed,
+        NULL,
     };
   } else {
     if (ctx->scratch.offs + size_needed > ctx->scratch.size) {
@@ -1124,10 +1155,10 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
 
     data = (char* const)ctx->scratch.data + ctx->scratch.offs;
 
-    *obj_new = (struct ne_object){
-        .offs = cur_end + NE_OBJECT_SIZE,
-        .size = sizeof(struct ne_tensor),
-        .next = NULL,
+    *obj_new = ne_object{
+        cur_end + NE_OBJECT_SIZE,
+        sizeof(struct ne_tensor),
+        NULL,
     };
 
     ctx->scratch.offs += size_needed;
@@ -1144,27 +1175,27 @@ struct ne_tensor* ne_new_tensor_impl(struct ne_context* ctx, enum ne_type type, 
 
   struct ne_tensor* const result = (struct ne_tensor*)(mem_buffer + obj_new->offs);
 
-  *result = (struct ne_tensor){
-      .type = type,
-      .backend = NE_BACKEND_CPU,
-      .n_dims = n_dims,
-      .ne = {1, 1, 1, 1},
-      .nb = {0, 0, 0, 0},
-      .op = NE_OP_NONE,
-      .is_param = false,
-      .op_params = {0},
-      .grad = NULL,
-      .src0 = NULL,
-      .src1 = NULL,
-      .opt = {NULL},
-      .n_tasks = 0,
-      .perf_runs = 0,
-      .perf_cycles = 0,
-      .perf_time_us = 0,
-      .data = (data == NULL && !ctx->no_alloc) ? (void*)(result + 1) : data,
-      .size = data ? size : size_needed,
-      .name = {0},
-      .padding = {0},
+  *result = ne_tensor{
+      type,
+      NE_BACKEND_CPU,
+      n_dims,
+      {1, 1, 1, 1},
+      {0, 0, 0, 0},
+      NE_OP_NONE,
+      false,
+      {0},
+      NULL,
+      NULL,
+      NULL,
+      {NULL},
+      0,
+      0,
+      0,
+      0,
+      (data == NULL && !ctx->no_alloc) ? (void*)(result + 1) : data,
+      data ? size : size_needed,
+      {0},
+      {0},
   };
 
   for (int i = 0; i < n_dims; i++) {
@@ -1395,7 +1426,7 @@ void ne_set_i32_1d(const struct ne_tensor* tensor, int i, int32_t value) {
     } break;
     case NE_TYPE_F16: {
       NE_ASSERT(tensor->nb[0] == sizeof(ne_fp16_t));
-      ((ne_fp16_t*)(tensor->data))[i] = NE_FP32_TO_FP16(value);
+      ((ne_fp16_t*)(tensor->data))[i] = NE_FP32_TO_FP16(float(value));
     } break;
     case NE_TYPE_F32: {
       NE_ASSERT(tensor->nb[0] == sizeof(float));
@@ -1547,7 +1578,7 @@ struct ne_tensor* ne_debug_op(struct ne_context* ctx, struct ne_tensor* a, ne_de
   result->op = NE_OP_DEBUG;
   result->src0 = a;
   static_assert(sizeof(void*) <= sizeof(result->padding), "No enough space for function ptr!");
-  *((void**)(result->padding)) = cb;
+  *(ne_debug_callback_t*)(result->padding) = cb;
   return result;
 }
 
@@ -2340,7 +2371,6 @@ struct ne_tensor* ne_rms_norm_back(struct ne_context* ctx, struct ne_tensor* a, 
 
 struct ne_tensor* ne_mul_mat(struct ne_context* ctx, struct ne_tensor* a, struct ne_tensor* b) {
   NE_ASSERT(ne_can_mul_mat(a, b));
-  NE_ASSERT(!ne_is_transposed(a));
 
   bool is_node = false;
 
@@ -2362,7 +2392,6 @@ struct ne_tensor* ne_mul_mat(struct ne_context* ctx, struct ne_tensor* a, struct
 struct ne_tensor* ne_mul_mat_with_bias(struct ne_context* ctx, struct ne_tensor* w, struct ne_tensor* b,
                                        struct ne_tensor* a) {
   NE_ASSERT(ne_can_mul_mat(w, a));
-  NE_ASSERT(!ne_is_transposed(w));
 
   bool is_node = false;
 
@@ -2410,7 +2439,6 @@ struct ne_tensor* ne_mul_mat_id(struct ne_context* ctx, struct ne_tensor* const 
     struct ne_tensor* a = as[i];
     NE_ASSERT(ne_are_same_shape(as[0], a));
     NE_ASSERT(ne_can_mul_mat(a, b));
-    NE_ASSERT(!ne_is_transposed(a));
     result->opt[i] = a;
   }
   return result;
@@ -10174,41 +10202,41 @@ static void ne_compute_forward_flash_attn_f32_f16_f16(const struct ne_compute_pa
   float scale = *(float*)dst->padding;
   ne_attn_flags_t flags = *(bool*)&dst->padding[sizeof(scale)];
   attn_fp32_fp16_fp16_fp32_fwd_args_t args = {
-      .Q = (float*)q->data,
-      .K = (ne_fp16_t*)k->data,
-      .V = (ne_fp16_t*)v->data,
-      .dst = (float*)dst->data,
-      .Q_sc = 1.f,
-      .K_sc = 1.f,
-      .V_sc = 1.f,
-      .dst_sc = 1.f,
-      .tmp = (char*)tmp->data,
-      .QK_scale = scale,
-      .attn_flags = flags,
-      .batch_size = batch,
-      .head_num = headnum,
-      .heads_kv = heads_kv,
-      .head_size = headsize,
-      .sl_q = seq_cur,
-      .sl_kv = seq_all,
-      .Q_layout = ATTN_FWD_LAYOUT_PLAIN,
-      .K_layout = ATTN_FWD_LAYOUT_PLAIN,
-      .V_layout = ATTN_FWD_LAYOUT_PLAIN,
-      .dst_layout = ATTN_FWD_LAYOUT_PLAIN,
-      .step_q_bs = seq_cur * embedsize,
-      .step_q_head_num = headsize,
-      .step_q_sl = embedsize,
-      .step_k_bs = step_k_bs,
-      .step_k_head_num = step_k_head_num,
-      .step_k_sl = step_k_sl,
-      .step_k_head_size = step_k_head_size,  // TODO
-      .step_v_bs = step_v_bs,
-      .step_v_head_num = step_v_head_num,
-      .step_v_sl = step_v_sl,
-      .step_v_head_size = 1,
-      .step_dst_bs = seq_cur * embedsize,
-      .step_dst_head_num = headsize,
-      .step_dst_sl = embedsize,
+      (float*)q->data,
+      (ne_fp16_t*)k->data,
+      (ne_fp16_t*)v->data,
+      (float*)dst->data,
+      1.f,
+      1.f,
+      1.f,
+      1.f,
+      (char*)tmp->data,
+      scale,
+      flags,
+      static_cast<int>(batch),
+      static_cast<int>(headnum),
+      static_cast<int>(heads_kv),
+      static_cast<int>(headsize),
+      static_cast<int>(seq_cur),
+      static_cast<int>(seq_all),
+      ATTN_FWD_LAYOUT_PLAIN,
+      ATTN_FWD_LAYOUT_PLAIN,
+      ATTN_FWD_LAYOUT_PLAIN,
+      ATTN_FWD_LAYOUT_PLAIN,
+      static_cast<int>(seq_cur * embedsize),
+      static_cast<int>(headsize),
+      static_cast<int>(embedsize),
+      step_k_bs,
+      step_k_head_num,
+      step_k_sl,
+      step_k_head_size,  // TODO
+      step_v_bs,
+      step_v_head_num,
+      step_v_sl,
+      1,
+      static_cast<int>(seq_cur * embedsize),
+      static_cast<int>(headsize),
+      static_cast<int>(embedsize),
   };
   bestla_fusion_attn_fp32_fp16_fp16_fp32_forward(&args);
 }
@@ -10236,45 +10264,45 @@ static void ne_compute_forward_flash_attn_reordered(const struct ne_compute_para
   ATTN_FWD_LAYOUT V_layout = *(ATTN_FWD_LAYOUT*)(&v->nb[0]);
 
   bestla_reordered_attn_fp32_fp32_fwd_args_t args = {
-      .Q = (float*)q->data,
-      .K = (char*)k->data,
-      .V = (char*)v->data,
-      .dst = (float*)dst->data,
-      .Q_sc = 1.f,
-      .K_sc = 1.f,
-      .V_sc = 1.f,
-      .dst_sc = 1.f,
-      .tmp = (char*)tmp->data,
-      .QK_scale = scale,
-      .attn_flags = flags,
-      .batch_size = batch,
-      .head_num = headnum,
-      .heads_kv = heads_kv,
-      .head_size = headsize,
-      .sl_q = seq_cur,
-      .sl_kv = seq_all,
-      .Q_layout = ATTN_FWD_LAYOUT_PLAIN,
-      .K_layout = K_layout,
-      .V_layout = V_layout,
-      .dst_layout = ATTN_FWD_LAYOUT_PLAIN,
-      .step_q_bs = q->nb[3] / q_ele_size,
-      .step_q_head_num = q->nb[2] / q_ele_size,
-      .step_q_sl = q->nb[1] / q_ele_size,
+      (float*)q->data,
+      (char*)k->data,
+      (char*)v->data,
+      (float*)dst->data,
+      1.f,
+      1.f,
+      1.f,
+      1.f,
+      (char*)tmp->data,
+      scale,
+      flags,
+      static_cast<int>(batch),
+      static_cast<int>(headnum),
+      static_cast<int>(heads_kv),
+      static_cast<int>(headsize),
+      static_cast<int>(seq_cur),
+      static_cast<int>(seq_all),
+      ATTN_FWD_LAYOUT_PLAIN,
+      K_layout,
+      V_layout,
+      ATTN_FWD_LAYOUT_PLAIN,
+      static_cast<int>(q->nb[3] / q_ele_size),
+      static_cast<int>(q->nb[2] / q_ele_size),
+      static_cast<int>(q->nb[1] / q_ele_size),
 
-      .stride_k_bs = k->nb[3],
-      .stride_k_head_num = k->nb[2],
-      .stride_k_sl = k->nb[1],
-      .stride_k_head_size = 0,
+      static_cast<int>(k->nb[3]),
+      static_cast<int>(k->nb[2]),
+      static_cast<int>(k->nb[1]),
+      0,
 
-      .stride_v_bs = v->nb[3],
-      .stride_v_head_num = v->nb[2],
-      .stride_v_sl = 0,
-      .stride_v_head_size = v->nb[1],
+      static_cast<int>(v->nb[3]),
+      static_cast<int>(v->nb[2]),
+      0,
+      static_cast<int>(v->nb[1]),
 
       // dst in (head_size, n_head, seq, bs)
-      .step_dst_bs = dst->nb[3] / dst_ele_size,
-      .step_dst_head_num = dst->nb[1] / dst_ele_size,
-      .step_dst_sl = dst->nb[2] / dst_ele_size,
+      static_cast<int>(dst->nb[3] / dst_ele_size),
+      static_cast<int>(dst->nb[1] / dst_ele_size),
+      static_cast<int>(dst->nb[2] / dst_ele_size),
   };
   bestla_reordered_attn_fp32_forward(&args);
 }
@@ -10537,19 +10565,19 @@ static void ne_compute_forward_flash_attn_kv_update(const struct ne_compute_para
   const bool no_zeroing = (bool)p_data[2];
   NE_ASSERT(cur->type == NE_TYPE_F32);
   bestla_fusion_attn_fp32_update_kv_args_t args = {
-      .src = (float*)cur->data,
-      .cache = (char*)cache->data,
-      .batch_size = cur->ne[3],
-      .heads_kv = cur->ne[1],
-      .head_size = cur->ne[0],
-      .seq_off = n_past,
-      .seq_size = cur->ne[2],
-      .seq_max = cache->ne[1],
-      .step_bs = cur->nb[3] / NE_TYPE_SIZE[cur->type],
-      .step_head_num = cur->nb[1] / NE_TYPE_SIZE[cur->type],
-      .step_seq = cur->nb[2] / NE_TYPE_SIZE[cur->type],
-      .step_head_size = cur->nb[0] / NE_TYPE_SIZE[cur->type],
-      .no_zeroing = no_zeroing,
+      (float*)cur->data,
+      (char*)cache->data,
+      static_cast<int>(cur->ne[3]),
+      (int)cur->ne[1],
+      (int)cur->ne[0],
+      n_past,
+      (int)cur->ne[2],
+      (int)cache->ne[1],
+      (int)(cur->nb[3] / NE_TYPE_SIZE[cur->type]),
+      (int)(cur->nb[1] / NE_TYPE_SIZE[cur->type]),
+      (int)(cur->nb[2] / NE_TYPE_SIZE[cur->type]),
+      (int)(cur->nb[0] / NE_TYPE_SIZE[cur->type]),
+      no_zeroing,
   };
   if (is_v)
     bestla_reordered_attn_fp32_update_v(&args);
@@ -12806,55 +12834,53 @@ struct ne_opt_params ne_opt_default_params(enum ne_opt_type type) {
 
   switch (type) {
     case NE_OPT_ADAM: {
-      result = (struct ne_opt_params){
-          .type = NE_OPT_ADAM,
-          .n_threads = 1,
-          .past = 0,
-          .delta = 1e-5f,
+      result = ne_opt_params{NE_OPT_ADAM,  //.type =
+                             1,            //.n_threads =
+                             0,            //.past =
+                             1e-5f,        //.delta =
 
-          .max_no_improvement = 100,
+                             100,  //.max_no_improvement =
 
-          .print_forward_graph = true,
-          .print_backward_graph = true,
+                             true,  //.print_forward_graph =
+                             true,  //.print_backward_graph =
 
-          .adam =
-              {
-                  .n_iter = 10000,
-                  .alpha = 0.001f,
-                  .beta1 = 0.9f,
-                  .beta2 = 0.999f,
-                  .eps = 1e-8f,
-                  .eps_f = 1e-5f,
-                  .eps_g = 1e-3f,
-              },
-      };
+                             {
+                                 10000,   //.n_iter =
+                                 0.001f,  //.alpha =
+                                 0.9f,    //.beta1 =
+                                 0.999f,  //.beta2 =
+                                 1e-8f,   //.eps =
+                                 1e-5f,   //.eps_f =
+                                 1e-3f,   //.eps_g =
+                             },           //.adam =
+                             {}};
     } break;
     case NE_OPT_LBFGS: {
-      result = (struct ne_opt_params){
-          .type = NE_OPT_LBFGS,
-          .n_threads = 1,
-          .past = 0,
-          .delta = 1e-5f,
+      result = ne_opt_params{
+          NE_OPT_LBFGS,  //.type =
+          1,             //.n_threads =
+          0,             //.past =
+          1e-5f,         //.delta =
 
-          .max_no_improvement = 0,
+          0,  //.max_no_improvement =
 
-          .print_forward_graph = true,
-          .print_backward_graph = true,
+          true,  //.print_forward_graph =
+          true,  //.print_backward_graph =
+          {},
 
-          .lbfgs =
-              {
-                  .m = 6,
-                  .n_iter = 100,
-                  .max_linesearch = 20,
+          {
+              6,    //.m =
+              100,  //.n_iter =
+              20,   //.max_linesearch =
 
-                  .eps = 1e-5f,
-                  .ftol = 1e-4f,
-                  .wolfe = 0.9f,
-                  .min_step = 1e-20f,
-                  .max_step = 1e+20f,
+              1e-5f,   //.eps =
+              1e-4f,   //.ftol =
+              0.9f,    //.wolfe =
+              1e-20f,  //.min_step =
+              1e+20f,  //.max_step =
 
-                  .linesearch = NE_LINESEARCH_DEFAULT,
-              },
+              NE_LINESEARCH_DEFAULT,  //.linesearch =
+          },                          //.lbfgs =
       };
     } break;
   }
@@ -12866,9 +12892,9 @@ enum ne_opt_result ne_opt(struct ne_context* ctx, struct ne_opt_params params, s
   bool free_ctx = false;
   if (ctx == NULL) {
     struct ne_init_params params_ctx = {
-        .mem_size = 16 * 1024 * 1024,
-        .mem_buffer = NULL,
-        .no_alloc = false,
+        16 * 1024 * 1024,
+        NULL,
+        false,
     };
 
     ctx = ne_init(params_ctx);

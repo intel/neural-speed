@@ -352,7 +352,6 @@ static bool llama_model_eval_internal(model_context* ctx, const model_input* inp
                                hparams.freq_scale);
         Kcur = ne_rope_inplace(  // n_ctx exceeds but it will be shift-roped back with cached K
             ctx0, Kcur, (is_ring_full ? n_ctx : n_past), n_rot, 0, 0, hparams.freq_base, hparams.freq_scale);
-        // Vcur = ne_transpose(ctx0, ne_reshape_2d(ctx0, Vcur, head_size * n_head_kv, N));
       }
       ne_set_name(Qcur, "Qcur");
       ne_set_name(Kcur, "Kcur");

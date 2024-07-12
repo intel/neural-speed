@@ -430,7 +430,7 @@ class UT_SyclS4Gemv {
     int constexpr TileK = 2;
     int constexpr GroupK = SgSize * TileK;
     sycl::range<1> group{SgSize};
-    sycl::range<1> problem{n * SgSize};
+    sycl::range<1> problem{(size_t)n * SgSize};
     auto S_d = dS.data();
     auto A_d = dA.data();
     auto B_d = dB.data();
@@ -471,7 +471,7 @@ class UT_SyclS4Gemv {
     int constexpr TileK = 32;
     int constexpr GroupK = SgSize * TileK;
     sycl::range<1> group{SgSize};
-    sycl::range<1> problem{n * SgSize};
+    sycl::range<1> problem{(size_t)n * SgSize};
     auto S_d = dS.data();
     auto A_d = dA.data();
     auto B_d = dB.data();
@@ -513,7 +513,7 @@ void mha_sref(float* Q, float* K, float* V, float* S, float* O, int batch, int s
         }
         float sums = 0.f;
         for (int jj = 0; jj < seqA; jj++) {
-          tmps[jj] = std::expf(tmps[jj] - maxs);
+          tmps[jj] = std::exp(tmps[jj] - maxs);
           sums += tmps[jj];
         }
         sums = 1.f / sums;
@@ -610,17 +610,17 @@ class UT_MHASgemm {
                            int jj = wg_loc_id * 2;
                            for (; jj < seq_acc_pad; jj += WgSize * 2) {
                              auto s2 = *(TC*)&slm[jj];
-                             s2[0] = std::expf(s2[0] - fmax);
-                             s2[1] = std::expf(s2[1] - fmax);
+                             s2[0] = std::exp(s2[0] - fmax);
+                             s2[1] = std::exp(s2[1] - fmax);
                              fsums += s2[0];
                              fsums += s2[1];
                              *(TC*)&slm[jj] = s2;
                            }
                            if (jj < seq_acc) {
-                             slm[jj] = std::expf(float(slm[jj]) - fmax);
+                             slm[jj] = std::exp(float(slm[jj]) - fmax);
                              fsums += slm[jj];
                              if (jj + 1 < seq_acc) {
-                               slm[jj + 1] = std::expf(float(slm[jj + 1]) - fmax);
+                               slm[jj + 1] = std::exp(float(slm[jj + 1]) - fmax);
                                fsums += slm[jj + 1];
                              }
                            }
@@ -694,7 +694,7 @@ class UT_MHASgemm {
     auto Sptr = dS.data();
     auto Optr = dO.data();
     int nf = hnum * hsize;
-    sycl::range<1> num_items{batch * seq * hnum};
+    sycl::range<1> num_items{(size_t)batch * seq * hnum};
     int n_past = seqA - seq;
     const float attn_scale = 1.0f / sqrtf(static_cast<float>(hsize));
     if (seq > 1) {
@@ -729,7 +729,7 @@ class UT_MHASgemm {
     //    }
     //    float sums = 0.f;
     //    for (int jj = 0; jj < seqA; jj++) {
-    //      tmps[jj] = std::expf(tmps[jj] - maxs);
+    //      tmps[jj] = std::exp(tmps[jj] - maxs);
     //      sums += tmps[jj];
     //    }
     //    sums = 1.f / sums;

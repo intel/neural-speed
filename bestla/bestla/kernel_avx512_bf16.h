@@ -19,12 +19,13 @@ namespace kernel {
 namespace avx512f {
 namespace avx512_bf16 {
 #if CompileBF16()
-#if defined(__GNUC__)
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute push(__attribute__((target("avx512f,avx512bf16,avx512vl,avx512bw"))), apply_to = function)
+#elif defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx512bf16", "avx512vl", "avx512bw")
-#elif defined(ICX)
-#pragma clang attribute push(__attribute__((target("avx512bf16,avx512vl,avx512bw"))), apply_to = function)
 #endif
+
 static inline __m256i zmm_cvt_fp32_bf16(__m512 vfp32) { return (__m256i)_mm512_cvtneps_pbh(vfp32); }
 
 static inline __m512 load_bf16_fp32(const utils::bf16* srcptr) {
@@ -175,7 +176,9 @@ static inline BTLA_CODE inplace_precompute_max_softmax_fp32_bf16(int m_size, int
   }
   return BTLA_CODE::Success;
 }
-#if defined(__GNUC__)
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute pop
+#elif defined(__GNUC__)
 #pragma GCC pop_options
 #endif
 #endif

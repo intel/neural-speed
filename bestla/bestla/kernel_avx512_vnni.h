@@ -18,12 +18,12 @@ namespace bestla {
 namespace kernel {
 namespace avx512f {
 #if CompileAVX512VNNI()
-#ifdef __GNUC__
-#pragma GCC push_options
-#pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512dq", "avx512vnni")
-#elif defined(ICX)
+#if defined(__INTEL_LLVM_COMPILER)
 #pragma clang attribute push(__attribute__((target("avx512f,avx512bw,avx512vl,avx512dq,avx512vnni"))), \
                              apply_to = function)
+#elif defined(__GNUC__)
+#pragma GCC push_options
+#pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512dq", "avx512vnni")
 #endif
 
 namespace vnni {
@@ -1517,9 +1517,10 @@ static inline BTLA_CODE gemv_7bit_s8s8_fp32(const utils::GemvParamA& A, const ut
 
 }  // namespace vnni
 
-#ifdef __GNUC__
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute pop
+#elif defined(__GNUC__)
 #pragma GCC pop_options
-#else
 #endif
 #endif
 }  // namespace avx512f

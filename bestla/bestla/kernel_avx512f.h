@@ -26,11 +26,11 @@ namespace bestla {
 namespace kernel {
 namespace avx512f {
 #if CompileAVX512F()
-#ifdef __GNUC__
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute push(__attribute__((target("avx512f,avx512vl,avx512bw,avx512dq"))), apply_to = function)
+#elif defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx512f", "avx512bw", "avx512vl", "avx512dq")
-#elif defined(ICX)
-#pragma clang attribute push(__attribute__((target("avx512f,avx512vl,avx512bw,avx512dq"))), apply_to = function)
 #endif
 
 inline __m512 zmm_cvt_fp16_fp32(__m256i vfp16) { return _mm512_cvtph_ps(vfp16); }
@@ -6512,9 +6512,10 @@ static inline BTLA_CODE inplace_precompute_max_softmax_fp32_u8(int m_size, int n
   }
   return BTLA_CODE::Success;
 }
-#ifdef __GNUC__
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute pop
+#elif defined(__GNUC__)
 #pragma GCC pop_options
-#else
 #endif
 #endif
 }  // namespace avx512f

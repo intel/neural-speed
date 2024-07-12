@@ -21,11 +21,11 @@ namespace bestla {
 namespace kernel {
 namespace avx2 {
 #if CompileAVX2()
-#if defined(__GNUC__)
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute push(__attribute__((target("avx2,fma,f16c"))), apply_to = function)
+#elif defined(__GNUC__)
 #pragma GCC push_options
 #pragma GCC target("avx2", "fma", "f16c")
-#elif defined(ICX)
-//#pragma clang attribute push(__attribute__((target("avx2,fma,f16c"))), apply_to = function)
 #endif
 
 static inline void zero_reg() { _mm256_zeroupper(); }
@@ -5373,10 +5373,11 @@ static inline BTLA_CODE inplace_precompute_max_softmax_fp32_fp32(int m_size, int
 
   return BTLA_CODE::Success;
 }
-#ifdef __GNUC__
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang attribute pop
+#elif defined(__GNUC__)
 #pragma GCC pop_options
 #endif
-
 #endif
 }  // namespace avx2
 }  // namespace kernel

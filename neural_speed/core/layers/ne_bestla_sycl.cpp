@@ -202,12 +202,12 @@ void bestla_device_mul_f32(const struct ne_compute_params* params, const struct 
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
-  sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  sycl::range<1> num_items{static_cast<size_t>(ne00) * ne01 * ne02 * ne03};
   auto src0ptr = (float*)src0->data;
   auto src1ptr = (float*)src1->data;
   auto dstptr = (float*)dst->data;
   auto ev = q->submit([&](sycl::handler& cgh) {
-    cgh.parallel_for(num_items, [=](auto it) {
+    cgh.parallel_for(num_items, [=](auto it) [[intel::reqd_sub_group_size(16)]] {
       int i = it;
       int i00 = i % ne00;
       i /= ne00;
@@ -264,12 +264,12 @@ void bestla_device_add_f32(const struct ne_compute_params* params, const struct 
   const size_t nb1 = dst->nb[1];
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
-  sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  sycl::range<1> num_items{static_cast<size_t>(ne00) * ne01 * ne02 * ne03};
   auto src0ptr = (float*)src0->data;
   auto src1ptr = (float*)src1->data;
   auto dstptr = (float*)dst->data;
   auto ev = q->submit([&](sycl::handler& cgh) {
-    cgh.parallel_for(num_items, [=](auto it) {
+    cgh.parallel_for(num_items, [=](auto it) [[intel::reqd_sub_group_size(16)]] {
       int i = it;
       int i00 = i % ne00;
       i /= ne00;
@@ -309,9 +309,9 @@ void bestla_device_elewise_f32(const struct ne_compute_params* params, const str
 
   auto srcptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
-  sycl::range<1> num_items{ne00 * ne01 * ne02 * ne03};
+  sycl::range<1> num_items{static_cast<size_t>(ne00) * ne01 * ne02 * ne03};
   auto ev = q->submit([&](sycl::handler& cgh) {
-    cgh.parallel_for(num_items, [=](auto it) {
+    cgh.parallel_for(num_items, [=](auto it) [[intel::reqd_sub_group_size(16)]] {
       int i = it;
       float srcval = srcptr[i];
       if (op == NE_OP_SILU) {
@@ -347,6 +347,7 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
   const size_t nb3 = dst->nb[3];
   int64_t constexpr WgSize = 1024;
   int constexpr SgSize = 16;
+  int constexpr SgNum = WgSize / SgSize;
   int64_t ne00_ = bestla::utils::padto_le(ne00, WgSize);
   auto src0ptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
@@ -370,34 +371,24 @@ void bestla_device_rms_norm_f32(const struct ne_compute_params* params, const st
                        float* src0_ptr = (float*)((char*)src0ptr + i03 * nb03 + i02 * nb02 + i01 * nb01);
                        float sum = 0.0;
                        int64_t i00 = wg_loc_id;
-                       for (; i00 < ne00_; i00 += WgSize) {
+                       for (; i00 < ne00; i00 += WgSize) {
                          sum += (src0_ptr[i00] * src0_ptr[i00]);
                        }
-                       if (i00 < ne00) {
-                         sum += (src0_ptr[i00] * src0_ptr[i00]);
-                       }
-                       slm[wg_loc_id] = sum;
-                       it.barrier(sycl::access::fence_space::local_space);
-                       if (sg_idx == 0) {
-                         for (size_t i = wg_loc_id; i < WgSize - SgSize; i += SgSize) {
-                           sum += slm[i + SgSize];
-                         }
-                         float gsum = 0.f;
-                         for (int i = 0; i < SgSize; i += 1) {
-                           gsum += sg.shuffle(sum, i);
-                         }
-                         float mean = gsum / ne00;
-                         const float scale = 1.0f / sqrtf(mean + eps);
-                         slm[0] = scale;
+                       auto gsum = sycl::reduce_over_group(sg, sum, sycl::plus<float>());
+                       if (lane_id == 0) {
+                         slm[sg_idx] = gsum;
                        }
                        it.barrier(sycl::access::fence_space::local_space);
+                       sum = 0;
+                       for (size_t i = lane_id; i < SgNum; i += SgSize) {
+                         sum += slm[i + SgSize];
+                       }
+                       gsum = sycl::reduce_over_group(sg, sum, sycl::plus<float>());
 
-                       float scale = slm[0];
+                       float mean = gsum / ne00;
+                       const float scale = 1.0f / sqrtf(mean + eps);
                        i00 = wg_loc_id;
-                       for (; i00 < ne00_; i00 += WgSize) {
-                         dst_ptr[i00] = src0_ptr[i00] * scale;
-                       }
-                       if (i00 < ne00) {
+                       for (; i00 < ne00; i00 += WgSize) {
                          dst_ptr[i00] = src0_ptr[i00] * scale;
                        }
                      });
@@ -484,7 +475,7 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
   const size_t nb2 = dst->nb[2];
   const size_t nb3 = dst->nb[3];
 
-  const int nr = ne1 * ne2 * ne3;
+  const size_t nr = ne1 * ne2 * ne3;
 
   const float theta_scale = powf(freq_base, -2.0f / n_dims);
   const float inv_ndims = -1.f / n_dims;
@@ -495,15 +486,14 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
   int constexpr SgSize = 16;
   auto src0ptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
+  int ne00_h = ne00 >> 1;
+  assert(ne00 % 2 == 0);
   auto ev = q->submit([&](sycl::handler& cgh) {
     // sycl::local_accessor<float, 1> slm(sycl::range(WgSize), cgh);
-    cgh.parallel_for(sycl::nd_range<1>(nr * SgSize, SgSize), [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
-      auto sg = it.get_sub_group();
-      auto sg_idx = sg.get_group_id()[0];
-      auto wg_idx = it.get_group(0);
-      auto wg_loc_id = it.get_local_id();
-      auto lane_id = sg.get_local_id()[0];
-      int i = wg_idx;
+    cgh.parallel_for(nr * ne00_h, [=](auto it) [[intel::reqd_sub_group_size(SgSize)]] {
+      int i = it;
+      int i0 = i % ne00_h;
+      i /= ne00_h;
       int i1 = i % ne1;
       i /= ne1;
       int i2 = i % ne2;
@@ -511,22 +501,19 @@ void bestla_device_rope_f32(const struct ne_compute_params* params, const struct
       int i3 = i % ne3;
 
       const int64_t p = n_past + i2;
-      float theta_base = (float)p;
-      for (int64_t i0 = 0; i0 < ne0; i0 += 2) {
-        float cos_theta, sin_theta;
-        rope_yarn(theta_base, freq_scale, corr_dims0, corr_dims1, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
+      float theta_base = (float)p * sycl::pow(theta_scale, (float)i0);
+      i0 *= 2;
+      float cos_theta, sin_theta;
+      rope_yarn(theta_base, freq_scale, corr_dims0, corr_dims1, i0, ext_factor, attn_factor, &cos_theta, &sin_theta);
 
-        theta_base *= theta_scale;
+      const float* const src = (float*)((char*)src0ptr + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
+      float* dst_data = (float*)((char*)dstptr + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
 
-        const float* const src = (float*)((char*)src0ptr + i3 * nb03 + i2 * nb02 + i1 * nb01 + i0 * nb00);
-        float* dst_data = (float*)((char*)dstptr + i3 * nb3 + i2 * nb2 + i1 * nb1 + i0 * nb0);
+      const float x0 = src[0];
+      const float x1 = src[1];
 
-        const float x0 = src[0];
-        const float x1 = src[1];
-
-        dst_data[0] = x0 * cos_theta - x1 * sin_theta;
-        dst_data[1] = x0 * sin_theta + x1 * cos_theta;
-      }
+      dst_data[0] = x0 * cos_theta - x1 * sin_theta;
+      dst_data[1] = x0 * sin_theta + x1 * cos_theta;
     });
   });
   if (sycl_device::SyclDevice::is_cpu(q)) {
@@ -564,9 +551,9 @@ void bestla_device_dup_f32(const struct ne_compute_params* params, const struct 
   auto srcptr = (float*)src0->data;
   auto dstptr = (float*)dst->data;
   auto dtype = dst->type;
-  sycl::range<1> num_items{ne0 * ne1 * ne2 * ne3};
+  sycl::range<1> num_items{static_cast<size_t>(ne0) * ne1 * ne2 * ne3};
   auto ev = q->submit([&](sycl::handler& cgh) {
-    cgh.parallel_for(num_items, [=](auto it) {
+    cgh.parallel_for(num_items, [=](auto it) [[intel::reqd_sub_group_size(16)]] {
       int i = it;
       int i0 = i % ne0;
       i /= ne0;
@@ -644,10 +631,7 @@ class MHA {
                              tmp *= attn_scale;
                            }
                            T tmp_sum = tmp[0] + tmp[1];
-                           T sum = 0;
-                           for (int i = 0; i < SgSize; i += 1) {
-                             sum += sg.shuffle(tmp_sum, i);
-                           }
+                           T sum = sycl::reduce_over_group(sg, tmp_sum, sycl::plus<T>);
                            slm[jj] = sum;
                            maxs = std::max(maxs, sum);
                          }
@@ -656,24 +640,21 @@ class MHA {
                          int jj = wg_loc_id * 2;
                          for (; jj < seq_acc_pad; jj += WgSize * 2) {
                            auto s2 = *(TC*)&slm[jj];
-                           s2[0] = std::expf(s2[0] - fmax);
-                           s2[1] = std::expf(s2[1] - fmax);
+                           s2[0] = std::exp(s2[0] - fmax);
+                           s2[1] = std::exp(s2[1] - fmax);
                            fsums += s2[0];
                            fsums += s2[1];
                            *(TC*)&slm[jj] = s2;
                          }
                          if (jj < seq_acc) {
-                           slm[jj] = std::expf(float(slm[jj]) - fmax);
+                           slm[jj] = std::exp(float(slm[jj]) - fmax);
                            fsums += slm[jj];
                            if (jj + 1 < seq_acc) {
-                             slm[jj + 1] = std::expf(float(slm[jj + 1]) - fmax);
+                             slm[jj + 1] = std::exp(float(slm[jj + 1]) - fmax);
                              fsums += slm[jj + 1];
                            }
                          }
-                         float gsum = 0;
-                         for (int i = 0; i < SgSize; i += 1) {
-                           gsum += sg.shuffle(fsums, i);
-                         }
+                         float gsum = sycl::reduce_over_group(sg, fsums, sycl::plus<float>);
                          T scale = 1.f / gsum;
                          jj = wg_loc_id * 2;
                          for (; jj < seq_acc_pad; jj += WgSize * 2) {
@@ -703,10 +684,7 @@ class MHA {
                              }
                            }
                            T tmp_sum = tmp[0] + tmp[1];
-                           T sum = 0;
-                           for (int i = 0; i < SgSize; i += 1) {
-                             sum += sg.shuffle(tmp_sum, i);
-                           }
+                           T sum = sycl::reduce_over_group(sg, tmp_sum, sycl::plus<T>);
                            O[O_off + kk] = sum;
                          }
                        });
@@ -774,11 +752,7 @@ class MHA {
                              }
                              tmp *= attn_scale;
                            }
-                           T sum = 0;
-#pragma unroll
-                           for (int i = 0; i < SgSize; i += 1) {
-                             sum += sg.shuffle(tmp, i);
-                           }
+                           T sum = sycl::reduce_over_group(sg, tmp, sycl::plus<T>());
                            slm[jj] = sum;
                            maxs = std::max(maxs, sum);
                          }
@@ -787,20 +761,16 @@ class MHA {
                          int jj = wg_loc_id;
                          for (; jj < seq_acc_pad; jj += SgSize) {
                            auto s = slm[jj];
-                           s = std::expf(s - fmax);
+                           s = std::exp(s - fmax);
                            fsums += s;
                            slm[jj] = s;
                          }
                          if (jj < seq_acc) {
-                           auto s = std::expf(float(slm[jj]) - fmax);
+                           auto s = std::exp(float(slm[jj]) - fmax);
                            fsums += s;
                            slm[jj] = s;
                          }
-                         float gsum = 0;
-#pragma unroll
-                         for (int i = 0; i < SgSize; i += 1) {
-                           gsum += sg.shuffle(fsums, i);
-                         }
+                         auto gsum = sycl::reduce_over_group(sg, fsums, sycl::plus<float>());
                          T scale = 1.f / gsum;
                          jj = wg_loc_id;
                          for (; jj < seq_acc_pad; jj += WgSize) {

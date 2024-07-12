@@ -1925,6 +1925,7 @@ class ScaleTrackMax {
                                 const int M_offset, const int N_offset, const int M, const int N, float scale,
                                 int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
                                 size_t cachesize) {
+#if CompileAVX2()
     if (alibi_slope == 0 && tanh_scale == 0)
       return avx2::scale_track_max_fp32_fp32<false, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
                                                            N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
@@ -1937,14 +1938,15 @@ class ScaleTrackMax {
       return avx2::scale_track_max_fp32_fp32<true, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M, N,
                                                           scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
                                                           cachesize);
-    else
-      return BTLA_CODE::NotSupport;
+#endif
+    return BTLA_CODE::NotSupport;
   }
 
   static BTLA_CODE forward_avx512(const SType* src, const int src_step, DType* dst, DType* dst_max, int ld_dst,
                                   const int M_offset, const int N_offset, const int M, const int N, float scale,
                                   int causal_offset, float alibi_slope, float tanh_scale, void* tmpcache,
                                   size_t cachesize) {
+#if CompileAVX512F()
     if (alibi_slope == 0 && tanh_scale == 0)
       return avx512f::scale_track_max_fp32_fp32<false, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset,
                                                               M, N, scale, causal_offset, alibi_slope, tanh_scale,
@@ -1957,8 +1959,8 @@ class ScaleTrackMax {
       return avx512f::scale_track_max_fp32_fp32<true, false>(src, src_step, dst, dst_max, ld_dst, M_offset, N_offset, M,
                                                              N, scale, causal_offset, alibi_slope, tanh_scale, tmpcache,
                                                              cachesize);
-    else
-      return BTLA_CODE::NotSupport;
+#endif
+    return BTLA_CODE::NotSupport;
   }
 };
 
