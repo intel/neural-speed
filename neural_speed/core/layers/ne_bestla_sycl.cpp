@@ -631,7 +631,7 @@ class MHA {
                              tmp *= attn_scale;
                            }
                            T tmp_sum = tmp[0] + tmp[1];
-                           T sum = sycl::reduce_over_group(sg, tmp_sum, sycl::plus<T>);
+                           T sum = sycl::reduce_over_group(sg, tmp_sum, sycl::plus<T>());
                            slm[jj] = sum;
                            maxs = std::max(maxs, sum);
                          }
@@ -654,7 +654,7 @@ class MHA {
                              fsums += slm[jj + 1];
                            }
                          }
-                         float gsum = sycl::reduce_over_group(sg, fsums, sycl::plus<float>);
+                         float gsum = sycl::reduce_over_group(sg, fsums, sycl::plus<float>());
                          T scale = 1.f / gsum;
                          jj = wg_loc_id * 2;
                          for (; jj < seq_acc_pad; jj += WgSize * 2) {
@@ -684,7 +684,7 @@ class MHA {
                              }
                            }
                            T tmp_sum = tmp[0] + tmp[1];
-                           T sum = sycl::reduce_over_group(sg, tmp_sum, sycl::plus<T>);
+                           T sum = sycl::reduce_over_group(sg, tmp_sum, sycl::plus<T>());
                            O[O_off + kk] = sum;
                          }
                        });
