@@ -87,7 +87,7 @@ class gemm_t<
   static constexpr bool is_col_major_a = mem_layout_a == mem_layout::col_major;
   static constexpr bool is_col_major_b = mem_layout_b == mem_layout::col_major;
   static constexpr bool is_gemv = is_col_major_b &&
-      compute_policy::mma_engine == mma_engine::fpu && sg_tile_m <= 4;
+      compute_policy::mma_engine == mma_engine::fpu && sg_tile_n == 1;
 
  private:
   /******** set data type **********/

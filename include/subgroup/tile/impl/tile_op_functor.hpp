@@ -77,7 +77,7 @@ struct dequant_int4_weight_t {
       matB_t& matB,
       scale_t& scale,
       zero_pt_t& zero_pt,
-      //   [[maybe_unused]] const coord_t& coord,
+      // [[maybe_unused]] const coord_t& coord,
       [[maybe_unused]] const arguments_t& args,
       [[maybe_unused]] uint32_t slm_base = 0,
       [[maybe_unused]] uint32_t nbarrier_base = 0) {

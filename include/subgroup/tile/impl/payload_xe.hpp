@@ -1141,13 +1141,13 @@ struct mem_payload_t<
       alignment_in_bytes);
 
   //     using mem_dtype = uint32_t;
-  using mem_dtype = typename std::conditional<
+  using mem_dtype = typename std::conditional_t<
       (block_per_row_bytes % sizeof(uint64_t) == 0),
       uint64_t,
-      typename std::conditional<
+      typename std::conditional_t<
           (block_per_row_bytes % sizeof(uint32_t) == 0),
           uint32_t,
-          dtype>::type>::type;
+          dtype>>;
   static constexpr uint32_t pack_factor = sizeof(mem_dtype) / sizeof(dtype);
 
   static constexpr uint32_t vector_size =
@@ -1163,7 +1163,7 @@ struct mem_payload_t<
       max_bytes / (vector_size * sizeof(mem_dtype));
 
   static constexpr uint32_t select_channel(const uint32_t channel) {
-    return (channel >= 32 && arch_tag == gpu_arch::XeHpc) ? 32
+    return (channel >= 32 && arch_tag >= gpu_arch::XeHpc) ? 32
         : channel >= 16                                   ? 16
         : channel >= 8                                    ? 8
                                                           : 1;

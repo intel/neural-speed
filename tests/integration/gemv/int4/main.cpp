@@ -33,9 +33,9 @@ class test_col_major_1 {
   static constexpr size_t mat_m = 1;
   static constexpr size_t mat_n = 11008;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 4;
+  static constexpr size_t wg_m = 1;
   static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 4;
+  static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024 / sg_m;
   static constexpr size_t dequant_s = 128;
@@ -55,17 +55,19 @@ class test_col_major_1 {
 class test_col_major_2 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 4;
-  static constexpr size_t mat_n = 4096;
-  static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 4;
-  static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 4;
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 8 * 1;
+  static constexpr size_t wg_n = 1 * 4;
+  static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024;
-  static constexpr size_t dequant_s = 4096;
+  static constexpr size_t sg_k = 1024 / sg_m;
+  static constexpr size_t dequant_s = 128;
+  // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
+  static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
 
-  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t local_kslicing = 2;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
@@ -594,7 +596,7 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
-using tests = ::testing::Types<test_col_major_1>;
+using tests = ::testing::Types<test_col_major_2>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemv_test_suite,

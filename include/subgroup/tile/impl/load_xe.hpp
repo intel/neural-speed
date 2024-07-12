@@ -509,7 +509,7 @@ tile_load(tile_t& tile, payload_t& payload) {
           xetla_vector<load_dtype, load_elems> reg_tmp_trans;
 #pragma unroll
           for (uint32_t iii = 0; iii < payload_t::num_channel; iii++) {
-            if ((bool)mask[iii]) // TODO (dingyi): Delete after driver fix
+            if ((bool)mask[iii]) // TODO (dingyi): use pas_thr
               reg_tmp_trans.xetla_select<payload_t::vector_size, 1>(
                   iii * payload_t::vector_size) =
                   reg_tmp.xetla_select<
@@ -676,12 +676,7 @@ tile_load(
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
 
-        reg_tmp = xetla_load_global<
-            load_dtype,
-            load_elems,
-            1,
-            L1,
-            L2>(
+        reg_tmp = xetla_load_global<load_dtype, load_elems, 1, L1, L2>(
             payload.base_ptr,
             payload.channel_offset + payload.base_offset + address_offset,
             pred_x && pred_y);

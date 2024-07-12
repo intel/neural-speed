@@ -109,21 +109,13 @@ class gemm_t<
   static constexpr uint32_t tile_size_y_c = sg_tile_m;
 
   static constexpr uint32_t block_size_x_a =
-      (compute_policy::block_size_x_a > tile_size_x_a)
-      ? tile_size_x_a
-      : compute_policy::block_size_x_a;
+      std::min(tile_size_x_a, compute_policy::block_size_x_a);
   static constexpr uint32_t block_size_y_a =
-      (compute_policy::block_size_y_a > tile_size_y_a)
-      ? tile_size_y_a
-      : compute_policy::block_size_y_a;
+      std::min(tile_size_y_a, compute_policy::block_size_y_a);
   static constexpr uint32_t block_size_x_b =
-      (compute_policy::block_size_x_b > tile_size_x_b)
-      ? tile_size_x_b
-      : compute_policy::block_size_x_b;
+      std::min(tile_size_x_b, compute_policy::block_size_x_b);
   static constexpr uint32_t block_size_y_b =
-      (compute_policy::block_size_y_b > tile_size_y_b)
-      ? tile_size_y_b
-      : compute_policy::block_size_y_b;
+      std::min(tile_size_y_b, compute_policy::block_size_y_b);
 
   using check_tile_size =
       group::gemm<arch_tag_>::default_fpu::template check_tile_size_default<

@@ -41,20 +41,18 @@ template <
     gpu_arch gpu_arch>
 struct fp16_gemm_test_func {
   using tile_shape = tile_shape_t<wg_n, wg_m, sg_n, sg_m>;
-  static constexpr uint32_t periodic_sync_interval = 1 ; //8;
-  static constexpr uint32_t prefetch_distance = 3 ;//256 / (sg_k * sizeof(dtype_a));
+  static constexpr uint32_t periodic_sync_interval = 0; // 8;
+  static constexpr uint32_t prefetch_distance =
+      0; // 256 / (sg_k * sizeof(dtype_a));
 
-  using compute_attr = typename std::conditional<
-      (engine == mma_engine::fpu),
-      compute_attr_t<dtype_a, dtype_b, dtype_acc>,
-      compute_attr_t<dtype_a, dtype_b, dtype_acc>>::type;
+  using compute_attr = compute_attr_t<dtype_a, dtype_b, dtype_acc>;
+
   using perf_tuning_knob =
       perf_tuning_knob_t<sg_k, prefetch_distance, periodic_sync_interval>;
-  using compute_policy = typename std::conditional<
-      (engine == mma_engine::fpu),
+  using compute_policy = typename std::conditional_t<
+      engine == mma_engine::fpu,
       compute_policy_default_fpu<compute_attr, perf_tuning_knob, gpu_arch>,
-      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch>>::
-      type;
+      compute_policy_default_xmx<compute_attr, perf_tuning_knob, gpu_arch>>;
 
   using mem_desc_input_a = mem_desc_t<dtype_a, layout_a, mem_space::global>;
   using mem_desc_input_b = mem_desc_t<dtype_b, layout_b, mem_space::global>;
