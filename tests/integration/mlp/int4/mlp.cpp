@@ -15,7 +15,7 @@
  *******************************************************************************/
 
 #include <utils/utils.hpp>
-#include "bit4_mlp_fusion_fwd.hpp"
+#include "int4_mlp_gate_mul_up_fwd.hpp"
 #include "xetla.hpp"
 
 // #define UT_DEBUG
@@ -86,7 +86,7 @@ template <
     typename data_type_b,
     typename data_type_c,
     typename data_type_acc = float>
-int bit4_mlp_result_validate(
+int int4_mlp_result_validate(
     data_type_a* A,
     data_type_b* up_proj,
     data_type_b* gate_proj,
@@ -129,7 +129,7 @@ int bit4_mlp_result_validate(
   buff_cmp::buff_vals<data_type_c, data_type_acc> other(gold_C.data(), m, n, n);
 
   bool result =
-      buff_cmp::xetla_buff_cmp(data, other, "bit4_mlp-fusion validation");
+      buff_cmp::xetla_buff_cmp(data, other, "int4_mlp-fusion validation");
 
 #ifdef UT_DEBUG
   // for (uint32_t i = 0; i < m; i++) {
@@ -220,7 +220,7 @@ std::vector<data_type_acc_in> dequantize_weight(
 }
 
 template <class Test>
-void dequantize_bit4_mlp_run(int iter) {
+void dequantize_int4_mlp_run(int iter) {
   using namespace gpu;
   // Accept incoming parameters
   constexpr size_t matrix_m = Test::mat_m;
@@ -324,7 +324,7 @@ void dequantize_bit4_mlp_run(int iter) {
   using post_ops_up_t = subgroup::chained_tile_op_t<>;
   using post_ops_gate_t = subgroup::chained_tile_op_t<subgroup::silu_op_t>;
 
-  using bit4_mlp_op_t = xetla::mlp::bit4_mlp_fusion_fwd_t<
+  using int4_mlp_op_t = xetla::mlp::int4_mlp_gate_mul_up_fwd_t<
       Test::arch,
       global_kslicing,
       local_kslicing,
@@ -333,8 +333,8 @@ void dequantize_bit4_mlp_run(int iter) {
       post_ops_gate_t,
       epilogue_t>;
 
-  size_t size_acc = bit4_mlp_op_t::get_acc_buf_size(matrix_m, matrix_n);
-  size_t size_cnt = bit4_mlp_op_t::get_cnt_buf_size(matrix_m, matrix_n);
+  size_t size_acc = int4_mlp_op_t::get_acc_buf_size(matrix_m, matrix_n);
+  size_t size_cnt = int4_mlp_op_t::get_cnt_buf_size(matrix_m, matrix_n);
 
   // Define and initialize the data required for the calculation
   auto* A_h = static_cast<data_type_a*>(
@@ -534,15 +534,15 @@ void dequantize_bit4_mlp_run(int iter) {
   queue.memset(Acc_up_proj_d, 0, size_acc * sizeof(data_type_acc)).wait();
   queue.memset(Acc_gate_proj_d, 0, size_acc * sizeof(data_type_acc)).wait();
 
-  // set up bit4_mlp arguments
-  typename bit4_mlp_op_t::quant_param_t quant_arg(
+  // set up int4_mlp arguments
+  typename int4_mlp_op_t::quant_param_t quant_arg(
       scale_up_proj_d,
       scale_gate_proj_d,
       zero_pt_up_proj_d,
       zero_pt_gate_proj_d,
       ld_scale,
       ld_zero_pt);
-  typename bit4_mlp_op_t::arguments_t bit4_mlp_arg(
+  typename int4_mlp_op_t::arguments_t int4_mlp_arg(
       matrix_m,
       matrix_k,
       matrix_n,
@@ -560,10 +560,10 @@ void dequantize_bit4_mlp_run(int iter) {
       {},
       {{}});
 
-  cl::sycl::nd_range<3> nd_range = bit4_mlp_op_t::get_nd_range(bit4_mlp_arg);
+  cl::sycl::nd_range<3> nd_range = int4_mlp_op_t::get_nd_range(int4_mlp_arg);
   // 2 gemm(2*m*n*k) + mul(m*n) + silu(3*m*n)
   size_t ops = 4 * matrix_m * matrix_n * matrix_k + 8 * matrix_m * matrix_n;
-  profiling_helper prof("bit4_mlp-fusion", ops, "gflops");
+  profiling_helper prof("int4_mlp-fusion", ops, "gflops");
 #ifdef UT_DEBUG
   int constexpr warm = 0;
 #else
@@ -576,9 +576,9 @@ void dequantize_bit4_mlp_run(int iter) {
       auto e_esimd = queue.submit([&](handler& cgh) {
         cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
           // allocate slm and nbarrier resource
-          slm_barrier_init<bit4_mlp_op_t>();
-          bit4_mlp_op_t bit4_mlp_op;
-          bit4_mlp_op(item, bit4_mlp_arg);
+          slm_barrier_init<int4_mlp_op_t>();
+          int4_mlp_op_t int4_mlp_op;
+          int4_mlp_op(item, int4_mlp_arg);
         });
       });
       if (i >= warm) {
@@ -609,7 +609,7 @@ void dequantize_bit4_mlp_run(int iter) {
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();
   ASSERT_EQ(
       0,
-      bit4_mlp_result_validate(
+      int4_mlp_result_validate(
           A_h,
           dequantize_up_proj.data(),
           dequantize_gate_proj.data(),
@@ -645,14 +645,14 @@ void dequantize_bit4_mlp_run(int iter) {
 }
 
 template <typename T>
-class bit4_mlp_test : public ::testing::Test {};
-TYPED_TEST_SUITE_P(bit4_mlp_test);
+class int4_mlp_test : public ::testing::Test {};
+TYPED_TEST_SUITE_P(int4_mlp_test);
 
-TYPED_TEST_P(bit4_mlp_test, esimd) {
-  dequantize_bit4_mlp_run<TypeParam>(ITER);
+TYPED_TEST_P(int4_mlp_test, esimd) {
+  dequantize_int4_mlp_run<TypeParam>(ITER);
 }
 
-REGISTER_TYPED_TEST_SUITE_P(bit4_mlp_test, esimd);
+REGISTER_TYPED_TEST_SUITE_P(int4_mlp_test, esimd);
 using tests = ::testing::Types<test_col_major_1>;
 
-INSTANTIATE_TYPED_TEST_SUITE_P(bit4_mlp_test_suite, bit4_mlp_test, tests);
+INSTANTIATE_TYPED_TEST_SUITE_P(int4_mlp_test_suite, int4_mlp_test, tests);

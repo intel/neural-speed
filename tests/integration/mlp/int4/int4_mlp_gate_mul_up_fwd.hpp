@@ -211,7 +211,7 @@ template <
     typename post_ops_up_t_,
     typename post_ops_gate_t_,
     typename epilogue_t_>
-class bit4_mlp_gate_mul_up_fwd_t {
+class int4_mlp_gate_mul_up_fwd_t {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using post_ops_up_t = post_ops_up_t_;
