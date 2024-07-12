@@ -157,7 +157,11 @@ class last {
   using data_type_c = fp16;
 };
 
-template <class Test>
+template <class Test, gpu_arch x, mma_engine y>
+class KernalName {
+
+};
+template <class Test, gpu_arch x, mma_engine y>
 void dequantize_gemm_run(uint32_t iter) {
   using namespace gpu;
   // Accept incoming parameters
@@ -238,16 +242,16 @@ void dequantize_gemm_run(uint32_t iter) {
       data_type_scale,
       data_type_zero_pt,
       quant_info,
-      mma_engine::xmx,
-      gpu_arch::XeHpg>;
+      y,
+      x>;
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_default<gpu_arch::XeHpg>,
+      xetla::group::epilogue_policy_default<x>,
       tile_shape,
       mem_desc_c_t>;
-  using group_swizzle = xetla::kernel::group_swizzle_default<gpu_arch::XeHpg>;
+  using group_swizzle = xetla::kernel::group_swizzle_default<x>;
   using gemm_op_t = xetla::kernel::gemm_universal_t<
       gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
           group_swizzle,
@@ -366,7 +370,7 @@ void dequantize_gemm_run(uint32_t iter) {
     for (uint32_t i = 0; i < iter; i++) {
       prof.cpu_start();
       auto e_esimd = queue.submit([&](handler& cgh) {
-        cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
+        cgh.parallel_for<KernalName<Test,x,y>>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
           // allocate slm and nbarrier resource
           slm_barrier_init<gemm_op_t>();
           gemm_op_t gemm_op;
@@ -433,8 +437,94 @@ template <typename T>
 class dequantize_gemm_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(dequantize_gemm_test);
 
+template <template<gpu_arch, mma_engine, class T> class F, class G>
+class dispatch_arch_test
+{
+ using T_RET = std::invoke_result_t<decltype(F<gpu_arch::XeHpc, mma_engine::xmx, G>::exec)>;
+
+ public:
+  template <typename... Args>
+  static T_RET exec(Args&&... args) {
+    // save default formatting
+    std::ios fmt_bak(nullptr);
+    fmt_bak.copyfmt(std::cout);
+
+    sycl::device device;
+    if (!device.has(aspect::ext_intel_device_id))
+      throw std::runtime_error("Can not get device ID");
+    auto deviceID = device.get_info<ext::intel::info::device::device_id>();
+    std::cout << "deviceID: 0x" << std::hex //
+              << std::right << std::setfill('0') << deviceID << "\n";
+
+    // restore default formatting
+    std::cout.copyfmt(fmt_bak);
+#if defined(SYCL_EXT_ONEAPI_DEVICE_ARCHITECTURE) && \
+    SYCL_EXT_ONEAPI_DEVICE_ARCHITECTURE
+    // https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_device_architecture.asciidoc#feature-test-macro
+    try {
+      namespace ENS = sycl::ext::oneapi::experimental;
+      auto deviceArch = device.get_info<ENS::info::device::architecture>();
+      switch (deviceArch) {
+        case ENS::architecture::intel_gpu_pvc:
+          return F<gpu_arch::XeHpc, mma_engine::xmx, G>::exec(std::forward<Args>(args)...);
+          return;
+        case ENS::architecture::intel_gpu_dg2_g10:
+        case ENS::architecture::intel_gpu_dg2_g11:
+        case ENS::architecture::intel_gpu_dg2_g12:
+          return F<gpu_arch::XeHpg, mma_engine::xmx, G>::exec(std::forward<Args>(args)...);
+        default:
+          break;
+      }
+    }
+    catch (...) {
+      std::cout << "Execption occurred! Please check one api versions.";
+    }
+#endif
+    std::cout << "No matching architecture, checking device ID ...\n";
+    switch (deviceID) {
+      // MTL devices
+      case 0x7d55: // Intel® Arc ™ Graphics
+        std::cout << "MTL devices identified!" << std::endl;
+        return F<gpu_arch::XeLpg, mma_engine::fpu, G>::exec(std::forward<Args>(args)...);
+      // DG2 devices
+      case 0x56a0: // Intel® Arc ™ A770 Graphics
+      case 0x56a1: // Intel® Arc ™ A750 Graphics
+      case 0x56a2: // Intel® Arc ™ A580 Graphics
+      case 0x5690: // Intel® Arc ™ A770M Graphics
+      case 0x5691: // Intel® Arc ™ A730M Graphics
+      case 0x5692: // Intel® Arc ™ A550M Graphics
+        return F<gpu_arch::XeHpg, mma_engine::xmx, G>::exec(std::forward<Args>(args)...);
+      // PVC devices
+      case 0x0bda: //
+        return F<gpu_arch::XeHpc, mma_engine::xmx, G>::exec(std::forward<Args>(args)...);
+      default:
+        std::cout << "Unknown device ID \n";
+        break;
+    }
+
+    if (device.has(aspect::ext_intel_gpu_eu_simd_width))
+      throw std::runtime_error("Can not get eu_simd_width");
+    auto eu_simd_width =
+        device.get_info<ext::intel::info::device::gpu_eu_simd_width>();
+    if (eu_simd_width == 8) {
+      return F<gpu_arch::XeHpg, mma_engine::xmx, G>::exec(std::forward<Args>(args)...);
+    } else if (eu_simd_width == 16) {
+      return F<gpu_arch::XeHpc, mma_engine::xmx, G>::exec(std::forward<Args>(args)...);
+    } else {
+      throw std::runtime_error("Can not get device ID");
+    }
+  }
+};
+
+template <gpu_arch arch_tag, mma_engine engine_tag, typename T>
+struct main_wrapper {
+  static constexpr auto exec = []() {
+    dequantize_gemm_run<T, arch_tag, engine_tag>(ITER);
+  };
+};
+
 TYPED_TEST_P(dequantize_gemm_test, esimd) {
-  dequantize_gemm_run<TypeParam>(ITER);
+  dispatch_arch_test<main_wrapper, TypeParam>::exec();
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);

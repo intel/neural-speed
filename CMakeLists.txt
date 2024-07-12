@@ -54,6 +54,30 @@ set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -enableBCR")
 # Optimization to reduce the tokens used for DPAS instruction.
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -Xfinalizer -DPASTokenReduction")
 
+# USE_XETLA - Align to IPEX logic
+if(USE_XETLA)  # A quoted string always evaluates to false unless: The string's value is one of the true constants
+    string(REPLACE "," ";" USE_XETLA ${USE_XETLA})
+    message("The used archs are: ${USE_XETLA}")
+elseif(NOT USE_XETLA) # if(<variable>): True if given a variable that is defined to a value that is not a false constant
+    message("No archs specified. Stopping CMake execution here.")
+    set(USE_XETLA "")
+endif()
+
+set(XETLA_AVAILABLE_ARCHS xe_hpc xe_hpg xe_lpg)
+set(USE_XETLA_XE_LPG OFF)
+set(USE_XETLA_XE_HPG OFF)
+set(USE_XETLA_XE_HPC OFF)
+
+foreach(used_arch IN LISTS USE_XETLA)
+    if (used_arch IN_LIST XETLA_AVAILABLE_ARCHS)
+        string(TOUPPER "${used_arch}" arch_upper)
+        set(USE_XETLA_${arch_upper} ON)
+        message(STATUS "XeTLA: Found arch from list: ${arch_upper}")
+    else()
+        message(FATAL_ERROR "Unexpected XeTLA architecture: ${used_arch}")
+    endif()
+endforeach()
+
 # AOT device
 set(USE_AOT_DEVLIST "" CACHE STRING "Set device list for AOT build")
 if (USE_AOT_DEVLIST)
