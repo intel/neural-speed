@@ -77,8 +77,8 @@ struct tile_fma_t {
       "mata block m should match with matAcc block m");
 
   __XETLA_API static void mma(
-      matAcc_dst_t_& acc_dst,
-      matAcc_src_t_& acc_src,
+      matAcc_dst_t& acc_dst,
+      matAcc_src_t& acc_src,
       matB_t& b,
       matA_t& a) {
 #pragma unroll
@@ -94,14 +94,13 @@ struct tile_fma_t {
           auto b_block = b.reg.xetla_select<matB_t::block_elems, 1>(
               b_block_idx * matB_t::block_elems);
 
+          uint32_t c_block_idx = m * tile_size_n / block_size_n + n;
           auto src_block =
               acc_src.reg.xetla_select<block_size_m * block_size_n, 1>(
-                  (m * tile_size_n / block_size_n + n) *
-                  matAcc_src_t::block_elems);
+                  c_block_idx * matAcc_src_t::block_elems);
           auto dst_block =
               acc_dst.reg.xetla_select<block_size_m * block_size_n, 1>(
-                  (m * tile_size_n / block_size_n + n) *
-                  matAcc_dst_t::block_elems);
+                  c_block_idx * matAcc_dst_t::block_elems);
 
           fma_core<block_size_m, block_size_n, block_size_k>(
               dst_block, src_block, b_block, a_block);

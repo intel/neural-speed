@@ -180,8 +180,6 @@ class gemm_t<
   using matA_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_a_t, matA_tile_desc_t, wg_size_x, arch_tag>;
 
-  // note: plane format, row-major
-  // note: 4bit x 2, row-major
   using matB_tile_desc_t = std::conditional_t<
       is_col_major_b,
       // compress int4 along K dimensions
