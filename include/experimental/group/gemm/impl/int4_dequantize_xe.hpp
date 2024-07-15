@@ -86,8 +86,8 @@ class gemm_t<
   static constexpr mem_layout mem_layout_b = mem_desc_b_t::layout;
   static constexpr bool is_col_major_a = mem_layout_a == mem_layout::col_major;
   static constexpr bool is_col_major_b = mem_layout_b == mem_layout::col_major;
-  static constexpr bool is_gemv = is_col_major_b &&
-      compute_policy::mma_engine == mma_engine::fpu && sg_tile_n == 1;
+  static constexpr bool is_gemv =
+      is_col_major_b && compute_policy::mma_engine == mma_engine::fpu;
 
  private:
   /******** set data type **********/
@@ -263,13 +263,6 @@ class gemm_t<
   using matC_t = subgroup::tile_t<dtype_mma_acc, matC_tile_desc_t>;
 
  private:
-  using matAcc_tile_desc_t = subgroup::tile_desc_t<
-      block_size_y_b,
-      tile_size_y_a,
-      block_size_y_b,
-      block_size_y_a,
-      reg_layout::tiled>;
-  using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
   using scale_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b,
       tile_size_y_scale,
@@ -304,7 +297,7 @@ class gemm_t<
 
   using tile_mma = std::conditional_t<
       is_gemv,
-      subgroup::tile_fma_t<matAcc_t, matC_t, matB_acc_t, matA_acc_t, arch_tag>,
+      subgroup::tile_fma_t<matC_t, matC_t, matB_acc_t, matA_acc_t, arch_tag>,
       subgroup::tile_mma_t<
           matC_t,
           matC_t,
@@ -480,8 +473,6 @@ class gemm_t<
     matB_t matB;
     scale_t scale;
     zero_pt_t zero_pt;
-    matAcc_t matAcc;
-    matAcc.reg = 0;
 
     matA_payload_t matA_payload(args.matA_base_desc);
     matB_payload_t matB_payload(args.matB_base_desc);
@@ -627,13 +618,7 @@ class gemm_t<
       dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
       SW_BARRIER();
       if constexpr (is_gemv) {
-        tile_mma::mma(
-            matAcc,
-            matAcc,
-            matC,
-            matB_acc,
-            matA_acc,
-            i == args.inner_loop_count - 1);
+        tile_mma::mma(matC, matC, matB_acc, matA_acc);
       } else {
         if constexpr (is_col_major_b) {
           tile_transpose(matB_acc);
