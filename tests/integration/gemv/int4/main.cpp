@@ -42,7 +42,7 @@ class test_col_major_1 {
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
 
-  static constexpr size_t local_kslicing = 4;
+  static constexpr size_t local_kslicing = 8;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;

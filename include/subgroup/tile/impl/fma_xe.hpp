@@ -125,10 +125,10 @@ struct tile_fma_t {
 #pragma unroll
       for (uint32_t n = 0; n < blk_n; n++) {
         auto b_row = b_blk_2d.row(n);
-        dst_blk_2d.row(m)[n] =
+        dst_block[m * blk_n + n] =
             recur_col_reduce<reduce_op::sum, dtype_acc, blk_k, 1>(
                 b_row * a_row) +
-            src_blk_2d.row(m)[n];
+            src_block[m * blk_n + n];
       }
     }
   }
