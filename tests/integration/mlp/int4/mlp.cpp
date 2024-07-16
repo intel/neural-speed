@@ -15,7 +15,9 @@
  *******************************************************************************/
 
 #include <utils/utils.hpp>
+#include "int4_mlp_gate_mul_up_fwd.hpp"
 #include "xetla.hpp"
+
 // #define UT_DEBUG
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;
@@ -37,7 +39,33 @@ class test_col_major_1 {
   static constexpr size_t wg_n = 1;
   static constexpr size_t sg_m = 1;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 512 / sg_m;
+  static constexpr size_t sg_k = 512;
+  static constexpr size_t dequant_s = 128;
+  static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
+  // static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
+
+  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::col_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x8;
+  using data_type_c = fp16;
+};
+
+class test_col_major_2 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 256;
+  static constexpr size_t mat_n = 11008;
+  static constexpr size_t mat_k = 1024;
+  static constexpr size_t wg_m = 4;
+  static constexpr size_t wg_n = 1;
+  static constexpr size_t sg_m = 4;
+  static constexpr size_t sg_n = 1;
+  static constexpr size_t sg_k = 1024 / 4;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
@@ -47,30 +75,7 @@ class test_col_major_1 {
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
-  using data_type_a = fp16;
-  using data_type_b = int4x8;
-  using data_type_c = fp16;
-};
-class test_col_major_2 {
- public:
-  // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 4;
-  static constexpr size_t mat_n = 4096;
-  static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 4;
-  static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 4;
-  static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024;
-  static constexpr size_t dequant_s = 4096;
-
-  static constexpr size_t local_kslicing = 1;
-  static constexpr size_t global_kslicing = 1;
-  static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::col_major;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr gpu_arch arch = gpu_arch::XeHpg;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
@@ -80,32 +85,51 @@ template <
     typename data_type_a,
     typename data_type_b,
     typename data_type_c,
-    typename data_type_bias,
     typename data_type_acc = float>
-int gemm_result_validate(
+int int4_mlp_result_validate(
     data_type_a* A,
-    data_type_b* B,
+    data_type_b* up_proj,
+    data_type_b* gate_proj,
     data_type_c* C,
-    data_type_bias* bias,
     uint32_t m,
     uint32_t k,
     uint32_t n,
     mem_layout mem_layout_a_ = mem_layout::row_major,
     mem_layout mem_layout_b_ = mem_layout::row_major) {
   buff_cmp::buff_vals<data_type_c> data(C, m, n, n);
+  std::vector<data_type_acc> gold_up_proj_out(m * n, 0);
+  std::vector<data_type_acc> gold_gate_proj_out(m * n, 0);
   std::vector<data_type_acc> gold_C(m * n, 0);
   get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
-      m, n, k, mem_layout_a_, mem_layout_b_, A, B, gold_C.data());
-
-  // BiasAdd
-  for (uint32_t i = 0; i < gold_C.size(); ++i) {
-    uint32_t col = i % n;
-    gold_C[i] += bias[col];
+      m,
+      n,
+      k,
+      mem_layout_a_,
+      mem_layout_b_,
+      A,
+      up_proj,
+      gold_up_proj_out.data());
+  get_gemm_gold<data_type_a, data_type_b, data_type_acc>(
+      m,
+      n,
+      k,
+      mem_layout_a_,
+      mem_layout_b_,
+      A,
+      gate_proj,
+      gold_gate_proj_out.data());
+  for (uint32_t i = 0; i < m; i++) {
+    for (uint32_t j = 0; j < n; j++) {
+      gold_C[i * n + j] = gold_up_proj_out[i * n + j] *
+          (gold_gate_proj_out[i * n + j] /
+           (1 + std::exp(-gold_gate_proj_out[i * n + j])));
+    }
   }
 
   buff_cmp::buff_vals<data_type_c, data_type_acc> other(gold_C.data(), m, n, n);
 
-  bool result = buff_cmp::xetla_buff_cmp(data, other, "gemv validation");
+  bool result =
+      buff_cmp::xetla_buff_cmp(data, other, "int4_mlp-fusion validation");
 
 #ifdef UT_DEBUG
   // for (uint32_t i = 0; i < m; i++) {
@@ -196,7 +220,7 @@ std::vector<data_type_acc_in> dequantize_weight(
 }
 
 template <class Test>
-void dequantize_gemv_run(int iter) {
+void dequantize_int4_mlp_run(int iter) {
   using namespace gpu;
   // Accept incoming parameters
   constexpr size_t matrix_m = Test::mat_m;
@@ -219,7 +243,6 @@ void dequantize_gemv_run(int iter) {
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
   using data_type_acc = float;
-  using data_type_bias = data_type_a;
 
   constexpr mem_layout layout_a = Test::layout_a;
   constexpr mem_layout layout_b = Test::layout_b;
@@ -237,7 +260,6 @@ void dequantize_gemv_run(int iter) {
       size_zero_pt_k * size_zero_pt_n / (2 * sizeof(data_type_b));
 
   constexpr size_t size_c = matrix_m * matrix_n;
-  constexpr size_t size_bias = matrix_n;
 
   uint32_t lda = layout_a == mem_layout::row_major ? matrix_k : matrix_m;
   uint32_t ldb = layout_b == mem_layout::row_major ? matrix_n : matrix_k;
@@ -277,12 +299,6 @@ void dequantize_gemv_run(int iter) {
       mem_space::global,
       DEVICE_MEM_ALIGNMENT / sizeof(data_type_c)>;
 
-  using mem_desc_bias_t = xetla::mem_desc_t<
-      data_type_bias,
-      mem_layout::row_major,
-      mem_space::global,
-      DEVICE_MEM_ALIGNMENT / sizeof(data_type_bias)>;
-
   using compute_attr = xetla::group::
       compute_attr_t<data_type_acc_in, data_type_acc_in, data_type_acc>;
   using perf_tuning_knob = xetla::group::
@@ -300,76 +316,95 @@ void dequantize_gemv_run(int iter) {
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
-  using bias_op_t =
-      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, Test::arch>;
-
-  using tile_op_t = gpu::xetla::subgroup::chained_tile_op_t<bias_op_t>;
-
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_tile_op<tile_op_t, Test::arch>,
+      xetla::group::epilogue_policy_default<Test::arch>,
       tile_shape,
       mem_desc_c_t>;
 
-  using group_swizzle = xetla::kernel::group_swizzle_default<Test::arch>;
+  using post_ops_up_t = subgroup::chained_tile_op_t<>;
+  using post_ops_gate_t = subgroup::chained_tile_op_t<subgroup::silu_op_t>;
 
-  using gemm_op_t = xetla::kernel::gemm_universal_t<
-      gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
-          group_swizzle,
-          global_kslicing,
-          local_kslicing>,
+  using int4_mlp_op_t = xetla::mlp::int4_mlp_gate_mul_up_fwd_t<
+      Test::arch,
+      global_kslicing,
+      local_kslicing,
       gemm_t,
+      post_ops_up_t,
+      post_ops_gate_t,
       epilogue_t>;
 
-  size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
-  size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
+  size_t size_acc = int4_mlp_op_t::get_acc_buf_size(matrix_m, matrix_n);
+  size_t size_cnt = int4_mlp_op_t::get_cnt_buf_size(matrix_m, matrix_n);
 
   // Define and initialize the data required for the calculation
   auto* A_h = static_cast<data_type_a*>(
       malloc_host(size_a * sizeof(data_type_a), context));
-  auto* B_h = static_cast<data_type_b*>(malloc_host(
+  auto* up_proj_h = static_cast<data_type_b*>(malloc_host(
+      (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b), context));
+  auto* gate_proj_h = static_cast<data_type_b*>(malloc_host(
       (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b), context));
   auto* C_h = static_cast<data_type_c*>(
       malloc_host(size_c * sizeof(data_type_c), context));
-  auto* Acc_h = static_cast<data_type_acc*>(
+  auto* Acc_up_proj_h = static_cast<data_type_acc*>(
+      malloc_host(size_acc * sizeof(data_type_acc), context));
+  auto* Acc_gate_proj_h = static_cast<data_type_acc*>(
       malloc_host(size_acc * sizeof(data_type_acc), context));
   auto* Cnt_h =
       static_cast<uint32_t*>(malloc_host(size_cnt * sizeof(uint32_t), context));
-  auto* scale_h = static_cast<data_type_scale*>(malloc_host(
+  auto* scale_up_proj_h = static_cast<data_type_scale*>(malloc_host(
       (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale), context));
-  auto* zero_pt_h = static_cast<data_type_zero_pt*>(malloc_host(
+  auto* scale_gate_proj_h = static_cast<data_type_scale*>(malloc_host(
+      (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale), context));
+
+  auto* zero_pt_up_proj_h = static_cast<data_type_zero_pt*>(malloc_host(
       (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
       context));
-  auto* bias_h = static_cast<data_type_bias*>(
-      malloc_host(size_bias * sizeof(data_type_bias), context));
+  auto* zero_pt_gate_proj_h = static_cast<data_type_zero_pt*>(malloc_host(
+      (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
+      context));
 
   auto* A_d = static_cast<data_type_a*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_a * sizeof(data_type_a), device, context));
-  auto* B_d = static_cast<data_type_b*>(aligned_alloc_device(
+  auto* up_proj_d = static_cast<data_type_b*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT,
+      (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b),
+      device,
+      context));
+  auto* gate_proj_d = static_cast<data_type_b*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT,
       (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b),
       device,
       context));
   auto* C_d = static_cast<data_type_c*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_c * sizeof(data_type_c), device, context));
-  auto* Acc_d = static_cast<data_type_acc*>(aligned_alloc_device(
+  auto* Acc_up_proj_d = static_cast<data_type_acc*>(aligned_alloc_device(
+      DEVICE_MEM_ALIGNMENT, size_acc * sizeof(data_type_acc), device, context));
+  auto* Acc_gate_proj_d = static_cast<data_type_acc*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_acc * sizeof(data_type_acc), device, context));
   auto* Cnt_d = static_cast<uint32_t*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT, size_cnt * sizeof(uint32_t), device, context));
-  auto* scale_d = static_cast<data_type_scale*>(aligned_alloc_device(
+  auto* scale_up_proj_d = static_cast<data_type_scale*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT,
       (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale),
       device,
       context));
-  auto* zero_pt_d = static_cast<data_type_zero_pt*>(aligned_alloc_device(
+  auto* scale_gate_proj_d = static_cast<data_type_scale*>(aligned_alloc_device(
       DEVICE_MEM_ALIGNMENT,
-      (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
+      (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale),
       device,
       context));
-  auto* bias_d = static_cast<data_type_bias*>(aligned_alloc_device(
-      DEVICE_MEM_ALIGNMENT,
-      size_bias * sizeof(data_type_bias),
-      device,
-      context));
+  auto* zero_pt_up_proj_d =
+      static_cast<data_type_zero_pt*>(aligned_alloc_device(
+          DEVICE_MEM_ALIGNMENT,
+          (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
+          device,
+          context));
+  auto* zero_pt_gate_proj_d =
+      static_cast<data_type_zero_pt*>(aligned_alloc_device(
+          DEVICE_MEM_ALIGNMENT,
+          (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt),
+          device,
+          context));
 
   for (unsigned i = 0; i < size_a; ++i) {
     A_h[i] = random_float();
@@ -383,37 +418,48 @@ void dequantize_gemv_run(int iter) {
 
   for (unsigned i = 0; i < size_b + UNDEFINED_DATA_SIZE; ++i) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
-      B_h[i] = random_uint8();
+      up_proj_h[i] = random_uint8();
+      gate_proj_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77;
+      up_proj_h[i] = 0x77;
+      gate_proj_h[i] = 0x77;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
-      B_h[i] = random_uint32();
+      up_proj_h[i] = random_uint32();
+      gate_proj_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77777777;
+      up_proj_h[i] = 0x77777777;
+      gate_proj_h[i] = 0x77777777;
 #endif
     }
   }
 
   for (unsigned i = 0; i < size_scale; ++i) {
-    scale_h[i] = random_float();
+    scale_up_proj_h[i] = random_float();
+    scale_gate_proj_h[i] = random_float();
 #ifdef UT_DEBUG
-    scale_h[i] = 1.f;
+    scale_up_proj_h[i] = 1.f;
+    scale_gate_proj_h[i] = 1.f;
 #endif
   }
   for (unsigned i = size_scale; i < size_scale + UNDEFINED_DATA_SIZE; ++i) {
-    scale_h[i] = INFINITY;
+    scale_up_proj_h[i] = INFINITY;
+    scale_gate_proj_h[i] = INFINITY;
   }
   for (unsigned i = 0; i < size_zero_pt + UNDEFINED_DATA_SIZE; ++i) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
-      zero_pt_h[i] = random_uint8();
+      zero_pt_up_proj_h[i] = random_uint8();
+      zero_pt_gate_proj_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      zero_pt_h[i] = 0x12 << i;
+      zero_pt_up_proj_h[i] = 0x12 << i;
+      zero_pt_gate_proj_h[i] = 0x12 << i;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
-      zero_pt_h[i] = random_uint32();
+      zero_pt_up_proj_h[i] = random_uint32();
+      zero_pt_gate_proj_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      zero_pt_h[i] = 0x33333333;
+      zero_pt_up_proj_h[i] = 0x33333333;
+      zero_pt_gate_proj_h[i] = 0x33333333;
 #endif
     }
   }
@@ -423,103 +469,101 @@ void dequantize_gemv_run(int iter) {
   }
 
   for (unsigned i = 0; i < size_acc; ++i) {
-    Acc_h[i] = random_float();
+    Acc_up_proj_h[i] = random_float();
+    Acc_gate_proj_h[i] = random_float();
   }
 
   for (unsigned i = 0; i < size_cnt; ++i) {
     Cnt_h[i] = random_uint8();
   }
 
-  for (unsigned i = 0; i < size_bias; ++i) {
-    bias_h[i] = random_float();
-#ifdef UT_DEBUG
-    bias_h[i] = 0.f;
-#endif
-  }
-
   queue.memcpy((void*)A_d, (void*)A_h, size_a * sizeof(data_type_a)).wait();
   queue
       .memcpy(
-          (void*)B_d,
-          (void*)B_h,
+          (void*)up_proj_d,
+          (void*)up_proj_h,
+          (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b))
+      .wait();
+  queue
+      .memcpy(
+          (void*)gate_proj_d,
+          (void*)gate_proj_h,
           (size_b + UNDEFINED_DATA_SIZE) * sizeof(data_type_b))
       .wait();
   queue.memcpy((void*)C_d, (void*)C_h, size_c * sizeof(data_type_c)).wait();
-  queue.memcpy((void*)Acc_d, (void*)Acc_h, size_acc * sizeof(data_type_acc))
+  queue
+      .memcpy(
+          (void*)Acc_up_proj_d,
+          (void*)Acc_up_proj_h,
+          size_acc * sizeof(data_type_acc))
+      .wait();
+  queue
+      .memcpy(
+          (void*)Acc_gate_proj_d,
+          (void*)Acc_gate_proj_h,
+          size_acc * sizeof(data_type_acc))
       .wait();
   queue.memcpy((void*)Cnt_d, (void*)Cnt_h, size_cnt * sizeof(uint32_t)).wait();
   queue
       .memcpy(
-          (void*)scale_d,
-          (void*)scale_h,
+          (void*)scale_up_proj_d,
+          (void*)scale_up_proj_h,
           (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale))
       .wait();
   queue
       .memcpy(
-          (void*)zero_pt_d,
-          (void*)zero_pt_h,
+          (void*)scale_gate_proj_d,
+          (void*)scale_gate_proj_h,
+          (size_scale + UNDEFINED_DATA_SIZE) * sizeof(data_type_scale))
+      .wait();
+
+  queue
+      .memcpy(
+          (void*)zero_pt_up_proj_d,
+          (void*)zero_pt_up_proj_h,
           (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt))
       .wait();
-  queue.memcpy((void*)bias_d, (void*)bias_h, size_bias * sizeof(data_type_bias))
+  queue
+      .memcpy(
+          (void*)zero_pt_gate_proj_d,
+          (void*)zero_pt_gate_proj_h,
+          (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt))
       .wait();
 
   queue.memset(Cnt_d, 0, size_cnt * sizeof(uint32_t)).wait();
-  queue.memset(Acc_d, 0, size_acc * sizeof(data_type_acc)).wait();
-  // set up gemm arguments
-  typename bias_op_t::shape_t bias_add_shape(matrix_n, 1, matrix_n);
-  using epilogue_args_t = epilogue_t::arguments_t;
+  queue.memset(Acc_up_proj_d, 0, size_acc * sizeof(data_type_acc)).wait();
+  queue.memset(Acc_gate_proj_d, 0, size_acc * sizeof(data_type_acc)).wait();
 
-  epilogue_args_t epilogue_args(
-      {// epilogue_args init list
-       // It accepts the base pointer to matrix D, and its dimensions
-       {bias_d, bias_add_shape}});
-  typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg;
-  if constexpr (compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
-    gemm_arg =
-        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
-            matrix_m,
-            matrix_k,
-            matrix_n,
-            A_d,
-            lda,
-            B_d,
-            ldb,
-            C_d,
-            ldc,
-            scale_d,
-            ld_scale,
-            Acc_d,
-            Cnt_d,
-            epilogue_args);
-  } else if constexpr (compute_policy::quant_mode == quant_mode::S4_ASYM) {
-    gemm_arg =
-        typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
-            matrix_m,
-            matrix_k,
-            matrix_n,
-            A_d,
-            lda,
-            B_d,
-            ldb,
-            C_d,
-            ldc,
-            scale_d,
-            ld_scale,
-            zero_pt_d,
-            ld_zero_pt,
-            Acc_d,
-            Cnt_d,
-            epilogue_args);
-  }
-  cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(gemm_arg);
-  // if (!gemm_op_t::can_implement(gemm_arg)) {
-  //   std::cout << "The arguments cannot be supported, aborting ... "
-  //             << std::endl;
-  //   FAIL();
-  // }
+  // set up int4_mlp arguments
+  typename int4_mlp_op_t::quant_param_t quant_arg(
+      scale_up_proj_d,
+      scale_gate_proj_d,
+      zero_pt_up_proj_d,
+      zero_pt_gate_proj_d,
+      ld_scale,
+      ld_zero_pt);
+  typename int4_mlp_op_t::arguments_t int4_mlp_arg(
+      matrix_m,
+      matrix_k,
+      matrix_n,
+      A_d,
+      lda,
+      up_proj_d,
+      gate_proj_d,
+      ldb,
+      C_d,
+      ldc,
+      Acc_up_proj_d,
+      Acc_gate_proj_d,
+      Cnt_d,
+      quant_arg,
+      {},
+      {{}});
 
-  size_t ops = 2 * matrix_m * matrix_n * matrix_k + matrix_m * matrix_n;
-  profiling_helper prof("dequantize_gemm", ops, "gflops");
+  cl::sycl::nd_range<3> nd_range = int4_mlp_op_t::get_nd_range(int4_mlp_arg);
+  // 2 gemm(2*m*n*k) + mul(m*n) + silu(3*m*n)
+  size_t ops = 4 * matrix_m * matrix_n * matrix_k + 8 * matrix_m * matrix_n;
+  profiling_helper prof("int4_mlp-fusion", ops, "gflops");
 #ifdef UT_DEBUG
   int constexpr warm = 0;
 #else
@@ -532,9 +576,9 @@ void dequantize_gemv_run(int iter) {
       auto e_esimd = queue.submit([&](handler& cgh) {
         cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
           // allocate slm and nbarrier resource
-          slm_barrier_init<gemm_op_t>();
-          gemm_op_t gemm_op;
-          gemm_op(item, gemm_arg);
+          slm_barrier_init<int4_mlp_op_t>();
+          int4_mlp_op_t int4_mlp_op;
+          int4_mlp_op(item, int4_mlp_arg);
         });
       });
       if (i >= warm) {
@@ -551,18 +595,25 @@ void dequantize_gemv_run(int iter) {
   // performance
   prof.print_profiling_result(profiling_selector::GPU);
   // check result
-  std::vector<typename Test::data_type_a> dequantize_b =
+  std::vector<typename Test::data_type_a> dequantize_up_proj =
       dequantize_weight<dequant_s, layout_b, compute_policy::quant_mode>(
-          matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
+          matrix_k, matrix_n, up_proj_h, scale_up_proj_h, zero_pt_up_proj_h);
+  std::vector<typename Test::data_type_a> dequantize_gate_proj =
+      dequantize_weight<dequant_s, layout_b, compute_policy::quant_mode>(
+          matrix_k,
+          matrix_n,
+          gate_proj_h,
+          scale_gate_proj_h,
+          zero_pt_gate_proj_h);
 
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();
   ASSERT_EQ(
       0,
-      gemm_result_validate(
+      int4_mlp_result_validate(
           A_h,
-          dequantize_b.data(),
+          dequantize_up_proj.data(),
+          dequantize_gate_proj.data(),
           C_h,
-          bias_h,
           matrix_m,
           matrix_k,
           matrix_n,
@@ -570,33 +621,38 @@ void dequantize_gemv_run(int iter) {
           layout_b));
 
   free(A_h, context);
-  free(B_h, context);
+  free(up_proj_h, context);
+  free(gate_proj_h, context);
   free(C_h, context);
-  free(scale_h, context);
-  free(zero_pt_h, context);
+  free(scale_up_proj_h, context);
+  free(scale_gate_proj_h, context);
+  free(zero_pt_up_proj_h, context);
+  free(zero_pt_gate_proj_h, context);
   free(A_d, context);
-  free(B_d, context);
+  free(up_proj_d, context);
+  free(gate_proj_d, context);
   free(C_d, context);
-  free(scale_d, context);
-  free(zero_pt_d, context);
-  free(Acc_h, context);
+  free(scale_up_proj_d, context);
+  free(scale_gate_proj_d, context);
+  free(zero_pt_up_proj_d, context);
+  free(zero_pt_gate_proj_d, context);
+  free(Acc_up_proj_h, context);
+  free(Acc_gate_proj_h, context);
   free(Cnt_h, context);
-  free(Acc_d, context);
+  free(Acc_up_proj_d, context);
+  free(Acc_gate_proj_d, context);
   free(Cnt_d, context);
 }
 
 template <typename T>
-class dequantize_gemv_test : public ::testing::Test {};
-TYPED_TEST_SUITE_P(dequantize_gemv_test);
+class int4_mlp_test : public ::testing::Test {};
+TYPED_TEST_SUITE_P(int4_mlp_test);
 
-TYPED_TEST_P(dequantize_gemv_test, esimd) {
-  dequantize_gemv_run<TypeParam>(ITER);
+TYPED_TEST_P(int4_mlp_test, esimd) {
+  dequantize_int4_mlp_run<TypeParam>(ITER);
 }
 
-REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
+REGISTER_TYPED_TEST_SUITE_P(int4_mlp_test, esimd);
 using tests = ::testing::Types<test_col_major_1>;
 
-INSTANTIATE_TYPED_TEST_SUITE_P(
-    dequantize_gemv_test_suite,
-    dequantize_gemv_test,
-    tests);
+INSTANTIATE_TYPED_TEST_SUITE_P(int4_mlp_test_suite, int4_mlp_test, tests);
