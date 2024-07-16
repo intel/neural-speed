@@ -1163,10 +1163,7 @@ struct mem_payload_t<
       max_bytes / (vector_size * sizeof(mem_dtype));
 
   static constexpr uint32_t select_channel(const uint32_t channel) {
-    return (channel >= 32 && arch_tag >= gpu_arch::XeHpc) ? 32
-        : channel >= 16                                   ? 16
-        : channel >= 8                                    ? 8
-                                                          : 1;
+    return channel >= 32 ? 32 : channel >= 16 ? 16 : channel >= 8 ? 8 : 1;
   }
 
   static constexpr uint32_t num_channel = select_channel(
@@ -1696,31 +1693,34 @@ struct prefetch_payload_t<
   static constexpr bool trans = (mem_transpose ^ reg_transpose) &&
       !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
-  using prefetch_dtype = typename std::conditional<
+  using prefetch_dtype = typename std::conditional_t<
       (alignment_in_bytes % (sizeof(uint64_t)) == 0),
       uint64_t,
-      typename std::conditional<
+      typename std::conditional_t<
           (alignment_in_bytes % (sizeof(uint32_t)) == 0),
           uint32_t,
-          dtype>::type>::type;
+          dtype>>;
   static constexpr uint32_t pack_factor =
       sizeof(prefetch_dtype) / sizeof(dtype);
 
-  static constexpr uint32_t min_store_bytes = 16 * sizeof(dtype);
-  static constexpr uint32_t max_store_bytes = 32 * sizeof(dtype);
-  static constexpr uint32_t simd_channel =
-      ((tile_bytes % max_store_bytes) == 0 &&
-       (block_bytes % max_store_bytes) == 0)
-      ? 32
-      : 16;
-  static constexpr uint32_t num_channel = mem_transpose
-      ? (simd_channel >= block_size_x) ? block_size_x : simd_channel
-      : (simd_channel >= block_size_y) ? block_size_y
-                                       : simd_channel;
+  static constexpr uint32_t vector_size =
+      ((mem_transpose ? block_size_y : block_size_x) + pack_factor - 1) /
+      pack_factor;
 
-  static constexpr uint32_t vector_size = mem_transpose
-      ? (block_size_y + pack_factor - 1) / pack_factor
-      : (block_size_x + pack_factor - 1) / pack_factor;
+  // for pvc, we can use simd16 or simd32
+  static constexpr uint32_t max_bytes =
+      load_store_attr_t<msg_type::block_1d, arch_tag>::max_prefetch_vec_len;
+  // std::min(load_store_attr::max_load_vec_len, block_bytes);
+
+  static constexpr uint32_t max_channel =
+      max_bytes / (vector_size * sizeof(prefetch_dtype));
+
+  static constexpr uint32_t select_channel(const uint32_t channel) {
+    return channel >= 32 ? 32 : channel >= 16 ? 16 : channel >= 8 ? 8 : 1;
+  }
+
+  static constexpr uint32_t num_channel = select_channel(
+      std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
 
   static constexpr uint32_t mem_tile_size_w =
       mem_transpose ? tile_size_y : tile_size_x;

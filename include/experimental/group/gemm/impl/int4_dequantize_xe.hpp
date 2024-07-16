@@ -615,14 +615,11 @@ class gemm_t<
 
       dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
       SW_BARRIER();
-      if constexpr (is_gemv) {
-        tile_mma::mma(matC, matC, matB_acc, matA_acc);
-      } else {
-        if constexpr (is_col_major_b) {
-          tile_transpose(matB_acc);
-        }
-        tile_mma::mma(matC, matC, matB_acc, matA_acc);
+
+      if constexpr (!is_gemv && is_col_major_b) {
+        tile_transpose(matB_acc);
       }
+      tile_mma::mma(matC, matC, matB_acc, matA_acc);
       SW_BARRIER();
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {

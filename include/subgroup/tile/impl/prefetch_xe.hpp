@@ -103,30 +103,33 @@ tile_prefetch(payload_t& payload) {
   using tile_desc = typename payload_t::tile_desc;
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   constexpr uint32_t num_channel = payload_t::num_channel;
+  constexpr uint32_t block_height = payload_t::mem_transpose
+      ? tile_desc::block_size_x
+      : tile_desc::block_size_y;
+
 #pragma unroll
-  for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
-       i++) {
+  for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
     uint32_t offset_y = i * tile_desc::block_size_y;
 #pragma unroll
     for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
       uint32_t offset_x = j * tile_desc::block_size_x;
-      // #pragma unroll
-      //       for (uint32_t sub_block_y = 0; sub_block_y <
-      //       tile_desc::block_size_y;
-      //            sub_block_y += num_channel) {
-      uint32_t address_offset = payload_t::mem_transpose
-          ? offset_x * payload.pitch_in_bytes + (offset_y + 0) * sizeof(dtype)
-          : offset_x * sizeof(dtype) + (offset_y + 0) * payload.pitch_in_bytes;
-
-      xetla_prefetch_global<
-          prefetch_dtype,
-          num_channel * payload_t::vector_size,
-          payload_t::vector_size,
-          L1,
-          L2>(
-          payload.base_ptr,
-          payload.channel_offset + payload.base_offset + address_offset);
-      //   }
+#pragma unroll
+      for (uint32_t sub_block_y = 0; sub_block_y < block_height;
+           sub_block_y += num_channel) {
+        uint32_t address_offset = payload_t::mem_transpose
+            ? (offset_x + sub_block_y) * payload.pitch_in_bytes +
+                (offset_y + 0) * sizeof(dtype)
+            : offset_x * sizeof(dtype) +
+                (offset_y + sub_block_y) * payload.pitch_in_bytes;
+        xetla_prefetch_global<
+            prefetch_dtype,
+            num_channel * payload_t::vector_size,
+            payload_t::vector_size,
+            L1,
+            L2>(
+            payload.base_ptr,
+            payload.channel_offset + payload.base_offset + address_offset);
+      }
     }
   }
 }
