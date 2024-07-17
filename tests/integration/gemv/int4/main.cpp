@@ -30,8 +30,8 @@ constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 11008;
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 8 * 1;
   static constexpr size_t wg_n = 16 * 4;
@@ -42,7 +42,7 @@ class test_col_major_1 {
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
 
-  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t local_kslicing = 4;
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;

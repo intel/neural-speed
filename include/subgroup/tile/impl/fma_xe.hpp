@@ -114,8 +114,8 @@ struct tile_fma_t {
       xetla_vector_ref<dtype_acc, blk_m * blk_n> __REF__ src_block,
       xetla_vector_ref<dtype_b, blk_k * blk_n> __REF__ b_block,
       xetla_vector_ref<dtype_a, blk_m * blk_k> __REF__ a_block) {
-    auto dst_blk_2d = dst_block.xetla_format<dtype_acc, blk_m, blk_n>();
-    auto src_blk_2d = src_block.xetla_format<dtype_acc, blk_m, blk_n>();
+    // auto dst_blk_2d = dst_block.xetla_format<dtype_acc, blk_m, blk_n>();
+    // auto src_blk_2d = src_block.xetla_format<dtype_acc, blk_m, blk_n>();
     auto b_blk_2d = b_block.xetla_format<dtype_b, blk_n, blk_k>();
     auto a_blk_2d = a_block.xetla_format<dtype_a, blk_m, blk_k>();
 
@@ -126,8 +126,8 @@ struct tile_fma_t {
       for (uint32_t n = 0; n < blk_n; n++) {
         auto b_row = b_blk_2d.row(n);
         dst_block[m * blk_n + n] =
-            recur_col_reduce<reduce_op::sum, dtype_acc, blk_k, 1>(
-                b_row * a_row) +
+            xetla_reduce<dtype_acc, dtype_a, blk_k, reduce_op::sum>(
+                a_row * b_row) +
             src_block[m * blk_n + n];
       }
     }
