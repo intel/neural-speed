@@ -34,7 +34,7 @@ class test_col_major_1 {
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 8 * 1;
-  static constexpr size_t wg_n = 16;
+  static constexpr size_t wg_n = 8;
   static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 8;
   static constexpr size_t sg_k = 128;
