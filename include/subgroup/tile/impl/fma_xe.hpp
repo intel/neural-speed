@@ -125,7 +125,8 @@ struct tile_fma_t {
 #pragma unroll
       for (uint32_t n = 0; n < blk_n; n++) {
         auto b_row = b_blk_2d.row(n);
-        static constexpr uint32_t step = 16;
+        static constexpr uint32_t step =
+            16; // Must be 16 to generate mad assembly code
         xetla_vector<dtype_a, step> reduce_acc = 0;
 #pragma unroll
         for (uint32_t k = 0; k < blk_k; k += step) {
@@ -133,7 +134,9 @@ struct tile_fma_t {
               a_row.xetla_select<step, 1>(k) * b_row.xetla_select<step, 1>(k);
         }
         dst_block[m * blk_n + n] =
-            xetla_reduce<dtype_acc, dtype_a, step, reduce_op::sum>(reduce_acc) +
+            recur_col_reduce<reduce_op::sum, dtype_acc, step, 1>(reduce_acc) +
+            // xetla_reduce<dtype_acc, dtype_a, step,
+            // reduce_op::sum>(reduce_acc) +
             src_block[m * blk_n + n];
       }
     }
