@@ -261,6 +261,14 @@ class gemm_t<
   using matC_t = subgroup::tile_t<dtype_mma_acc, matC_tile_desc_t>;
 
  private:
+  using matAcc_tile_desc_t = subgroup::tile_desc_t<
+      16,
+      tile_size_x_c * tile_size_y_c,
+      16,
+      block_size_x_b * block_size_y_a,
+      reg_layout::tiled>;
+  using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
+
   using scale_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b,
       tile_size_y_scale,
@@ -295,7 +303,7 @@ class gemm_t<
 
   using tile_mma = std::conditional_t<
       is_gemv,
-      subgroup::tile_fma_t<matC_t, matC_t, matB_acc_t, matA_acc_t, arch_tag>,
+      subgroup::tile_fma_t<matAcc_t, matC_t, matB_acc_t, matA_acc_t, arch_tag>,
       subgroup::tile_mma_t<
           matC_t,
           matC_t,
@@ -471,6 +479,8 @@ class gemm_t<
     matB_t matB;
     scale_t scale;
     zero_pt_t zero_pt;
+    matAcc_t matAcc;
+    matAcc.reg = 0;
 
     matA_payload_t matA_payload(args.matA_base_desc);
     matB_payload_t matB_payload(args.matB_base_desc);
@@ -619,7 +629,12 @@ class gemm_t<
       if constexpr (!is_gemv && is_col_major_b) {
         tile_transpose(matB_acc);
       }
-      tile_mma::mma(matC, matC, matB_acc, matA_acc);
+      if constexpr (is_gemv) {
+        tile_mma::mma(matAcc, matC, matB_acc, matA_acc, false);
+        
+      } else {
+        tile_mma::mma(matC, matC, matB_acc, matA_acc);
+      }
       SW_BARRIER();
       if constexpr (enable_periodic_sync) {
         if ((i % sync_freq) == 0) {
@@ -634,6 +649,8 @@ class gemm_t<
         }
       }
     }
+    //
+    // tile_mma::reduce_acc_k(matAcc, matC);
     SW_BARRIER();
   }
 

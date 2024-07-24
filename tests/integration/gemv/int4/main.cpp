@@ -33,10 +33,10 @@ class test_col_major_1 {
   static constexpr size_t mat_m = 1024;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 8 * 1;
-  static constexpr size_t wg_n = 8;
-  static constexpr size_t sg_m = 8;
-  static constexpr size_t sg_n = 8;
+  static constexpr size_t wg_m = 16;
+  static constexpr size_t wg_n = 4;
+  static constexpr size_t sg_m = 16;
+  static constexpr size_t sg_n = 4;
   static constexpr size_t sg_k = 128;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
@@ -220,7 +220,7 @@ void dequantize_gemv_run(int iter) {
   using data_type_zero_pt = data_type_b;
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
-  using data_type_acc = float;
+  using data_type_acc = fp16;
   using data_type_bias = data_type_a;
 
   constexpr mem_layout layout_a = Test::layout_a;
