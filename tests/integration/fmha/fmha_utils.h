@@ -24,7 +24,7 @@ struct tile_mask_t {
       uint32_t start_x,
       uint32_t start_y) {
 #pragma unroll
-    for (int i = 0; i < tile_size_y / block_size_y; i++) {
+    for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
       uint32_t blk_start_y = start_y + i * block_size_y;
 #pragma unroll
       for (int j = 0; j < num_block_x; j++) {
@@ -203,16 +203,24 @@ struct group_row_reduce_t {
   }
 };
 
+enum class add_type : uint8_t {
+  single_line = 0, // add one line of data of given coord to target tile
+  single_element = 1 // add single data of given coord to target tile
+};
+
 /// @brief Is the bias_add op functor.
 /// Load the 1d bias data from memory and get the input from matAcc, update the
 /// output in place. Used in epilogue::tile_op or chained_tile_op.
 /// @tparam dtype_bias Is the data type of bias buffer.
 /// @tparam arch_tag Is the hardware architecture tag.
-template <typename dtype_bias, gpu_arch arch_tag = gpu_arch::XeHpc>
-struct bias_add_op_t;
-/// @brief Is the bias_add op functor, specialized for Xe architecture.
+template <
+    typename dtype_bias_,
+    gpu_arch arch_tag = gpu_arch::XeHpc,
+    add_type add_tag = add_type::single_line>
+struct bias_add_op_t {};
+
 template <typename dtype_bias_, gpu_arch arch_tag>
-struct bias_add_op_t {
+struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_line> {
   using dtype_bias = dtype_bias_;
   using mem_desc_bias_t =
       mem_desc_t<dtype_bias, mem_layout::row_major, mem_space::global>;
@@ -245,12 +253,15 @@ struct bias_add_op_t {
     using bias_tile_desc_t = subgroup::
         tile_desc_t<tile_size_x, 1, block_size_x, 1, reg_layout::tiled>;
     using bias_t = subgroup::tile_t<dtype_bias, bias_tile_desc_t>;
-    using mem_desc_bias_t =
-        mem_desc_t<dtype_bias, mem_desc_bias_t::layout, mem_desc_bias_t::space>;
     using bias_payload_t = subgroup::mem_payload_t<
-        mem_desc_bias_t,
+        mem_desc_t<dtype_bias, mem_desc_bias_t::layout, mem_desc_bias_t::space>,
         bias_tile_desc_t,
-        subgroup::msg_type_v<bias_tile_desc_t, mem_desc_bias_t>,
+        subgroup::msg_type_v<
+            bias_tile_desc_t,
+            mem_desc_t<
+                dtype_bias,
+                mem_desc_bias_t::layout,
+                mem_desc_bias_t::space>>,
         arch_tag>;
     coord_t bias_coord(coord.x, coord.y);
     mem_desc_bias_t mem_desc_bias(args.base, args.shape, bias_coord);
@@ -291,7 +302,7 @@ struct bias_add_op_t {
                     tail_start_y * tile_size_x + j * tail_block_elems)
                 .xetla_format<dtype_acc, tail_size_y, block_size_x>();
 #pragma unroll
-        for (int row_i = 0; row_i < tail_size_y; row_i++) {
+        for (uint32_t row_i = 0; row_i < tail_size_y; row_i++) {
           auto src_reg =
               bias.reg.xetla_select<block_size_x, 1>(j * block_size_x);
           dst_reg.row(row_i) =
@@ -302,6 +313,90 @@ struct bias_add_op_t {
     }
   }
 };
+
+template <typename dtype_bias_, gpu_arch arch_tag>
+struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
+  using dtype_bias = dtype_bias_;
+  using mem_desc_bias_t =
+      mem_desc_t<dtype_bias, mem_layout::row_major, mem_space::global>;
+  using shape_t = typename mem_desc_bias_t::shape_t;
+  using coord_t = typename mem_desc_bias_t::coord_t;
+  using base_t = typename mem_desc_bias_t::base_t;
+
+  struct arguments_t {
+    shape_t shape;
+    base_t base;
+    inline arguments_t() = default;
+    inline arguments_t(base_t base_, shape_t shape_)
+        : base(base_), shape(shape_) {}
+  };
+  template <typename matAcc_t>
+  __XETLA_API KERNEL_FUNC void operator()(
+      matAcc_t& matAcc,
+      const coord_t& coord,
+      const arguments_t& args,
+      [[maybe_unused]] uint32_t slm_base = 0,
+      [[maybe_unused]] uint32_t nbarrier_base = 0) {
+    using dtype_acc = typename matAcc_t::dtype;
+    static constexpr uint32_t tile_size_x = matAcc_t::tile_size_x;
+    static constexpr uint32_t tile_size_y = matAcc_t::tile_size_y;
+    static constexpr uint32_t block_size_x = matAcc_t::block_size_x;
+    static constexpr uint32_t block_size_y = matAcc_t::block_size_y;
+    static constexpr int32_t num_block_x = matAcc_t::num_block_x;
+    static constexpr uint32_t block_elems = matAcc_t::block_elems;
+
+    dtype_bias* ptr = static_cast<dtype_bias*>(args.base.base);
+    int32_t pos_x = coord.x > args.shape.x - 1 ? args.shape.x - 1 : coord.x;
+    int32_t pos_y = coord.y > args.shape.y - 1 ? args.shape.y - 1 : coord.y;
+    uint32_t offset = (pos_y + pos_x * args.shape.stride) * sizeof(dtype_bias);
+    auto bias_data_vector = xetla_load_global<
+        dtype_bias,
+        1,
+        data_size::default_size,
+        cache_hint::cached,
+        cache_hint::cached,
+        16>(ptr, offset);
+    dtype_acc bias_data =
+        xetla_cvt<dtype_acc, dtype_bias, 16>(bias_data_vector)[0];
+
+    {
+      auto bias_reg =
+          xetla_vector<dtype_acc, block_size_y * block_size_x>(bias_data);
+#pragma unroll
+      for (uint32_t i = 0; i < tile_size_y / block_size_y; i++) {
+#pragma unroll
+        for (int j = 0; j < num_block_x; j++) {
+          auto dst_reg =
+              matAcc.reg
+                  .xetla_select<block_elems, 1>(
+                      (i * num_block_x + j) * block_elems)
+                  .xetla_format<dtype_acc, block_size_y, block_size_x>();
+
+          dst_reg += bias_reg;
+        }
+      }
+    }
+    // process the tail
+    if constexpr ((tile_size_y % block_size_y) != 0) {
+      constexpr uint32_t tail_start_y =
+          tile_size_y / block_size_y * block_size_y;
+      constexpr int32_t tail_size_y = tile_size_y % block_size_y;
+      constexpr int32_t tail_block_elems = tail_size_y * block_size_x;
+      auto bias_reg =
+          xetla_vector<dtype_acc, tail_size_y * block_size_x>(bias_data);
+#pragma unroll
+      for (int j = 0; j < num_block_x; j++) {
+        auto dst_reg =
+            matAcc.reg
+                .xetla_select<tail_block_elems, 1>(
+                    tail_start_y * tile_size_x + j * tail_block_elems)
+                .xetla_format<dtype_acc, tail_size_y, block_size_x>();
+        dst_reg += bias_reg;
+      }
+    }
+  }
+};
+
 struct tile_mul {
   template <typename dtype, int vec_len>
   static xetla_vector<dtype, vec_len> inline func(

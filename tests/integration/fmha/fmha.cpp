@@ -245,6 +245,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
       false,
       kSeqLast,
       false,
+      false,
       false>;
   using accum_t = typename fmha_forward_op_t::accum_t;
 
@@ -346,6 +347,8 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
             kUseBias ? klen_pad32 * qlen : 0,
             kUseBias ? 0 : 0, // broadcast on N (head num)
             kUseBias ? klen_pad32 : 0,
+            nullptr,
+            nullptr,
             softmax_scale,
             0,
             0,
