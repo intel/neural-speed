@@ -404,7 +404,7 @@ bool xetla_buff_cmp(
   }
 
   if constexpr (
-      std::is_floating_point_v<dtype1> != 0 ||
+      std::is_floating_point_v<dtype1> == true ||
       gpu::xetla::is_internal_type<dtype1>::value ||
       std::is_same<remove_const_t<dtype1>, gpu::xetla::fp16>::value) {
     if (std::is_same<remove_const_t<dtype1>, gpu::xetla::bf16>::value ||

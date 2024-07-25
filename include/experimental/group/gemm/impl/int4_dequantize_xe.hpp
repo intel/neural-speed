@@ -263,7 +263,8 @@ class gemm_t<
  private:
   using matAcc_tile_desc_t = subgroup::tile_desc_t<
       16,
-      tile_size_x_c * tile_size_y_c,
+      // tile_size_x_c * tile_size_y_c,
+      block_size_x_b * block_size_y_a,
       16,
       block_size_x_b * block_size_y_a,
       reg_layout::tiled>;
@@ -480,7 +481,7 @@ class gemm_t<
     scale_t scale;
     zero_pt_t zero_pt;
     matAcc_t matAcc;
-    matAcc.reg = 0;
+    // matAcc.reg = 0;
 
     matA_payload_t matA_payload(args.matA_base_desc);
     matB_payload_t matB_payload(args.matB_base_desc);
@@ -630,8 +631,7 @@ class gemm_t<
         tile_transpose(matB_acc);
       }
       if constexpr (is_gemv) {
-        tile_mma::mma(matAcc, matC, matB_acc, matA_acc, false);
-        
+        tile_mma::mma(matAcc, matC, matB_acc, matA_acc);
       } else {
         tile_mma::mma(matC, matC, matB_acc, matA_acc);
       }
@@ -649,8 +649,6 @@ class gemm_t<
         }
       }
     }
-    //
-    // tile_mma::reduce_acc_k(matAcc, matC);
     SW_BARRIER();
   }
 

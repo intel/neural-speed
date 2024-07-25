@@ -34,9 +34,9 @@ class test_col_major_1 {
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 16;
-  static constexpr size_t wg_n = 4;
+  static constexpr size_t wg_n = 8;
   static constexpr size_t sg_m = 16;
-  static constexpr size_t sg_n = 4;
+  static constexpr size_t sg_n = 8;
   static constexpr size_t sg_k = 128;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
@@ -51,24 +51,26 @@ class test_col_major_1 {
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
+  using data_type_acc = fp16;
 };
+
 class test_col_major_2 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 4096 * 1;
-  static constexpr size_t mat_k = 4096 * 1; // 2048
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024 / sg_m;
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 8;
+  static constexpr size_t wg_n = 8;
+  static constexpr size_t sg_m = 8;
+  static constexpr size_t sg_n = 8;
+  static constexpr size_t sg_k = 64;
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
 
   static constexpr size_t local_kslicing = 1;
-  static constexpr size_t global_kslicing = 2;
+  static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
@@ -76,6 +78,34 @@ class test_col_major_2 {
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
+  using data_type_acc = float;
+};
+
+class test_col_major_3 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 1;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 1;
+  static constexpr size_t sg_k = 1024;
+  static constexpr size_t dequant_s = 128;
+  // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
+  static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
+
+  static constexpr size_t local_kslicing = 1;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::col_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x8;
+  using data_type_c = fp16;
+  using data_type_acc = float;
 };
 
 template <
@@ -218,10 +248,10 @@ void dequantize_gemv_run(int iter) {
   using data_type_b = typename Test::data_type_b;
   using data_type_c = typename Test::data_type_c;
   using data_type_zero_pt = data_type_b;
-  using data_type_scale = fp16;
-  using data_type_acc_in = fp16;
-  using data_type_acc = fp16;
-  using data_type_bias = data_type_a;
+  using data_type_scale = data_type_a;
+  using data_type_acc_in = data_type_a;
+  using data_type_acc = typename Test::data_type_acc;
+  using data_type_bias = data_type_c;
 
   constexpr mem_layout layout_a = Test::layout_a;
   constexpr mem_layout layout_b = Test::layout_b;

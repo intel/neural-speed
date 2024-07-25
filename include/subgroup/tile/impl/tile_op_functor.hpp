@@ -96,14 +96,11 @@ struct dequant_int4_weight_t {
       for (uint32_t j = 0; j < num_block_x; ++j) {
         int block_id = (i * num_block_x + j);
         // Must be little-endian
-        xetla_vector<uint8_t, matB_acc_t::block_elems / 2> matB_blk =
-            matB.reg.xetla_format<int8_t>()
-                .xetla_select<matB_acc_t::block_elems / 2, 1>(
-                    block_id * matB_acc_t::block_elems / 2);
-        auto dst_blk = matB_acc.reg
-                           .xetla_select<matB_acc_t::block_elems, 1>(
-                               block_id * matB_acc_t::block_elems)
-                           .xetla_format<typename matB_acc_t::dtype>();
+        auto matB_blk = matB.reg.xetla_format<int8_t>()
+                            .xetla_select<matB_acc_t::block_elems / 2, 1>(
+                                block_id * matB_acc_t::block_elems / 2);
+        auto dst_blk = matB_acc.reg.xetla_select<matB_acc_t::block_elems, 1>(
+            block_id * matB_acc_t::block_elems);
 
         // int8 includes 2 4bits data.
         xetla_vector<int8_t, matB_acc_t::block_elems> cvt_blk_i8;
