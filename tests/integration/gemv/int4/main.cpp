@@ -27,6 +27,7 @@ constexpr int ITER = 200;
 #endif
 constexpr size_t UNDEFINED_DATA_SIZE = 1024;
 
+template <typename scalar_t, quant_mode quant_mode_>
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
@@ -39,8 +40,8 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 512 / sg_m;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
-  static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
+  // static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
+  static constexpr quant_mode quant_mode = quant_mode_;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -48,9 +49,9 @@ class test_col_major_1 {
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
   static constexpr gpu_arch arch = gpu_arch::XeLpg;
-  using data_type_a = fp16;
+  using data_type_a = scalar_t;
   using data_type_b = int4x8;
-  using data_type_c = fp16;
+  using data_type_c = scalar_t;
 };
 class test_col_major_2 {
  public:
@@ -120,7 +121,7 @@ int gemm_result_validate(
 }
 
 template <
-    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::I4_SYM,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -131,13 +132,19 @@ std::vector<fp16> convert_int4(
     data_type_zero_pt zero_pt) {
   std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
 
-  int8_t zero_pt_i8 = zero_pt & 0xf;
+  int8_t zero_pt_i8;
+  if constexpr (quant_mode != quant_mode::I4_ASYM_FP_ZERO)
+    zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     int8_t dequant_8bit = data_b & 0xf;
-    if constexpr (quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (quant_mode == quant_mode::I4_SYM) {
       dequant_fp16[i] = scale * (dequant_8bit - 8);
-    } else {
+    } else if constexpr (quant_mode == quant_mode::I4_ASYM) {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
+    } else if constexpr (quant_mode == quant_mode::I4_ASYM_FP_ZERO) {
+      dequant_fp16[i] = scale * (dequant_8bit - 8) + zero_pt;
+    } else {
+      assert(0);
     }
     data_b = data_b >> 4;
   }
@@ -147,7 +154,7 @@ std::vector<fp16> convert_int4(
 template <
     size_t dequant_s,
     mem_layout layout_b = mem_layout::col_major,
-    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::I4_SYM,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -169,15 +176,17 @@ std::vector<data_type_acc_in> dequantize_weight(
     for (uint32_t j = 0; j < width; j += step) {
       int start_b_in = i * width + j;
       int start_scale_in = start_b_in / step;
-      int start_zero_pt_in =
-          (j / step) * (matrix_n / pack_radio) + i / pack_radio;
+      int start_zero_pt_in = quant_mode == quant_mode::I4_ASYM_FP_ZERO
+          ? (j / step) * matrix_n + i
+          : (j / step) * (matrix_n / pack_radio) + i / pack_radio;
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
+      data_type_zero_pt zp_value = zero_pt[start_zero_pt_in];
+      if constexpr (quant_mode != quant_mode::I4_ASYM_FP_ZERO)
+        zp_value = zp_value >> (4 * (i % pack_radio));
       for (uint32_t jj = 0; jj < step; jj++) {
         std::vector<fp16> dequant_fp16 = convert_int4<quant_mode>(
-            b[start_b_in + jj],
-            scale[start_scale_in],
-            zero_pt[start_zero_pt_in] >> (4 * (i % pack_radio)));
+            b[start_b_in + jj], scale[start_scale_in], zp_value);
         for (uint32_t jjj = 0; jjj < dequant_fp16.size(); jjj++) {
           b_out[start_out + pack_radio * jj + jjj] = dequant_fp16[jjj];
         }
@@ -215,7 +224,10 @@ void dequantize_gemv_run(int iter) {
   using data_type_a = typename Test::data_type_a;
   using data_type_b = typename Test::data_type_b;
   using data_type_c = typename Test::data_type_c;
-  using data_type_zero_pt = data_type_b;
+  using data_type_zero_pt = std::conditional_t<
+      Test::quant_mode == quant_mode::I4_ASYM_FP_ZERO,
+      data_type_c,
+      data_type_b>;
   using data_type_scale = fp16;
   using data_type_acc_in = fp16;
   using data_type_acc = float;
@@ -225,7 +237,7 @@ void dequantize_gemv_run(int iter) {
   constexpr mem_layout layout_b = Test::layout_b;
 
   constexpr size_t size_a = matrix_m * matrix_k;
-  constexpr size_t size_b = matrix_k * matrix_n / (2 * sizeof(data_type_b));
+  constexpr size_t size_b = matrix_k * matrix_n / 2;
 
   constexpr size_t size_scale_k = matrix_k / dequant_s;
   constexpr size_t size_scale_n = matrix_n;
@@ -234,7 +246,9 @@ void dequantize_gemv_run(int iter) {
   constexpr size_t size_zero_pt_k = matrix_k / dequant_s;
   constexpr size_t size_zero_pt_n = matrix_n;
   constexpr size_t size_zero_pt =
-      size_zero_pt_k * size_zero_pt_n / (2 * sizeof(data_type_b));
+      Test::quant_mode != quant_mode::I4_ASYM_FP_ZERO
+      ? size_zero_pt_k * size_zero_pt_n / 2
+      : size_zero_pt_k * size_zero_pt_n;
 
   constexpr size_t size_c = matrix_m * matrix_n;
   constexpr size_t size_bias = matrix_n;
@@ -405,16 +419,18 @@ void dequantize_gemv_run(int iter) {
     scale_h[i] = INFINITY;
   }
   for (unsigned i = 0; i < size_zero_pt + UNDEFINED_DATA_SIZE; ++i) {
-    if constexpr (std::is_same_v<int4x2, data_type_b>) {
+    if constexpr (std::is_same_v<int4x2, data_type_zero_pt>) {
       zero_pt_h[i] = random_uint8();
 #ifdef UT_DEBUG
       zero_pt_h[i] = 0x12 << i;
 #endif
-    } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
+    } else if constexpr (std::is_same_v<int4x8, data_type_zero_pt>) {
       zero_pt_h[i] = random_uint32();
 #ifdef UT_DEBUG
       zero_pt_h[i] = 0x33333333;
 #endif
+    } else if constexpr (std::is_same_v<fp16, data_type_zero_pt>) {
+      zero_pt_h[i] = random_float();
     }
   }
 
@@ -474,7 +490,7 @@ void dequantize_gemv_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
   typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg;
-  if constexpr (compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+  if constexpr (compute_policy::quant_mode == quant_mode::I4_SYM) {
     gemm_arg =
         typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
@@ -491,7 +507,9 @@ void dequantize_gemv_run(int iter) {
             Acc_d,
             Cnt_d,
             epilogue_args);
-  } else if constexpr (compute_policy::quant_mode == quant_mode::S4_ASYM) {
+  } else if constexpr (
+      compute_policy::quant_mode == quant_mode::I4_ASYM ||
+      compute_policy::quant_mode == quant_mode::I4_ASYM_FP_ZERO) {
     gemm_arg =
         typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
@@ -551,9 +569,11 @@ void dequantize_gemv_run(int iter) {
   // performance
   prof.print_profiling_result(profiling_selector::GPU);
   // check result
-  std::vector<typename Test::data_type_a> dequantize_b =
-      dequantize_weight<dequant_s, layout_b, compute_policy::quant_mode>(
-          matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
+  std::vector<typename Test::data_type_a> dequantize_b = dequantize_weight<
+      dequant_s,
+      layout_b,
+      compute_policy::quant_mode,
+      data_type_c>(matrix_k, matrix_n, B_h, scale_h, zero_pt_h);
 
   queue.memcpy((void*)C_h, (void*)C_d, size_c * sizeof(data_type_c)).wait();
   ASSERT_EQ(
@@ -585,6 +605,12 @@ void dequantize_gemv_run(int iter) {
   free(Cnt_d, context);
 }
 
+// Placeholder for void test param
+template <>
+void dequantize_gemv_run<void>(int) {
+  GTEST_SKIP();
+}
+
 template <typename T>
 class dequantize_gemv_test : public ::testing::Test {};
 TYPED_TEST_SUITE_P(dequantize_gemv_test);
@@ -594,7 +620,13 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
-using tests = ::testing::Types<test_col_major_1>;
+using tests = ::testing::Types< //
+    test_col_major_1<fp16, quant_mode::I4_SYM>,
+    test_col_major_1<bf16, quant_mode::I4_SYM>,
+    test_col_major_1<fp16, quant_mode::I4_ASYM_FP_ZERO>,
+    test_col_major_1<bf16, quant_mode::I4_ASYM_FP_ZERO>,
+    // test_col_major_2,
+    void>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemv_test_suite,

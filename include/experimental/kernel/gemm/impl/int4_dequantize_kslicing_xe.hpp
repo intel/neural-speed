@@ -159,7 +159,7 @@ class gemm_universal_t<
   /// @brief GEMM arguments.
   /// This is the interface for users to pass the application-related runtime
   /// variables.
-  template <quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP>
+  template <quant_mode quant_mode = quant_mode::I4_SYM>
   struct arguments_t {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
@@ -295,7 +295,7 @@ class gemm_universal_t<
     }
   };
   template <>
-  struct arguments_t<quant_mode::S4_FULLRANGE_NO_ZP> {
+  struct arguments_t<quant_mode::I4_SYM> {
     /// @brief Is the size of the m dimension of the matrix multiplication (m x
     /// k x n).
     uint32_t matrix_m;
@@ -526,6 +526,10 @@ class gemm_universal_t<
   template <quant_mode quant_mode>
   static bool can_implement(arguments_t<quant_mode>& args) {
     bool implementable = true;
+    if (arch_tag == gpu_arch::XeLpg) {
+      implementable &= !std::is_same_v<dtype_a, bf16>; // XeLpg arch dosen't
+                                                       // have bf16 related isa.
+    }
     if (gemm_t::msg_type_a != msg_type::unaligned_2d) {
       if (gemm_t::msg_type_a == msg_type::block_2d) {
         implementable &= kernel::block_2d<arch_tag, dtype_a>::check_tensor(
@@ -566,8 +570,7 @@ class gemm_universal_t<
     // check for int4x2
     implementable &=
         ((args.matB_ld % pack_ratio == 0) && (args.matrix_n % pack_ratio == 0));
-    if constexpr (
-        gemm_t::compute_policy::quant_mode != quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM) {
       implementable &= (args.zero_pt_ld % pack_ratio == 0);
     }
 
@@ -618,7 +621,10 @@ class gemm_universal_t<
     int start_x_scale = start_n;
     int start_y_scale = start_k / dequant_s;
 
-    int start_x_zero_pt = start_n / pack_ratio;
+    int start_x_zero_pt =
+        gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM_FP_ZERO
+        ? start_n
+        : start_n / pack_ratio;
     int start_y_zero_pt = start_k / dequant_s;
 
     // set up arguments
@@ -664,15 +670,15 @@ class gemm_universal_t<
     uint32_t inner_loop_start = (start_k + k_stride - 1) / k_stride;
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args;
-    if constexpr (
-        gemm_t::compute_policy::quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (gemm_t::compute_policy::quant_mode == quant_mode::I4_SYM) {
       gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,
           inner_loop_start,
           inner_loop_count,
           mem_desc_scale);
-    } else {
+    } else if constexpr (
+        gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM) {
       mem_desc_zero_pt_t mem_desc_zero_pt(
           args.zero_pt_base,
           {(args.matrix_n + pack_ratio - 1) / pack_ratio,
@@ -686,6 +692,23 @@ class gemm_universal_t<
           inner_loop_count,
           mem_desc_scale,
           mem_desc_zero_pt);
+    } else if constexpr (
+        gemm_t::compute_policy::quant_mode == quant_mode::I4_ASYM_FP_ZERO) {
+      mem_desc_zero_pt_t mem_desc_zero_pt(
+          args.zero_pt_base,
+          {args.matrix_n,
+           ((args.matrix_k + dequant_s - 1) / dequant_s),
+           args.zero_pt_ld},
+          {start_x_zero_pt, start_y_zero_pt});
+      gemm_args = gemm_args_t(
+          mem_desc_a,
+          mem_desc_b,
+          inner_loop_start,
+          inner_loop_count,
+          mem_desc_scale,
+          mem_desc_zero_pt);
+    } else {
+      assert(0);
     }
     matAcc_t matAcc;
     matAcc.init(0);
