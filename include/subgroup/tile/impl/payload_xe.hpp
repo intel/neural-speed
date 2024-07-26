@@ -38,16 +38,17 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
     std::enable_if_t<arch_has_2d_load_store<arch_tag_>>> {
   using tile_desc = tile_desc_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using dtype = dtype_;
   static constexpr msg_type message_type = msg_type::block_2d;
   static constexpr mem_space memory_space = mem_space::global;
@@ -400,15 +401,25 @@ template <
     typename tile_desc_,
     gpu_arch arch_tag_,
     uint32_t alignment_,
-    mem_layout memory_layout_>
+    mem_layout memory_layout_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>,
+    mem_desc_t<
+        dtype_,
+        memory_layout_,
+        mem_space::global,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, memory_layout_, mem_space::global, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      memory_layout_,
+      mem_space::global,
+      alignment_,
+      use_mask_>;
   using dtype = native_type_t<dtype_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
@@ -554,15 +565,25 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::global,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::atomic_add,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::global, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::global,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
@@ -736,15 +757,25 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::local,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::block_1d,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::local,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::local;
@@ -867,16 +898,17 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     gpu_arch arch_tag_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_,
     msg_type::unaligned_2d,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
@@ -1094,22 +1126,24 @@ template <
     typename tile_desc_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     gpu_arch arch_tag_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_,
     msg_type::block_2d,
     arch_tag_,
     std::enable_if_t<!arch_has_2d_load_store<arch_tag_>>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::global;
   static constexpr mem_layout memory_layout = mem_layout_;
   static constexpr msg_type message_type = msg_type::block_2d;
   static constexpr uint32_t alignment_in_bytes = mem_desc_t::alignment_in_bytes;
   static constexpr gpu_arch arch_tag = arch_tag_;
+  static constexpr bool use_mask = mem_desc_t::use_mask;
 
  private:
   static constexpr uint32_t tile_size_x = tile_desc::tile_size_x;
@@ -1315,15 +1349,25 @@ template <
     typename dtype_,
     typename tile_desc_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::local,
+        alignment_,
+        use_mask_>,
     tile_desc_,
     msg_type::scatter,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::local,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::local;
@@ -1489,9 +1533,15 @@ template <
     uint32_t block_size_x_,
     uint32_t block_size_y_,
     gpu_arch arch_tag_,
-    uint32_t alignment_>
+    uint32_t alignment_,
+    bool use_mask_>
 struct mem_payload_t<
-    mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>,
+    mem_desc_t<
+        dtype_,
+        mem_layout::row_major,
+        mem_space::local,
+        alignment_,
+        use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -1501,8 +1551,12 @@ struct mem_payload_t<
     msg_type::scatter,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
-  using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout::row_major, mem_space::local, alignment_>;
+  using mem_desc_t = mem_desc_t<
+      dtype_,
+      mem_layout::row_major,
+      mem_space::local,
+      alignment_,
+      use_mask_>;
   using dtype = dtype_;
   using tile_desc = tile_desc_t<
       tile_size_x_,
@@ -1639,11 +1693,12 @@ template <
     uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     uint32_t num_coop_sg_,
     reg_layout reg_layout_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -1660,7 +1715,7 @@ struct prefetch_payload_t<
           mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_t<
       tile_size_x_,
       tile_size_y_,
@@ -1866,11 +1921,12 @@ template <
     uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     uint32_t num_coop_sg_,
     reg_layout reg_layout_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -1885,7 +1941,7 @@ struct prefetch_payload_t<
          ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   using tile_desc = tile_desc_t<
       tile_size_x_,
       tile_size_y_,
@@ -2158,11 +2214,12 @@ template <
     uint32_t block_size_y_,
     mem_layout mem_layout_,
     uint32_t alignment_,
+    bool use_mask_,
     uint32_t num_coop_sg_,
     reg_layout reg_layout_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>,
     tile_desc_t<
         tile_size_x_,
         tile_size_y_,
@@ -2176,7 +2233,7 @@ struct prefetch_payload_t<
         ((tile_size_x_ == 1) && mem_layout_ == mem_layout::col_major)>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
   // CL aligned, so we can use uint64_t
   using prefetch_dtype = uint64_t;
   static constexpr msg_type message_type = msg_type::block_1d;
@@ -2284,18 +2341,19 @@ template <
     typename dtype_,
     typename tile_desc_,
     mem_layout mem_layout_,
+    bool use_mask_,
     uint32_t alignment_,
     uint32_t num_coop_sg_,
     gpu_arch arch_tag_>
 struct prefetch_payload_t<
-    mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_>,
+    mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_, use_mask_>,
     tile_desc_,
     num_coop_sg_,
     arch_tag_,
     std::enable_if_t<(arch_tag_ <= gpu_arch::XeHpc)>> {
   using dtype = dtype_;
   using mem_desc_t =
-      mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_>;
+      mem_desc_t<dtype_, mem_layout_, mem_space::local, alignment_, use_mask_>;
   using tile_desc = tile_desc_;
   static constexpr mem_space memory_space = mem_space::local;
   static constexpr mem_layout memory_layout = mem_layout_;
