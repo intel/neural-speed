@@ -480,7 +480,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_offset) * payload.pitch_in_bytes;
         xetla_mask<num_channel> pred = 1;
-        if constexpr (num_channel > 1) {
+        if constexpr (num_channel > 1 && payload_t::use_mask) {
           // For SDP load, need pred
           const uint32_t sub_block_offset_x = payload.base_x + offset_x +
               (payload_t::mem_transpose ? sub_block_offset : 0);
