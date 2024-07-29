@@ -161,19 +161,23 @@ class fmha_forward_t {
   // --------------------- // Memory desc // ---------------------- //
   // suffix: L -> local; T -> transpose
   using mem_desc_Qi_t =
-      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Qi_L_t =
-      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Kj_T_t =
       mem_mask_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
+  using mem_desc_Kj_T_aligned_t =
+      mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
   using mem_desc_Pij_L_t =
-      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Vj_t =
       mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+  using mem_desc_Vj_aligned_t =
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Bij_t =
       mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Oi_t =
-      mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Ai_t =
       mem_mask_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
 
@@ -200,6 +204,11 @@ class fmha_forward_t {
       tile_shape_BrBc,
       mem_desc_Qi_L_t,
       mem_desc_Kj_T_t>;
+  using gemm_Sij_aligned_t = group::gemm_t<
+      compute_policy_BrBc,
+      tile_shape_BrBc,
+      mem_desc_Qi_L_t,
+      mem_desc_Kj_T_aligned_t>;
   using matAccSij_t = typename gemm_Sij_t::matAcc_t;
   using dropout_fd_t = dropout_fwd_t<matAccSij_t::tile_elems>;
   using dp_mask_tile_desc_t = typename gemm_Sij_t::matAcc_tile_desc_t;
@@ -221,7 +230,11 @@ class fmha_forward_t {
     // mem desc variables
     mem_desc_Qi_t mem_desc_Qi;
     mem_desc_Qi_L_t mem_desc_Qi_L;
-    mem_desc_Kj_T_t mem_desc_Kj_T;
+
+    union {
+      mem_desc_Kj_T_t mem_desc_Kj_T;
+      mem_desc_Kj_T_aligned_t mem_desc_Kj_T_aligned;
+    };
     mem_desc_Pij_L_t mem_desc_Pij_L;
     mem_desc_Vj_t mem_desc_Vj;
     mem_desc_Bij_t mem_desc_Bij;
@@ -472,14 +485,21 @@ class fmha_forward_t {
   // Define kernel to compute Sij = Qi x Kj.T
   /// @brief gemm_Sij is used to compute Sij = Qi x Kj.T
   /// # [Br,H] x [H,Bc] = [Br,Bc]
+  template <bool NO_MASK>
   inline void gemm_Sij(matAccSij_t& matAccSij, arguments_t& args) {
-    using gemm_args_t = typename gemm_Sij_t::arguments_t;
+    using gemm_t = std::conditional_t<NO_MASK, gemm_Sij_aligned_t, gemm_Sij_t>;
+    using gemm_args_t = typename gemm_t::arguments_t;
 
     // Gemm to comput Sij
-    gemm_Sij_t gemm;
+    gemm_t gemm;
     uint32_t loop_count = (args.uH + accum_step - 1) / accum_step;
-    gemm_args_t gemm_args(ctx.mem_desc_Qi_L, ctx.mem_desc_Kj_T, loop_count);
-    gemm(ctx.g, matAccSij, gemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
+    if constexpr (NO_MASK) {
+      gemm_args_t gemm_args(ctx.mem_desc_Qi_L, ctx.mem_desc_Kj_T_aligned, loop_count);
+      gemm(ctx.g, matAccSij, gemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
+    } else {
+      gemm_args_t gemm_args(ctx.mem_desc_Qi_L, ctx.mem_desc_Kj_T, loop_count);
+      gemm(ctx.g, matAccSij, gemm_args, 0, /* nbarrier_base */ nbarrier_cnt);
+    }
 
     // Multiply by softmax scaling factor
     // bmm * alpha
@@ -749,109 +769,23 @@ class fmha_forward_t {
     epilogue(ctx.g, matAccOi, ctx.mem_desc_Oi);
   }
 
-  // ================== // permute_store_Oi // ==================== //
-
-  /// @brief permuted store Oi to global memory. [B,N,F,H]
-  inline void permute_store_Oi(
-      nd_item<3>& item,
-      matAccOi_t& matAccOi,
-      arguments_t& args) {
-    uint32_t b = item.get_group(0) / args.uN;
-    uint32_t n = item.get_group(0) % args.uN;
-    uint32_t f = ctx.sg_idy * kSgBr + item.get_group(1) * kBr;
-    uint32_t h = ctx.sg_idx * kSgHm;
-
-    // Because Hm is greater than uH
-    if (h >= args.uH)
-      return;
-
-    xetla_tdescriptor transpose_tdecs;
-    xetla_vector<scalar_t, kSgHm> v_out;
-
-    uint32_t height = args.uB * args.uN * args.uF;
-    uint32_t offset_height = b * args.uN * args.uF + f * args.uN + n;
-
-    if constexpr (arch_tag != gpu_arch::XeHpc) {
-      // offset for curr work item
-      const uint32_t O_offset = offset_height * args.uH + h;
-      const auto ld_c = args.uN * args.uH;
-
-      matOi_t matOi;
-      subgroup::elemwise_cvt(matOi, matAccOi);
-
-      mem_desc_Oi_t mem_desc_Oi;
-      mem_desc_Oi.init(
-          args.O_ptr + O_offset, // dst_base = out_ptr + thread offset
-          {std::min(kSgBc, args.uH - h), std::min(kSgBr, args.uF - f), ld_c},
-          {0, 0});
-      using matOi_tile_desc_t = typename matOi_t::tile_desc;
-      using matOi_store_t = subgroup::mem_payload_t<
-          mem_mask_desc_t<
-              scalar_t,
-              mem_desc_Oi_t::layout,
-              mem_desc_Oi_t::space>,
-          matOi_tile_desc_t,
-          subgroup::msg_type_v<
-              matOi_tile_desc_t,
-              mem_mask_desc_t<
-                  scalar_t,
-                  mem_desc_Oi_t::layout,
-                  mem_desc_Oi_t::space>>,
-          arch_tag>;
-      matOi_store_t matOi_store(mem_desc_Oi);
-      subgroup::tile_store<cache_hint::write_back, cache_hint::write_back>(
-          matOi, matOi_store);
-      return;
-    }
-
-    xetla_fill_tdesc<scalar_t, kSgHm, 1, 1>(
-        transpose_tdecs.xetla_format<uint32_t>(),
-        args.O_ptr,
-        args.uH,
-        height,
-        args.uH,
-        h,
-        offset_height);
-
-    for (uint32_t i = 0; i < kSgBr && (f + i < args.uF); ++i) {
-      // load data from matAccOi
-      auto v_acc = matAccOi.reg.xetla_select<kSgHm, 1>(i * kSgHm);
-      v_out = xetla_cvt<scalar_t, accum_t, kSgHm>(v_acc);
-
-      xetla_tstore_global<
-          scalar_t,
-          kSgHm,
-          cache_hint::write_back,
-          cache_hint::write_back>(transpose_tdecs, v_out);
-      xetla_update_tdesc_offsety(
-          transpose_tdecs.xetla_format<uint32_t>(), args.uN);
-    }
-  }
-  // ====================== // preload_Qi // ====================== //
-
   /// @brief preload_Qi is used to load Qi from global to local memory.
   inline void preload_Qi([[maybe_unused]] arguments_t& args) {
     using matQi_tile_desc_t = typename gemm_Oi_t::matAcc_tile_desc_t;
     using matQi_t = subgroup::tile_t<scalar_t, matQi_tile_desc_t>;
     using matQi_load_t = subgroup::mem_payload_t<
-        mem_mask_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
+        mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<
             matQi_tile_desc_t,
-            mem_mask_desc_t<
-                scalar_t,
-                mem_desc_Qi_t::layout,
-                mem_desc_Qi_t::space>>,
+            mem_desc_t<scalar_t, mem_desc_Qi_t::layout, mem_desc_Qi_t::space>>,
         arch_tag>;
     using matQi_store_t = subgroup::mem_payload_t<
-        mem_mask_desc_t<
-            scalar_t,
-            mem_desc_Qi_L_t::layout,
-            mem_desc_Qi_L_t::space>,
+        mem_desc_t<scalar_t, mem_desc_Qi_L_t::layout, mem_desc_Qi_L_t::space>,
         matQi_tile_desc_t,
         subgroup::msg_type_v<
             matQi_tile_desc_t,
-            mem_mask_desc_t<
+            mem_desc_t<
                 scalar_t,
                 mem_desc_Qi_L_t::layout,
                 mem_desc_Qi_L_t::space>>,
@@ -959,8 +893,23 @@ class fmha_forward_t {
     uint32_t startF = item.get_group(1) /* 0 */ * kBr /* 64 */;
     uint32_t endF = std::min(startF + kBr, args.uF);
 
+#define LOOP_BODY(aligned)                           \
+  /* update context for current loop */              \
+  ctx.update_context(item, args, startT);            \
+  /* compute Sij */                                  \
+  matAccSij_t matAccSij(0);                          \
+  gemm_Sij<aligned>(matAccSij, args);                \
+  /* apply mask */                                   \
+  apply_mask(item, matAccSij, args, startF, startT); \
+  /* softmax */                                      \
+  dp_mask_tile_t mask_in;                            \
+  softmax_fwd(matAccSij, matAccOi, mask_in, args);   \
+  /* compute Oi */                                   \
+  gemm_Oi(matAccOi, args, startT);
+
     // iterate through the keys
-    for (uint32_t startT = 0; startT < args.uT; startT += kBc) {
+    uint32_t startT = 0;
+    for (; startT < args.uT; startT += kBc) {
       // Early leave for varlen_fwd if we found current seqlen exceed the actual
       // seqlen.
       if constexpr (kVarlen) {
@@ -974,19 +923,9 @@ class fmha_forward_t {
         if (startT >= endF)
           break;
       }
-      // update context for current loop
-      ctx.update_context(item, args, startT);
-      // compute Sij
-      matAccSij_t matAccSij(0);
-      gemm_Sij(matAccSij, args);
-      // apply mask
-      apply_mask(item, matAccSij, args, startF, startT);
-      // softmax
-      dp_mask_tile_t mask_in;
-      softmax_fwd(matAccSij, matAccOi, mask_in, args);
-      // compute Oi
-      gemm_Oi(matAccOi, args, startT);
+      LOOP_BODY(true);
     }
+    { LOOP_BODY(true); }
 
     // Store output to global
     rescale_then_store_Oi(matAccOi, args);
