@@ -200,6 +200,8 @@ void gemm_softmax_run(uint32_t iter) {
           static constexpr uint32_t prefetch_distance = 3;
           // should larger than 8
           static constexpr uint32_t k_iter_num = 16;
+          static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+          //static constexpr gpu_arch arch_tag = gpu_arch::XeHpg;
 
           // Step 1: define Micro-kernel's configuration
           using wg_shape = shape<wg_tile_n, wg_tile_m>;
@@ -227,7 +229,7 @@ void gemm_softmax_run(uint32_t iter) {
               data_type_sfx, // accumulator data type for intermediate results
               wg_shape, // computation tile shape
               k_iter_num, // elements in each iteration
-              gpu_arch::XeHpc, // GPU arch
+              arch_tag, // GPU arch
               tune_option>;
 
           using gemm_args_t = gemm_op_t::arguments_t;
@@ -239,14 +241,14 @@ void gemm_softmax_run(uint32_t iter) {
               mem_space::global, // memory writing to global mem for C
               wg_shape, // computation tile shape
               k_iter_num, // elements in each iteration
-              gpu_arch::XeHpc, // GPU arch
+              arch_tag, // GPU arch
               tune_option>;
 
           // using experimental::group::softmax
           // define softmax forward op
           using tile_shape = typename gemm_op_t::tile_shape;
           using softmax_fwd_t = softmax_t<
-              softmax_policy_fwd<data_type_sfx, gpu_arch::XeHpc>,
+              softmax_policy_fwd<data_type_sfx, arch_tag>,
               tile_shape>;
           using softmax_fwd_args_t = typename softmax_fwd_t::arguments_t;
 

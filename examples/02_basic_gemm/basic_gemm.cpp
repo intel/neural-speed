@@ -114,8 +114,10 @@ void basic_gemm_run(sycl::queue queue, uint32_t iter) {
         // wrap the nd_range to XeTLA range
 
         // Performance tuning setting based on different shapes
-        static constexpr uint32_t periodic_sync_interval = 0;
-        static constexpr uint32_t prefetch_distance = 1;
+        static constexpr uint32_t periodic_sync_interval =
+            (arch_tag == gpu_arch::XeHpc) ? 8 : 0;
+        static constexpr uint32_t prefetch_distance =
+            (arch_tag == gpu_arch::XeHpc) ? 3 : 1;
         // should larger than 8
         static constexpr uint32_t k_stride = 32;
 

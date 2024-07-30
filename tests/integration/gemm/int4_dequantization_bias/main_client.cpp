@@ -259,16 +259,16 @@ class test9_xehpg {
   using data_type_c = fp16;
 };
 
-class test1_xelpg {
+class test1_xelpg_1x12288x4096 {
  public:
   // Extract the parameters required by different test cases
   static constexpr size_t mat_m = 1;
   static constexpr size_t mat_n = 4096 * 3;
   static constexpr size_t mat_k = 4096 * 1;
   static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 32 * 4;
+  static constexpr size_t wg_n = 256;
   static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 32;
+  static constexpr size_t sg_n = 64;
   static constexpr size_t sg_k = 16;
   static constexpr size_t dequant_s = 128;
 
@@ -282,6 +282,79 @@ class test1_xelpg {
   using data_type_b = int4x2;
   using data_type_c = fp16;
 };
+
+class test1_xelpg_1x4096x11008 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 11008;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 256;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 64;
+  static constexpr size_t sg_k = 32;
+  static constexpr size_t dequant_s = 128;
+
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
+class test1_xelpg_1x4096x4096 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
+  static constexpr size_t wg_m = 1;
+  static constexpr size_t wg_n = 64;
+  static constexpr size_t sg_m = 1;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 32;
+  static constexpr size_t dequant_s = 128;
+
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
+class test1_xelpg_4x4096x4096 {
+ public:
+  // Extract the parameters required by different test cases
+  static constexpr size_t mat_m = 4;
+  static constexpr size_t mat_n = 4096 * 1;
+  static constexpr size_t mat_k = 4096 * 1;
+  static constexpr size_t wg_m = 4;
+  static constexpr size_t wg_n = 64;
+  static constexpr size_t sg_m = 4;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 64;
+  static constexpr size_t dequant_s = 128;
+
+  static constexpr size_t local_kslicing = 8;
+  static constexpr size_t global_kslicing = 1;
+  static constexpr mem_layout layout_a = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::row_major;
+  static constexpr mma_engine mma_eng = mma_engine::fpu;
+  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  using data_type_a = fp16;
+  using data_type_b = int4x2;
+  using data_type_c = fp16;
+};
+
 class test2_xelpg {
  public:
   // Extract the parameters required by different test cases
@@ -1019,7 +1092,11 @@ TYPED_TEST_P(dequantize_gemm_test, esimd) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemm_test, esimd);
-using tests = ::testing::Types<test1_xelpg>;
+using tests = ::testing::Types<
+    test1_xelpg_1x12288x4096,
+    test1_xelpg_1x4096x11008,
+    test1_xelpg_1x4096x4096,
+    test1_xelpg_4x4096x4096>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     dequantize_gemm_test_suite,

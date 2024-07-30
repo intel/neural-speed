@@ -40,7 +40,6 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 512 / sg_m;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
   static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
 
   static constexpr size_t local_kslicing = 1;
@@ -53,6 +52,7 @@ class test_col_major_1 {
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
 };
+
 class test_col_major_2 {
  public:
   // Extract the parameters required by different test cases
@@ -63,8 +63,9 @@ class test_col_major_2 {
   static constexpr size_t wg_n = 1;
   static constexpr size_t sg_m = 4;
   static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 1024;
-  static constexpr size_t dequant_s = 4096;
+  static constexpr size_t sg_k = 512 / sg_m;
+  static constexpr size_t dequant_s = 128;
+  static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
