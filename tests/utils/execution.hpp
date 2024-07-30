@@ -315,7 +315,6 @@ class dispatch_arch {
     switch (deviceArch) {
       case ENS::architecture::intel_gpu_pvc:
         return F<gpu_arch::XeHpc>::exec(std::forward<Args>(args)...);
-        return;
       case ENS::architecture::intel_gpu_dg2_g10:
       case ENS::architecture::intel_gpu_dg2_g11:
       case ENS::architecture::intel_gpu_dg2_g12:

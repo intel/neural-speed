@@ -60,7 +60,8 @@ struct xetla_softmax_fwd_t {
   using softmax_tile_desc_t = subgroup::
       tile_desc_t<SIMD, block_height, SIMD, block_height, reg_layout::tiled>;
   using softmax_load_t = subgroup::tile_t<dtype_in, softmax_tile_desc_t>;
-  using mem_desc_in_t = mem_desc_t<dtype_in, mem_layout::row_major, mem_space_in>;
+  using mem_desc_in_t =
+      mem_desc_t<dtype_in, mem_layout::row_major, mem_space_in>;
   using softmax_load_payload_t = subgroup::mem_payload_t<
       mem_desc_in_t,
       softmax_tile_desc_t,

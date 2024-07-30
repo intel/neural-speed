@@ -41,8 +41,7 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 512;
   static constexpr size_t dequant_s = 128;
-  static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
-  // static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
+  static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -67,8 +66,7 @@ class test_col_major_2 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 1024 / 4;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_mode = quant_mode::S4_ASYM;
-  static constexpr quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP;
+  static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -144,7 +142,7 @@ int int4_mlp_result_validate(
 }
 
 template <
-    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::I4_SYM,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,
@@ -158,7 +156,7 @@ std::vector<fp16> convert_int4(
   int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     int8_t dequant_8bit = data_b & 0xf;
-    if constexpr (quant_mode == quant_mode::S4_FULLRANGE_NO_ZP) {
+    if constexpr (quant_mode == quant_mode::I4_SYM) {
       dequant_fp16[i] = scale * (dequant_8bit - 8);
     } else {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
@@ -171,7 +169,7 @@ std::vector<fp16> convert_int4(
 template <
     size_t dequant_s,
     mem_layout layout_b = mem_layout::col_major,
-    quant_mode quant_mode = quant_mode::S4_FULLRANGE_NO_ZP,
+    quant_mode quant_mode = quant_mode::I4_SYM,
     typename data_type_acc_in = fp16,
     typename data_type_b,
     typename data_type_scale,

@@ -32,25 +32,7 @@ TYPED_TEST_P(fp16_gemm_test, esimd) {
       esimd_compile_string);
 }
 REGISTER_TYPED_TEST_SUITE_P(fp16_gemm_test, esimd);
-using tests = ::testing::Types<
-    Test0>;
-    // Test1,
-    // Test2,
-    // Test3>;
-    // Test4,
-    // Test5,
-    // Test6,
-    // Test7,
-    // Test8,
-    // Test9,
-    // Test10,
-    // Test11,
-    // Test12,
-    // Test13,
-    // Test14,
-    // Test15,
-    // Test16,
-    // Test17,
-    // Test18,
-    // Test19>;
+using tests =
+    ::testing::Types<Test0, Test0x, Test0f, Test2f, Test2fx1, Test4x, Test4x1, Test4f>;
+
 INSTANTIATE_TYPED_TEST_SUITE_P(fp16_gemm_test_suite, fp16_gemm_test, tests);
