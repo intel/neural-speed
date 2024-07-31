@@ -2226,18 +2226,18 @@ struct prefetch_payload_t<
 
  private:
   // Fetches the entire CL.
-  // static constexpr uint32_t cacheline_elems = 64 / sizeof(dtype);
-  // static constexpr uint32_t mem_block_nums =
-  //     (tile_desc::tile_size_x + cacheline_elems - 1) / cacheline_elems;
-  // static constexpr uint32_t num_coop_sg = num_coop_sg_;
+  static constexpr uint32_t cacheline_elems = 64 / sizeof(dtype);
+  static constexpr uint32_t mem_block_nums =
+      (tile_desc::tile_size_x + cacheline_elems - 1) / cacheline_elems;
+  static constexpr uint32_t num_coop_sg = num_coop_sg_;
 
   // For mem_tile_nums < num_coop_sg cases, mem_tile_size_x will be CL length
   // which might lead to illegal read.
   // there are num_coop_sg threads to prefetch mem_block_nums
   // each thread will prefetch mem_tile_size_x elements
-  // static constexpr uint32_t mem_tile_size_x = mem_block_nums > num_coop_sg
-  //     ? (mem_block_nums + num_coop_sg - 1) / num_coop_sg* cacheline_elems
-  //     : 0;
+  static constexpr uint32_t mem_tile_size_x = mem_block_nums > num_coop_sg
+      ? (mem_block_nums + num_coop_sg - 1) / num_coop_sg* cacheline_elems
+      : 0;
   using this_payload_t =
       prefetch_payload_t<mem_desc_t, tile_desc, num_coop_sg_, arch_tag>;
 

@@ -398,9 +398,8 @@ tile_load(tile_t& tile, payload_t& payload) {
       detail::getNextPowerOf2<uint32_t(tile_t::block_elems * sizeof(dtype))>();
 
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
-  static constexpr uint32_t max_load_vec_len = std::min(
-      uint32_t(tile_t::block_elems * sizeof(dtype)),
-      load_store_attr::max_load_vec_len);
+  static constexpr uint32_t max_load_vec_len =
+      std::min(power2_block_elems, load_store_attr::max_aligned_load_vec_len);
 
   static constexpr uint32_t max_load_vec_elems =
       max_load_vec_len / sizeof(dtype);
@@ -501,10 +500,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             load_elems,
             payload_t::vector_size,
             L1,
-            L2>(
-            payload.base_ptr,
-            payload.channel_offset + payload.base_offset + address_offset,
-            mask);
+            L2>(payload.base_ptr, channel_offset + address_offset, mask);
 
         if constexpr (
             payload_t::vector_size > 1 && payload_t::num_channel > 1) {
@@ -684,12 +680,7 @@ tile_load(
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
 
-        reg_tmp = xetla_load_global<
-            load_dtype,
-            load_elems,
-            1,
-            L1,
-            L2>(
+        reg_tmp = xetla_load_global<load_dtype, load_elems, 1, L1, L2>(
             payload.base_ptr,
             channel_offset + address_offset,
             pred_x && pred_y);
