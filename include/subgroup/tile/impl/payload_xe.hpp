@@ -1655,11 +1655,12 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<(!arch_has_2d_load_store<arch_tag_>)&&(
-        ((block_size_y_ != 1 || tile_size_y_ != 1) &&
-         mem_layout_ == mem_layout::row_major) ||
-        ((block_size_x_ != 1 || tile_size_x_ != 1) &&
-         mem_layout_ == mem_layout::col_major))>> {
+    std::enable_if_t<
+        (!arch_has_2d_load_store<arch_tag_>) &&
+        (((block_size_y_ != 1 || tile_size_y_ != 1) &&
+          mem_layout_ == mem_layout::row_major) ||
+         ((block_size_x_ != 1 || tile_size_x_ != 1) &&
+          mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
@@ -1901,9 +1902,10 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<(arch_has_2d_load_store<arch_tag_>)&&(
-        ((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
-        ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
+    std::enable_if_t<
+        (arch_has_2d_load_store<arch_tag_>) &&
+        (((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
+         ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_>;
