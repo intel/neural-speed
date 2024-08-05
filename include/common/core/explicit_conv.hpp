@@ -262,6 +262,18 @@ xetla_cvt(xetla_vector<T_src, N> src) {
   return src;
 }
 
+template <typename T_dst, typename T_src, int N>
+__XETLA_API typename std::enable_if_t<
+    std::is_same_v<T_dst, fp16> && std::is_same_v<T_src, f8e5m2>,
+    xetla_vector<T_dst, N>>
+xetla_cvt(xetla_vector<T_src, N> src) {
+  xetla_vector<uint8_t, N> src_u8 = src.xetla_format<uint8_t>();
+  xetla_vector<uint16_t, N> src_u16 = __ESIMD_NS::convert<uint16_t>(src_u8);
+  xetla_vector<uint16_t, N> dst =
+      xetla_shl<uint16_t, uint16_t, N, uint8_t>(src_u16, 8U);
+  return dst.xetla_format<fp16>();
+}
+
 /// @} xetla_core_conv
 
 } // namespace gpu::xetla

@@ -443,6 +443,9 @@ class gemm_t<
       matB_acc_t matB_acc;
       subgroup::elemwise_cvt(matA_acc, matA);
       subgroup::vnni_transform(matB_acc, matB);
+      // sycl::ext::oneapi::experimental::printf("\nxmx matb\n");
+      // dump_mat(matB_acc);
+
       pre_processing(matA_acc, matB_acc, matA, matB);
       tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
       SW_BARRIER();

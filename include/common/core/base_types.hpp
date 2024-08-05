@@ -81,6 +81,42 @@ struct int4x8 {
   }
 };
 
+struct f8e5m2 {
+  uint8_t data;
+
+  operator uint8_t() const {
+    return data;
+  }
+  f8e5m2() = default;
+  f8e5m2(uint8_t val) {
+    data = val;
+  }
+  f8e5m2(fp16 val) {
+    union {
+      fp16 val_fp16;
+      uint16_t val_uint16;
+    };
+    val_fp16 = val;
+    uint16_t bias = val_uint16 & 0x100 ? 0x0080 : 0;
+    data = (val_uint16 + bias) >> 8;
+
+    if ((data & 0b01111100) == 0)
+      data = 0;
+  }
+  operator fp16() const {
+    union {
+      fp16 val_fp16;
+      uint16_t val_uint16;
+    };
+    val_uint16 = data << 8;
+    return val_fp16;
+  }
+  f8e5m2(float val) : f8e5m2(fp16(val)) {}
+  operator float() const {
+    return static_cast<float>(static_cast<fp16>(*this));
+  }
+};
+
 /// @brief mx_fp4(E2M1) data packed as 8bits data type.
 struct mx_fp4 {
   uint8_t data;
@@ -117,6 +153,7 @@ struct is_internal_type {
       std::is_same<remove_const_t<T>, tf32>::value ||
       std::is_same<remove_const_t<T>, int4x2>::value ||
       std::is_same<remove_const_t<T>, int4x8>::value ||
+      std::is_same<remove_const_t<T>, f8e5m2>::value ||
       std::is_same<remove_const_t<T>, mx_fp4>::value;
 };
 template <typename T>
@@ -168,6 +205,12 @@ struct native_type<mx_fp4> {
 /// @brief Set uint8_t as the native data type of int4x2.
 template <>
 struct native_type<int4x2> {
+  using type = uint8_t;
+};
+
+/// @brief Set uint8_t as the native data type of f8e5m2.
+template <>
+struct native_type<f8e5m2> {
   using type = uint8_t;
 };
 

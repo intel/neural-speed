@@ -17,6 +17,7 @@ namespace fmha {
 template <
     typename fmha_policy,
     typename scalar_t,
+    typename kv_t,
     gpu_arch arch_tag,
     bool kUseAlibi,
     bool kUseBias,
@@ -32,8 +33,8 @@ class fmha_forward_t {
   struct arguments_t {
     // Input tensors
     scalar_t* Q_ptr; // [B, F, N, H] - query
-    scalar_t* K_ptr; // [B, T, N, H] - key
-    scalar_t* V_ptr; // [B, T, N, H] - value
+    kv_t* K_ptr; // [B, T, N, H] - key
+    kv_t* V_ptr; // [B, T, N, H] - value
     scalar_t* A_ptr = nullptr; // [B, N, 1, T] - Alibi
     scalar_t* B_ptr = nullptr; // [1/B, 1/N, 1/F, M] - bias
     uint8_t* Dp_ptr = nullptr; // [B, N, F, T] - dropout mask
@@ -67,8 +68,8 @@ class fmha_forward_t {
     inline arguments_t() = default;
     inline arguments_t(
         scalar_t* query,
-        scalar_t* key,
-        scalar_t* value,
+        kv_t* key,
+        kv_t* value,
         scalar_t* alibi,
         scalar_t* bias,
         uint8_t* dropout,
@@ -129,12 +130,12 @@ class fmha_forward_t {
   using comp_attr = group::compute_attr_t<scalar_t, scalar_t, accum_t>;
   using knobs = group::perf_tuning_knob_t<accum_step, stages, sync_freq>;
   using compute_policy_BrBc = std::conditional_t<
-      (arch_tag >= gpu_arch::XeHpg),
+      (arch_has_xmx<arch_tag>),
       group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
       group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
   // TODO: add k slicing
   using compute_policy_BrBm = std::conditional_t<
-      (arch_tag >= gpu_arch::XeHpg),
+      (arch_has_xmx<arch_tag>),
       group::compute_policy_default_xmx<comp_attr, knobs, arch_tag>,
       group::compute_policy_default_fpu<comp_attr, knobs, arch_tag>>;
   // ---------------- // Tile shape and Threads // ---------------- //
@@ -165,11 +166,11 @@ class fmha_forward_t {
   using mem_desc_Qi_L_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Kj_T_t =
-      mem_desc_t<scalar_t, mem_layout::col_major, mem_space::global>;
+      mem_desc_t<kv_t, mem_layout::col_major, mem_space::global>;
   using mem_desc_Pij_L_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::local>;
   using mem_desc_Vj_t =
-      mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
+      mem_desc_t<kv_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Bij_t =
       mem_desc_t<scalar_t, mem_layout::row_major, mem_space::global>;
   using mem_desc_Oi_t =
@@ -688,7 +689,7 @@ class fmha_forward_t {
                     uint8_t,
                     mem_desc_Dp_Mask_t::layout,
                     mem_desc_Dp_Mask_t::space>>,
-            gpu_arch::XeHpc>;
+            arch_tag>;
         load_payload_mask_t load_payload_mask(ctx.mem_desc_Dpij);
         subgroup::tile_load(mask_in, load_payload_mask);
         matAccSij.reg = matAccSij.reg * mask_in.reg * args.dp_scale;
@@ -771,7 +772,7 @@ class fmha_forward_t {
     uint32_t height = args.uB * args.uN * args.uF;
     uint32_t offset_height = b * args.uN * args.uF + f * args.uN + n;
 
-    if constexpr (arch_tag != gpu_arch::XeHpc) {
+    if constexpr (!arch_has_2d_load_store<arch_tag>) {
       // offset for curr work item
       const uint32_t O_offset = offset_height * args.uH + h;
       const auto ld_c = args.uN * args.uH;
@@ -798,30 +799,30 @@ class fmha_forward_t {
       matOi_store_t matOi_store(mem_desc_Oi);
       subgroup::tile_store<cache_hint::write_back, cache_hint::write_back>(
           matOi, matOi_store);
-      return;
-    }
+    } else {
+      xetla_fill_tdesc<scalar_t, kSgHm, 1, 1>(
+          transpose_tdecs.xetla_format<uint32_t>(),
+          args.O_ptr,
+          args.uH,
+          height,
+          args.uH,
+          h,
+          offset_height);
 
-    xetla_fill_tdesc<scalar_t, kSgHm, 1, 1>(
-        transpose_tdecs.xetla_format<uint32_t>(),
-        args.O_ptr,
-        args.uH,
-        height,
-        args.uH,
-        h,
-        offset_height);
+      for (uint32_t i = 0; i < kSgBr && (f + i < args.uF); ++i) {
+        // load data from matAccOi
+        auto v_acc = matAccOi.reg.xetla_select<kSgHm, 1>(i * kSgHm);
+        v_out = xetla_cvt<scalar_t, accum_t, kSgHm>(v_acc);
 
-    for (uint32_t i = 0; i < kSgBr && (f + i < args.uF); ++i) {
-      // load data from matAccOi
-      auto v_acc = matAccOi.reg.xetla_select<kSgHm, 1>(i * kSgHm);
-      v_out = xetla_cvt<scalar_t, accum_t, kSgHm>(v_acc);
-
-      xetla_tstore_global<
-          scalar_t,
-          kSgHm,
-          cache_hint::write_back,
-          cache_hint::write_back>(transpose_tdecs, v_out);
-      xetla_update_tdesc_offsety(
-          transpose_tdecs.xetla_format<uint32_t>(), args.uN);
+        xetla_tstore_global<
+            scalar_t,
+            kSgHm,
+            cache_hint::write_back,
+            cache_hint::write_back,
+            arch_tag>(transpose_tdecs, v_out);
+        xetla_update_tdesc_offsety(
+            transpose_tdecs.xetla_format<uint32_t>(), args.uN);
+      }
     }
   }
   // ====================== // preload_Qi // ====================== //
@@ -888,16 +889,9 @@ class fmha_forward_t {
   /// @return The size of local memory required.
   inline static constexpr uint32_t get_slm_size() {
     constexpr uint32_t size = slm_size_Qi + slm_size_Pij + slm_size_softmax;
-    if constexpr (arch_tag == gpu_arch::XeHpc) {
-      static_assert(
-          size <= (128 * 1024),
-          "The local memory size should be less than 128KB!");
-
-    } else {
-      static_assert(
-          size <= (64 * 1024),
-          "The local memory size should be less than 64KB!");
-    }
+    static_assert(
+        size <= (arch_attr_t<arch_tag>::local_mem_size),
+        "The local memory size should be less than arch total local memory size");
     return size;
   };
 
