@@ -134,7 +134,7 @@ template <
     typename mat_t,
     uint32_t kNumSg,
     reduce_op reduce_kind,
-    gpu_arch arch_tag = gpu_arch::XeHpc>
+    gpu_arch arch_tag>
 struct group_row_reduce_t {
   using T = typename mat_t::dtype;
   static constexpr uint32_t kNum = mat_t::tile_desc::tile_size_y;
@@ -215,7 +215,7 @@ enum class add_type : uint8_t {
 /// @tparam arch_tag Is the hardware architecture tag.
 template <
     typename dtype_bias_,
-    gpu_arch arch_tag = gpu_arch::XeHpc,
+    gpu_arch arch_tag,
     add_type add_tag = add_type::single_line>
 struct bias_add_op_t {};
 
@@ -324,8 +324,8 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
   using base_t = typename mem_desc_bias_t::base_t;
 
   struct arguments_t {
-    shape_t shape;
     base_t base;
+    shape_t shape;
     inline arguments_t() = default;
     inline arguments_t(base_t base_, shape_t shape_)
         : base(base_), shape(shape_) {}
@@ -351,11 +351,10 @@ struct bias_add_op_t<dtype_bias_, arch_tag, add_type::single_element> {
     uint32_t offset = (pos_y + pos_x * args.shape.stride) * sizeof(dtype_bias);
     auto bias_data_vector = xetla_load_global<
         dtype_bias,
+        16,
         1,
-        data_size::default_size,
         cache_hint::cached,
-        cache_hint::cached,
-        16>(ptr, offset);
+        cache_hint::cached>(ptr, offset);
     dtype_acc bias_data =
         xetla_cvt<dtype_acc, dtype_bias, 16>(bias_data_vector)[0];
 
@@ -418,15 +417,19 @@ template <
     typename mem_desc_c_t_>
 class epilogue_transp_t {};
 
-template <typename tile_op_t_, typename tile_shape_, typename mem_desc_c_t_>
+template <
+    typename tile_op_t_,
+    typename tile_shape_,
+    typename mem_desc_c_t_,
+    gpu_arch arch_tag_>
 class epilogue_transp_t<
-    epilogue_policy_tile_op<tile_op_t_, gpu_arch::XeHpc>,
+    epilogue_policy_tile_op<tile_op_t_, arch_tag_>,
     tile_shape_,
     mem_desc_c_t_> {
  public:
   using tile_shape = tile_shape_;
   using mem_desc_c_t = mem_desc_c_t_;
-  static constexpr gpu_arch arch_tag = gpu_arch::XeHpc;
+  static constexpr gpu_arch arch_tag = arch_tag_;
   static constexpr uint32_t barrier_count = 0;
   static constexpr uint32_t slm_size = 0;
 
@@ -505,7 +508,7 @@ class epilogue_write_back_t<
     epilogue_policy_default<arch_tag_>,
     tile_shape_,
     mem_desc_c_t_,
-    std::enable_if_t<((arch_tag_ <= gpu_arch::XeHpc))>> {
+    std::enable_if_t<valid_xe_arch_tag<arch_tag_>>> {
  public:
   using epilogue_policy = epilogue_policy_default<arch_tag_>;
   using tile_shape = tile_shape_;
