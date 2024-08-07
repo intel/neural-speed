@@ -458,8 +458,16 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
     size_t SurfacePitch,
     int X,
     int Y) {
-  return __ESIMD_ENS::lsc_load_2d(
-      Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y);
+  return __ESIMD_ENS::lsc_load_2d<
+      T,
+      BlockWidth,
+      BlockHeight,
+      NBlocks,
+      Transposed,
+      Transformed,
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H),
+      N>(Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y);
 }
 
 /// simd<T, N> block_load(const T* ptr, size_t byte_offset,
@@ -724,7 +732,12 @@ __XETLA_API void xetla_store_global(
     int X,
     int Y,
     xetla_vector<T, N> Vals) {
-  __ESIMD_ENS::lsc_store_2d(
+  __ESIMD_ENS::lsc_store_2d<
+      T,
+      BlockWidth,
+      BlockHeight,
+      gpu::xetla::detail::get_cache_hint(L1H),
+      gpu::xetla::detail::get_cache_hint(L2H)>(
       Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y, Vals);
 }
 /// template <typename T, int N, int VS = 1, typename OffsetT,
