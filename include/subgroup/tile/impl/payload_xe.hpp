@@ -75,22 +75,46 @@ struct mem_payload_t<
   static constexpr bool trans = (mem_transpose ^ reg_transpose) &&
       !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
-  static constexpr bool mem_transform = (sizeof(dtype) < 4) && !mem_transpose &&
+  // Transformed and Transposed cannot be set to true at the same time.
+  static constexpr bool mem_transform = (sizeof(dtype) <= 2) && !trans &&
       (register_layout == reg_layout::vnni_tiled ||
        register_layout == reg_layout::vnni_tiled_col_major);
-  static constexpr bool mem_dword_transpose = (sizeof(dtype) < 4) && trans;
+  static constexpr bool mem_dword_qword_transpose =
+      (sizeof(dtype) < 4) && trans;
 
-  using mem_dtype =
-      typename std::conditional<mem_dword_transpose, uint32_t, dtype>::type;
+  using mem_dtype = typename std::
+      conditional<mem_dword_qword_transpose, uint32_t, dtype>::type;
   static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
+  mem_dtype* base_ptr;
+  uint32_t surface_width;
+  uint32_t surface_height;
+  uint32_t surface_pitch;
+  int32_t offset_x;
+  int32_t offset_y;
 
   xetla_vector<uint32_t, 16 * num_block> payloads;
 
   inline mem_payload_t(const this_payload_t& rhs) {
+    this->base_ptr = rhs.base_ptr;
+    this->surface_width = rhs.surface_width;
+    this->surface_height = rhs.surface_height;
+    this->surface_pitch = rhs.surface_pitch;
+    this->offset_x = rhs.offset_x;
+    this->offset_y = rhs.offset_y;
+
     this->payloads = rhs.payloads;
   }
 
   inline mem_payload_t(mem_desc_t& mem_desc) {
+    this->base_ptr = (mem_dtype*)mem_desc.base.base;
+    this->surface_width =
+        (mem_transpose ? mem_desc.shape.y : mem_desc.shape.x) * sizeof(dtype);
+    this->surface_height =
+        (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
+    this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
+    this->offset_x = mem_desc.coord.x;
+    this->offset_y = mem_desc.coord.y;
+
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
     int32_t offset = gpu::xetla::detail::xetla_get_tensor_offset_x(base_tdesc) /
         int32_t(scale_factor);
@@ -106,6 +130,13 @@ struct mem_payload_t<
       uint32_t surface_pitch,
       int32_t surface_offset_x = 0,
       int32_t surface_offset_y = 0) {
+    this->base_ptr = (mem_dtype)p;
+    this->surface_width = surface_width;
+    this->surface_height = surface_height;
+    this->surface_pitch = surface_pitch;
+    this->offset_x = surface_offset_x;
+    this->offset_y = surface_offset_y;
+
     xetla_tdescriptor base_tdesc;
     xetla_fill_tdesc(
         base_tdesc.xetla_format<uint32_t>(),
@@ -119,6 +150,15 @@ struct mem_payload_t<
   }
 
   __XETLA_API void init(mem_desc_t& mem_desc) {
+    this->base_ptr = (mem_dtype*)mem_desc.base.base;
+    this->surface_width =
+        (mem_transpose ? mem_desc.shape.y : mem_desc.shape.x) * sizeof(dtype);
+    this->surface_height =
+        (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
+    this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
+    this->offset_x = mem_desc.coord.x;
+    this->offset_y = mem_desc.coord.y;
+
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
     int32_t offset = gpu::xetla::detail::xetla_get_tensor_offset_x(base_tdesc) /
         int32_t(scale_factor);
@@ -142,6 +182,13 @@ struct mem_payload_t<
       uint32_t surface_pitch,
       int32_t surface_offset_x = 0,
       int32_t surface_offset_y = 0) {
+    this->base_ptr = (mem_dtype)p;
+    this->surface_width = surface_width;
+    this->surface_height = surface_height;
+    this->surface_pitch = surface_pitch;
+    this->offset_x = surface_offset_x;
+    this->offset_y = surface_offset_y;
+
     xetla_tdescriptor base_tdesc;
     xetla_fill_tdesc(
         base_tdesc.xetla_format<uint32_t>(),
@@ -160,6 +207,13 @@ struct mem_payload_t<
   // ~mem_payload_t(){}
 
   inline this_payload_t& operator=(const this_payload_t& rhs) {
+    this->base_ptr = rhs.base_ptr;
+    this->surface_width = rhs.surface_width;
+    this->surface_height = rhs.surface_height;
+    this->surface_pitch = rhs.surface_pitch;
+    this->offset_x = rhs.offset_x;
+    this->offset_y = rhs.offset_y;
+
     this->payloads = rhs.payloads;
     return *this;
   }
