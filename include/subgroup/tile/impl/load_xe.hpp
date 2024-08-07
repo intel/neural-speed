@@ -394,12 +394,10 @@ tile_load(tile_t& tile, payload_t& payload) {
   using dtype = typename payload_t::dtype;
   static constexpr uint32_t load_len = tile_t::tile_elems;
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
-  static constexpr uint32_t power2_block_elems =
-      detail::getNextPowerOf2<uint32_t(tile_t::block_elems * sizeof(dtype))>();
 
   using load_store_attr = load_store_attr_t<msg_type::block_1d, arch_tag>;
   static constexpr uint32_t max_load_vec_len =
-      std::min(power2_block_elems, load_store_attr::max_aligned_load_vec_len);
+      load_store_attr::max_aligned_load_vec_len;
 
   static constexpr uint32_t max_load_vec_elems =
       max_load_vec_len / sizeof(dtype);
@@ -457,6 +455,9 @@ tile_load(tile_t& tile, payload_t& payload) {
   constexpr uint32_t num_channel = payload_t::num_channel;
   constexpr uint32_t load_elems = num_channel * payload_t::vector_size;
   constexpr uint32_t pack_factor = payload_t::pack_factor;
+  constexpr uint32_t block_height = payload_t::mem_transpose
+      ? tile_desc::block_size_x
+      : tile_desc::block_size_y;
 
   auto channel_offset = payload.channel_offset + payload.base_offset;
 #pragma unroll
@@ -468,9 +469,7 @@ tile_load(tile_t& tile, payload_t& payload) {
       auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
           (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
 #pragma unroll
-      for (uint32_t sub_block_offset = 0; sub_block_offset <
-           (payload_t::mem_transpose ? tile_desc::block_size_x
-                                     : tile_desc::block_size_y);
+      for (uint32_t sub_block_offset = 0; sub_block_offset < block_height;
            sub_block_offset += num_channel) {
         xetla_vector<load_dtype, load_elems> reg_tmp = 0;
         uint32_t address_offset = payload_t::mem_transpose
@@ -479,20 +478,19 @@ tile_load(tile_t& tile, payload_t& payload) {
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_offset) * payload.pitch_in_bytes;
         xetla_mask<num_channel> mask = 1;
-        if constexpr (num_channel > 1) {
-          // For SDP load, need pred
+        if constexpr (payload_t::use_mask) {
+          // For SDP load, need mask
           const uint32_t sub_block_offset_x = payload.base_x + offset_x +
               (payload_t::mem_transpose ? sub_block_offset : 0);
           const uint32_t sub_block_offset_y = payload.base_y + offset_y +
               (payload_t::mem_transpose ? 0 : sub_block_offset);
-          const auto offset_ch_dim =
-              payload_t::trans ? sub_block_offset_x : sub_block_offset_y;
-          const auto size_ch_dim = payload_t::trans ? payload.width_in_elems
-                                                    : payload.height_in_elems;
+          const auto offset_ch_dim = payload_t::mem_transpose
+              ? sub_block_offset_x
+              : sub_block_offset_y;
 
-          mask = offset_ch_dim + num_channel > size_ch_dim
+          mask = offset_ch_dim + num_channel > payload.height_in_elems
               ? (xetla_vector_gen<uint32_t, num_channel>(offset_ch_dim, 1) <
-                 size_ch_dim)
+                 payload.height_in_elems)
               : 1;
         }
         reg_tmp = xetla_load_global<
@@ -574,6 +572,9 @@ tile_load(tile_t& tile, payload_t& payload) {
   constexpr uint32_t load_elems = payload_t::mem_transpose
       ? tile_desc::block_size_y
       : tile_desc::block_size_x;
+  constexpr uint32_t block_height = payload_t::mem_transpose
+      ? tile_desc::block_size_x
+      : tile_desc::block_size_y;
 
 #pragma unroll
   for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
@@ -584,18 +585,15 @@ tile_load(tile_t& tile, payload_t& payload) {
       auto reg_sub = tile.reg.xetla_select<tile_desc::block_elems, 1>(
           (i * tile_desc::num_block_x + j) * tile_desc::block_elems);
 #pragma unroll
-      for (uint32_t sub_block_y = 0;
-           sub_block_y < (payload_t::mem_transpose ? tile_desc::block_size_x
-                                                   : tile_desc::block_size_y);
-           sub_block_y += 1) {
+      for (uint32_t sub_block_y = 0; sub_block_y < block_height;
+           sub_block_y++) {
         uint32_t address_offset = payload_t::mem_transpose
             ? (offset_x + sub_block_y) * payload.pitch_in_bytes +
                 offset_y * sizeof(dtype)
             : offset_x * sizeof(dtype) +
                 (offset_y + sub_block_y) * payload.pitch_in_bytes;
 
-        reg_sub.xetla_select<load_elems, 1>(
-            sub_block_y * tile_desc::block_size_x) =
+        reg_sub.xetla_select<load_elems, 1>(sub_block_y * load_elems) =
             xetla_load_global<dtype, load_elems, L1, L2>(
                 (dtype*)payload.base_ptr, payload.base_offset + address_offset);
       }
