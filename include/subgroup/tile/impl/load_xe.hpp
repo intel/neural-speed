@@ -94,7 +94,8 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
   static constexpr reg_layout reg_layout_ = tile_desc::register_layout;
-  static constexpr bool is_vnni_reverse = payload_t::mem_dword_transpose &&
+  static constexpr bool is_vnni_reverse =
+      payload_t::mem_dword_qword_transpose &&
       ((reg_layout_ == reg_layout::tiled) ||
        (reg_layout_ == reg_layout::transpose_tiled));
   static constexpr bool reg_transpose = tile_desc::reg_transpose;
@@ -121,28 +122,27 @@ tile_load(tile_t& tile, payload_t& payload) {
       mem_transpose ? max_trans_block_width : max_load_block_height;
   static constexpr uint32_t ld_blk_size_y = reg_transpose
       ? block_size_y
-      : (block_size_y > ld_blk_size_y_limit ? ld_blk_size_y_limit
-                                            : block_size_y);
+      : std::min(ld_blk_size_y_limit, block_size_y)
 
-  // array len is used to make sure memory load is cache line aligned
-  // disabled while register or memory transpose
-  static constexpr uint8_t arr_len_candidate =
-      (reg_transpose ||
-       mem_transpose
-       // block elements should be integer
-       // times of register bytes
-       || ((block_size_y * block_size_x) % elems_per_reg != 0)
-       // tail blocks also need to meet above condition
-       ||
-       (((tile_size_y % block_size_y) * block_size_x) % elems_per_reg != 0)) ||
-          (block_size_y > ld_blk_size_y_limit)
-      ? 1
-      : (((tile_size_x % elems_per_CL) == 0)
-             ? (((elems_per_CL % block_size_x) == 0)
-                    ? elems_per_CL / block_size_x
-                    : 1)
-             : ((tile_size_x < elems_per_CL) ? (tile_size_x / block_size_x)
-                                             : 1));
+      // array len is used to make sure memory load is cache line aligned
+      // disabled while register or memory transpose
+      static constexpr uint8_t arr_len_candidate =
+          (reg_transpose ||
+           mem_transpose
+           // block elements should be integer
+           // times of register bytes
+           || ((block_size_y * block_size_x) % elems_per_reg != 0)
+           // tail blocks also need to meet above condition
+           || (((tile_size_y % block_size_y) * block_size_x) % elems_per_reg !=
+               0)) ||
+              (block_size_y > ld_blk_size_y_limit)
+          ? 1
+          : (((tile_size_x % elems_per_CL) == 0)
+                 ? (((elems_per_CL % block_size_x) == 0)
+                        ? elems_per_CL / block_size_x
+                        : 1)
+                 : ((tile_size_x < elems_per_CL) ? (tile_size_x / block_size_x)
+                                                 : 1));
   static constexpr bool is_valid_arr_len_candidate = (arr_len_candidate == 1) ||
       (arr_len_candidate == 2) || (arr_len_candidate == 4);
 
@@ -203,14 +203,31 @@ tile_load(tile_t& tile, payload_t& payload) {
       for (uint32_t ii = 0; ii < block_size_y / ld_blk_size_y; ++ii) {
         constexpr uint32_t load_elems = ld_blk_size_y * block_size_x * arr_len;
 
-        reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
+        // reg_tmp.xetla_format<native_type_t<load_dtype>>() =
+        // xetla_tload_global<
+        //     load_dtype,
+        //     ld_blk_height * block_size_x * arr_len / scale_factor,
+        //     L1,
+        //     L2,
+        //     trans,
+        //     mem_transform,
+        //     arch_tag>(tdesc);
+        reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             load_dtype,
-            ld_blk_height * block_size_x * arr_len / scale_factor,
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            block_size_y,
+            num_block,
             trans,
             mem_transform,
-            arch_tag>(tdesc);
+            L1,
+            L2>(
+            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
+                tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
               .xetla_format<native_type_t<load_dtype>>() =
@@ -256,14 +273,30 @@ tile_load(tile_t& tile, payload_t& payload) {
             tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
 
         reg_blk.xetla_select<load_elems, 1>(remained_start)
-            .xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
+            .xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             load_dtype,
-            (load_elems / scale_factor),
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            block_size_y,
+            num_block,
             trans,
             mem_transform,
-            arch_tag>(tdesc);
+            L1,
+            L2>(
+            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
+                tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+        // xetla_tload_global<
+        // load_dtype,
+        // (load_elems / scale_factor),
+        // L1,
+        // L2,
+        // trans,
+        // mem_transform,
+        // arch_tag>(tdesc);
       }
     }
   }
@@ -301,14 +334,30 @@ tile_load(tile_t& tile, payload_t& payload) {
         constexpr uint32_t load_elems =
             remained_ld_blk_size_y * block_size_x * arr_len;
 
-        reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
+        reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             load_dtype,
-            (ld_blk_height * block_size_x * arr_len / scale_factor),
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            block_size_y,
+            num_block,
             trans,
             mem_transform,
-            arch_tag>(tdesc);
+            L1,
+            L2>(
+            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
+                tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+        //  xetla_tload_global<
+        // load_dtype,
+        // (ld_blk_height * block_size_x * arr_len / scale_factor),
+        // L1,
+        // L2,
+        // trans,
+        // mem_transform,
+        // arch_tag>(tdesc);
 
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
@@ -352,14 +401,30 @@ tile_load(tile_t& tile, payload_t& payload) {
         gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
             tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
         reg_blk.xetla_select<final_load_elems, 1>(final_start)
-            .xetla_format<native_type_t<load_dtype>>() = xetla_tload_global<
+            .xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             load_dtype,
-            final_load_elems / scale_factor,
-            L1,
-            L2,
+            block_size_x / scale_factor,
+            block_size_y,
+            num_block,
             trans,
             mem_transform,
-            arch_tag>(tdesc);
+            L1,
+            L2>(
+            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
+                tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+        // xetla_tload_global<
+        // load_dtype,
+        // final_load_elems / scale_factor,
+        // L1,
+        // L2,
+        // trans,
+        // mem_transform,
+        // arch_tag>(tdesc);
       }
     }
   }

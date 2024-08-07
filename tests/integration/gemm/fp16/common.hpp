@@ -59,7 +59,7 @@ class TestBaseFP16f : public TestBase {
   using data_type_b = fp16;
   using data_type_c = fp16;
   using data_type_acc = float;
-  static constexpr mma_engine engine = mma_engine::fpu;
+  static constexpr mma_engine engine = mma_engine::xmx;
 };
 
 class TestBaseFP16x : public TestBase {
