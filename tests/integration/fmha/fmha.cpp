@@ -32,28 +32,31 @@ struct test_params_t {
   bool kSeqLast;
   uint32_t bs;
   uint32_t hn;
+  uint32_t hkv; // number of kv head
   uint32_t hs;
   uint32_t qlen;
   uint32_t klen;
 
   static std::vector<test_params_t> cases() {
     std::vector<test_params_t> ret;
-    std::vector<std::array<uint32_t, 5>> shapes{
-        {1, 32, 64, 1, 33},
-        {1, 32, 64, 34, 34},
-        {1, 32, 64, 1023, 1023},
+    std::vector<std::array<uint32_t, 6>> shapes{
+        {1, 32, 32, 64, 1, 33},
+        {1, 32, 32, 64, 34, 34},
+        {1, 32, 32, 64, 1023, 1023},
 
-        {1, 32, 128, 1, 33},
-        {1, 32, 128, 1, 1023},
-        {1, 32, 128, 1, 16384},
-        {1, 32, 128, 34, 34},
-        {1, 32, 128, 34, 1023},
-        {1, 32, 128, 1023, 1023},
+        {1, 32, 32, 128, 1, 33},
+        {1, 32, 8, 128, 1, 33},
+        {1, 32, 32, 128, 1, 1023},
+        {1, 32, 8, 128, 1, 1023},
+        {1, 32, 32, 128, 1, 16384},
+        {1, 32, 32, 128, 34, 34},
+        {1, 32, 32, 128, 34, 1023},
+        {1, 32, 32, 128, 1023, 1023},
     };
-    for (auto [bs, hn, hs, qlen, klen] : shapes)
+    for (auto [bs, hn, hkv, hs, qlen, klen] : shapes)
       for (auto kUseBias : {false, true})
         for (auto kSeqLast : {false, true})
-          ret.emplace_back(kUseBias, kSeqLast, bs, hn, hs, qlen, klen);
+          ret.emplace_back(kUseBias, kSeqLast, bs, hn, hkv, hs, qlen, klen);
     return ret;
   }
 
@@ -63,6 +66,7 @@ struct test_params_t {
     params.push_back(std::string("kSeqLast") + (kSeqLast ? "ON" : "OFF"));
     params.push_back("bs" + std::to_string(bs));
     params.push_back("hn" + std::to_string(hn));
+    params.push_back("hkv" + std::to_string(hkv));
     params.push_back("hs" + std::to_string(hs));
     params.push_back("qlen" + std::to_string(qlen));
     params.push_back("klen" + std::to_string(klen));
@@ -88,6 +92,7 @@ int fma_result_validate(
     sycl::queue& queue) {
   const auto bs = p.bs;
   const auto hn = p.hn;
+  const auto hkv = p.hkv;
   const auto hs = p.hs;
   const auto qlen = p.qlen;
   const auto klen = p.klen;
@@ -96,9 +101,9 @@ int fma_result_validate(
   auto Q_ptr =
       alloc_host_and_copy<FMHA_T>(q_device, bs * hn * hs * qlen, queue);
   auto K_ptr =
-      alloc_host_and_copy<FMHA_T>(k_device, bs * hn * hs * klen, queue);
+      alloc_host_and_copy<FMHA_T>(k_device, bs * hkv * hs * klen, queue);
   auto V_ptr =
-      alloc_host_and_copy<FMHA_T>(v_device, bs * hn * hs * klen, queue);
+      alloc_host_and_copy<FMHA_T>(v_device, bs * hkv * hs * klen, queue);
   auto DST_ptr =
       alloc_host_and_copy<FMHA_T>(DST_device, bs * hn * hs * qlen, queue);
   auto BIAS_ptr = kUseBias ? alloc_host_and_copy<FMHA_T>(
@@ -109,13 +114,14 @@ int fma_result_validate(
   for (uint32_t gid = 0; gid < bs * hn; gid++) {
     uint32_t batch_id = gid / hn; // get batch idx
     uint32_t head_id = gid % hn; // get head idx
+    uint32_t kv_id = head_id / (hn / hkv);
 
     const auto Q_cur = kSeqLast
         ? Q_ptr + batch_id * hs * hn + hs * head_id
         : Q_ptr + batch_id * qlen * hs * hn + hs * head_id;
     const auto K_cur = kSeqLast
-        ? K_ptr + batch_id * hs * hn + hs * head_id
-        : K_ptr + batch_id * klen * hs * hn + hs * head_id;
+        ? K_ptr + batch_id * hs * hkv + hs * kv_id
+        : K_ptr + batch_id * klen * hs * hkv + hs * kv_id;
     const auto gold_cur = gold_SP.data() + gid * qlen * klen;
     const auto BIAS_cur =
         kUseBias ? BIAS_ptr + batch_id * qlen * klen_pad32 : nullptr;
@@ -127,7 +133,7 @@ int fma_result_validate(
     auto K_tmp = std::unique_ptr<FMHA_T[]>(new FMHA_T[klen * hs]);
     for (uint32_t i = 0; i < klen; ++i)
       for (uint32_t j = 0; j < hs; ++j)
-        K_tmp[j * klen + i] = K_cur[i * hs * hn * (kSeqLast ? bs : 1) + j];
+        K_tmp[j * klen + i] = K_cur[i * hs * hkv * (kSeqLast ? bs : 1) + j];
 
     get_gemm_gold<FMHA_T, FMHA_T, accum_t>(
         qlen,
@@ -164,17 +170,18 @@ int fma_result_validate(
   for (uint32_t gid = 0; gid < bs * hn; gid++) {
     uint32_t batch_id = gid / hn; // get batch idx
     uint32_t head_id = gid % hn; // get head idx
+    uint32_t kv_id = head_id / (hn / hkv);
 
     const auto V_cur = kSeqLast
-        ? V_ptr + batch_id * hs * hn + hs * head_id
-        : V_ptr + batch_id * klen * hs * hn + hs * head_id;
+        ? V_ptr + batch_id * hs * hkv + hs * kv_id
+        : V_ptr + batch_id * klen * hs * hkv + hs * kv_id;
     const auto P_cur = gold_SP.data() + gid * qlen * klen;
     auto dst_cur = std::unique_ptr<accum_t[]>(new accum_t[qlen * hs]);
     std::fill_n(dst_cur.get(), qlen * hs, 0);
     auto V_tmp = std::unique_ptr<FMHA_T[]>(new FMHA_T[klen * hs]);
     for (uint32_t i = 0; i < klen; ++i)
       std::copy_n(
-          V_cur + i * hs * hn * (kSeqLast ? bs : 1), hs, V_tmp.get() + i * hs);
+          V_cur + i * hs * hkv * (kSeqLast ? bs : 1), hs, V_tmp.get() + i * hs);
     get_gemm_gold(
         qlen,
         hs,
@@ -231,6 +238,7 @@ template <typename policy_t, bool kUseBias, bool kSeqLast>
 void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
   const auto bs = p.bs;
   const auto hn = p.hn;
+  const auto hkv = p.hkv;
   const auto hs = p.hs;
   const auto qlen = p.qlen;
   const auto klen = p.klen;
@@ -267,7 +275,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
       device,
       context);
   auto K = alloc_device_and_init<FMHA_T>(
-      bs * hn * hs * klen,
+      bs * hkv * hs * klen,
       [](FMHA_T* data, size_t idx) {
         data[idx] = static_cast<FMHA_T>(idx % 11);
       },
@@ -275,7 +283,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
       device,
       context);
   auto V = alloc_device_and_init<FMHA_T>(
-      bs * hn * hs * klen,
+      bs * hkv * hs * klen,
       [](FMHA_T* data, size_t idx) {
         data[idx] = static_cast<FMHA_T>(random_float());
       },
@@ -340,7 +348,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
             L,
             bs,
             hn,
-            hn, // num_kv_heads
+            hkv, // num_kv_heads
             hs,
             qlen,
             klen,
