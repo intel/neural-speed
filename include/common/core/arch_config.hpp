@@ -65,7 +65,7 @@ struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc> {
   // BlockWidth * NBlocks must not exceed 64 for bytes, 32 for words, 16 for
   // dwords, and 8 for qwords.
   static constexpr uint32_t max_load_size_in_bytes = 2048;
-  
+
   // BlockWidth * BlockHeight * sizeof(T) must not exceed 512.
   static constexpr uint32_t max_store_size_in_bytes = 512;
 
