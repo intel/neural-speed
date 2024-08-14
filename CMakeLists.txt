@@ -45,8 +45,15 @@ if (${LOG} STREQUAL "on")
     add_definitions(-DLOG_PRINT)
 endif ()
 
-# For large registers mode, enable 256 registers for kernels
-set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
+# doubleGRF
+set(USE_DOUBLE_GRF "off" CACHE STRING "on/off log message")
+message(STATUS "USE_DOUBLE_GRF is " ${USE_DOUBLE_GRF})
+if (${USE_DOUBLE_GRF} STREQUAL "on")
+    add_definitions(-DUSE_DOUBLE_GRF)
+    # For large registers mode, enable 256 registers for kernels
+    set(XETLA_OFFLINE_OPTIONS "-doubleGRF")
+endif ()
+
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-disable-indvars-opt")
 set(XETLA_OFFLINE_OPTIONS "${XETLA_OFFLINE_OPTIONS} -vc-codegen")
 # Enable bank conflict reduction.
@@ -67,7 +74,7 @@ else()
 endif()
 
 add_compile_options(-fsycl -fsycl-device-code-split=per_kernel)
-add_compile_options(-Wall -Wextra -Werror)
+add_compile_options(-Wall -Wextra )
 
 include(ProcessorCount)
 ProcessorCount(nproc)

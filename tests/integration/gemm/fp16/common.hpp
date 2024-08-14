@@ -46,7 +46,7 @@ class TestBase {
     return name;
   }
 
-  static constexpr gpu_arch gpu_arch = gpu_arch::XeHpc;
+  static constexpr gpu_arch gpu_arch = gpu_arch::XeLpg;
   //static constexpr gpu_arch gpu_arch = gpu_arch::XeHpg;
   static constexpr uint32_t global_kslicing = 1;
   static constexpr uint32_t local_kslicing = 1;
@@ -73,18 +73,18 @@ class TestBaseFP16x : public TestBase {
 
 class Test0 : public TestBaseFP16f {
   public:
-  static constexpr size_t mat_m = 1;
-  static constexpr size_t mat_n = 64;
-  static constexpr size_t mat_k = 8192;
+  static constexpr size_t mat_m = 1024;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_m = 8;
-  static constexpr size_t wg_n = 32;
+  static constexpr size_t wg_n = 16;
   static constexpr size_t sg_m = 8;
   static constexpr size_t sg_n = 16;
-  static constexpr size_t sg_k = 16;
+  static constexpr size_t sg_k = 128;
   static constexpr uint32_t global_kslicing = 1;
-  static constexpr uint32_t local_kslicing = 8;
+  static constexpr uint32_t local_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
-  static constexpr mem_layout layout_b = mem_layout::row_major;
+  static constexpr mem_layout layout_b = mem_layout::col_major;
 };
 
 class Test0x : public TestBaseFP16x {

@@ -86,8 +86,8 @@ class gemm_t<
   static constexpr mem_layout mem_layout_b = mem_desc_b_t::layout;
   static constexpr bool is_col_major_a = mem_layout_a == mem_layout::col_major;
   static constexpr bool is_col_major_b = mem_layout_b == mem_layout::col_major;
-  static constexpr bool is_gemv = is_col_major_b &&
-      compute_policy::mma_engine == mma_engine::fpu && sg_tile_m <= 4;
+  static constexpr bool is_gemv =
+      is_col_major_b && compute_policy::mma_engine == mma_engine::fpu;
 
  private:
   /******** set data type **********/
@@ -151,7 +151,7 @@ class gemm_t<
   static constexpr reg_layout reg_layout_a =
       // fpu
       compute_policy::mma_engine == mma_engine::fpu
-      ? (is_gemv ? reg_layout::tiled : reg_layout::transpose_tiled)
+      ? (is_col_major_b ? reg_layout::tiled : reg_layout::transpose_tiled)
       // xmx
       : is_vnni_tiled_a ? reg_layout::vnni_tiled
                         : reg_layout::tiled;
@@ -159,7 +159,7 @@ class gemm_t<
   static constexpr reg_layout reg_layout_b =
       // fpu
       compute_policy::mma_engine == mma_engine::fpu
-      ? (is_gemv ? reg_layout::transpose_tiled : reg_layout::tiled)
+      ? (is_col_major_b ? reg_layout::transpose_tiled : reg_layout::tiled)
       // xmx
       : (sizeof(dtype_mma_b) < sizeof(uint32_t)) ? reg_layout::vnni_tiled
                                                  : reg_layout::tiled;
@@ -302,16 +302,13 @@ class gemm_t<
   using zero_pt_prefetch_payload_t = subgroup::
       prefetch_payload_t<mem_desc_zero_pt_t, zero_pt_tile_desc_t, 1, arch_tag>;
 
-  using tile_mma = std::conditional_t<
-      is_gemv,
-      subgroup::tile_fma_t<matAcc_t, matC_t, matB_acc_t, matA_acc_t, arch_tag>,
-      subgroup::tile_mma_t<
-          matC_t,
-          matC_t,
-          matB_acc_t,
-          matA_acc_t,
-          compute_policy::mma_engine,
-          arch_tag>>;
+  using tile_mma = subgroup::tile_mma_t<
+      std::conditional_t<is_gemv, matAcc_t, matC_t>,
+      matC_t,
+      matB_acc_t,
+      matA_acc_t,
+      compute_policy::mma_engine,
+      arch_tag>;
   using dequantize_t = subgroup::dequant_int4_weight_t<
       matB_acc_t,
       matB_t,

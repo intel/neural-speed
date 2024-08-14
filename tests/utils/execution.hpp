@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022-2023 Intel Corporation
+ * Copyright (c) 2022-2024 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,22 +20,26 @@
 #include <stdexcept>
 #include "common.hpp"
 #include "profiling.hpp"
+#ifdef _WIN32
+#include "windows_functions.hpp"
+#endif
 #include "xetla.hpp"
 
 using namespace cl::sycl;
 using namespace gpu;
 using namespace gpu::xetla;
 
-template <
-    class Test,
-    typename validate_func,
-    typename KERNEL,
-    int SLMSIZE = arch_attr_t<Test::gpu_arch>::local_mem_size,
-    int BARNUM = 32>
-void gemm_exec(const std::string& compile_str, size_t batch = 1) {
+template <typename Test, typename validate_func, typename kernel_t>
+void gemm_exec(
+    const std::string& compile_str,
+    size_t batch = 1,
+    size_t scaling = 1) {
   test_result result = test_result::complete;
 
-  using gemm_op_t = typename KERNEL::gemm_op_t;
+  using gemm_op_t = typename kernel_t::gemm_op_t;
+
+  constexpr uint32_t slm_size = kernel_t::slm_size;
+  constexpr uint32_t barrier_num = kernel_t::barrier_count;
 
   using data_type_a = typename Test::data_type_a;
   using data_type_b = typename Test::data_type_b;
@@ -45,6 +49,12 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
   constexpr size_t matrix_m = Test::mat_m;
   constexpr size_t matrix_n = Test::mat_n;
   constexpr size_t matrix_k = Test::mat_k;
+
+  [[maybe_unused]] constexpr size_t wg_tile_m = Test::wg_m;
+  [[maybe_unused]] constexpr size_t wg_tile_n = Test::wg_n;
+  [[maybe_unused]] constexpr size_t sg_tile_m = Test::sg_m;
+  [[maybe_unused]] constexpr size_t sg_tile_n = Test::sg_n;
+  [[maybe_unused]] constexpr size_t sg_tile_k = Test::sg_k;
 
   size_t size_a = matrix_m * matrix_k;
   size_t size_b = matrix_k * matrix_n;
@@ -59,16 +69,16 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
 
   auto A = alloc_device_and_init<data_type_a>(
       batch * size_a,
-      [](data_type_a* data, size_t idx) {
-        data[idx] = static_cast<data_type_a>(random_float());
+      [&scaling](data_type_a* data, size_t idx) {
+        data[idx] = static_cast<data_type_a>(scaling * (random_float() - 0.5f));
       },
       queue,
       device,
       context);
   auto B = alloc_device_and_init<data_type_b>(
       batch * size_b,
-      [](data_type_b* data, size_t idx) {
-        data[idx] = static_cast<data_type_b>(random_float());
+      [&scaling](data_type_b* data, size_t idx) {
+        data[idx] = static_cast<data_type_b>(scaling * (random_float() - 0.5f));
       },
       queue,
       device,
@@ -81,6 +91,7 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
       queue,
       device,
       context);
+
   size_t size_acc = gemm_op_t::get_acc_buf_size(matrix_m, matrix_n);
   size_t size_cnt = gemm_op_t::get_cnt_buf_size(matrix_m, matrix_n);
   auto Acc = alloc_device_and_init<data_type_acc>(
@@ -97,20 +108,20 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
       queue,
       device,
       context);
-
-  size_t ops = 2 * matrix_m * matrix_n * matrix_k;
+  long ops = 2 * static_cast<long>(matrix_m) * matrix_n * matrix_k;
   profiling_helper prof("gemm", ops, "gflops");
-
   try {
     std::vector<kernel_id> kernelId = {get_kernel_id<Test>()};
     auto inputBundle =
         get_kernel_bundle<bundle_state::input>(context, kernelId);
-    static const std::string env_set_str =
-        "SYCL_PROGRAM_COMPILE_OPTIONS=" + compile_str;
-    putenv(const_cast<char*>(env_set_str.c_str()));
+    char* value = getenv("GOGRITS");
+    if (value == NULL || strcmp(value, "on") != 0) {
+      setenv("SYCL_PROGRAM_COMPILE_OPTIONS", compile_str.c_str(), 1);
+    }
     kernel_bundle<bundle_state::executable> exeBundle = build(inputBundle);
-    static const std::string env_unset_str = "SYCL_PROGRAM_COMPILE_OPTIONS=";
-    putenv(const_cast<char*>(env_unset_str.c_str()));
+    if (value == NULL || strcmp(value, "on") != 0) {
+      unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
+    }
 
     using namespace gpu::xetla::group;
     using namespace gpu::xetla::kernel;
@@ -130,10 +141,10 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
         nullptr);
 
     cl::sycl::nd_range<3> nd_range = gemm_op_t::get_nd_range(arg);
-
     int constexpr warm_up = 10;
     int constexpr iters = 100;
     for (size_t i = 0; i < batch; i++) {
+      prof.cpu_start();
       auto A_ptr = A + i * size_a;
       auto B_ptr = B + i * size_b;
       auto C_ptr = C + i * size_c;
@@ -157,11 +168,13 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
           prof.cpu_start();
         }
         auto e_esimd = queue.submit([&](handler& cgh) {
-          cgh.use_kernel_bundle(exeBundle);
+          if (value == NULL || strcmp(value, "on") != 0) {
+            cgh.use_kernel_bundle(exeBundle);
+          }
           cgh.parallel_for<Test>(nd_range, [=](nd_item<3> item) KERNEL_MAIN {
-            gpu::xetla::xetla_local_init<SLMSIZE>();
-            gpu::xetla::xetla_nbarrier_init<BARNUM>();
-            KERNEL::run(
+            gpu::xetla::xetla_local_init<slm_size>();
+            gpu::xetla::xetla_nbarrier_init<barrier_num>();
+            kernel_t::run(
                 item,
                 A_ptr,
                 B_ptr,
@@ -184,9 +197,7 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
     std::cout << "SYCL exception caught: " << e.what() << '\n';
     result = test_result::fail;
   }
-
-  // performance
-  prof.print_profiling_result(profiling_selector::GPU);
+  unsetenv("SYCL_PROGRAM_COMPILE_OPTIONS");
   // validation
   if (result == test_result::complete) {
     validate_func vfunc;
@@ -204,6 +215,7 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
   } else if (result != test_result::complete) {
     FAIL();
   }
+  prof.print_profiling_result(profiling_selector::GPU);
 }
 
 /// @brief The template function to execute kernel in esimd way for unit test
@@ -211,54 +223,41 @@ void gemm_exec(const std::string& compile_str, size_t batch = 1) {
 ///
 /// @tparam data_type data_type The data type of buffer used in kernel and
 /// buffer allocation
-/// @tparam KERNEL the kernel function struct
+/// @tparam kernel_t the kernel function struct
 /// @param nd_range the range of workitems
-/// @param validate_result validation function, taking 3 parameters buffer A, B
-/// as input C as output
+/// @param validate_result validation function, taking 3 parameters buffer A,
+/// B as input C as output
 ///
 template <
     typename data_type,
-    class KERNEL,
-    size_t SLMSIZE = 8 * 1024,
-    size_t BARNUM = 32,
-    size_t Size = 4096>
-void kernel_run(auto nd_range, auto validate_result) {
+    typename kernel_t,
+    size_t slm_size = 8 * 1024,
+    size_t barrier_num = 32,
+    size_t size = 4096>
+void kernel_run(
+    auto nd_range,
+    auto validate_result,
+    init_func_t<data_type> init_func_a = index_init_func<data_type>,
+    init_func_t<data_type> init_func_b = index_init_func<data_type>,
+    init_func_t<data_type> init_func_c = no_init_func<data_type>) {
   queue queue{};
   auto context = queue.get_info<info::queue::context>();
   auto device = queue.get_info<info::queue::device>();
   std::cout << "Running on " << device.get_info<info::device::name>() << "\n";
 
   auto A = alloc_device_and_init<data_type>(
-      Size,
-      [](data_type* data, size_t idx) {
-        data[idx] = static_cast<data_type>(idx);
-      },
-      queue,
-      device,
-      context);
+      size, init_func_a, queue, device, context);
   auto B = alloc_device_and_init<data_type>(
-      Size,
-      [](data_type* data, size_t idx) {
-        data[idx] = static_cast<data_type>(idx);
-      },
-      queue,
-      device,
-      context);
+      size, init_func_b, queue, device, context);
   auto C = alloc_device_and_init<data_type>(
-      Size,
-      [](data_type* data, size_t idx) {
-        data[idx] = static_cast<data_type>(idx);
-      },
-      queue,
-      device,
-      context);
+      size, init_func_c, queue, device, context);
 
   try {
     auto e_esimd = queue.submit([&](handler& cgh) {
       cgh.parallel_for<>(nd_range, [=](nd_item<1> ndi) KERNEL_MAIN {
-        gpu::xetla::xetla_local_init<SLMSIZE>();
-        gpu::xetla::xetla_nbarrier_init<BARNUM>();
-        KERNEL::run(&ndi, A, B, C);
+        gpu::xetla::xetla_local_init<slm_size>();
+        gpu::xetla::xetla_nbarrier_init<barrier_num>();
+        kernel_t::run(&ndi, A, B, C);
       });
     });
     e_esimd.wait();
@@ -267,9 +266,9 @@ void kernel_run(auto nd_range, auto validate_result) {
     FAIL();
   }
 
-  auto A_host = alloc_host_and_copy<data_type>(A, Size, queue);
-  auto B_host = alloc_host_and_copy<data_type>(B, Size, queue);
-  auto C_host = alloc_host_and_copy<data_type>(C, Size, queue);
+  auto A_host = alloc_host_and_copy<data_type>(A, size, queue);
+  auto B_host = alloc_host_and_copy<data_type>(B, size, queue);
+  auto C_host = alloc_host_and_copy<data_type>(C, size, queue);
 
   ASSERT_EQ(0, validate_result(A_host, B_host, C_host));
 

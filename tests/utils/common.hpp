@@ -90,6 +90,7 @@ inline auto getTypeName<gpu::xetla::tf32>() {
 }
 
 enum class test_result : uint8_t { complete = 0, skip = 1, fail = 2 };
+enum Direction { FWD = 0, BWDD = 1, BWDW = 2 };
 
 template <typename result_type>
 inline result_type generate_real_random(
@@ -127,6 +128,26 @@ template <typename data_type>
 inline data_type* alloc_host(size_t size) {
   auto host_ptr = static_cast<data_type*>(malloc(size * sizeof(data_type)));
   return host_ptr;
+}
+
+template <typename data_type>
+using init_func_t = std::function<void(data_type* data, size_t elements)>;
+
+template <typename data_type>
+void index_init_func(data_type* data, size_t idx) {
+  data[idx] = static_cast<data_type>(idx);
+}
+template <typename data_type>
+void no_init_func(data_type* data, size_t idx) {}
+
+template <typename data_type>
+void rand_init_func(data_type* data, size_t idx) {
+  data[idx] = static_cast<data_type>(random_float() - 0.5f);
+}
+
+template <typename data_type>
+void zero_init_func(data_type* data, size_t idx) {
+  data[idx] = 0;
 }
 
 template <typename data_type>

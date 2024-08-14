@@ -30,14 +30,24 @@ template <
     typename matB_t_,
     typename matA_t_,
     gpu_arch arch_tag_>
-struct tile_fma_t {
+struct tile_mma_t<
+    matAcc_t_,
+    matC_t_,
+    matB_t_,
+    matA_t_,
+    mma_engine::fpu,
+    arch_tag_,
+    std::enable_if_t<
+        arch_has_fpu<arch_tag_> && !matA_t_::reg_transpose &&
+        matB_t_::reg_transpose>> {
   using matA_t = matA_t_;
   using matB_t = matB_t_;
   using matC_t = matC_t_;
   using matAcc_t = matAcc_t_;
   using dtype_a = typename matA_t::dtype;
   using dtype_b = typename matB_t::dtype;
-  using dtype_acc = typename matAcc_t_::dtype;
+  using dtype_c = typename matC_t::dtype;
+  using dtype_acc = typename matAcc_t::dtype;
 
   static constexpr uint32_t a_tile_size_y = matA_t::tile_size_y;
   static constexpr uint32_t a_tile_size_x = matA_t::tile_size_x;
@@ -61,33 +71,32 @@ struct tile_fma_t {
   static constexpr uint32_t block_size_n = b_block_size_x;
 
   static_assert(
+      !matA_t::reg_transpose,
+      "For FMAOp GEMM, the register layout of matA should be row-major");
+  static_assert(
+      matB_t::reg_transpose,
+      "For FMAOp GEMM, the register layout of matB should be col-major");
+
+  static_assert(
       a_tile_size_x == b_tile_size_y,
       "matA tile k should match with matB tile k");
   static_assert(
       a_block_size_x == b_block_size_y,
       "matA block k should match with matB block k");
   static_assert(
-      b_block_size_y == matAcc_t::block_size_x,
-      "matA block k should match with matAcc block k");
+      b_block_size_x == matC_t::block_size_x,
+      "matB block n should match with matAcc block n");
   static_assert(
-      a_block_size_y == matAcc_t::block_size_y,
-      "mata block m should match with matAcc block m");
+      a_block_size_y == matC_t::block_size_y,
+      "matA block m should match with matAcc block m");
 
-  static_assert(tile_size_n == 1, "matB tile n must be 1");
-  static_assert(b_block_size_x == 1, "matB block n must be 1");
-  __XETLA_API static void mma(
-      matAcc_t& acc_dst,
-      matAcc_t& acc_src,
-      matC_t& c,
-      matB_t& b,
-      matA_t& a,
-      bool reduce) {
+  __XETLA_API static void mma(matAcc_t& acc, matC_t& c, matB_t& b, matA_t& a) {
 #pragma unroll
     for (uint32_t k = 0; k < tile_size_k / block_size_k; k++) {
 #pragma unroll
       for (uint32_t m = 0; m < tile_size_m / block_size_m; m++) {
         uint32_t a_block_idx = m * tile_size_k / block_size_k + k;
-        auto a_block = a.reg.xetla_select<block_size_m * block_size_k, 1>(
+        auto a_block = a.reg.xetla_select<matA_t::block_elems, 1>(
             a_block_idx * matA_t::block_elems);
 #pragma unroll
         for (uint32_t n = 0; n < tile_size_n / block_size_n; n++) {
@@ -95,70 +104,85 @@ struct tile_fma_t {
           auto b_block = b.reg.xetla_select<matB_t::block_elems, 1>(
               b_block_idx * matB_t::block_elems);
 
-          auto src_block =
-              acc_src.reg.xetla_select<block_size_m * block_size_k, 1>(
-                  m * matAcc_t::block_elems);
-          auto dst_block =
-              acc_dst.reg.xetla_select<block_size_m * block_size_k, 1>(
-                  m * matAcc_t::block_elems);
-          fma_core<block_size_m, block_size_n, block_size_k>(
-              dst_block, src_block, b_block, a_block);
+          uint32_t c_block_idx = m * tile_size_n / block_size_n + n;
+          auto c_block = c.reg.xetla_select<matC_t::block_elems, 1>(
+              c_block_idx * matC_t::block_elems);
+
+          acc.reg = 0;
+          auto acc_block = acc.reg.xetla_select<matAcc_t::block_elems, 1>(0);
+          mma_core<block_size_m, block_size_n, block_size_k>(
+              acc_block, b_block, a_block);
+          reduce_block_acc_k<block_size_m, block_size_n>(acc_block, c_block);
         }
       }
     }
-    if (reduce) {
-      reduce_acc_k(acc_dst, c);
-    }
   }
+
   template <int blk_m, int blk_n, int blk_k>
-  __XETLA_API static void fma_core(
-      xetla_vector_ref<dtype_acc, blk_m * blk_k> __REF__ dst_block,
-      xetla_vector_ref<dtype_acc, blk_m * blk_k> __REF__ src_block,
+  __XETLA_API static void mma_core(
+      xetla_vector_ref<dtype_acc, blk_m * blk_n * matAcc_t::block_size_x>
+          __REF__ acc_block,
       xetla_vector_ref<dtype_b, blk_k * blk_n> __REF__ b_block,
       xetla_vector_ref<dtype_a, blk_m * blk_k> __REF__ a_block) {
-    static_assert(blk_n == 1, "block n must be 1");
-    auto dst_blk_2d = dst_block.xetla_format<dtype_acc, blk_m, blk_k>();
-    auto src_blk_2d = src_block.xetla_format<dtype_acc, blk_m, blk_k>();
+    auto acc_blk_2d = acc_block.xetla_format<
+        dtype_acc,
+        matAcc_t::block_size_y,
+        matAcc_t::block_size_x>();
     auto b_blk_2d = b_block.xetla_format<dtype_b, blk_n, blk_k>();
     auto a_blk_2d = a_block.xetla_format<dtype_a, blk_m, blk_k>();
-
 #pragma unroll
     for (uint32_t m = 0; m < blk_m; m++) {
       auto a_row = a_blk_2d.row(m);
 #pragma unroll
       for (uint32_t n = 0; n < blk_n; n++) {
         auto b_row = b_blk_2d.row(n);
-        dst_blk_2d.row(m) = b_row * a_row + src_blk_2d.row(m);
+        if constexpr (std::is_same_v<dtype_acc, dtype_a>) {
+#pragma unroll
+          for (uint32_t k = 0; k < blk_k; k += matAcc_t::block_size_x) {
+            acc_blk_2d.row(m * blk_n + n) +=
+                a_row.xetla_select<matAcc_t::block_size_x, 1>(k) *
+                b_row.xetla_select<matAcc_t::block_size_x, 1>(k);
+          }
+        } else {
+          xetla_vector<dtype_a, matAcc_t::block_size_x> acc_tmp = 0;
+#pragma unroll
+          for (uint32_t k = 0; k < blk_k; k += matAcc_t::block_size_x) {
+            acc_tmp += a_row.xetla_select<matAcc_t::block_size_x, 1>(k) *
+                b_row.xetla_select<matAcc_t::block_size_x, 1>(k);
+          }
+          acc_blk_2d.row(m * blk_n + n) = acc_tmp;
+        }
       }
     }
   }
-  __XETLA_API static void reduce_acc_k(matAcc_t& matAcc, matC_t& matC) {
-    // matC  [tx,ty,bx,by](matmul): tile_n,       1, block_n,       1
-    // matAcc[tx,ty,bx,by](matmul): tile_n, block_k, block_n, block_k
-    // matAcc[tx,ty,bx,by](memory): block_k, tile_n, block_k, block_n
 
-    // static_assert(
-    //     matC_t::tile_size_y == 1 && matC_t::block_size_y == 1,
-    //     "matDst_t_ tile m and block m should match be 1");
-    static_assert(
-        matAcc_t::tile_size_y == matC_t::tile_size_y,
-        "matAcc_t tile m should match with matDst_t_ tile m");
-    static_assert(
-        matAcc_t::block_size_y == matC_t::block_size_y,
-        "matAcc_t block m should match with matDst_t_ block m");
-    static constexpr uint32_t block_k = matAcc_t::block_size_x;
-    static constexpr uint32_t block_m = matAcc_t::block_size_y;
-    using dtype = matAcc_t::dtype;
-
+  template <int blk_m, int blk_n>
+  __XETLA_API static void reduce_block_acc_k(
+      xetla_vector_ref<dtype_acc, blk_m * blk_n * matAcc_t::block_size_x>
+          __REF__ acc_block,
+      xetla_vector_ref<dtype_c, blk_m * blk_n> __REF__ c_block) {
+    if constexpr (std::is_same_v<dtype_acc, dtype_c>) {
+      c_block += recur_col_reduce<
+          reduce_op::sum,
+          dtype_acc,
+          matAcc_t::block_size_x,
+          block_size_m * block_size_n>(acc_block);
+    } else {
+      auto acc_block_2d = acc_block.xetla_format<
+          dtype_acc,
+          matAcc_t::block_size_y,
+          matAcc_t::block_size_x>();
 #pragma unroll
-    for (uint32_t m = 0; m < a_tile_size_y / a_block_size_y; m++) {
-      matC.reg.xetla_select<block_m, 1>(m * block_m) =
-          recur_col_reduce<reduce_op::sum, dtype, block_k, block_m>(
-              matAcc.reg.xetla_select<block_m * block_k, 1>(
-                  m * block_m * block_k));
-      // matC.reg =
-      //     recur_col_reduce<reduce_op::sum, dtype, block_k,
-      //     block_m>(matAcc.reg);
+      for (uint32_t mm = 0; mm < block_size_m; mm++) {
+#pragma unroll
+        for (uint32_t nn = 0; nn < block_size_n; nn++) {
+          c_block[mm * block_size_n + nn] += xetla_reduce<
+              typename matC_t::dtype,
+              dtype_acc,
+              matAcc_t::block_size_x,
+              reduce_op::sum>(acc_block_2d.row(mm * block_size_n + nn));
+        }
+      }
     }
   }
 };
@@ -178,7 +202,9 @@ struct tile_mma_t<
     matA_t_,
     mma_engine::fpu,
     arch_tag_,
-    std::enable_if_t<arch_has_fpu<arch_tag_>>> {
+    std::enable_if_t<
+        arch_has_fpu<arch_tag_> && matA_t_::reg_transpose &&
+        !matB_t_::reg_transpose>> {
   using matA_t = matA_t_;
   using matB_t = matB_t_;
   using matSrc_t = matAcc_src_t_;
@@ -215,6 +241,13 @@ struct tile_mma_t<
   static constexpr uint32_t tail_size_m = tile_size_m - tail_start_m;
   static constexpr uint32_t tail_start_offset = tail_start_m * tile_size_n;
   static constexpr uint32_t a_tail_start_offset = tail_start_m * a_tile_size_x;
+
+  static_assert(
+      matA_t::reg_transpose,
+      "For FMAOp GEMM, the register layout of matA should be col-major");
+  static_assert(
+      !matB_t::reg_transpose,
+      "For FMAOp GEMM, the register layout of matB should be row-major");
 
   static_assert(
       tile_size_m == matA_t::tile_size_y,

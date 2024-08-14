@@ -110,21 +110,13 @@ class gemm_t<
   static constexpr uint32_t tile_size_y_c = sg_tile_m;
 
   static constexpr uint32_t block_size_x_a =
-      (compute_policy::block_size_x_a > tile_size_x_a)
-      ? tile_size_x_a
-      : compute_policy::block_size_x_a;
+      std::min(compute_policy::block_size_x_a, tile_size_x_a);
   static constexpr uint32_t block_size_y_a =
-      (compute_policy::block_size_y_a > tile_size_y_a)
-      ? tile_size_y_a
-      : compute_policy::block_size_y_a;
+      std::min(compute_policy::block_size_y_a, tile_size_y_a);
   static constexpr uint32_t block_size_x_b =
-      (compute_policy::block_size_x_b > tile_size_x_b)
-      ? tile_size_x_b
-      : compute_policy::block_size_x_b;
+      std::min(compute_policy::block_size_x_b, tile_size_x_b);
   static constexpr uint32_t block_size_y_b =
-      (compute_policy::block_size_y_b > tile_size_y_b)
-      ? tile_size_y_b
-      : compute_policy::block_size_y_b;
+      std::min(compute_policy::block_size_y_b, tile_size_y_b);
 
   using check_tile_size =
       group::gemm<arch_tag_>::default_fpu::template check_tile_size_default<
@@ -140,7 +132,8 @@ class gemm_t<
 
   /******** set tile  **********/
   // transpose in reg for src suppression
-  static constexpr reg_layout reg_layout_a = reg_layout::transpose_tiled;
+  static constexpr reg_layout reg_layout_a =
+      is_col_major_b ? reg_layout::tiled : reg_layout::transpose_tiled;
   using matA_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_a,
       tile_size_y_a,
@@ -162,7 +155,8 @@ class gemm_t<
       arch_tag>;
   matA_prefetch_payload_t matA_prefetch_payload;
 
-  static constexpr reg_layout reg_layout_b = reg_layout::tiled;
+  static constexpr reg_layout reg_layout_b =
+      is_col_major_b ? reg_layout::transpose_tiled : reg_layout::tiled;
   using matB_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_b,
       tile_size_y_b,
@@ -184,18 +178,27 @@ class gemm_t<
   matB_prefetch_payload_t matB_prefetch_payload;
 
  public:
-  using matAcc_tile_desc_t = subgroup::tile_desc_t<
+  using matC_tile_desc_t = subgroup::tile_desc_t<
       tile_size_x_c,
       tile_size_y_c,
       block_size_x_b,
       block_size_y_a,
       reg_layout::tiled>;
-  using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
+  using matC_t = subgroup::tile_t<dtype_mma_acc, matC_tile_desc_t>;
 
  private:
+  using matAcc_tile_desc_t = subgroup::tile_desc_t<
+      16,
+      // tile_size_x_c * tile_size_y_c,
+      block_size_x_b * block_size_y_a,
+      16,
+      block_size_x_b * block_size_y_a,
+      reg_layout::tiled>;
+  using matAcc_t = subgroup::tile_t<dtype_mma_acc, matAcc_tile_desc_t>;
+
   using tile_mma = subgroup::tile_mma_t<
-      matAcc_t,
-      matAcc_t,
+      std::conditional_t<is_col_major_b, matAcc_t, matC_t>,
+      matC_t,
       matB_acc_t,
       matA_acc_t,
       mma_engine::fpu,
@@ -400,13 +403,13 @@ class gemm_t<
   /// @brief Main execution function for gemm.
   /// The basic process is load data -> matrix multiply.
   /// @param g Is the workgroup of the current tile.
-  /// @param matAcc Is the reference of the accumulation buffer.
+  /// @param matC Is the reference of the accumulation buffer.
   /// @param args Is the gemm::arguments_t.
   /// @param slm_base Is the slm base address.
   /// @param nbarrier_base Is the named barrier base.
   __XETLA_API KERNEL_FUNC void operator()(
       work_group_t& g,
-      matAcc_t& matAcc,
+      matC_t& matC,
       arguments_t args,
       [[maybe_unused]] uint32_t slm_base = 0,
       uint32_t nbarrier_base = 0) {
@@ -416,6 +419,7 @@ class gemm_t<
     pre_processing_t pre_processing;
     matA_t matA;
     matB_t matB;
+    matAcc_t matAcc;
     //  >>>>>>>>>>>>>>>>>> pre_processing init
     pre_processing.init(g, args.pre_processing_args);
     matA_payload_t matA_payload(args.matA_base_desc);
@@ -450,7 +454,11 @@ class gemm_t<
       subgroup::elemwise_cvt(matA_acc, matA);
       subgroup::elemwise_cvt(matB_acc, matB);
       pre_processing(matA_acc, matB_acc, matA, matB);
-      tile_mma::mma(matAcc, matAcc, matB_acc, matA_acc);
+      if constexpr (is_col_major_b) {
+        tile_mma::mma(matAcc, matC, matB_acc, matA_acc);
+      } else {
+        tile_mma::mma(matC, matC, matB_acc, matA_acc);
+      }
       SW_BARRIER();
 
       periodic_sync_wait(i);

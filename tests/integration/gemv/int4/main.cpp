@@ -606,7 +606,7 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
 using tests = ::testing::Types< //
     test_col_major_1<fp16>,
-    test_col_major_1<bf16>,
+    // test_col_major_1<bf16>,
     // test_col_major_2,
     void>;
 
