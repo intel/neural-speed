@@ -130,7 +130,7 @@ struct mem_payload_t<
       uint32_t surface_pitch,
       int32_t surface_offset_x = 0,
       int32_t surface_offset_y = 0) {
-    this->base_ptr = (mem_dtype)p;
+    this->base_ptr = (mem_dtype*)p;
     this->surface_width = surface_width;
     this->surface_height = surface_height;
     this->surface_pitch = surface_pitch;
