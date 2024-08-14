@@ -122,27 +122,27 @@ tile_load(tile_t& tile, payload_t& payload) {
       mem_transpose ? max_trans_block_width : max_load_block_height;
   static constexpr uint32_t ld_blk_size_y = reg_transpose
       ? block_size_y
-      : std::min(ld_blk_size_y_limit, block_size_y)
+      : std::min(ld_blk_size_y_limit, block_size_y);
 
-      // array len is used to make sure memory load is cache line aligned
-      // disabled while register or memory transpose
-      static constexpr uint8_t arr_len_candidate =
-          (reg_transpose ||
-           mem_transpose
-           // block elements should be integer
-           // times of register bytes
-           || ((block_size_y * block_size_x) % elems_per_reg != 0)
-           // tail blocks also need to meet above condition
-           || (((tile_size_y % block_size_y) * block_size_x) % elems_per_reg !=
-               0)) ||
-              (block_size_y > ld_blk_size_y_limit)
-          ? 1
-          : (((tile_size_x % elems_per_CL) == 0)
-                 ? (((elems_per_CL % block_size_x) == 0)
-                        ? elems_per_CL / block_size_x
-                        : 1)
-                 : ((tile_size_x < elems_per_CL) ? (tile_size_x / block_size_x)
-                                                 : 1));
+  // array len is used to make sure memory load is cache line aligned
+  // disabled while register or memory transpose
+  static constexpr uint8_t arr_len_candidate =
+      (reg_transpose ||
+       mem_transpose
+       // block elements should be integer
+       // times of register bytes
+       || ((block_size_y * block_size_x) % elems_per_reg != 0)
+       // tail blocks also need to meet above condition
+       ||
+       (((tile_size_y % block_size_y) * block_size_x) % elems_per_reg != 0)) ||
+          (block_size_y > ld_blk_size_y_limit)
+      ? 1
+      : (((tile_size_x % elems_per_CL) == 0)
+             ? (((elems_per_CL % block_size_x) == 0)
+                    ? elems_per_CL / block_size_x
+                    : 1)
+             : ((tile_size_x < elems_per_CL) ? (tile_size_x / block_size_x)
+                                             : 1));
   static constexpr bool is_valid_arr_len_candidate = (arr_len_candidate == 1) ||
       (arr_len_candidate == 2) || (arr_len_candidate == 4);
 
@@ -213,16 +213,16 @@ tile_load(tile_t& tile, payload_t& payload) {
         //     mem_transform,
         //     arch_tag>(tdesc);
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
-            load_dtype,
+            native_type_t<load_dtype>,
             block_size_x / scale_factor,
             block_size_y,
-            num_block,
+            arr_len,
             trans,
             mem_transform,
             L1,
             L2>(
-            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
-                tdesc),
+            (native_type_t<load_dtype>*)::gpu::xetla::detail::
+                xetla_get_tensor_base_address(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
