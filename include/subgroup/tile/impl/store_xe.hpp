@@ -161,18 +161,17 @@ tile_store(tile_t& tile, payload_t& payload) {
       for (uint32_t ii = 0; ii < block_size_y / st_block_size_y; ++ii) {
         constexpr uint32_t store_elems =
             st_block_size_y * block_size_x * arr_len;
-        auto st_blk =
+        xetla_vector<dtype, store_elems> st_blk =
             combine_blk.xetla_select<store_elems, 1>(ii * store_elems);
         // xetla_tstore_global<dtype, store_elems, L1, L2, payload_t::arch_tag>(
         //     tdesc, st_blk);
         xetla_store_global<
             dtype,
-            block_size_x,
-            block_size_y,
-            num_block,
+            block_size_x * arr_len,
+            st_block_size_y,
             L1,
             L2>(
-            ::gpu::xetla::detail::xetla_get_tensor_base_address(tdesc),
+            (dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
