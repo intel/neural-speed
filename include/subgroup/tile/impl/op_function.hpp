@@ -729,7 +729,7 @@ void dump_mat_reg(T mat, size_t tile_x, size_t tile_y) {
 #pragma unroll
     for (size_t col = 0; col < tile_x; col++) {
       sycl::ext::oneapi::experimental::printf(
-          "%d ", (int)(sycl::half)mat[row * tile_x + col]);
+          "%f ", (float)(T)mat[row * tile_x + col]);
     }
     sycl::ext::oneapi::experimental::printf("\n");
   }
