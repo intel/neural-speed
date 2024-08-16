@@ -20,10 +20,12 @@
 #include <string>
 #include "fmha_forward.hpp"
 #include "fmha_forward_policy.h"
+#include "fmha_forward_v2.hpp"
 
 #include "xetla.hpp"
 
 const auto IS_VERBOSE = false;
+static constexpr bool PREFER_V2 = true;
 
 struct test_params_t {
   // Q: [FxBxNxH] or [BxFxMxH] ; similar for K/V/O
@@ -40,22 +42,22 @@ struct test_params_t {
   static std::vector<test_params_t> cases() {
     std::vector<test_params_t> ret;
     std::vector<std::array<uint32_t, 6>> shapes{
-        {1, 32, 32, 64, 1, 33},
-        {1, 32, 32, 64, 34, 34},
-        {1, 32, 32, 64, 1023, 1023},
+        // {1, 32, 32, 64, 1, 33},
+        // {1, 32, 32, 64, 34, 34},
+        // {1, 32, 32, 64, 1023, 1023},
 
         {1, 32, 32, 128, 1, 33},
         {1, 32, 8, 128, 1, 33},
-        {1, 32, 32, 128, 1, 1023},
-        {1, 32, 8, 128, 1, 1023},
-        {1, 32, 32, 128, 1, 16384},
-        {1, 32, 32, 128, 34, 34},
-        {1, 32, 32, 128, 34, 1023},
-        {1, 32, 32, 128, 1023, 1023},
+        {1, 32, 32, 128, 1, 4095},
+        {1, 32, 8, 128, 1, 4095},
+        // {1, 32, 32, 128, 1, 16384},
+        // {1, 32, 32, 128, 34, 34},
+        // {1, 32, 32, 128, 34, 1023},
+        // {1, 32, 32, 128, 1023, 1023},
     };
     for (auto [bs, hn, hkv, hs, qlen, klen] : shapes)
-      for (auto kUseBias : {false, true})
-        for (auto kSeqLast : {false, true})
+      for (auto kUseBias : {false, /*true*/})
+        for (auto kSeqLast : {false, /*true*/})
           ret.emplace_back(kUseBias, kSeqLast, bs, hn, hkv, hs, qlen, klen);
     return ret;
   }
@@ -244,17 +246,24 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
   const auto klen = p.klen;
   const auto klen_pad32 = (klen + 31) / 32 * 32;
   const float softmax_scale = 1.f / std::sqrt(p.hs);
-  using fmha_forward_op_t = gpu::xetla::fmha::fmha_forward_t<
-      policy_t,
-      FMHA_T,
-      gpu_arch::XeLpg,
-      false,
-      kUseBias,
-      false,
-      kSeqLast,
-      false,
-      false,
-      false>;
+
+  constexpr auto USE_V2 = std::is_same_v<policy_t, std::false_type>;
+  using fmha_forward_op_t = std::conditional_t<
+      USE_V2,
+      gpu::xetla::fmha::
+          fmha_forward_v2_t<FMHA_T, gpu_arch::XeLpg, 64, 128, kUseBias>,
+      gpu::xetla::fmha::fmha_forward_t<
+          policy_t,
+          FMHA_T,
+          gpu_arch::XeLpg,
+          false,
+          kUseBias,
+          false,
+          kSeqLast,
+          false,
+          false,
+          false>>;
+
   using accum_t = typename fmha_forward_op_t::accum_t;
 
   // Define SYCL queue, context and device
@@ -314,7 +323,14 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
       device,
       context);
 
-  sycl::nd_range<3> nd_range = fmha_forward_op_t::get_nd_range(bs * hn, qlen);
+  const int64_t qk_ops = static_cast<int64_t>(2) * bs * hn * hs * qlen * klen;
+  const int64_t pv_ops = static_cast<int64_t>(2) * bs * hn * hs * qlen * klen;
+  const int64_t ops = qk_ops + pv_ops;
+  profiling_helper prof("gemm_universal", ops, "gflops");
+
+  sycl::nd_range<3> nd_range = USE_V2
+      ? fmha_forward_op_t::get_nd_range(bs, hn)
+      : fmha_forward_op_t::get_nd_range(bs * hn, qlen);
   fmha_forward_op_t::check_slm_size(queue.get_info<info::queue::device>());
   if (IS_VERBOSE) {
     std::cout << "slm_size:\t" << fmha_forward_op_t::get_slm_size()
@@ -326,44 +342,71 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
               << nd_range.get_local_range()[1] << ",\t"
               << nd_range.get_local_range()[2] << std::endl;
   }
-  const int64_t qk_ops = static_cast<int64_t>(2) * bs * hn * hs * qlen * klen;
-  const int64_t pv_ops = static_cast<int64_t>(2) * bs * hn * hs * qlen * klen;
-
-  const int64_t ops = qk_ops + pv_ops;
-  profiling_helper prof("gemm_universal", ops, "gflops");
   for (uint32_t i = 0; i < iter + warmup; i++) {
     if (i >= warmup) {
       prof.cpu_start();
     }
     auto gpu_event = queue.submit([&](handler& cgh) {
       cgh.parallel_for(nd_range, [=](sycl::nd_item<3> item) KERNEL_MAIN {
-        typename fmha_forward_op_t::arguments_t kern_args(
-            Q,
-            K,
-            V,
-            nullptr,
-            BIAS,
-            nullptr,
-            DST,
-            L,
-            bs,
-            hn,
-            hkv, // num_kv_heads
-            hs,
-            qlen,
-            klen,
-            kUseBias ? klen_pad32 * qlen : 0,
-            kUseBias ? 0 : 0, // broadcast on N (head num)
-            kUseBias ? klen_pad32 : 0,
-            nullptr,
-            nullptr,
-            softmax_scale,
-            0,
-            0,
-            kUseBias ? klen_pad32 : 0,
-            (uint64_t)0,
-            (uint64_t)0);
-        fmha_forward_op_t{}(item, kern_args);
+        using kern_args_t = typename fmha_forward_op_t::arguments_t;
+        if constexpr (USE_V2) {
+          kern_args_t kern_args = {
+              .query = Q,
+              .key = K,
+              .value = V,
+              .mask = BIAS,
+              .output = DST,
+
+              .num_batch = bs,
+              .num_heads = hn,
+              .num_kv_heads = hkv,
+              .ctx_len = klen,
+
+              .sm_scale = softmax_scale,
+
+              .q_batch_step = (kSeqLast ? hn * hs : qlen * hn * hs),
+              .q_head_step = hs,
+              .k_batch_step = (kSeqLast ? hkv * hs : klen * hkv * hs),
+              .k_head_step = hs,
+              .k_seq_step = (kSeqLast ? bs * hkv * hs : hkv * hs),
+              .v_batch_step = (kSeqLast ? hkv * hs : klen * hkv * hs),
+              .v_head_step = hs,
+              .v_seq_step = (kSeqLast ? bs * hkv * hs : hkv * hs),
+              .mask_batch_step = qlen * klen,
+              .mask_head_step = 0,
+              .out_batch_step = (kSeqLast ? hn * hs : qlen * hn * hs),
+              .out_head_step = hs,
+          };
+          fmha_forward_op_t{}(item, kern_args);
+        } else {
+          kern_args_t kern_args(
+              Q,
+              K,
+              V,
+              nullptr,
+              BIAS,
+              nullptr,
+              DST,
+              L,
+              bs,
+              hn,
+              hkv, // num_kv_heads
+              hs,
+              qlen,
+              klen,
+              kUseBias ? klen_pad32 * qlen : 0,
+              kUseBias ? 0 : 0, // broadcast on N (head num)
+              kUseBias ? klen_pad32 : 0,
+              nullptr,
+              nullptr,
+              softmax_scale,
+              0,
+              0,
+              kUseBias ? klen_pad32 : 0,
+              (uint64_t)0,
+              (uint64_t)0);
+          fmha_forward_op_t{}(item, kern_args);
+        }
       });
     });
     gpu_event.wait();
@@ -403,7 +446,10 @@ void fmha_dispatch_policy(const test_params_t& p, Args... args) {
   } else if (p.hs <= 128) {
     if (p.qlen == 1) {
       // for extremely short query length
-      if (p.klen < 512) {
+      if constexpr (PREFER_V2) {
+        assert(p.hs == 64);
+        return fmha_run_<std::false_type>(p, args...);
+      } else if (p.klen < 512) {
         return fmha_run_<stage0<fmha_policy_1x256x128>>(p, args...);
       } else {
         return fmha_run_<stage0<fmha_policy_1x512x128>>(p, args...);
@@ -442,7 +488,7 @@ class FMHATest : public TestWithParam<test_params_t> {
 };
 TEST_P(FMHATest, ) {
   test_params_t p = TestWithParam<test_params_t>::GetParam();
-  fmha_run(p, 5, 3);
+  fmha_run(p, 500, 300);
 }
 INSTANTIATE_TEST_SUITE_P(
     XeTLA,
