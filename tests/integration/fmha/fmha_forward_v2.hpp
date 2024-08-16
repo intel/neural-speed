@@ -163,6 +163,14 @@ class fmha_forward_v2_t {
       kv_row = __ESIMD_NS::block_load<scaler_t, head_dim>(
           value_head + i * args.v_seq_step);
       O = (O * L_old + kv_row * attn_exp) / L;
+      // if (item.get_global_linear_id() == 1) {
+      //   sycl::ext::oneapi::experimental::printf(
+      //       "\n\n%d %d S:%f M:%f L:%f attn_exp:%f v:%f", (int)start_ctx_id,
+      //       (int)end_ctx_id, S, M, L, attn_exp,
+      //       (float)(scaler_t)(kv_row[0]));
+      //   sycl::ext::oneapi::experimental::printf(
+      //       " %f\n", (float)(scaler_t)(O[0]));
+      // }
     }
 
     __ESIMD_NS::simd<uint32_t, head_dim> offset(
@@ -179,6 +187,9 @@ class fmha_forward_v2_t {
         L_offset + sg_id * sizeof(accum_t), L);
     __ESIMD_NS::slm_scalar_store<accum_t>(
         M_offset + sg_id * sizeof(accum_t), M);
+    // if (item.get_global_linear_id() == 0) {
+    //   sycl::ext::oneapi::experimental::printf("\n\n%f\n", (float)M);
+    // }
 
     __ESIMD_NS::barrier();
 
@@ -189,12 +200,24 @@ class fmha_forward_v2_t {
         accum_t,
         sg_num,
         __ESIMD_NS::detail::esimd_apply_reduced_max>(M_sg);
+    // if (item.get_global_linear_id() == 0) {
+    //   sycl::ext::oneapi::experimental::printf("\n\nM_sg\n");
+    //   dump_mat_reg(M_sg, sg_num, 1);
+    // }
 
     __ESIMD_NS::simd<accum_t, sg_num> L_sg =
         __ESIMD_NS::slm_block_load<accum_t, sg_num>(L_offset);
     L_sg *= __ESIMD_NS::exp(M_sg - M_total);
+    // if (item.get_global_linear_id() == 0) {
+    //   sycl::ext::oneapi::experimental::printf("\n\nL_sg\n");
+    //   dump_mat_reg(L_sg, sg_num, 1);
+    // }
     accum_t L_total = __ESIMD_NS::detail::sum<accum_t, accum_t, sg_num>(L_sg);
     __ESIMD_NS::simd<accum_t, sg_num> L_ratio = L_sg / L_total;
+    // if (item.get_global_linear_id() == 0) {
+    //   sycl::ext::oneapi::experimental::printf("\n\nL_ratio\n");
+    //   dump_mat_reg(L_ratio, sg_num, 1);
+    // }
 
     const size_t start_idx = sg_head_dim * sg_id;
 #pragma unroll
