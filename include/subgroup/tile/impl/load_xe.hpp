@@ -274,16 +274,16 @@ tile_load(tile_t& tile, payload_t& payload) {
 
         reg_blk.xetla_select<load_elems, 1>(remained_start)
             .xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
-            load_dtype,
+            native_type_t<load_dtype>,
             block_size_x / scale_factor,
-            block_size_y,
-            num_block,
+            remained_blk_size_y,
+            arr_len,
             trans,
             mem_transform,
             L1,
             L2>(
-            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
-                tdesc),
+            (native_type_t<load_dtype>*)::gpu::xetla::detail::
+                xetla_get_tensor_base_address(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
@@ -335,16 +335,16 @@ tile_load(tile_t& tile, payload_t& payload) {
             remained_ld_blk_size_y * block_size_x * arr_len;
 
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
-            load_dtype,
+            native_type_t<load_dtype>,
             block_size_x / scale_factor,
             block_size_y,
-            num_block,
+            arr_len,
             trans,
             mem_transform,
             L1,
             L2>(
-            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
-                tdesc),
+            (native_type_t<load_dtype>*)::gpu::xetla::detail::
+                xetla_get_tensor_base_address(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
@@ -402,16 +402,16 @@ tile_load(tile_t& tile, payload_t& payload) {
             tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
         reg_blk.xetla_select<final_load_elems, 1>(final_start)
             .xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
-            load_dtype,
+            native_type_t<load_dtype>,
             block_size_x / scale_factor,
-            block_size_y,
-            num_block,
+            final_ld_blk_size_y,
+            arr_len,
             trans,
             mem_transform,
             L1,
             L2>(
-            (load_dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(
-                tdesc),
+            (native_type_t<load_dtype>*)::gpu::xetla::detail::
+                xetla_get_tensor_base_address(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
