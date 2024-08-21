@@ -458,7 +458,24 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
     size_t SurfacePitch,
     int X,
     int Y) {
-  if constexpr (BlockWidth * sizeof(T) < sizeof(uint32_t)) {
+  if constexpr (std::is_same_v<T, bf16>) {
+    auto ret = xetla_load_global<
+        fp16,
+        BlockWidth,
+        BlockHeight,
+        NBlocks,
+        Transposed,
+        Transformed,
+        L1H,
+        L2H>(
+        reinterpret_cast<const fp16*>(Ptr),
+        SurfaceWidth,
+        SurfaceHeight,
+        SurfacePitch,
+        X,
+        Y);
+    return ret.xetla_format<T>();
+  } else if constexpr (BlockWidth * sizeof(T) < sizeof(uint32_t)) {
     constexpr auto scale_factor = sizeof(uint32_t) / sizeof(T);
     xetla_vector<uint32_t, N> ret = __ESIMD_ENS::lsc_load_2d<
         uint32_t,
@@ -754,13 +771,25 @@ __XETLA_API void xetla_store_global(
     int X,
     int Y,
     xetla_vector<T, N> Vals) {
-  __ESIMD_ENS::lsc_store_2d<
-      T,
-      BlockWidth,
-      BlockHeight,
-      gpu::xetla::detail::get_cache_hint(L1H),
-      gpu::xetla::detail::get_cache_hint(L2H)>(
-      Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y, Vals);
+  if constexpr (std::is_same_v<T, bf16>) {
+    xetla_vector<fp16, N> Vals_fp16 = Vals.xetla_format<fp16>();
+    xetla_store_global<fp16, BlockWidth, BlockHeight, L1H, L2H>(
+        reinterpret_cast<fp16*>(Ptr),
+        SurfaceWidth,
+        SurfaceHeight,
+        SurfacePitch,
+        X,
+        Y,
+        Vals_fp16);
+  } else {
+    __ESIMD_ENS::lsc_store_2d<
+        T,
+        BlockWidth,
+        BlockHeight,
+        gpu::xetla::detail::get_cache_hint(L1H),
+        gpu::xetla::detail::get_cache_hint(L2H)>(
+        Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y, Vals);
+  }
 }
 /// template <typename T, int N, int VS = 1, typename OffsetT,
 /// 	  typename PropertyListT = empty_properties_t>
