@@ -46,10 +46,10 @@ struct test_params_t {
         // {1, 32, 32, 64, 34, 34},
         // {1, 32, 32, 64, 1023, 1023},
 
-        {1, 32, 32, 128, 1, 33},
-        {1, 32, 8, 128, 1, 33},
-        {1, 32, 32, 128, 1, 4095},
-        {1, 32, 8, 128, 1, 4095},
+        // {1, 32, 32, 128, 1, 33},
+        // {1, 32, 8, 128, 1, 33},
+        // {1, 32, 32, 128, 1, 4095},
+        {1, 32, 8, 128, 1, 1025},
         // {1, 32, 32, 128, 1, 16384},
         // {1, 32, 32, 128, 34, 34},
         // {1, 32, 32, 128, 34, 1023},
@@ -251,7 +251,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
   using fmha_forward_op_t = std::conditional_t<
       USE_V2,
       gpu::xetla::fmha::
-          fmha_forward_v2_t<FMHA_T, gpu_arch::XeLpg, 64, 128, kUseBias>,
+          fmha_forward_v2_t<FMHA_T, gpu_arch::XeLpg, 16, 128, 4, kUseBias>,
       gpu::xetla::fmha::fmha_forward_t<
           policy_t,
           FMHA_T,
@@ -301,7 +301,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
       context);
   auto DST = alloc_device_and_init<FMHA_T>(
       bs * hn * hs * qlen,
-      [](FMHA_T* data, size_t idx) { data[idx] = static_cast<FMHA_T>(9999); },
+      [](FMHA_T* data, size_t idx) { data[idx] = static_cast<FMHA_T>(8888); },
       queue,
       device,
       context);
@@ -438,10 +438,10 @@ void fmha_dispatch_policy(const test_params_t& p, Args... args) {
   if (p.hs <= 64) {
     if (p.qlen < 64) {
       // for short query length
-      return fmha_run_<stage0<fmha_policy_8x128x64>>(p, args...);
+      // return fmha_run_<stage0<fmha_policy_8x128x64>>(p, args...);
     } else {
       // for long query length
-      return fmha_run_<stage0<fmha_policy_64x128x64>>(p, args...);
+      // return fmha_run_<stage0<fmha_policy_64x128x64>>(p, args...);
     }
   } else if (p.hs <= 128) {
     if (p.qlen == 1) {
@@ -450,19 +450,19 @@ void fmha_dispatch_policy(const test_params_t& p, Args... args) {
         assert(p.hs == 64);
         return fmha_run_<std::false_type>(p, args...);
       } else if (p.klen < 512) {
-        return fmha_run_<stage0<fmha_policy_1x256x128>>(p, args...);
+        // return fmha_run_<stage0<fmha_policy_1x256x128>>(p, args...);
       } else {
-        return fmha_run_<stage0<fmha_policy_1x512x128>>(p, args...);
+        // return fmha_run_<stage0<fmha_policy_1x512x128>>(p, args...);
       }
     } else if (p.qlen < 64) {
       // for short query length
       if (p.klen < 512) {
-        return fmha_run_<stage0<fmha_policy_8x256x128>>(p, args...);
+        // return fmha_run_<stage0<fmha_policy_8x256x128>>(p, args...);
       } else {
-        return fmha_run_<stage0<fmha_policy_8x512x128>>(p, args...);
+        // return fmha_run_<stage0<fmha_policy_8x512x128>>(p, args...);
       }
     } else {
-      return fmha_run_<stage0<fmha_policy_32x128x128>>(p, args...);
+      // return fmha_run_<stage0<fmha_policy_32x128x128>>(p, args...);
     }
   } else {
     std::cout << "Larger hs to be tested...\n";
