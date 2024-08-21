@@ -36,7 +36,7 @@ enum class quant_mode : uint8_t {
   I4_ASYM = 0,
   I4_SYM = 1,
   NF4 = 2,
-  DEGREE5_FAPPROX_NF4 = 3
+  DEGREE5_APPROX_NF4 = 3
 };
 
 struct quant_info {

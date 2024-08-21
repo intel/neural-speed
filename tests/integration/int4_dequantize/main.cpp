@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-#define UT_DEBUG
+// #define UT_DEBUG
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;
 // The number of times the kernel is executed
@@ -30,17 +30,17 @@ constexpr size_t UNDEFINED_DATA_SIZE = 512;
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_n = 16;
-  static constexpr size_t mat_k = 128;
+  static constexpr size_t mat_n = 4096;
+  static constexpr size_t mat_k = 4096;
   static constexpr size_t wg_k = 128;
   static constexpr size_t wg_n = 16;
   static constexpr size_t sg_k = 128;
   static constexpr size_t sg_n = 16;
   static constexpr size_t k_stride = 32;
   static constexpr size_t dequant_s = 128;
-  static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
+  // static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
   // static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
-  // static constexpr quant_mode quant_mode = quant_mode::DEGREE5_FAPPROX_NF4;
+  static constexpr quant_mode quant_mode = quant_mode::DEGREE5_APPROX_NF4;
 
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
@@ -55,7 +55,7 @@ template <
     typename data_type_b,
     typename data_type_scale,
     typename data_type_zero_pt>
-std::vector<fp16> convert_int4(
+std::vector<fp16> convert_bit4(
     data_type_b data_b,
     data_type_scale scale,
     data_type_zero_pt zero_pt) {
@@ -66,8 +66,18 @@ std::vector<fp16> convert_int4(
     int8_t dequant_8bit = data_b & 0xf;
     if constexpr (quant_mode == quant_mode::I4_SYM) {
       dequant_fp16[i] = scale * (dequant_8bit - 8);
-    } else {
+    } else if constexpr (quant_mode == quant_mode::I4_ASYM) {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
+    } else if constexpr (quant_mode == quant_mode::DEGREE5_APPROX_NF4) {
+      float tmp = 1.831e-05;
+      tmp = tmp * dequant_8bit - 0.0006863;
+      tmp = tmp * dequant_8bit + 0.01005;
+      tmp = tmp * dequant_8bit - 0.07231;
+      tmp = tmp * dequant_8bit + 0.3462;
+      tmp = tmp * dequant_8bit - 0.9942;
+      dequant_fp16[i] = scale * tmp;
+    } else {
+      assert(0);
     }
     data_b = data_b >> 4;
   }
@@ -104,7 +114,7 @@ std::vector<data_type_acc_in> dequantize_weight(
       int start_out =
           layout_b == mem_layout::row_major ? 0 : i * matrix_k + j * pack_radio;
       for (uint32_t jj = 0; jj < step; jj++) {
-        std::vector<fp16> dequant_fp16 = convert_int4<quant_mode>(
+        std::vector<fp16> dequant_fp16 = convert_bit4<quant_mode>(
             b[start_b_in + jj],
             scale[start_scale_in],
             zero_pt[start_zero_pt_in] >> (4 * (i % pack_radio)));

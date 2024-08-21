@@ -227,9 +227,10 @@ struct dequant_f4_weight_t {
 
         if constexpr (quant_mode == quant_mode::NF4) {
           assert(0);
-        } else if constexpr (quant_mode == quant_mode::DEGREE5_FAPPROX_NF4) {
+        } else if constexpr (quant_mode == quant_mode::DEGREE5_APPROX_NF4) {
           approx_value = 1.831e-05;
           vec_const = -0.0006863;
+          approx_value = cvt_blk_f16 * approx_value + vec_const;
           vec_const = 0.01005;
           approx_value = cvt_blk_f16 * approx_value + vec_const;
           vec_const = -0.07231;
