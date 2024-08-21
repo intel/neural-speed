@@ -1204,10 +1204,9 @@ struct mem_payload_t<
   static constexpr uint32_t tile_size_y = tile_desc::tile_size_y;
   static constexpr uint32_t block_size_x = tile_desc::block_size_x;
   static constexpr uint32_t block_size_y = tile_desc::block_size_y;
-  static constexpr uint32_t tile_bytes =
-      tile_size_x * tile_size_y * sizeof(dtype);
+  static constexpr uint32_t tile_bytes = tile_desc::tile_elems * sizeof(dtype);
   static constexpr uint32_t block_bytes =
-      block_size_x * block_size_y * sizeof(dtype);
+      tile_desc::block_elems * sizeof(dtype);
   using this_payload_t =
       mem_payload_t<mem_desc_t, tile_desc, msg_type::block_2d, arch_tag_>;
 
@@ -1284,7 +1283,7 @@ struct mem_payload_t<
     base_offset = mem_transpose
         ? base_x * pitch_in_bytes + base_y * sizeof(dtype)
         : base_y * pitch_in_bytes + base_x * sizeof(dtype);
-    base_ptr = (mem_dtype*)mem_tdesc.base.base;
+    base_ptr = reinterpret_cast<mem_dtype*>(mem_tdesc.base.base);
 
     xetla_vector<uint32_t, num_channel> channel_index =
         xetla_vector_gen<uint32_t, num_channel>(0, 1);
@@ -1789,10 +1788,8 @@ struct prefetch_payload_t<
   static constexpr uint32_t tile_size_y = tile_desc::tile_size_y;
   static constexpr uint32_t block_size_x = tile_desc::block_size_x;
   static constexpr uint32_t block_size_y = tile_desc::block_size_y;
-  static constexpr uint32_t tile_bytes =
-      tile_size_x * tile_size_y * sizeof(dtype);
-  static constexpr uint32_t block_bytes =
-      block_size_x * block_size_y * sizeof(dtype);
+  static constexpr uint32_t tile_bytes = tile_desc::block_elems * sizeof(dtype);
+  static constexpr uint32_t block_bytes = tile_desc::tile_elems * sizeof(dtype);
 
  private:
   using this_payload_t =
@@ -1835,41 +1832,57 @@ struct prefetch_payload_t<
   static constexpr uint32_t num_channel = select_channel(
       std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
 
-  static constexpr uint32_t mem_tile_size_w =
-      mem_transpose ? tile_size_y : tile_size_x;
-  static constexpr uint32_t mem_tile_size_h =
-      mem_transpose ? tile_size_x : tile_size_y;
-  using load_store_attr =
-      typename arch_attr_t<arch_tag>::template load_store_attr<message_type>;
-  static constexpr uint32_t special_prefetch_width =
-      load_store_attr::special_prefetch_width_in_bytes / sizeof(dtype);
-  static constexpr uint32_t normal_prefetch_width =
-      load_store_attr::max_load_width_in_bytes / sizeof(dtype);
-  static constexpr bool is_special_prefetch =
-      (mem_tile_size_w % special_prefetch_width) == 0;
+  static constexpr uint32_t max_channel =
+      max_prefetch_vec_len / (vector_size * sizeof(prefetch_dtype));
 
-  static constexpr uint32_t block_size_w = is_special_prefetch
-      ? special_prefetch_width
-      : (normal_prefetch_width > mem_tile_size_w ? mem_tile_size_w
-                                                 : normal_prefetch_width);
-  static constexpr uint32_t block_size_h =
-      load_store_attr::max_load_height_in_elem;
-  // could have over-prefetch, but that's should be fine
-  static constexpr uint32_t max_num_block_w =
-      (mem_tile_size_w + block_size_w - 1) / block_size_w;
-  static constexpr uint32_t num_coop_sg = num_coop_sg_;
-  static constexpr uint32_t num_coop_sg_w =
-      detail::gcd<num_coop_sg, max_num_block_w>::value;
-  static constexpr uint32_t num_coop_sg_h = num_coop_sg / num_coop_sg_w;
+  static constexpr uint32_t select_channel(const uint32_t channel) {
+    return (channel >= load_store_attr::max_channel_num)
+        ? load_store_attr::max_channel_num
+        : channel >= 16 ? 16
+        : channel >= 8  ? 8
+                        : 1;
+  }
 
-  static constexpr uint32_t num_block_w = max_num_block_w / num_coop_sg_w;
-  static constexpr uint32_t tile_size_w = block_size_w * num_block_w;
-  static constexpr uint32_t tile_size_h =
-      (mem_tile_size_h + num_coop_sg_h - 1) / num_coop_sg_h;
-  static constexpr uint32_t num_block_h =
-      (tile_size_h + block_size_h - 1) / block_size_h;
+  static constexpr uint32_t num_channel = select_channel(
+      std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
+
+  // static constexpr uint32_t mem_tile_size_w =
+  //     mem_transpose ? tile_size_y : tile_size_x;
+  // static constexpr uint32_t mem_tile_size_h =
+  //     mem_transpose ? tile_size_x : tile_size_y;
+
+  // static constexpr uint32_t special_prefetch_width =
+  //     load_store_attr::special_prefetch_width_in_bytes / sizeof(dtype);
+  // static constexpr uint32_t normal_prefetch_width =
+  //     load_store_attr::max_load_width_in_bytes / sizeof(dtype);
+  // static constexpr bool is_special_prefetch =
+  //     (mem_tile_size_w % special_prefetch_width) == 0;
+
+  // static constexpr uint32_t block_size_w = is_special_prefetch
+  //     ? special_prefetch_width
+  //     : (normal_prefetch_width > mem_tile_size_w ? mem_tile_size_w
+  //                                                : normal_prefetch_width);
+  // static constexpr uint32_t block_size_h =
+  //     load_store_attr::max_load_height_in_elem;
+  // // could have over-prefetch, but that's should be fine
+  // static constexpr uint32_t max_num_block_w =
+  //     (mem_tile_size_w + block_size_w - 1) / block_size_w;
+  // static constexpr uint32_t num_coop_sg = num_coop_sg_;
+  // static constexpr uint32_t num_coop_sg_w =
+  //     detail::gcd<num_coop_sg, max_num_block_w>::value;
+  // static constexpr uint32_t num_coop_sg_h = num_coop_sg / num_coop_sg_w;
+
+  // static constexpr uint32_t num_block_w = max_num_block_w / num_coop_sg_w;
+  // static constexpr uint32_t tile_size_w = block_size_w * num_block_w;
+  // static constexpr uint32_t tile_size_h =
+  //     (mem_tile_size_h + num_coop_sg_h - 1) / num_coop_sg_h;
+  // static constexpr uint32_t num_block_h =
+  //     (tile_size_h + block_size_h - 1) / block_size_h;
 
   xetla_vector<uint32_t, num_channel> channel_offset;
+  xetla_vector<uint32_t, num_channel> step_x;
+  xetla_vector<uint32_t, num_channel> step_y;
+
   uint64_t base_offset;
   uint32_t base_x;
   uint32_t base_y;
@@ -1906,13 +1919,15 @@ struct prefetch_payload_t<
     return *this;
   }
 
-  inline prefetch_payload_t(mem_desc_t& mem_desc, uint32_t coop_id = 0) {
-    uint32_t coop_id_x = coop_id % num_coop_sg_w;
-    uint32_t coop_id_y = coop_id / num_coop_sg_w;
+  inline prefetch_payload_t(
+      mem_desc_t& mem_desc,
+      [[maybe_unused]] uint32_t coop_id = 0) {
+    // uint32_t coop_id_x = coop_id % num_coop_sg_w;
+    // uint32_t coop_id_y = coop_id / num_coop_sg_w;
 
     pitch_in_bytes = mem_desc.shape.stride * sizeof(dtype);
-    base_x = mem_desc.coord.x + coop_id_x * tile_size_w;
-    base_y = mem_desc.coord.y + coop_id_y * tile_size_h;
+    base_x = mem_desc.coord.x;
+    base_y = mem_desc.coord.y;
     width_in_elems = mem_desc.shape.x;
     height_in_elems = mem_desc.shape.y;
     base_offset = mem_transpose
@@ -1932,13 +1947,15 @@ struct prefetch_payload_t<
       int surface_pitch,
       int surface_offset_x,
       int surface_offset_y,
-      uint32_t coop_id = 0) {
-    uint32_t coop_id_x = coop_id % num_coop_sg_w;
-    uint32_t coop_id_y = coop_id / num_coop_sg_w;
+      [[maybe_unused]] uint32_t coop_id = 0) {
+    // uint32_t coop_id_x = coop_id % num_coop_sg_w;
+    // uint32_t coop_id_y = coop_id / num_coop_sg_w;
+    // base_x = surface_offset_x + coop_id_x * tile_size_w;
+    // base_y = surface_offset_y + coop_id_y * tile_size_h;
 
     pitch_in_bytes = surface_pitch * sizeof(dtype);
-    base_x = surface_offset_x + coop_id_x * tile_size_w;
-    base_y = surface_offset_y + coop_id_y * tile_size_h;
+    base_x = surface_offset_x;
+    base_y = surface_offset_y;
     width_in_elems = surface_width;
     height_in_elems = surface_height;
     base_offset = mem_transpose
@@ -1951,13 +1968,17 @@ struct prefetch_payload_t<
     channel_offset = channel_index * pitch_in_bytes;
   }
 
-  inline void init(mem_desc_t& mem_desc, uint32_t coop_id = 0) {
-    uint32_t coop_id_x = coop_id % num_coop_sg_w;
-    uint32_t coop_id_y = coop_id / num_coop_sg_w;
+  inline void init(
+      mem_desc_t& mem_desc,
+      [[maybe_unused]] uint32_t coop_id = 0) {
+    // uint32_t coop_id_x = coop_id % num_coop_sg_w;
+    // uint32_t coop_id_y = coop_id / num_coop_sg_w;
+    // base_x = mem_desc.coord.x + coop_id_x * tile_size_w;
+    // base_y = mem_desc.coord.y + coop_id_y * tile_size_h;
 
     pitch_in_bytes = mem_desc.shape.stride * sizeof(dtype);
-    base_x = mem_desc.coord.x + coop_id_x * tile_size_w;
-    base_y = mem_desc.coord.y + coop_id_y * tile_size_h;
+    base_x = mem_desc.coord.x;
+    base_y = mem_desc.coord.y;
     width_in_elems = mem_desc.shape.x;
     height_in_elems = mem_desc.shape.y;
     base_offset = mem_transpose
