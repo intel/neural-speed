@@ -104,8 +104,7 @@ tile_prefetch(payload_t& payload) {
   using prefetch_dtype = typename payload_t::prefetch_dtype;
   constexpr uint32_t num_channel = payload_t::num_channel;
 #pragma unroll
-  for (uint32_t i = 0; i < tile_desc::tile_size_y / tile_desc::block_size_y;
-       i++) {
+  for (uint32_t i = 0; i < tile_desc::num_block_y; i++) {
     uint32_t offset_y = i * tile_desc::block_size_y;
 #pragma unroll
     for (uint32_t j = 0; j < tile_desc::num_block_x; j++) {
@@ -126,7 +125,6 @@ tile_prefetch(payload_t& payload) {
           L2>(
           payload.base_ptr,
           payload.channel_offset + payload.base_offset + address_offset);
-      //   }
     }
   }
 }

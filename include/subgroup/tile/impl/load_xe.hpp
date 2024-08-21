@@ -214,8 +214,10 @@ tile_load(tile_t& tile, payload_t& payload) {
         //     arch_tag>(tdesc);
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
-            block_size_x / scale_factor,
-            block_size_y,
+            (mem_transpose ? ld_blk_size_y : block_size_x) / scale_factor,
+            (mem_transpose ? block_size_x : ld_blk_size_y),
+            // block_size_x / scale_factor,
+            // ld_blk_size_y,
             arr_len,
             trans,
             mem_transform,
