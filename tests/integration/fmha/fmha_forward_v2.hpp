@@ -51,7 +51,7 @@ class fmha_forward_v2_t {
   static constexpr size_t LOAD_BYTES_LEN = 128;
   static constexpr size_t O_offset = 0;
   static constexpr size_t O_size =
-      kv_group_size * sg_num * head_dim * sizeof(accum_t);
+      kv_group_size * sg_num * head_dim * sizeof(uint8_t);
   static constexpr size_t L_offset = O_size;
   static constexpr size_t L_size = kv_group_size * sg_num * sizeof(accum_t);
   static constexpr size_t M_offset = L_offset + L_size;
@@ -149,7 +149,7 @@ class fmha_forward_v2_t {
     // L_i = sum(exp(S_i) - M_i)
     xetla_vector<accum_t, kv_group_size> L =
         std::numeric_limits<accum_t>::min();
-    xetla_vector<accum_t, kv_group_size* head_dim> O = 0;
+    xetla_vector<accum_t, head_dim* kv_group_size> O = 0;
     for (size_t i = start_ctx_id; i < end_ctx_id; ++i) {
       const auto k_i = xetla_load_global<scaler_t, head_dim>(
           key_head, sizeof(scaler_t) * i * args.k_seq_step);
@@ -176,8 +176,8 @@ class fmha_forward_v2_t {
 
 #pragma unroll
       for (int j = 0; j < kv_group_size; ++j)
-        O.xetla_select<head_dim, 1>(j * head_dim) =
-            (O.xetla_select<head_dim, 1>(j * head_dim) * L_old[j] +
+        O.xetla_select<head_dim, kv_group_size>(j) =
+            (O.xetla_select<head_dim, kv_group_size>(j) * L_old[j] +
              v_i * accum_t(attn_exp[j])) /
             accum_t(L[j]);
 
@@ -185,20 +185,30 @@ class fmha_forward_v2_t {
       //   dump_mat_reg(O, head_dim * kv_group_size, 1);
       // }
     }
+    // O: headdim * kv_gz
+    // local_O: headdim * sg * kv_gz
 
 #pragma unroll
-    for (int j = 0; j < kv_group_size; ++j)
-#pragma unroll
-      for (int i = 0; i < head_dim; i += BLK) {
-        xetla_vector<uint32_t, BLK> offset_i(
-            O_offset +
-                (j * sg_num * head_dim + sg_id + i * sg_num) * sizeof(accum_t),
-            sg_num * sizeof(accum_t));
-        xetla_vector<accum_t, BLK> O_i =
-            O.xetla_select<BLK, 1>(j * head_dim + i);
-        xetla_store_local<accum_t, 1, data_size::default_size, BLK>(
-            offset_i, O_i);
-      }
+    for (int i = 0; i < head_dim; i += BLK) {
+      xetla_vector<uint32_t, BLK> offset_i(
+          O_offset +
+              (sg_id * kv_group_size + i * sg_num * kv_group_size) *
+                  sizeof(uint8_t),
+          sg_num * kv_group_size * sizeof(uint8_t));
+      xetla_vector<fp16, BLK* kv_group_size> O_i =
+          xetla_cvt<fp16, float, BLK * kv_group_size>(
+              O.xetla_select<BLK * kv_group_size, 1>(i));
+      static_assert(kv_group_size % sizeof(uint32_t) == 0);
+      xetla_store_local<
+          uint32_t,
+          kv_group_size / sizeof(uint32_t),
+          data_size::default_size,
+          BLK>(
+          offset_i,
+          O_i.xetla_format<uint8_t>()
+              .xetla_select<BLK * kv_group_size, 2>(1)
+              .xetla_format<uint32_t>());
+    }
 
     xetla_store_local<accum_t, kv_group_size>(
         L_offset + sg_id * kv_group_size * sizeof(accum_t), L);
@@ -237,17 +247,19 @@ class fmha_forward_v2_t {
     //   dump_mat_reg(L_ratio, kv_group_size * sg_num, 1);
     // }
     const size_t start_idx = sg_head_dim * sg_id;
+    xetla_vector<fp16, sg_num* kv_group_size> O_tmp = 0x80;
 #pragma unroll
-    for (int j = 0; j < kv_group_size; ++j) {
+    for (size_t i = start_idx; i < start_idx + sg_head_dim; ++i) {
+      // local_O: headdim * sg * kv_gz
+      O_tmp.xetla_format<uint8_t>().xetla_select<sg_num * kv_group_size, 2>(1) =
+          xetla_load_local<uint8_t, sg_num * kv_group_size>(
+              O_offset + (i * sg_num * kv_group_size) * sizeof(uint8_t));
 #pragma unroll
-      for (size_t i = start_idx; i < start_idx + sg_head_dim; ++i) {
-        auto tmp = xetla_load_local<accum_t, sg_num>(
-            O_offset + (i * sg_num + j * head_dim * sg_num) * sizeof(accum_t));
+      for (int j = 0; j < kv_group_size; ++j) {
         accum_t O_total =
             xetla_reduce<accum_t, accum_t, sg_num, reduce_op::sum>(
-                tmp * L_ratio.xetla_select<sg_num, 1>(j * sg_num)
-
-            );
+                O_tmp.xetla_select<sg_num, kv_group_size>(j) *
+                L_ratio.xetla_select<sg_num, 1>(j * sg_num));
         output_head[i + j * args.out_head_step] = O_total;
       }
     }
