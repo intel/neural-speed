@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include <common/common.hpp>
-#include <group/group.hpp>
-#include <subgroup/subgroup.hpp>
-
-namespace gpu::xetla {} // namespace gpu::xetla
+#include <experimental/kernel/int4_dequantize/api.hpp>
+#include <experimental/kernel/int4_dequantize/config.hpp>
+#include <experimental/kernel/int4_dequantize/int4_dequantize_xe_impl.hpp>

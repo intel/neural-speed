@@ -25,34 +25,26 @@
 
 namespace gpu::xetla::kernel {
 
-/// @brief Sets up attribute of the col-major-shuf.
+/// @brief Sets up attribute of the int4 dequantize.
 ///
-/// @tparam wg_tile_x_ Is the num of cols processed by one workgroup.
-/// @tparam wg_tile_y_ Is the num of rows processed by one workgroup.
-/// @tparam sg_tile_x_ Is the num of cols processed by one subgroup.
-/// @tparam sg_tile_y_ Is the num of rows processed by one subgroup.
+/// @tparam wg_tile_n_ Is the N-dim of KxN weight processed by one workgroup.
+/// @tparam wg_tile_k_ Is the K-dim of KxN weight processed by one workgroup.
+/// @tparam sg_tile_n_ Is the N-dim of KxN weight processed by one subgroup.
+/// @tparam sg_tile_k_ Is the K-dim of KxN weight processed by one subgroup.
 /// @tparam load_block_size_ Is the size of block when load x dimenstion.
 /// kernels have spills.
 template <
-    uint32_t wg_tile_x_,
-    uint32_t wg_tile_y_,
-    uint32_t sg_tile_x_,
-    uint32_t sg_tile_y_,
-    uint32_t load_block_size_>
-struct col_major_shuf_attr_t {
-  static constexpr uint32_t wg_tile_x = wg_tile_x_;
-  static constexpr uint32_t wg_tile_y = wg_tile_y_;
-  static constexpr uint32_t sg_tile_x = sg_tile_x_;
-  static constexpr uint32_t sg_tile_y = sg_tile_y_;
-  static constexpr uint32_t load_block_size = load_block_size_;
-
-  static_assert(
-      wg_tile_x % sg_tile_x == 0,
-      "Current design we don't enable the boundary check");
-  static_assert(
-      sg_tile_x % load_block_size == 0 && sg_tile_x >= load_block_size,
-      "Current design we don't enable the boundary check on chunking "
-      "mechanism");
+    uint32_t wg_tile_n_,
+    uint32_t wg_tile_k_,
+    uint32_t sg_tile_n_,
+    uint32_t sg_tile_k_,
+    uint32_t k_stride_>
+struct int4_dequantize_attr_t {
+  static constexpr uint32_t wg_tile_n = wg_tile_n_;
+  static constexpr uint32_t wg_tile_k = wg_tile_k_;
+  static constexpr uint32_t sg_tile_n = sg_tile_n_;
+  static constexpr uint32_t sg_tile_k = sg_tile_k_;
+  static constexpr uint32_t k_stride = k_stride_;
 };
 
 } // namespace gpu::xetla::kernel

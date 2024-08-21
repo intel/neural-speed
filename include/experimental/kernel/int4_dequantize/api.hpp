@@ -19,26 +19,33 @@
 
 #pragma once
 
-#include <experimental/kernel/col_major_shuf/config.hpp>
+#include <experimental/kernel/int4_dequantize/config.hpp>
 
 namespace gpu::xetla::kernel {
 
 /// @brief
 ///
-/// @tparam dtype_in_  input data type.
-/// @tparam dtype_out_ output data type.
-/// @tparam dtype_gidx_ gidx data type.
-/// @tparam mem_layout_in_ input memory layout.
-/// @tparam col_major_shuf_attr_ parallel-related attributes.
+/// @tparam dtype_qweight_  qweight data type.
+/// @tparam dtype_scale_ scale data type.
+/// @tparam dtype_zp_ zero point data
+/// @tparam dtype_dequant_weight_  dequant_weight data type.
+/// @tparam mem_layout_dequant_weight_ dequant_weight memory layout.
+/// @tparam quant_info quant_mode, blocksize, qweight_layout info.
+/// @tparam int4_dequantize_attr_ parallel-related attribute.
 /// @tparam arch_ HW architecture.
 template <
-    typename dtype_in_,
-    typename dtype_out_,
-    typename dtype_gidx_,
-    mem_layout mem_layout_in_,
-    typename col_major_shuf_attr_,
+    typename dtype_qweight_,
+    typename dtype_scale_,
+    typename dtype_zp_,
+    typename dtype_dequant_weight_,
+    mem_layout mem_layout_qweight_,
+    mem_layout mem_layout_scale_,
+    mem_layout mem_layout_zp_,
+    mem_layout mem_layout_dequant_weight_,
+    quant_info quant_info_,
+    typename int4_dequantize_attr_,
     gpu_arch arch_,
     typename enable = void>
-struct col_major_shuf_t {};
+struct int4_dequantize_t {};
 
 } // namespace gpu::xetla::kernel
