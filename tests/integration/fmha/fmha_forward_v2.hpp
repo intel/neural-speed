@@ -49,7 +49,7 @@ class fmha_forward_v2_t {
   };
   static constexpr size_t LOAD_BYTES_LEN = 128;
   static constexpr size_t O_offset = 0;
-  static constexpr size_t O_size = sg_num * head_dim * sizeof(accum_t);
+  static constexpr size_t O_size = sg_num * head_dim * sizeof(scaler_t);
   static constexpr size_t L_offset = O_size;
   static constexpr size_t L_size = sg_num * sizeof(accum_t);
   static constexpr size_t M_offset = L_offset + L_size;
@@ -151,10 +151,11 @@ class fmha_forward_v2_t {
 #pragma unroll
     for (int i = 0; i < head_dim; i += BLK) {
       xetla_vector<uint32_t, BLK> offset_i(
-          O_offset + (sg_id + i * sg_num) * sizeof(accum_t),
-          sg_num * sizeof(accum_t));
-      xetla_vector<accum_t, BLK> O_i = O.xetla_select<BLK, 1>(i);
-      xetla_store_local<accum_t, 1, data_size::default_size, BLK>(
+          O_offset + (sg_id + i * sg_num) * sizeof(scaler_t),
+          sg_num * sizeof(scaler_t));
+      xetla_vector<scaler_t, BLK> O_i =
+          xetla_cvt<scaler_t, accum_t, BLK>(O.xetla_select<BLK, 1>(i));
+      xetla_store_local<scaler_t, 1, data_size::default_size, BLK>(
           offset_i, O_i);
     }
 
@@ -179,8 +180,8 @@ class fmha_forward_v2_t {
 #pragma unroll
     for (size_t i = start_idx; i < start_idx + sg_head_dim; ++i) {
       accum_t O_total = xetla_reduce<accum_t, accum_t, sg_num, reduce_op::sum>(
-          xetla_load_local<accum_t, sg_num>(
-              O_offset + i * sg_num * sizeof(accum_t)) *
+          xetla_load_local<scaler_t, sg_num>(
+              O_offset + i * sg_num * sizeof(scaler_t)) *
           L_ratio
 
       );
