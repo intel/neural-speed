@@ -33,7 +33,7 @@ template <
     mem_layout mem_layout_zp_,
     mem_layout mem_layout_dequant_weight_,
     quant_info quant_info_,
-    typename int4_dequantize_attr_,
+    typename bit4_dequantize_attr_,
     gpu_arch arch_>
 struct int4_dequantize_t<
     dtype_qweight_,
@@ -45,7 +45,7 @@ struct int4_dequantize_t<
     mem_layout_zp_,
     mem_layout_dequant_weight_,
     quant_info_,
-    int4_dequantize_attr_,
+    bit4_dequantize_attr_,
     arch_> {
   static_assert(
       mem_layout_qweight_ == mem_layout::col_major,
@@ -60,13 +60,14 @@ struct int4_dequantize_t<
       mem_layout_dequant_weight_ == mem_layout::row_major,
       "only support row_major dequant_weight now.");
 
+ public:
   static constexpr uint32_t dequant_s = quant_info_.dequant_s;
   static constexpr uint32_t pack_ratio = sizeof(dtype_qweight_) * 2;
-  static constexpr uint32_t wg_tile_n = int4_dequantize_attr_::wg_tile_n;
-  static constexpr uint32_t wg_tile_k = int4_dequantize_attr_::wg_tile_k;
-  static constexpr uint32_t sg_tile_n = int4_dequantize_attr_::sg_tile_n;
-  static constexpr uint32_t sg_tile_k = int4_dequantize_attr_::sg_tile_k;
-  static constexpr uint32_t k_stride = int4_dequantize_attr_::k_stride;
+  static constexpr uint32_t wg_tile_n = bit4_dequantize_attr_::wg_tile_n;
+  static constexpr uint32_t wg_tile_k = bit4_dequantize_attr_::wg_tile_k;
+  static constexpr uint32_t sg_tile_n = bit4_dequantize_attr_::sg_tile_n;
+  static constexpr uint32_t sg_tile_k = bit4_dequantize_attr_::sg_tile_k;
+  static constexpr uint32_t k_stride = bit4_dequantize_attr_::k_stride;
 
   static_assert(
       wg_tile_n % sg_tile_n == 0,
@@ -128,10 +129,9 @@ struct int4_dequantize_t<
     return cl::sycl::range<3>{1, group_range_k, group_range_n};
   };
 
-  static cl::sycl::nd_range<3> get_nd_range(arguments_t& args) {
+  static cl::sycl::nd_range<3> get_nd_range(int k, int n) {
     cl::sycl::range<3> local_range = get_local_range();
-    cl::sycl::range<3> group_range =
-        get_group_range(args.matrix_k, args.matrix_n);
+    cl::sycl::range<3> group_range = get_group_range(k, n);
     return cl::sycl::nd_range<3>{group_range * local_range, local_range};
   };
 
@@ -200,7 +200,7 @@ struct int4_dequantize_t<
 
   static constexpr uint32_t quant_factor_update_freq =
       (k_stride < dequant_s) ? dequant_s / k_stride : 1;
-  __XETLA_API static void call(
+  static __XETLA_API KERNEL_FUNC void call(
       sycl::nd_item<3>& item,
       const arguments_t& args) {
     int wg_id_n = item.get_group(2);
@@ -250,7 +250,6 @@ struct int4_dequantize_t<
     scale_payload_t scale_payload(mem_desc_scale);
     zp_payload_t zp_payload(mem_desc_zp);
     typename dequantize_t::arguments_t dequantize_args(start_n, start_k);
-    dequantize_t dequantize;
     int tile_k_idx = (start_k + k_stride - 1) / k_stride;
     SW_BARRIER();
 #pragma unroll
@@ -277,11 +276,142 @@ struct int4_dequantize_t<
         }
       }
       SW_BARRIER();
-      dequantize(mat_dequant_weight, mat_qweight, scale, zp, dequantize_args);
+      dequantize_t::call(
+          mat_dequant_weight, mat_qweight, scale, zp, dequantize_args);
       tile_transpose(mat_dequant_weight);
       subgroup::tile_store(mat_dequant_weight, mat_dequant_weight_payload);
       mat_dequant_weight_payload.template update_tdesc<tdesc_update_dir::y_dir>(
           mat_dequant_weight_t::tile_size_y);
+      SW_BARRIER();
+    }
+  };
+};
+
+template <
+    typename dtype_qweight_,
+    typename dtype_scale_,
+    typename dtype_dequant_weight_,
+    mem_layout mem_layout_qweight_,
+    mem_layout mem_layout_scale_,
+    mem_layout mem_layout_dequant_weight_,
+    quant_info quant_info_,
+    typename bit4_dequantize_attr_,
+    gpu_arch arch_>
+struct f4_dequantize_t : public int4_dequantize_t<
+                             dtype_qweight_,
+                             dtype_scale_,
+                             fp16,
+                             dtype_dequant_weight_,
+                             mem_layout_qweight_,
+                             mem_layout_scale_,
+                             mem_layout::row_major,
+                             mem_layout_dequant_weight_,
+                             quant_info_,
+                             bit4_dequantize_attr_,
+                             arch_> {
+ public:
+  using int4_dq_t = int4_dequantize_t<
+      dtype_qweight_,
+      dtype_scale_,
+      fp16,
+      dtype_dequant_weight_,
+      mem_layout_qweight_,
+      mem_layout_scale_,
+      mem_layout::row_major,
+      mem_layout_dequant_weight_,
+      quant_info_,
+      bit4_dequantize_attr_,
+      arch_>;
+
+  struct arguments_t {
+    uint32_t matrix_k;
+    uint32_t matrix_n;
+    dtype_qweight_* qweight_base;
+    dtype_scale_* scale_base;
+    dtype_dequant_weight_* dequant_weight_base;
+    uint32_t qweight_ld;
+    uint32_t dequant_weight_ld;
+    uint32_t scale_ld;
+  };
+
+  using dequantize_t = subgroup::dequant_f4_weight_t<
+      typename int4_dq_t::mat_dequant_weight_t,
+      typename int4_dq_t::mat_qweight_t,
+      typename int4_dq_t::scale_t,
+      int4_dq_t::dequant_s,
+      quant_info_.quant_mode>;
+
+  static __XETLA_API KERNEL_FUNC void call(
+      sycl::nd_item<3>& item,
+      const arguments_t& args) {
+    int wg_id_n = item.get_group(2);
+    int wg_id_k = item.get_group(1);
+    int sg_id_n = item.get_local_id(2);
+    int sg_id_k = item.get_local_id(1);
+    int start_k =
+        wg_id_k * int4_dq_t::wg_tile_k + sg_id_k * int4_dq_t::sg_tile_k;
+    int start_n =
+        wg_id_n * int4_dq_t::wg_tile_n + sg_id_n * int4_dq_t::sg_tile_n;
+    int start_x_scale = start_n;
+    int start_y_scale = start_k / int4_dq_t::dequant_s;
+
+    typename int4_dq_t::mem_desc_qweight_t mem_desc_qweight(
+        args.qweight_base,
+        {start_n + int4_dq_t::sg_tile_n, // compressed KxN weight width(N)
+         start_k + int4_dq_t::sg_tile_k, // compressed KxN weight height(K)
+         args.qweight_ld / int4_dq_t::pack_ratio}, // compressed weight pitch
+        {start_n,
+         int(start_k / int4_dq_t::pack_ratio)}); // compressed KxN weight
+                                                 // offset_x, offset_y
+    typename int4_dq_t::mem_desc_dequant_weight_t mem_desc_dequant_weight(
+        args.dequant_weight_base,
+        {start_n + int4_dq_t::sg_tile_n,
+         start_k + int4_dq_t::sg_tile_k,
+         args.dequant_weight_ld},
+        {start_n, start_k});
+    uint32_t scale_size_y =
+        ((args.matrix_k + int4_dq_t::dequant_s - 1) / int4_dq_t::dequant_s);
+    typename int4_dq_t::mem_desc_scale_t mem_desc_scale(
+        args.scale_base,
+        {args.matrix_n, scale_size_y, args.scale_ld},
+        {start_x_scale, start_y_scale});
+
+    uint32_t k_dim_loop = int4_dq_t::sg_tile_k / int4_dq_t::k_stride;
+
+    typename int4_dq_t::mat_qweight_t mat_qweight;
+    typename int4_dq_t::mat_dequant_weight_t mat_dequant_weight;
+    typename int4_dq_t::scale_t scale;
+
+    typename int4_dq_t::mat_qweight_payload_t mat_qweight_payload(
+        mem_desc_qweight);
+    typename int4_dq_t::mat_dequant_weight_payload_t mat_dequant_weight_payload(
+        mem_desc_dequant_weight);
+    typename int4_dq_t::scale_payload_t scale_payload(mem_desc_scale);
+    typename dequantize_t::arguments_t dequantize_args(start_n, start_k);
+    int tile_k_idx = (start_k + int4_dq_t::k_stride - 1) / int4_dq_t::k_stride;
+    SW_BARRIER();
+#pragma unroll
+    for (uint32_t i = 0; i < k_dim_loop; i++) {
+      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+          mat_qweight, mat_qweight_payload);
+      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+          scale, scale_payload);
+      tile_k_idx++;
+      SW_BARRIER();
+      mat_qweight_payload.template update_tdesc<tdesc_update_dir::x_dir>(
+          int4_dq_t::mat_qweight_t::tile_size_y);
+
+      if (tile_k_idx % int4_dq_t::quant_factor_update_freq == 0) {
+        scale_payload.template update_tdesc<tdesc_update_dir::x_dir>(
+            int4_dq_t::scale_t::tile_size_y);
+      }
+      SW_BARRIER();
+      dequantize_t::call(
+          mat_dequant_weight, mat_qweight, scale, dequantize_args);
+      tile_transpose(mat_dequant_weight);
+      subgroup::tile_store(mat_dequant_weight, mat_dequant_weight_payload);
+      mat_dequant_weight_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+          int4_dq_t::mat_dequant_weight_t::tile_size_y);
       SW_BARRIER();
     }
   };

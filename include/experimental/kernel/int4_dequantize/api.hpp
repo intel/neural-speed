@@ -31,7 +31,7 @@ namespace gpu::xetla::kernel {
 /// @tparam dtype_dequant_weight_  dequant_weight data type.
 /// @tparam mem_layout_dequant_weight_ dequant_weight memory layout.
 /// @tparam quant_info quant_mode, blocksize, qweight_layout info.
-/// @tparam int4_dequantize_attr_ parallel-related attribute.
+/// @tparam bit4_dequantize_attr_ parallel-related attribute.
 /// @tparam arch_ HW architecture.
 template <
     typename dtype_qweight_,
@@ -43,7 +43,7 @@ template <
     mem_layout mem_layout_zp_,
     mem_layout mem_layout_dequant_weight_,
     quant_info quant_info_,
-    typename int4_dequantize_attr_,
+    typename bit4_dequantize_attr_,
     gpu_arch arch_,
     typename enable = void>
 struct int4_dequantize_t {};

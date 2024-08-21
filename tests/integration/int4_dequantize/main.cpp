@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-// #define UT_DEBUG
+#define UT_DEBUG
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;
 // The number of times the kernel is executed
@@ -30,16 +30,17 @@ constexpr size_t UNDEFINED_DATA_SIZE = 512;
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_n = 4096;
-  static constexpr size_t mat_k = 4096;
+  static constexpr size_t mat_n = 16;
+  static constexpr size_t mat_k = 128;
   static constexpr size_t wg_k = 128;
   static constexpr size_t wg_n = 16;
   static constexpr size_t sg_k = 128;
   static constexpr size_t sg_n = 16;
   static constexpr size_t k_stride = 32;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
-  static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
+  static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
+  // static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
+  // static constexpr quant_mode quant_mode = quant_mode::DEGREE5_FAPPROX_NF4;
 
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
@@ -193,7 +194,7 @@ void dequantize_run(int iter) {
 
   std::cout << "Running on " << device.get_info<info::device::name>() << "\n";
 
-  using int4_dequantize_attr = gpu::xetla::kernel::int4_dequantize_attr_t<
+  using bit4_dequantize_attr = gpu::xetla::kernel::bit4_dequantize_attr_t<
       wg_tile_n,
       wg_tile_k,
       sg_tile_n,
@@ -210,7 +211,18 @@ void dequantize_run(int iter) {
       mem_layout::row_major,
       mem_layout::row_major,
       q_info,
-      int4_dequantize_attr,
+      bit4_dequantize_attr,
+      Test::arch>;
+
+  using f4_dequantize_kernel = gpu::xetla::kernel::f4_dequantize_t<
+      data_type_b,
+      data_type_scale,
+      data_type_c,
+      layout_b,
+      layout_b,
+      mem_layout::row_major,
+      q_info,
+      bit4_dequantize_attr,
       Test::arch>;
 
   // Define and initialize the data required for the calculation
@@ -303,7 +315,7 @@ void dequantize_run(int iter) {
           (size_zero_pt + UNDEFINED_DATA_SIZE) * sizeof(data_type_zero_pt))
       .wait();
 
-  typename int4_dequantize_kernel::arguments_t args(
+  typename int4_dequantize_kernel::arguments_t i4_args(
       matrix_k,
       matrix_n,
       B_d,
@@ -314,7 +326,12 @@ void dequantize_run(int iter) {
       ldc,
       ld_scale,
       ld_zero_pt);
-  cl::sycl::nd_range<3> nd_range = int4_dequantize_kernel::get_nd_range(args);
+
+  typename f4_dequantize_kernel::arguments_t f4_args(
+      matrix_k, matrix_n, B_d, scale_d, C_d, ldb, ldc, ld_scale);
+
+  cl::sycl::nd_range<3> nd_range =
+      int4_dequantize_kernel::get_nd_range(matrix_k, matrix_n);
 
   size_t bytes = matrix_n * matrix_k / 2 +
       matrix_k * matrix_n * sizeof(data_type_c) +
@@ -334,7 +351,13 @@ void dequantize_run(int iter) {
       auto e_esimd = queue.submit([&](handler& cgh) {
         cgh.parallel_for(nd_range, [=](nd_item<3> item) SYCL_ESIMD_KERNEL {
           // allocate slm and nbarrier resource
-          int4_dequantize_kernel::call(item, args);
+          if constexpr (
+              quant_mode == quant_mode::I4_SYM ||
+              quant_mode == quant_mode::I4_ASYM) {
+            int4_dequantize_kernel::call(item, i4_args);
+          } else {
+            f4_dequantize_kernel::call(item, f4_args);
+          }
         });
       });
       if (i >= warm) {

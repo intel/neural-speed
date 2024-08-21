@@ -39,7 +39,7 @@ template <
     uint32_t sg_tile_n_,
     uint32_t sg_tile_k_,
     uint32_t k_stride_>
-struct int4_dequantize_attr_t {
+struct bit4_dequantize_attr_t {
   static constexpr uint32_t wg_tile_n = wg_tile_n_;
   static constexpr uint32_t wg_tile_k = wg_tile_k_;
   static constexpr uint32_t sg_tile_n = sg_tile_n_;

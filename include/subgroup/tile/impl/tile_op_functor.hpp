@@ -67,7 +67,7 @@ struct dequant_int4_weight_t {
     inline arguments_t(uint32_t wg_start_n_, uint32_t wg_start_k_)
         : wg_start_n(wg_start_n_), wg_start_k(wg_start_k_) {}
   };
-  __XETLA_API KERNEL_FUNC void operator()(
+  static __XETLA_API KERNEL_FUNC void call(
       matB_acc_t& matB_acc,
       matB_t& matB,
       scale_t& scale,
@@ -157,6 +157,108 @@ struct dequant_int4_weight_t {
             //     "scale[%d] %f \n",
             //     scale_idx,
             //     float(sycl::half(scale.reg.xetla_select<1, 1>(scale_idx))));
+          }
+        }
+      }
+    }
+  }
+};
+
+template <
+    typename matB_acc_t,
+    typename matB_t,
+    typename scale_t,
+    uint32_t dequant_s,
+    quant_mode quant_mode>
+struct dequant_f4_weight_t {
+  struct arguments_t {
+    uint32_t wg_start_n;
+    uint32_t wg_start_k;
+    inline arguments_t() = default;
+    inline arguments_t(uint32_t wg_start_n_, uint32_t wg_start_k_)
+        : wg_start_n(wg_start_n_), wg_start_k(wg_start_k_) {}
+  };
+  static __XETLA_API KERNEL_FUNC void call(
+      matB_acc_t& matB_acc,
+      matB_t& matB,
+      scale_t& scale,
+      [[maybe_unused]] const arguments_t& args) {
+    // no tail, because this is matB
+    constexpr uint32_t tile_size_x_b = matB_acc_t::tile_size_x;
+    constexpr uint32_t tile_size_y_b = matB_acc_t::tile_size_y;
+    constexpr uint32_t block_size_x_b = matB_acc_t::block_size_x;
+    constexpr uint32_t block_size_y_b = matB_acc_t::block_size_y;
+
+    constexpr uint32_t num_block_x = tile_size_x_b / block_size_x_b;
+    constexpr uint32_t num_block_y = tile_size_y_b / block_size_y_b;
+#pragma unroll
+    for (uint32_t i = 0; i < num_block_y; ++i) {
+#pragma unroll
+      for (uint32_t j = 0; j < num_block_x; ++j) {
+        int block_id = (i * num_block_x + j);
+        // Must be little-endian
+        xetla_vector<uint8_t, matB_acc_t::block_elems / 2> matB_blk =
+            matB.reg.xetla_format<int8_t>()
+                .xetla_select<matB_acc_t::block_elems / 2, 1>(
+                    block_id * matB_acc_t::block_elems / 2);
+        auto dst_blk = matB_acc.reg
+                           .xetla_select<matB_acc_t::block_elems, 1>(
+                               block_id * matB_acc_t::block_elems)
+                           .xetla_format<typename matB_acc_t::dtype>();
+
+        // int8 includes 2 4bits data.
+        xetla_vector<int8_t, matB_acc_t::block_elems> cvt_blk_i8;
+
+        // lowest 4 bit
+        {
+          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(0) =
+              matB_blk & 0xf;
+        }
+        // highest 4 bit
+        {
+          cvt_blk_i8.xetla_select<matB_acc_t::block_elems / 2, 2>(1) =
+              xetla_shr<int8_t, uint8_t, matB_acc_t::block_elems / 2>(
+                  matB_blk, 4);
+        }
+
+        xetla_vector<float, matB_acc_t::block_elems> approx_value;
+        xetla_vector<float, matB_acc_t::block_elems> cvt_blk_f16 = cvt_blk_i8;
+        xetla_vector<float, matB_acc_t::block_elems> vec_const;
+
+        if constexpr (quant_mode == quant_mode::NF4) {
+          assert(0);
+        } else if constexpr (quant_mode == quant_mode::DEGREE5_FAPPROX_NF4) {
+          approx_value = 1.831e-05;
+          vec_const = -0.0006863;
+          vec_const = 0.01005;
+          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          vec_const = -0.07231;
+          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          vec_const = 0.3462;
+          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          vec_const = -0.9942;
+          approx_value = cvt_blk_f16 * approx_value + vec_const;
+        }
+
+        constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
+#pragma unroll
+        for (uint32_t jj = 0; jj < block_size_x_b; jj++) {
+#pragma unroll
+          for (uint32_t ii = 0; ii < block_size_y_b; ii += step) {
+            uint32_t offset_y_in_tile = i * block_size_y_b + ii;
+            uint32_t offset_x_in_tile = j * block_size_x_b + jj;
+            uint32_t scale_idx =
+                (offset_y_in_tile) / dequant_s * scale_t::block_size_x +
+                offset_x_in_tile;
+            typename matB_acc_t::dtype scale_value =
+                (typename scale_t::dtype)scale.reg[scale_idx];
+#pragma unroll
+            for (uint32_t iii = 0; iii < step; iii += 16) {
+              dst_blk.xetla_select<16, 1>(jj * block_size_y_b + ii + iii) =
+                  approx_value.xetla_select<16, 1>(
+                      jj * block_size_y_b + ii + iii) *
+                  scale_value;
+            }
           }
         }
       }
