@@ -40,7 +40,8 @@ class test_col_major_1 {
   static constexpr size_t dequant_s = 128;
   // static constexpr quant_mode quant_mode = quant_mode::I4_ASYM;
   // static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
-  static constexpr quant_mode quant_mode = quant_mode::DEGREE5_APPROX_NF4;
+  // static constexpr quant_mode quant_mode = quant_mode::DEGREE5_APPROX_NF4;
+  static constexpr quant_mode quant_mode = quant_mode::NF4;
 
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
@@ -61,6 +62,24 @@ std::vector<fp16> convert_bit4(
     data_type_zero_pt zero_pt) {
   std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
 
+  float nf4_LUT alignas(64)[] = {
+      -1.f,
+      -0.6961928009986877f,
+      -0.5250730514526367f,
+      -0.39491748809814453f,
+      -0.28444138169288635f,
+      -0.18477343022823334f,
+      -0.09105003625154495f,
+      0.f,
+      0.07958029955625534f,
+      0.16093020141124725f,
+      0.24611230194568634f,
+      0.33791524171829224f,
+      0.44070982933044434f,
+      0.5626170039176941f,
+      0.7229568362236023f,
+      1.0f};
+
   int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     int8_t dequant_8bit = data_b & 0xf;
@@ -76,6 +95,8 @@ std::vector<fp16> convert_bit4(
       tmp = tmp * dequant_8bit + 0.3462;
       tmp = tmp * dequant_8bit - 0.9942;
       dequant_fp16[i] = scale * tmp;
+    } else if constexpr (quant_mode == quant_mode::NF4) {
+      dequant_fp16[i] = scale * nf4_LUT[dequant_8bit];
     } else {
       assert(0);
     }

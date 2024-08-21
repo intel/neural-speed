@@ -499,7 +499,6 @@ class gemm_t<
     wg_start_n = args.scale_base_desc.coord.x;
     wg_start_k = args.matA_base_desc.coord.x;
     typename dequantize_t::arguments_t dequantize_args{wg_start_n, wg_start_k};
-    dequantize_t dequantize;
 
     xetla_nbarrier_t<wg_size_x, wg_size_x, arch_tag> nbarrier_a;
     nbarrier_a.init_nbarrier(
@@ -623,7 +622,7 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
 
-      dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
+      dequantize_t::call(matB_acc, matB, scale, zero_pt, dequantize_args);
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
@@ -700,7 +699,7 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
 
-      dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
+      dequantize_t::call(matB_acc, matB, scale, zero_pt, dequantize_args);
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(

@@ -184,6 +184,26 @@ struct dequant_f4_weight_t {
       scale_t& scale,
       [[maybe_unused]] const arguments_t& args) {
     // no tail, because this is matB
+
+    xetla_vector<float, 16> F4_LUT;
+    if constexpr (quant_mode == quant_mode::NF4) {
+      F4_LUT[0] = -1.f;
+      F4_LUT[1] = -0.6961928009986877f;
+      F4_LUT[2] = -0.5250730514526367f;
+      F4_LUT[3] = -0.39491748809814453f;
+      F4_LUT[4] = -0.28444138169288635f;
+      F4_LUT[5] = -0.18477343022823334f;
+      F4_LUT[6] = -0.09105003625154495f;
+      F4_LUT[7] = 0.f;
+      F4_LUT[8] = 0.07958029955625534f;
+      F4_LUT[9] = 0.16093020141124725f;
+      F4_LUT[10] = 0.24611230194568634f;
+      F4_LUT[11] = 0.33791524171829224f;
+      F4_LUT[12] = 0.44070982933044434f;
+      F4_LUT[13] = 0.5626170039176941f;
+      F4_LUT[14] = 0.7229568362236023f;
+      F4_LUT[15] = 1.0f;
+    }
     constexpr uint32_t tile_size_x_b = matB_acc_t::tile_size_x;
     constexpr uint32_t tile_size_y_b = matB_acc_t::tile_size_y;
     constexpr uint32_t block_size_x_b = matB_acc_t::block_size_x;
@@ -221,24 +241,25 @@ struct dequant_f4_weight_t {
                   matB_blk, 4);
         }
 
-        xetla_vector<float, matB_acc_t::block_elems> approx_value;
-        xetla_vector<float, matB_acc_t::block_elems> cvt_blk_f16 = cvt_blk_i8;
-        xetla_vector<float, matB_acc_t::block_elems> vec_const;
+        xetla_vector<float, matB_acc_t::block_elems> f4_value;
 
         if constexpr (quant_mode == quant_mode::NF4) {
-          assert(0);
+          xetla_vector<uint16_t, matB_acc_t::block_elems> idx_blk = cvt_blk_i8;
+          f4_value = F4_LUT.iselect(idx_blk);
         } else if constexpr (quant_mode == quant_mode::DEGREE5_APPROX_NF4) {
-          approx_value = 1.831e-05;
+          xetla_vector<float, matB_acc_t::block_elems> cvt_blk_f16 = cvt_blk_i8;
+          xetla_vector<float, matB_acc_t::block_elems> vec_const;
+          f4_value = 1.831e-05;
           vec_const = -0.0006863;
-          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          f4_value = cvt_blk_f16 * f4_value + vec_const;
           vec_const = 0.01005;
-          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          f4_value = cvt_blk_f16 * f4_value + vec_const;
           vec_const = -0.07231;
-          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          f4_value = cvt_blk_f16 * f4_value + vec_const;
           vec_const = 0.3462;
-          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          f4_value = cvt_blk_f16 * f4_value + vec_const;
           vec_const = -0.9942;
-          approx_value = cvt_blk_f16 * approx_value + vec_const;
+          f4_value = cvt_blk_f16 * f4_value + vec_const;
         }
 
         constexpr uint32_t step = std::min(block_size_y_b, dequant_s);
@@ -256,8 +277,7 @@ struct dequant_f4_weight_t {
 #pragma unroll
             for (uint32_t iii = 0; iii < step; iii += 16) {
               dst_blk.xetla_select<16, 1>(jj * block_size_y_b + ii + iii) =
-                  approx_value.xetla_select<16, 1>(
-                      jj * block_size_y_b + ii + iii) *
+                  f4_value.xetla_select<16, 1>(jj * block_size_y_b + ii + iii) *
                   scale_value;
             }
           }
