@@ -171,10 +171,10 @@ tile_store(tile_t& tile, payload_t& payload) {
             st_block_size_y,
             L1,
             L2>(
-            (dtype*)::gpu::xetla::detail::xetla_get_tensor_base_address(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
             ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
             st_blk);
@@ -194,12 +194,25 @@ tile_store(tile_t& tile, payload_t& payload) {
             (block_size_x * arr_len - 1) | ((blk_remained_y - 1) << 8);
         gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
             tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
-        xetla_tstore_global<
+        // xetla_tstore_global<
+        //     dtype,
+        //     blk_remained_elems,
+        //     L1,
+        //     L2,
+        //     payload_t::arch_tag>(tdesc, st_blk);
+        xetla_store_global<
             dtype,
-            blk_remained_elems,
+            block_size_x * arr_len,
+            blk_remained_y,
             L1,
-            L2,
-            payload_t::arch_tag>(tdesc, st_blk);
+            L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            st_blk);
       }
     }
   }
@@ -244,8 +257,21 @@ tile_store(tile_t& tile, payload_t& payload) {
             remained_st_blk_size_y * block_size_x * arr_len;
         auto st_blk =
             combine_blk.xetla_select<store_elems, 1>(ii * store_elems);
-        xetla_tstore_global<dtype, store_elems, L1, L2, payload_t::arch_tag>(
-            tdesc, st_blk);
+        // xetla_tstore_global<dtype, store_elems, L1, L2, payload_t::arch_tag>(
+        //     tdesc, st_blk);
+        xetla_store_global<
+            dtype,
+            block_size_x * arr_len,
+            remained_st_blk_size_y,
+            L1,
+            L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            st_blk);
         xetla_update_tdesc_offsety(
             tdesc.xetla_format<uint32_t>(), remained_st_blk_size_y);
       }
@@ -263,12 +289,25 @@ tile_store(tile_t& tile, payload_t& payload) {
             (block_size_x * arr_len - 1) | ((final_st_blk_size_y - 1) << 8);
         gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
             tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
-        xetla_tstore_global<
+        // xetla_tstore_global<
+        //     dtype,
+        //     final_store_elems,
+        //     L1,
+        //     L2,
+        //     payload_t::arch_tag>(tdesc, st_blk);
+        xetla_store_global<
             dtype,
-            final_store_elems,
+            block_size_x * arr_len,
+            final_st_blk_size_y,
             L1,
-            L2,
-            payload_t::arch_tag>(tdesc, st_blk);
+            L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            st_blk);
       }
     }
   }
