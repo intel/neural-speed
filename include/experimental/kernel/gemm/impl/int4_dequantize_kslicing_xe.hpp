@@ -190,6 +190,133 @@ class gemm_universal_t<
     epilogue_args_t epilogue_args;
 
     scale_base_t scale_base;
+    uint32_t scale_ld;
+
+    /// @brief Constructs arguments with default method.
+    inline arguments_t() = default;
+
+    /// @brief Set for device copyable
+    static constexpr bool host_callable = true;
+
+    // Be aware of the risks: Rule of three (copy constructor, copy assignment,
+    // destructor) Please check if you need to add self-define destructor
+    // ~arguments_t(){}
+
+    /// @brief Constructs arguments with initialization list.
+    /// @param matrix_m_ Is the size of the m dimension of the matrix
+    /// multiplication (m x k x n).
+    /// @param matrix_k_ Is the size of the k dimension of the matrix
+    /// multiplication (m x k x n).
+    /// @param matrix_n_ Is the size of the n dimension of the matrix
+    /// multiplication (m x k x n).
+    /// @param matA_base_ Is the base address of matrix A.
+    /// @param matA_ld_ Is the leading dimension (pitch) size of the matrix A in
+    /// memory.
+    /// @param matB_base_ Is the base address of matrix B.
+    /// @param matB_ld_ Is the leading dimension (pitch) size of the matrix B in
+    /// memory.
+    /// @param matC_base_ Is the base address of matrix C.
+    /// @param matC_ld_ Is the leading dimension (pitch) size of the matrix C in
+    /// memory.
+    /// @param epilogue_args_ Is the epilogue arguments.
+    inline arguments_t(
+        uint32_t matrix_m_,
+        uint32_t matrix_k_,
+        uint32_t matrix_n_,
+        matA_base_t matA_base_,
+        uint32_t matA_ld_,
+        matB_base_t matB_base_,
+        uint32_t matB_ld_,
+        matC_base_t matC_base_,
+        uint32_t matC_ld_,
+        scale_base_t scale_base_,
+        uint32_t scale_ld_,
+        acc_base_t acc_base_ = {},
+        cnt_base_t cnt_base_ = {},
+        epilogue_args_t epilogue_args_ = {})
+        : matrix_m(matrix_m_),
+          matrix_k(matrix_k_),
+          matrix_n(matrix_n_),
+          matA_ld(matA_ld_),
+          matB_ld(matB_ld_),
+          matC_ld(matC_ld_),
+          matA_base(matA_base_),
+          matB_base(matB_base_),
+          matC_base(matC_base_),
+          acc_base(acc_base_),
+          cnt_base(cnt_base_),
+          epilogue_args(epilogue_args_),
+          scale_base(scale_base_),
+          scale_ld(scale_ld_) {}
+
+    inline arguments_t(const arguments_t& args)
+        : matrix_m(args.matrix_m),
+          matrix_k(args.matrix_k),
+          matrix_n(args.matrix_n),
+          matA_ld(args.matA_ld),
+          matB_ld(args.matB_ld),
+          matC_ld(args.matC_ld),
+          matA_base(args.matA_base),
+          matB_base(args.matB_base),
+          matC_base(args.matC_base),
+          acc_base(args.acc_base),
+          cnt_base(args.cnt_base),
+          epilogue_args(args.epilogue_args),
+          scale_base(args.scale_base),
+          scale_ld(args.scale_ld) {}
+    // Be aware of the risks: Rule of three (copy constructor, copy assignment,
+    // destructor) Please check if you need to add self-define destructor inline
+    // ~arguments_t(){}
+    inline arguments_t& operator=(const arguments_t& args) {
+      this->matrix_m = args.matrix_m;
+      this->matrix_k = args.matrix_k;
+      this->matrix_n = args.matrix_n;
+      this->matA_base = args.matA_base;
+      this->matA_ld = args.matA_ld;
+      this->matB_base = args.matB_base;
+      this->matB_ld = args.matB_ld;
+      this->matC_base = args.matC_base;
+      this->matC_ld = args.matC_ld;
+      this->scale_base = args.scale_base;
+      this->scale_ld = args.scale_ld;
+      this->acc_base = args.acc_base;
+      this->cnt_base = args.cnt_base;
+      this->epilogue_args = args.epilogue_args;
+      return *this;
+    }
+  };
+
+  template <>
+  struct arguments_t<quant_mode::I4_ASYM> {
+    /// @brief Is the size of the m dimension of the matrix multiplication (m x
+    /// k x n).
+    uint32_t matrix_m;
+    /// @brief Is the size of the k dimension of the matrix multiplication (m x
+    /// k x n).
+    uint32_t matrix_k;
+    /// @brief Is the size of the n dimension of the matrix multiplication (m x
+    /// k x n).
+    uint32_t matrix_n;
+    /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
+    uint32_t matA_ld;
+    /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
+    uint32_t matB_ld;
+    /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
+    uint32_t matC_ld;
+    /// @brief Is the base address of matrix A.
+    matA_base_t matA_base;
+    /// @brief Is the base address of matrix B.
+    matB_base_t matB_base;
+    /// @brief Is the base address of matrix C.
+    matC_base_t matC_base;
+    /// @brief Is the base address of accumulation buffer.
+    acc_base_t acc_base;
+    /// @brief Is the base address of counter buffer.
+    cnt_base_t cnt_base;
+    /// @brief Is the epilogue arguments.
+    epilogue_args_t epilogue_args;
+
+    scale_base_t scale_base;
     zero_pt_base_t zero_pt_base;
     uint32_t scale_ld;
     uint32_t zero_pt_ld;
@@ -294,133 +421,6 @@ class gemm_universal_t<
       return *this;
     }
   };
-  template <>
-  struct arguments_t<quant_mode::I4_SYM> {
-    /// @brief Is the size of the m dimension of the matrix multiplication (m x
-    /// k x n).
-    uint32_t matrix_m;
-    /// @brief Is the size of the k dimension of the matrix multiplication (m x
-    /// k x n).
-    uint32_t matrix_k;
-    /// @brief Is the size of the n dimension of the matrix multiplication (m x
-    /// k x n).
-    uint32_t matrix_n;
-    /// @brief Is the leading dimension (pitch) size of the matrix A in memory.
-    uint32_t matA_ld;
-    /// @brief Is the leading dimension (pitch) size of the matrix B in memory.
-    uint32_t matB_ld;
-    /// @brief Is the leading dimension (pitch) size of the matrix C in memory.
-    uint32_t matC_ld;
-    /// @brief Is the base address of matrix A.
-    matA_base_t matA_base;
-    /// @brief Is the base address of matrix B.
-    matB_base_t matB_base;
-    /// @brief Is the base address of matrix C.
-    matC_base_t matC_base;
-    /// @brief Is the base address of accumulation buffer.
-    acc_base_t acc_base;
-    /// @brief Is the base address of counter buffer.
-    cnt_base_t cnt_base;
-    /// @brief Is the epilogue arguments.
-    epilogue_args_t epilogue_args;
-
-    scale_base_t scale_base;
-    uint32_t scale_ld;
-
-    /// @brief Constructs arguments with default method.
-    inline arguments_t() = default;
-
-    /// @brief Set for device copyable
-    static constexpr bool host_callable = true;
-
-    // Be aware of the risks: Rule of three (copy constructor, copy assignment,
-    // destructor) Please check if you need to add self-define destructor
-    // ~arguments_t(){}
-
-    /// @brief Constructs arguments with initialization list.
-    /// @param matrix_m_ Is the size of the m dimension of the matrix
-    /// multiplication (m x k x n).
-    /// @param matrix_k_ Is the size of the k dimension of the matrix
-    /// multiplication (m x k x n).
-    /// @param matrix_n_ Is the size of the n dimension of the matrix
-    /// multiplication (m x k x n).
-    /// @param matA_base_ Is the base address of matrix A.
-    /// @param matA_ld_ Is the leading dimension (pitch) size of the matrix A in
-    /// memory.
-    /// @param matB_base_ Is the base address of matrix B.
-    /// @param matB_ld_ Is the leading dimension (pitch) size of the matrix B in
-    /// memory.
-    /// @param matC_base_ Is the base address of matrix C.
-    /// @param matC_ld_ Is the leading dimension (pitch) size of the matrix C in
-    /// memory.
-    /// @param epilogue_args_ Is the epilogue arguments.
-    inline arguments_t(
-        uint32_t matrix_m_,
-        uint32_t matrix_k_,
-        uint32_t matrix_n_,
-        matA_base_t matA_base_,
-        uint32_t matA_ld_,
-        matB_base_t matB_base_,
-        uint32_t matB_ld_,
-        matC_base_t matC_base_,
-        uint32_t matC_ld_,
-        scale_base_t scale_base_,
-        uint32_t scale_ld_,
-        acc_base_t acc_base_ = {},
-        cnt_base_t cnt_base_ = {},
-        epilogue_args_t epilogue_args_ = {})
-        : matrix_m(matrix_m_),
-          matrix_k(matrix_k_),
-          matrix_n(matrix_n_),
-          matA_ld(matA_ld_),
-          matB_ld(matB_ld_),
-          matC_ld(matC_ld_),
-          matA_base(matA_base_),
-          matB_base(matB_base_),
-          matC_base(matC_base_),
-          acc_base(acc_base_),
-          cnt_base(cnt_base_),
-          epilogue_args(epilogue_args_),
-          scale_base(scale_base_),
-          scale_ld(scale_ld_) {}
-
-    inline arguments_t(const arguments_t& args)
-        : matrix_m(args.matrix_m),
-          matrix_k(args.matrix_k),
-          matrix_n(args.matrix_n),
-          matA_ld(args.matA_ld),
-          matB_ld(args.matB_ld),
-          matC_ld(args.matC_ld),
-          matA_base(args.matA_base),
-          matB_base(args.matB_base),
-          matC_base(args.matC_base),
-          acc_base(args.acc_base),
-          cnt_base(args.cnt_base),
-          epilogue_args(args.epilogue_args),
-          scale_base(args.scale_base),
-          scale_ld(args.scale_ld) {}
-    // Be aware of the risks: Rule of three (copy constructor, copy assignment,
-    // destructor) Please check if you need to add self-define destructor inline
-    // ~arguments_t(){}
-    inline arguments_t& operator=(const arguments_t& args) {
-      this->matrix_m = args.matrix_m;
-      this->matrix_k = args.matrix_k;
-      this->matrix_n = args.matrix_n;
-      this->matA_base = args.matA_base;
-      this->matA_ld = args.matA_ld;
-      this->matB_base = args.matB_base;
-      this->matB_ld = args.matB_ld;
-      this->matC_base = args.matC_base;
-      this->matC_ld = args.matC_ld;
-      this->scale_base = args.scale_base;
-      this->scale_ld = args.scale_ld;
-      this->acc_base = args.acc_base;
-      this->cnt_base = args.cnt_base;
-      this->epilogue_args = args.epilogue_args;
-      return *this;
-    }
-  };
-
   /// @brief Gets named_barrier id consumption count.
   /// Users query and get a named_barrier id consumption count in compile time.
   /// @return The count of named barriers required.
@@ -667,7 +667,7 @@ class gemm_universal_t<
     uint32_t inner_loop_start = (start_k + k_stride - 1) / k_stride;
     uint32_t inner_loop_count = (wg_tile_k + k_stride - 1) / k_stride;
     gemm_args_t gemm_args;
-    if constexpr (gemm_t::compute_policy::quant_mode == quant_mode::I4_SYM) {
+    if constexpr (gemm_t::compute_policy::quant_mode != quant_mode::I4_ASYM) {
       gemm_args = gemm_args_t(
           mem_desc_a,
           mem_desc_b,

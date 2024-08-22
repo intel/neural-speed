@@ -312,13 +312,21 @@ class gemm_t<
           matA_acc_t,
           compute_policy::mma_engine,
           arch_tag>>;
-  using dequantize_t = subgroup::dequant_int4_weight_t<
-      matB_acc_t,
-      matB_t,
-      scale_t,
-      zero_pt_t,
-      dequant_s,
-      quant_mode>;
+  using dequantize_t = std::conditional_t<
+      quant_mode == quant_mode::I4_SYM || quant_mode == quant_mode::I4_ASYM,
+      subgroup::dequant_int4_weight_t<
+          matB_acc_t,
+          matB_t,
+          scale_t,
+          zero_pt_t,
+          dequant_s,
+          quant_mode>,
+      subgroup::dequant_f4_weight_t<
+          matB_acc_t,
+          matB_t,
+          scale_t,
+          dequant_s,
+          quant_mode>>;
   static constexpr bool enable_periodic_sync = (sync_freq != 0);
   static constexpr uint32_t barrier_count_x = wg_size_y > 1 ? wg_size_x : 0;
   static constexpr uint32_t barrier_count_y = wg_size_x > 1 ? wg_size_y : 0;
@@ -622,7 +630,13 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
 
-      dequantize_t::call(matB_acc, matB, scale, zero_pt, dequantize_args);
+      if constexpr (
+          quant_mode == quant_mode::I4_ASYM ||
+          quant_mode == quant_mode::I4_SYM) {
+        dequantize_t::call(matB_acc, matB, scale, zero_pt, dequantize_args);
+      } else {
+        dequantize_t::call(matB_acc, matB, scale, dequantize_args);
+      }
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(
@@ -699,7 +713,13 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
 
-      dequantize_t::call(matB_acc, matB, scale, zero_pt, dequantize_args);
+      if constexpr (
+          quant_mode == quant_mode::I4_ASYM ||
+          quant_mode == quant_mode::I4_SYM) {
+        dequantize_t::call(matB_acc, matB, scale, zero_pt, dequantize_args);
+      } else {
+        dequantize_t::call(matB_acc, matB, scale, dequantize_args);
+      }
       SW_BARRIER();
       if constexpr (is_gemv) {
         tile_mma::mma(

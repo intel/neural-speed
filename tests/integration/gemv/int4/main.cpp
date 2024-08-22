@@ -40,7 +40,9 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 512 / sg_m;
   static constexpr size_t dequant_s = 128;
-  static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
+  // static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
+  // static constexpr quant_mode quant_mode = quant_mode::NF4;
+  static constexpr quant_mode quant_mode = quant_mode::DEGREE5_APPROX_NF4;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;
@@ -127,19 +129,49 @@ template <
     typename data_type_b,
     typename data_type_scale,
     typename data_type_zero_pt>
-std::vector<fp16> convert_int4(
+std::vector<fp16> convert_bit4(
     data_type_b data_b,
     data_type_scale scale,
     data_type_zero_pt zero_pt) {
   std::vector<fp16> dequant_fp16(sizeof(data_type_b) * 2);
+
+  float nf4_LUT alignas(64)[] = {
+      -1.f,
+      -0.6961928009986877f,
+      -0.5250730514526367f,
+      -0.39491748809814453f,
+      -0.28444138169288635f,
+      -0.18477343022823334f,
+      -0.09105003625154495f,
+      0.f,
+      0.07958029955625534f,
+      0.16093020141124725f,
+      0.24611230194568634f,
+      0.33791524171829224f,
+      0.44070982933044434f,
+      0.5626170039176941f,
+      0.7229568362236023f,
+      1.0f};
 
   int8_t zero_pt_i8 = zero_pt & 0xf;
   for (uint32_t i = 0; i < dequant_fp16.size(); i++) {
     int8_t dequant_8bit = data_b & 0xf;
     if constexpr (quant_mode == quant_mode::I4_SYM) {
       dequant_fp16[i] = scale * (dequant_8bit - 8);
-    } else {
+    } else if constexpr (quant_mode == quant_mode::I4_ASYM) {
       dequant_fp16[i] = scale * (dequant_8bit - zero_pt_i8);
+    } else if constexpr (quant_mode == quant_mode::DEGREE5_APPROX_NF4) {
+      float tmp = 1.831e-05;
+      tmp = tmp * dequant_8bit - 0.0006863;
+      tmp = tmp * dequant_8bit + 0.01005;
+      tmp = tmp * dequant_8bit - 0.07231;
+      tmp = tmp * dequant_8bit + 0.3462;
+      tmp = tmp * dequant_8bit - 0.9942;
+      dequant_fp16[i] = scale * tmp;
+    } else if constexpr (quant_mode == quant_mode::NF4) {
+      dequant_fp16[i] = scale * nf4_LUT[dequant_8bit];
+    } else {
+      assert(0);
     }
     data_b = data_b >> 4;
   }
@@ -178,7 +210,7 @@ std::vector<data_type_acc_in> dequantize_weight(
       data_type_zero_pt zp_value = zero_pt[start_zero_pt_in];
       zp_value = zp_value >> (4 * (i % pack_radio));
       for (uint32_t jj = 0; jj < step; jj++) {
-        std::vector<fp16> dequant_fp16 = convert_int4<quant_mode>(
+        std::vector<fp16> dequant_fp16 = convert_bit4<quant_mode>(
             b[start_b_in + jj], scale[start_scale_in], zp_value);
         for (uint32_t jjj = 0; jjj < dequant_fp16.size(); jjj++) {
           b_out[start_out + pack_radio * jj + jjj] = dequant_fp16[jjj];
@@ -476,7 +508,7 @@ void dequantize_gemv_run(int iter) {
        // It accepts the base pointer to matrix D, and its dimensions
        {bias_d, bias_add_shape}});
   typename gemm_op_t::template arguments_t<compute_policy::quant_mode> gemm_arg;
-  if constexpr (compute_policy::quant_mode == quant_mode::I4_SYM) {
+  if constexpr (compute_policy::quant_mode != quant_mode::I4_ASYM) {
     gemm_arg =
         typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
@@ -493,7 +525,7 @@ void dequantize_gemv_run(int iter) {
             Acc_d,
             Cnt_d,
             epilogue_args);
-  } else if constexpr (compute_policy::quant_mode == quant_mode::I4_ASYM) {
+  } else {
     gemm_arg =
         typename gemm_op_t::template arguments_t<compute_policy::quant_mode>(
             matrix_m,
