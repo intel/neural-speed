@@ -477,16 +477,15 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
     return ret.xetla_format<T>();
   } else if constexpr (BlockWidth * sizeof(T) < sizeof(uint32_t)) {
     constexpr auto scale_factor = sizeof(uint32_t) / sizeof(T);
-    xetla_vector<uint32_t, N> ret = __ESIMD_ENS::lsc_load_2d<
+    xetla_vector<uint32_t, N> ret = xetla_load_global<
         uint32_t,
         BlockWidth,
         BlockHeight,
         NBlocks,
         Transposed,
         Transformed,
-        gpu::xetla::detail::get_cache_hint(L1H),
-        gpu::xetla::detail::get_cache_hint(L2H),
-        N>(
+        L1H,
+        L2H>(
         reinterpret_cast<const uint32_t*>(Ptr),
         SurfaceWidth,
         SurfaceHeight,
@@ -505,7 +504,7 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
         Transformed,
         gpu::xetla::detail::get_cache_hint(L1H),
         gpu::xetla::detail::get_cache_hint(L2H),
-        N>(Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y);
+        N>(Ptr, SurfaceWidth - 1, SurfaceHeight - 1, SurfacePitch - 1, X, Y);
   }
 }
 
@@ -788,7 +787,7 @@ __XETLA_API void xetla_store_global(
         BlockHeight,
         gpu::xetla::detail::get_cache_hint(L1H),
         gpu::xetla::detail::get_cache_hint(L2H)>(
-        Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y, Vals);
+        Ptr, SurfaceWidth - 1, SurfaceHeight - 1, SurfacePitch - 1, X, Y, Vals);
   }
 }
 /// template <typename T, int N, int VS = 1, typename OffsetT,

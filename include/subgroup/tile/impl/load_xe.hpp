@@ -95,7 +95,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   static constexpr reg_layout reg_layout_ = tile_desc::register_layout;
   static constexpr bool is_vnni_reverse =
-      payload_t::mem_dword_qword_transpose &&
+      payload_t::mem_transpose_dtype_less4bytes &&
       ((reg_layout_ == reg_layout::tiled) ||
        (reg_layout_ == reg_layout::transpose_tiled));
   static constexpr bool reg_transpose = tile_desc::reg_transpose;
@@ -202,20 +202,10 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t ii = 0; ii < block_size_y / ld_blk_size_y; ++ii) {
         constexpr uint32_t load_elems = ld_blk_size_y * block_size_x * arr_len;
-
-        // reg_tmp.xetla_format<native_type_t<load_dtype>>() =
-        // xetla_tload_global<
-        //     load_dtype,
-        //     ld_blk_height * block_size_x * arr_len / scale_factor,
-        //     L1,
-        //     L2,
-        //     trans,
-        //     mem_transform,
-        //     arch_tag>(tdesc);
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
-            (mem_transpose ? ld_blk_size_y : block_size_x) / scale_factor,
-            (mem_transpose ? block_size_x : ld_blk_size_y),
+            (trans ? ld_blk_size_y : block_size_x) / scale_factor,
+            (trans ? block_size_x : ld_blk_size_y),
             // block_size_x / scale_factor,
             // ld_blk_size_y,
             arr_len,
@@ -223,11 +213,18 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            (native_type_t<load_dtype>*)::gpu::xetla::detail::
-                xetla_get_tensor_base_address(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            // payload.offset_x,
+            // payload.offset_y);
+
+            // (native_type_t<load_dtype>*)::gpu::xetla::detail::
+            //     xetla_get_tensor_base_address(tdesc),
+            // ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
+            // ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
+            // ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
         if constexpr (reg_transpose && trans) {
@@ -284,11 +281,10 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            (native_type_t<load_dtype>*)::gpu::xetla::detail::
-                xetla_get_tensor_base_address(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
             ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
         // xetla_tload_global<
@@ -345,11 +341,10 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            (native_type_t<load_dtype>*)::gpu::xetla::detail::
-                xetla_get_tensor_base_address(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
             ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
         //  xetla_tload_global<
@@ -412,11 +407,10 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            (native_type_t<load_dtype>*)::gpu::xetla::detail::
-                xetla_get_tensor_base_address(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
             ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
             ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
         // xetla_tload_global<
