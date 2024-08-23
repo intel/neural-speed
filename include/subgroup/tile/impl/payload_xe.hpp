@@ -111,10 +111,8 @@ struct mem_payload_t<
     this->surface_height =
         (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
     this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
-    // this->offset_x = mem_desc.coord.x;
-    // this->offset_y = mem_desc.coord.y;
-    this->offset_x = mem_transpose ? mem_desc.coord.y : mem_desc.coord.x;
-    this->offset_x = this->offset_x / scale_factor;
+    this->offset_x =
+        (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) / scale_factor;
     this->offset_y = mem_transpose ? mem_desc.coord.x : mem_desc.coord.y;
 
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
@@ -159,8 +157,9 @@ struct mem_payload_t<
     this->surface_height =
         (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
     this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
-    this->offset_x = mem_desc.coord.x / scale_factor;
-    this->offset_y = mem_desc.coord.y;
+    this->offset_x =
+        (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) / scale_factor;
+    this->offset_y = (mem_transpose ? mem_desc.coord.x : mem_desc.coord.y);
 
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
     int32_t offset = gpu::xetla::detail::xetla_get_tensor_offset_x(base_tdesc) /

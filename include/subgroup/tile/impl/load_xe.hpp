@@ -180,6 +180,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
   for (uint32_t i = 0; i < num_block_y; ++i) {
     constexpr uint32_t load_block_elems = block_elems * arr_len;
+    int offset_y = i * block_size_y;
     auto payload_row =
         payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
     detail::reset_tile_desc_core<
@@ -191,6 +192,7 @@ tile_load(tile_t& tile, payload_t& payload) {
         mem_transpose>(payload_row);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
+      uint32_t offset_x = j * block_size_x;
       xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<load_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
@@ -201,6 +203,7 @@ tile_load(tile_t& tile, payload_t& payload) {
       xetla_vector<dtype, tmp_size> reg_tmp;
 #pragma unroll
       for (uint32_t ii = 0; ii < block_size_y / ld_blk_size_y; ++ii) {
+        // offset_y += ld_blk_size_y;
         constexpr uint32_t load_elems = ld_blk_size_y * block_size_x * arr_len;
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
@@ -217,16 +220,12 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            // payload.offset_x,
-            // payload.offset_y);
-
-            // (native_type_t<load_dtype>*)::gpu::xetla::detail::
-            //     xetla_get_tensor_base_address(tdesc),
-            // ::gpu::xetla::detail::xetla_get_tensor_width_x(tdesc),
-            // ::gpu::xetla::detail::xetla_get_tensor_width_y(tdesc),
-            // ::gpu::xetla::detail::xetla_get_tensor_pitch_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+            mem_transpose
+                // ? (payload.offset_x + offset_y / scale_factor)
+                ? ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc)
+                : (payload.offset_x + offset_x / scale_factor),
+                
+            payload.offset_y + (mem_transpose ? offset_x : offset_y));
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
               .xetla_format<native_type_t<load_dtype>>() =
@@ -243,7 +242,6 @@ tile_load(tile_t& tile, payload_t& payload) {
         } else {
           reg_blk.xetla_select<tmp_size, 1>(ii * tmp_size) = reg_tmp;
         }
-
         if constexpr (mem_transpose) {
           xetla_update_tdesc_offsetx(
               tdesc.xetla_format<uint32_t>(), ld_blk_size_y / scale_factor);
