@@ -89,7 +89,7 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   static constexpr uint32_t num_block_x = tile_desc::num_block_x;
   static constexpr uint32_t num_block_y = tile_desc::num_block_y;
-  static constexpr uint32_t num_block = tile_desc::num_block;
+  //   static constexpr uint32_t num_block = tile_desc::num_block;
 
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
@@ -176,24 +176,24 @@ tile_load(tile_t& tile, payload_t& payload) {
           ((block_size_y * sizeof(dtype)) % sizeof(load_dtype) == 0),
       "check vnni limitation for DW transpose");
 
-  auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
+//   auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
 #pragma unroll
   for (uint32_t i = 0; i < num_block_y; ++i) {
     constexpr uint32_t load_block_elems = block_elems * arr_len;
     int offset_y = i * block_size_y;
-    auto payload_row =
-        payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
-    detail::reset_tile_desc_core<
-        num_block_x,
-        block_size_x,
-        ld_blk_size_y,
-        scale_factor,
-        arr_len,
-        mem_transpose>(payload_row);
+    // auto payload_row =
+    //     payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
+    // detail::reset_tile_desc_core<
+    //     num_block_x,
+    //     block_size_x,
+    //     ld_blk_size_y,
+    //     scale_factor,
+    //     arr_len,
+    //     mem_transpose>(payload_row);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
-      uint32_t offset_x = j * block_size_x;
-      xetla_tdescriptor tdesc = payload_row.row(j);
+      int32_t offset_x = j * block_size_x;
+      //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<load_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       constexpr uint32_t ld_blk_height = (reg_transpose && trans)
@@ -203,7 +203,6 @@ tile_load(tile_t& tile, payload_t& payload) {
       xetla_vector<dtype, tmp_size> reg_tmp;
 #pragma unroll
       for (uint32_t ii = 0; ii < block_size_y / ld_blk_size_y; ++ii) {
-        // offset_y += ld_blk_size_y;
         constexpr uint32_t load_elems = ld_blk_size_y * block_size_x * arr_len;
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
@@ -220,12 +219,14 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            mem_transpose
-                // ? (payload.offset_x + offset_y / scale_factor)
-                ? ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc)
-                : (payload.offset_x + offset_x / scale_factor),
-                
-            payload.offset_y + (mem_transpose ? offset_x : offset_y));
+            payload.offset_x +
+                (mem_transpose ? (offset_y / (int)scale_factor +
+                                  ii * ld_blk_size_y / (int)scale_factor)
+                               : (offset_x / scale_factor)),
+
+            payload.offset_y +
+                (mem_transpose ? offset_x : (offset_y + ii * ld_blk_size_y)));
+
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
               .xetla_format<native_type_t<load_dtype>>() =
@@ -242,13 +243,6 @@ tile_load(tile_t& tile, payload_t& payload) {
         } else {
           reg_blk.xetla_select<tmp_size, 1>(ii * tmp_size) = reg_tmp;
         }
-        if constexpr (mem_transpose) {
-          xetla_update_tdesc_offsetx(
-              tdesc.xetla_format<uint32_t>(), ld_blk_size_y / scale_factor);
-        } else {
-          xetla_update_tdesc_offsety(
-              tdesc.xetla_format<uint32_t>(), ld_blk_size_y);
-        }
       }
       // exceed HW limitation
       if constexpr (block_size_y % ld_blk_size_y != 0) {
@@ -258,22 +252,22 @@ tile_load(tile_t& tile, payload_t& payload) {
             remained_start_y * block_size_x * arr_len;
         constexpr uint32_t remained_blk_size_y = block_size_y % ld_blk_size_y;
         constexpr uint32_t load_elems =
-            remained_blk_size_y * block_size_x * arr_len;
+            remained_blk_size_y * block_size_x * arr_len / scale_factor;
 
         constexpr uint8_t block_width =
-            mem_transpose ? (remained_blk_size_y / scale_factor) : block_size_x;
+            (mem_transpose ? remained_blk_size_y : block_size_x) / scale_factor;
         constexpr uint8_t block_height =
-            trans ? block_size_x : remained_blk_size_y;
-        constexpr uint32_t block_widthx_widthy_arrlen =
-            (block_width - 1) | ((block_height - 1) << 8);
-        gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
-            tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
+            mem_transpose ? block_size_x : remained_blk_size_y;
+        // constexpr uint32_t block_widthx_widthy_arrlen =
+        //     (block_width - 1) | ((block_height - 1) << 8);
+        // gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
+        //     tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
 
         reg_blk.xetla_select<load_elems, 1>(remained_start)
             .xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
-            block_size_x / scale_factor,
-            remained_blk_size_y,
+            block_width,
+            block_height,
             arr_len,
             trans,
             mem_transform,
@@ -283,8 +277,9 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+            payload.offset_x + offset_x / scale_factor,
+            payload.offset_y + offset_y + remained_start_y);
+
         // xetla_tload_global<
         // load_dtype,
         // (load_elems / scale_factor),
@@ -305,18 +300,19 @@ tile_load(tile_t& tile, payload_t& payload) {
         (!reg_transpose && (remained_size_y > ld_blk_size_y_limit))
         ? ld_blk_size_y_limit
         : remained_size_y;
-    auto payload_row = payload_2d.xetla_select<num_block_x, 1, 16, 1>(
-        num_block_y * num_block_x, 0);
-    detail::reset_tile_desc_core<
-        num_block_x,
-        block_size_x,
-        remained_ld_blk_size_y,
-        scale_factor,
-        arr_len,
-        mem_transpose>(payload_row);
+    // auto payload_row = payload_2d.xetla_select<num_block_x, 1, 16, 1>(
+    //     num_block_y * num_block_x, 0);
+    // detail::reset_tile_desc_core<
+    //     num_block_x,
+    //     block_size_x,
+    //     remained_ld_blk_size_y,
+    //     scale_factor,
+    //     arr_len,
+    //     mem_transpose>(payload_row);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
-      xetla_tdescriptor tdesc = payload_row.row(j);
+      int32_t offset_x = j * block_size_x;
+      //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<remained_block_elems * arr_len, 1>(
           processed_elems + j * remained_block_elems);
       constexpr uint32_t ld_blk_height = (reg_transpose && trans)
@@ -343,8 +339,9 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+            payload.offset_x + offset_x / scale_factor,
+            payload.offset_y + num_block_y * block_size_y +
+                ii * remained_ld_blk_size_y);
         //  xetla_tload_global<
         // load_dtype,
         // (ld_blk_height * block_size_x * arr_len / scale_factor),
@@ -370,14 +367,14 @@ tile_load(tile_t& tile, payload_t& payload) {
         } else {
           reg_blk.xetla_select<tmp_size, 1>(ii * tmp_size) = reg_tmp;
         }
-        if constexpr (mem_transpose) {
-          xetla_update_tdesc_offsetx(
-              tdesc.xetla_format<uint32_t>(),
-              remained_ld_blk_size_y / scale_factor);
-        } else {
-          xetla_update_tdesc_offsety(
-              tdesc.xetla_format<uint32_t>(), remained_ld_blk_size_y);
-        }
+        // if constexpr (mem_transpose) {
+        //   xetla_update_tdesc_offsetx(
+        //       tdesc.xetla_format<uint32_t>(),
+        //       remained_ld_blk_size_y / scale_factor);
+        // } else {
+        //   xetla_update_tdesc_offsety(
+        //       tdesc.xetla_format<uint32_t>(), remained_ld_blk_size_y);
+        // }
       }
       constexpr uint32_t final_ld_blk_size_y =
           remained_size_y % remained_ld_blk_size_y;
@@ -388,18 +385,18 @@ tile_load(tile_t& tile, payload_t& payload) {
         constexpr uint32_t final_load_elems =
             final_ld_blk_size_y * block_size_x * arr_len;
         constexpr uint8_t block_width =
-            mem_transpose ? (final_ld_blk_size_y / scale_factor) : block_size_x;
+            (mem_transpose ? final_ld_blk_size_y : block_size_x) / scale_factor;
         constexpr uint8_t block_height =
-            trans ? block_size_x : final_ld_blk_size_y;
-        constexpr uint32_t block_widthx_widthy_arrlen =
-            (block_width - 1) | ((block_height - 1) << 8);
-        gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
-            tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
+            mem_transpose ? block_size_x : final_ld_blk_size_y;
+        // constexpr uint32_t block_widthx_widthy_arrlen =
+        //     (block_width - 1) | ((block_height - 1) << 8);
+        // gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
+        //     tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
         reg_blk.xetla_select<final_load_elems, 1>(final_start)
             .xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
-            block_size_x / scale_factor,
-            final_ld_blk_size_y,
+            block_width,
+            block_height,
             arr_len,
             trans,
             mem_transform,
@@ -409,8 +406,10 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc));
+            payload.offset_x + offset_x / scale_factor,
+            payload.offset_y + num_block_y * block_size_y +
+                remained_size_y / remained_ld_blk_size_y *
+                    remained_ld_blk_size_y);
         // xetla_tload_global<
         // load_dtype,
         // final_load_elems / scale_factor,
