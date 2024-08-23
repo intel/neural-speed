@@ -112,8 +112,8 @@ struct mem_payload_t<
     this->surface_height =
         (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
     this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
-    this->offset_x =
-        (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) / scale_factor;
+    this->offset_x = (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) /
+        int32_t(scale_factor);
     this->offset_y = mem_transpose ? mem_desc.coord.x : mem_desc.coord.y;
 
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
@@ -135,7 +135,7 @@ struct mem_payload_t<
     this->surface_width = surface_width * sizeof(dtype);
     this->surface_height = surface_height;
     this->surface_pitch = surface_pitch * sizeof(dtype);
-    this->offset_x = surface_offset_x / scale_factor;
+    this->offset_x = surface_offset_x / int32_t(scale_factor);
     this->offset_y = surface_offset_y;
 
     xetla_tdescriptor base_tdesc;
@@ -158,8 +158,8 @@ struct mem_payload_t<
     this->surface_height =
         (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
     this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
-    this->offset_x =
-        (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) / scale_factor;
+    this->offset_x = (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) /
+        int32_t(scale_factor);
     this->offset_y = (mem_transpose ? mem_desc.coord.x : mem_desc.coord.y);
 
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
@@ -189,7 +189,7 @@ struct mem_payload_t<
     this->surface_width = surface_width * sizeof(dtype);
     this->surface_height = surface_height;
     this->surface_pitch = surface_pitch * sizeof(dtype);
-    this->offset_x = surface_offset_x / scale_factor;
+    this->offset_x = surface_offset_x / int32_t(scale_factor);
     this->offset_y = surface_offset_y;
 
     xetla_tdescriptor base_tdesc;
@@ -1766,12 +1766,11 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<
-        (!arch_has_2d_load_store<arch_tag_>) &&
-        (((block_size_y_ != 1 || tile_size_y_ != 1) &&
-          mem_layout_ == mem_layout::row_major) ||
-         ((block_size_x_ != 1 || tile_size_x_ != 1) &&
-          mem_layout_ == mem_layout::col_major))>> {
+    std::enable_if_t<(!arch_has_2d_load_store<arch_tag_>)&&(
+        ((block_size_y_ != 1 || tile_size_y_ != 1) &&
+         mem_layout_ == mem_layout::row_major) ||
+        ((block_size_x_ != 1 || tile_size_x_ != 1) &&
+         mem_layout_ == mem_layout::col_major))>> {
   using dtype = native_type_t<dtype_>;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
@@ -2028,10 +2027,9 @@ struct prefetch_payload_t<
         reg_layout_>,
     num_coop_sg_,
     arch_tag_,
-    std::enable_if_t<
-        (arch_has_2d_load_store<arch_tag_>) &&
-        (((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
-         ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
+    std::enable_if_t<(arch_has_2d_load_store<arch_tag_>)&&(
+        ((tile_size_y_ != 1) && mem_layout_ == mem_layout::row_major) ||
+        ((tile_size_x_ != 1) && mem_layout_ == mem_layout::col_major))>> {
   using dtype = dtype_;
   using mem_desc_t =
       mem_desc_t<dtype_, mem_layout_, mem_space::global, alignment_, use_mask_>;
