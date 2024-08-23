@@ -40,9 +40,9 @@ class test_col_major_1 {
   static constexpr size_t sg_n = 1;
   static constexpr size_t sg_k = 512 / sg_m;
   static constexpr size_t dequant_s = 128;
-  // static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
+  static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
   // static constexpr quant_mode quant_mode = quant_mode::NF4;
-  static constexpr quant_mode quant_mode = quant_mode::DEGREE5_APPROX_NF4;
+  // static constexpr quant_mode quant_mode = quant_mode::DEGREE5_APPROX_NF4;
 
   static constexpr size_t local_kslicing = 1;
   static constexpr size_t global_kslicing = 1;

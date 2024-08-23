@@ -68,7 +68,7 @@ struct compute_policy_int4_dequantize<
   static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
-  static constexpr bool is_int4_matB_policy = true;
+  static constexpr bool is_bit4_matB_policy = true;
 
   static constexpr uint32_t dequant_s = quant_info_.dequant_s;
   static_assert(
@@ -119,7 +119,7 @@ struct compute_policy_int4_dequantize<
   static constexpr mma_engine mma_engine = mma_engine_;
   static constexpr gpu_arch arch_tag = arch_tag_;
 
-  static constexpr bool is_int4_matB_policy = true;
+  static constexpr bool is_bit4_matB_policy = true;
 
   static constexpr uint32_t dequant_s = quant_info_.dequant_s;
   static_assert(

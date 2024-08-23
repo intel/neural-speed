@@ -105,7 +105,7 @@ class gemm_universal_t<
   using cnt_base_t = typename mem_desc_cnt_t::base_t;
 
   static_assert(
-      gemm_t::compute_policy::is_int4_matB_policy,
+      gemm_t::compute_policy::is_bit4_matB_policy,
       "should match with 4bit gemm impl");
 
   static constexpr uint32_t num_global_kslicing = num_global_kslicing_;

@@ -211,7 +211,7 @@ template <
     typename post_ops_up_t_,
     typename post_ops_gate_t_,
     typename epilogue_t_>
-class int4_mlp_gate_mul_up_fwd_t {
+class bit4_mlp_gate_mul_up_fwd_t {
   using gemm_t = gemm_t_;
   using epilogue_t = epilogue_t_;
   using post_ops_up_t = post_ops_up_t_;
@@ -254,7 +254,7 @@ class int4_mlp_gate_mul_up_fwd_t {
   using cnt_base_t = typename mem_desc_cnt_t::base_t;
 
   static_assert(
-      gemm_t::compute_policy::is_int4_matB_policy,
+      gemm_t::compute_policy::is_bit4_matB_policy,
       "should match with 4bit gemm impl");
 
   static constexpr uint32_t num_global_kslicing = num_global_kslicing_;

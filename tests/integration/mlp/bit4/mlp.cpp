@@ -15,7 +15,7 @@
  *******************************************************************************/
 
 #include <utils/utils.hpp>
-#include "int4_mlp_gate_mul_up_fwd.hpp"
+#include "bit4_mlp_gate_mul_up_fwd.hpp"
 #include "xetla.hpp"
 
 // #define UT_DEBUG
@@ -322,7 +322,7 @@ void dequantize_int4_mlp_run(int iter) {
   using post_ops_up_t = subgroup::chained_tile_op_t<>;
   using post_ops_gate_t = subgroup::chained_tile_op_t<subgroup::silu_op_t>;
 
-  using int4_mlp_op_t = xetla::mlp::int4_mlp_gate_mul_up_fwd_t<
+  using int4_mlp_op_t = xetla::mlp::bit4_mlp_gate_mul_up_fwd_t<
       Test::arch,
       global_kslicing,
       local_kslicing,
