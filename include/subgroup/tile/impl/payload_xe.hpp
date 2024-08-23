@@ -111,8 +111,8 @@ struct mem_payload_t<
     this->surface_height =
         (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
     this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
-    this->offset_x =
-        (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) / scale_factor;
+    this->offset_x = (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) /
+        int32_t(scale_factor);
     this->offset_y = mem_transpose ? mem_desc.coord.x : mem_desc.coord.y;
 
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
@@ -134,7 +134,7 @@ struct mem_payload_t<
     this->surface_width = surface_width * sizeof(dtype);
     this->surface_height = surface_height;
     this->surface_pitch = surface_pitch * sizeof(dtype);
-    this->offset_x = surface_offset_x / scale_factor;
+    this->offset_x = surface_offset_x / int32_t(scale_factor);
     this->offset_y = surface_offset_y;
 
     xetla_tdescriptor base_tdesc;
@@ -157,8 +157,8 @@ struct mem_payload_t<
     this->surface_height =
         (mem_transpose ? mem_desc.shape.x : mem_desc.shape.y);
     this->surface_pitch = mem_desc.shape.stride * sizeof(dtype);
-    this->offset_x =
-        (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) / scale_factor;
+    this->offset_x = (mem_transpose ? mem_desc.coord.y : mem_desc.coord.x) /
+        int32_t(scale_factor);
     this->offset_y = (mem_transpose ? mem_desc.coord.x : mem_desc.coord.y);
 
     xetla_tdescriptor base_tdesc = mem_desc.get_tdesc();
@@ -188,7 +188,7 @@ struct mem_payload_t<
     this->surface_width = surface_width * sizeof(dtype);
     this->surface_height = surface_height;
     this->surface_pitch = surface_pitch * sizeof(dtype);
-    this->offset_x = surface_offset_x / scale_factor;
+    this->offset_x = surface_offset_x / int32_t(scale_factor);
     this->offset_y = surface_offset_y;
 
     xetla_tdescriptor base_tdesc;

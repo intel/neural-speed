@@ -98,7 +98,7 @@ tile_store(tile_t& tile, payload_t& payload) {
 
   static constexpr uint32_t num_block_x = tile_desc::num_block_x;
   static constexpr uint32_t num_block_y = tile_desc::num_block_y;
-  static constexpr uint32_t num_block = tile_desc::num_block;
+//   static constexpr uint32_t num_block = tile_desc::num_block;
 
   using load_store_attr = typename arch_attr_t<
       payload_t::arch_tag>::template load_store_attr<msg_type::block_2d>;
@@ -128,22 +128,24 @@ tile_store(tile_t& tile, payload_t& payload) {
   static constexpr uint8_t arr_len =
       is_valid_arr_len_candidate ? arr_len_candidate : 1;
 
-  auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
+//   auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
 #pragma unroll
   for (uint32_t i = 0; i < num_block_y; ++i) {
+    int32_t offset_y = i * block_size_y;
     constexpr uint32_t store_block_elems = block_elems * arr_len;
-    auto payload_row =
-        payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
-    detail::reset_tile_desc_core<
-        num_block_x,
-        block_size_x * arr_len,
-        st_block_size_y,
-        1,
-        1,
-        false>(payload_row);
+    // auto payload_row =
+    //     payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
+    // detail::reset_tile_desc_core<
+    //     num_block_x,
+    //     block_size_x * arr_len,
+    //     st_block_size_y,
+    //     1,
+    //     1,
+    //     false>(payload_row);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
-      xetla_tdescriptor tdesc = payload_row.row(j);
+      int32_t offset_x = j * block_size_x;
+    //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<store_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       xetla_vector<dtype, store_block_elems> combine_blk;
@@ -175,11 +177,13 @@ tile_store(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            payload.offset_x + offset_x,
+            payload.offset_y + offset_y + ii * st_block_size_y,
+            // ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
+            // ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
             st_blk);
-        xetla_update_tdesc_offsety(
-            tdesc.xetla_format<uint32_t>(), st_block_size_y);
+        // xetla_update_tdesc_offsety(
+        //     tdesc.xetla_format<uint32_t>(), st_block_size_y);
       }
       // exceed hardware limitation
       if constexpr ((block_size_y % st_block_size_y) != 0) {
@@ -190,10 +194,10 @@ tile_store(tile_t& tile, payload_t& payload) {
             blk_remained_y * block_size_x * arr_len;
         auto st_blk =
             combine_blk.xetla_select<blk_remained_elems, 1>(blk_remained_start);
-        constexpr uint32_t block_widthx_widthy_arrlen =
-            (block_size_x * arr_len - 1) | ((blk_remained_y - 1) << 8);
-        gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
-            tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
+        // constexpr uint32_t block_widthx_widthy_arrlen =
+        //     (block_size_x * arr_len - 1) | ((blk_remained_y - 1) << 8);
+        // gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
+        //     tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
         // xetla_tstore_global<
         //     dtype,
         //     blk_remained_elems,
@@ -210,8 +214,9 @@ tile_store(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            payload.offset_x + offset_x,
+            payload.offset_y + offset_y +
+                block_size_y / st_block_size_y * st_block_size_y,
             st_blk);
       }
     }
@@ -223,18 +228,19 @@ tile_store(tile_t& tile, payload_t& payload) {
         num_block_y * num_block_x * block_elems;
     constexpr uint32_t remained_st_blk_size_y =
         st_block_size_y > remained_size_y ? remained_size_y : st_block_size_y;
-    auto payload_row = payload_2d.xetla_select<num_block_x, 1, 16, 1>(
-        num_block_y * num_block_x, 0);
-    detail::reset_tile_desc_core<
-        num_block_x,
-        block_size_x * arr_len,
-        remained_st_blk_size_y,
-        1,
-        1,
-        false>(payload_row);
+    // auto payload_row = payload_2d.xetla_select<num_block_x, 1, 16, 1>(
+    //     num_block_y * num_block_x, 0);
+    // detail::reset_tile_desc_core<
+    //     num_block_x,
+    //     block_size_x * arr_len,
+    //     remained_st_blk_size_y,
+    //     1,
+    //     1,
+    //     false>(payload_row);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
-      xetla_tdescriptor tdesc = payload_row.row(j);
+      int offset_x = j * block_size_x;
+    //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<remained_block_elems * arr_len, 1>(
           processed_elems + j * remained_block_elems);
       // Do combination
@@ -269,11 +275,12 @@ tile_store(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            payload.offset_x + offset_x,
+            payload.offset_y + num_block_y * block_size_y +
+                ii * remained_st_blk_size_y,
             st_blk);
-        xetla_update_tdesc_offsety(
-            tdesc.xetla_format<uint32_t>(), remained_st_blk_size_y);
+        // xetla_update_tdesc_offsety(
+        //     tdesc.xetla_format<uint32_t>(), remained_st_blk_size_y);
       }
       constexpr uint32_t final_st_blk_size_y =
           remained_size_y % remained_st_blk_size_y;
@@ -285,10 +292,10 @@ tile_store(tile_t& tile, payload_t& payload) {
             final_st_blk_size_y * block_size_x * arr_len;
         auto st_blk =
             combine_blk.xetla_select<final_store_elems, 1>(final_start);
-        constexpr uint32_t block_widthx_widthy_arrlen =
-            (block_size_x * arr_len - 1) | ((final_st_blk_size_y - 1) << 8);
-        gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
-            tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
+        // constexpr uint32_t block_widthx_widthy_arrlen =
+        //     (block_size_x * arr_len - 1) | ((final_st_blk_size_y - 1) << 8);
+        // gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
+        //     tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
         // xetla_tstore_global<
         //     dtype,
         //     final_store_elems,
@@ -305,8 +312,10 @@ tile_store(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            ::gpu::xetla::detail::xetla_get_tensor_offset_x(tdesc),
-            ::gpu::xetla::detail::xetla_get_tensor_offset_y(tdesc),
+            payload.offset_x + offset_x,
+            payload.offset_y + num_block_y * block_size_y +
+                remained_size_y / remained_st_blk_size_y *
+                    remained_st_blk_size_y,
             st_blk);
       }
     }
