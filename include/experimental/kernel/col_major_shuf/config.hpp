@@ -19,13 +19,11 @@
 
 #pragma once
 
-#include <common/common.hpp>
-#include <group/group.hpp>
-#include <subgroup/subgroup.hpp>
+#include <experimental/kernel/layer_norm/common.hpp>
 
 namespace gpu::xetla::kernel {
 
-/// @brief Sets up attribute of the col-major-shuf.
+/// @brief Sets up attribute of the layer norm.
 ///
 /// @tparam wg_tile_x_ Is the num of cols processed by one workgroup.
 /// @tparam wg_tile_y_ Is the num of rows processed by one workgroup.

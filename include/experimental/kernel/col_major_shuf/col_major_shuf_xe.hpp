@@ -20,6 +20,7 @@
 #pragma once
 
 #include <experimental/kernel/col_major_shuf/api.hpp>
+#include <experimental/kernel/col_major_shuf/common.hpp>
 #include <experimental/kernel/col_major_shuf/config.hpp>
 
 namespace gpu::xetla::kernel {

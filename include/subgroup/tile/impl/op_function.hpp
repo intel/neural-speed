@@ -713,12 +713,10 @@ void dump_mat(
   for (size_t row = 0; row < tile_y; row++) {
 #pragma unroll
     for (size_t col = 0; col < tile_x; col++) {
-            sycl::ext::oneapi::experimental::printf(
-          "%d ", (int)(sycl::half)mat.reg[row * tile_x + col]);
-      // sycl::ext::oneapi::experimental::printf(
-      //     "%x(%d) ",
-      //     int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])),
-      //     int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])));
+      sycl::ext::oneapi::experimental::printf(
+          "%x(%d) ",
+          int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])),
+          int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])));
     }
     sycl::ext::oneapi::experimental::printf("\n");
   }
