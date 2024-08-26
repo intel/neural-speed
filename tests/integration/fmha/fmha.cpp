@@ -239,7 +239,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
   using fmha_forward_op_t = gpu::xetla::fmha::fmha_forward_t<
       policy_t,
       FMHA_T,
-      gpu_arch::XeLpg,
+      gpu_arch::XeHpc,
       false,
       kUseBias,
       false,
@@ -393,13 +393,13 @@ void fmha_dispatch_policy(const test_params_t& p, Args... args) {
       return fmha_run_<stage0<fmha_policy_64x128x64>>(p, args...);
     }
   } else if (p.hs <= 128) {
-    if (p.qlen == 1) {
+    if (p.qlen == 1 && 0) {
       // for extremely short query length
-      if (p.klen < 512) {
-        return fmha_run_<stage0<fmha_policy_1x256x128>>(p, args...);
-      } else {
-        return fmha_run_<stage0<fmha_policy_1x512x128>>(p, args...);
-      }
+      // if (p.klen < 512) {
+      //   return fmha_run_<stage0<fmha_policy_1x256x128>>(p, args...);
+      // } else {
+      //   return fmha_run_<stage0<fmha_policy_1x512x128>>(p, args...);
+      // }
     } else if (p.qlen < 64) {
       // for short query length
       if (p.klen < 512) {
