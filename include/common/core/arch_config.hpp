@@ -47,6 +47,9 @@ struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc> {
   // BlockWidth must be 1,2,4 for qwords and be in range [1..8] for dwords.
   static constexpr uint32_t max_trans_load_width_in_bytes = 32;
 
+  // BlockHeight must be 8 for qwords and be in range [1..32] for dwords.
+  static constexpr uint32_t max_trans_load_height_in_elem = 32;
+
   // If Transformed is true
   // BlockWidth must be in range [4..16] for bytes and [2..16] for word.
   static constexpr uint32_t max_vnni_load_width_in_elems = 16;
