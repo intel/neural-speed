@@ -98,7 +98,7 @@ tile_store(tile_t& tile, payload_t& payload) {
 
   static constexpr uint32_t num_block_x = tile_desc::num_block_x;
   static constexpr uint32_t num_block_y = tile_desc::num_block_y;
-//   static constexpr uint32_t num_block = tile_desc::num_block;
+  //   static constexpr uint32_t num_block = tile_desc::num_block;
 
   using load_store_attr = typename arch_attr_t<
       payload_t::arch_tag>::template load_store_attr<msg_type::block_2d>;
@@ -145,7 +145,7 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
       int32_t offset_x = j * block_size_x;
-    //   xetla_tdescriptor tdesc = payload_row.row(j);
+      //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<store_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       xetla_vector<dtype, store_block_elems> combine_blk;
@@ -163,7 +163,7 @@ tile_store(tile_t& tile, payload_t& payload) {
       for (uint32_t ii = 0; ii < block_size_y / st_block_size_y; ++ii) {
         constexpr uint32_t store_elems =
             st_block_size_y * block_size_x * arr_len;
-        xetla_vector<dtype, store_elems> st_blk =
+        auto st_blk =
             combine_blk.xetla_select<store_elems, 1>(ii * store_elems);
         // xetla_tstore_global<dtype, store_elems, L1, L2, payload_t::arch_tag>(
         //     tdesc, st_blk);
@@ -173,7 +173,7 @@ tile_store(tile_t& tile, payload_t& payload) {
             st_block_size_y,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<dtype*>(payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
@@ -210,7 +210,7 @@ tile_store(tile_t& tile, payload_t& payload) {
             blk_remained_y,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<dtype*>(payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
@@ -240,7 +240,7 @@ tile_store(tile_t& tile, payload_t& payload) {
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
       int offset_x = j * block_size_x;
-    //   xetla_tdescriptor tdesc = payload_row.row(j);
+      //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<remained_block_elems * arr_len, 1>(
           processed_elems + j * remained_block_elems);
       // Do combination
@@ -271,7 +271,7 @@ tile_store(tile_t& tile, payload_t& payload) {
             remained_st_blk_size_y,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<dtype*>(payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
@@ -308,7 +308,7 @@ tile_store(tile_t& tile, payload_t& payload) {
             final_st_blk_size_y,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<dtype*>(payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
