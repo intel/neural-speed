@@ -108,6 +108,9 @@ struct default_config_group_gemm_test_func {
 
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
 
+  static constexpr uint32_t barrier_count = gemm_op_t::get_barrier_count();
+  static constexpr uint32_t slm_size = gemm_op_t::get_slm_size();
+
   static const char* func_name() {
     return "default_config_group_gemm_test_func";
   }
