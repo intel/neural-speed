@@ -89,7 +89,6 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   static constexpr uint32_t num_block_x = tile_desc::num_block_x;
   static constexpr uint32_t num_block_y = tile_desc::num_block_y;
-  //   static constexpr uint32_t num_block = tile_desc::num_block;
 
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
@@ -181,19 +180,9 @@ tile_load(tile_t& tile, payload_t& payload) {
   for (uint32_t i = 0; i < num_block_y; ++i) {
     constexpr uint32_t load_block_elems = block_elems * arr_len;
     int offset_y = i * block_size_y;
-    // auto payload_row =
-    //     payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
-    // detail::reset_tile_desc_core<
-    //     num_block_x,
-    //     block_size_x,
-    //     ld_blk_size_y,
-    //     scale_factor,
-    //     arr_len,
-    //     mem_transpose>(payload_row);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
       int32_t offset_x = j * block_size_x;
-      //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<load_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       constexpr uint32_t ld_blk_height = (reg_transpose && trans)
@@ -215,7 +204,8 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<const native_type_t<load_dtype*>>(
+                payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
@@ -273,7 +263,8 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<const native_type_t<load_dtype*>>(
+                payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
@@ -335,7 +326,8 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<const native_type_t<load_dtype*>>(
+                payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
@@ -402,7 +394,8 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            payload.base_ptr,
+            reinterpret_cast<const native_type_t<load_dtype*>>(
+                payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
