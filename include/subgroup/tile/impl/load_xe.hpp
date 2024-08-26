@@ -329,7 +329,7 @@ tile_load(tile_t& tile, payload_t& payload) {
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
             block_size_x / scale_factor,
-            block_size_y,
+            ld_blk_height,
             arr_len,
             trans,
             mem_transform,

@@ -769,9 +769,8 @@ __XETLA_API void xetla_store_global(
     unsigned SurfacePitch,
     int X,
     int Y,
-    xetla_vector<T, N> Vals) {
+    auto&& Vals) {
   if constexpr (std::is_same_v<T, bf16>) {
-    xetla_vector<fp16, N> Vals_fp16 = Vals.xetla_format<fp16>();
     xetla_store_global<fp16, BlockWidth, BlockHeight, L1H, L2H>(
         reinterpret_cast<fp16*>(Ptr),
         SurfaceWidth,
@@ -779,14 +778,15 @@ __XETLA_API void xetla_store_global(
         SurfacePitch,
         X,
         Y,
-        Vals_fp16);
+        Vals.xetla_format<fp16>());
   } else {
     __ESIMD_ENS::lsc_store_2d<
         T,
         BlockWidth,
         BlockHeight,
         gpu::xetla::detail::get_cache_hint(L1H),
-        gpu::xetla::detail::get_cache_hint(L2H)>(
+        gpu::xetla::detail::get_cache_hint(L2H),
+        N>(
         Ptr, SurfaceWidth - 1, SurfaceHeight - 1, SurfacePitch - 1, X, Y, Vals);
   }
 }
