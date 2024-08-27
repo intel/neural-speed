@@ -86,26 +86,6 @@ struct mem_payload_t<
       conditional_t<mem_transpose_dtype_less4bytes, uint32_t, dtype>;
   static constexpr uint32_t scale_factor = sizeof(mem_dtype) / sizeof(dtype);
 
-  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
-
-  static constexpr uint32_t max_load_width_in_elem = trans
-      ? load_store_attr::max_trans_load_width_in_bytes / sizeof(dtype)
-      : load_store_attr::max_load_width_in_bytes / sizeof(dtype);
-  static constexpr uint32_t max_load_height_in_elem = trans
-      ? load_store_attr::max_trans_load_height_in_elem
-      : load_store_attr::max_load_height_in_elem;
-
-  static constexpr uint32_t max_store_width_in_elem =
-      load_store_attr::max_store_width_in_bytes / sizeof(dtype);
-  static constexpr uint32_t max_store_height_in_elem =
-      load_store_attr::max_store_height_in_elem;
-
-  static constexpr uint32_t elems_per_CL =
-      load_store_attr::cache_line_size_in_bytes / sizeof(dtype);
-
-  static constexpr uint32_t elems_per_reg =
-      register_bytes_t<arch_tag>::reg_in_bytes / sizeof(dtype);
-
   dtype* base_ptr;
   uint32_t surface_width;
   uint32_t surface_height;

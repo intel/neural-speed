@@ -99,19 +99,28 @@ tile_store(tile_t& tile, payload_t& payload) {
   static constexpr uint32_t num_block_x = tile_desc::num_block_x;
   static constexpr uint32_t num_block_y = tile_desc::num_block_y;
 
+  static constexpr gpu_arch arch_tag = payload_t::arch_tag;
+
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
+  static constexpr uint32_t max_store_width_in_elem =
+      load_store_attr::max_store_width_in_bytes / sizeof(dtype);
+  static constexpr uint32_t max_store_height_in_elem =
+      load_store_attr::max_store_height_in_elem;
+
+  static constexpr uint32_t elems_per_CL =
+      load_store_attr::cache_line_size_in_bytes / sizeof(dtype);
+
   static_assert(
-      (payload_t::max_store_width_in_elem % block_size_x) == 0,
+      (max_store_width_in_elem % block_size_x) == 0,
       "max_store_width_in_elem should be a multiply of block_size_x.");
 
   static constexpr uint32_t st_blk_size_y =
-      std::min(block_size_y, payload_t::max_store_height_in_elem);
+      std::min(block_size_y, max_store_height_in_elem);
 
   // to make sure full CL store
-  static constexpr uint32_t st_blk_size_x =
-      ((tile_size_x % payload_t::elems_per_CL) == 0)
-      ? payload_t::elems_per_CL
-      : (((payload_t::elems_per_CL % tile_size_x) == 0) ? tile_size_x
-                                                        : block_size_x);
+  static constexpr uint32_t st_blk_size_x = ((tile_size_x % elems_per_CL) == 0)
+      ? elems_per_CL
+      : (((elems_per_CL % tile_size_x) == 0) ? tile_size_x : block_size_x);
 
   static constexpr uint8_t arr_len_candidate = st_blk_size_x / block_size_x;
   static constexpr bool is_valid_arr_len_candidate = (arr_len_candidate == 1) ||
@@ -120,14 +129,13 @@ tile_store(tile_t& tile, payload_t& payload) {
   static constexpr uint8_t arr_len =
       is_valid_arr_len_candidate ? arr_len_candidate : 1;
 
-  constexpr uint32_t store_block_elems = block_elems * arr_len;
-  constexpr uint32_t store_elems = st_blk_size_y * st_blk_size_x;
 #pragma unroll
   for (uint32_t i = 0; i < num_block_y; ++i) {
     int32_t offset_y = i * block_size_y;
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
       int32_t offset_x = j * block_size_x;
+      constexpr uint32_t store_block_elems = block_elems * arr_len;
       auto reg_blk = tile.reg.xetla_select<store_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       xetla_vector<dtype, store_block_elems> combine_blk;
@@ -150,6 +158,7 @@ tile_store(tile_t& tile, payload_t& payload) {
       }
 #pragma unroll
       for (uint32_t ii = 0; ii < block_size_y; ii += st_blk_size_y) {
+        constexpr uint32_t store_elems = st_blk_size_y * st_blk_size_x;
         auto st_blk =
             combine_blk.xetla_select<store_elems, 1>(ii * st_blk_size_x);
         xetla_store_global<dtype, st_blk_size_x, st_blk_size_y, L1, L2>(
