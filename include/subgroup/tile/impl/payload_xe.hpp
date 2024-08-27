@@ -231,12 +231,14 @@ struct mem_payload_t<
   __XETLA_API void update_tdesc(int offset) {
     auto payloads_2d = payloads.xetla_format<uint32_t, num_block, 16>();
     if constexpr (update_dir == tdesc_update_dir::x_dir) {
+      offset_x += offset / scale_factor;
 #pragma unroll
       for (uint32_t i = 0; i < num_block; i++) {
         xetla_update_tdesc_offsetx(
             payloads_2d.row(i), offset / int32_t(scale_factor));
       }
     } else {
+      offset_y += offset;
 #pragma unroll
       for (uint32_t i = 0; i < num_block; i++) {
         xetla_update_tdesc_offsety(payloads_2d.row(i), offset);
