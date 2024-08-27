@@ -93,6 +93,7 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
   static constexpr reg_layout reg_layout_ = tile_desc::register_layout;
+  //   In the case of pack, tranpose is in vnni format
   static constexpr bool is_vnni_reverse =
       payload_t::mem_transpose_dtype_less4bytes &&
       ((reg_layout_ == reg_layout::tiled) ||
@@ -188,14 +189,13 @@ tile_load(tile_t& tile, payload_t& payload) {
           ((block_size_y * sizeof(dtype)) % sizeof(load_dtype) == 0),
       "check vnni limitation for DW transpose");
 
-//   auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
 #pragma unroll
   for (uint32_t i = 0; i < num_block_y; ++i) {
-    constexpr uint32_t load_block_elems = block_elems * arr_len;
     int offset_y = i * block_size_y;
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
       int32_t offset_x = j * block_size_x;
+      constexpr uint32_t load_block_elems = block_elems * arr_len;
       auto reg_blk = tile.reg.xetla_select<load_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       constexpr uint32_t ld_blk_height = (reg_transpose && trans)
