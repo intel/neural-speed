@@ -106,19 +106,31 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr bool mem_transform = payload_t::mem_transform;
 
   using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
+
+  //   static constexpr uint32_t max_load_width_in_elem = trans
+  //       ? load_store_attr::max_trans_load_width_in_bytes / sizeof(dtype)
+  //       : load_store_attr::max_load_width_in_bytes / sizeof(dtype);
+  //   static constexpr uint32_t max_load_height_in_elem = trans
+  //       ? load_store_attr::max_trans_load_height_in_elem
+  //       : load_store_attr::max_load_height_in_elem;
+  static constexpr uint32_t max_trans_load_width_in_elem =
+      load_store_attr::max_trans_load_width_in_bytes / sizeof(dtype);
+  static constexpr uint32_t max_load_width_in_elem =
+      load_store_attr::max_load_width_in_bytes / sizeof(dtype);
+
+//   static constexpr uint32_t max_trans_load_height_in_elem =
+//       load_store_attr::max_trans_load_height_in_elem;
+  static constexpr uint32_t max_load_height_in_elem =
+      load_store_attr::max_load_height_in_elem;
+
   static constexpr uint32_t elems_per_CL =
       load_store_attr::cache_line_size_in_bytes / sizeof(dtype);
+
   static constexpr uint32_t elems_per_reg =
       register_bytes_t<arch_tag>::reg_in_bytes / sizeof(dtype);
-  static constexpr int32_t max_load_block_height =
-      load_store_attr::max_load_height_in_elem;
-  static constexpr int32_t max_block_width =
-      load_store_attr::max_load_width_in_bytes / sizeof(dtype);
-  static constexpr int32_t max_trans_block_width =
-      load_store_attr::max_trans_load_width_in_bytes / sizeof(dtype);
 
   static constexpr uint32_t ld_blk_size_y_limit =
-      mem_transpose ? max_trans_block_width : max_load_block_height;
+      mem_transpose ? max_trans_load_width_in_elem : max_load_height_in_elem;
   static constexpr uint32_t ld_blk_size_y = reg_transpose
       ? block_size_y
       : std::min(ld_blk_size_y_limit, block_size_y);
@@ -150,20 +162,21 @@ tile_load(tile_t& tile, payload_t& payload) {
 
   static_assert(
       reg_transpose || mem_transpose ||
-          (!mem_transpose && (block_size_x * arr_len) <= max_block_width),
+          (!mem_transpose &&
+           (block_size_x * arr_len) <= max_load_width_in_elem),
       "When reg_transpose was disabled, check 2d block width "
       "restriction");
   static_assert(
       !reg_transpose ||
           (!mem_transpose &&
-           (block_size_x * arr_len) <= max_trans_block_width) ||
-          (mem_transpose && (block_size_y * arr_len) <= max_block_width),
+           (block_size_x * arr_len) <= max_trans_load_width_in_elem) ||
+          (mem_transpose && (block_size_y * arr_len) <= max_load_width_in_elem),
       "When reg_transpose was enabled, check 2d block width "
       "restriction");
   static_assert(
       !reg_transpose ||
-          (!mem_transpose && (block_size_y <= max_load_block_height)) ||
-          (mem_transpose && (block_size_x) <= max_load_block_height),
+          (!mem_transpose && (block_size_y <= max_load_height_in_elem)) ||
+          (mem_transpose && (block_size_x) <= max_load_height_in_elem),
       "When reg_transpose was enabled, check 2d block height "
       "restriction");
   static_assert(
