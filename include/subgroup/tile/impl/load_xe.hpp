@@ -118,8 +118,8 @@ tile_load(tile_t& tile, payload_t& payload) {
   static constexpr uint32_t max_load_width_in_elem =
       load_store_attr::max_load_width_in_bytes / sizeof(dtype);
 
-//   static constexpr uint32_t max_trans_load_height_in_elem =
-//       load_store_attr::max_trans_load_height_in_elem;
+  //   static constexpr uint32_t max_trans_load_height_in_elem =
+  //       load_store_attr::max_trans_load_height_in_elem;
   static constexpr uint32_t max_load_height_in_elem =
       load_store_attr::max_load_height_in_elem;
 
@@ -206,6 +206,11 @@ tile_load(tile_t& tile, payload_t& payload) {
 #pragma unroll
       for (uint32_t ii = 0; ii < block_size_y / ld_blk_size_y; ++ii) {
         constexpr uint32_t load_elems = ld_blk_size_y * block_size_x * arr_len;
+        uint32_t address_offset_x =
+            (mem_transpose ? (offset_y + ii * ld_blk_size_y) : offset_x) /
+            scale_factor;
+        uint32_t address_offset_y =
+            mem_transpose ? offset_x : (offset_y + ii * ld_blk_size_y);
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
             (trans ? ld_blk_size_y : block_size_x) / scale_factor,
@@ -222,13 +227,8 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
-            payload.offset_x +
-                (mem_transpose ? (offset_y / (int)scale_factor +
-                                  ii * ld_blk_size_y / (int)scale_factor)
-                               : (offset_x / scale_factor)),
-
-            payload.offset_y +
-                (mem_transpose ? offset_x : (offset_y + ii * ld_blk_size_y)));
+            payload.offset_x + address_offset_x,
+            payload.offset_y + address_offset_y);
 
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
