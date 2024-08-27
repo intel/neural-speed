@@ -76,9 +76,14 @@ struct mem_payload_t<
       !(std::is_same_v<dtype_, int4x2> || std::is_same_v<dtype_, int4x8>);
 
   // Transformed and Transposed cannot be set to true at the same time.
+  // If Transformed is true then:
+  // sizeof(T) must be 1- or 2-byte (bytes or words).
   static constexpr bool mem_transform = (sizeof(dtype) <= 2) && !trans &&
       (register_layout == reg_layout::vnni_tiled ||
        register_layout == reg_layout::vnni_tiled_col_major);
+
+  // If Transposed is true then:
+  // sizeof(T) must be 4- or 8-byte (dwords or qwords).
   static constexpr bool mem_transpose_dtype_less4bytes =
       (sizeof(dtype) < 4) && trans;
 
