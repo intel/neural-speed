@@ -103,9 +103,9 @@ struct tile_mma_func {
         matA, matA_payload);
     subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
         matB, matB_payload);
-    SW_BARRIER();
+    sw_barrier();
     tile_mma::mma(matAcc, matAcc, matB, matA);
-    SW_BARRIER();
+    sw_barrier();
     matC.reg = xetla_cvt<dtypeC, dtypeAcc, matAcc_t::tile_desc::tile_elems>(
         matAcc.reg);
     matC_payload.init(c, n, m, n, 0, 0);

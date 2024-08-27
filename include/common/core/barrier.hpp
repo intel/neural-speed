@@ -26,6 +26,16 @@ namespace gpu::xetla {
 /// @addtogroup xetla_core_barrier
 /// @{
 
+/// sw_barrier, insert software scheduling barrier, for better code control
+///
+
+void sw_barrier() {
+#if __INTEL_LLVM_COMPILER >= 20250000
+#else
+  __ESIMD_NS::fence<__ESIMD_NS::fence_mask::sw_barrier>();
+#endif
+}
+
 /// @brief Initialize the number of named barrier index for a kernel.
 /// Available only on PVC. Only need to initialize once at the beginning.
 ///
