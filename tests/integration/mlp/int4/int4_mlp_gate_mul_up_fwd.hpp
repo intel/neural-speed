@@ -188,7 +188,7 @@ class global_sum_reduce_two_mat_t {
           mat_zero, matAcc1_payload);
       subgroup::tile_store<cache_hint::uncached, cache_hint::write_back>(
           mat_zero, matAcc2_payload);
-      SW_BARRIER();
+      sw_barrier();
     }
   }
 };
