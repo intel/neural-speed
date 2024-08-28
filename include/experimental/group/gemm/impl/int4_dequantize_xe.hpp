@@ -156,7 +156,12 @@ class gemm_t<
       : is_vnni_tiled_a ? reg_layout::vnni_tiled
                         : reg_layout::tiled;
 
+  // reg_layout of the load result
   static constexpr reg_layout reg_layout_b =
+      is_col_major_b ? reg_layout::transpose_tiled : reg_layout::tiled;
+
+  // reg_layout required by mma
+  static constexpr reg_layout reg_layout_b_acc =
       // fpu
       compute_policy::mma_engine == mma_engine::fpu
       ? (is_gemv ? reg_layout::transpose_tiled : reg_layout::tiled)
@@ -214,7 +219,7 @@ class gemm_t<
       tile_size_y_b,
       block_size_x_b,
       block_size_y_b,
-      reg_layout_b>;
+      reg_layout_b_acc>;
   using matB_acc_t = subgroup::tile_t<dtype_mma_b, matB_acc_tile_desc_t>;
 
  public:
@@ -281,7 +286,9 @@ class gemm_t<
       mem_desc_scale_t,
       scale_tile_desc_t,
       subgroup::msg_type_v<scale_tile_desc_t, mem_desc_scale_t>,
-      arch_tag>;
+      (tile_size_x_b > 1 && arch_tag == gpu_arch::XeHpc) // TODO(Yi): PVC 2d WA
+          ? gpu_arch::XeHpg
+          : arch_tag>;
 
   // compress int4 along N dimensions
   using zero_pt_tile_desc_t = subgroup::tile_desc_t<
@@ -629,9 +636,10 @@ class gemm_t<
             matA_acc,
             i == args.inner_loop_count - 1);
       } else {
-        if constexpr (is_col_major_b) {
-          tile_transpose(matB_acc);
-        }
+        // The result of dequantize should always be (plain) tiled
+        if constexpr (
+            matB_acc_tile_desc_t::register_layout == reg_layout::vnni_tiled)
+          subgroup::vnni_convert(matB_acc);
         tile_mma::mma(matC, matC, matB_acc, matA_acc);
       }
       if constexpr (enable_periodic_sync) {
@@ -696,9 +704,10 @@ class gemm_t<
         tile_mma::mma(
             matAcc, matAcc, matC, matB_acc, matA_acc, i == compute_stages - 1);
       } else {
-        if constexpr (is_col_major_b) {
-          tile_transpose(matB_acc);
-        }
+        // The result of dequantize should always be (plain) tiled
+        if constexpr (
+            matB_acc_tile_desc_t::register_layout == reg_layout::vnni_tiled)
+          subgroup::vnni_convert(matB_acc);
         tile_mma::mma(matC, matC, matB_acc, matA_acc);
       }
       if constexpr (enable_periodic_sync) {

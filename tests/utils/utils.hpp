@@ -21,3 +21,13 @@
 #include "execution.hpp"
 #include "gemm_gen.hpp"
 #include "profiling.hpp"
+
+#if defined(TEST_GPU_ARCH_XE_LPG)
+inline constexpr gpu_arch TEST_GPU_ARCH = gpu_arch::XeLpg;
+#elif defined(TEST_GPU_ARCH_XE_HPG)
+inline constexpr gpu_arch TEST_GPU_ARCH = gpu_arch::XeHpg;
+#elif defined(TEST_GPU_ARCH_XE_HPC)
+inline constexpr gpu_arch TEST_GPU_ARCH = gpu_arch::XeHpc;
+#else
+static_assert(false, "TEST_GPU_ARCH not defined");
+#endif

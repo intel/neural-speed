@@ -705,35 +705,36 @@ layout_convert(T_dst& dst, T_src& src) {
 }
 
 template <typename T>
-void dump_mat(
-    T mat,
-    size_t tile_x = T::reg_transpose ? T::tile_size_y : T::tile_size_x,
-    size_t tile_y = T::reg_transpose ? T::tile_size_x : T::tile_size_y) {
-#pragma unroll
-  for (size_t row = 0; row < tile_y; row++) {
-#pragma unroll
-    for (size_t col = 0; col < tile_x; col++) {
-      sycl::ext::oneapi::experimental::printf(
-          "%x(%d) ",
-          int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])),
-          int(native_type_t<typename T::dtype>(mat.reg[row * tile_x + col])));
-    }
-    sycl::ext::oneapi::experimental::printf("\n");
-  }
-  sycl::ext::oneapi::experimental::printf("\n ");
-}
-template <typename T>
 void dump_mat_reg(T mat, size_t tile_x, size_t tile_y) {
 #pragma unroll
   for (size_t row = 0; row < tile_y; row++) {
 #pragma unroll
     for (size_t col = 0; col < tile_x; col++) {
-      sycl::ext::oneapi::experimental::printf(
-          "%d ", (int)(sycl::half)mat[row * tile_x + col]);
+      const auto&& v = int64_t(
+          native_type_t<typename T::element_type>(mat[row * tile_x + col]));
+      constexpr bool is_int32 =
+          (std::is_same<typename T::element_type, int4x2>::value ||
+           std::is_same<typename T::element_type, int4x8>::value ||
+           std::is_same<typename T::element_type, uint32_t>::value ||
+           std::is_same<typename T::element_type, int32_t>::value);
+      constexpr bool is_int64 =
+          (std::is_same<typename T::element_type, uint64_t>::value ||
+           std::is_same<typename T::element_type, int64_t>::value);
+      is_int32 ? sycl::ext::oneapi::experimental::printf(
+                    "%08x(%10u)  ", int(v), int(v))
+          : is_int64
+          ? sycl::ext::oneapi::experimental::printf("%016llx(%20llu)  ", v, v)
+          : sycl::ext::oneapi::experimental::printf("%3lld ", v);
     }
     sycl::ext::oneapi::experimental::printf("\n");
   }
   sycl::ext::oneapi::experimental::printf("\n");
 }
-
+template <typename T>
+void dump_mat(
+    T mat,
+    size_t tile_x = T::reg_transpose ? T::tile_size_y : T::tile_size_x,
+    size_t tile_y = T::reg_transpose ? T::tile_size_x : T::tile_size_y) {
+  dump_mat_reg(mat.reg, tile_x, tile_y);
+}
 } // namespace gpu::xetla::subgroup

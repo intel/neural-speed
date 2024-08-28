@@ -239,7 +239,7 @@ void fmha_run_(const test_params_t& p, uint32_t iter, uint32_t warmup) {
   using fmha_forward_op_t = gpu::xetla::fmha::fmha_forward_t<
       policy_t,
       FMHA_T,
-      gpu_arch::XeLpg,
+      TEST_GPU_ARCH,
       false,
       kUseBias,
       false,

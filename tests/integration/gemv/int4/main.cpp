@@ -16,7 +16,7 @@
 
 #include <utils/utils.hpp>
 #include "xetla.hpp"
-// #define UT_DEBUG
+#define UT_DEBUG
 using namespace gpu::xetla;
 using namespace gpu::xetla::group;
 // The number of times the kernel is executed
@@ -31,14 +31,14 @@ template <typename scalar_t>
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 1;
+  static constexpr size_t mat_m = 4096;
   static constexpr size_t mat_n = 4096;
   static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 1;
-  static constexpr size_t wg_n = 1;
-  static constexpr size_t sg_m = 1;
-  static constexpr size_t sg_n = 1;
-  static constexpr size_t sg_k = 512 / sg_m;
+  static constexpr size_t wg_m = 64;
+  static constexpr size_t wg_n = 64;
+  static constexpr size_t sg_m = 16;
+  static constexpr size_t sg_n = 16;
+  static constexpr size_t sg_k = 32;
   static constexpr size_t dequant_s = 128;
   static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
 
@@ -46,8 +46,8 @@ class test_col_major_1 {
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr mma_engine mma_eng =
+      arch_has_xmx<TEST_GPU_ARCH> ? mma_engine::xmx : mma_engine::fpu;
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
@@ -72,7 +72,6 @@ class test_col_major_2 {
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
@@ -110,14 +109,17 @@ int gemm_result_validate(
   bool result = buff_cmp::xetla_buff_cmp(data, other, "gemv validation");
 
 #ifdef UT_DEBUG
-  // for (uint32_t i = 0; i < m; i++) {
-  //   for (uint32_t j = 0; j < n; j++) {
-  //     std::cout << float(sycl::half(C[i * n + j])) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  if (m * n <= 4096) {
+    std::cout << "result:\n";
+    for (uint32_t i = 0; i < m; i++) {
+      for (uint32_t j = 0; j < n; j++) {
+        std::cout << float(sycl::half(C[i * n + j])) << " ";
+      }
+      std::cout << "\n";
+    }
+  }
 #endif
-  std::cout << (!result ? "FAILED\n" : "PASSED\n");
+  std::cout << (!result ? "FAILED" : "PASSED") << std::endl;
   return result ? 0 : 1;
 }
 
@@ -187,12 +189,15 @@ std::vector<data_type_acc_in> dequantize_weight(
     }
   }
 #ifdef UT_DEBUG
-  // for (uint32_t i = 0; i < matrix_n; i++) {
-  //   for (uint32_t j = 0; j < matrix_k; j++) {
-  //     std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
-  //   }
-  //   std::cout << std::endl;
-  // }
+  if (matrix_n * matrix_k <= 4096) {
+    std::cout << "dequantize_weight:\n";
+    for (uint32_t i = 0; i < matrix_n; i++) {
+      for (uint32_t j = 0; j < matrix_k; j++) {
+        std::cout << float(sycl::half(b_out[i * matrix_k + j])) << " ";
+      }
+      std::cout << std::endl;
+    }
+  }
 #endif
   return b_out;
 }
@@ -297,22 +302,22 @@ void dequantize_gemv_run(int iter) {
       data_type_zero_pt,
       quant_info,
       Test::mma_eng,
-      Test::arch>;
+      TEST_GPU_ARCH>;
 
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using bias_op_t =
-      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, Test::arch>;
+      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, TEST_GPU_ARCH>;
 
   using tile_op_t = gpu::xetla::subgroup::chained_tile_op_t<bias_op_t>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_tile_op<tile_op_t, Test::arch>,
+      xetla::group::epilogue_policy_tile_op<tile_op_t, TEST_GPU_ARCH>,
       tile_shape,
       mem_desc_c_t>;
 
-  using group_swizzle = xetla::kernel::group_swizzle_default<Test::arch>;
+  using group_swizzle = xetla::kernel::group_swizzle_default<TEST_GPU_ARCH>;
 
   using gemm_op_t = xetla::kernel::gemm_universal_t<
       gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
@@ -387,12 +392,14 @@ void dequantize_gemv_run(int iter) {
     if constexpr (std::is_same_v<int4x2, data_type_b>) {
       B_h[i] = random_uint8();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77;
+      B_h[i] = ((7 + i) % 15 + 1) * 0x11;
+      if (i >= size_b)
+        B_h[i] = -1;
 #endif
     } else if constexpr (std::is_same_v<int4x8, data_type_b>) {
       B_h[i] = random_uint32();
 #ifdef UT_DEBUG
-      B_h[i] = 0x77777777;
+      B_h[i] = ((7 + i) % 15 + 1) * 0x11111111;
 #endif
     }
   }
