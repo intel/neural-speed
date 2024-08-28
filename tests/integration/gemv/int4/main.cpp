@@ -46,8 +46,8 @@ class test_col_major_1 {
   static constexpr size_t global_kslicing = 1;
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
-  static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
+  static constexpr mma_engine mma_eng =
+      arch_has_xmx<TEST_GPU_ARCH> ? mma_engine::xmx : mma_engine::fpu;
   using data_type_a = scalar_t;
   using data_type_b = int4x8;
   using data_type_c = scalar_t;
@@ -72,7 +72,6 @@ class test_col_major_2 {
   static constexpr mem_layout layout_a = mem_layout::row_major;
   static constexpr mem_layout layout_b = mem_layout::col_major;
   static constexpr mma_engine mma_eng = mma_engine::fpu;
-  static constexpr gpu_arch arch = gpu_arch::XeLpg;
   using data_type_a = fp16;
   using data_type_b = int4x8;
   using data_type_c = fp16;
@@ -297,22 +296,22 @@ void dequantize_gemv_run(int iter) {
       data_type_zero_pt,
       quant_info,
       Test::mma_eng,
-      Test::arch>;
+      TEST_GPU_ARCH>;
 
   using gemm_t = xetla::group::
       gemm_t<compute_policy, tile_shape, mem_desc_a_t, mem_desc_b_t>;
 
   using bias_op_t =
-      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, Test::arch>;
+      gpu::xetla::subgroup::bias_add_op_t<mem_desc_bias_t, TEST_GPU_ARCH>;
 
   using tile_op_t = gpu::xetla::subgroup::chained_tile_op_t<bias_op_t>;
 
   using epilogue_t = xetla::group::epilogue_t<
-      xetla::group::epilogue_policy_tile_op<tile_op_t, Test::arch>,
+      xetla::group::epilogue_policy_tile_op<tile_op_t, TEST_GPU_ARCH>,
       tile_shape,
       mem_desc_c_t>;
 
-  using group_swizzle = xetla::kernel::group_swizzle_default<Test::arch>;
+  using group_swizzle = xetla::kernel::group_swizzle_default<TEST_GPU_ARCH>;
 
   using gemm_op_t = xetla::kernel::gemm_universal_t<
       gpu::xetla::kernel::dispatch_policy_int4_dequantize_kslicing<
