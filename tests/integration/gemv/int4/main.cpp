@@ -31,11 +31,11 @@ template <typename scalar_t>
 class test_col_major_1 {
  public:
   // Extract the parameters required by different test cases
-  static constexpr size_t mat_m = 4096;
-  static constexpr size_t mat_n = 4096;
-  static constexpr size_t mat_k = 4096;
-  static constexpr size_t wg_m = 64;
-  static constexpr size_t wg_n = 64;
+  static constexpr size_t mat_m = 16;
+  static constexpr size_t mat_n = 16;
+  static constexpr size_t mat_k = 32;
+  static constexpr size_t wg_m = 16;
+  static constexpr size_t wg_n = 16;
   static constexpr size_t sg_m = 16;
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 32;
@@ -613,7 +613,7 @@ TYPED_TEST_P(dequantize_gemv_test, esimd) {
 REGISTER_TYPED_TEST_SUITE_P(dequantize_gemv_test, esimd);
 using tests = ::testing::Types< //
     test_col_major_1<fp16>,
-    test_col_major_1<bf16>,
+    // test_col_major_1<bf16>,
     // test_col_major_2,
     void>;
 

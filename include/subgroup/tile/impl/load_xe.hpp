@@ -213,6 +213,16 @@ tile_load(tile_t& tile, payload_t& payload) {
             scale_factor;
         uint32_t address_offset_y =
             mem_transpose ? offset_x : (offset_y + ii * ld_blk_size_y);
+        XETLA_PRINT<trans>();
+        XETLA_PRINT<block_size_y>();
+        XETLA_PRINT<ld_blk_size_y>();
+        XETLA_PRINT<block_size_x>();
+        XETLA_PRINT<(trans ? ld_blk_size_y : block_size_x) / scale_factor>();
+        XETLA_PRINT<(trans ? block_size_x : ld_blk_size_y)>();
+        XETLA_PRINT<(arr_len)>();
+        XETLA_PRINT<mem_transform>();
+        XETLA_PRINT<load_dtype>();
+        XETLA_PRINT<native_type_t<load_dtype>>();
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
             ld_blk_width / scale_factor,
@@ -222,13 +232,40 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            reinterpret_cast<const native_type_t<load_dtype*>>(
+            reinterpret_cast<const native_type_t<load_dtype>*>(
                 payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
             payload.surface_pitch,
             payload.offset_x + address_offset_x,
             payload.offset_y + address_offset_y);
+        sycl::ext::oneapi::experimental::printf(
+            "\nreg_tmp %u %u %u %d %d \n",
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            int(payload.offset_x + address_offset_x),
+            int(payload.offset_y + address_offset_y));
+        dump_mat_reg(reg_tmp.xetla_format<native_type_t<load_dtype>>(), 2, 16);
+
+
+        dump_mat_reg(xetla_load_global<
+            uint32_t,
+            4,
+            2,
+            1,
+            true,
+            false,
+            L1,
+            L2>(
+            reinterpret_cast<const uint32_t*>(
+                payload.base_ptr),
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            payload.offset_x + address_offset_x,
+            payload.offset_y + address_offset_y), 1, 8);
+
 
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
@@ -271,7 +308,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            reinterpret_cast<const native_type_t<load_dtype*>>(
+            reinterpret_cast<const native_type_t<load_dtype>*>(
                 payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
@@ -317,7 +354,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            reinterpret_cast<const native_type_t<load_dtype*>>(
+            reinterpret_cast<const native_type_t<load_dtype>*>(
                 payload.base_ptr),
             payload.surface_width,
             payload.surface_height,
@@ -385,7 +422,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             mem_transform,
             L1,
             L2>(
-            reinterpret_cast<const native_type_t<load_dtype*>>(
+            reinterpret_cast<const native_type_t<load_dtype>*>(
                 payload.base_ptr),
             payload.surface_width,
             payload.surface_height,

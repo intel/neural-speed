@@ -286,9 +286,7 @@ class gemm_t<
       mem_desc_scale_t,
       scale_tile_desc_t,
       subgroup::msg_type_v<scale_tile_desc_t, mem_desc_scale_t>,
-      (tile_size_x_b > 1 && arch_tag == gpu_arch::XeHpc) // TODO(Yi): PVC 2d WA
-          ? gpu_arch::XeHpg
-          : arch_tag>;
+      arch_tag>;
 
   // compress int4 along N dimensions
   using zero_pt_tile_desc_t = subgroup::tile_desc_t<
@@ -494,6 +492,7 @@ class gemm_t<
 
     matA_payload_t matA_payload(args.matA_base_desc);
     matB_payload_t matB_payload(args.matB_base_desc);
+    XETLA_PRINT<matB_payload_t>;
     scale_payload_t scale_payload(args.scale_base_desc);
     zero_pt_payload_t zero_pt_payload(args.zero_pt_base_desc);
     matA_prefetch_payload_t matA_prefetch_payload(args.matA_base_desc, sg_idx);
@@ -565,17 +564,20 @@ class gemm_t<
           }
         }
       }
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          matA, matA_payload);
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          matB, matB_payload);
-      // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
+      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+      //     matA, matA_payload);
+      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
       //     matB, matB_payload);
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          scale, scale_payload);
+      subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
+          matB, matB_payload);
+      sycl::ext::oneapi::experimental::printf("\nmatB\n");
+      XETLA_PRINT<decltype(matB)>();
+      gpu::xetla::subgroup::dump_mat_reg(matB.reg, 4/2, 16 * 2);
+      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+      //     scale, scale_payload);
       if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
-        subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-            zero_pt, zero_pt_payload);
+        // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+        //     zero_pt, zero_pt_payload);
       }
       tile_k_idx++;
       if constexpr (stages != 0) {
@@ -668,17 +670,17 @@ class gemm_t<
           }
         }
       }
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          matA, matA_payload);
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          matB, matB_payload);
+      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+      //     matA, matA_payload);
+      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+      //     matB, matB_payload);
       // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
       //     matB, matB_payload);
-      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-          scale, scale_payload);
+      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+      //     scale, scale_payload);
       if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
-        subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-            zero_pt, zero_pt_payload);
+        // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+        //     zero_pt, zero_pt_payload);
       }
       tile_k_idx++;
       matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
