@@ -242,7 +242,6 @@ struct tile_load_store_atomic_func {
     matBias.reg = matA.reg;
     matA.reg = 0;
     tile_store(matA, payload_store);
-    SW_BARRIER();
     tile_store(matBias, payload_store_add, check_tag);
   }
 };

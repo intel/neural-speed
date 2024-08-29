@@ -85,8 +85,7 @@ struct fused_config_t {
        is_col_major_b ? matrix_k_##id : matrix_n},               \
       {start_x_b, start_y_b});                                   \
   gemm_args.init(mem_desc_a, mem_desc_b, inner_loop_count_##id); \
-  op(g, matAcc_##acc_id, gemm_args);                             \
-  SW_BARRIER();
+  op(g, matAcc_##acc_id, gemm_args);
 
 #define MATC_STORE(ptr_c)                                               \
   mem_desc_c.init(                                                      \
@@ -229,7 +228,6 @@ struct gru_layer {
         int start_n = (j)*wg_tile_n;
         CONFIG_SETTING(batch_size, -1, hidden_size);
         matAcc_0.init(0);
-        SW_BARRIER();
 
         // calculate reset gate: r_t = \sigmoid(X_t x W_ir + h_{t - 1} x W_hr)
         // acc0 = X_t x W_ir
@@ -278,19 +276,15 @@ struct gru_layer {
         matAcc_0.reg = matAcc_0.reg * (1 - matAcc_1.reg) +
             matAcc_1.reg *
                 xetla_cvt<Act_T, T, matAcc_t::tile_elems>(mat_hidden.reg);
-        SW_BARRIER();
 
         if (seq_id == seq_len - 1) {
           MATC_STORE(args->layer_output);
-          SW_BARRIER();
           __esimd_barrier();
         }
         MATC_STORE(args->cell_out_ptr + seq_id * io_size);
-        SW_BARRIER();
         __esimd_barrier();
 
         MATC_STORE(args->one_cell_ptr + (seq_id % 2) * io_size);
-        SW_BARRIER();
         __esimd_barrier();
       }
       args->hx_ptr = args->one_cell_ptr + (seq_id % 2) * io_size;
@@ -386,7 +380,6 @@ struct kernel_xcoder_gru_fusion {
     args.W_hz_ptr = (W_hz_ptr);
     args.W_in_ptr = (W_in_ptr);
     args.W_hn_ptr = (W_hn_ptr);
-    SW_BARRIER();
     fused_op::call(item, &args);
     ping = (ping + 1) % 2;
     pong = (pong + 1) % 2;
@@ -411,7 +404,6 @@ struct kernel_xcoder_gru_fusion {
           ? hidden_out_ptr
           : (ping_pong_buffer + ping * one_layer_size);
       args.layer_ptr = ((ping_pong_buffer + pong * one_layer_size));
-      SW_BARRIER();
       fused_op::call(item, &args);
       ping = (ping + 1) % 2;
       pong = (pong + 1) % 2;

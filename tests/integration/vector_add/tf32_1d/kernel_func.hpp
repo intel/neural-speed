@@ -36,7 +36,6 @@ KERNEL_FUNC inline void vector_add_func(
   /// use block prefetch for b
   xetla_prefetch_global<dtype, SIMD, cache_hint::cached, cache_hint::cached>(
       b, offset);
-  SW_BARRIER();
   /// use scattered load for a
   xetla_vector<dtype, SIMD> ivector1 = xetla_load_global<
       dtype,

@@ -44,7 +44,6 @@ struct block_load_store_func {
         cache_hint::cached,
         cache_hint::cached,
         arch_tag>(src_tdesc);
-    SW_BARRIER();
     xetla_vector<dtype, bwidth* bheight> A_load_vec = xetla_tload_global<
         dtype,
         bwidth * bheight,
