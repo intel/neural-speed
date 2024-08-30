@@ -68,12 +68,19 @@ struct unaligned_gemm_test_func {
   using epilogue_t = epilogue_t<
       epilogue_policy_unaligned<arch_tag>,
       tile_shape,
-      mem_desc_t<dtype_c, mem_layout::row_major, mem_space::global, ldc_alignment>>;
+      mem_desc_t<
+          dtype_c,
+          mem_layout::row_major,
+          mem_space::global,
+          ldc_alignment>>;
 
   using group_swizzle = gpu::xetla::kernel::group_swizzle_default<arch_tag>;
   using dispatch_policy =
       dispatch_policy_kslicing<group_swizzle, global_kslicing, local_kslicing>;
   using gemm_op_t = gemm_universal_t<dispatch_policy, gemm_t, epilogue_t>;
+
+  static constexpr uint32_t barrier_count = gemm_op_t::get_barrier_count();
+  static constexpr uint32_t slm_size = gemm_op_t::get_slm_size();
 
   static const char* func_name() {
     return "unaligned_gemm_test_func";

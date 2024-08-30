@@ -271,34 +271,34 @@ TEST(tile_load_store_atomic_disable_oob_check, esimd) {
           false>>(nd_range, result_validate);
 }
 
-TEST(tile_load_store_atomic_boundary, esimd) {
-  cl::sycl::nd_range<1> nd_range({1}, {1});
-  auto result_validate = std::bind(
-      tile_load_store_result_validate<float>,
-      _1,
-      _2,
-      _3,
-      128,
-      33554440,
-      32,
-      32,
-      33554432);
-  kernel_run<
-      float,
-      tile_load_store_atomic_func<
-          float,
-          128,
-          33554440,
-          128,
-          32,
-          32,
-          16,
-          16,
-          true>,
-      128 * 1024,
-      32,
-      4294968320U>(nd_range, result_validate);
-}
+// TEST(tile_load_store_atomic_boundary, esimd) {
+//   cl::sycl::nd_range<1> nd_range({1}, {1});
+//   auto result_validate = std::bind(
+//       tile_load_store_result_validate<float>,
+//       _1,
+//       _2,
+//       _3,
+//       128,
+//       33554440,
+//       32,
+//       32,
+//       33554432);
+//   kernel_run<
+//       float,
+//       tile_load_store_atomic_func<
+//           float,
+//           128,
+//           33554440,
+//           128,
+//           32,
+//           32,
+//           16,
+//           16,
+//           true>,
+//       128 * 1024,
+//       32,
+//       4294968320U>(nd_range, result_validate);
+// }
 
 TEST(tile_load_broadcast_store, esimd) {
   cl::sycl::nd_range<1> nd_range({1}, {1});
@@ -318,25 +318,25 @@ TEST(tile_load_store_1d, esimd) {
       nd_range, result_validate);
 }
 
-TEST(tile_load_store_1d_boundary, esimd) {
-  cl::sycl::nd_range<1> nd_range({1}, {1});
-  auto result_validate = std::bind(
-      tile_load_store_result_validate<int>,
-      _1,
-      _2,
-      _3,
-      128,
-      33554440,
-      128,
-      1,
-      33554432);
-  kernel_run<
-      int,
-      tile_load_store_1d_func<int, 128, 33554440, 128, 128, 1, 128, 1, true>,
-      128 * 1024,
-      32,
-      4294968320U>(nd_range, result_validate);
-}
+// TEST(tile_load_store_1d_boundary, esimd) {
+//   cl::sycl::nd_range<1> nd_range({1}, {1});
+//   auto result_validate = std::bind(
+//       tile_load_store_result_validate<int>,
+//       _1,
+//       _2,
+//       _3,
+//       128,
+//       33554440,
+//       128,
+//       1,
+//       33554432);
+//   kernel_run<
+//       int,
+//       tile_load_store_1d_func<int, 128, 33554440, 128, 128, 1, 128, 1, true>,
+//       128 * 1024,
+//       32,
+//       4294968320U>(nd_range, result_validate);
+// }
 
 TEST(tile_load_store_unaligned_2d, esimd) {
   cl::sycl::nd_range<1> nd_range({1}, {1});

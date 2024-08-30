@@ -275,8 +275,8 @@ enum class reg_layout : uint8_t {
   tiled = 1,
   vnni_tiled = 2,
   transpose_tiled = 3,
-  /// this is vnni tiled format, but for each block, they are stored in col
-  /// major order
+  /// this is vnni tiled format, but for each block, they are stored in
+  /// col-major order
   vnni_tiled_col_major = 4
 };
 enum class store_op : uint8_t {

@@ -98,51 +98,44 @@ tile_store(tile_t& tile, payload_t& payload) {
 
   static constexpr uint32_t num_block_x = tile_desc::num_block_x;
   static constexpr uint32_t num_block_y = tile_desc::num_block_y;
-  static constexpr uint32_t num_block = tile_desc::num_block;
 
-  using load_store_attr = typename arch_attr_t<
-      payload_t::arch_tag>::template load_store_attr<msg_type::block_2d>;
+  static constexpr gpu_arch arch_tag = payload_t::arch_tag;
 
-  static constexpr int32_t max_block_width =
-      load_store_attr::max_load_width_in_bytes / sizeof(dtype);
-  static constexpr int32_t max_store_block_height =
+  using load_store_attr = load_store_attr_t<msg_type::block_2d, arch_tag>;
+  static constexpr uint32_t max_store_width_in_elem =
+      load_store_attr::max_store_width_in_bytes / sizeof(dtype);
+  static constexpr uint32_t max_store_height_in_elem =
       load_store_attr::max_store_height_in_elem;
-  static_assert(
-      (max_block_width % block_size_x) == 0,
-      "max_block_width should be a multiply of block size x.");
+
   static constexpr uint32_t elems_per_CL =
       load_store_attr::cache_line_size_in_bytes / sizeof(dtype);
+
+  static_assert(
+      (max_store_width_in_elem % block_size_x) == 0,
+      "max_store_width_in_elem should be a multiply of block_size_x.");
+
   static constexpr uint32_t st_blk_size_y =
-      block_size_y > max_store_block_height ? max_store_block_height
-                                            : block_size_y;
+      std::min(block_size_y, max_store_height_in_elem);
+
   // to make sure full CL store
-  static constexpr uint32_t st_block_x = ((tile_size_x % elems_per_CL) == 0)
+  static constexpr uint32_t st_blk_size_x = ((tile_size_x % elems_per_CL) == 0)
       ? elems_per_CL
       : (((elems_per_CL % tile_size_x) == 0) ? tile_size_x : block_size_x);
 
-  static constexpr uint8_t arr_len_candidate = st_block_x / block_size_x;
+  static constexpr uint8_t arr_len_candidate = st_blk_size_x / block_size_x;
   static constexpr bool is_valid_arr_len_candidate = (arr_len_candidate == 1) ||
       (arr_len_candidate == 2) || (arr_len_candidate == 4);
 
   static constexpr uint8_t arr_len =
       is_valid_arr_len_candidate ? arr_len_candidate : 1;
 
-  auto payload_2d = payload.payloads.xetla_format<uint32_t, num_block, 16>();
 #pragma unroll
   for (uint32_t i = 0; i < num_block_y; ++i) {
-    constexpr uint32_t store_block_elems = block_elems * arr_len;
-    auto payload_row =
-        payload_2d.xetla_select<num_block_x, 1, 16, 1>(i * num_block_x, 0);
-    detail::reset_tile_desc_core<
-        num_block_x,
-        block_size_x * arr_len,
-        st_blk_size_y,
-        1,
-        1,
-        false>(payload_row);
+    int32_t offset_y = i * block_size_y;
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
-      xetla_tdescriptor tdesc = payload_row.row(j);
+      int32_t offset_x = j * block_size_x;
+      constexpr uint32_t store_block_elems = block_elems * arr_len;
       auto reg_blk = tile.reg.xetla_select<store_block_elems, 1>(
           (i * num_block_x + j) * block_elems);
       xetla_vector<dtype, store_block_elems> combine_blk;
@@ -150,41 +143,50 @@ tile_store(tile_t& tile, payload_t& payload) {
           native_type_t<dtype>,
           block_size_y,
           block_size_x * arr_len>();
+      /*     combine_blk_2d
+        ____________  ____________
+       |            ||            |
+       |   block    ||   block    |
+       |            ||            |
+       |____________||____________|
+      */
 #pragma unroll
-      for (uint32_t combine_i = 0; combine_i < arr_len; ++combine_i) {
+      for (uint32_t block_id = 0; block_id < arr_len; ++block_id) {
         combine_blk_2d.xetla_select<block_size_y, 1, block_size_x, 1>(
-            0, combine_i * block_size_x) =
-            reg_blk.xetla_select<block_elems, 1>(combine_i * block_elems);
+            0, block_id * block_size_x) =
+            reg_blk.xetla_select<block_elems, 1>(block_id * block_elems);
       }
 #pragma unroll
-      for (uint32_t ii = 0; ii < block_size_y / st_blk_size_y; ++ii) {
-        constexpr uint32_t store_elems = st_blk_size_y * block_size_x * arr_len;
+      for (uint32_t ii = 0; ii < block_size_y; ii += st_blk_size_y) {
+        constexpr uint32_t store_elems = st_blk_size_y * st_blk_size_x;
         auto st_blk =
-            combine_blk.xetla_select<store_elems, 1>(ii * store_elems);
-        xetla_tstore_global<dtype, store_elems, L1, L2, payload_t::arch_tag>(
-            tdesc, st_blk);
-        xetla_update_tdesc_offsety(
-            tdesc.xetla_format<uint32_t>(), st_blk_size_y);
+            combine_blk.xetla_select<store_elems, 1>(ii * st_blk_size_x);
+        xetla_store_global<dtype, st_blk_size_x, st_blk_size_y, L1, L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            payload.offset_x + offset_x,
+            payload.offset_y + offset_y + ii,
+            st_blk);
       }
       // exceed hardware limitation
       if constexpr ((block_size_y % st_blk_size_y) != 0) {
-        constexpr uint32_t blk_remained_start = block_size_y / st_blk_size_y *
-            st_blk_size_y * block_size_x * arr_len;
+        constexpr uint32_t blk_remained_start =
+            block_size_y / st_blk_size_y * st_blk_size_y * st_blk_size_x;
         constexpr uint8_t blk_remained_y = block_size_y % st_blk_size_y;
-        constexpr uint8_t blk_remained_elems =
-            blk_remained_y * block_size_x * arr_len;
+        constexpr uint8_t blk_remained_elems = blk_remained_y * st_blk_size_x;
         auto st_blk =
             combine_blk.xetla_select<blk_remained_elems, 1>(blk_remained_start);
-        constexpr uint32_t block_widthx_widthy_arrlen =
-            (block_size_x * arr_len - 1) | ((blk_remained_y - 1) << 8);
-        gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
-            tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
-        xetla_tstore_global<
-            dtype,
-            blk_remained_elems,
-            L1,
-            L2,
-            payload_t::arch_tag>(tdesc, st_blk);
+        xetla_store_global<dtype, st_blk_size_x, blk_remained_y, L1, L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            payload.offset_x + offset_x,
+            payload.offset_y + offset_y +
+                block_size_y / st_blk_size_y * st_blk_size_y,
+            st_blk);
       }
     }
   }
@@ -194,19 +196,10 @@ tile_store(tile_t& tile, payload_t& payload) {
     constexpr uint32_t processed_elems =
         num_block_y * num_block_x * block_elems;
     constexpr uint32_t remained_st_blk_size_y =
-        st_blk_size_y > remained_size_y ? remained_size_y : st_blk_size_y;
-    auto payload_row = payload_2d.xetla_select<num_block_x, 1, 16, 1>(
-        num_block_y * num_block_x, 0);
-    detail::reset_tile_desc_core<
-        num_block_x,
-        block_size_x * arr_len,
-        remained_st_blk_size_y,
-        1,
-        1,
-        false>(payload_row);
+        std::min(st_blk_size_y, remained_size_y);
 #pragma unroll
     for (uint32_t j = 0; j < num_block_x; j += arr_len) {
-      xetla_tdescriptor tdesc = payload_row.row(j);
+      int offset_x = j * block_size_x;
       auto reg_blk = tile.reg.xetla_select<remained_block_elems * arr_len, 1>(
           processed_elems + j * remained_block_elems);
       // Do combination
@@ -214,46 +207,53 @@ tile_store(tile_t& tile, payload_t& payload) {
       auto combine_blk_2d = combine_blk.xetla_format<
           native_type_t<dtype>,
           remained_size_y,
-          block_size_x * arr_len>();
+          st_blk_size_x>();
 #pragma unroll
-      for (uint32_t combine_i = 0; combine_i < arr_len; ++combine_i) {
+      for (uint32_t block_id = 0; block_id < arr_len; ++block_id) {
         combine_blk_2d.xetla_select<remained_size_y, 1, block_size_x, 1>(
-            0, combine_i * block_size_x) =
+            0, block_id * block_size_x) =
             reg_blk.xetla_select<remained_block_elems, 1>(
-                combine_i * remained_block_elems);
+                block_id * remained_block_elems);
       }
 #pragma unroll
-      for (uint32_t ii = 0; ii < remained_size_y / remained_st_blk_size_y;
-           ++ii) {
-        constexpr uint32_t store_elems =
-            remained_st_blk_size_y * block_size_x * arr_len;
+      for (uint32_t ii = 0; ii < remained_size_y;
+           ii += remained_st_blk_size_y) {
+        constexpr uint32_t store_elems = remained_st_blk_size_y * st_blk_size_x;
         auto st_blk =
-            combine_blk.xetla_select<store_elems, 1>(ii * store_elems);
-        xetla_tstore_global<dtype, store_elems, L1, L2, payload_t::arch_tag>(
-            tdesc, st_blk);
-        xetla_update_tdesc_offsety(
-            tdesc.xetla_format<uint32_t>(), remained_st_blk_size_y);
+            combine_blk.xetla_select<store_elems, 1>(ii * st_blk_size_x);
+        xetla_store_global<
+            dtype,
+            st_blk_size_x,
+            remained_st_blk_size_y,
+            L1,
+            L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            payload.offset_x + offset_x,
+            payload.offset_y + num_block_y * block_size_y + ii,
+            st_blk);
       }
       constexpr uint32_t final_st_blk_size_y =
           remained_size_y % remained_st_blk_size_y;
       if constexpr (final_st_blk_size_y != 0) {
         constexpr uint32_t final_start = remained_size_y /
-            remained_st_blk_size_y * remained_st_blk_size_y * block_size_x *
-            arr_len;
+            remained_st_blk_size_y * remained_st_blk_size_y * st_blk_size_x;
         constexpr uint32_t final_store_elems =
-            final_st_blk_size_y * block_size_x * arr_len;
+            final_st_blk_size_y * st_blk_size_x;
         auto st_blk =
             combine_blk.xetla_select<final_store_elems, 1>(final_start);
-        constexpr uint32_t block_widthx_widthy_arrlen =
-            (block_size_x * arr_len - 1) | ((final_st_blk_size_y - 1) << 8);
-        gpu::xetla::detail::xetla_set_block_widthx_widthy_arrlen(
-            tdesc.xetla_format<uint32_t>(), block_widthx_widthy_arrlen);
-        xetla_tstore_global<
-            dtype,
-            final_store_elems,
-            L1,
-            L2,
-            payload_t::arch_tag>(tdesc, st_blk);
+        xetla_store_global<dtype, st_blk_size_x, final_st_blk_size_y, L1, L2>(
+            payload.base_ptr,
+            payload.surface_width,
+            payload.surface_height,
+            payload.surface_pitch,
+            payload.offset_x + offset_x,
+            payload.offset_y + num_block_y * block_size_y +
+                remained_size_y / remained_st_blk_size_y *
+                    remained_st_blk_size_y,
+            st_blk);
       }
     }
   }

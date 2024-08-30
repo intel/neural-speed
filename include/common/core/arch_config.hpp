@@ -35,16 +35,41 @@ template <>
 struct load_store_attr_t<msg_type::block_2d, gpu_arch::XeHpc> {
   /// HW limitation checks https://gfxspecs.intel.com/Predator/Home/Index/55490
   static constexpr bool has_hw_block_2d = true;
+  // If Transposed and Transformed are both set to false
+  // BlockHeight must not exceed 32.
   static constexpr uint32_t max_load_height_in_elem = 32;
+
+  // BlockWidth * NBlocks must not exceed 64 for bytes, 32 for words, 16 for
+  // dwords, and 8 for qwords.
   static constexpr uint32_t max_load_width_in_bytes = 64;
+
+  // If Transposed is true then
+  // BlockWidth must be 1,2,4 for qwords and be in range [1..8] for dwords.
   static constexpr uint32_t max_trans_load_width_in_bytes = 32;
+
+  // BlockHeight must be 8 for qwords and be in range [1..32] for dwords.
+  static constexpr uint32_t max_trans_load_height_in_elem = 32;
+
+  // If Transformed is true
+  // BlockWidth must be in range [4..16] for bytes and [2..16] for word.
   static constexpr uint32_t max_vnni_load_width_in_elems = 16;
+
+  // BlockHeight must be in range [4..32] for bytes and [2..32] for words.
   static constexpr uint32_t min_vnni_load_height_in_bytes = 4;
 
+  // BlockHeight must not exceed 8.
   static constexpr uint32_t max_store_height_in_elem = 8;
+
+  // BlockWidth must not exceed 64 for bytes, 32 for words, 16 for dwords, and 8
+  // for qwords.
   static constexpr uint32_t max_store_width_in_bytes = 64;
 
+  // BlockHeight must not exceed 32.
+  // BlockWidth * NBlocks must not exceed 64 for bytes, 32 for words, 16 for
+  // dwords, and 8 for qwords.
   static constexpr uint32_t max_load_size_in_bytes = 2048;
+
+  // BlockWidth * BlockHeight * sizeof(T) must not exceed 512.
   static constexpr uint32_t max_store_size_in_bytes = 512;
 
   static constexpr uint32_t special_prefetch_width_in_bytes = 64;
@@ -97,7 +122,7 @@ struct load_store_attr_t<msg_type::block_1d, arch_tag> {
   static constexpr uint32_t max_aligned_load_vec_len = 256;
   static constexpr uint32_t max_store_vec_len = 256;
   static constexpr uint32_t max_aligned_store_vec_len = 256;
-  static constexpr uint32_t max_prefetch_vec_len = 32;
+  static constexpr uint32_t max_prefetch_vec_len = 256;
   static constexpr uint32_t max_channel_num = 16;
 };
 

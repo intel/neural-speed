@@ -320,6 +320,53 @@ __XETLA_API void xetla_prefetch_global(
 #endif
 }
 
+/// 2D USM pointer block prefetch.
+/// Supported platforms: PVC
+/// VISA instruction: lsc_load_block2d.ugm
+///
+/// Prefetches elements located at specified address.
+///
+/// @tparam T is element type.
+/// @tparam BlockWidth is the block width in number of elements.
+/// @tparam BlockHeight is the block height in number of elements.
+/// @tparam NBlocks is the number of blocks.
+/// @tparam L1H is L1 cache hint.
+/// @tparam L2H is L2 cache hint.
+/// @tparam N is the data size
+/// @param Ptr is the surface base address for this operation.
+/// @param SurfaceWidth is the surface width minus 1 in bytes
+/// @param SurfaceHeight is the surface height minus 1 in rows
+/// @param SurfacePitch is the surface pitch minus 1 in bytes
+/// @param X is zero based X-coordinate of the left upper rectangle corner in
+/// number of elements.
+/// @param Y is zero based Y-coordinate of the left upper rectangle corner in
+/// rows.
+///
+template <
+    typename T,
+    int BlockWidth,
+    int BlockHeight = 1,
+    int NBlocks = 1,
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int N = __ESIMD_ENS::detail::get_lsc_block_2d_data_size<
+        T,
+        NBlocks,
+        BlockHeight,
+        BlockWidth,
+        false,
+        false>()>
+__XETLA_API void xetla_prefetch_global(
+    const T* Ptr,
+    unsigned SurfaceWidth,
+    unsigned SurfaceHeight,
+    unsigned SurfacePitch,
+    int X,
+    int Y) {
+  return __ESIMD_ENS::lsc_prefetch_2d(
+      Ptr, SurfaceWidth, SurfaceHeight, SurfacePitch, X, Y);
+}
+
 /// template <typename T, int VS = 1, typename OffsetT,
 ///           typename PropertyListT = empty_properties_t>
 /// void prefetch(const T *p, OffsetT byte_offset,
@@ -358,14 +405,102 @@ __XETLA_API void xetla_prefetch_global(T* p, uint64_t byte_offset = 0) {
 #endif
 }
 
+/// 2D USM pointer block load.
+/// Supported platforms: PVC
+/// VISA instruction: lsc_load_block2d.ugm
+///
+/// Collects elements located at specified address and returns them
+/// as a single \ref simd object.
+///
+/// @tparam T is element type.
+/// @tparam BlockWidth is the block width in number of elements.
+/// @tparam BlockHeight is the block height in number of elements.
+/// @tparam NBlocks is the number of blocks.
+/// @tparam Transposed is the transposed version or not.
+/// @tparam Transformed is apply VNNI transform or not.
+/// @tparam L1H is L1 cache hint.
+/// @tparam L2H is L2 cache hint.
+/// @tparam N is the data size
+/// @param Ptr is the surface base address for this operation.
+/// @param SurfaceWidth is the surface width minus 1 in bytes
+/// @param SurfaceHeight is the surface height minus 1 in rows
+/// @param SurfacePitch is the surface pitch minus 1 in bytes
+/// @param X is zero based X-coordinate of the left upper rectangle corner in
+/// number of elements.
+/// @param Y is zero based Y-coordinate of the left upper rectangle corner in
+/// rows.
+/// @return is a vector of type T and size N, where N is
+///  BlockWidth * BlockHeight * NBlocks, if transformed;
+///  otherwise,
+///  N = roundUpNextMultiple(BlockHeight, 4 / sizeof(T)) *
+///   getNextPowerOf2(BlockWidth) * NBlocks
+///
+template <
+    typename T,
+    int BlockWidth,
+    int BlockHeight = 1,
+    int NBlocks = 1,
+    bool Transposed = false,
+    bool Transformed = false,
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int N = __ESIMD_ENS::detail::get_lsc_block_2d_data_size<
+        T,
+        NBlocks,
+        BlockHeight,
+        BlockWidth,
+        Transposed,
+        Transformed>()>
+__XETLA_API xetla_vector<T, N> xetla_load_global(
+    const T* Ptr,
+    size_t SurfaceWidth,
+    size_t SurfaceHeight,
+    size_t SurfacePitch,
+    int X,
+    int Y) {
+  if constexpr (std::is_same_v<T, bf16>) {
+    auto ret = xetla_load_global<
+        fp16,
+        BlockWidth,
+        BlockHeight,
+        NBlocks,
+        Transposed,
+        Transformed,
+        L1H,
+        L2H>(
+        reinterpret_cast<const fp16*>(Ptr),
+        SurfaceWidth,
+        SurfaceHeight,
+        SurfacePitch,
+        X,
+        Y);
+    return ret.xetla_format<T>();
+  } else if constexpr (BlockWidth * sizeof(T) < sizeof(uint32_t)) {
+    xetla_vector<uint32_t, BlockHeight> byte_offsets =
+        xetla_vector_gen<uint32_t, BlockHeight>(0, SurfacePitch);
+    return xetla_load_global<T, N, BlockWidth, L1H, L2H>(Ptr, byte_offsets);
+  } else {
+    return __ESIMD_ENS::lsc_load_2d<
+        T,
+        BlockWidth,
+        BlockHeight,
+        NBlocks,
+        Transposed,
+        Transformed,
+        gpu::xetla::detail::get_cache_hint(L1H),
+        gpu::xetla::detail::get_cache_hint(L2H),
+        N>(Ptr, SurfaceWidth - 1, SurfaceHeight - 1, SurfacePitch - 1, X, Y);
+  }
+}
+
 /// simd<T, N> block_load(const T* ptr, size_t byte_offset,
 ///                       props={});  // (usm-bl-2)
 /// This function loads a contiguous memory block from address referenced
 /// by USM pointer \p ptr and the given \p byte_offset.
 ///
 /// There may be temporary restrictions depending on L1, L2 cache hints,
-/// See details in the 'Restrictions' section below. The restrictions will be
-/// relaxed in the future.
+/// See details in the 'Restrictions' section below. The restrictions will
+/// be relaxed in the future.
 ///
 /// The parameter \p props specifies the optional compile-time properties
 /// of the type esimd::properties and may include esimd::cache_hint_L1,
@@ -383,7 +518,8 @@ __XETLA_API void xetla_prefetch_global(T* p, uint64_t byte_offset = 0) {
 ///
 /// Restrictions - cache hint imposed - temporary:
 /// If L1 or L2 cache hint is passed, then:
-/// R1: The pointer must be at least 4-byte aligned for elements of 4-bytes or
+/// R1: The pointer must be at least 4-byte aligned for elements of 4-bytes
+/// or
 ///     smaller and 8-byte aligned for 8-byte elements.
 /// R2: The number of elements for 8-byte data: 1, 2, 3, 4, 8, 16, 32, 64;
 ///     for 4-byte data: 1, 2, 3, 4, 8, 16, 32, 64,
@@ -574,6 +710,71 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
 #endif
 }
 
+/// 2D USM pointer block store.
+/// Supported platforms: PVC
+/// VISA instruction: lsc_store_block2d.ugm
+///
+/// Stores elements at specified address.
+///
+/// @tparam T is element type.
+/// @tparam BlockWidth is the block width in number of elements.
+/// @tparam BlockHeight is the block height in number of elements.
+/// @tparam L1H is L1 cache hint.
+/// @tparam L2H is L2 cache hint.
+/// @tparam N is the data size
+/// @param Ptr is the surface base address for this operation.
+/// @param SurfaceWidth is the surface width minus 1 in bytes
+/// @param SurfaceHeight is the surface height minus 1 in rows
+/// @param SurfacePitch is the surface pitch minus 1 in bytes
+/// @param X is zero based X-coordinate of the left upper rectangle corner in
+/// number of elements.
+/// @param Y is zero based Y-coordinate of the left upper rectangle corner in
+/// rows.
+/// @param Vals is a vector to store of type T and size N, where
+///  N = roundUpNextMultiple(BlockHeight, 4 / sizeof(T)) *
+///   getNextPowerOf2(BlockWidth) * NBlocks
+///
+template <
+    typename T,
+    int BlockWidth,
+    int BlockHeight = 1,
+    cache_hint L1H = cache_hint::none,
+    cache_hint L2H = cache_hint::none,
+    int N = __ESIMD_ENS::detail::get_lsc_block_2d_data_size<
+        T,
+        1u,
+        BlockHeight,
+        BlockWidth,
+        false,
+        false>()>
+__XETLA_API void xetla_store_global(
+    T* Ptr,
+    unsigned SurfaceWidth,
+    unsigned SurfaceHeight,
+    unsigned SurfacePitch,
+    int X,
+    int Y,
+    auto&& Vals) {
+  if constexpr (std::is_same_v<T, bf16>) {
+    xetla_store_global<fp16, BlockWidth, BlockHeight, L1H, L2H>(
+        reinterpret_cast<fp16*>(Ptr),
+        SurfaceWidth,
+        SurfaceHeight,
+        SurfacePitch,
+        X,
+        Y,
+        Vals.xetla_format<fp16>());
+  } else {
+    __ESIMD_ENS::lsc_store_2d<
+        T,
+        BlockWidth,
+        BlockHeight,
+        gpu::xetla::detail::get_cache_hint(L1H),
+        gpu::xetla::detail::get_cache_hint(L2H),
+        N>(
+        Ptr, SurfaceWidth - 1, SurfaceHeight - 1, SurfacePitch - 1, X, Y, Vals);
+  }
+}
 /// template <typename T, int N, int VS = 1, typename OffsetT,
 /// 	  typename PropertyListT = empty_properties_t>
 /// void scatter(T *p, simd<OffsetT, N / VS> byte_offsets, simd<T, N> vals,
@@ -951,6 +1152,10 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
     xetla_vector<uint32_t, N> offsets,
     xetla_mask<N> pred = 1) {
   using T = native_type_t<Ty>;
+  DEBUG_INVOKE(
+      dbg_level::core,
+      core::general_1d<gpu_arch::XeHpc, Ty>::
+          template check_restriction<NElts, N>(offsets));
 
   return __ESIMD_ENS::
       lsc_slm_gather<T, NElts, gpu::xetla::detail::get_data_size(DS), N>(
@@ -975,6 +1180,11 @@ __XETLA_API xetla_vector<Ty, N * NElts> xetla_load_local(
 template <typename Ty, int NElts = 1, data_size DS = data_size::default_size>
 __XETLA_API xetla_vector<Ty, NElts> xetla_load_local(uint32_t offset) {
   using T = native_type_t<Ty>;
+  // DEBUG_INVOKE(
+  //     dbg_level::core,
+  //     core::general_1d<gpu_arch::XeHpc, Ty>::template
+  //     check_restriction<NElts>(
+  //         (uint64_t)offset));
 
   return __ESIMD_NS::slm_block_load<T, NElts>(offset);
 }
@@ -1005,6 +1215,10 @@ __XETLA_API void xetla_store_local(
     xetla_vector<Ty, N * NElts> vals,
     xetla_mask<N> pred = 1) {
   using T = native_type_t<Ty>;
+  DEBUG_INVOKE(
+      dbg_level::core,
+      core::general_1d<gpu_arch::XeHpc, Ty>::
+          template check_restriction<NElts, N, uint32_t>(offsets));
 
   __ESIMD_ENS::
       lsc_slm_scatter<T, NElts, gpu::xetla::detail::get_data_size(DS), N>(
