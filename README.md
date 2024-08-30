@@ -1,3 +1,13 @@
+# PROJECT NOT UNDER ACTIVE MANAGEMENT
+This project will no longer be maintained by Intel.  
+
+Intel has ceased development and contributions including, but not limited to, maintenance, bug fixes, new releases, or updates, to this project.  
+
+Intel no longer accepts patches to this project.  
+
+## Please refer to https://github.com/intel/intel-extension-for-pytorch as an alternative
+
+
 # Neural Speed
 
 Neural Speed is an innovative library designed to support the efficient inference of large language models (LLMs) on Intel platforms through the state-of-the-art (SOTA) low-bit quantization powered by [Intel Neural Compressor](https://github.com/intel/neural-compressor). The work is inspired by [llama.cpp](https://github.com/ggerganov/llama.cpp) and further optimized for Intel platforms with our innovations in [NeurIPS' 2023](https://arxiv.org/abs/2311.00502)
