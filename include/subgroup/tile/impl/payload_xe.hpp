@@ -1844,20 +1844,6 @@ struct prefetch_payload_t<
   static constexpr uint32_t num_channel = select_channel(
       std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
 
-  static constexpr uint32_t max_channel =
-      max_prefetch_vec_len / (vector_size * sizeof(prefetch_dtype));
-
-  static constexpr uint32_t select_channel(const uint32_t channel) {
-    return (channel >= load_store_attr::max_channel_num)
-        ? load_store_attr::max_channel_num
-        : channel >= 16 ? 16
-        : channel >= 8  ? 8
-                        : 1;
-  }
-
-  static constexpr uint32_t num_channel = select_channel(
-      std::min(mem_transpose ? block_size_x : block_size_y, max_channel));
-
   // static constexpr uint32_t mem_tile_size_w =
   //     mem_transpose ? tile_size_y : tile_size_x;
   // static constexpr uint32_t mem_tile_size_h =

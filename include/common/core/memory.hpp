@@ -476,24 +476,9 @@ __XETLA_API xetla_vector<T, N> xetla_load_global(
         Y);
     return ret.xetla_format<T>();
   } else if constexpr (BlockWidth * sizeof(T) < sizeof(uint32_t)) {
-    constexpr auto scale_factor = sizeof(uint32_t) / sizeof(T);
-    xetla_vector<uint32_t, N> ret = xetla_load_global<
-        uint32_t,
-        BlockWidth,
-        BlockHeight,
-        NBlocks,
-        Transposed,
-        Transformed,
-        L1H,
-        L2H>(
-        reinterpret_cast<const uint32_t*>(Ptr),
-        SurfaceWidth,
-        SurfaceHeight,
-        SurfacePitch,
-        X / scale_factor,
-        Y);
-    return ret.xetla_format<T>().xetla_select<N, scale_factor>(
-        X % scale_factor);
+    xetla_vector<uint32_t, BlockHeight> byte_offsets =
+        xetla_vector_gen<uint32_t, BlockHeight>(0, SurfacePitch);
+    return xetla_load_global<T, N, BlockWidth, L1H, L2H>(Ptr, byte_offsets);
   } else {
     return __ESIMD_ENS::lsc_load_2d<
         T,

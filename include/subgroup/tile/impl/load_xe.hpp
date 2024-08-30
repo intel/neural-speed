@@ -236,10 +236,10 @@ tile_load(tile_t& tile, payload_t& payload) {
               reg_tmp
                   .xetla_format<
                       native_type_t<load_dtype>,
-                      block_size_x / scale_factor,
+                      ld_blk_width / scale_factor,
                       ld_blk_height>()
                   .xetla_select<
-                      block_size_x / scale_factor,
+                      ld_blk_width / scale_factor,
                       1,
                       ld_blk_size_y,
                       1>(0, 0);
@@ -297,9 +297,9 @@ tile_load(tile_t& tile, payload_t& payload) {
       //   xetla_tdescriptor tdesc = payload_row.row(j);
       auto reg_blk = tile.reg.xetla_select<remained_block_elems * arr_len, 1>(
           processed_elems + j * remained_block_elems);
-      // constexpr uint32_t ld_blk_height = (reg_transpose && trans)
-      //     ? detail::getNextPowerOf2<remained_ld_blk_size_y>()
-      //     : remained_ld_blk_size_y;
+      constexpr uint32_t ld_blk_height = (reg_transpose && trans)
+          ? detail::getNextPowerOf2<remained_ld_blk_size_y>()
+          : remained_ld_blk_size_y;
       constexpr uint32_t tmp_size = ld_blk_height * block_size_x * arr_len;
       xetla_vector<dtype, tmp_size> reg_tmp;
 #pragma unroll
@@ -311,7 +311,7 @@ tile_load(tile_t& tile, payload_t& payload) {
         reg_tmp.xetla_format<native_type_t<load_dtype>>() = xetla_load_global<
             native_type_t<load_dtype>,
             block_size_x / scale_factor,
-            ld_blk_height,
+            remained_ld_blk_size_y,
             arr_len,
             trans,
             mem_transform,
@@ -325,15 +325,6 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.offset_x + offset_x / scale_factor,
             payload.offset_y + num_block_y * block_size_y +
                 ii * remained_ld_blk_size_y);
-        //  xetla_tload_global<
-        // load_dtype,
-        // (ld_blk_height * block_size_x * arr_len / scale_factor),
-        // L1,
-        // L2,
-        // trans,
-        // mem_transform,
-        // arch_tag>(tdesc);
-
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)
               .xetla_format<native_type_t<load_dtype>>() =
