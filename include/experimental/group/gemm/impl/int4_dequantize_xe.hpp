@@ -492,7 +492,6 @@ class gemm_t<
 
     matA_payload_t matA_payload(args.matA_base_desc);
     matB_payload_t matB_payload(args.matB_base_desc);
-    XETLA_PRINT<matB_payload_t>;
     scale_payload_t scale_payload(args.scale_base_desc);
     zero_pt_payload_t zero_pt_payload(args.zero_pt_base_desc);
     matA_prefetch_payload_t matA_prefetch_payload(args.matA_base_desc, sg_idx);
@@ -568,13 +567,13 @@ class gemm_t<
       //     matA, matA_payload);
       // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
       //     matB, matB_payload);
-      subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
-          matB, matB_payload);
-      sycl::ext::oneapi::experimental::printf("\nmatB\n");
-      XETLA_PRINT<decltype(matB)>();
-      gpu::xetla::subgroup::dump_mat_reg(matB.reg, 4/2, 16 * 2);
-      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-      //     scale, scale_payload);
+      // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
+      //     matB, matB_payload);
+      // sycl::ext::oneapi::experimental::printf("\nmatB\n");
+      // XETLA_PRINT<decltype(matB)>();
+      // gpu::xetla::subgroup::dump_mat_reg(matB.reg, 4 / 2, 16 * 2);
+      subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+          scale, scale_payload);
       if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
         // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
         //     zero_pt, zero_pt_payload);
@@ -628,7 +627,15 @@ class gemm_t<
       }
       subgroup::elemwise_cvt(matA_acc, matA);
 
+      sycl::ext::oneapi::experimental::printf("\nmatB\n");
+      XETLA_PRINT<decltype(matB)>();
+      gpu::xetla::subgroup::dump_mat_reg(matB.reg, 4 / 2, 16 * 2);
+      XETLA_PRINT<scale_payload_t>();
       dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
+      sycl::ext::oneapi::experimental::printf("\nscale\n");
+      gpu::xetla::subgroup::dump_mat(scale);
+      sycl::ext::oneapi::experimental::printf("\nmatB_acc\n");
+      gpu::xetla::subgroup::dump_mat(matB_acc);
       if constexpr (is_gemv) {
         tile_mma::mma(
             matAcc,
@@ -657,74 +664,74 @@ class gemm_t<
         }
       }
     }
-    for (uint32_t i = 0; i < compute_stages; i++) {
-      if constexpr (enable_periodic_sync) {
-        if ((i % sync_freq) == 0) {
-          if constexpr (wg_size_x > 1) {
-            nbarrier_a.arrive();
-          }
-          if constexpr (arch_tag >= gpu_arch::XeHpc) {
-            if constexpr (wg_size_y > 1) {
-              nbarrier_b.arrive();
-            }
-          }
-        }
-      }
-      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-      //     matA, matA_payload);
-      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-      //     matB, matB_payload);
-      // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
-      //     matB, matB_payload);
-      // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-      //     scale, scale_payload);
-      if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
-        // subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
-        //     zero_pt, zero_pt_payload);
-      }
-      tile_k_idx++;
-      matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
-      matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
-      if (tile_k_idx % scale_addr_update_freq == 0) {
-        scale_payload.template update_tdesc<update_dir_b>(scale_t::tile_size_y);
-      }
-      if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
-        if (tile_k_idx % zero_pt_addr_update_freq == 0) {
-          zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
-              zero_pt_t::tile_size_y);
-        }
-      }
-      matA_acc_t matA_acc;
-      matB_acc_t matB_acc;
-      if constexpr (is_vnni_tiled_a) {
-        subgroup::vnni_reverse(matA);
-      }
-      subgroup::elemwise_cvt(matA_acc, matA);
+    // for (uint32_t i = 0; i < compute_stages; i++) {
+    //   if constexpr (enable_periodic_sync) {
+    //     if ((i % sync_freq) == 0) {
+    //       if constexpr (wg_size_x > 1) {
+    //         nbarrier_a.arrive();
+    //       }
+    //       if constexpr (arch_tag >= gpu_arch::XeHpc) {
+    //         if constexpr (wg_size_y > 1) {
+    //           nbarrier_b.arrive();
+    //         }
+    //       }
+    //     }
+    //   }
+    //   subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+    //       matA, matA_payload);
+    //   subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+    //       matB, matB_payload);
+    //   // subgroup::tile_load<cache_hint::uncached, cache_hint::uncached>(
+    //   //     matB, matB_payload);
+    //   subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+    //       scale, scale_payload);
+    //   if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
+    //     subgroup::tile_load<cache_hint::cached, cache_hint::cached>(
+    //         zero_pt, zero_pt_payload);
+    //   }
+    //   tile_k_idx++;
+    //   matA_payload.template update_tdesc<update_dir_a>(matA_t::tile_size_x);
+    //   matB_payload.template update_tdesc<update_dir_b>(matB_t::tile_size_y);
+    //   if (tile_k_idx % scale_addr_update_freq == 0) {
+    //     scale_payload.template update_tdesc<update_dir_b>(scale_t::tile_size_y);
+    //   }
+    //   if constexpr (compute_policy::quant_mode != quant_mode::I4_SYM) {
+    //     if (tile_k_idx % zero_pt_addr_update_freq == 0) {
+    //       zero_pt_payload.template update_tdesc<tdesc_update_dir::y_dir>(
+    //           zero_pt_t::tile_size_y);
+    //     }
+    //   }
+    //   matA_acc_t matA_acc;
+    //   matB_acc_t matB_acc;
+    //   if constexpr (is_vnni_tiled_a) {
+    //     subgroup::vnni_reverse(matA);
+    //   }
+    //   subgroup::elemwise_cvt(matA_acc, matA);
 
-      dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
-      if constexpr (is_gemv) {
-        tile_mma::mma(
-            matAcc, matAcc, matC, matB_acc, matA_acc, i == compute_stages - 1);
-      } else {
-        // The result of dequantize should always be (plain) tiled
-        if constexpr (
-            matB_acc_tile_desc_t::register_layout == reg_layout::vnni_tiled)
-          subgroup::vnni_convert(matB_acc);
-        tile_mma::mma(matC, matC, matB_acc, matA_acc);
-      }
-      if constexpr (enable_periodic_sync) {
-        if ((i % sync_freq) == 0) {
-          if constexpr (wg_size_x > 1) {
-            nbarrier_a.wait();
-          }
-          if constexpr (arch_tag >= gpu_arch::XeHpc) {
-            if constexpr (wg_size_y > 1) {
-              nbarrier_b.wait();
-            }
-          }
-        }
-      }
-    }
+    //   dequantize(matB_acc, matB, scale, zero_pt, dequantize_args);
+    //   if constexpr (is_gemv) {
+    //     tile_mma::mma(
+    //         matAcc, matAcc, matC, matB_acc, matA_acc, i == compute_stages - 1);
+    //   } else {
+    //     // The result of dequantize should always be (plain) tiled
+    //     if constexpr (
+    //         matB_acc_tile_desc_t::register_layout == reg_layout::vnni_tiled)
+    //       subgroup::vnni_convert(matB_acc);
+    //     tile_mma::mma(matC, matC, matB_acc, matA_acc);
+    //   }
+    //   if constexpr (enable_periodic_sync) {
+    //     if ((i % sync_freq) == 0) {
+    //       if constexpr (wg_size_x > 1) {
+    //         nbarrier_a.wait();
+    //       }
+    //       if constexpr (arch_tag >= gpu_arch::XeHpc) {
+    //         if constexpr (wg_size_y > 1) {
+    //           nbarrier_b.wait();
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
   }
 
  private:

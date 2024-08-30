@@ -217,8 +217,8 @@ tile_load(tile_t& tile, payload_t& payload) {
         XETLA_PRINT<block_size_y>();
         XETLA_PRINT<ld_blk_size_y>();
         XETLA_PRINT<block_size_x>();
-        XETLA_PRINT<(trans ? ld_blk_size_y : block_size_x) / scale_factor>();
-        XETLA_PRINT<(trans ? block_size_x : ld_blk_size_y)>();
+        XETLA_PRINT<ld_blk_width / scale_factor>();
+        XETLA_PRINT<ld_blk_height>();
         XETLA_PRINT<(arr_len)>();
         XETLA_PRINT<mem_transform>();
         XETLA_PRINT<load_dtype>();
@@ -246,26 +246,7 @@ tile_load(tile_t& tile, payload_t& payload) {
             payload.surface_pitch,
             int(payload.offset_x + address_offset_x),
             int(payload.offset_y + address_offset_y));
-        dump_mat_reg(reg_tmp.xetla_format<native_type_t<load_dtype>>(), 2, 16);
-
-
-        dump_mat_reg(xetla_load_global<
-            uint32_t,
-            4,
-            2,
-            1,
-            true,
-            false,
-            L1,
-            L2>(
-            reinterpret_cast<const uint32_t*>(
-                payload.base_ptr),
-            payload.surface_width,
-            payload.surface_height,
-            payload.surface_pitch,
-            payload.offset_x + address_offset_x,
-            payload.offset_y + address_offset_y), 1, 8);
-
+        dump_mat_reg(reg_tmp, 1, tmp_size);
 
         if constexpr (reg_transpose && trans) {
           reg_blk.xetla_select<load_elems, 1>(ii * load_elems)

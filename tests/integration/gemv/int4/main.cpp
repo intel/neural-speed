@@ -39,7 +39,7 @@ class test_col_major_1 {
   static constexpr size_t sg_m = 16;
   static constexpr size_t sg_n = 16;
   static constexpr size_t sg_k = 32;
-  static constexpr size_t dequant_s = 128;
+  static constexpr size_t dequant_s = 32;
   static constexpr quant_mode quant_mode = quant_mode::I4_SYM;
 
   static constexpr size_t local_kslicing = 1;
