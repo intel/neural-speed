@@ -153,6 +153,7 @@ model_name_map["baichuan2-13b"]="baichuan-inc/Baichuan2-13B-Chat"
 model_name_map["baichuan-13b"]="baichuan-inc/Baichuan-13B-Chat"
 model_name_map["mistral-7b"]="mistralai/Mistral-7B-v0.1"
 model_name_map["qwen-7b"]="Qwen/Qwen-7B-Chat"
+model_name_map["qwen2-7b"]="Qwen/Qwen2-7B"
 model_name_map["magicoder"]="ise-uiuc/Magicoder-S-DS-6.7B"
 model_name_map["whisper"]="openai/whisper-tiny"
 model_name_map["phi2"]="microsoft/phi-2"
@@ -292,6 +293,10 @@ function main() {
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
         infer_cmd="./build/bin/run_qwen"
+    elif [[ "${model}" == "qwen2-7b" ]]; then
+        quant_script="./build/bin/quant_qwen"
+        convert_script="${convert_script}/convert_qwen.py"
+        infer_cmd="./build/bin/run_qwen"
     elif [[ "${model}" == "qwen-1_5" ]]; then
         quant_script="./build/bin/quant_qwen"
         convert_script="${convert_script}/convert_qwen.py"
