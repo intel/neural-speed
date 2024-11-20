@@ -685,7 +685,7 @@ static inline bool ne_are_same_shape(const struct ne_tensor* t0, const struct ne
   return (t0->ne[0] == t1->ne[0]) && (t0->ne[1] == t1->ne[1]) && (t0->ne[2] == t1->ne[2]) && (t0->ne[3] == t1->ne[3]);
 }
 
-// check if t1 can be represented as a repeatition of t0
+// check if t1 can be represented as a repetition of t0
 static inline bool ne_can_repeat(const struct ne_tensor* t0, const struct ne_tensor* t1) {
   static_assert(NE_MAX_DIMS == 4, "NE_MAX_DIMS is not 4 - update this function");
 
